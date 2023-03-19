@@ -1,0 +1,13 @@
+cmcApiKey:
+exchanges:
+  - name: binance
+    initParams:
+      apiKey:
+      secret:
+  - name: okex
+    initParams:
+      apiKey:
+      secret:
+      password:
+erc20:
+  addresses: []

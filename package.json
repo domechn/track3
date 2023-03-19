@@ -1,0 +1,26 @@
+{
+  "name": "asset-statistics",
+  "version": "0.1.0",
+  "devDependencies": {
+    "@types/big.js": "^6.1.6",
+    "@types/bluebird": "^3.5.38",
+    "@types/color-diff": "^1.2.1",
+    "@types/got": "^9.6.12",
+    "@types/lodash": "^4.14.191",
+    "@types/node": "^18.14.0",
+    "@types/yaml": "^1.9.7",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "big.js": "^6.2.1",
+    "bluebird": "^3.7.2",
+    "ccxt": "^2.8.24",
+    "chart.js": "^3.9.1",
+    "chartjs-node-canvas": "^4.1.6",
+    "chartjs-plugin-datalabels": "^2.2.0",
+    "color-diff": "^1.2.0",
+    "got": "^11.8.0",
+    "lodash": "^4.17.21",
+    "yaml": "^2.2.1"
+  }
+}
