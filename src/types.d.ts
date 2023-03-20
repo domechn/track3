@@ -17,8 +17,17 @@ export type CexConfig = {
 	}[]
 }
 
-export type ERC20Config = {
-	erc20: {
-		addresses: string[]
-	}
+type Addresses = {
+	addresses?: string[]
+}
+
+export type TokenConfig = {
+	erc20: Addresses
+	btc: Addresses
+	sol: Addresses
+	doge: Addresses
+	others: {
+		symbol: string
+		amount: number
+	}[]
 }

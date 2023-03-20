@@ -1,6 +1,6 @@
 import bluebird from 'bluebird'
 import got from 'got'
-import { Analyzer, Coin, ERC20Config } from './types'
+import { Analyzer, Coin, TokenConfig } from './types'
 import _ from 'lodash'
 
 type DeBankAssetResp = {
@@ -9,10 +9,10 @@ type DeBankAssetResp = {
 }
 
 export class ERC20Analyzer implements Analyzer {
-	private readonly config: ERC20Config
+	private readonly config: Pick<TokenConfig, 'erc20'>
 	private readonly queryUrl = "https://api.debank.com/asset/classify"
 
-	constructor(config: ERC20Config) {
+	constructor(config: Pick<TokenConfig, 'erc20'>) {
 		this.config = config
 	}
 
@@ -26,7 +26,7 @@ export class ERC20Analyzer implements Analyzer {
 		return _([data.coin_list, data.token_list]).flatten().value()
 	}
 	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await bluebird.map(this.config.erc20.addresses, async addr => this.query(addr))
+		const coinLists = await bluebird.map(this.config.erc20.addresses || [], async addr => this.query(addr))
 		return _(coinLists).flatten().value()
 	}
 }

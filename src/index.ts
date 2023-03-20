@@ -6,22 +6,40 @@ import { ERC20Analyzer } from './erc20'
 import { calculateTotalValue, combineCoinLists } from './utils/coins'
 import { CoinGecko } from './price'
 import { drawPie } from './utils/chart'
+import { BTCAnalyzer } from './btc'
+import { SOLAnalyzer } from './sol'
+import bluebird from 'bluebird'
+import { OthersAnalyzer } from './others'
+
+const STABLE_COIN = ["USDT","USDC","BUSD","DAI","TUSD","PAX"]
 
 async function main() {
 	const configStr = await fs.readFile('config.yaml', 'utf8')
 	const config = yaml.parse(configStr)
-	const ca = new CexAnalyzer(config)
-	const cp = await ca.loadPortfolio()
 
-	const ea = new ERC20Analyzer(config)
-	const ep = await ea.loadPortfolio()
+	const coinLists = await bluebird.map([CexAnalyzer, ERC20Analyzer, BTCAnalyzer, SOLAnalyzer, OthersAnalyzer], async ana => {
+		const a = new ana(config)
+		return a.loadPortfolio()
+	}, {
+		concurrency: 3
+	})
 
-
-	const assets = combineCoinLists([cp, ep])
+	const assets = combineCoinLists(coinLists)
 	const cc = new CoinGecko()
 	const priceMap = await cc.queryPrices(_(assets).map("symbol").value())
 
-	const totals = calculateTotalValue(assets, priceMap)
+	let lastAssets = assets
+	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
+	if (groupUSD) {
+		const usdValue = _(assets).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
+		lastAssets = _(assets).remove(c => !STABLE_COIN.includes(c.symbol)).value()
+		lastAssets.push({
+			symbol: "USDT",
+			amount: usdValue,
+		})
+	}
+
+	const totals = calculateTotalValue(lastAssets, priceMap)
 	drawPie(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), "pie.svg")
 }
 
