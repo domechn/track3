@@ -48,7 +48,7 @@ function generateRandomColors(size: number): { R: number; G: number; B: number }
 }
 
 
-export async function drawPie(data: Datum[], savePath: string) {
+export async function drawDoughnut(data: Datum[], savePath: string) {
 	const width = 500
 	const height = 500
 

@@ -5,7 +5,7 @@ import { CexAnalyzer } from './cex'
 import { ERC20Analyzer } from './erc20'
 import { calculateTotalValue, combineCoinLists } from './utils/coins'
 import { CoinGecko } from './price'
-import { drawPie } from './utils/chart'
+import { drawDoughnut } from './utils/chart'
 import { BTCAnalyzer } from './btc'
 import { SOLAnalyzer } from './sol'
 import bluebird from 'bluebird'
@@ -41,7 +41,7 @@ async function main() {
 	}
 
 	const totals = calculateTotalValue(lastAssets, priceMap)
-	drawPie(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), "assets.svg")
+	drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), "assets.svg")
 }
 
 main()
