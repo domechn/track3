@@ -14,7 +14,7 @@ export class DOGEAnalyzer implements Analyzer {
 
 	private async query(address: string): Promise<number> { 
 		const resp = await got.get(this.queryUrl + address).json() as { balance: number}
-		const amount = resp.balance
+		const amount = _(resp.balance).toNumber()
 		return amount
 	}
 

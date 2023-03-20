@@ -10,6 +10,7 @@ import { BTCAnalyzer } from './btc'
 import { SOLAnalyzer } from './sol'
 import bluebird from 'bluebird'
 import { OthersAnalyzer } from './others'
+import { DOGEAnalyzer } from './doge'
 
 const STABLE_COIN = ["USDT","USDC","BUSD","DAI","TUSD","PAX"]
 
@@ -17,7 +18,7 @@ async function main() {
 	const configStr = await fs.readFile('config.yaml', 'utf8')
 	const config = yaml.parse(configStr)
 
-	const coinLists = await bluebird.map([CexAnalyzer, ERC20Analyzer, BTCAnalyzer, SOLAnalyzer, OthersAnalyzer], async ana => {
+	const coinLists = await bluebird.map([CexAnalyzer, ERC20Analyzer, BTCAnalyzer, SOLAnalyzer, DOGEAnalyzer, OthersAnalyzer], async ana => {
 		const a = new ana(config)
 		return a.loadPortfolio()
 	}, {
@@ -40,7 +41,7 @@ async function main() {
 	}
 
 	const totals = calculateTotalValue(lastAssets, priceMap)
-	drawPie(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), "pie.svg")
+	drawPie(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), "assets.svg")
 }
 
 main()

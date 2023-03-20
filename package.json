@@ -1,6 +1,10 @@
 {
   "name": "asset-statistics",
   "version": "0.1.0",
+  "scripts": {
+    "build": "npx tsc",
+    "gen": "node dist/index.js"
+  },
   "devDependencies": {
     "@types/big.js": "^6.1.6",
     "@types/bluebird": "^3.5.38",
