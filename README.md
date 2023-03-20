@@ -31,5 +31,5 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 - https://blockchain.info
 - https://dogechain.info
 - https://debank.com
-- https://solscan.io/
-- https://www.coingecko.com/
+- https://solscan.io
+- https://www.coingecko.com
