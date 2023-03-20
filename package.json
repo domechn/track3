@@ -18,6 +18,7 @@
     "chart.js": "^3.9.1",
     "chartjs-node-canvas": "^4.1.6",
     "chartjs-plugin-datalabels": "^2.2.0",
+    "coingecko-api-v3": "^0.0.22",
     "color-diff": "^1.2.0",
     "got": "^11.8.0",
     "lodash": "^4.17.21",

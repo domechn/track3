@@ -4,7 +4,7 @@ import fs from "fs/promises"
 import { CexAnalyzer } from './cex'
 import { ERC20Analyzer } from './erc20'
 import { calculateTotalValue, combineCoinLists } from './utils/coins'
-import { CoinMarketCap } from './price'
+import { CoinGecko } from './price'
 import { drawPie } from './utils/chart'
 
 async function main() {
@@ -18,8 +18,8 @@ async function main() {
 
 
 	const assets = combineCoinLists([cp, ep])
-	const cmc = new CoinMarketCap(_(config).get("cmcApiKey"))
-	const priceMap = await cmc.queryPrices(_(assets).map("symbol").value())
+	const cc = new CoinGecko()
+	const priceMap = await cc.queryPrices(_(assets).map("symbol").value())
 
 	const totals = calculateTotalValue(assets, priceMap)
 	drawPie(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), "pie.svg")
