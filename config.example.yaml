@@ -1,4 +1,5 @@
-cmcApiKey:
+configs:
+  groupUSD: true # combine all USD stablecoins into USDT
 exchanges:
   - name: binance
     initParams:
@@ -10,4 +11,19 @@ exchanges:
       secret:
       password:
 erc20:
-  addresses: []
+  addresses:
+    - "0xb5dd722b87c129dd9e18bd53122c2e1d957cae43"
+    - ""
+btc:
+  addresses:
+    - ""
+sol:
+  addresses:
+    - ""
+doge:
+  addresses:
+    - ""
+
+others:
+  - symbol: USDT
+    amount: 1000
