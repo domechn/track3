@@ -3,11 +3,11 @@ configs:
 exchanges:
   - name: binance
     initParams:
-      apiKey:
+      apiKey: # readonly api key
       secret:
   - name: okex
     initParams:
-      apiKey:
+      apiKey: # readonly api key
       secret:
       password:
 erc20:
