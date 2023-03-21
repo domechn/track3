@@ -9,7 +9,7 @@ Show your crypto currency assets in centralized exchanges and web3 wallets.
 
 ## Configuration
 
-See Details in [config.example.yaml](./config.example.yaml).
+Create a `config.yaml`, for specific fields, see details in [config.example.yaml](./config.example.yaml).
 
 ## Usage
 
