@@ -24,6 +24,10 @@ yarn gen
 
 ![out](./assets.svg)
 
+## Known Issues
+
+- [ ] Cannot list assets in earn wallet in OKX
+
 ## Thanks
 
 Thanks for these platform who provide powerful APIs without API Key. Fuck API Key.
