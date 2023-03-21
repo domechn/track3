@@ -12,7 +12,6 @@ exchanges:
       password:
 erc20:
   addresses:
-    - "0xb5dd722b87c129dd9e18bd53122c2e1d957cae43"
     - ""
 btc:
   addresses:
