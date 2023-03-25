@@ -1,3 +1,11 @@
+export type CommandConfig = {
+	width: number
+	height: number
+	output: string
+	'show-value': boolean
+	config: string
+}
+
 export type Coin = {
 	symbol: string
 	amount: number

@@ -9,6 +9,7 @@
     "@types/big.js": "^6.1.6",
     "@types/bluebird": "^3.5.38",
     "@types/color-diff": "^1.2.1",
+    "@types/command-line-args": "^5.2.0",
     "@types/got": "^9.6.12",
     "@types/lodash": "^4.14.191",
     "@types/node": "^18.14.0",
@@ -24,6 +25,7 @@
     "chartjs-plugin-datalabels": "^2.2.0",
     "coingecko-api-v3": "^0.0.22",
     "color-diff": "^1.2.0",
+    "command-line-args": "^5.2.1",
     "got": "^11.8.0",
     "lodash": "^4.17.21",
     "yaml": "^2.2.1"

@@ -1,5 +1,5 @@
 import * as fs from 'fs/promises'
-import _, { random } from 'lodash'
+import _, { random, size } from 'lodash'
 import { ChartCallback, ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import { ChartConfiguration, Chart } from 'chart.js'
 import ChartDataLabels, { Context } from 'chartjs-plugin-datalabels'
@@ -48,10 +48,7 @@ function generateRandomColors(size: number): { R: number; G: number; B: number }
 }
 
 
-export async function drawDoughnut(data: Datum[], savePath: string) {
-	const width = 500
-	const height = 500
-
+export async function drawDoughnut(data: Datum[], width: number, height: number, savePath: string, title?: string) {
 	let newData = []
 	// only keep top 10
 	if (data.length > 10) {
@@ -66,6 +63,10 @@ export async function drawDoughnut(data: Datum[], savePath: string) {
 	const bgColor = _(generateRandomColors(_(newData).size())).map(color => `rgba(${color.R}, ${color.G}, ${color.B}, 1)`).value()
 
 	const totalValue = _(newData).sumBy('value')
+	const isSmall = height < 300
+	const labelFontSize = isSmall ? height / 25 :undefined
+	const labelBoxSize = isSmall ? height / 10 : undefined
+	const dataLabelFontSize = isSmall ? height / 35 : undefined
 
 	Chart.register(ChartDataLabels)
 	const configuration: ChartConfiguration = {
@@ -82,11 +83,24 @@ export async function drawDoughnut(data: Datum[], savePath: string) {
 		},
 		options: {
 			plugins: {
+				title: {
+					display: !!title,
+					text: title
+				},
+				legend: {
+					labels: {
+						boxWidth: labelBoxSize,
+						font: {
+							size: labelFontSize,
+						}
+					}
+				},
 				datalabels: {
 					// anchor:'end',
 					color: 'white',
 					font: {
-						weight: 'bold'
+						weight: 'bold',
+						size: dataLabelFontSize,
 					},
 					display: 'auto',
 					// offset: 20,
