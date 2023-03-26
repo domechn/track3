@@ -15,6 +15,8 @@ export interface Analyzer {
 	loadPortfolio(): Promise<Coin[]>
 }
 
+export interface Database { }
+
 export type CexConfig = {
 	exchanges: {
 		name: string, initParams: {
@@ -38,4 +40,15 @@ export type TokenConfig = {
 		symbol: string
 		amount: number
 	}[]
+}
+
+export type DatabaseConfig = {
+	notion?: {
+		token: string
+		databaseId: string
+	}
+}
+
+export type CoinModel = Coin & {
+	value: number
 }

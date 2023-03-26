@@ -1,4 +1,4 @@
-import { Analyzer, Coin, TokenConfig } from './types'
+import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
 
 export class OthersAnalyzer implements Analyzer {

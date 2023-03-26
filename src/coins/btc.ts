@@ -1,5 +1,5 @@
 import bluebird from 'bluebird'
-import { Analyzer, Coin, TokenConfig } from './types'
+import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
 import got from 'got'
 

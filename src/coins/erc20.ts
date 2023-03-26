@@ -1,6 +1,6 @@
 import bluebird from 'bluebird'
 import got from 'got'
-import { Analyzer, Coin, TokenConfig } from './types'
+import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
 
 type DeBankAssetResp = {

@@ -1,6 +1,6 @@
 import _ from "lodash"
 import ex from "ccxt"
-import { Analyzer, CexConfig, Coin } from './types'
+import { Analyzer, CexConfig, Coin } from '../types'
 import bluebird from 'bluebird'
 
 // TODO: support earning wallet in okx

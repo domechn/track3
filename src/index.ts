@@ -1,18 +1,19 @@
 import _ from "lodash"
 import yaml from 'yaml'
 import fs from "fs/promises"
-import { CexAnalyzer } from './cex'
-import { ERC20Analyzer } from './erc20'
+import { CexAnalyzer } from './coins/cex'
+import { ERC20Analyzer } from './coins/erc20'
 import { calculateTotalValue, combineCoinLists } from './utils/coins'
 import { CoinGecko } from './price'
 import { drawDoughnut } from './utils/chart'
-import { BTCAnalyzer } from './btc'
-import { SOLAnalyzer } from './sol'
+import { BTCAnalyzer } from './coins/btc'
+import { SOLAnalyzer } from './coins/sol'
 import bluebird from 'bluebird'
-import { OthersAnalyzer } from './others'
-import { DOGEAnalyzer } from './doge'
+import { OthersAnalyzer } from './coins/others'
+import { DOGEAnalyzer } from './coins/doge'
 import commandLineArgs, { OptionDefinition } from 'command-line-args'
-import { CexConfig, Coin, CommandConfig, TokenConfig } from './types'
+import { CexConfig, Coin, CommandConfig, DatabaseConfig, TokenConfig } from './types'
+import { NotionStore } from './database/notion'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -53,16 +54,6 @@ async function loadPortfolios(config: CexConfig & TokenConfig): Promise<Coin[]> 
 		concurrency: 3
 	})
 	const assets = combineCoinLists(coinLists)
-	// const assets = [{
-	// 	symbol: "BTC",
-	// 	amount: 0.0001,
-	// }, {
-	// 	symbol: "ETH",
-	// 	amount: 0.001,
-	// }, {
-	// 	symbol: "USDT",
-	// 	amount: 10,
-	// }]
 	return assets
 }
 
@@ -75,11 +66,6 @@ async function main() {
 
 	const cc = new CoinGecko()
 	const priceMap = await cc.queryPrices(_(assets).map("symbol").value())
-	// const priceMap = {
-	// 	"BTC": 50000,
-	// 	"ETH": 3000,
-	// 	"USDT": 1,
-	// }
 
 	let lastAssets = assets
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
@@ -96,6 +82,21 @@ async function main() {
 	const sum = _(totals).map(c => c.usdValue).sum()
 	const title = commandVal['show-value'] ? `Total: $${sum.toFixed(2)}` : undefined
 	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, "assets.svg", title)
+
+	await saveToDatabase(totals, _(config).get('database'))
+}
+
+async function saveToDatabase(coins: (Coin & { usdValue: number })[], config?: DatabaseConfig) {
+	if (!config?.notion) {
+		console.info("No database config, skip saving to database")
+		return
+	}
+	const ns = new NotionStore(config!)
+	await ns.saveToDatabase(_(coins).map(t => ({
+		symbol: t.symbol,
+		amount: t.amount,
+		value: t.usdValue,
+	})).value())
 }
 
 main()

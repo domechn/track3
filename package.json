@@ -17,6 +17,7 @@
     "typescript": "^4.9.5"
   },
   "dependencies": {
+    "@notionhq/client": "^2.2.3",
     "big.js": "^6.2.1",
     "bluebird": "^3.7.2",
     "ccxt": "^2.8.24",
