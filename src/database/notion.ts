@@ -49,7 +49,7 @@ export class NotionStore implements Database {
 				rich_text: {}
 			},
 			AmountOthers: {
-				number: {}
+				rich_text: {}
 			},
 			ValueOthers: {
 				number: {}
@@ -97,7 +97,11 @@ export class NotionStore implements Database {
 				}]
 			},
 			AmountOthers: {
-				number: _(others).sumBy(m => m.amount),
+				rich_text: [{
+					text: {
+						content: "N/A"
+					}
+				}],
 			},
 			ValueOthers: {
 				number: _(others).sumBy(m => m.value),
@@ -142,6 +146,11 @@ export class NotionStore implements Database {
 		})
 	}
 
+	// save data to database
+	// for the latest data, we always save it to the same page and update the page's name to a new page
+	// why do this?
+	// because for some chart plugins, like grid, it always sort the pages by id ( or creation time ), and it is hard to get latest page by using formula they provide
+	// but in this way it is easy to get latest page by using index 1, because the latest page id is always the smallest, and the order is 1
 	async saveToDatabase(models: CoinModel[]) {
 		const queryResp = await this.client.databases.query({
 			database_id: this.databaseId,
