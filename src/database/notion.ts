@@ -1,6 +1,5 @@
 import { Client } from '@notionhq/client'
-import Big from 'big.js'
-import _, { random } from 'lodash'
+import _ from 'lodash'
 import { CoinModel, Database, DatabaseConfig } from '../types'
 
 export class NotionStore implements Database {
@@ -54,6 +53,9 @@ export class NotionStore implements Database {
 			ValueOthers: {
 				number: {}
 			},
+			ZTotal: {
+				number: {}
+			}
 		}
 	}
 
@@ -67,6 +69,7 @@ export class NotionStore implements Database {
 	private getLatestPageProperties(models: CoinModel[]) {
 		const top10 = _(models).sortBy(m => m.value).reverse().take(10).value()
 		const others = _(models).sortBy(m => m.value).reverse().drop(10).value()
+		const totalValue = _(models).sumBy(m => m.value)
 		const top10Props = _(top10).map((m, idx) => {
 			const index = this.getIndex(idx + 1)
 			const topKey = `Top` + index
@@ -123,6 +126,9 @@ export class NotionStore implements Database {
 			},
 			...top10Props,
 			...othersProps,
+			ZTotal: {
+				number: totalValue,
+			}
 		}
 	}
 
