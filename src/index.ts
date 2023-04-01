@@ -81,7 +81,7 @@ async function main() {
 	const totals = calculateTotalValue(lastAssets, priceMap)
 	const sum = _(totals).map(c => c.usdValue).sum()
 	const title = commandVal['show-value'] ? `Total: $${sum.toFixed(2)}` : undefined
-	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, "assets.svg", title)
+	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, commandVal.output, title)
 
 	await saveToDatabase(totals, _(config).get('database'))
 }

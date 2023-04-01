@@ -19,9 +19,20 @@ export class CexAnalyzer implements Analyzer {
 		}).value()
 	}
 
+	private getAccountTypes(exchangeName: string): { type?: string }[] {
+		switch (exchangeName.toLowerCase()) {
+			case "binance":
+				return [{ type: 'future' }, { type: 'delivery' }, { type: 'spot' }, { type: "funding" }, { type: 'savings' }]
+			case "okex" || "okx":
+				return [{}, { type: "funding" }]
+			default:
+				return [{}]
+		}
+	}
+
 	async loadPortfolio(): Promise<Coin[]> {
 		// balance type: main | funding
-		const clientAndParams = _(this.exchanges).map(ex => _([{}, { type: "funding" }]).map(param => ({
+		const clientAndParams = _(this.exchanges).map(ex => _(this.getAccountTypes(ex.name)).map(param => ({
 			client: ex,
 			param
 		})).value()).flatten().value()
@@ -29,6 +40,8 @@ export class CexAnalyzer implements Analyzer {
 			const portfolio = await cap.client.fetchTotalBalance(cap.param)
 			// filter all keys are capital
 			return filterCoinsInPortfolio(portfolio)
+		}, {
+			concurrency: 2,
 		})
 
 		return _(coinLists).flatten().value()
@@ -38,17 +51,18 @@ export class CexAnalyzer implements Analyzer {
 export function filterCoinsInPortfolio(portfolio: { [k: string]: number }): Coin[] {
 	return _(portfolio).keys()
 		.filter(k => portfolio[k] > 0) // amount > 0
+		.filter(k => !!coinSymbolHandler(k))
 		.map(k => ({
 			symbol: coinSymbolHandler(k),
 			amount: portfolio[k]
 		} as Coin)).value()
 }
 
-function coinSymbolHandler(name: string): string {
+function coinSymbolHandler(name: string): string | undefined {
 	const ld = "LD"
 	// LD in binance is for ean
-	if (name.startsWith(ld)) {
-		return name.slice(ld.length)
+	if (name.startsWith(ld) && name.length > ld.length + 1) {
+		return
 	}
 	if (name == "BETH") {
 		return "ETH"
