@@ -19,7 +19,7 @@ export class NotionStore implements Database {
 			auth: this.config.notion?.token,
 		})
 	}
-	private getIndex(i: number) : string{
+	private getIndex(i: number): string {
 		return i > 9 ? `${i}` : `0${i}`
 	}
 
@@ -203,5 +203,49 @@ export class NotionStore implements Database {
 
 			await this.updateLatestPage(pageId, models)
 		}
+	}
+
+	async queryDatabase(recordSize = 30): Promise<CoinModel[][]> {
+		const queryResp = await this.client.databases.query({
+			database_id: this.databaseId,
+			filter: {
+				property: "Name",
+				title: {
+					contains: "Assets Status",
+				}
+			},
+			sorts: [
+				{
+					property: "Date",
+					direction: "descending",
+				}
+			],
+			page_size: recordSize,
+		})
+
+		return _(queryResp.results).map('properties').map((r: { [k: string]: { rich_text?: { text: { content: string } }[], number?: number } }) => {
+			const tops = _(r).pickBy((v, k) => k.startsWith("Top")).map((v, k) => ({
+				key: k,
+				value: v.rich_text![0].text.content,
+			})).sortBy('key').value()
+			const amounts = _(r).pickBy((v, k) => k.startsWith("Amount")).map((v, k) => ({
+				key: k,
+				value: v.number!,
+			})).sortBy('key').value()
+			const values = _(r).pickBy((v, k) => k.startsWith("Value")).map((v, k) => ({
+				key: k,
+				value: v.number!,
+			})).sortBy('key').value()
+
+			const topModels = _(tops).map((symbol, idx) => {
+				return {
+					symbol: symbol.value,
+					amount: amounts[idx].value,
+					value: values[idx].value,
+				}
+			}).value()
+
+			return topModels as CoinModel[]
+		}).value() as unknown as CoinModel[][]
 	}
 }

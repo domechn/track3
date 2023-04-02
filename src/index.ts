@@ -12,8 +12,9 @@ import bluebird from 'bluebird'
 import { OthersAnalyzer } from './coins/others'
 import { DOGEAnalyzer } from './coins/doge'
 import commandLineArgs, { OptionDefinition } from 'command-line-args'
-import { CexConfig, Coin, CommandConfig, DatabaseConfig, TokenConfig } from './types'
+import { CexConfig, Coin, CommandConfig, Database, DatabaseConfig, TokenConfig } from './types'
 import { NotionStore } from './database/notion'
+import { AssetsPercentage } from './chart/percentage'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -83,20 +84,36 @@ async function main() {
 	const title = commandVal['show-value'] ? `Total: $${sum.toFixed(2)}` : undefined
 	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, commandVal.output, title)
 
-	await saveToDatabase(totals, _(config).get('database'))
+	const ns = new NotionStore(config.database)
+
+	await saveToDatabase(ns, totals, _(config).get('database'))
+	await generateChartHtml(ns, commandVal.width, commandVal.height, commandVal.output, commandVal['show-value'])
 }
 
-async function saveToDatabase(coins: (Coin & { usdValue: number })[], config?: DatabaseConfig) {
+async function saveToDatabase(db: Database, coins: (Coin & { usdValue: number })[], config?: DatabaseConfig) {
 	if (!config?.notion) {
 		console.info("No database config, skip saving to database")
 		return
 	}
-	const ns = new NotionStore(config!)
-	await ns.saveToDatabase(_(coins).map(t => ({
+	await db.saveToDatabase(_(coins).map(t => ({
 		symbol: t.symbol,
 		amount: t.amount,
 		value: t.usdValue,
 	})).value())
+}
+
+async function generateChartHtml(db: Database, width: number, height: number, output: string, showValue?: boolean) {
+	const ap = new AssetsPercentage(width, height, showValue)
+	const data = await db.queryDatabase()
+
+	if (data.length === 0) {
+		console.info("No data in database, skip generating chart")
+		return
+	}
+	const latestModels = data[0]
+	const historicalModels = data.slice(1, -1)
+
+	await ap.renderToFile(latestModels, historicalModels, output)
 }
 
 main()

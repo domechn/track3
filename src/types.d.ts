@@ -15,7 +15,11 @@ export interface Analyzer {
 	loadPortfolio(): Promise<Coin[]>
 }
 
-export interface Database { }
+export interface Database {
+	saveToDatabase(models: CoinModel[]): Promise<void>
+
+	queryDatabase(recordSize = 30): Promise<CoinModel[][]>
+}
 
 export type CexConfig = {
 	exchanges: {
