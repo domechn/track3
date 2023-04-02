@@ -19,8 +19,12 @@ export class NotionStore implements Database {
 			auth: this.config.notion?.token,
 		})
 	}
-	private getIndex(i: number) {
+	private getIndex(i: number) : string{
 		return i > 9 ? `${i}` : `0${i}`
+	}
+
+	private prettyNumber(val: number): number {
+		return parseFloat(val.toFixed(2))
 	}
 
 	private getDatabaseProperties() {
@@ -29,10 +33,14 @@ export class NotionStore implements Database {
 				rich_text: {}
 			},
 			[`Amount${this.getIndex(i)}`]: {
-				number: {}
+				number: {
+					format: "number_with_commas"
+				}
 			},
 			[`Value${this.getIndex(i)}`]: {
-				number: {}
+				number: {
+					format: "number_with_commas"
+				}
 			},
 		})).reduce((acc, cur) => _.merge(acc, cur), {})
 		return {
@@ -51,10 +59,14 @@ export class NotionStore implements Database {
 				rich_text: {}
 			},
 			ValueOthers: {
-				number: {}
+				number: {
+					format: "number_with_commas" as any
+				}
 			},
 			ZTotal: {
-				number: {}
+				number: {
+					format: "number_with_commas" as any
+				}
 			}
 		}
 	}
@@ -87,7 +99,7 @@ export class NotionStore implements Database {
 					number: m.amount,
 				},
 				[valueKey]: {
-					number: m.value,
+					number: this.prettyNumber(m.value),
 				},
 			}
 		}).reduce((acc, cur) => _.merge(acc, cur), {})
@@ -107,7 +119,7 @@ export class NotionStore implements Database {
 				}],
 			},
 			ValueOthers: {
-				number: _(others).sumBy(m => m.value),
+				number: this.prettyNumber(_(others).sumBy(m => m.value)),
 			},
 		}
 
@@ -127,7 +139,7 @@ export class NotionStore implements Database {
 			...top10Props,
 			...othersProps,
 			ZTotal: {
-				number: totalValue,
+				number: this.prettyNumber(totalValue),
 			}
 		}
 	}
