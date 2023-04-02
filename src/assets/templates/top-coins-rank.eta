@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <body>
+    <canvas
+      id="top-coins-rank"
+      style="width: 100%; max-width: {{=it.width}}px; height: 100%; max-height: {{=it.height}}px"
+    ></canvas>
+
+    <script>
+      const ctx = document.getElementById("top-coins-rank");
+
+      const data = {
+        labels: {{=it.labels}},
+        datasets: [
+        {{ it.ranks.forEach((rank, index) => { }}
+          {
+            label: "{{=rank.name}}",
+            data: {{=rank.data}},
+            borderColor: "{{=rank.color}}",
+            backgroundColor: "{{=rank.color}}",
+            borderWidth: 5,
+            tension: 0.1,
+            pointRadius: 1,
+            pointStyle: 'rotRect'
+          },
+        {{ }) }}
+        ],
+      };
+
+      const options = {
+        plugins: {
+          title: {
+            display: true,
+            text: "Trend of Top Coins Rank",
+          },
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Date",
+            },
+          },
+          y: {
+            title: {
+              display: true,
+              text: "Rank",
+            },
+            offset: true,
+            reverse: true,
+            ticks: {
+              precision: 0,
+            },
+            grid: {
+              display: false,
+            }
+          },
+        },
+      };
+
+      const config = {
+        type: "line",
+        data,
+        options,
+      };
+
+      new Chart(ctx, config);
+    </script>
+  </body>
+</html>

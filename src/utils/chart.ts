@@ -33,7 +33,7 @@ function generateRandomColor(): { R: number; G: number; B: number } {
 	}
 }
 
-function generateRandomColors(size: number): { R: number; G: number; B: number }[] {
+export function generateRandomColors(size: number): { R: number; G: number; B: number }[] {
 	let colors = []
 	let lastColor: { R: number; G: number; B: number } | null = null
 	for (let i = 0; i < size; i++) {

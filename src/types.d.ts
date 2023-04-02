@@ -18,7 +18,7 @@ export interface Analyzer {
 export interface Database {
 	saveToDatabase(models: CoinModel[]): Promise<void>
 
-	queryDatabase(recordSize = 30): Promise<CoinModel[][]>
+	queryDatabase(recordSize = 30): Promise<CoinQueryDetail[][]>
 }
 
 export type CexConfig = {
@@ -55,4 +55,9 @@ export type DatabaseConfig = {
 
 export type CoinModel = Coin & {
 	value: number
+}
+
+export type CoinQueryDetail = {
+	model: CoinModel
+	date: Date
 }

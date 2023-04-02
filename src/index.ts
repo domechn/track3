@@ -15,6 +15,8 @@ import commandLineArgs, { OptionDefinition } from 'command-line-args'
 import { CexConfig, Coin, CommandConfig, Database, DatabaseConfig, TokenConfig } from './types'
 import { NotionStore } from './database/notion'
 import { AssetsPercentage } from './chart/percentage'
+import path from 'path'
+import { TopCoinsRank } from './chart/rank'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -82,7 +84,7 @@ async function main() {
 	const totals = calculateTotalValue(lastAssets, priceMap)
 	const sum = _(totals).map(c => c.usdValue).sum()
 	const title = commandVal['show-value'] ? `Total: $${sum.toFixed(2)}` : undefined
-	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, commandVal.output, title)
+	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, commandVal.output.endsWith(".svg") ? commandVal.output : path.join(commandVal.output, "assets.svg") , title)
 
 	const ns = new NotionStore(config.database)
 
@@ -104,6 +106,8 @@ async function saveToDatabase(db: Database, coins: (Coin & { usdValue: number })
 
 async function generateChartHtml(db: Database, width: number, height: number, output: string, showValue?: boolean) {
 	const ap = new AssetsPercentage(width, height, showValue)
+	const tcr = new TopCoinsRank(width, height)
+	const gens = [ap, tcr]
 	const data = await db.queryDatabase()
 
 	if (data.length === 0) {
@@ -111,9 +115,9 @@ async function generateChartHtml(db: Database, width: number, height: number, ou
 		return
 	}
 	const latestModels = data[0]
-	const historicalModels = data.slice(1, -1)
+	const historicalModels = data.slice(1)
 
-	await ap.renderToFile(latestModels, historicalModels, output)
+	await bluebird.map(gens, async g => g.renderToFile(latestModels, historicalModels, output), { concurrency: 1 })
 }
 
 main()

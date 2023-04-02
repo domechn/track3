@@ -1,6 +1,6 @@
 import { Client } from '@notionhq/client'
 import _ from 'lodash'
-import { CoinModel, Database, DatabaseConfig } from '../types'
+import { CoinModel, CoinQueryDetail, Database, DatabaseConfig } from '../types'
 
 export class NotionStore implements Database {
 	private readonly config: Pick<DatabaseConfig, 'notion'>
@@ -205,7 +205,7 @@ export class NotionStore implements Database {
 		}
 	}
 
-	async queryDatabase(recordSize = 30): Promise<CoinModel[][]> {
+	async queryDatabase(recordSize = 30): Promise<CoinQueryDetail[][]> {
 		const queryResp = await this.client.databases.query({
 			database_id: this.databaseId,
 			filter: {
@@ -223,7 +223,7 @@ export class NotionStore implements Database {
 			page_size: recordSize,
 		})
 
-		return _(queryResp.results).map('properties').map((r: { [k: string]: { rich_text?: { text: { content: string } }[], number?: number } }) => {
+		return _(queryResp.results).map('properties').map((r: { [k: string]: { rich_text?: { text: { content: string } }[], number?: number, date?: { start: string } } }) => {
 			const tops = _(r).pickBy((v, k) => k.startsWith("Top")).map((v, k) => ({
 				key: k,
 				value: v.rich_text![0].text.content,
@@ -239,13 +239,16 @@ export class NotionStore implements Database {
 
 			const topModels = _(tops).map((symbol, idx) => {
 				return {
-					symbol: symbol.value,
-					amount: amounts[idx].value,
-					value: values[idx].value,
+					date: new Date(r.Date.date!.start),
+					model: {
+						symbol: symbol.value,
+						amount: amounts[idx].value,
+						value: values[idx].value,
+					}
 				}
 			}).value()
 
-			return topModels as CoinModel[]
-		}).value() as unknown as CoinModel[][]
+			return topModels as CoinQueryDetail[]
+		}).value() as unknown as CoinQueryDetail[][]
 	}
 }

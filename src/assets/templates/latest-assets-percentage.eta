@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <body>
+    <canvas
+      id="latest-assets-percentage"
+      style="width: 100%; max-width: {{=it.width}}px; height: 100%; max-height: {{=it.height}}px"
+    ></canvas>
+
+    <script>
+      const ctx = document.getElementById("latest-assets-percentage");
+
+      const data = {
+        labels: {{=it.labels}},
+        datasets: [
+          {
+            data: {{=it.data}},
+            backgroundColor: {{=it.backgroundColors}},
+            borderColor: {{=it.borderColors}},
+            borderWidth: 1,
+          },
+        ],
+      };
+
+      const options = {
+        plugins: {
+          {{ if ( it.title ) { }}
+          title: { display: true, text: "{{=it.title}}" },
+          {{ } else { }}
+          title: { display: true, text: "Percentage of Assets" },
+          {{ } }}
+          legend: { labels: { font: {} } },
+          datalabels: {
+            color: "white",
+            font: {
+              weight: "bold",
+            },
+            display: "auto",
+            formatter: function (value, context) {
+              const label = context.chart.data.labels[context.dataIndex];
+              return (
+                label +
+                ":" +
+                Math.round((value / {{=it.totalValue}}) * 10000) / 100 +
+                "%"
+              );
+            },
+          },
+        },
+      }
+      
+      const config = {
+        type: "doughnut",
+        data,
+        options,
+        plugins: [ChartDataLabels],
+      };
+
+      new Chart(ctx, config);
+    </script>
+  </body>
+</html>

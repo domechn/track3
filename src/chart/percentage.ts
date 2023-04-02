@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { BaseChart } from '.'
-import { CoinModel } from '../types'
+import { CoinModel, CoinQueryDetail } from '../types'
 
 const backgroundColors = [
 	"rgba(122, 51, 255, 1)",
@@ -35,9 +35,11 @@ export class AssetsPercentage extends BaseChart {
 	}
 
 	// only need latest models
-	async getRenders(latestModels: CoinModel[], _historicalModels: CoinModel[][]): Promise<{ [key: string]: unknown }> {
+	async getRenders(cqd: CoinQueryDetail[], _historicalModels: CoinQueryDetail[][]): Promise<{ [key: string]: unknown }> {
+		const latestModels = _(cqd).map('model').value()
+
 		const totalValue = _(latestModels).sumBy('value')
-		return {
+		const renderValues = {
 			width: this.width,
 			height: this.height,
 			labels: _(latestModels).map('symbol').value(),
@@ -47,6 +49,18 @@ export class AssetsPercentage extends BaseChart {
 			totalValue,
 			title: this.showTotal ? `Total Assets: $${totalValue}` : undefined,
 		}
+
+		// transfer array values to string
+		return _(renderValues).map((v, k) => {
+			let newVal = v
+			if (Array.isArray(v)) {
+				newVal = JSON.stringify(v)
+			}
+			return {
+				k,
+				v: newVal,
+			}
+		}).mapKeys('k').mapValues('v').value()
 	}
 
 }
