@@ -4,7 +4,7 @@
   <body>
     <canvas
       id="top-coins-rank"
-      style="width: 100%; max-width: {{=it.width}}px; height: 100%; max-height: {{=it.height}}px"
+      style="max-width: {{=it.width}}px; max-height: {{=it.height}}px"
     ></canvas>
 
     <script>

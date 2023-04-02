@@ -30,7 +30,7 @@ export class TopCoinsRank extends BaseChart {
 
 	// only need latest models
 	async getRenders(latestCQD: CoinQueryDetail[], historicalCQD: CoinQueryDetail[][]): Promise<{ [key: string]: unknown }> {
-		const details = [latestCQD, ...historicalCQD]
+		const details = _([latestCQD, ...historicalCQD]).reverse().value()
 
 		const coins = _(details).map((m) => _(m).map('model').map((c) => c.symbol).value()).flatten().uniq().value()
 

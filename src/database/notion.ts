@@ -205,6 +205,7 @@ export class NotionStore implements Database {
 		}
 	}
 
+	// response data is sorted by date descending
 	async queryDatabase(recordSize = 30): Promise<CoinQueryDetail[][]> {
 		const queryResp = await this.client.databases.query({
 			database_id: this.databaseId,
