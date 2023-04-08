@@ -8,6 +8,9 @@ export class TopCoinsRank extends BaseChart {
 	private static readonly CHART_TEMPLATE_ID = "top-coins-rank"
 	private width: number
 	private height: number
+	
+	// size of x axis
+	private xSize = 10
 
 	constructor(width: number, height: number) {
 		super()
@@ -30,7 +33,7 @@ export class TopCoinsRank extends BaseChart {
 
 	// only need latest models
 	async getRenders(latestCQD: CoinQueryDetail[], historicalCQD: CoinQueryDetail[][]): Promise<{ [key: string]: unknown }> {
-		const details = _([latestCQD, ...historicalCQD]).reverse().value()
+		const details = _([latestCQD, ...historicalCQD]).reverse().take(this.xSize).value()
 
 		const coins = _(details).map((m) => _(m).map('model').map((c) => c.symbol).value()).flatten().uniq().value()
 

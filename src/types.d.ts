@@ -18,7 +18,7 @@ export interface Analyzer {
 export interface Database {
 	saveToDatabase(models: CoinModel[]): Promise<void>
 
-	queryDatabase(recordSize = 30): Promise<CoinQueryDetail[][]>
+	queryDatabase(recordSize = 30, dateSort?: 'desc' | 'asc'): Promise<CoinQueryDetail[][]>
 }
 
 export type CexConfig = {
@@ -50,6 +50,9 @@ export type DatabaseConfig = {
 	notion?: {
 		token: string
 		databaseId: string
+	}
+	csv?: {
+		outputDir: string
 	}
 }
 

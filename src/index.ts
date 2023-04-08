@@ -13,10 +13,10 @@ import { OthersAnalyzer } from './coins/others'
 import { DOGEAnalyzer } from './coins/doge'
 import commandLineArgs, { OptionDefinition } from 'command-line-args'
 import { CexConfig, Coin, CommandConfig, Database, DatabaseConfig, TokenConfig } from './types'
-import { NotionStore } from './database/notion'
 import { AssetsPercentage } from './chart/percentage'
 import path from 'path'
 import { TopCoinsRank } from './chart/rank'
+import { getOneDatabase, saveToDatabases } from './database'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -84,31 +84,25 @@ async function main() {
 	const totals = calculateTotalValue(lastAssets, priceMap)
 	const sum = _(totals).map(c => c.usdValue).sum()
 	const title = commandVal['show-value'] ? `Total: $${sum.toFixed(2)}` : undefined
-	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, commandVal.output.endsWith(".svg") ? commandVal.output : path.join(commandVal.output, "assets.svg") , title)
+	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, commandVal.output.endsWith(".svg") ? commandVal.output : path.join(commandVal.output, "assets.svg"), title)
 
-	const ns = new NotionStore(config.database)
 
-	await saveToDatabase(ns, totals, _(config).get('database'))
-	await generateChartHtml(ns, commandVal.width, commandVal.height, commandVal.output, commandVal['show-value'])
+	await saveToDatabases(config.database, totals)
+
+	await generateChartHtml(config.database, commandVal.width, commandVal.height, commandVal.output, commandVal['show-value'])
+
 }
 
-async function saveToDatabase(db: Database, coins: (Coin & { usdValue: number })[], config?: DatabaseConfig) {
-	if (!config?.notion) {
-		console.info("No database config, skip saving to database")
+async function generateChartHtml(dbConfig: DatabaseConfig, width: number, height: number, output: string, showValue?: boolean) {
+	const db = getOneDatabase(dbConfig)
+	if (!db) {
+		console.error("No database found")
 		return
 	}
-	await db.saveToDatabase(_(coins).map(t => ({
-		symbol: t.symbol,
-		amount: t.amount,
-		value: t.usdValue,
-	})).value())
-}
-
-async function generateChartHtml(db: Database, width: number, height: number, output: string, showValue?: boolean) {
 	const ap = new AssetsPercentage(width, height, showValue)
 	const tcr = new TopCoinsRank(width, height)
 	const gens = [ap, tcr]
-	const data = await db.queryDatabase()
+	const data = await db.queryDatabase(30, 'desc')
 
 	if (data.length === 0) {
 		console.info("No data in database, skip generating chart")

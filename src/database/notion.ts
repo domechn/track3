@@ -206,7 +206,7 @@ export class NotionStore implements Database {
 	}
 
 	// response data is sorted by date descending
-	async queryDatabase(recordSize = 30): Promise<CoinQueryDetail[][]> {
+	async queryDatabase(recordSize = 30, dateQuery = 'desc'): Promise<CoinQueryDetail[][]> {
 		const queryResp = await this.client.databases.query({
 			database_id: this.databaseId,
 			filter: {
@@ -224,7 +224,7 @@ export class NotionStore implements Database {
 			page_size: recordSize,
 		})
 
-		return _(queryResp.results).map('properties').map((r: { [k: string]: { rich_text?: { text: { content: string } }[], number?: number, date?: { start: string } } }) => {
+		const dataFunc = _(queryResp.results).map('properties').map((r: { [k: string]: { rich_text?: { text: { content: string } }[], number?: number, date?: { start: string } } }) => {
 			const tops = _(r).pickBy((v, k) => k.startsWith("Top")).map((v, k) => ({
 				key: k,
 				value: v.rich_text![0].text.content,
@@ -250,6 +250,12 @@ export class NotionStore implements Database {
 			}).value()
 
 			return topModels as CoinQueryDetail[]
-		}).value() as unknown as CoinQueryDetail[][]
+		})
+
+		if (dateQuery === 'asc') {
+			dataFunc.reverse()
+		}
+		
+		return dataFunc.value() as unknown as CoinQueryDetail[][]
 	}
 }

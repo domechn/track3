@@ -31,3 +31,5 @@ database: # save data to database ( optional )
   notion:
     token: # secret token
     databaseId: # database id
+  csv:
+    outputDir: # output directory
