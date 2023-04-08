@@ -49,6 +49,7 @@ interface DataStruct {
 class DataStruct implements DataStruct {
 
 	static fromCSVRow(row: CSVRow): DataStruct {
+
 		const res = new DataStruct()
 		res.date = new Date(row.date)
 		for (let i = 1; i <= 10; i++) {
@@ -77,7 +78,7 @@ class DataStruct implements DataStruct {
 				return v.toISOString().slice(0, 10)
 			}
 			if (_.isNumber(v)) {
-				return v.toString()
+				return v.toFixed(2)
 			}
 			if (_.isString(v)) {
 				return v
