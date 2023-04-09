@@ -1,14 +1,5 @@
-import * as fs from 'fs/promises'
 import _, { random } from 'lodash'
-import { ChartCallback, ChartJSNodeCanvas } from 'chartjs-node-canvas'
-import { ChartConfiguration, Chart } from 'chart.js'
-import ChartDataLabels, { Context } from 'chartjs-plugin-datalabels'
 import ColorDiff from 'color-diff'
-
-interface Datum {
-	label: string
-	value: number
-}
 
 function generateRandomColor(): { R: number; G: number; B: number } {
 	let r = random(0, 255)
@@ -45,91 +36,4 @@ export function generateRandomColors(size: number): { R: number; G: number; B: n
 		lastColor = color
 	}
 	return colors
-}
-
-
-export async function drawDoughnut(data: Datum[], width: number, height: number, savePath: string, title?: string) {
-	let newData = []
-	// only keep top 10
-	if (data.length > 10) {
-		newData = _(data).sortBy('value').reverse().take(10).value()
-		newData.push({
-			label: 'Others',
-			value: _(data).sumBy('value') - _(newData).sumBy('value')
-		})
-	} else {
-		newData = data
-	}
-	const bgColor = _(generateRandomColors(_(newData).size())).map(color => `rgba(${color.R}, ${color.G}, ${color.B}, 1)`).value()
-
-	const totalValue = _(newData).sumBy('value')
-	const isSmall = height < 300
-	const labelFontSize = isSmall ? height / 25 :undefined
-	const labelBoxSize = isSmall ? height / 10 : undefined
-	const dataLabelFontSize = isSmall ? height / 35 : undefined
-
-	Chart.register(ChartDataLabels)
-	const configuration: ChartConfiguration = {
-		type: 'doughnut',
-		data: {
-			labels: _(newData).map('label').value(),
-			datasets: [{
-				// label: '# of Votes',
-				data: _(newData).map('value').value(),
-				backgroundColor: bgColor,
-				borderColor: bgColor,
-				borderWidth: 1
-			}],
-		},
-		options: {
-			plugins: {
-				title: {
-					display: !!title,
-					text: title
-				},
-				legend: {
-					labels: {
-						boxWidth: labelBoxSize,
-						font: {
-							size: labelFontSize,
-						}
-					}
-				},
-				datalabels: {
-					// anchor:'end',
-					color: 'white',
-					font: {
-						weight: 'bold',
-						size: dataLabelFontSize,
-					},
-					display: 'auto',
-					// offset: 20,
-					formatter: function (value: number, context: Context) {
-						const label = context.chart.data.labels![context.dataIndex] as string
-						return label + ":" + Math.round((value / totalValue) * 10000) / 100 + '%'
-					}
-				}
-			}
-		},
-		plugins: [{
-			id: 'background-color',
-			beforeDraw: (chart) => {
-				const ctx = chart.ctx
-				ctx.save()
-				ctx.fillStyle = 'white'
-				ctx.fillRect(0, 0, width, height)
-				ctx.restore()
-			}
-		}]
-	}
-	type NewType = ChartCallback
-
-	const chartCallback: NewType = (ChartJS) => {
-		ChartJS.defaults.responsive = true
-		ChartJS.defaults.maintainAspectRatio = false
-	}
-	const chartJSNodeCanvas = new ChartJSNodeCanvas({ type: 'svg', width, height, chartCallback, plugins: { modern: ['chartjs-plugin-datalabels'] } })
-	// For some unknown reason canvas requires use of the sync API's to use SVG's or PDF's. This libraries which support these are
-	const buffer = chartJSNodeCanvas.renderToBufferSync(configuration)
-	await fs.writeFile(savePath, buffer, 'base64')
 }

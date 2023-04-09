@@ -22,10 +22,6 @@ yarn build
 yarn gen
 ```
 
-## Output
-
-![out](./assets.svg)
-
 ## Known Issues
 
 - [ ] Cannot list assets in earn wallet in OKX

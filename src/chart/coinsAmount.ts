@@ -1,8 +1,8 @@
 import _ from 'lodash'
-import { BaseChart } from './chart'
 import { CoinQueryDetail } from '../types'
 import { generateRandomColors } from '../utils/chart'
 import { dateToDayStr } from '../utils/date'
+import { BaseChart } from './chart'
 
 
 export class CoinsAmountChange extends BaseChart {

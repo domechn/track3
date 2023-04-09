@@ -5,21 +5,15 @@ import { CexAnalyzer } from './coins/cex'
 import { ERC20Analyzer } from './coins/erc20'
 import { calculateTotalValue, combineCoinLists } from './utils/coins'
 import { CoinGecko } from './price/price'
-import { drawDoughnut } from './utils/chart'
 import { BTCAnalyzer } from './coins/btc'
 import { SOLAnalyzer } from './coins/sol'
 import bluebird from 'bluebird'
 import { OthersAnalyzer } from './coins/others'
 import { DOGEAnalyzer } from './coins/doge'
 import commandLineArgs, { OptionDefinition } from 'command-line-args'
-import { CexConfig, Coin, CommandConfig, DatabaseConfig, TokenConfig } from './types'
-import { AssetsPercentage } from './chart/percentage'
-import path from 'path'
-import { TopCoinsRank } from './chart/rank'
+import { CexConfig, Coin, CommandConfig, TokenConfig } from './types'
 import { getOneDatabase, saveToDatabases } from './database'
-import { AssetChange } from './chart/assets'
-import { CoinsAmountChange } from './chart/coinsAmount'
-import generateChartHtmlFiles from './chart/chart'
+import generateChartHtmlFiles from './chart'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -35,10 +29,10 @@ function command() {
 		type: Number,
 		defaultValue: 500,
 	}, {
-		name: "output",
+		name: "output-dir",
 		alias: "o",
 		type: String,
-		defaultValue: "assets.svg",
+		defaultValue: "output",
 	}, {
 		name: "show-value",
 		type: Boolean,
@@ -85,16 +79,12 @@ async function main() {
 	}
 
 	const totals = calculateTotalValue(lastAssets, priceMap)
-	const sum = _(totals).map(c => c.usdValue).sum()
-	const title = commandVal['show-value'] ? `Total: $${sum.toFixed(2)}` : undefined
-	await drawDoughnut(_(totals).map(c => ({ label: c.symbol, value: c.usdValue })).value(), commandVal.width, commandVal.height, commandVal.output.endsWith(".svg") ? commandVal.output : path.join(commandVal.output, "assets.svg"), title)
-
 
 	await saveToDatabases(config.database, totals)
 
 	const db = getOneDatabase(config.database)
 	if (db) {
-		await generateChartHtmlFiles(db, commandVal.width, commandVal.height, commandVal.output, commandVal['show-value'])
+		await generateChartHtmlFiles(db, commandVal.width, commandVal.height, commandVal['output-dir'], commandVal['show-value'])
 	}
 }
 

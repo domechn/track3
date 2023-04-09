@@ -1,7 +1,7 @@
 export type CommandConfig = {
 	width: number
 	height: number
-	output: string
+	'output-dir': string
 	'show-value': boolean
 	config: string
 }

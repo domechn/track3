@@ -1,6 +1,6 @@
 import _ from 'lodash'
-import { BaseChart } from './chart'
 import { CoinQueryDetail } from '../types'
+import { BaseChart } from './chart'
 
 
 export class AssetChange extends BaseChart {
