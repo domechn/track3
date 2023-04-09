@@ -1,10 +1,26 @@
 <!DOCTYPE html>
 <html>
   <body>
+  <div style="padding: 20px 10px;">
   {{ it.templates.forEach((template, idx) => { }}
     {{ if (idx % 2 === 0) { }}
     <div>
     {{ } }}
+      <div
+        class="expand-icon"
+        style="top: {{=(it.height * Math.floor( idx / 2 ) + 20)}}px; right: {{ if (idx % 2 === 0) { }}55%{{ } else { }}10px{{ } }};"
+      >
+        <svg
+          id="expand-or-collapse-icon"
+          viewBox="0 0 1024 1024"
+          onclick="expandOrCollapse('{{= template }}.html')"
+          fill="#c0c0c0"
+        >
+          <path
+            d="M1024 0v416l-160-160-192 192-96-96 192-192-160-160zM448 672l-192 192 160 160h-416v-416l160 160 192-192z"
+          />
+        </svg>
+      </div>
 	<iframe
 	  src="{{= template }}.html"
 	  class="iframeBox"
@@ -17,6 +33,7 @@
     </div>
     {{ } }}
   {{ }) }}
+  </div>
   </body>
 
   <style>
@@ -25,5 +42,23 @@
       width: 45%;
       height: {{=it.height}}px;
     }
+    .expand-icon {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      <!-- display: none; -->
+      cursor: pointer;
+    }
   </style>
+
+
+  <script>
+    function expandOrCollapse(jumpTo) {
+      let that = window;
+      if (window != top) {
+        that = top;
+      }
+      top.location.href = jumpTo;
+    }
+  </script>
 </html>
