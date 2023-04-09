@@ -6,17 +6,15 @@ import { BaseChart } from './chart'
 
 export class TopCoinsRank extends BaseChart {
 	private static readonly CHART_TEMPLATE_ID = "top-coins-rank"
-	private width: number
-	private height: number
+	private maxHeight: number
 	
 	// size of x axis
 	private xSize = 10
 
-	constructor(width: number, height: number) {
+	constructor() {
 		super()
 
-		this.width = width
-		this.height = height
+		this.maxHeight = 500
 	}
 
 	private formatDate(date: Date): string {
@@ -35,7 +33,7 @@ export class TopCoinsRank extends BaseChart {
 	async getRenders(latestCQD: CoinQueryDetail[], historicalCQD: CoinQueryDetail[][]): Promise<{ [key: string]: unknown }> {
 		const details = _([latestCQD, ...historicalCQD]).reverse().take(this.xSize).value()
 
-		const coins = _(details).map((m) => _(m).map('model').map((c) => c.symbol).value()).flatten().uniq().value()
+		const coins = _(details).map((m) => _(m).map('model').map((c) => c.symbol).value()).flatten().uniq().filter(c=> c.toLowerCase() !== 'others').value()
 
 		const getRanks = (symbol: string): (number | undefined)[] => {
 			return _(details).map((m) => m.findIndex((c) => c.model.symbol === symbol)).map(idx => idx === -1 ? undefined : idx + 1).value()
@@ -44,8 +42,7 @@ export class TopCoinsRank extends BaseChart {
 		const colors = generateRandomColors(coins.length)
 
 		return {
-			width: this.width,
-			height: this.height,
+			maxHeight: this.maxHeight,
 			labels: JSON.stringify(_(details).map(d => d[0]).map(d => this.formatDate(d.date)).value()),
 			ranks: _(coins).map((c, idx) => ({
 				name: c,

@@ -5,12 +5,15 @@ import { TopCoinsRank } from './rank'
 import { AssetChange } from './assets'
 import { CoinsAmountChange } from './coinsAmount'
 import bluebird from 'bluebird'
+import { BaseChart } from './chart'
+import { promises } from 'fs'
+import * as Eta from 'eta'
 
-export default async function generateChartHtmlFiles(db: Database, width: number, height: number, output: string, showValue?: boolean) {
-	const ap = new AssetsPercentage(width, height, showValue)
-	const tcr = new TopCoinsRank(width, height)
-	const as = new AssetChange(width, height)
-	const cac = new CoinsAmountChange(width, height)
+export default async function generateChartHtmlFiles(db: Database, output: string, showValue?: boolean) {
+	const ap = new AssetsPercentage(showValue)
+	const tcr = new TopCoinsRank()
+	const as = new AssetChange()
+	const cac = new CoinsAmountChange()
 	const gens = [ap, tcr, as, cac]
 	const data = await db.queryDatabase(30, 'desc')
 
@@ -22,4 +25,27 @@ export default async function generateChartHtmlFiles(db: Database, width: number
 	const historicalModels = data.slice(1)
 
 	await bluebird.map(gens, async g => g.renderToFile(latestModels, historicalModels, output), { concurrency: 1 })
+
+	await renderIndexFile(gens, output)
+}
+
+async function renderIndexFile(charts: BaseChart[], outputDir: string) {
+	if (!charts) {
+		return
+	}
+
+	const templates = _(charts).map(t => t.getTemplateId()).value()
+	const tplId = 'index'
+	const tpl = charts[0].getTemplate(tplId)
+
+	const payload = {
+		templates,
+		height: 600,
+	}
+
+	const res = await Eta.renderAsync(tpl, payload, { tags: ['{{', '}}'], autoEscape: false })
+
+	await promises.access(outputDir).catch(() => promises.mkdir(outputDir, { recursive: true }))
+
+	await promises.writeFile(`${outputDir}/${tplId}.html`, res)
 }

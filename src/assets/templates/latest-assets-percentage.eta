@@ -5,7 +5,7 @@
   <body>
     <canvas
       id="latest-assets-percentage"
-      style="max-width: {{=it.width}}px; max-height: {{=it.height}}px"
+      style="max-height: {{=it.maxHeight}}px"
     ></canvas>
 
     <script>

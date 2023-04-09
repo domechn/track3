@@ -18,15 +18,13 @@ const backgroundColors = [
 
 export class AssetsPercentage extends BaseChart {
 	private static readonly CHART_TEMPLATE_ID = "latest-assets-percentage"
-	private width: number
-	private height: number
+	private maxHeight: number
 	private showTotal: boolean
 
-	constructor(width: number, height: number, showTotal = false) {
+	constructor(showTotal = false) {
 		super()
 
-		this.width = width
-		this.height = height
+		this.maxHeight = 500
 		this.showTotal = showTotal
 	}
 
@@ -40,8 +38,7 @@ export class AssetsPercentage extends BaseChart {
 
 		const totalValue = _(latestModels).sumBy('value')
 		const renderValues = {
-			width: this.width,
-			height: this.height,
+			maxHeight: this.maxHeight,
 			labels: _(latestModels).map('symbol').value(),
 			data: _(latestModels).map('value').value(),
 			backgroundColors: backgroundColors,

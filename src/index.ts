@@ -19,16 +19,6 @@ const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
 function command() {
 	const optionDefinitions: OptionDefinition[] = [{
-		name: "width",
-		alias: "w",
-		type: Number,
-		defaultValue: 500,
-	}, {
-		name: "height",
-		alias: "h",
-		type: Number,
-		defaultValue: 500,
-	}, {
 		name: "output-dir",
 		alias: "o",
 		type: String,
@@ -84,7 +74,7 @@ async function main() {
 
 	const db = getOneDatabase(config.database)
 	if (db) {
-		await generateChartHtmlFiles(db, commandVal.width, commandVal.height, commandVal['output-dir'], commandVal['show-value'])
+		await generateChartHtmlFiles(db, commandVal['output-dir'], commandVal['show-value'])
 	}
 }
 

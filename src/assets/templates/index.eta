@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <body>
+  {{ it.templates.forEach((template, idx) => { }}
+    {{ if (idx % 2 === 0) { }}
+    <div>
+    {{ } }}
+	<iframe
+	  src="{{= template }}.html"
+	  class="iframeBox"
+	  name="template"
+	></iframe>
+    {{ if (idx % 2 === 1) { }}
+    </div>
+    {{ } }}
+    {{ if (idx === it.templates.length - 1 && idx % 2 !== 1) { }}
+    </div>
+    {{ } }}
+  {{ }) }}
+  </body>
+
+  <style>
+    .iframeBox {
+      border: none;
+      width: 45%;
+      height: {{=it.height}}px;
+    }
+  </style>
+</html>

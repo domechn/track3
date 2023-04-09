@@ -27,6 +27,10 @@ export abstract class BaseChart implements Charter {
 		})
 	}
 
+	getTemplate(templateId: string) {
+		return this.templates[templateId]
+	}
+
 	abstract getTemplateId(): string
 
 	abstract getRenders(latestModels: CoinQueryDetail[], historicalModels: CoinQueryDetail[][]): Promise<{ [key: string]: unknown }>
@@ -34,7 +38,7 @@ export abstract class BaseChart implements Charter {
 	async renderToFile(latestModels: CoinQueryDetail[], historicalModels: CoinQueryDetail[][], outputDir: string): Promise<void> {
 		const tplId = this.getTemplateId()
 		console.log(`Rendering ${tplId}...`)
-		const tpl = this.templates[tplId]
+		const tpl = this.getTemplate(tplId)
 		if (!tpl) {
 			throw new Error(`Template ${tplId} not found`)
 		}

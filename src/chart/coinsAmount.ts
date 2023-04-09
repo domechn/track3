@@ -7,17 +7,15 @@ import { BaseChart } from './chart'
 
 export class CoinsAmountChange extends BaseChart {
 	private static readonly CHART_TEMPLATE_ID = "coins-amount-change"
-	private width: number
-	private height: number
+	private maxHeight: number
 
 	// size of x axis
 	private xSize = 10
 
-	constructor(width: number, height: number) {
+	constructor() {
 		super()
 
-		this.width = width
-		this.height = height
+		this.maxHeight = 500
 	}
 
 	private formatDate(date: Date): string {
@@ -50,8 +48,7 @@ export class CoinsAmountChange extends BaseChart {
 
 
 		return {
-			width: this.width,
-			height: this.height,
+			maxHeight: this.maxHeight,
 			labels: JSON.stringify(_(details).map(d => d[0]).map(d => this.formatDate(d.date)).value()),
 			coins: coinsList,
 			coinsAmount: JSON.stringify(coinsAmount),
