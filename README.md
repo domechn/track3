@@ -7,6 +7,7 @@ Show your crypto currency assets in centralized exchanges and web3 wallets.
 1. Support all CEX supported by [cctx](https://github.com/ccxt/ccxt)
 2. Support BTC, SOL, Doge and all ERC20 Tokens
 3. Export all data to Notion Database or CSV file
+4. Render a visual chart of asset changes or the proportion of each asset
 
 ## Configuration
 
@@ -19,8 +20,14 @@ yarn
 
 yarn build
 
-yarn gen
+yarn gen -o output
 ```
+
+## Output
+
+[Online Demo](https://asset-statistics-pages.vercel.app/mocked/index.html)
+
+![demo](./images/demo.png)
 
 ## Known Issues
 
