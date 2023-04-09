@@ -1,6 +1,7 @@
 import { Client } from '@notionhq/client'
 import _ from 'lodash'
 import { CoinModel, CoinQueryDetail, Database, DatabaseConfig } from '../types'
+import { dateToDayStr } from '../utils/date'
 
 export class NotionStore implements Database {
 	private readonly config: Pick<DatabaseConfig, 'notion'>
@@ -133,7 +134,7 @@ export class NotionStore implements Database {
 			},
 			Date: {
 				date: {
-					start: new Date().toISOString().slice(0, 10),
+					start: dateToDayStr(new Date()),
 				}
 			},
 			...top10Props,

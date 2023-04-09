@@ -3,6 +3,7 @@ import { CoinModel, CoinQueryDetail, Database, DatabaseConfig } from '../types'
 import { promises } from 'fs'
 import { CSVRow, readCSV, writeCSV } from '../utils/csv'
 import path from 'path'
+import { dateToDayStr } from '../utils/date'
 
 interface DataStruct {
 	date: Date
@@ -75,7 +76,7 @@ class DataStruct implements DataStruct {
 	toCSVRow(): CSVRow {
 		return _(this).mapValues((v) => {
 			if (_.isDate(v)) {
-				return v.toISOString().slice(0, 10)
+				return dateToDayStr(v)
 			}
 			if (_.isNumber(v)) {
 				return v.toFixed(2)

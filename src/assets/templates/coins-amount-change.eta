@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <body>
+    <label for="coins">Choose a coin:</label>
+
+    <select name="coins" id="coins">
+      {{ it.coins.forEach((coin) => { }}
+        <option value="{{=coin}}">{{=coin}}</option>
+      {{ }) }}
+    </select>
+    <canvas
+      id="coins-amount-change"
+      style="max-width: {{=it.width}}px; max-height: {{=it.height}}px"
+    ></canvas>
+
+    <script>
+      const ctx = document.getElementById("coins-amount-change");
+
+      const coinsAmount = {{=it.coinsAmount}};
+      const coinsDate = {{=it.coinsDate}};
+      const coinColors = {{=it.coinColors}};
+      const currentCoinSelect = document.getElementById("coins");
+      let chartCtx;
+      function renderChart(currentCoinValue) {
+        const data = {
+          labels: coinsDate[currentCoinValue],
+          datasets: [
+            {
+              label: currentCoinValue + " Amount",
+              data: coinsAmount[currentCoinValue],
+              borderColor: coinColors[currentCoinValue],
+              backgroundColor: coinColors[currentCoinValue],
+              borderWidth: 5,
+              tension: 0.1,
+              pointRadius: 1,
+              pointStyle: 'rotRect'
+            },
+          ],
+        };
+  
+        const options = {
+          plugins: {
+            title: {
+              display: true,
+              text: "Trend of Asset USD Value",
+            },
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "Date",
+              },
+            },
+            y: {
+              title: {
+                display: true,
+                text: "Amount",
+              },
+              offset: true,
+              ticks: {
+                precision: 4,
+              },
+              grid: {
+                display: false,
+              }
+            },
+          },
+        };
+  
+        const config = {
+          type: "line",
+          data,
+          options,
+        };
+        chartCtx = new Chart(ctx, config);
+      }
+
+      currentCoinSelect.onchange = (event) => {
+        chartCtx.destroy();
+        renderChart(event.target.value);
+      }
+
+      renderChart(currentCoinSelect.value);
+    </script>
+  </body>
+</html>

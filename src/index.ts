@@ -18,6 +18,7 @@ import path from 'path'
 import { TopCoinsRank } from './chart/rank'
 import { getOneDatabase, saveToDatabases } from './database'
 import { AssetChange } from './chart/assets'
+import { CoinsAmountChange } from './chart/coinsAmount'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -103,7 +104,8 @@ async function generateChartHtml(dbConfig: DatabaseConfig, width: number, height
 	const ap = new AssetsPercentage(width, height, showValue)
 	const tcr = new TopCoinsRank(width, height)
 	const as = new AssetChange(width, height)
-	const gens = [ap, tcr, as]
+	const cac = new CoinsAmountChange(width, height)
+	const gens = [ap, tcr, as, cac]
 	const data = await db.queryDatabase(30, 'desc')
 
 	if (data.length === 0) {

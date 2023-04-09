@@ -1,10 +1,12 @@
 import _ from 'lodash'
 import { BaseChart } from '.'
 import { CoinQueryDetail } from '../types'
+import { generateRandomColors } from '../utils/chart'
+import { dateToDayStr } from '../utils/date'
 
 
-export class AssetChange extends BaseChart {
-	private static readonly CHART_TEMPLATE_ID = "asset-change"
+export class CoinsAmountChange extends BaseChart {
+	private static readonly CHART_TEMPLATE_ID = "coins-amount-change"
 	private width: number
 	private height: number
 
@@ -27,28 +29,34 @@ export class AssetChange extends BaseChart {
 	}
 
 	getTemplateId(): string {
-		return AssetChange.CHART_TEMPLATE_ID
+		return CoinsAmountChange.CHART_TEMPLATE_ID
 	}
 
 	// only need latest models
 	async getRenders(latestCQD: CoinQueryDetail[], historicalCQD: CoinQueryDetail[][]): Promise<{ [key: string]: unknown }> {
 		const details = _([latestCQD, ...historicalCQD]).reverse().take(this.xSize).value()
 
-		const getTotalValue = (coins: CoinQueryDetail[]): number => _(coins).sumBy(c => c.model.value)
+		const coins = _(details).flattenDeep().filter(c => c.model.symbol.toLowerCase() != "others").groupBy(c => c.model.symbol).value()
 
+		const coinsList = _(coins).keys().value()
+		const coinsAmount = _(coins).mapValues(c => _(c).map(cc => cc.model.amount)).value()
+		const coinsDate = _(coins).mapValues(c => _(c).map(cc => dateToDayStr(cc.date))).value()
 
-		const color = {
-			R: 255,
-			G: 99,
-			B: 71,
-		}
+		const colors = generateRandomColors(coinsList.length)
+
+		const coinsColor = _(coinsList).map((c, idx) => ({
+			[c]: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
+		})).value()
+
 
 		return {
 			width: this.width,
 			height: this.height,
 			labels: JSON.stringify(_(details).map(d => d[0]).map(d => this.formatDate(d.date)).value()),
-			color: `rgba(${color.R}, ${color.G}, ${color.B}, 1)`,
-			data: JSON.stringify(_(details).map(d => getTotalValue(d)).value()),
+			coins: coinsList,
+			coinsAmount: JSON.stringify(coinsAmount),
+			coinsDate: JSON.stringify(coinsDate),
+			coinColors: JSON.stringify(coinsColor),
 		}
 	}
 }

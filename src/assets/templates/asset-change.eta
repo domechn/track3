@@ -46,9 +46,8 @@
               text: "USD",
             },
             offset: true,
-            reverse: true,
             ticks: {
-              precision: 0,
+              precision: 2,
             },
             grid: {
               display: false,
