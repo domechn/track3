@@ -1,5 +1,5 @@
 import _ from 'lodash'
-import { BaseChart } from '.'
+import { BaseChart } from './chart'
 import { CoinModel, CoinQueryDetail } from '../types'
 
 const backgroundColors = [

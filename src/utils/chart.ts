@@ -1,5 +1,5 @@
 import * as fs from 'fs/promises'
-import _, { random, size } from 'lodash'
+import _, { random } from 'lodash'
 import { ChartCallback, ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import { ChartConfiguration, Chart } from 'chart.js'
 import ChartDataLabels, { Context } from 'chartjs-plugin-datalabels'

@@ -1,5 +1,5 @@
 import _ from 'lodash'
-import { BaseChart } from '.'
+import { BaseChart } from './chart'
 import { CoinQueryDetail } from '../types'
 import { generateRandomColors } from '../utils/chart'
 import { dateToDayStr } from '../utils/date'

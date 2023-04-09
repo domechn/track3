@@ -4,7 +4,7 @@ import fs from "fs/promises"
 import { CexAnalyzer } from './coins/cex'
 import { ERC20Analyzer } from './coins/erc20'
 import { calculateTotalValue, combineCoinLists } from './utils/coins'
-import { CoinGecko } from './price'
+import { CoinGecko } from './price/price'
 import { drawDoughnut } from './utils/chart'
 import { BTCAnalyzer } from './coins/btc'
 import { SOLAnalyzer } from './coins/sol'
@@ -12,13 +12,14 @@ import bluebird from 'bluebird'
 import { OthersAnalyzer } from './coins/others'
 import { DOGEAnalyzer } from './coins/doge'
 import commandLineArgs, { OptionDefinition } from 'command-line-args'
-import { CexConfig, Coin, CommandConfig, Database, DatabaseConfig, TokenConfig } from './types'
+import { CexConfig, Coin, CommandConfig, DatabaseConfig, TokenConfig } from './types'
 import { AssetsPercentage } from './chart/percentage'
 import path from 'path'
 import { TopCoinsRank } from './chart/rank'
 import { getOneDatabase, saveToDatabases } from './database'
 import { AssetChange } from './chart/assets'
 import { CoinsAmountChange } from './chart/coinsAmount'
+import generateChartHtmlFiles from './chart/chart'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -91,31 +92,10 @@ async function main() {
 
 	await saveToDatabases(config.database, totals)
 
-	await generateChartHtml(config.database, commandVal.width, commandVal.height, commandVal.output, commandVal['show-value'])
-
-}
-
-async function generateChartHtml(dbConfig: DatabaseConfig, width: number, height: number, output: string, showValue?: boolean) {
-	const db = getOneDatabase(dbConfig)
-	if (!db) {
-		console.error("No database found")
-		return
+	const db = getOneDatabase(config.database)
+	if (db) {
+		await generateChartHtmlFiles(db, commandVal.width, commandVal.height, commandVal.output, commandVal['show-value'])
 	}
-	const ap = new AssetsPercentage(width, height, showValue)
-	const tcr = new TopCoinsRank(width, height)
-	const as = new AssetChange(width, height)
-	const cac = new CoinsAmountChange(width, height)
-	const gens = [ap, tcr, as, cac]
-	const data = await db.queryDatabase(30, 'desc')
-
-	if (data.length === 0) {
-		console.info("No data in database, skip generating chart")
-		return
-	}
-	const latestModels = data[0]
-	const historicalModels = data.slice(1)
-
-	await bluebird.map(gens, async g => g.renderToFile(latestModels, historicalModels, output), { concurrency: 1 })
 }
 
 main()
