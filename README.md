@@ -32,7 +32,7 @@ yarn gen -o output
 ## Known Issues
 
 - [ ] Cannot list assets in earn wallet in OKX
-- [ ] Cannot list assets in LaunchPad in Binance
+- [ ] Cannot list assets in Launchpool in Binance
 
 ## Thanks
 
