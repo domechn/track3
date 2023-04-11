@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      .container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+
+      .totalValue {
+        font-size: calc(
+          10vw / var(--totalValue-length)
+        ); 
+        font-weight: bold;
+        width: 60%;
+        text-align: center;
+        color: black;
+      }
+
+      .changePercentage {
+	position: absolute;
+	font-size: calc(10vw / 5);
+	font-weight: bold;
+	color: white;
+	padding: 1vw 2vw;
+	border-radius: 5px;
+	top: 55%;
+	left: 50%;
+	transform: translate(-50%, 1vw);
+      }
+
+      .changePercentage.positive {
+        color: green;
+      }
+
+      .changePercentage.negative {
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <span class="totalValue">1</span>
+      <span class="changePercentage {{ it.changePercentage >= 0 ? 'positive' : 'negative' }}">{{=it.changePercentage}}%</span>
+    </div>
+
+    <script>
+      const totalValue = {{=it.total}};
+      document.querySelector(".totalValue").textContent = totalValue.toLocaleString();
+      const fontCount = totalValue.toString().length / 5;
+      document
+        .querySelector(".totalValue")
+        .style.setProperty(
+          "--totalValue-length",
+          fontCount < 1 ? 1 : fontCount
+        );
+    </script>
+  </body>
+</html>

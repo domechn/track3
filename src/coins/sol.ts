@@ -8,15 +8,22 @@ export class SOLAnalyzer implements Analyzer {
 
 	private readonly queryUrl = "https://api.solscan.io/account"
 
+	private readonly fakeUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62"
+
 	constructor(config: Pick<TokenConfig, 'sol'>) {
 		this.config = config
 	}
 
 	private async query(address: string): Promise<number> {
+
 		const resp = await got.get(this.queryUrl, {
+			headers: {
+				referer: "https://solscan.io/",
+				"user-agent": this.fakeUA,
+			},
 			searchParams: {
-				address: address
-			}
+				address,
+			},
 		}).json() as { data: { lamports: number } }
 		const amount = resp.data.lamports / 1e9
 		return amount
