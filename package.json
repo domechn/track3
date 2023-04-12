@@ -15,6 +15,7 @@
     "@types/got": "^9.6.12",
     "@types/lodash": "^4.14.191",
     "@types/node": "^18.14.0",
+    "@types/user-agents": "^1.0.2",
     "@types/yaml": "^1.9.7",
     "@vercel/ncc": "^0.36.1",
     "typescript": "^4.9.5"
@@ -31,6 +32,7 @@
     "eta": "^2.0.1",
     "got": "^11.8.0",
     "lodash": "^4.17.21",
+    "user-agents": "^1.0.1347",
     "yaml": "^2.2.1"
   }
 }

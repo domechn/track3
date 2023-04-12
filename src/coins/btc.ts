@@ -1,7 +1,7 @@
 import bluebird from 'bluebird'
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
-import got from 'got'
+import { gotWithFakeUA } from '../utils/http'
 
 export class BTCAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'btc'>
@@ -13,7 +13,7 @@ export class BTCAnalyzer implements Analyzer {
 	}
 
 	private async query(address: string): Promise<number> {
-		const balance = await got.get(this.queryUrl + address).text()
+		const balance = await gotWithFakeUA().get(this.queryUrl + address).text()
 		const amount = _(balance).toNumber() / 1e8
 		return amount
 	}

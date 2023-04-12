@@ -1,7 +1,7 @@
 import bluebird from 'bluebird'
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
-import got from 'got'
+import { gotWithFakeUA } from '../utils/http'
 
 export class SOLAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'sol'>
@@ -16,10 +16,9 @@ export class SOLAnalyzer implements Analyzer {
 
 	private async query(address: string): Promise<number> {
 
-		const resp = await got.get(this.queryUrl, {
+		const resp = await gotWithFakeUA().get(this.queryUrl, {
 			headers: {
 				referer: "https://solscan.io/",
-				"user-agent": this.fakeUA,
 			},
 			searchParams: {
 				address,

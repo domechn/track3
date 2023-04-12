@@ -1,7 +1,7 @@
 import bluebird from 'bluebird'
-import got from 'got'
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
+import { gotWithFakeUA } from '../utils/http'
 
 type DeBankAssetResp = {
 	coin_list: Coin[]
@@ -17,7 +17,7 @@ export class ERC20Analyzer implements Analyzer {
 	}
 
 	private async query(address: string): Promise<Coin[]> {
-		const { data } = await got.get(this.queryUrl, {
+		const { data } = await gotWithFakeUA().get(this.queryUrl, {
 			searchParams: {
 				user_addr: address,
 			}

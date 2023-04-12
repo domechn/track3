@@ -1,7 +1,7 @@
 import bluebird from 'bluebird'
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
-import got from 'got'
+import { gotWithFakeUA } from '../utils/http'
 
 export class DOGEAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'doge'>
@@ -13,7 +13,7 @@ export class DOGEAnalyzer implements Analyzer {
 	}
 
 	private async query(address: string): Promise<number> { 
-		const resp = await got.get(this.queryUrl + address).json() as { balance: number}
+		const resp = await gotWithFakeUA().get(this.queryUrl + address).json() as { balance: number}
 		const amount = _(resp.balance).toNumber()
 		return amount
 	}
