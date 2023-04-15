@@ -3,23 +3,31 @@ import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
 import { gotWithFakeUA } from '../utils/http'
 
+interface BTCQuerier {
+	query(address: string): Promise<number>
+}
+
 export class BTCAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'btc'>
 
-	private readonly queryUrl = "https://blockchain.info/q/addressbalance/"
+	private btcQueriers: BTCQuerier[]
 
 	constructor(config: Pick<TokenConfig, 'btc'>) {
 		this.config = config
-	}
-
-	private async query(address: string): Promise<number> {
-		const balance = await gotWithFakeUA().get(this.queryUrl + address).text()
-		const amount = _(balance).toNumber() / 1e8
-		return amount
+		this.btcQueriers = [new BlockCypher(), new Blockchain()]
 	}
 
 	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await bluebird.map(this.config.btc.addresses || [], async addr => this.query(addr), {
+		const coinLists = await bluebird.map(this.config.btc.addresses || [], async addr => {
+			for (const btcQuerier of this.btcQueriers) {
+				try {
+					return await btcQuerier.query(addr)
+				} catch (e) {
+					console.error(e)
+				}
+			}
+			throw new Error("All BTC queriers failed")
+		}, {
 			concurrency: 1,
 		})
 		return [{
@@ -27,4 +35,26 @@ export class BTCAnalyzer implements Analyzer {
 			amount: _(coinLists).sum(),
 		}]
 	}
+}
+
+class Blockchain implements BTCQuerier {
+	private readonly queryUrl = "https://blockchain.info/q/addressbalance/"
+
+	async query(address: string): Promise<number> {
+		const balance = await gotWithFakeUA().get(this.queryUrl + address).text()
+		const amount = _(balance).toNumber() / 1e8
+		return amount
+	}
+
+}
+
+class BlockCypher implements BTCQuerier {
+	private readonly queryUrl = "https://api.blockcypher.com/v1/btc/main/addrs/"
+
+	async query(address: string): Promise<number> {
+		const resp = await gotWithFakeUA().get(this.queryUrl + address).json() as { final_balance: number }
+
+		return resp.final_balance / 1e8
+	}
+
 }
