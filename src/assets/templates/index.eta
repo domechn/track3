@@ -1,5 +1,8 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <title>Assets Statistics</title>
+  </head>
   <body>
   <div style="padding: 20px 10px;">
   {{ it.templates.forEach((template, idx) => { }}

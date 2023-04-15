@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <title>Assets Statistics</title>
+  </head>
+  <head>
     <style>
       .container {
         display: flex;
