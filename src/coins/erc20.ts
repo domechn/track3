@@ -18,6 +18,10 @@ export class ERC20Analyzer implements Analyzer {
 
 	private async query(address: string): Promise<Coin[]> {
 		const { data } = await gotWithFakeUA().get(this.queryUrl, {
+			headers: {
+				origin: "https://debank.com",
+				referer: "https://debank.com/",
+			},
 			searchParams: {
 				user_addr: address,
 			}

@@ -11,12 +11,13 @@ import * as Eta from 'eta'
 import { TotalValue } from './totalValue'
 
 export default async function generateChartHtmlFiles(db: Database, output: string, showValue?: boolean) {
+	const tv = new TotalValue()
 	const ap = new AssetsPercentage(showValue)
 	const tcr = new TopCoinsRank()
 	const as = new AssetChange()
 	const cac = new CoinsAmountChange()
-	const tv = new TotalValue()
-	const gens = [ap, tcr, as, cac, tv]
+	// the order determines the order of the charts in the index.html
+	const gens = [[tv], [ap, tcr], [as, cac]]
 	const data = await db.queryDatabase(30, 'desc')
 
 	if (data.length === 0) {
@@ -26,19 +27,19 @@ export default async function generateChartHtmlFiles(db: Database, output: strin
 	const latestModels = data[0]
 	const historicalModels = data.slice(1)
 
-	await bluebird.map(gens, async g => g.renderToFile(latestModels, historicalModels, output), { concurrency: 1 })
+	await bluebird.map(_(gens).flatten().value(), async g => g.renderToFile(latestModels, historicalModels, output), { concurrency: 1 })
 
 	await renderIndexFile(gens, output)
 }
 
-async function renderIndexFile(charts: BaseChart[], outputDir: string) {
+async function renderIndexFile(charts: BaseChart[][], outputDir: string) {
 	if (!charts) {
 		return
 	}
 
-	const templates = _(charts).map(t => t.getTemplateId()).value()
+	const templates = _(charts).map(ts => _(ts).map(t => t.getTemplateId()).value()).value()
 	const tplId = 'index'
-	const tpl = charts[0].getTemplate(tplId)
+	const tpl = _(charts).flatten().first()!.getTemplate(tplId)
 
 	const payload = {
 		templates,

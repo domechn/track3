@@ -26,7 +26,7 @@ export class TotalValue extends BaseChart {
 		const currentTotalValue = getTotalValue(latestCQD)
 		const lastTotalValue = lastOne ? getTotalValue(lastOne) : undefined
 
-		const changePercentage = lastTotalValue ? (currentTotalValue - lastTotalValue) / lastTotalValue : undefined
+		const changePercentage = lastTotalValue ? (currentTotalValue - lastTotalValue) / lastTotalValue * 100 : undefined
 
 		return {
 			total: currentTotalValue,

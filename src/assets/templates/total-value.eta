@@ -47,7 +47,7 @@
     <div class="container">
       <span class="totalValue">0</span>
       {{ if (it.changePercentage !== undefined ) { }}
-      <span class="changePercentage {{ if ( it.changePercentage >= 0 ) { }}positive{{ } else { }}negative{{ } }}">{{ if (it.changePercentage > 0) { }}+{{ } else if (it.changePercentage < 0) { }}-{{ } }}{{=it.changePercentage.toLocaleString()}}%</span>
+      <span class="changePercentage {{ if ( it.changePercentage >= 0 ) { }}positive{{ } else { }}negative{{ } }}">{{ if (it.changePercentage > 0) { }}+{{ } }}{{=it.changePercentage.toLocaleString()}}%</span>
       {{ } }}
     </div>
 
