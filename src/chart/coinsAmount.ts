@@ -32,7 +32,7 @@ export class CoinsAmountChange extends BaseChart {
 
 	// only need latest models
 	async getRenders(latestCQD: CoinQueryDetail[], historicalCQD: CoinQueryDetail[][]): Promise<{ [key: string]: unknown }> {
-		const details = _([latestCQD, ...historicalCQD]).reverse().take(this.xSize).value()
+		const details = _([latestCQD, ...historicalCQD]).take(this.xSize).reverse().value()
 
 		const coins = _(details).flattenDeep().filter(c => c.model.symbol.toLowerCase() != "others").groupBy(c => c.model.symbol).value()
 

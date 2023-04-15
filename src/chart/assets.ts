@@ -30,7 +30,7 @@ export class AssetChange extends BaseChart {
 
 	// only need latest models
 	async getRenders(latestCQD: CoinQueryDetail[], historicalCQD: CoinQueryDetail[][]): Promise<{ [key: string]: unknown }> {
-		const details = _([latestCQD, ...historicalCQD]).reverse().take(this.xSize).value()
+		const details = _([latestCQD, ...historicalCQD]).take(this.xSize).reverse().value()
 
 		const getTotalValue = (coins: CoinQueryDetail[]): number => _(coins).sumBy(c => c.model.value)
 
