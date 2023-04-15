@@ -6,7 +6,15 @@ export function gotWithFakeUA() {
 	const gotInstance = got.extend({
 		headers: {
 			"user-agent": ua.toString(),
-		}
+		},
+		// hooks: {
+		// 	beforeRequest: [
+		// 		options => {
+		// 			console.log(options.headers);
+					
+		// 		}
+		// 	]
+		// }
 	})
 	return gotInstance
 }

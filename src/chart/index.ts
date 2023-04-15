@@ -8,13 +8,15 @@ import bluebird from 'bluebird'
 import { BaseChart } from './chart'
 import { promises } from 'fs'
 import * as Eta from 'eta'
+import { TotalValue } from './totalValue'
 
 export default async function generateChartHtmlFiles(db: Database, output: string, showValue?: boolean) {
 	const ap = new AssetsPercentage(showValue)
 	const tcr = new TopCoinsRank()
 	const as = new AssetChange()
 	const cac = new CoinsAmountChange()
-	const gens = [ap, tcr, as, cac]
+	const tv = new TotalValue()
+	const gens = [ap, tcr, as, cac, tv]
 	const data = await db.queryDatabase(30, 'desc')
 
 	if (data.length === 0) {
