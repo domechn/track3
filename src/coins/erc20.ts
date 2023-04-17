@@ -30,7 +30,7 @@ export class ERC20Analyzer implements Analyzer {
 		return _([data.coin_list, data.token_list]).flatten().value()
 	}
 	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await bluebird.map(this.config.erc20.addresses || [], async addr => this.query(addr))
+		const coinLists = await bluebird.map(this.config.erc20.addresses || [], async addr => this.query(addr), { concurrency: 1 })
 		return _(coinLists).flatten().value()
 	}
 }

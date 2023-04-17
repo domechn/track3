@@ -27,7 +27,7 @@ yarn gen -o output
 
 [Online Demo](https://asset-statistics-pages.vercel.app/mocked/index.html)
 
-![demo](./images/demo.png)
+![demo](./images/demo.jpeg)
 
 ## Known Issues
 
