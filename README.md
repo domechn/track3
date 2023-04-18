@@ -39,6 +39,7 @@ yarn gen -o output
 Thanks for these platform who provide powerful APIs without API Key. Fuck API Key.
 
 - https://blockchain.info
+- https://blockcypher.com
 - https://dogechain.info
 - https://debank.com
 - https://solscan.io
