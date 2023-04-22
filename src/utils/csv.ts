@@ -49,18 +49,3 @@ export async function writeCSV<T extends CSVRow>(filePath: string, data: T[]): P
 		stream.end()
 	})
 }
-
-// (async () => {
-//   try {
-//     const people = await readCSV<{ name: string; age: number; city: string }>('people.csv');
-//     console.log(people);
-
-//     const newPerson = { name: 'John', age: 30, city: 'New York' };
-//     people.push(newPerson);
-
-//     await writeCSV('people.csv', people);
-//     console.log('CSV file written successfully.');
-//   } catch (err) {
-//     console.error(err);
-//   }
-// })();

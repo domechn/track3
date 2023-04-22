@@ -1,21 +1,18 @@
-import bluebird from 'bluebird'
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
 import { gotWithFakeUA } from '../utils/http'
+import { asyncMap } from '../utils/async'
 
 export class SOLAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'sol'>
 
 	private readonly queryUrl = "https://api.solscan.io/account"
 
-	private readonly fakeUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62"
-
 	constructor(config: Pick<TokenConfig, 'sol'>) {
 		this.config = config
 	}
 
 	private async query(address: string): Promise<number> {
-
 		const resp = await gotWithFakeUA().get(this.queryUrl, {
 			headers: {
 				referer: "https://solscan.io/",
@@ -29,9 +26,7 @@ export class SOLAnalyzer implements Analyzer {
 	}
 
 	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await bluebird.map(this.config.sol.addresses || [], async addr => this.query(addr), {
-			concurrency: 1,
-		})
+		const coinLists = await asyncMap(this.config.sol.addresses || [], async addr => this.query(addr), 1, 1000)
 		return [{
 			symbol: "SOL",
 			amount: _(coinLists).sum(),

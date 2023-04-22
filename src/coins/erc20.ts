@@ -1,7 +1,7 @@
-import bluebird from 'bluebird'
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
-import { gotWithFakeUA } from '../utils/http'
+import { getFakeUA, gotWithFakeUA } from '../utils/http'
+import { asyncMap } from '../utils/async'
 
 type DeBankAssetResp = {
 	coin_list: Coin[]
@@ -21,6 +21,7 @@ export class ERC20Analyzer implements Analyzer {
 			headers: {
 				origin: "https://debank.com",
 				referer: "https://debank.com/",
+				"sec-ch-ua": getFakeUA()
 			},
 			searchParams: {
 				user_addr: address,
@@ -30,7 +31,7 @@ export class ERC20Analyzer implements Analyzer {
 		return _([data.coin_list, data.token_list]).flatten().value()
 	}
 	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await bluebird.map(this.config.erc20.addresses || [], async addr => this.query(addr), { concurrency: 1 })
+		const coinLists = await asyncMap(this.config.erc20.addresses || [], async addr => this.query(addr), 1, 1000)
 		return _(coinLists).flatten().value()
 	}
 }

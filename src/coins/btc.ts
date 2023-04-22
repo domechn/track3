@@ -1,7 +1,7 @@
-import bluebird from 'bluebird'
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
 import { gotWithFakeUA } from '../utils/http'
+import { asyncMap } from '../utils/async'
 
 interface BTCQuerier {
 	query(address: string): Promise<number>
@@ -17,19 +17,19 @@ export class BTCAnalyzer implements Analyzer {
 		this.btcQueriers = [new BlockCypher(), new Blockchain()]
 	}
 
-	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await bluebird.map(this.config.btc.addresses || [], async addr => {
-			for (const btcQuerier of this.btcQueriers) {
-				try {
-					return await btcQuerier.query(addr)
-				} catch (e) {
-					console.error(e)
-				}
+	async query(address: string): Promise<number> {
+		for (const btcQuerier of this.btcQueriers) {
+			try {
+				return await btcQuerier.query(address)
+			} catch (e) {
+				console.error(e)
 			}
-			throw new Error("All BTC queriers failed")
-		}, {
-			concurrency: 1,
-		})
+		}
+		throw new Error("All BTC queriers failed")
+	}
+
+	async loadPortfolio(): Promise<Coin[]> {
+		const coinLists = asyncMap(this.config.btc.addresses || [], async addr => this.query(addr), 1, 1000)
 		return [{
 			symbol: "BTC",
 			amount: _(coinLists).sum(),

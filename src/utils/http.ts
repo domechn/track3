@@ -1,11 +1,14 @@
 import got from 'got'
 import UserAgent from 'user-agents'
 
+export function getFakeUA() {
+	return (new UserAgent()).toString()
+}
+
 export function gotWithFakeUA(timeout = 5000) {
-	const ua = new UserAgent()
 	const gotInstance = got.extend({
 		headers: {
-			"user-agent": ua.toString(),
+			"user-agent": getFakeUA(),
 		},
 		timeout
 		// hooks: {
