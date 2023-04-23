@@ -2,6 +2,7 @@ import _ from "lodash"
 import { Analyzer, CexConfig, Coin } from '../../types'
 import bluebird from 'bluebird'
 import { OtherCexExchanges } from './others'
+import { BinanceExchange } from './binance'
 
 export interface Exchanger {
 	// return all coins in exchange
@@ -20,9 +21,15 @@ export class CexAnalyzer implements Analyzer {
 		this.config = config
 
 		this.exchanges = _(_(config).get("exchanges", [])).map(exCfg => {
-
-			return new OtherCexExchanges(exCfg.name, exCfg.initParams)
-		}).value()
+			switch (exCfg.name) {
+				case "binance":
+					return new BinanceExchange(exCfg.initParams.apiKey, exCfg.initParams.secret)
+				case "okx" || "okex":
+					break
+				default:
+					return new OtherCexExchanges(exCfg.name, exCfg.initParams)
+			}
+		}).compact().value()
 	}
 
 	async loadPortfolio(): Promise<Coin[]> {

@@ -23,6 +23,7 @@
   "dependencies": {
     "@notionhq/client": "^2.2.3",
     "big.js": "^6.2.1",
+    "binance": "^2.5.4",
     "bluebird": "^3.7.2",
     "ccxt": "^2.8.24",
     "coingecko-api-v3": "^0.0.22",

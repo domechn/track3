@@ -60,7 +60,8 @@ async function main() {
 	const assets = await loadPortfolios(config)
 
 	const cc = new CoinGecko()
-	const priceMap = await cc.queryPrices(_(assets).map("symbol").value())
+	// add usdt to query always
+	const priceMap = await cc.queryPrices(_(assets).map("symbol").push("USDT").uniq().value())
 
 	let lastAssets = assets
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
