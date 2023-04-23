@@ -1,7 +1,7 @@
 import _ from "lodash"
 import yaml from 'yaml'
 import fs from "fs/promises"
-import { CexAnalyzer } from './coins/cex'
+import { CexAnalyzer } from './coins/cex/cex'
 import { ERC20Analyzer } from './coins/erc20'
 import { calculateTotalValue, combineCoinLists } from './utils/coins'
 import { CoinGecko } from './price/price'
