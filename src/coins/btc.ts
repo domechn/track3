@@ -20,7 +20,7 @@ export class BTCAnalyzer implements Analyzer {
 	async query(address: string): Promise<number> {
 		for (const btcQuerier of this.btcQueriers) {
 			try {
-				return await btcQuerier.query(address)
+				return btcQuerier.query(address)
 			} catch (e) {
 				console.error(e)
 			}
@@ -29,7 +29,7 @@ export class BTCAnalyzer implements Analyzer {
 	}
 
 	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = asyncMap(this.config.btc.addresses || [], async addr => this.query(addr), 1, 1000)
+		const coinLists = await asyncMap(this.config.btc.addresses || [], async addr => this.query(addr), 1, 1000)
 		return [{
 			symbol: "BTC",
 			amount: _(coinLists).sum(),

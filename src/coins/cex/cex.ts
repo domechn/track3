@@ -24,8 +24,8 @@ export class CexAnalyzer implements Analyzer {
 			switch (exCfg.name) {
 				case "binance":
 					return new BinanceExchange(exCfg.initParams.apiKey, exCfg.initParams.secret)
-				case "okx" || "okex":
-					break
+				// case "okx" || "okex":
+				// 	break
 				default:
 					return new OtherCexExchanges(exCfg.name, exCfg.initParams)
 			}

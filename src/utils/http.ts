@@ -1,8 +1,13 @@
 import got from 'got'
 import UserAgent from 'user-agents'
 
+let ua: string
+
 export function getFakeUA() {
-	return (new UserAgent()).toString()
+	if (!ua) {
+		ua = (new UserAgent()).toString()
+	}
+	return ua
 }
 
 export function gotWithFakeUA(timeout = 5000) {
@@ -15,7 +20,7 @@ export function gotWithFakeUA(timeout = 5000) {
 		// 	beforeRequest: [
 		// 		options => {
 		// 			console.log(options.headers);
-					
+
 		// 		}
 		// 	]
 		// }
