@@ -1,0 +1,28 @@
+.totalValue {
+  font-weight: bold;
+  width: 60%;
+  color: black;
+}
+
+.changePercentage {
+  font-weight: bold;
+  color: gray;
+  margin-left: 1vw;
+  border-radius: 5px;
+  transform: translate(-50%, 1vw);
+}
+
+.changePercentage.positive {
+  color: green;
+}
+
+.changePercentage.negative {
+  color: red;
+}
+
+.chartTitle {
+  font-size: 18px;
+  font-weight: bolder;
+  color: gray;
+  font-family: BM Jua;
+}
