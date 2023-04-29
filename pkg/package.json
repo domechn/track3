@@ -1,0 +1,37 @@
+{
+  "name": "track3-backend",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "npx tsc && yarn assets",
+    "assets": "cp -r src/assets dist",
+    "gen": "node dist/index.js"
+  },
+  "devDependencies": {
+    "@types/big.js": "^6.1.6",
+    "@types/bluebird": "^3.5.38",
+    "@types/color-diff": "^1.2.1",
+    "@types/command-line-args": "^5.2.0",
+    "@types/got": "^9.6.12",
+    "@types/lodash": "^4.14.191",
+    "@types/node": "^18.14.0",
+    "@types/user-agents": "^1.0.2",
+    "@types/yaml": "^1.9.7",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.3",
+    "big.js": "^6.2.1",
+    "binance": "^2.5.4",
+    "bluebird": "^3.7.2",
+    "ccxt": "^2.8.24",
+    "coingecko-api-v3": "^0.0.22",
+    "color-diff": "^1.2.0",
+    "command-line-args": "^5.2.1",
+    "csv-parser": "^3.0.0",
+    "eta": "^2.0.1",
+    "got": "^11.8.0",
+    "lodash": "^4.17.21",
+    "user-agents": "^1.0.1347",
+    "yaml": "^2.2.1"
+  }
+}

@@ -8,7 +8,6 @@ const Configuration = () => {
 
   const handleButtonClick = () => {
     setLoading(true);
-    console.log("handleButtonClick");
 
     setTimeout(() => {
 	      setLoading(false);

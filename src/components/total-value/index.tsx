@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./index.css";
+import { queryTotalValue } from '../../middlelayers/charts'
 
 const App = () => {
   const baseFontSize = 6;
@@ -7,8 +8,10 @@ const App = () => {
   const [changePercentage, setChangePercentage] = useState(0);
 
   useEffect(() => {
-    setTotalValue(1242394389594);
-    setChangePercentage(-9.221);
+    queryTotalValue().then(data=>{
+    setTotalValue(data.totalValue);
+    setChangePercentage(data.changePercentage);
+    })
   }, []);
 
   function formatTotalValue() {
@@ -16,7 +19,7 @@ const App = () => {
   }
 
   function formatChangePercentage() {
-    return `${changePercentage}%`;
+    return `${changePercentage.toLocaleString()}%`;
   }
 
   function fontCount() {

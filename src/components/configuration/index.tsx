@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import "./index.css";
 import gearIcon from "./gear-icon.png";
 import SimpleEditor from "../simple-editor";
+import {
+  getConfiguration,
+  saveConfiguration,
+} from "../../middlelayers/configuration";
+import Loading from "../loading";
 
 const initialConfiguration = `configs:
   groupUSD: true # combine all USD stablecoins into USDT
@@ -38,16 +43,19 @@ database: # save data to database ( optional )
     databaseId: # database id
   csv:
     outputDir: # output directory
-`
+`;
 
 const Configuration = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [configuration, setConfiguration] = useState(initialConfiguration);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-	// setConfiguration("a: 1")
-  }, [])
-  
+    setLoading(true);
+    getConfiguration()
+      .then((d) => setConfiguration(d?.data ?? initialConfiguration))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleButtonClick = () => {
     setIsModalOpen(true);
@@ -60,11 +68,15 @@ const Configuration = () => {
   };
 
   function onEditorSubmit(val: string) {
-    console.log(val);
+    setLoading(true);
+    saveConfiguration(val)
+      .then(() => setIsModalOpen(false))
+      .finally(() => setLoading(false));
   }
 
   return (
     <div>
+      <Loading loading={loading} />
       <button className="gear-button" onClick={handleButtonClick}>
         <img
           src={gearIcon}
@@ -86,6 +98,6 @@ const Configuration = () => {
       )}
     </div>
   );
-}
+};
 
 export default Configuration;

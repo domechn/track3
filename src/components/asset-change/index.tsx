@@ -4,11 +4,8 @@ import {
   useWindowSize,
 } from "../../utils/hook";
 import { timestampToDate } from '../../utils/date'
-
-type AssetChangeData = {
-  timestamps: number[];
-  data: number[];
-};
+import { AssetChangeData } from '../../middlelayers/types'
+import { queryAssetChange } from '../../middlelayers/charts'
 
 const App = () => {
   const lineColor = "rgba(255, 99, 71, 1)";
@@ -21,18 +18,7 @@ const App = () => {
   const size = useWindowSize();
 
   useEffect(() => {
-    setData({
-      timestamps: [
-        1640995200000, 1641081600000, 1641168000000, 1641254400000,
-        1641340800000, 1641427200000, 1641513600000, 1641600000000,
-        1641686400000, 1641772800000,
-      ],
-      data: [
-        22544.8211354334, 19650.42, 22006.24999999997, 21419.01,
-        21246.53000000006, 31684.81, 29099.96, 40718.17999999996,
-        39184.47000000003, 39085.53,
-      ],
-    });
+    queryAssetChange().then(d=>setData(d))
   }, []);
 
   const options = {

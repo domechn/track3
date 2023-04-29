@@ -1,48 +1,16 @@
 import { useEffect, useState } from "react";
 import { Doughnut } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
-import type { ChartOptions } from "chart.js";
-import ChartDataLabels from "chartjs-plugin-datalabels";
+import { LatestAssetsPercentageData } from '../../middlelayers/types'
+import { queryLatestAssetsPercentage } from '../../middlelayers/charts'
 
-type LatestAssetsPercentageData = {
-  coin: string;
-  percentage: number;
-  chartColor: string;
-}[];
 
 const App = () => {
   const [data, setData] = useState([] as LatestAssetsPercentageData);
   const size = useWindowSize();
 
   useEffect(() => {
-    const loadedData = [
-      {
-        coin: "BTC",
-        percentage: 29.8,
-        chartColor: "#f7931a",
-      },
-      {
-        coin: "ETH",
-        percentage: 15.2,
-        chartColor: "#627eea",
-      },
-      {
-        coin: "ADA",
-        percentage: 8.2,
-        chartColor: "#3ccfcf",
-      },
-      {
-        coin: "BNB",
-        percentage: 4.9,
-        chartColor: "#f3ba2f",
-      },
-      {
-        coin: "OTHERS",
-        percentage: 41.9,
-        chartColor: "#a1a1e8",
-      },
-    ] as LatestAssetsPercentageData;
-    setData(loadedData);
+    queryLatestAssetsPercentage().then(d=>setData(d))
   }, []);
 
   const options = {
@@ -65,7 +33,7 @@ const App = () => {
           }
         ) => {
           const label = context.chart.data.labels[context.dataIndex];
-          return `${label}: ${value}%`;
+          return `${label}: ${value.toLocaleString()}%`;
         },
       },
     },
@@ -92,7 +60,7 @@ const App = () => {
           height: Math.max((size.height || 100) / 2, 400),
         }}
       >
-        <Doughnut options={options as ChartOptions} data={lineData()} />
+        <Doughnut options={options as any} data={lineData()} />
       </div>
     </div>
   );
