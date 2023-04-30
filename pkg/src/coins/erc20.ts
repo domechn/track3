@@ -21,7 +21,7 @@ export class ERC20Analyzer implements Analyzer {
 			headers: {
 				origin: "https://debank.com",
 				referer: "https://debank.com/",
-				"sec-ch-ua": getFakeUA()
+				"sec-ch-ua": `"Chromium";v="112", "Microsoft Edge";v="112", "Not:A-Brand";v="99"`
 			},
 			searchParams: {
 				user_addr: address,

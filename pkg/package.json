@@ -1,9 +1,8 @@
 {
-  "name": "track3-backend",
+  "name": "track3-loader",
   "version": "0.1.0",
   "scripts": {
-    "build": "npx tsc && yarn assets",
-    "assets": "cp -r src/assets dist",
+    "build": "npx tsc",
     "gen": "node dist/index.js"
   },
   "devDependencies": {
@@ -31,6 +30,7 @@
     "eta": "^2.0.1",
     "got": "^11.8.0",
     "lodash": "^4.17.21",
+    "sqlite3": "^5.1.6",
     "user-agents": "^1.0.1347",
     "yaml": "^2.2.1"
   }

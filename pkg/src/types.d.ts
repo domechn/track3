@@ -8,9 +8,20 @@ export interface Analyzer {
 }
 
 export interface Database {
+
+	initDatabase(): Promise<void>
+
+	loadConfiguration(): Promise<GlobalConfig>
+
 	saveToDatabase(models: CoinModel[]): Promise<void>
 
 	queryDatabase(recordSize = 30, dateSort?: 'desc' | 'asc'): Promise<CoinQueryDetail[][]>
+
+	close(): Promise<void>
+}
+
+export type GlobalConfig = CexConfig & TokenConfig & {
+	database: DatabaseConfig
 }
 
 export type CexConfig = {
@@ -39,9 +50,8 @@ export type TokenConfig = {
 }
 
 export type DatabaseConfig = {
-	notion?: {
-		token: string
-		databaseId: string
+	sqlite3: {
+		path: string
 	}
 }
 
