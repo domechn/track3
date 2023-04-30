@@ -11,7 +11,6 @@ import { DOGEAnalyzer } from './coins/doge'
 import { CexConfig, Coin, TokenConfig } from './types'
 import { closeDatabases, getDatabases, getOneDatabase, saveToDatabases } from './database'
 import commandLineArgs, { OptionDefinition } from 'command-line-args'
-
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
 

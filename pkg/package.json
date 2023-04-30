@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "scripts": {
     "build": "npx tsc",
-    "gen": "node dist/index.js"
+    "package": "ncc build dist -o public",
+    "binary": "pkg public/index.js --output bin/track3-loader && cp public/lib/binding/napi-v6-darwin-unknown-x64/node_sqlite3.node bin/",
+    "all": "yarn build && yarn package && yarn binary"
   },
   "devDependencies": {
     "@types/big.js": "^6.1.6",
@@ -15,6 +17,8 @@
     "@types/node": "^18.14.0",
     "@types/user-agents": "^1.0.2",
     "@types/yaml": "^1.9.7",
+    "@vercel/ncc": "^0.36.1",
+    "pkg": "^5.8.1",
     "typescript": "^4.9.5"
   },
   "dependencies": {
