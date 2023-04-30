@@ -111,7 +111,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	]
 
 	const assets = await queryAssets(size) || []
-	if (!assets) {
+	if (assets.length === 0) {
 		return []
 	}
 
