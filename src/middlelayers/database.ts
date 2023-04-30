@@ -35,6 +35,7 @@ export async function initTables(db: Database) {
 	// 	top10,
 	// 	amount10,
 	// 	value10,
+	// 	topOthers,
 	// 	amountOthers,
 	// 	valueOthers,
 	// 	total
@@ -52,7 +53,6 @@ export async function initTables(db: Database) {
 	// 	4,
 	// 	4000,
 	// 	"BCH",
-
 	// 	5,
 	// 	5000,
 	// 	"BSV",
@@ -70,6 +70,7 @@ export async function initTables(db: Database) {
 	// 	"LINK",
 	// 	10,
 	// 	10000,
+	// 	"Others",
 	// 	100000,
 	// 	1000000,
 	// 	1000001
@@ -109,6 +110,7 @@ export async function initTables(db: Database) {
 		top10 TEXT,
 		value10 REAL,
 		amount10 REAL,
+		topOthers TEXT,
 		valueOthers REAL,
 		amountOthers TEXT,
 		total REAL

@@ -1,14 +1,10 @@
 import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
-import { timestampToDate } from '../../utils/date'
-
-type CoinsAmountChangeData = {
-  coin: string;
-  lineColor: string;
-  amounts: number[];
-  timestamps: number[];
-}[];
+import { timestampToDate } from "../../utils/date";
+import { CoinsAmountChangeData } from "../../middlelayers/types";
+import { queryCoinsAmountChange } from "../../middlelayers/charts";
+import "./index.css";
 
 const App = () => {
   const [data, setData] = useState([] as CoinsAmountChangeData);
@@ -16,27 +12,12 @@ const App = () => {
   const size = useWindowSize();
 
   useEffect(() => {
-    const loadedData = [
-      {
-        coin: "BTC",
-        lineColor: "rgba(80, 10, 71, 1)",
-        amounts: [
-          55.98759681758725, 55.988746335189, 55.96256739237964,
-          56.01501429334957, 55.966802196756, 55.96769667261728,
-          55.96769667261728, 55.96828002261728, 55.96828002261728,
-          55.96828002261728,
-        ],
-        timestamps: [
-          1640995200000, 1641081600000, 1641168000000, 1641254400000,
-          1641340800000, 1641427200000, 1641513600000, 1641600000000,
-          1641686400000, 1641772800000,
-        ],
-      },
-    ] as CoinsAmountChangeData;
-    setData(loadedData);
-    if (loadedData.length > 0) {
-      setCurrentCoinSelected(loadedData[0].coin);
-    }
+    queryCoinsAmountChange().then((d) => {
+      setData(d);
+      if (d.length > 0) {
+        setCurrentCoinSelected(d[0].coin);
+      }
+    });
   }, []);
 
   const options = {
@@ -49,7 +30,7 @@ const App = () => {
       },
       datalabels: {
         display: false,
-      }
+      },
     },
     scales: {
       x: {
@@ -106,8 +87,8 @@ const App = () => {
 
   return (
     <div>
-      <div>
-        <select name="coins" id="coins" onChange={onCoinSelectChange}>
+      <label className="nice-select">
+        <select id="slct" name="coins" onChange={onCoinSelectChange}>
           {data.map((d) => {
             return (
               <option key={d.coin} value={d.coin}>
@@ -116,7 +97,10 @@ const App = () => {
             );
           })}
         </select>
-      </div>
+        <svg>
+          <use xlinkHref="#select-arrow-down"></use>
+        </svg>
+      </label>
       <div
         style={{
           height: Math.max((size.height || 100) / 2, 350),
@@ -124,6 +108,11 @@ const App = () => {
       >
         <Line options={options} data={chartDataByCoin(currentCoinSelected)} />
       </div>
+      <svg className="sprites">
+        <symbol id="select-arrow-down" viewBox="0 0 10 6">
+          <polyline points="1 1 5 5 9 1"></polyline>
+        </symbol>
+      </svg>
     </div>
   );
 };

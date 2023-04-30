@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase } from './database'
-import { AssetChangeData, AssetModel, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
+import { AssetChangeData, AssetModel, CoinsAmountChangeData, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
 
 
 async function queryAssets(size = 1): Promise<AssetModel[]> {
@@ -45,11 +45,13 @@ export async function queryTopCoinsRank(): Promise<TopCoinsRankData> {
 
 	const assets = await queryAssets(size) || []
 
+	const reservedAssets = _(assets).reverse().value()
+
 	const getRankData = (symbol: string): {
 		timestamp: number,
 		rank: number
 	}[] => {
-		return _(assets).filter(asset => Object.values(asset).includes(symbol))
+		return _(reservedAssets).filter(asset => Object.values(asset).includes(symbol))
 			.map(asset => {
 				const [key, value] = Object.entries(asset).find(([key, value]) => value === symbol)!
 				const idxStr = key.slice("top".length)
@@ -61,18 +63,22 @@ export async function queryTopCoinsRank(): Promise<TopCoinsRankData> {
 	}
 
 
-	const coins = _(assets).map(asset => _(asset).pickBy((k, v) => v.startsWith("top")).values().value() as string[]).flatten().uniq().value()
+	const coins = getCoins(reservedAssets)
 	const colors = generateRandomColors(coins.length)
 
 
 	return {
-		timestamps: assets.map(t => new Date(t.createdAt).getTime()),
-		coins: coins.map((coin, idx) => ({
+		timestamps: _(reservedAssets).map(t => new Date(t.createdAt).getTime()).value(),
+		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
 			rankData: getRankData(coin),
-		}))
+		})).value()
 	}
+}
+
+function getCoins(assets: AssetModel[]): string[] {
+	return _(assets).map(asset => _(asset).pickBy((k, v) => v.startsWith("top")).values().value() as string[]).flatten().uniq().filter(c => c.toLowerCase() !== "others").value()
 }
 
 export async function queryAssetChange(): Promise<AssetChangeData> {
@@ -80,9 +86,11 @@ export async function queryAssetChange(): Promise<AssetChangeData> {
 
 	const assets = await queryAssets(size) || []
 
+	const reservedAssets = _(assets).reverse().value()
+
 	return {
-		timestamps: assets.map(t => new Date(t.createdAt).getTime()),
-		data: assets.map(t => t.total)
+		timestamps: reservedAssets.map(t => new Date(t.createdAt).getTime()),
+		data: reservedAssets.map(t => t.total)
 	}
 }
 
@@ -125,4 +133,45 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 		...v,
 		chartColor: backgroundColors[idx]
 	})).value()
+}
+
+export async function queryCoinsAmountChange(): Promise<CoinsAmountChangeData> {
+	const size = 30
+
+	const assets = await queryAssets(size) || []
+	if (!assets) {
+		return []
+	}
+
+	const reservedAssets = _(assets).reverse().value()
+
+	const coins = getCoins(reservedAssets)
+
+	const colors = generateRandomColors(coins.length)
+
+	const getAmountsAndTimestamps = (symbol: string): {
+		amount: number,
+		timestamp: number
+	}[] => {
+		return _(reservedAssets).filter(asset => !!_(asset).values().find(v => v === symbol)).map(asset => {
+			const [key, value] = Object.entries(asset).find(([key, value]) => value === symbol)!
+			const idxStr = key.slice("top".length)
+			return {
+				amount: _(asset).get(`amount${idxStr}`) as unknown as number,
+				timestamp: new Date(asset.createdAt).getTime(),
+			}
+		}).value()
+	}
+
+
+	return _(coins).map((coin, idx) => {
+		const aat = getAmountsAndTimestamps(coin)
+		
+		return {
+			coin,
+			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
+			amounts: _(aat).map('amount').value(),
+			timestamps: _(aat).map('timestamp').value(),
+		}
+	}).value()
 }

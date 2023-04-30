@@ -31,6 +31,7 @@ export type AssetModel = {
 	top10: string
 	amount10: number
 	value10: number
+	topOthers: string
 	amountOthers: string
 	valueOthers: number
 	total: number
@@ -62,10 +63,17 @@ export type TotalValueData = {
 export type AssetChangeData = {
 	timestamps: number[]
 	data: number[]
-};
+}
 
 export type LatestAssetsPercentageData = {
-  coin: string;
-  percentage: number;
-  chartColor: string;
-}[];
+	coin: string
+	percentage: number
+	chartColor: string
+}[]
+
+export type CoinsAmountChangeData = {
+	coin: string
+	lineColor: string
+	amounts: number[]
+	timestamps: number[]
+}[]
