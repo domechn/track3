@@ -4,8 +4,12 @@
   "scripts": {
     "build": "npx tsc",
     "package": "ncc build dist -o public",
-    "binary:darwin_x86": "pkg public/index.js --output bin/track3-loader-x86_64-apple-darwin && cp public/lib/binding/napi-v6-darwin-unknown-x64/node_sqlite3.node bin/node_sqlite3.node-x86_64-apple-darwin",
-    "all": "yarn build && yarn package && yarn binary:darwin_x86",
+    "binary:darwin": "pkg public/index.js --output bin/track3-loader-x86_64-apple-darwin && cp public/lib/binding/*/node_sqlite3.node bin/node_sqlite3.node-x86_64-apple-darwin",
+    "binary:linux": "pkg public/index.js --output bin/track3-loader-x86_64-unknown-linux-gnu && cp public/lib/binding/*/node_sqlite3.node bin/node_sqlite3.node-x86_64-unknown-linux-gnu",
+    "binary:win": "pkg public/index.js --output bin/track3-loader-x86_64-pc-windows-msvc.exe && cp public/lib/binding/*/node_sqlite3.node bin/node_sqlite3.node-x86_64-pc-windows-msvc.exe",
+    "all:darwin": "yarn build && yarn package && yarn binary:darwin",
+    "all:linux": "yarn build && yarn package && yarn binary:linux",
+    "all:win": "yarn build && yarn package && yarn binary:win",
     "start": "node dist/index.js"
   },
   "devDependencies": {
