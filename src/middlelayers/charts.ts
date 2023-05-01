@@ -159,9 +159,10 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 }
 
 export async function queryCoinsAmountChange(): Promise<CoinsAmountChangeData> {
-	const size = 30
+	const querySize = 30
+	const size = 10
 
-	const assets = await queryAssets(size) || []
+	const assets = await queryAssets(querySize) || []
 	if (!assets) {
 		return []
 	}
@@ -193,8 +194,8 @@ export async function queryCoinsAmountChange(): Promise<CoinsAmountChangeData> {
 		return {
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
-			amounts: _(aat).map('amount').value(),
-			timestamps: _(aat).map('timestamp').value(),
+			amounts: _(aat).map('amount').reverse().take(size).reverse().value(),
+			timestamps: _(aat).map('timestamp').reverse().take(size).reverse().value(),
 		}
 	}).value()
 }

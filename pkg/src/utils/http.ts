@@ -15,7 +15,7 @@ export function gotWithFakeUA(timeout = 5000) {
 		headers: {
 			"user-agent": getFakeUA(),
 		},
-		timeout
+		timeout,
 		// hooks: {
 		// 	beforeRequest: [
 		// 		options => {

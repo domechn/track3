@@ -34,7 +34,7 @@ function command() {
 }
 
 async function loadPortfolios(config: CexConfig & TokenConfig): Promise<Coin[]> {
-	const coinLists = await bluebird.map([CexAnalyzer, ERC20Analyzer, BTCAnalyzer, SOLAnalyzer, DOGEAnalyzer, OthersAnalyzer], async ana => {
+	const coinLists = await bluebird.map([ERC20Analyzer, CexAnalyzer, BTCAnalyzer, SOLAnalyzer, DOGEAnalyzer, OthersAnalyzer], async ana => {
 		console.log("loading portfolio from ", ana.name)
 
 		const a = new ana(config)
@@ -43,7 +43,7 @@ async function loadPortfolios(config: CexConfig & TokenConfig): Promise<Coin[]> 
 
 		return portfolio
 	}, {
-		concurrency: 1
+		concurrency: 3
 	})
 	const assets = combineCoinLists(coinLists)
 	return assets
