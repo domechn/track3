@@ -7,14 +7,11 @@ import { appDataDir } from '@tauri-apps/api/path'
 import { Command } from '@tauri-apps/api/shell'
 import { path } from '@tauri-apps/api'
 
-
 export async function refreshAllData() {
 	const appDataDirPath = await appDataDir()
 
 	const dbPath = await path.join(appDataDirPath, databaseName)
 
-	console.log(dbPath);
-	
 	const command = Command.sidecar("../pkg/bin/track3-loader", ["-c", "refresh", "-d", dbPath])
 	const out = await command.execute()
 	if (out.code !== 0) {
@@ -33,8 +30,7 @@ async function queryAssets(size = 1): Promise<AssetModel[]> {
 }
 
 export async function queryTotalValue(): Promise<TotalValueData> {
-
-	const results = await queryAssets()
+	const results = await queryAssets(2)
 
 	if (results.length === 0) {
 		return {
@@ -46,6 +42,7 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 	const latest = results[0]
 
 	let changePercentage = 0
+	
 	if (results.length === 2) {
 		const previous = results[1]
 

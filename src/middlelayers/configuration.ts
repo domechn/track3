@@ -2,13 +2,11 @@ import { getDatabase } from './database'
 import { ConfigurationModel } from './types'
 import yaml from 'yaml'
 
-
 export async function getConfiguration(): Promise<ConfigurationModel | undefined> {
 	const db = await getDatabase()
 	const assets = await db.select<ConfigurationModel[]>(`SELECT * FROM configuration where id = 1`)
 	return assets[0]
 }
-
 
 export async function saveConfiguration(data: string) {
 	// validate data is yaml

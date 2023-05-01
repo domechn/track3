@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./index.css";
 
 const SimpleEditor = ({data, onSubmit} : {
@@ -6,6 +6,10 @@ const SimpleEditor = ({data, onSubmit} : {
 	  onSubmit: (d: string) => unknown
 }) => {
   const [inputData, setInputData] = useState(data);
+
+  useEffect(()=>{
+    setInputData(data)
+  }, [data])
 
   const handleChange = (event: { target: { value: React.SetStateAction<string> } }) => {
     const newValue = event.target.value;

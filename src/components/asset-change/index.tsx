@@ -1,25 +1,14 @@
-import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import {
   useWindowSize,
 } from "../../utils/hook";
 import { timestampToDate } from '../../utils/date'
 import { AssetChangeData } from '../../middlelayers/types'
-import { queryAssetChange } from '../../middlelayers/charts'
 
-const App = () => {
+const App = ({data}: {data: AssetChangeData}) => {
   const lineColor = "rgba(255, 99, 71, 1)";
 
-  const [data, setData] = useState({
-    timestamps: [],
-    data: [],
-  } as AssetChangeData);
-
   const size = useWindowSize();
-
-  useEffect(() => {
-    queryAssetChange().then(d=>setData(d))
-  }, []);
 
   const options = {
     maintainAspectRatio: false,

@@ -3,22 +3,17 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
 import { CoinsAmountChangeData } from "../../middlelayers/types";
-import { queryCoinsAmountChange } from "../../middlelayers/charts";
 import "./index.css";
 
-const App = () => {
-  const [data, setData] = useState([] as CoinsAmountChangeData);
+const App = ({ data }: { data: CoinsAmountChangeData }) => {
   const [currentCoinSelected, setCurrentCoinSelected] = useState("");
   const size = useWindowSize();
 
   useEffect(() => {
-    queryCoinsAmountChange().then((d) => {
-      setData(d);
-      if (d.length > 0) {
-        setCurrentCoinSelected(d[0].coin);
-      }
-    });
-  }, []);
+    if (data.length > 0) {
+      setCurrentCoinSelected(data[0].coin);
+    }
+  }, [data]);
 
   const options = {
     maintainAspectRatio: false,

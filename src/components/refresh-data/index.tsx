@@ -5,7 +5,9 @@ import { useState } from "react";
 import { refreshAllData } from "../../middlelayers/charts";
 import { Toaster, toast } from "react-hot-toast";
 
-const Configuration = () => {
+const App = ({afterRefresh}:{
+  afterRefresh?: (success:boolean) => unknown
+}) => {
   const [loading, setLoading] = useState(false);
 
   const handleButtonClick = () => {
@@ -22,6 +24,10 @@ const Configuration = () => {
           toast.error(refreshError.message);
         } else {
           toast.success("Refresh successfully!");
+        }
+
+        if (afterRefresh) {
+          afterRefresh(!refreshError);
         }
       });
   };
@@ -45,4 +51,4 @@ const Configuration = () => {
   );
 };
 
-export default Configuration;
+export default App;

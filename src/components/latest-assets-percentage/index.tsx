@@ -1,17 +1,9 @@
-import { useEffect, useState } from "react";
 import { Doughnut } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
-import { LatestAssetsPercentageData } from '../../middlelayers/types'
-import { queryLatestAssetsPercentage } from '../../middlelayers/charts'
+import { LatestAssetsPercentageData } from "../../middlelayers/types";
 
-
-const App = () => {
-  const [data, setData] = useState([] as LatestAssetsPercentageData);
+const App = ({ data }: { data: LatestAssetsPercentageData }) => {
   const size = useWindowSize();
-
-  useEffect(() => {
-    queryLatestAssetsPercentage().then(d=>setData(d))
-  }, []);
 
   const options = {
     maintainAspectRatio: false,

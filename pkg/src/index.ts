@@ -104,12 +104,6 @@ async function refreshData(sqliteDBPath: string) {
 
 	try {
 		await saveToDatabases(dbConfig.database, totals)
-
-		const db = getOneDatabase(dbConfig.database)
-		if (db) {
-			const coins = await db.queryDatabase(1)
-			console.log("query", coins)
-		}
 	} finally {
 		await closeDatabases(dbConfig.database)
 	}

@@ -1,137 +1,10 @@
-import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
-import { TopCoinsRankData } from '../../middlelayers/types'
-import { queryTopCoinsRank } from '../../middlelayers/charts'
+import { TopCoinsRankData } from "../../middlelayers/types";
 
-const App = () => {
-  const [data, setData] = useState({
-    timestamps: [],
-    coins: [],
-  } as TopCoinsRankData);
+const App = ({ data }: { data: TopCoinsRankData }) => {
   const size = useWindowSize();
-
-  useEffect(() => {
-    queryTopCoinsRank().then(d => setData(d))
-    // const loadedData = {
-    //   timestamps: [
-    //     1640995200000, 1641081600000, 1641168000000, 1641254400000,
-    //     1641340800000, 1641427200000, 1641513600000, 1641600000000,
-    //     1641686400000, 1641772800000,
-    //   ],
-    //   coins: [
-    //     {
-    //       coin: "BTC",
-    //       lineColor: "rgba(80, 10, 71, 1)",
-    //       rankData: [
-    //         {
-    //           rank: 1,
-    //           timestamp: 1640995200000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641081600000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641168000000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641254400000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641340800000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641427200000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641513600000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641600000000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641686400000,
-    //         },
-    //         {
-    //           rank: 1,
-    //           timestamp: 1641772800000,
-    //         },
-    //       ],
-    //     },
-    //     {
-    //       coin: "ETH",
-    //       lineColor: "rgba(255, 110, 31, 1)",
-    //       rankData: [
-    //         {
-    //           rank: 2,
-    //           timestamp: 1640995200000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641081600000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641168000000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641254400000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641340800000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641427200000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641513600000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641600000000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641686400000,
-    //         },
-    //         {
-    //           rank: 2,
-    //           timestamp: 1641772800000,
-    //         },
-    //       ],
-    //     },
-    //     {
-    //       coin: "BNB",
-    //       lineColor: "rgba(12, 50, 31, 1)",
-    //       rankData: [
-    //         {
-    //           rank: 3,
-    //           timestamp: 1640995200000,
-    //         },
-    //         {
-    //           rank: 3,
-
-    //           timestamp: 1641081600000,
-    //         },
-    //       ],
-    //     },
-    //   ],
-    // } as TopCoinsRankData;
-    // setData(loadedData);
-  }, []);
 
   const options = {
     maintainAspectRatio: false,
@@ -143,7 +16,7 @@ const App = () => {
       },
       datalabels: {
         display: false,
-      }
+      },
     },
     scales: {
       x: {

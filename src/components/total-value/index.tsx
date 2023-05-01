@@ -1,29 +1,24 @@
-import { useEffect, useState } from "react";
 import "./index.css";
-import { queryTotalValue } from '../../middlelayers/charts'
 
-const App = () => {
+const App = ({data}:{
+  data: {
+    totalValue: number,
+    changePercentage: number,
+  }
+}) => {
   const baseFontSize = 6;
-  const [totalValue, setTotalValue] = useState(0);
-  const [changePercentage, setChangePercentage] = useState(0);
 
-  useEffect(() => {
-    queryTotalValue().then(data=>{
-    setTotalValue(data.totalValue);
-    setChangePercentage(data.changePercentage);
-    })
-  }, []);
 
   function formatTotalValue() {
-    return `$${totalValue.toLocaleString()}`;
+    return `$${data.totalValue.toLocaleString()}`;
   }
 
   function formatChangePercentage() {
-    return `${changePercentage.toLocaleString()}%`;
+    return `${data.changePercentage.toLocaleString()}%`;
   }
 
   function fontCount() {
-    return Math.max(totalValue.toString().length / 10, 1);
+    return Math.max(data.totalValue.toString().length / 10, 1);
   }
 
   function totalValueFontSize() {
@@ -32,15 +27,15 @@ const App = () => {
   }
 
   function changePercentageFontSize() {
-    const size = baseFontSize / fontCount() / 3;
+    const size = baseFontSize / fontCount() / 2.5;
     return `${size}vw`;
   }
 
   function changePercentageColorClass() {
-    if (changePercentage === 0) {
+    if (data.changePercentage === 0) {
       return "";
     }
-    return changePercentage > 0 ? "positive" : "negative";
+    return data.changePercentage > 0 ? "positive" : "negative";
   }
 
   return (

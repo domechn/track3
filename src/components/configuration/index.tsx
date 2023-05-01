@@ -45,12 +45,25 @@ const Configuration = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    loadConfiguration();
+  }, []);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      loadConfiguration();
+    }
+  }, [isModalOpen])
+  
+
+  function loadConfiguration() {
     setLoading(true);
 
     getConfiguration()
-      .then((d) => setConfiguration(d?.data ?? initialConfiguration))
+      .then((d) => {
+        setConfiguration(d?.data ?? initialConfiguration);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }
 
   const handleButtonClick = () => {
     setIsModalOpen(true);
