@@ -4,8 +4,8 @@
   "scripts": {
     "build": "npx tsc",
     "package": "ncc build dist -o public",
-    "binary": "pkg public/index.js --output bin/track3-loader-x86_64-apple-darwin && cp public/lib/binding/napi-v6-darwin-unknown-x64/node_sqlite3.node bin/node_sqlite3.node-x86_64-apple-darwin",
-    "all": "yarn build && yarn package && yarn binary",
+    "binary:darwin_x86": "pkg public/index.js --output bin/track3-loader-x86_64-apple-darwin && cp public/lib/binding/napi-v6-darwin-unknown-x64/node_sqlite3.node bin/node_sqlite3.node-x86_64-apple-darwin",
+    "all": "yarn build && yarn package && yarn binary:darwin_x86",
     "start": "node dist/index.js"
   },
   "devDependencies": {
