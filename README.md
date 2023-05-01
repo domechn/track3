@@ -11,13 +11,13 @@ Show your crypto currency assets in centralized exchanges and web3 wallets.
 
 ## Installation
 
-TODO
+[Download](https://github.com/domechn/track3/releases)
 
-## Output
+## Screenshots
 
-[Online Demo](https://asset-statistics-pages.vercel.app/mocked/index.html)
-
-![demo](./images/demo.jpeg)
+![sc1](./images/demo/sc1.png)
+![sc2](./images/demo/sc2.png)
+![sc3](./images/demo/sc3.png)
 
 ## Known Issues
 
