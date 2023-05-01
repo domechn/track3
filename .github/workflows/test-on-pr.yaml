@@ -28,9 +28,14 @@ jobs:
         run: |
           cd pkg
           yarn
-          # yarn all
-          ls node_modules/sqlite3/lib/binding
+          if [ '${{ matrix.platform }}' == 'windows-latest' ]; then
+            yarn all:win
+          elif [ '${{ matrix.platform }}' == 'macos-latest' ]; then
+            yarn all:darwin
+          else 
+            yarn all:linux
+          fi
           
-      # - uses: tauri-apps/tauri-action@v0
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
