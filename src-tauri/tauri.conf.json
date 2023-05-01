@@ -14,8 +14,16 @@
       "all": true,
       "shell": {
         "scope": [
+          {
+            "name": "../pkg/bin/track3-loader",
+            "sidecar": true,
+            "args": true
+          }
         ],
         "sidecar": true
+      },
+      "fs": {
+        "scope": ["$APP/*"]
       }
     },
     "bundle": {
@@ -26,6 +34,8 @@
         "depends": []
       },
       "externalBin": [
+        "../pkg/bin/node_sqlite3.node",
+        "../pkg/bin/track3-loader"
       ],
       "icon": [
         "icons/32x32.png",
@@ -34,7 +44,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "dev.track3",
+      "identifier": "dev.track3.track3",
       "longDescription": "",
       "macOS": {
         "entitlements": null,

@@ -1,6 +1,25 @@
+import { path } from '@tauri-apps/api'
+import { appDataDir } from '@tauri-apps/api/path'
+import { Command } from '@tauri-apps/api/shell'
 import Database from "tauri-plugin-sql-api"
 
+export const databaseName = "track3.db"
+
 let dbInstance: Database
+
+export async function initDatabase() {
+	const appDataDirPath = await appDataDir()
+
+	const dbPath = await path.join(appDataDirPath, databaseName)
+
+	const command = Command.sidecar("../pkg/bin/track3-loader", ["-c", "init", "-d", `'${dbPath}'`])
+	const out = await command.execute()
+	console.log(out);
+	
+	if (out.code !== 0) {
+		throw new Error(out.stderr)
+	}
+}
 
 export async function initTables(db: Database) {
 	// await db.execute("DROP TABLE IF EXISTS assets")
@@ -75,8 +94,8 @@ export async function initTables(db: Database) {
 	// 	1000000,
 	// 	1000001
 	// )`)
-	console.log("initTables");
-	
+	console.log("initTables")
+
 	await db.execute(`CREATE TABLE IF NOT EXISTS "assets" (
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
 		createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -116,17 +135,16 @@ export async function initTables(db: Database) {
 		total REAL
 )`)
 
-await db.execute(`CREATE TABLE IF NOT EXISTS "configuration" (
+	await db.execute(`CREATE TABLE IF NOT EXISTS "configuration" (
 	id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
 	data TEXT NOT NULL
 )`)
 }
 
 export async function getDatabase(): Promise<Database> {
-	
 	if (dbInstance) {
 		return dbInstance
 	}
-	dbInstance = await Database.load("sqlite:track3.db")
+	dbInstance = await Database.load(`sqlite:${databaseName}`)
 	return dbInstance
 }

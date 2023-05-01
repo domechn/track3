@@ -1,8 +1,26 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { getDatabase } from './database'
+import { databaseName, getDatabase } from './database'
 import { AssetChangeData, AssetModel, CoinsAmountChangeData, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
 
+import { appDataDir } from '@tauri-apps/api/path'
+import { Command } from '@tauri-apps/api/shell'
+import { path } from '@tauri-apps/api'
+
+
+export async function refreshAllData() {
+	const appDataDirPath = await appDataDir()
+
+	const dbPath = await path.join(appDataDirPath, databaseName)
+
+	console.log(dbPath);
+	
+	const command = Command.sidecar("../pkg/bin/track3-loader", ["-c", "refresh", "-d", dbPath])
+	const out = await command.execute()
+	if (out.code !== 0) {
+		throw new Error(out.stderr)
+	}
+}
 
 async function queryAssets(size = 1): Promise<AssetModel[]> {
 	const db = await getDatabase()
@@ -166,7 +184,7 @@ export async function queryCoinsAmountChange(): Promise<CoinsAmountChangeData> {
 
 	return _(coins).map((coin, idx) => {
 		const aat = getAmountsAndTimestamps(coin)
-		
+
 		return {
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,

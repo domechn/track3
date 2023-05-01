@@ -4,10 +4,10 @@ import "./App.css";
 import { getDatabase, initTables } from "./middlelayers/database";
 
 function App() {
-  useEffect(() => {
-    console.log("App.tsx: useEffect");
-    getDatabase().then((db) => initTables(db));
-  }, []);
+  // useEffect(() => {
+  //   console.log("App.tsx: useEffect");
+  //   getDatabase().then((db) => initTables(db));
+  // }, []);
 
   return (
     <div className="container">

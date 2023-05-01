@@ -11,6 +11,8 @@ import { DOGEAnalyzer } from './coins/doge'
 import { CexConfig, Coin, TokenConfig } from './types'
 import { closeDatabases, getDatabases, getOneDatabase, saveToDatabases } from './database'
 import commandLineArgs, { OptionDefinition } from 'command-line-args'
+import { dirname } from 'path'
+import fs from 'fs'
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
 
@@ -48,26 +50,38 @@ async function loadPortfolios(config: CexConfig & TokenConfig): Promise<Coin[]> 
 }
 
 async function init(sqliteDBPath: string) {
-	// init databases
-	const dbs = getDatabases({
+	await new Promise((resolve, reject) => {
+		// check if db file exists
+		if (!fs.existsSync(sqliteDBPath)) {
+			fs.mkdirSync(dirname(sqliteDBPath), { recursive: true })
+			console.log("db file not exists, creating...")
+			fs.closeSync(fs.openSync(sqliteDBPath, 'w'))
+		}
+		resolve(true)
+	})
+	const cfg = {
 		sqlite3: {
 			path: sqliteDBPath
 		}
-	})
+	}
+	// init databases
+	const dbs = getDatabases(cfg)
 
 	await bluebird.map(dbs, async db => db.initDatabase())
+
+	await closeDatabases(cfg)
 }
 
 async function refreshData(sqliteDBPath: string) {
-	const db = getOneDatabase({
-		sqlite3: {
-			path: sqliteDBPath
+	const dbConfig = {
+		database: {
+			sqlite3: {
+				path: sqliteDBPath
+			}
 		}
-	})
+	}
+	const db = getOneDatabase(dbConfig.database)
 	const config = await db.loadConfiguration()
-
-	console.log(config)
-
 
 	const assets = await loadPortfolios(config)
 
@@ -89,15 +103,15 @@ async function refreshData(sqliteDBPath: string) {
 	const totals = calculateTotalValue(lastAssets, priceMap)
 
 	try {
-		await saveToDatabases(config.database, totals)
+		await saveToDatabases(dbConfig.database, totals)
 
-		const db = getOneDatabase(config.database)
+		const db = getOneDatabase(dbConfig.database)
 		if (db) {
 			const coins = await db.queryDatabase(1)
 			console.log("query", coins)
 		}
 	} finally {
-		await closeDatabases(config.database)
+		await closeDatabases(dbConfig.database)
 	}
 }
 
@@ -106,16 +120,17 @@ async function main() {
 
 	const c = commandVal.command
 	const dbPath = commandVal.dbPath
+
 	if (!dbPath) {
 		throw new Error("dbPath is required")
 	}
 	switch (c) {
 		case "init":
 			await init(dbPath)
-			break;
+			break
 		case "refresh":
 			await refreshData(dbPath)
-			break;
+			break
 		default:
 			throw new Error("unknown command")
 	}

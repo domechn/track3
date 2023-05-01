@@ -2,6 +2,7 @@ import "./index.css";
 import refreshIcon from "./refresh-icon.png";
 import Loading from "../loading";
 import { useState } from "react";
+import { refreshAllData } from '../../middlelayers/charts'
 
 const Configuration = () => {
   const [loading, setLoading] = useState(false);
@@ -9,9 +10,9 @@ const Configuration = () => {
   const handleButtonClick = () => {
     setLoading(true);
 
-    setTimeout(() => {
+    refreshAllData().then(()=> {
 	      setLoading(false);
-    }, 2000);
+    })
   };
 
   return (

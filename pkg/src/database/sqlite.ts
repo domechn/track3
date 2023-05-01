@@ -1,8 +1,7 @@
 import _ from 'lodash'
 import { Database as SqliteDatabase } from 'sqlite3'
-import fs from 'fs'
 import {  CoinModel, CoinQueryDetail, Database, GlobalConfig } from '../types'
-import { dirname } from 'path'
+import yaml from 'yaml'
 import bluebird from 'bluebird'
 
 type AssetModel = {
@@ -52,13 +51,6 @@ export class SqliteStore implements Database {
 	constructor(path: string) {
 		this.path = path
 
-		// check if db file exists
-		if (!fs.existsSync(this.path)) {
-			fs.mkdirSync(dirname(this.path), { recursive: true })
-			console.log("db file not exists, creating...")
-			fs.closeSync(fs.openSync(this.path, 'w'))
-		}
-
 		this.db = new SqliteDatabase(this.path)
 	}
 
@@ -94,53 +86,51 @@ export class SqliteStore implements Database {
 
 		// init tables
 		const createAssetSql = `CREATE TABLE IF NOT EXISTS assets (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-				top01 TEXT,
-				amount01 REAL,
-				value01 REAL,
-				top02 TEXT,
-				amount02 REAL,
-				value02 REAL,
-				top03 TEXT,
-				amount03 REAL,
-				value03 REAL,
-				top04 TEXT,
-				amount04 REAL,
-				value04 REAL,
-				top05 TEXT,
-				amount05 REAL,
-				value05 REAL,
-				top06 TEXT,
-				amount06 REAL,
-				value06 REAL,
-				top07 TEXT,
-				amount07 REAL,
-				value07 REAL,
-				top08 TEXT,
-				amount08 REAL,
-				value08 REAL,
-				top09 TEXT,
-				amount09 REAL,
-				value09 REAL,
-				top10 TEXT,
-				amount10 REAL,
-				value10 REAL,
-				topOthers TEXT,
-				amountOthers TEXT,
-				valueOthers REAL,
-				total REAL
-			);
-		`
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+	top01 TEXT,
+	amount01 REAL,
+	value01 REAL,
+	top02 TEXT,
+	amount02 REAL,
+	value02 REAL,
+	top03 TEXT,
+	amount03 REAL,
+	value03 REAL,
+	top04 TEXT,
+	amount04 REAL,
+	value04 REAL,
+	top05 TEXT,
+	amount05 REAL,
+	value05 REAL,
+	top06 TEXT,
+	amount06 REAL,
+	value06 REAL,
+	top07 TEXT,
+	amount07 REAL,
+	value07 REAL,
+	top08 TEXT,
+	amount08 REAL,
+	value08 REAL,
+	top09 TEXT,
+	amount09 REAL,
+	value09 REAL,
+	top10 TEXT,
+	amount10 REAL,
+	value10 REAL,
+	topOthers TEXT,
+	amountOthers TEXT,
+	valueOthers REAL,
+	total REAL
+);`
 
 		const createConfigurationSql = `CREATE TABLE IF NOT EXISTS "configuration" (
-				id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-				data TEXT NOT NULL
-			);
-		`
+	id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+	data TEXT NOT NULL
+);`
 
-		await bluebird.map([createAssetSql, createConfigurationSql], async sql => new Promise((resolve, reject) => {
-			this.db.run(sql, (err) => {
+		await bluebird.mapSeries([createAssetSql, createConfigurationSql], async sql => new Promise((resolve, reject) => {
+			return this.db.run(sql, (err) => {
 				if (err) {
 					reject(err)
 				} else {
@@ -152,14 +142,14 @@ export class SqliteStore implements Database {
 
 	async loadConfiguration(): Promise<GlobalConfig > {
 		return new Promise((resolve, reject) => {
-			this.db.get('SELECT * FROM configuration WHERE id = 1', (err, row: { id: string, data: string }[]) => {
+			this.db.get('SELECT * FROM configuration WHERE id = 1', (err, row: { id: string, data: string }) => {
 				if (err) {
 					reject(err)
 				} else {
 					if (!row) {
 						reject(new Error("no configuration found"))
 					} else {
-						resolve(JSON.parse(row[0].data))
+						resolve(yaml.parse(row.data))
 					}
 				}
 			})
