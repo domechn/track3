@@ -6,7 +6,8 @@ import {
   getConfiguration,
   saveConfiguration,
 } from "../../middlelayers/configuration";
-import Loading from "../loading";
+import Loading from "../common/loading";
+import { Toaster, toast } from "react-hot-toast";
 
 const initialConfiguration = `configs:
   groupUSD: true # combine all USD stablecoins into USDT
@@ -36,13 +37,6 @@ doge:
 others:
   - symbol: USDT
     amount: 1000
-
-database: # save data to database ( optional )
-  notion:
-    token: # secret token
-    databaseId: # database id
-  csv:
-    outputDir: # output directory
 `;
 
 const Configuration = () => {
@@ -52,6 +46,7 @@ const Configuration = () => {
 
   useEffect(() => {
     setLoading(true);
+
     getConfiguration()
       .then((d) => setConfiguration(d?.data ?? initialConfiguration))
       .finally(() => setLoading(false));
@@ -69,14 +64,26 @@ const Configuration = () => {
 
   function onEditorSubmit(val: string) {
     setLoading(true);
+    let saveError: Error | undefined;
+
     saveConfiguration(val)
       .then(() => setIsModalOpen(false))
-      .finally(() => setLoading(false));
+      .catch((e) => (saveError = e))
+      .finally(() => {
+        setLoading(false);
+
+        if (saveError) {
+          toast.error(saveError.message);
+        } else {
+          toast.success("Configuration updated successfully!");
+        }
+      });
   }
 
   return (
     <div>
       <Loading loading={loading} />
+      <Toaster />
       <button className="gear-button" onClick={handleButtonClick}>
         <img
           src={gearIcon}

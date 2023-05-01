@@ -1,8 +1,9 @@
 import "./index.css";
 import refreshIcon from "./refresh-icon.png";
-import Loading from "../loading";
+import Loading from "../common/loading";
 import { useState } from "react";
-import { refreshAllData } from '../../middlelayers/charts'
+import { refreshAllData } from "../../middlelayers/charts";
+import { Toaster, toast } from "react-hot-toast";
 
 const Configuration = () => {
   const [loading, setLoading] = useState(false);
@@ -10,14 +11,25 @@ const Configuration = () => {
   const handleButtonClick = () => {
     setLoading(true);
 
-    refreshAllData().then(()=> {
-	      setLoading(false);
-    })
+    let refreshError: Error | undefined;
+    refreshAllData()
+      .catch((err) => {
+        refreshError = err;
+      })
+      .finally(() => {
+        setLoading(false);
+        if (refreshError) {
+          toast.error(refreshError.message);
+        } else {
+          toast.success("Refresh successfully!");
+        }
+      });
   };
 
   return (
     <div>
       <Loading loading={loading} />
+      <Toaster />
       <button className="refresh-button" onClick={handleButtonClick}>
         <img
           src={refreshIcon}

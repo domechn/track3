@@ -12,7 +12,7 @@ export async function initDatabase() {
 
 	const dbPath = await path.join(appDataDirPath, databaseName)
 
-	const command = Command.sidecar("../pkg/bin/track3-loader", ["-c", "init", "-d", `'${dbPath}'`])
+	const command = Command.sidecar("../pkg/bin/track3-loader", ["-c", "init", "-d", dbPath])
 	const out = await command.execute()
 	console.log(out);
 	

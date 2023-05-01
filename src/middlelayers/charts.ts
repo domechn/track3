@@ -18,6 +18,10 @@ export async function refreshAllData() {
 	const command = Command.sidecar("../pkg/bin/track3-loader", ["-c", "refresh", "-d", dbPath])
 	const out = await command.execute()
 	if (out.code !== 0) {
+		if (out.stderr.includes("no configuration found")) {
+			throw new Error("no configuration found,\n please add configuration first");
+			
+		}
 		throw new Error(out.stderr)
 	}
 }
@@ -96,7 +100,7 @@ export async function queryTopCoinsRank(): Promise<TopCoinsRankData> {
 }
 
 function getCoins(assets: AssetModel[]): string[] {
-	return _(assets).map(asset => _(asset).pickBy((k, v) => v.startsWith("top")).values().value() as string[]).flatten().uniq().filter(c => c.toLowerCase() !== "others").value()
+	return _(assets).map(asset => _(asset).pickBy((k, v) => v.startsWith("top")).values().value() as string[]).flatten().compact().uniq().filter(c => c.toLowerCase() !== "others").value()
 }
 
 export async function queryAssetChange(): Promise<AssetChangeData> {
@@ -138,6 +142,10 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	const total = latest.total
 	const res: { coin: string, percentage: number }[] = []
 	_(latest).forEach((v, k) => {
+		// skip null value
+		if (!v) {
+			return
+		}
 		if (k.startsWith("top")) {
 			const idxStr = k.slice("top".length)
 			res.push({

@@ -23,7 +23,7 @@ const App = () => {
   }
 
   function fontCount() {
-    return Math.max(totalValue.toString().length / 5, 1);
+    return Math.max(totalValue.toString().length / 10, 1);
   }
 
   function totalValueFontSize() {
