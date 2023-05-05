@@ -5,7 +5,15 @@ let ua: string
 
 export function getFakeUA() {
 	if (!ua) {
-		ua = (new UserAgent()).toString()
+		ua = (new UserAgent([
+			/Safari/,
+			{
+				connection: {
+					type: 'wifi',
+				},
+				platform: 'MacIntel',
+			},
+		])).toString()
 	}
 	return ua
 }

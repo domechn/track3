@@ -1,5 +1,5 @@
 import { Analyzer, Coin, TokenConfig } from '../types'
-import _, { random } from 'lodash'
+import _ from 'lodash'
 import { gotWithFakeUA } from '../utils/http'
 import { asyncMap } from '../utils/async'
 
@@ -21,7 +21,6 @@ export class ERC20Analyzer implements Analyzer {
 			headers: {
 				origin: "https://debank.com",
 				referer: "https://debank.com/",
-				"sec-ch-ua": `"Chromium";v="${random(90, 112, false)}", "Microsoft Edge";v="${random(90, 112, false)}", "Not:A-Brand";v="${random(90, 112, false)}"`
 			},
 			searchParams: {
 				user_addr: address,
