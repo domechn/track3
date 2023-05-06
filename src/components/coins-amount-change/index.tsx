@@ -3,7 +3,7 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
 import { CoinsAmountChangeData } from "../../middlelayers/types";
-import "./index.css";
+import Select from "../common/select";
 
 const App = ({ data }: { data: CoinsAmountChangeData }) => {
   const [currentCoinSelected, setCurrentCoinSelected] = useState("");
@@ -75,27 +75,16 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
     };
   }
 
-  function onCoinSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const coin = e.target.value;
+  function onCoinSelectChange(coin: string) {
     setCurrentCoinSelected(coin);
   }
 
   return (
     <div>
-      <label className="nice-select">
-        <select id="slct" name="coins" onChange={onCoinSelectChange}>
-          {data.map((d) => {
-            return (
-              <option key={d.coin} value={d.coin}>
-                {d.coin}
-              </option>
-            );
-          })}
-        </select>
-        <svg>
-          <use xlinkHref="#select-arrow-down"></use>
-        </svg>
-      </label>
+      <Select
+        options={data.map((d) => ({ value: d.coin, label: d.coin }))}
+        onSelectChange={onCoinSelectChange}
+      />
       <div
         style={{
           height: Math.max((size.height || 100) / 2, 350),
@@ -103,11 +92,6 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
       >
         <Line options={options} data={chartDataByCoin(currentCoinSelected)} />
       </div>
-      <svg className="sprites">
-        <symbol id="select-arrow-down" viewBox="0 0 10 6">
-          <polyline points="1 1 5 5 9 1"></polyline>
-        </symbol>
-      </svg>
     </div>
   );
 };

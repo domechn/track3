@@ -18,6 +18,8 @@ import LatestAssetsPercentage from "../latest-assets-percentage";
 import CoinsAmountChange from "../coins-amount-change";
 import TopCoinsRank from "../top-coins-rank";
 import HistoricalData from "../historical-data";
+import "./index.css";
+import Select, { SelectOption } from "../common/select";
 
 import "./index.css";
 import {
@@ -26,12 +28,13 @@ import {
   LatestAssetsPercentageData,
   TopCoinsRankData,
 } from "../../middlelayers/types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { queryAssetChange } from "../../middlelayers/charts";
 import { queryCoinsAmountChange } from "../../middlelayers/charts";
 import { queryTopCoinsRank } from "../../middlelayers/charts";
 import { queryTotalValue } from "../../middlelayers/charts";
 import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
+import Loading from "../common/loading";
 
 ChartJS.register(
   ArcElement,
@@ -46,6 +49,8 @@ ChartJS.register(
 );
 
 const App = () => {
+  const [loading, setLoading] = useState(false);
+  const [querySize, setQuerySize] = useState(10);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData
   );
@@ -65,29 +70,70 @@ const App = () => {
     coins: [],
   } as TopCoinsRankData);
 
-  useEffect(() => {
-    loadAllData();
-  }, []);
+  const querySizeOptions = useMemo(
+    () =>
+      [
+        {
+          value: "10",
+          label: "10",
+        },
+        {
+          value: "20",
+          label: "20",
+        },
+        {
+          value: "50",
+          label: "50",
+        },
+      ] as SelectOption[],
+    []
+  );
 
-  function loadAllData() {
-    console.log("loading all data...");
-    queryTotalValue().then((data) => setTotalValueData(data));
-    queryLatestAssetsPercentage().then((data) =>
-      setLatestAssetsPercentageData(data)
-    );
-    queryAssetChange().then((data) => setAssetChangeData(data));
-    queryCoinsAmountChange().then((data) => setCoinsAmountChangeData(data));
-    queryTopCoinsRank().then((data) => setTopCoinsRankData(data));
+  useEffect(() => {
+    loadAllData(querySize);
+  }, [querySize]);
+
+  async function loadAllDataAsync(size = 10) {
+    console.log("loading all data... size: ", size);
+    const tv = await queryTotalValue();
+    setTotalValueData(tv);
+    const lap = await queryLatestAssetsPercentage();
+    setLatestAssetsPercentageData(lap);
+    const ac = await queryAssetChange(size);
+    setAssetChangeData(ac);
+    const cac = await queryCoinsAmountChange(size);
+    setCoinsAmountChangeData(cac);
+    const tcr = await queryTopCoinsRank(size);
+    setTopCoinsRankData(tcr);
+  }
+
+  function loadAllData(size = 10) {
+    setLoading(true);
+    // set a loading delay to show the loading animation
+    setTimeout(() => {
+      loadAllDataAsync(size).finally(() => setLoading(false));
+    }, 200);
+  }
+
+  function onQuerySizeChanged(val: string) {
+    setQuerySize(parseInt(val, 10));
   }
 
   return (
     <div>
-      <div className="top-buttons-wrapper">
+      <Loading loading={loading} />
+      <div className="top-left-buttons-wrapper">
+        <Select
+          options={querySizeOptions}
+          onSelectChange={onQuerySizeChanged}
+        />
+      </div>
+      <div className="top-right-buttons-wrapper">
         <div style={{ display: "inline-block" }}>
-          <HistoricalData afterDataDeleted={loadAllData}/>
+          <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
         </div>
         <div style={{ display: "inline-block" }}>
-          <RefreshData afterRefresh={loadAllData} />
+          <RefreshData afterRefresh={() => loadAllData(querySize)} />
         </div>
         <div style={{ display: "inline-block" }}>
           <Configuration />
