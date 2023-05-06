@@ -1,6 +1,6 @@
 {
   "name": "track3-loader",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "scripts": {
     "build": "npx tsc",
     "package": "ncc build dist -o public",
