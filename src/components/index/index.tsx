@@ -17,6 +17,7 @@ import AssetChange from "../asset-change";
 import LatestAssetsPercentage from "../latest-assets-percentage";
 import CoinsAmountChange from "../coins-amount-change";
 import TopCoinsRank from "../top-coins-rank";
+import HistoricalData from "../historical-data";
 
 import "./index.css";
 import {
@@ -25,12 +26,12 @@ import {
   LatestAssetsPercentageData,
   TopCoinsRankData,
 } from "../../middlelayers/types";
-import { useEffect, useRef, useState } from "react";
-import { queryAssetChange } from '../../middlelayers/charts'
-import { queryCoinsAmountChange } from '../../middlelayers/charts'
-import { queryTopCoinsRank } from '../../middlelayers/charts'
-import { queryTotalValue } from '../../middlelayers/charts'
-import { queryLatestAssetsPercentage } from '../../middlelayers/charts'
+import { useEffect, useState } from "react";
+import { queryAssetChange } from "../../middlelayers/charts";
+import { queryCoinsAmountChange } from "../../middlelayers/charts";
+import { queryTopCoinsRank } from "../../middlelayers/charts";
+import { queryTotalValue } from "../../middlelayers/charts";
+import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 
 ChartJS.register(
   ArcElement,
@@ -64,25 +65,29 @@ const App = () => {
     coins: [],
   } as TopCoinsRankData);
 
-
   useEffect(() => {
-    loadAllData()
+    loadAllData();
   }, []);
 
   function loadAllData() {
     console.log("loading all data...");
-    queryTotalValue().then(data=> setTotalValueData(data))
-    queryLatestAssetsPercentage().then(data=> setLatestAssetsPercentageData(data))
-    queryAssetChange().then(data=> setAssetChangeData(data))
-    queryCoinsAmountChange().then(data=> setCoinsAmountChangeData(data))
-    queryTopCoinsRank().then(data=> setTopCoinsRankData(data))
+    queryTotalValue().then((data) => setTotalValueData(data));
+    queryLatestAssetsPercentage().then((data) =>
+      setLatestAssetsPercentageData(data)
+    );
+    queryAssetChange().then((data) => setAssetChangeData(data));
+    queryCoinsAmountChange().then((data) => setCoinsAmountChangeData(data));
+    queryTopCoinsRank().then((data) => setTopCoinsRankData(data));
   }
 
   return (
     <div>
-      <div className="gear-button-wrapper">
+      <div className="top-buttons-wrapper">
         <div style={{ display: "inline-block" }}>
-          <RefreshData afterRefresh={loadAllData}/>
+          <HistoricalData afterDataDeleted={loadAllData}/>
+        </div>
+        <div style={{ display: "inline-block" }}>
+          <RefreshData afterRefresh={loadAllData} />
         </div>
         <div style={{ display: "inline-block" }}>
           <Configuration />

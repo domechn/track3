@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import "./index.css";
-import gearIcon from "./gear-icon.png";
+import gearIcon from "../../assets/icons/gear-icon.png";
 import SimpleEditor from "../simple-editor";
 import {
   getConfiguration,
@@ -8,6 +8,7 @@ import {
 } from "../../middlelayers/configuration";
 import Loading from "../common/loading";
 import { Toaster, toast } from "react-hot-toast";
+import Modal from "../common/modal";
 
 const initialConfiguration = `configs:
   groupUSD: true # combine all USD stablecoins into USDT
@@ -52,8 +53,7 @@ const Configuration = () => {
     if (isModalOpen) {
       loadConfiguration();
     }
-  }, [isModalOpen])
-  
+  }, [isModalOpen]);
 
   function loadConfiguration() {
     setLoading(true);
@@ -67,13 +67,11 @@ const Configuration = () => {
 
   const handleButtonClick = () => {
     setIsModalOpen(true);
-    document.body.style.overflow = "hidden";
   };
 
-  const handleModalClose = () => {
+  function onModalClose() {
     setIsModalOpen(false);
-    document.body.style.overflow = "auto";
-  };
+  }
 
   function onEditorSubmit(val: string) {
     setLoading(true);
@@ -108,14 +106,10 @@ const Configuration = () => {
           }}
         />
       </button>
-      {isModalOpen && (
-        <div className="modal-overlay" onClick={handleModalClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Configuration</h2>
-            <SimpleEditor data={configuration} onSubmit={onEditorSubmit} />
-          </div>
-        </div>
-      )}
+      <Modal visible={isModalOpen} onClose={onModalClose}>
+        <h2>Configuration</h2>
+        <SimpleEditor data={configuration} onSubmit={onEditorSubmit} />
+      </Modal>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-.gear-button {
+.history-button {
   border: none;
   border-radius: 50%;
   cursor: pointer;
@@ -7,6 +7,6 @@
   transition: transform 0.7s ease-in-out;
 }
 
-.gear-button:hover {
-  transform: rotate(60deg);
+.history-button:hover {
+  transform: rotate(-360deg);
 }
