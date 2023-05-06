@@ -123,10 +123,20 @@ const App = () => {
     <div>
       <Loading loading={loading} />
       <div className="top-left-buttons-wrapper">
-        <Select
-          options={querySizeOptions}
-          onSelectChange={onQuerySizeChanged}
-        />
+        <div style={{ display: "inline-block" }}>
+          <span
+            style={{
+              fontFamily: "BM Jua",
+              fontWeight: "bold",
+            }}
+          >
+            Size{" "}
+          </span>
+          <Select
+            options={querySizeOptions}
+            onSelectChange={onQuerySizeChanged}
+          />
+        </div>
       </div>
       <div className="top-right-buttons-wrapper">
         <div style={{ display: "inline-block" }}>
