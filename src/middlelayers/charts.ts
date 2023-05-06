@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
 import { databaseName, getDatabase } from './database'
-import { AssetChangeData, AssetModel, CoinsAmountChangeData, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
+import { AssetChangeData, AssetModel, CoinsAmountChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
 
 import { appDataDir } from '@tauri-apps/api/path'
 import { Command } from '@tauri-apps/api/shell'
@@ -16,8 +16,8 @@ export async function refreshAllData() {
 	const out = await command.execute()
 	if (out.code !== 0) {
 		if (out.stderr.includes("no configuration found")) {
-			throw new Error("no configuration found,\n please add configuration first");
-			
+			throw new Error("no configuration found,\n please add configuration first")
+
 		}
 		throw new Error(out.stderr)
 	}
@@ -27,6 +27,11 @@ async function queryAssets(size = 1): Promise<AssetModel[]> {
 	const db = await getDatabase()
 	const assets = await db.select<AssetModel[]>(`SELECT * FROM assets ORDER BY createdAt DESC LIMIT ${size}`)
 	return assets
+}
+
+async function deleteAsset(id: number): Promise<void> {
+	const db = await getDatabase()
+	await db.execute(`DELETE FROM assets WHERE id = ?`, [id])
 }
 
 export async function queryTotalValue(): Promise<TotalValueData> {
@@ -42,7 +47,7 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 	const latest = results[0]
 
 	let changePercentage = 0
-	
+
 	if (results.length === 2) {
 		const previous = results[1]
 
@@ -198,4 +203,12 @@ export async function queryCoinsAmountChange(): Promise<CoinsAmountChangeData> {
 			timestamps: _(aat).map('timestamp').reverse().take(size).reverse().value(),
 		}
 	}).value()
+}
+
+export async function queryHistoricalData(size = 30): Promise<HistoricalData[]> {
+	return queryAssets(size)
+}
+
+export async function deleteHistoricalDataById(id: number): Promise<void> {
+	return deleteAsset(id)
 }

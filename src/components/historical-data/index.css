@@ -1,0 +1,12 @@
+.history-button {
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  appearance: none;
+  background-color: inherit;
+  transition: transform 0.7s ease-in-out;
+}
+
+.history-button:hover {
+  transform: rotate(-360deg);
+}

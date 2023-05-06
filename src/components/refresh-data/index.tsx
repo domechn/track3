@@ -1,5 +1,5 @@
 import "./index.css";
-import refreshIcon from "./refresh-icon.png";
+import refreshIcon from "../../assets/icons/refresh-icon.png";
 import Loading from "../common/loading";
 import { useState } from "react";
 import { refreshAllData } from "../../middlelayers/charts";
