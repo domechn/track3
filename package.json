@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "update-release": "node ./scripts/update-release.js",
+    "update-release": "node ./scripts/update.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
