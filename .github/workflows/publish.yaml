@@ -61,7 +61,7 @@ jobs:
           prerelease: false
   update-release:
     needs: publish-tauri
-    runs-on: ubuntu-20.04-release
+    runs-on: ubuntu-20.04
     permissions:
       contents: write
     steps:
