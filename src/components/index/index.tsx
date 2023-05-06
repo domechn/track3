@@ -122,31 +122,37 @@ const App = () => {
   return (
     <div>
       <Loading loading={loading} />
-      <div className="top-left-buttons-wrapper">
-        <div style={{ display: "inline-block" }}>
-          <span
-            style={{
-              fontFamily: "BM Jua",
-              fontWeight: "bold",
-            }}
-          >
-            Size{" "}
-          </span>
-          <Select
-            options={querySizeOptions}
-            onSelectChange={onQuerySizeChanged}
-          />
+      <div className="top-buttons-wrapper">
+        <div className="left-buttons">
+          <div>
+            <span
+              style={{
+                fontFamily: "BM Jua",
+                fontWeight: "bold",
+                color: "white",
+                display: "inline-block",
+                lineHeight: "40px",
+                marginRight: "10px",
+              }}
+            >
+              Size{" "}
+            </span>
+            <Select
+              options={querySizeOptions}
+              onSelectChange={onQuerySizeChanged}
+            />
+          </div>
         </div>
-      </div>
-      <div className="top-right-buttons-wrapper">
-        <div style={{ display: "inline-block" }}>
-          <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
-        </div>
-        <div style={{ display: "inline-block" }}>
-          <RefreshData afterRefresh={() => loadAllData(querySize)} />
-        </div>
-        <div style={{ display: "inline-block" }}>
-          <Configuration />
+        <div className="right-buttons">
+          <div style={{ display: "inline-block" }}>
+            <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
+          </div>
+          <div style={{ display: "inline-block" }}>
+            <RefreshData afterRefresh={() => loadAllData(querySize)} />
+          </div>
+          <div style={{ display: "inline-block" }}>
+            <Configuration />
+          </div>
         </div>
       </div>
       <div>

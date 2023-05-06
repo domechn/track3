@@ -1,13 +1,30 @@
-.top-right-buttons-wrapper {
+.top-buttons-wrapper {
   position: fixed;
-  top: 20px;
+  top: 0px;
+  width: 100%;
+  left: -1px;
+  z-index: 998;
+  height: 40px;
+  background-color: #484a54;
+  box-shadow: 0 1px 5px #484a54;
+}
+
+.top-buttons-wrapper select {
+  width: 60px;
+  font-size: 15px;
+  padding: 5px 5px 5px 10px;
+}
+
+.top-buttons-wrapper .right-buttons {
+  position: fixed;
+  display: inline-block;
   right: 20px;
   z-index: 999;
 }
 
-.top-left-buttons-wrapper {
+.top-buttons-wrapper .left-buttons {
   position: fixed;
-  top: 20px;
+  display: inline-block;
   left: 20px;
   z-index: 999;
 }
