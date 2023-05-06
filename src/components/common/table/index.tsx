@@ -1,7 +1,7 @@
 import _ from "lodash";
-import React from 'react'
+import React from "react";
 
-import "./index.css"
+import "./index.css";
 
 export type ColumnData = {
   title: string;
@@ -18,45 +18,45 @@ const App = ({
   columns: ColumnData[];
   data: ({ id: string | number } & unknown)[];
 }) => {
-
   const getColStyle = (column: ColumnData): React.CSSProperties => {
-    const style = {} as React.CSSProperties
+    const style = {} as React.CSSProperties;
     if (column.width) {
-      style.width = column.width
+      style.width = column.width;
     }
-    return style
-  }
-
+    return style;
+  };
 
   return (
-    <table>
-      <colgroup>
-        {columns.map((column) => (
-          <col key={column.key} style={getColStyle(column)} />
-        ))}
-      </colgroup>
-      <thead>
-        <tr>
+    <div className="nice-table">
+      <table>
+        <colgroup>
           {columns.map((column) => (
-            <th key={column.key}>{column.title}</th>
+            <col key={column.key} style={getColStyle(column)} />
           ))}
-        </tr>
-      </thead>
-
-      <tbody>
-        {data.map((row) => (
-          <tr key={row.id}>
+        </colgroup>
+        <thead>
+          <tr>
             {columns.map((column) => (
-              <td key={column.dataIndex + row.id}>
-                {column.render
-                  ? column.render(row.id)
-                  : _(row).get(column.dataIndex)}
-              </td>
+              <th key={column.key}>{column.title}</th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+
+        <tbody>
+          {data.map((row) => (
+            <tr key={row.id}>
+              {columns.map((column) => (
+                <td key={column.dataIndex + row.id}>
+                  {column.render
+                    ? column.render(row.id)
+                    : _(row).get(column.dataIndex)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };
 
