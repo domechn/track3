@@ -61,7 +61,9 @@ jobs:
           prerelease: false
   update-release:
     needs: publish-tauri
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-20.04-release
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
