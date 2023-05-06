@@ -63,9 +63,7 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 	}
 }
 
-export async function queryTopCoinsRank(): Promise<TopCoinsRankData> {
-
-	const size = 10
+export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
 
 	const assets = await queryAssets(size) || []
 
@@ -105,8 +103,7 @@ function getCoins(assets: AssetModel[]): string[] {
 	return _(assets).map(asset => _(asset).pickBy((k, v) => v.startsWith("top")).values().value() as string[]).flatten().compact().uniq().filter(c => c.toLowerCase() !== "others").value()
 }
 
-export async function queryAssetChange(): Promise<AssetChangeData> {
-	const size = 10
+export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
 
 	const assets = await queryAssets(size) || []
 
@@ -163,9 +160,8 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	})).value()
 }
 
-export async function queryCoinsAmountChange(): Promise<CoinsAmountChangeData> {
-	const querySize = 30
-	const size = 10
+export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountChangeData> {
+	const querySize = size * 2
 
 	const assets = await queryAssets(querySize) || []
 	if (!assets) {

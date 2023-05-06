@@ -1,7 +1,13 @@
-.top-buttons-wrapper {
-	position: fixed;
-	top: 20px;
-	right: 20px;
-	z-index: 999;
-      }
-      
+.top-right-buttons-wrapper {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 999;
+}
+
+.top-left-buttons-wrapper {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 999;
+}
