@@ -22,9 +22,9 @@ export async function loadPortfolios(): Promise<Coin[]> {
 	}
 
 	const parsedCfg = yaml.parse(config.data) as CexConfig & TokenConfig
-	console.log(parsedCfg);
-	
+
 	return loadPortfoliosByConfig({
+		exchanges: [],
 		erc20: {
 		},
 		btc: {
@@ -32,6 +32,7 @@ export async function loadPortfolios(): Promise<Coin[]> {
 		doge: {
 		},
 		sol: {},
+		others: [],
 	} as CexConfig & TokenConfig)
 
 }

@@ -16,6 +16,7 @@ export class OtherCexExchanges implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		return this.client.fetchTotalBalance()
+		// return this.client.fetchTotalBalance()
+		return {}
 	}
 }

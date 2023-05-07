@@ -1,6 +1,6 @@
-use std::{collections::HashMap, path::Path, process};
+use std::{collections::HashMap, path::Path};
 
-use tauri::api::process::{Command, CommandEvent};
+// use tauri::api::process::{Command, CommandEvent};
 use track3::price::{get_price_querier};
 
 #[cfg_attr(
@@ -57,21 +57,21 @@ fn is_first_run(path: &Path) -> bool {
 
 fn init_resources(path: &Path) {
     println!("init resources in rust");
-    let (mut rx, mut _child) = Command::new_sidecar("track3-loader")
-        .expect("failed to create `track3-loader` binary command")
-        .args(&["-c", "init", "-d", path.join("track3.db").to_str().unwrap()])
-        .spawn()
-        .expect("failed to spawn sidecar");
+    // let (mut rx, mut _child) = Command::new_sidecar("track3-loader")
+    //     .expect("failed to create `track3-loader` binary command")
+    //     .args(&["-c", "init", "-d", path.join("track3.db").to_str().unwrap()])
+    //     .spawn()
+    //     .expect("failed to spawn sidecar");
 
-    tauri::async_runtime::spawn(async move {
-        // read events such as stdout
-        while let Some(event) = rx.recv().await {
-            if let CommandEvent::Stdout(line) = event {
-                println!("init stdout: {}", line);
-            } else if let CommandEvent::Stderr(line) = event {
-                println!("init stderr: {}", line);
-                process::exit(1);
-            }
-        }
-    });
+    // tauri::async_runtime::spawn(async move {
+    //     // read events such as stdout
+    //     while let Some(event) = rx.recv().await {
+    //         if let CommandEvent::Stdout(line) = event {
+    //             println!("init stdout: {}", line);
+    //         } else if let CommandEvent::Stderr(line) = event {
+    //             println!("init stderr: {}", line);
+    //             process::exit(1);
+    //         }
+    //     }
+    // });
 }
