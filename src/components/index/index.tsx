@@ -35,6 +35,7 @@ import { queryTopCoinsRank } from "../../middlelayers/charts";
 import { queryTotalValue } from "../../middlelayers/charts";
 import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import Loading from "../common/loading";
+import {  loadPortfolios } from '../../middlelayers/data'
 
 ChartJS.register(
   ArcElement,
@@ -91,6 +92,11 @@ const App = () => {
 
   useEffect(() => {
     loadAllData(querySize);
+
+    // TODO: remove
+    // queryCoinPrices(["BTC"])
+    loadPortfolios()
+    .then(res=>console.log(res))
   }, [querySize]);
 
   async function loadAllDataAsync(size = 10) {

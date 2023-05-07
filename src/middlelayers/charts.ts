@@ -6,6 +6,7 @@ import { AssetChangeData, AssetModel, CoinsAmountChangeData, HistoricalData, Lat
 import { appDataDir } from '@tauri-apps/api/path'
 import { Command } from '@tauri-apps/api/shell'
 import { path } from '@tauri-apps/api'
+import { getConfiguration } from './configuration'
 
 export async function refreshAllData() {
 	const appDataDirPath = await appDataDir()
@@ -21,6 +22,11 @@ export async function refreshAllData() {
 		}
 		throw new Error(out.stderr)
 	}
+}
+
+async function queryCoinsData() {
+	const config = await getConfiguration()
+	// queryCoinPrices()
 }
 
 async function queryAssets(size = 1): Promise<AssetModel[]> {

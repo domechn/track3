@@ -11,7 +11,7 @@
   },
   "tauri": {
     "allowlist": {
-      "all": true,
+      "all": false,
       "shell": {
         "scope": [
           {
@@ -24,6 +24,11 @@
       },
       "fs": {
         "scope": ["$APP/*"]
+      },
+      "http": {
+        "all": true,
+        "request": true,
+        "scope": ["https://**"]
       }
     },
     "bundle": {
