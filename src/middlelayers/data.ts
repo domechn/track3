@@ -27,7 +27,6 @@ export async function loadPortfolios(): Promise<Coin[]> {
 
 	return loadPortfoliosByConfig({
 		exchanges: [
-
 		],
 		erc20: {
 		},

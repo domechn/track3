@@ -10,7 +10,6 @@ export interface Exchanger {
 	fetchTotalBalance(): Promise<{ [k: string]: number }>
 }
 
-// TODO: support earning wallet in okx
 export class CexAnalyzer implements Analyzer {
 	private readonly config: CexConfig
 
@@ -60,7 +59,7 @@ function coinSymbolHandler(name: string): string | undefined {
 	const ld = "LD"
 	// LD in binance is for ean
 	if (name.startsWith(ld) && name.length > ld.length + 1) {
-		return
+		return name.substr(ld.length)
 	}
 	if (name == "BETH") {
 		return "ETH"
