@@ -1,7 +1,21 @@
 use std::{collections::HashMap, path::Path};
 
 // use tauri::api::process::{Command, CommandEvent};
-use track3::price::{get_price_querier};
+use track3::{price::{get_price_querier}, binance::Binance};
+
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+async fn query_cex_balance(exchange_name: String, api_key: String, api_secret: String) -> Result<HashMap<String, f64>, String> {
+    let b = Binance::new(api_key, api_secret);
+    let res = b.query_balance().await;
+    match res {
+        Ok(balances) => Ok(balances),
+        Err(e) => Err(e.to_string()),
+    }
+}
 
 #[cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
@@ -40,7 +54,7 @@ fn main() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![query_coins_prices])
+        .invoke_handler(tauri::generate_handler![query_coins_prices, query_cex_balance])
         .plugin(tauri_plugin_sql::Builder::default().build())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,38 +1,22 @@
 import { Exchanger } from './cex'
 import _ from 'lodash'
-import { Exchange, binance } from 'ccxt'
-import bluebird from 'bluebird'
-import { sendHttpRequest } from '../../utils/http'
+import { invoke } from '@tauri-apps/api'
 
 export class BinanceExchange implements Exchanger {
-	private client: Exchange
+
+	private readonly apiKey: string
+	private readonly secret: string
 
 	constructor(
 		apiKey: string,
 		secret: string
 	) {
 
-		this.client = new binance({
-			apiKey,
-			secret,
-			has: {
-				CORS: false,
-			}
-		})
+		this.apiKey = apiKey
+		this.secret = secret
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		// const types = [{ type: 'future' }, { type: 'delivery' }, { type: 'spot' }, { type: "funding" }, { type: 'savings' }]
-		const types = [ { type: 'spot' }]
-		const balances = await bluebird.mapSeries(types, async type => this.client.fetchBalance(type))
-		console.log(balances);
-		
-		return {}
-		// return _.reduce(balances, (acc, obj) => {
-		// 	_.forEach(obj, (val, key) => {
-		// 		acc[key] = (acc[key] || 0) + val
-		// 	})
-		// 	return acc
-		// }, {} as { [k: string]: number })
+		return invoke("query_cex_balance", { exchangeName: "binance", apiKey: this.apiKey, apiSecret: this.secret })
 	}
 }

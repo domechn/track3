@@ -9,6 +9,7 @@ import { OthersAnalyzer } from './datafetch/coins/others'
 import { SOLAnalyzer } from './datafetch/coins/sol'
 import { ERC20Analyzer } from './datafetch/coins/erc20'
 import { getConfiguration } from './configuration'
+import { CexAnalyzer } from './datafetch/coins/cex/cex'
 
 export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]: number }> {
 	return await invoke("query_coins_prices", { symbols })
@@ -22,9 +23,12 @@ export async function loadPortfolios(): Promise<Coin[]> {
 	}
 
 	const parsedCfg = yaml.parse(config.data) as CexConfig & TokenConfig
+	console.log(parsedCfg)
 
 	return loadPortfoliosByConfig({
-		exchanges: [],
+		exchanges: [
+
+		],
 		erc20: {
 		},
 		btc: {
@@ -38,7 +42,7 @@ export async function loadPortfolios(): Promise<Coin[]> {
 }
 
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<Coin[]> {
-	const coinLists = await bluebird.map([ERC20Analyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer], async ana => {
+	const coinLists = await bluebird.map([CexAnalyzer, ERC20Analyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer], async ana => {
 		console.log("loading portfolio from ", ana.name)
 
 		const a = new ana(config)
