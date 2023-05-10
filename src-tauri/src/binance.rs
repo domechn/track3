@@ -1,4 +1,4 @@
-use binance::{account::Account, api::Binance as BinanceApi, wallet::Wallet, futures::{general::FuturesGeneral, account::FuturesAccount}};
+use binance::{account::Account, api::Binance as BinanceApi, wallet::Wallet, futures::{account::FuturesAccount}};
 use std::collections::HashMap;
 
 pub struct Binance {

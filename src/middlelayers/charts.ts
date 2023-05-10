@@ -1,32 +1,47 @@
 import _ from 'lodash'
+import yaml from 'yaml'
 import { generateRandomColors } from '../utils/color'
-import { databaseName, getDatabase } from './database'
+import { getDatabase, saveCoinsToDatabase } from './database'
 import { AssetChangeData, AssetModel, CoinsAmountChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
 
-import { appDataDir } from '@tauri-apps/api/path'
-import { Command } from '@tauri-apps/api/shell'
-import { path } from '@tauri-apps/api'
+import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
+import { calculateTotalValue } from './datafetch/utils/coins'
+import { CexConfig, Coin, TokenConfig } from './datafetch/types'
+
+const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
 export async function refreshAllData() {
-	const appDataDirPath = await appDataDir()
-
-	const dbPath = await path.join(appDataDirPath, databaseName)
-
-	const command = Command.sidecar("../pkg/bin/track3-loader", ["-c", "refresh", "-d", dbPath])
-	const out = await command.execute()
-	if (out.code !== 0) {
-		if (out.stderr.includes("no configuration found")) {
-			throw new Error("no configuration found,\n please add configuration first")
-
-		}
-		throw new Error(out.stderr)
-	}
+	const coins = await queryCoinsData()
+	await saveCoinsToDatabase(coins)
 }
 
-async function queryCoinsData() {
-	const config = await getConfiguration()
-	// queryCoinPrices()
+async function queryCoinsData(): Promise<(Coin & {
+	price: number,
+	usdValue: number,
+})[]> {
+	const configModel = await getConfiguration()
+	if (!configModel) {
+		throw new Error("no configuration found,\n please add configuration first")
+	}
+	const config = yaml.parse(configModel.data) as CexConfig & TokenConfig
+	const assets = await loadPortfolios(config)
+	const priceMap = await queryCoinPrices(_(assets).map("symbol").push("USDT").uniq().value())
+
+	let lastAssets = assets
+	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
+	console.error("groupUSD", groupUSD, config);
+	
+	if (groupUSD) {
+		const usdValue = _(assets).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
+		lastAssets = _(assets).remove(c => !STABLE_COIN.includes(c.symbol)).value()
+		lastAssets.push({
+			symbol: "USDT",
+			amount: usdValue,
+		})
+	}
+	const totals = calculateTotalValue(lastAssets, priceMap)
+	return totals
 }
 
 async function queryAssets(size = 1): Promise<AssetModel[]> {

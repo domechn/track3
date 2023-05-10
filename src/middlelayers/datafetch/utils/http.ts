@@ -2,8 +2,6 @@ import { HttpVerb, getClient } from '@tauri-apps/api/http'
 
 export function getCurrentUA() {
 	const userAgent = window.navigator.userAgent
-	console.log(userAgent)
-
 	return userAgent
 }
 

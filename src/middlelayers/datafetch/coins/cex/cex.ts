@@ -3,6 +3,7 @@ import { Analyzer, CexConfig, Coin } from '../../types'
 import bluebird from 'bluebird'
 import { OtherCexExchanges } from './others'
 import { BinanceExchange } from './binance'
+import { OkexExchange } from './okex'
 
 export interface Exchanger {
 	// return all coins in exchange
@@ -20,11 +21,17 @@ export class CexAnalyzer implements Analyzer {
 		this.config = config
 
 		this.exchanges = _(_(config).get("exchanges", [])).map(exCfg => {
+			
+			console.log("loading exchange", exCfg.name);
 			switch (exCfg.name) {
 				case "binance":
 					return new BinanceExchange(exCfg.initParams.apiKey, exCfg.initParams.secret)
-				// case "okx" || "okex":
-				// 	break
+				case "okex":
+				case "okx":
+					if (!exCfg.initParams.password) {
+						throw new Error("okex password is required")
+					}
+					return new OkexExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.password)
 				default:
 					return new OtherCexExchanges(exCfg.name, exCfg.initParams)
 			}

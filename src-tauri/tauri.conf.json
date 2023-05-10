@@ -13,7 +13,7 @@
     "allowlist": {
       "all": false,
       "fs": {
-        "scope": ["$APP/*"]
+        "scope": ["$APP/*", "$RESOURCE/*"]
       },
       "http": {
         "all": true,
@@ -44,7 +44,9 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [],
+      "resources": [
+        "migrations/**/*"
+      ],
       "shortDescription": "",
       "targets": "all",
       "windows": {
