@@ -1,7 +1,7 @@
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
-import { gotWithFakeUA } from '../utils/http'
 import { asyncMap } from '../utils/async'
+import { sendHttpRequest } from '../utils/http'
 
 export class DOGEAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'doge'>
@@ -13,7 +13,7 @@ export class DOGEAnalyzer implements Analyzer {
 	}
 
 	private async query(address: string): Promise<number> {
-		const resp = await gotWithFakeUA().get(this.queryUrl + address).json() as { balance: number }
+		const resp = await sendHttpRequest<{ balance: number }>("GET", this.queryUrl + address)
 		const amount = _(resp.balance).toNumber()
 		return amount
 	}

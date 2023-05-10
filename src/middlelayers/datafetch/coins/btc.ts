@@ -1,7 +1,7 @@
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
-import { gotWithFakeUA } from '../utils/http'
 import { asyncMap } from '../utils/async'
+import { sendHttpRequest } from '../utils/http'
 
 interface BTCQuerier {
 	query(address: string): Promise<number>
@@ -41,7 +41,7 @@ class Blockchain implements BTCQuerier {
 	private readonly queryUrl = "https://blockchain.info/q/addressbalance/"
 
 	async query(address: string): Promise<number> {
-		const balance = await gotWithFakeUA().get(this.queryUrl + address).text()
+		const balance = await sendHttpRequest<string>("GET", this.queryUrl + address)
 		const amount = _(balance).toNumber() / 1e8
 		return amount
 	}
@@ -52,7 +52,7 @@ class BlockCypher implements BTCQuerier {
 	private readonly queryUrl = "https://api.blockcypher.com/v1/btc/main/addrs/"
 
 	async query(address: string): Promise<number> {
-		const resp = await gotWithFakeUA().get(this.queryUrl + address).json() as { final_balance: number }
+		const resp = await sendHttpRequest<{ final_balance: number }>("GET", this.queryUrl + address)
 
 		return resp.final_balance / 1e8
 	}

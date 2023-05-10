@@ -1,7 +1,7 @@
 import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
-import { gotWithFakeUA } from '../utils/http'
 import { asyncMap } from '../utils/async'
+import { sendHttpRequest } from '../utils/http'
 
 type DeBankAssetResp = {
 	coin_list: Coin[]
@@ -17,15 +17,12 @@ export class ERC20Analyzer implements Analyzer {
 	}
 
 	private async query(address: string): Promise<Coin[]> {
-		const { data } = await gotWithFakeUA().get(this.queryUrl, {
-			headers: {
-				origin: "https://debank.com",
-				referer: "https://debank.com/",
-			},
-			searchParams: {
-				user_addr: address,
-			}
-		}).json() as { data: DeBankAssetResp }
+		const url = `${this.queryUrl}?user_addr=${address}`
+		const { data } = await sendHttpRequest<{ data: DeBankAssetResp }>("GET", url, 5000, {})
+		if (!data) {
+			throw new Error("failed to query erc20 assets")
+		}
+
 
 		return _([data.coin_list, data.token_list]).flatten().value()
 	}
