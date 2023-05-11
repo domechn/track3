@@ -39,8 +39,6 @@ const App = ({
 
     const realId = (i: string | number) => "row-" + i + "-" + randomId;
 
-    console.log("clicked", idx, realId(idx), clickedRow);
-    
     // set clicked background
     if (clickedRow !== null) {
       document.getElementById(realId(clickedRow))?.classList.remove("clicked");
