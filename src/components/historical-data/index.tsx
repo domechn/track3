@@ -8,11 +8,21 @@ import { HistoricalData } from "../../middlelayers/types";
 import Modal from "../common/modal";
 import historyIcon from "../../assets/icons/history-icon.png";
 import deleteIcon from "../../assets/icons/delete-icon.png";
-import Table from "../common/table"
+import Table from "../common/table";
 import _ from "lodash";
 
 import "./index.css";
 import { toast } from "react-hot-toast";
+import { useWindowSize } from "../../utils/hook";
+
+type RankData = {
+  id: number;
+  rank: number;
+  symbol: string;
+  value: number;
+  amount: number | string;
+  price: number | string;
+};
 
 const App = ({
   afterDataDeleted,
@@ -20,8 +30,13 @@ const App = ({
   afterDataDeleted: (id: number) => unknown;
 }) => {
   const [data, setData] = useState([] as HistoricalData[]);
+  const [rankData, setRankData] = useState([] as RankData[]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const size = useWindowSize();
+  const leftTableWidth = 350;
+  const rightTableWidth = 420;
+  const twoTablesWidth = 800;
 
   const columns = [
     {
@@ -48,164 +63,37 @@ const App = ({
       title: "Date",
     },
     {
-      key: "top01",
-      dataIndex: "top01",
-      title: "Top01",
+      key: "total",
+      dataIndex: "total",
+      title: "Total",
+    },
+  ];
+
+  const rankColumns = [
+    {
+      key: "rank",
+      dataIndex: "rank",
+      title: "Rank",
     },
     {
-      key: "amount01",
-      dataIndex: "amount01",
-      title: "Amount01",
+      key: "symbol",
+      dataIndex: "symbol",
+      title: "Symbol",
     },
     {
-      key: "value01",
-      dataIndex: "value01",
-      title: "Value01",
+      key: "amount",
+      dataIndex: "amount",
+      title: "Amount",
     },
     {
-      key: "top02",
-      dataIndex: "top02",
-      title: "Top02",
+      key: "value",
+      dataIndex: "value",
+      title: "Value",
     },
     {
-      key: "amount02",
-      dataIndex: "amount02",
-      title: "Amount02",
-    },
-    {
-      key: "value02",
-      dataIndex: "value02",
-      title: "Value02",
-    },
-    {
-      key: "top03",
-      dataIndex: "top03",
-      title: "Top03",
-    },
-    {
-      key: "amount03",
-      dataIndex: "amount03",
-      title: "Amount03",
-    },
-    {
-      key: "value03",
-      dataIndex: "value03",
-      title: "Value03",
-    },
-    {
-      key: "top04",
-      dataIndex: "top04",
-      title: "Top04",
-    },
-    {
-      key: "amount04",
-      dataIndex: "amount04",
-      title: "Amount04",
-    },
-    {
-      key: "value04",
-      dataIndex: "value04",
-      title: "Value04",
-    },
-    {
-      key: "top05",
-      dataIndex: "top05",
-      title: "Top05",
-    },
-    {
-      key: "amount05",
-      dataIndex: "amount05",
-      title: "Amount05",
-    },
-    {
-      key: "value05",
-      dataIndex: "value05",
-      title: "Value05",
-    },
-    {
-      key: "top06",
-      dataIndex: "top06",
-      title: "Top06",
-    },
-    {
-      key: "amount06",
-      dataIndex: "amount06",
-      title: "Amount06",
-    },
-    {
-      key: "value06",
-      dataIndex: "value06",
-      title: "Value06",
-    },
-    {
-      key: "top07",
-      dataIndex: "top07",
-      title: "Top07",
-    },
-    {
-      key: "amount07",
-      dataIndex: "amount07",
-      title: "Amount07",
-    },
-    {
-      key: "value07",
-      dataIndex: "value07",
-      title: "Value07",
-    },
-    {
-      key: "top08",
-      dataIndex: "top08",
-      title: "Top08",
-    },
-    {
-      key: "amount08",
-      dataIndex: "amount08",
-      title: "Amount08",
-    },
-    {
-      key: "value08",
-      dataIndex: "value08",
-      title: "Value08",
-    },
-    {
-      key: "top09",
-      dataIndex: "top09",
-      title: "Top09",
-    },
-    {
-      key: "amount09",
-      dataIndex: "amount09",
-      title: "Amount09",
-    },
-    {
-      key: "value09",
-      dataIndex: "value09",
-      title: "Value09",
-    },
-    {
-      key: "top10",
-      dataIndex: "top10",
-      title: "Top10",
-    },
-    {
-      key: "amount10",
-      dataIndex: "amount10",
-      title: "Amount10",
-    },
-    {
-      key: "value10",
-      dataIndex: "value10",
-      title: "Value10",
-    },
-    {
-      key: "topOthers",
-      dataIndex: "topOthers",
-      title: "TopOthers",
-    },
-    {
-      key: "valueOthers",
-      dataIndex: "valueOthers",
-      title: "ValueOthers",
+      key: "price",
+      dataIndex: "price",
+      title: "Price",
     },
   ];
 
@@ -213,8 +101,6 @@ const App = ({
     setIsModalOpen(true);
     loadAllData();
   };
-
-  useEffect(() => {}, []);
 
   function loadAllData() {
     setLoading(true);
@@ -225,6 +111,8 @@ const App = ({
 
   function onModalClose() {
     setIsModalOpen(false);
+    // clean data rank when modal close
+    setRankData([]);
   }
 
   function onDeleteClick(id: number) {
@@ -237,6 +125,59 @@ const App = ({
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
+  }
+
+  function onRowClick(id: number | string) {
+    const d = _(data).find((d) => d.id === id);
+    if (!d) {
+      return;
+    }
+
+    const rankData = _([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      .map((i) => {
+        const idxStr = i.toString().padStart(2, "0");
+
+        const top = _(d).get(`top${idxStr}`) as string | undefined;
+        const amount = _(d).get(`amount${idxStr}`) as number | undefined;
+        const value = _(d).get(`value${idxStr}`) as number | undefined;
+
+        if (!top || !amount || !value) {
+          return;
+        }
+
+        return {
+          id: i,
+          rank: i,
+          symbol: top,
+          amount: amount.toFixed(5),
+          value: +value.toFixed(4),
+          price: (value / amount).toFixed(4),
+        } as RankData;
+      })
+      .compact()
+      .value();
+
+    // others
+    const top = _(d).get("topOthers") as string | undefined;
+    const value = _(d).get("valueOthers") as number | undefined;
+
+    if (top && value) {
+      rankData.push({
+        id: 11,
+        rank: 11,
+        symbol: top,
+        amount: "N/A",
+        value: value,
+        price: "N/A",
+      });
+    }
+
+    setRankData(rankData);
+  }
+
+  function getLeftPosition() {
+    const modalMaxSize = size.width! * 0.9;
+    return (Math.min(modalMaxSize, twoTablesWidth) - leftTableWidth) / 2;
   }
 
   return (
@@ -255,7 +196,46 @@ const App = ({
       <Modal visible={isModalOpen} onClose={onModalClose}>
         <Loading loading={loading} />
         <h2>Historical Data</h2>
-        <Table data={data} columns={columns} />
+        <div
+          style={{
+            position: "relative",
+            height: Math.max(30 * data.length + 30, 30 * rankData.length + 55),
+            width: twoTablesWidth,
+          }}
+        >
+          <div
+            style={{
+              overflow: "auto",
+              height: 30 * data.length + 30,
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                left: rankData.length > 0 ? 0 : getLeftPosition(),
+                width: leftTableWidth,
+              }}
+            >
+              <Table data={data} columns={columns} onRowClick={onRowClick} />
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                display: rankData.length > 0 ? "block" : "none",
+                width: rightTableWidth,
+                marginLeft: 10,
+                left: leftTableWidth,
+              }}
+            >
+              <Table
+                data={rankData}
+                columns={rankColumns}
+                onRowClick={onRowClick}
+              />
+              <h3>👆 Details</h3>
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );

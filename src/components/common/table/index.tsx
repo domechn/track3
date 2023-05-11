@@ -1,5 +1,5 @@
 import _ from "lodash";
-import React from "react";
+import React, { createRef, useEffect, useMemo, useState } from "react";
 
 import "./index.css";
 
@@ -14,10 +14,13 @@ export type ColumnData = {
 const App = ({
   columns,
   data,
+  onRowClick,
 }: {
   columns: ColumnData[];
   data: ({ id: string | number } & unknown)[];
+  onRowClick?: (id: string | number) => unknown;
 }) => {
+  const randomId = useMemo(() => "" + Math.floor(Math.random() * 1000000), []);
   const getColStyle = (column: ColumnData): React.CSSProperties => {
     const style = {} as React.CSSProperties;
     if (column.width) {
@@ -25,6 +28,24 @@ const App = ({
     }
     return style;
   };
+
+  const [clickedRow, setClickedRow] = useState<number | null>(null);
+
+  function onRowClickInternal(id: string | number, idx: number) {
+    if (!onRowClick) {
+      return;
+    }
+    onRowClick(id);
+
+    const realId = (i: string | number) => "row-" + i + "-" + randomId;
+
+    // set clicked background
+    if (clickedRow !== null) {
+      document.getElementById(realId(clickedRow))?.classList.remove("clicked");
+    }
+    document.getElementById(realId(idx))?.classList.add("clicked");
+    setClickedRow(idx);
+  }
 
   return (
     <div className="nice-table">
@@ -43,8 +64,15 @@ const App = ({
         </thead>
 
         <tbody>
-          {data.map((row) => (
-            <tr key={row.id}>
+          {data.map((row, idx) => (
+            <tr
+              id={"row-" + idx + "-" + randomId}
+              key={row.id}
+              onClick={() => onRowClickInternal(row.id, idx)}
+              style={{
+                cursor: onRowClick ? "pointer" : "default",
+              }}
+            >
               {columns.map((column) => (
                 <td key={column.dataIndex + row.id}>
                   {column.render
