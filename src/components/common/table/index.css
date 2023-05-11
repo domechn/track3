@@ -10,3 +10,7 @@ td {
   font-size: 15px;
   font-family: Arial;
 }
+
+.clicked {
+background-color: rgb(165, 195, 215);
+}
