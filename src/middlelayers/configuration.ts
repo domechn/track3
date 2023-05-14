@@ -1,4 +1,5 @@
 import { getDatabase } from './database'
+import { GlobalConfig } from './datafetch/types'
 import { ConfigurationModel } from './types'
 import yaml from 'yaml'
 
@@ -8,14 +9,9 @@ export async function getConfiguration(): Promise<ConfigurationModel | undefined
 	return assets[0]
 }
 
-export async function saveConfiguration(data: string) {
+export async function saveConfiguration(cfg: GlobalConfig) {
 	// validate data is yaml
-	try {
-		yaml.parse(data)
-	} catch (e) {
-		console.error(e)
-		throw new Error('Invalid yaml configuration')
-	}
+	const data = yaml.stringify(cfg)
 
 	const db = await getDatabase()
 	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (1, ?)`, [data])

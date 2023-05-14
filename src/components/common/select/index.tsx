@@ -5,8 +5,12 @@ export type SelectOption = { value: string; label: string };
 const App = ({
   options,
   onSelectChange,
+  defaultValue,
+  width,
 }: {
   options: SelectOption[];
+  defaultValue?: string;
+  width?: number;
   onSelectChange: (val: string) => unknown;
 }) => {
   return (
@@ -16,6 +20,10 @@ const App = ({
           id="slct"
           name="coins"
           onChange={(e) => onSelectChange(e.target.value)}
+          defaultValue={defaultValue}
+          style={{
+            width: width ? `${width}px` : "",
+          }}
         >
           {options.map((d) => {
             return (

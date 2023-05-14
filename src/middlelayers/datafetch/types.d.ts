@@ -7,21 +7,10 @@ export interface Analyzer {
 	loadPortfolio(): Promise<Coin[]>
 }
 
-export interface Database {
-
-	initDatabase(): Promise<void>
-
-	loadConfiguration(): Promise<GlobalConfig>
-
-	saveToDatabase(models: CoinModel[]): Promise<void>
-
-	queryDatabase(recordSize = 30, dateSort?: 'desc' | 'asc'): Promise<CoinQueryDetail[][]>
-
-	close(): Promise<void>
-}
-
 export type GlobalConfig = CexConfig & TokenConfig & {
-	database: DatabaseConfig
+	configs: {
+		groupUSD: boolean
+	}
 }
 
 export type CexConfig = {
@@ -47,12 +36,6 @@ export type TokenConfig = {
 		symbol: string
 		amount: number
 	}[]
-}
-
-export type DatabaseConfig = {
-	sqlite3: {
-		path: string
-	}
 }
 
 export type CoinModel = Coin & {
