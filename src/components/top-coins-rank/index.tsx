@@ -2,11 +2,9 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
 import { TopCoinsRankData } from "../../middlelayers/types";
-import { useRef } from "react";
 
 const App = ({ data }: { data: TopCoinsRankData }) => {
   const size = useWindowSize();
-  const chartRef = useRef(null);
 
   const options = {
     maintainAspectRatio: false,
@@ -78,7 +76,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
           height: Math.max((size.height || 100) / 2, 350),
         }}
       >
-        <Line ref={chartRef} options={options} data={lineData()} />
+        <Line options={options} data={lineData()} />
       </div>
     </>
   );

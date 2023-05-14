@@ -75,7 +75,7 @@ const App = () => {
     coins: [],
   } as TopCoinsRankData);
 
-  let lastSize = useMemo(() => windowSize, []);
+const [lastSize, setLastSize] = useState(windowSize);
 
   const querySizeOptions = useMemo(
     () =>
@@ -101,19 +101,23 @@ const App = () => {
   }, [querySize]);
 
   useEffect(() => {
-    // if (lastSize !== windowSize) {
-    //   lastSize = windowSize;
-    // }
-    // console.log(lastSize);
-
-    // setTimeout(() => {
-      
-    // }, resizeDelay);
-
-    resizeAllCharts();
+    setTimeout(() => {
+      setLastSize(windowSize);
+    }, resizeDelay); // to reduce resize count and cpu usage
   }, [windowSize]);
 
+  useEffect(() => {
+    if (
+      lastSize.width === windowSize.width &&
+      lastSize.height === windowSize.height
+    ) {
+      resizeAllCharts();
+    }
+  }, [lastSize]);
+
   function resizeAllCharts() {
+    console.log("resizing all charts");
+    
     for (const id in Chart.instances) {
       Chart.instances[id].resize();
     }
