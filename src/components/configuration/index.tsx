@@ -7,13 +7,13 @@ import {
   saveConfiguration,
 } from "../../middlelayers/configuration";
 import Loading from "../common/loading";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import Modal from "../common/modal";
 import yaml from "yaml";
 import deleteIcon from "../../assets/icons/delete-icon.png";
 import { GlobalConfig, TokenConfig } from "../../middlelayers/datafetch/types";
 import Select from "../common/select";
-import { useWindowSize } from '../../utils/hook'
+import { useWindowSize } from "../../utils/hook";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -68,7 +68,7 @@ const Configuration = () => {
     }[]
   >([]);
 
-  const size= useWindowSize()
+  const size = useWindowSize();
 
   useEffect(() => {
     if (isModalOpen) {
@@ -88,12 +88,14 @@ const Configuration = () => {
         setGroupUSD(globalConfig.configs.groupUSD);
 
         setExchanges(
-          globalConfig.exchanges.map((ex) => ({
-            type: ex.name,
-            apiKey: ex.initParams.apiKey,
-            secret: ex.initParams.secret,
-            password: ex.initParams.password,
-          }))
+          _(globalConfig.exchanges)
+            .map((ex) => ({
+              type: ex.name,
+              apiKey: ex.initParams.apiKey,
+              secret: ex.initParams.secret,
+              password: ex.initParams.password,
+            }))
+            .value()
         );
         setWallets(
           _(globalConfig)
@@ -125,7 +127,6 @@ const Configuration = () => {
     setLoading(true);
     let saveError: Error | undefined;
 
-    
     saveConfiguration(globalConfig)
       .then(() => setIsModalOpen(false))
       .catch((e) => (saveError = e))
@@ -136,7 +137,7 @@ const Configuration = () => {
           toast.error(saveError.message);
         } else {
           toast.success("Configuration updated successfully!", {
-            duration: 2000000,
+            id: "configuration-update-success",
           });
         }
       });
@@ -149,7 +150,7 @@ const Configuration = () => {
         initParams: {
           apiKey: ex.apiKey,
           secret: ex.secret,
-          password: ex.password,
+          password: ex.type !== "okex" ? undefined : ex.password,
         },
       }))
       .value();
@@ -178,7 +179,14 @@ const Configuration = () => {
     };
   }
 
-  function renderExchangeForm() {
+  function renderExchangeForm(
+    exs: {
+      type: string;
+      apiKey: string;
+      secret: string;
+      password?: string;
+    }[]
+  ) {
     const getInputWidth = (type: string) => {
       switch (type) {
         case "binance":
@@ -189,7 +197,7 @@ const Configuration = () => {
           return 200;
       }
     };
-    return _(exchanges)
+    return _(exs)
       .map((ex, idx) => {
         return (
           <div key={"ex" + idx} className="exchanges">
@@ -200,17 +208,17 @@ const Configuration = () => {
                   { value: "okex", label: "OKex" },
                 ]}
                 onSelectChange={(v) => handleExchangeChange(idx, "type", v)}
-                defaultValue={ex.type}
+                value={ex.type}
                 width={selectWidth}
                 height={selectHeight}
               />
             </label>
-            <label key={"ex-type-appKey" + idx}>
+            <label>
               <input
                 type="text"
                 name="apiKey"
                 placeholder="apiKey"
-                defaultValue={ex.apiKey}
+                value={ex.apiKey}
                 style={{
                   width: getInputWidth(ex.type),
                 }}
@@ -221,13 +229,13 @@ const Configuration = () => {
             </label>
             <label>
               <input
-                type="text"
+                type="password"
                 name="secret"
                 placeholder="secret"
                 style={{
                   width: getInputWidth(ex.type),
                 }}
-                defaultValue={ex.secret}
+                value={ex.secret}
                 onChange={(e) =>
                   handleExchangeChange(idx, "secret", e.target.value)
                 }
@@ -235,14 +243,14 @@ const Configuration = () => {
             </label>
             <label>
               <input
-                type="text"
+                type="password"
                 name="password"
                 placeholder="password"
                 style={{
                   display: ex.type === "okex" ? "inline-block" : "none",
                   width: getInputWidth(ex.type),
                 }}
-                defaultValue={ex.password}
+                value={ex.password}
                 onChange={(e) =>
                   handleExchangeChange(idx, "password", e.target.value)
                 }
@@ -258,12 +266,13 @@ const Configuration = () => {
   }
 
   function handleWalletChange(idx: number, key: string, val: string) {
-    _.set(wallets, [idx, key], val);
-    setWallets(wallets);
+    const newWs = _.set(wallets, [idx, key], val);
+    setWallets([...newWs]);
   }
 
-  function renderWalletForm() {
-    return _(wallets)
+  function renderWalletForm(ws: { type: string; address: string }[]) {
+    
+    return _(ws)
       .map((w, idx) => {
         return (
           <div key={"wallet" + idx} className="wallets">
@@ -288,7 +297,7 @@ const Configuration = () => {
                   },
                 ]}
                 onSelectChange={(v) => handleWalletChange(idx, "type", v)}
-                defaultValue={w.type}
+                value={w.type}
                 width={selectWidth}
                 height={selectHeight}
               />
@@ -298,7 +307,7 @@ const Configuration = () => {
                 type="text"
                 name="address"
                 placeholder="wallet address"
-                defaultValue={w.address}
+                value={w.address}
                 style={{
                   width: 410,
                 }}
@@ -317,8 +326,8 @@ const Configuration = () => {
   }
 
   function handleOthersChange(idx: number, key: string, val: string) {
-    _.set(others, [idx, key], val);
-    setOthers(others);
+    const nos = _.set(others, [idx, key], val);
+    setOthers([...nos]);
   }
 
   function renderOthersForm() {
@@ -330,7 +339,7 @@ const Configuration = () => {
               type="text"
               name="symbol"
               placeholder="symbol, e.g. BTC"
-              defaultValue={o.symbol}
+              value={o.symbol}
               style={{
                 width: 100,
               }}
@@ -344,7 +353,7 @@ const Configuration = () => {
               type="number"
               name="amount"
               placeholder="amount"
-              defaultValue={o.amount}
+              value={o.amount}
               onChange={(e) =>
                 handleOthersChange(idx, "amount", e.target.value)
               }
@@ -398,18 +407,19 @@ const Configuration = () => {
   }
 
   function handleRemoveWallet(idx: number) {
+    console.log(idx, wallets, _.filter(wallets, (_, i) => i !== idx));
     setWallets(_.filter(wallets, (_, i) => i !== idx));
   }
 
   function handleExchangeChange(idx: number, key: string, val: string) {
-    _.set(exchanges, [idx, key], val);
-    setExchanges(exchanges);
+    const newExs = _.set(exchanges, [idx, key], val);
+
+    setExchanges([...newExs]);
   }
 
   return (
     <div className="configuration">
       <Loading loading={loading} />
-      <Toaster />
       <button className="gear-button" onClick={handleButtonClick}>
         <img
           src={gearIcon}
@@ -422,9 +432,11 @@ const Configuration = () => {
         />
       </button>
       <Modal visible={isModalOpen} onClose={onModalClose}>
-        <div style={{
-         height: Math.min(700, size.height! - 100), // make sure modal is not too high to hint max-hight of the modal, otherwise it will make view fuzzy
-        }}>
+        <div
+          style={{
+            height: Math.min(700, size.height! - 100), // make sure modal is not too high to hint max-hight of the modal, otherwise it will make view fuzzy
+          }}
+        >
           <h2>Configuration</h2>
           <form onSubmit={onFormSubmit}>
             <label>
@@ -455,7 +467,7 @@ const Configuration = () => {
             >
               Add
             </button>
-            {renderExchangeForm()}
+            {renderExchangeForm(exchanges)}
             <h3>Wallets</h3>
             <button
               type="button"
@@ -464,7 +476,7 @@ const Configuration = () => {
             >
               Add
             </button>
-            {renderWalletForm()}
+            {renderWalletForm(wallets)}
             <h3>Others</h3>
             <button
               type="button"
