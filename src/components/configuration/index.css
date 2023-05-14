@@ -10,3 +10,7 @@
 .gear-button:hover {
   transform: rotate(60deg);
 }
+
+.configuration input {
+  
+}
