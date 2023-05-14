@@ -12,7 +12,7 @@ const App = ({data}: {data: AssetChangeData}) => {
 
   const options = {
     maintainAspectRatio: false,
-    responsive: true,
+    responsive: false,
     plugins: {
       title: {
         display: true,

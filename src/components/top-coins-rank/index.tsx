@@ -8,7 +8,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
 
   const options = {
     maintainAspectRatio: false,
-    responsive: true,
+    responsive: false,
     plugins: {
       title: {
         display: true,
@@ -70,7 +70,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
   }
 
   return (
-    <div>
+    <>
       <div
         style={{
           height: Math.max((size.height || 100) / 2, 350),
@@ -78,7 +78,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
       >
         <Line options={options} data={lineData()} />
       </div>
-    </div>
+    </>
   );
 };
 

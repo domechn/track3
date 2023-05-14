@@ -35,6 +35,8 @@ import { queryTopCoinsRank } from "../../middlelayers/charts";
 import { queryTotalValue } from "../../middlelayers/charts";
 import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import Loading from "../common/loading";
+import { useWindowSize } from "../../utils/hook";
+import { Chart } from "chart.js";
 
 ChartJS.register(
   ArcElement,
@@ -48,9 +50,12 @@ ChartJS.register(
   ChartDataLabels
 );
 
+const resizeDelay = 200; // 200 ms
+
 const App = () => {
   const [loading, setLoading] = useState(false);
   const [querySize, setQuerySize] = useState(10);
+  const windowSize = useWindowSize();
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData
   );
@@ -69,6 +74,8 @@ const App = () => {
     timestamps: [],
     coins: [],
   } as TopCoinsRankData);
+
+const [lastSize, setLastSize] = useState(windowSize);
 
   const querySizeOptions = useMemo(
     () =>
@@ -92,6 +99,29 @@ const App = () => {
   useEffect(() => {
     loadAllData(querySize);
   }, [querySize]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setLastSize(windowSize);
+    }, resizeDelay); // to reduce resize count and cpu usage
+  }, [windowSize]);
+
+  useEffect(() => {
+    if (
+      lastSize.width === windowSize.width &&
+      lastSize.height === windowSize.height
+    ) {
+      resizeAllCharts();
+    }
+  }, [lastSize]);
+
+  function resizeAllCharts() {
+    console.log("resizing all charts");
+    
+    for (const id in Chart.instances) {
+      Chart.instances[id].resize();
+    }
+  }
 
   async function loadAllDataAsync(size = 10) {
     console.log("loading all data... size: ", size);
@@ -138,6 +168,7 @@ const App = () => {
               Size{" "}
             </span>
             <Select
+              width={60}
               options={querySizeOptions}
               onSelectChange={onQuerySizeChanged}
             />

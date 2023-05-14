@@ -6,11 +6,15 @@ const App = ({
   options,
   onSelectChange,
   defaultValue,
+  value,
   width,
+  height,
 }: {
   options: SelectOption[];
   defaultValue?: string;
+  value?: string;
   width?: number;
+  height?: number;
   onSelectChange: (val: string) => unknown;
 }) => {
   return (
@@ -21,8 +25,10 @@ const App = ({
           name="coins"
           onChange={(e) => onSelectChange(e.target.value)}
           defaultValue={defaultValue}
+          value={value}
           style={{
             width: width ? `${width}px` : "",
+            height: height ? `${height}px` : "",
           }}
         >
           {options.map((d) => {
