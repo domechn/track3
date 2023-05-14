@@ -13,6 +13,7 @@ import yaml from "yaml";
 import deleteIcon from "../../assets/icons/delete-icon.png";
 import { GlobalConfig, TokenConfig } from "../../middlelayers/datafetch/types";
 import Select from "../common/select";
+import { useWindowSize } from '../../utils/hook'
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -34,7 +35,8 @@ const initialConfiguration: GlobalConfig = {
   others: [],
 };
 
-const deleteIconSize = 15;
+const selectWidth = 100;
+const selectHeight = 30;
 
 const supportCoins = ["btc", "erc20", "sol", "doge"];
 
@@ -65,6 +67,8 @@ const Configuration = () => {
       amount: number;
     }[]
   >([]);
+
+  const size= useWindowSize()
 
   useEffect(() => {
     if (isModalOpen) {
@@ -121,6 +125,7 @@ const Configuration = () => {
     setLoading(true);
     let saveError: Error | undefined;
 
+    
     saveConfiguration(globalConfig)
       .then(() => setIsModalOpen(false))
       .catch((e) => (saveError = e))
@@ -130,7 +135,9 @@ const Configuration = () => {
         if (saveError) {
           toast.error(saveError.message);
         } else {
-          toast.success("Configuration updated successfully!");
+          toast.success("Configuration updated successfully!", {
+            duration: 2000000,
+          });
         }
       });
   }
@@ -172,16 +179,30 @@ const Configuration = () => {
   }
 
   function renderExchangeForm() {
+    const getInputWidth = (type: string) => {
+      switch (type) {
+        case "binance":
+          return 200;
+        case "okex":
+          return 130;
+        default:
+          return 200;
+      }
+    };
     return _(exchanges)
       .map((ex, idx) => {
         return (
-          <div key={"ex" + idx}>
+          <div key={"ex" + idx} className="exchanges">
             <label>
               <Select
-                options={[{value: "binance", label: "Binance"}, {value: "okex", label: "OKex"}]}
+                options={[
+                  { value: "binance", label: "Binance" },
+                  { value: "okex", label: "OKex" },
+                ]}
                 onSelectChange={(v) => handleExchangeChange(idx, "type", v)}
                 defaultValue={ex.type}
-                width={100}
+                width={selectWidth}
+                height={selectHeight}
               />
             </label>
             <label key={"ex-type-appKey" + idx}>
@@ -190,6 +211,9 @@ const Configuration = () => {
                 name="apiKey"
                 placeholder="apiKey"
                 defaultValue={ex.apiKey}
+                style={{
+                  width: getInputWidth(ex.type),
+                }}
                 onChange={(e) =>
                   handleExchangeChange(idx, "apiKey", e.target.value)
                 }
@@ -200,6 +224,9 @@ const Configuration = () => {
                 type="text"
                 name="secret"
                 placeholder="secret"
+                style={{
+                  width: getInputWidth(ex.type),
+                }}
                 defaultValue={ex.secret}
                 onChange={(e) =>
                   handleExchangeChange(idx, "secret", e.target.value)
@@ -212,7 +239,8 @@ const Configuration = () => {
                 name="password"
                 placeholder="password"
                 style={{
-                  display: ex.type === "okex" ? "block" : "none",
+                  display: ex.type === "okex" ? "inline-block" : "none",
+                  width: getInputWidth(ex.type),
                 }}
                 defaultValue={ex.password}
                 onChange={(e) =>
@@ -221,15 +249,7 @@ const Configuration = () => {
               />
             </label>
             <a href="#" onClick={() => handleRemoveExchange(idx)}>
-              <img
-                src={deleteIcon}
-                alt="delete"
-                style={{
-                  border: 0,
-                  height: deleteIconSize,
-                  width: deleteIconSize,
-                }}
-              />
+              <img src={deleteIcon} alt="delete" />
             </a>
           </div>
         );
@@ -246,48 +266,49 @@ const Configuration = () => {
     return _(wallets)
       .map((w, idx) => {
         return (
-          <div key={"wallet" + idx}>
+          <div key={"wallet" + idx} className="wallets">
             <label>
-            <Select
-                options={[{
-                  value: "btc",
-                  label: "BTC"
-                }, {
-                  value: "erc20",
-                  label: "ERC20"
-                }, {
-                  value: "sol",
-                  label: "SOL"
-                }, {
-                  value: "doge",
-                  label: "DOGE"
-                }]}
-                onSelectChange={(v) =>  handleWalletChange(idx, "type", v)}
+              <Select
+                options={[
+                  {
+                    value: "btc",
+                    label: "BTC",
+                  },
+                  {
+                    value: "erc20",
+                    label: "ERC20",
+                  },
+                  {
+                    value: "sol",
+                    label: "SOL",
+                  },
+                  {
+                    value: "doge",
+                    label: "DOGE",
+                  },
+                ]}
+                onSelectChange={(v) => handleWalletChange(idx, "type", v)}
                 defaultValue={w.type}
-                width={100}
+                width={selectWidth}
+                height={selectHeight}
               />
             </label>
             <label>
               <input
                 type="text"
                 name="address"
-                placeholder="address"
+                placeholder="wallet address"
                 defaultValue={w.address}
+                style={{
+                  width: 410,
+                }}
                 onChange={(e) =>
                   handleWalletChange(idx, "address", e.target.value)
                 }
               />
             </label>
             <a href="#" onClick={() => handleRemoveWallet(idx)}>
-              <img
-                src={deleteIcon}
-                alt="delete"
-                style={{
-                  border: 0,
-                  height: deleteIconSize,
-                  width: deleteIconSize,
-                }}
-              />
+              <img src={deleteIcon} alt="delete" />
             </a>
           </div>
         );
@@ -303,13 +324,16 @@ const Configuration = () => {
   function renderOthersForm() {
     return _(others)
       .map((o, idx) => (
-        <div key={"other" + idx}>
+        <div key={"other" + idx} className="others">
           <label>
             <input
               type="text"
               name="symbol"
-              placeholder="symbol, e.g. BTC, ETH"
+              placeholder="symbol, e.g. BTC"
               defaultValue={o.symbol}
+              style={{
+                width: 100,
+              }}
               onChange={(e) =>
                 handleOthersChange(idx, "symbol", e.target.value)
               }
@@ -327,15 +351,7 @@ const Configuration = () => {
             />
           </label>
           <a href="#" onClick={() => handleRemoveOther(idx)}>
-            <img
-              src={deleteIcon}
-              alt="delete"
-              style={{
-                border: 0,
-                height: deleteIconSize,
-                width: deleteIconSize,
-              }}
-            />
+            <img src={deleteIcon} alt="delete" />
           </a>
         </div>
       ))
@@ -406,41 +422,65 @@ const Configuration = () => {
         />
       </button>
       <Modal visible={isModalOpen} onClose={onModalClose}>
-        <h2>Configuration</h2>
-        <form onSubmit={onFormSubmit}>
-          <label>
-            GroupUSD
-            <input
-              type="checkbox"
-              name="groupUSD"
-              defaultChecked={groupUSD}
-              onChange={(e) => setGroupUSD(e.target.checked)}
-            />
-          </label>
-          <br />
-          <h3>Exchanges</h3>
-          {renderExchangeForm()}
-          <br />
-          <button type="button" onClick={handleAddExchange}>
-            Add Exchange
-          </button>
-          <h3>Wallets</h3>
-          {renderWalletForm()}
-          <br />
-          <button type="button" onClick={handleAddWallet}>
-            Add Wallet
-          </button>
-          <h3>Others</h3>
-          {renderOthersForm()}
-          <br />
-          <button type="button" onClick={handleAddOther}>
-            Add Other
-          </button>
-          <br />
-          <button type="button" onClick={onFormSubmit}>
-            Save
-          </button>
-        </form>
+        <div style={{
+         height: Math.min(700, size.height! - 100), // make sure modal is not too high to hint max-hight of the modal, otherwise it will make view fuzzy
+        }}>
+          <h2>Configuration</h2>
+          <form onSubmit={onFormSubmit}>
+            <label>
+              <span
+                style={{
+                  display: "inline-block",
+                }}
+              >
+                GroupUSD
+              </span>
+              <input
+                style={{
+                  width: 50,
+                  height: 16,
+                  cursor: "pointer",
+                }}
+                type="checkbox"
+                name="groupUSD"
+                defaultChecked={groupUSD}
+                onChange={(e) => setGroupUSD(e.target.checked)}
+              />
+            </label>
+            <h3>Exchanges</h3>
+            <button
+              type="button"
+              className="add-button"
+              onClick={handleAddExchange}
+            >
+              Add
+            </button>
+            {renderExchangeForm()}
+            <h3>Wallets</h3>
+            <button
+              type="button"
+              className="add-button"
+              onClick={handleAddWallet}
+            >
+              Add
+            </button>
+            {renderWalletForm()}
+            <h3>Others</h3>
+            <button
+              type="button"
+              className="add-button"
+              onClick={handleAddOther}
+            >
+              Add
+            </button>
+            {renderOthersForm()}
+            <br />
+            <br />
+            <button className="save" type="button" onClick={onFormSubmit}>
+              Save
+            </button>
+          </form>
+        </div>
       </Modal>
     </div>
   );

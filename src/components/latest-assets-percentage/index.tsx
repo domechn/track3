@@ -7,7 +7,7 @@ const App = ({ data }: { data: LatestAssetsPercentageData }) => {
 
   const options = {
     maintainAspectRatio: false,
-    responsive: true,
+    responsive: false,
     plugins: {
       title: { display: true, text: "Percentage of Assets" },
       legend: { labels: { font: {} } },

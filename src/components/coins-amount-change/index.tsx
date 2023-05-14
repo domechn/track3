@@ -17,7 +17,7 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
 
   const options = {
     maintainAspectRatio: false,
-    responsive: true,
+    responsive: false,
     plugins: {
       title: {
         display: true,

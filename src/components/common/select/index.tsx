@@ -7,10 +7,12 @@ const App = ({
   onSelectChange,
   defaultValue,
   width,
+  height,
 }: {
   options: SelectOption[];
   defaultValue?: string;
   width?: number;
+  height?: number;
   onSelectChange: (val: string) => unknown;
 }) => {
   return (
@@ -23,6 +25,7 @@ const App = ({
           defaultValue={defaultValue}
           style={{
             width: width ? `${width}px` : "",
+            height: height ? `${height}px` : "",
           }}
         >
           {options.map((d) => {
