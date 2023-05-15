@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate lazy_static;
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -6,7 +8,11 @@ use std::{
 
 use sqlx::{Connection, Executor, SqliteConnection};
 use tokio::{runtime::Runtime};
-use track3::{binance::Binance, okex::Okex, price::get_price_querier};
+use track3::{binance::Binance, okex::Okex, price::get_price_querier, ent::Ent};
+
+lazy_static! {
+    static ref ENT: Ent = Ent::new();
+}
 
 #[cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
@@ -68,6 +74,36 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
     }
 }
 
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+fn encrypt(
+    data: String,
+) -> Result<String, String> {
+    let res = ENT.encrypt(data);
+    match res {
+        Ok(encrypted) => Ok(encrypted),
+        Err(e) => Err(format!("encrypt error: {:?}", e)),
+    }
+}
+
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+fn decrypt(
+    data: String,
+) -> Result<String, String> {
+    let res = ENT.decrypt(data);
+    match res {
+        Ok(encrypted) => Ok(encrypted),
+        Err(e) => Err(format!("decrypt error: {:?}", e)),
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -84,7 +120,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             query_coins_prices,
             query_binance_balance,
-            query_okex_balance
+            query_okex_balance,
+            encrypt,
+            decrypt,
         ])
         .plugin(tauri_plugin_sql::Builder::default().build())
         .run(tauri::generate_context!())

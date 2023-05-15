@@ -37,6 +37,7 @@ import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import Loading from "../common/loading";
 import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
+import { invoke } from '@tauri-apps/api'
 
 ChartJS.register(
   ArcElement,
@@ -75,7 +76,7 @@ const App = () => {
     coins: [],
   } as TopCoinsRankData);
 
-const [lastSize, setLastSize] = useState(windowSize);
+  const [lastSize, setLastSize] = useState(windowSize);
 
   const querySizeOptions = useMemo(
     () =>
@@ -117,7 +118,7 @@ const [lastSize, setLastSize] = useState(windowSize);
 
   function resizeAllCharts() {
     console.log("resizing all charts");
-    
+
     for (const id in Chart.instances) {
       Chart.instances[id].resize();
     }
@@ -148,6 +149,25 @@ const [lastSize, setLastSize] = useState(windowSize);
   function onQuerySizeChanged(val: string) {
     setQuerySize(parseInt(val, 10));
   }
+
+  const [test, setTest] = useState("");
+  const [test1, setTest1] = useState("");
+
+  useEffect(() => {
+    const data = "12345";
+    invoke("encrypt", {data:data}).then((res) => {
+      setTest(res as string);
+    });
+  }, []);
+
+  useEffect(() => {
+    const data = "12345";
+    invoke("decrypt", {data:data}).then((res) => {
+      setTest1(res as string);
+    });
+  }, []);
+
+  
 
   return (
     <div>
@@ -187,6 +207,9 @@ const [lastSize, setLastSize] = useState(windowSize);
         </div>
       </div>
       <div>
+      <h1>{test}</h1>
+      <h1>{test1}</h1>
+
         <TotalValue data={totalValueData} />
         <LatestAssetsPercentage data={latestAssetsPercentageData} />
         <AssetChange data={assetChangeData} />
