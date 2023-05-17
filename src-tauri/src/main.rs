@@ -80,9 +80,9 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
 )]
 #[tauri::command]
 fn encrypt(
-    data: String,
-) -> Result<String, String> {
-    let res = ENT.encrypt(data);
+    data: Vec<u8>,
+) -> Result<Vec<u8>, String> {
+    let res = ENT.encrypt(data.as_slice());
     match res {
         Ok(encrypted) => Ok(encrypted),
         Err(e) => Err(format!("encrypt error: {:?}", e)),
@@ -95,9 +95,9 @@ fn encrypt(
 )]
 #[tauri::command]
 fn decrypt(
-    data: String,
-) -> Result<String, String> {
-    let res = ENT.decrypt(data);
+    data: Vec<u8>,
+) -> Result<Vec<u8>, String> {
+    let res = ENT.decrypt(data.as_slice());
     match res {
         Ok(encrypted) => Ok(encrypted),
         Err(e) => Err(format!("decrypt error: {:?}", e)),

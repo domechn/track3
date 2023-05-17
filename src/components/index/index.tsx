@@ -37,7 +37,7 @@ import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import Loading from "../common/loading";
 import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
-import { invoke } from '@tauri-apps/api'
+import { invoke } from "@tauri-apps/api";
 
 ChartJS.register(
   ArcElement,
@@ -52,6 +52,9 @@ ChartJS.register(
 );
 
 const resizeDelay = 200; // 200 ms
+
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
 const App = () => {
   const [loading, setLoading] = useState(false);
@@ -154,20 +157,24 @@ const App = () => {
   const [test1, setTest1] = useState("");
 
   useEffect(() => {
-    const data = "12345";
-    invoke("encrypt", {data:data}).then((res) => {
-      setTest(res as string);
-    });
+    const data = [].slice.call(textEncoder.encode("hello world"));
+    invoke("encrypt", { data }).then(
+      (res) => {
+        console.log(res);
+        
+        setTest(textDecoder.decode(Uint8Array.from(res as number[])));
+      }
+    );
   }, []);
 
   useEffect(() => {
-    const data = "12345";
-    invoke("decrypt", {data:data}).then((res) => {
-      setTest1(res as string);
+    if (!test) return;
+    const data = [].slice.call(textEncoder.encode(test))
+    
+    invoke("decrypt", { data }).then((res) => {
+      setTest1(textDecoder.decode(Uint8Array.from(res as number[])));
     });
-  }, []);
-
-  
+  }, [test]);
 
   return (
     <div>
@@ -207,8 +214,9 @@ const App = () => {
         </div>
       </div>
       <div>
-      <h1>{test}</h1>
-      <h1>{test1}</h1>
+        <h1>{test}</h1>
+        123
+        <h1>{test1}</h1>
 
         <TotalValue data={totalValueData} />
         <LatestAssetsPercentage data={latestAssetsPercentageData} />
