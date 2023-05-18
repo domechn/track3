@@ -1,5 +1,5 @@
 use crypto::buffer::{BufferResult, ReadBuffer, WriteBuffer};
-use crypto::{aes, blockmodes, buffer, symmetriccipher};
+use crypto::{aes, blockmodes, buffer};
 use rand::{OsRng, Rng};
 
 pub struct Ent {
@@ -32,13 +32,13 @@ impl Ent {
         return "#t.3eis@hck,btr!a".as_bytes();
     }
 
-    pub fn encrypt(&self, data: &[u8]) -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
+    pub fn encrypt(&self, data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let mut iv: [u8; 16] = [0; 16];
         let mut rng = OsRng::new().ok().unwrap();
         rng.fill_bytes(&mut iv);
 
         let key = self.get_key();
-        
+
         // combine data and salt
 
         let mut data_with_salt = Vec::<u8>::new();
@@ -55,7 +55,13 @@ impl Ent {
         let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
 
         loop {
-            let result = encryptor.encrypt(&mut read_buffer, &mut write_buffer, true)?;
+            let result = encryptor.encrypt(&mut read_buffer, &mut write_buffer, true);
+
+            if let Err(e) = result {
+                return Err(format!("decrypt error: {:?}", e).into());
+            }
+
+            let result = result.unwrap();
 
             final_result.extend(
                 write_buffer
@@ -79,18 +85,15 @@ impl Ent {
         Ok(final_result_with_iv)
     }
 
-    pub fn decrypt(
-        &self,
-        encrypted_data: &[u8],
-    ) -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
+    pub fn decrypt(&self, encrypted_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         if !self.is_ent(encrypted_data) {
-            return Err(symmetriccipher::SymmetricCipherError::InvalidPadding);
+            return Err("not ent".into());
         }
         // remove ent prefix
         let encrypted_data = &encrypted_data[self.ent_prefix.len()..];
         // if ed size < 16, it's not encrypted, raise error
         if encrypted_data.len() < 16 {
-            return Err(symmetriccipher::SymmetricCipherError::InvalidLength);
+            return Err("invalid length".into());
         }
 
         // iv is the first 16 bytes
@@ -111,7 +114,11 @@ impl Ent {
         let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
 
         loop {
-            let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true)?;
+            let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true);
+            if let Err(e) = result {
+                return Err(format!("decrypt error: {:?}", e).into());
+            }
+            let result = result.unwrap();
             final_result.extend(
                 write_buffer
                     .take_read_buffer()
