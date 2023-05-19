@@ -15,7 +15,7 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import TotalValue from "../total-value";
 import AssetChange from "../asset-change";
 import LatestAssetsPercentage from "../latest-assets-percentage";
-import CoinsAmountChange from "../coins-amount-change";
+import CoinsAmountAndValueChange from "../coins-amount-and-value-change";
 import TopCoinsRank from "../top-coins-rank";
 import HistoricalData from "../historical-data";
 import "./index.css";
@@ -190,7 +190,7 @@ const App = () => {
         <TotalValue data={totalValueData} />
         <LatestAssetsPercentage data={latestAssetsPercentageData} />
         <AssetChange data={assetChangeData} />
-        <CoinsAmountChange data={coinsAmountChangeData} />
+        <CoinsAmountAndValueChange data={coinsAmountChangeData} />
         <TopCoinsRank data={topCoinsRankData} />
       </div>
     </div>

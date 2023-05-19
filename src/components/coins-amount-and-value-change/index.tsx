@@ -1,12 +1,15 @@
+import _ from "lodash";
 import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
 import { CoinsAmountChangeData } from "../../middlelayers/types";
 import Select from "../common/select";
+import "./index.css";
 
 const App = ({ data }: { data: CoinsAmountChangeData }) => {
   const [currentCoinSelected, setCurrentCoinSelected] = useState("");
+  const [currentType, setCurrentType] = useState("amount"); // ['amount', 'value'
   const size = useWindowSize();
 
   useEffect(() => {
@@ -15,13 +18,18 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
     }
   }, [data]);
 
+  function getLabel() {
+    // set first char to upper case
+    return _.upperFirst(currentType);
+  }
+
   const options = {
     maintainAspectRatio: false,
     responsive: false,
     plugins: {
       title: {
         display: true,
-        text: "Trend of Coin Amount Value",
+        text: `Trend of Coin ${getLabel()} Value`,
       },
       datalabels: {
         display: false,
@@ -37,7 +45,7 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
       y: {
         title: {
           display: true,
-          text: "Amount",
+          text: getLabel(),
         },
         offset: true,
         ticks: {
@@ -62,7 +70,7 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
       labels: current.timestamps.map(timestampToDate),
       datasets: [
         {
-          label: coin + " Amount",
+          label: coin + " " + getLabel(),
           data: current.amounts,
           borderColor: current.lineColor,
           backgroundColor: current.lineColor,
@@ -79,12 +87,47 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
     setCurrentCoinSelected(coin);
   }
 
+  function onTypeSelectChange(type: string) {
+    setCurrentType(type);
+
+    const buttons = document.getElementsByClassName("active");
+
+    for (let i = 0; i < buttons.length; i++) {
+      buttons[i].classList.remove("active");
+    }
+
+    document.getElementById(type)?.classList.add("active");
+  }
+
   return (
-    <div>
-      <Select
-        options={data.map((d) => ({ value: d.coin, label: d.coin }))}
-        onSelectChange={onCoinSelectChange}
-      />
+    <>
+      <div style={{
+        height: 34,
+      }}>
+        <div className="type-updater button-group">
+          <button
+            id="amount"
+            onClick={() => onTypeSelectChange("amount")}
+            className="left active"
+          >
+            Amount
+          </button>
+          <button
+            id="value"
+            onClick={() => onTypeSelectChange("value")}
+            className="right"
+          >
+            Value
+          </button>
+        </div>
+        <div className="type-updater">
+          <Select
+            options={data.map((d) => ({ value: d.coin, label: d.coin }))}
+            onSelectChange={onCoinSelectChange}
+            value={currentCoinSelected}
+          />
+        </div>
+      </div>
       <div
         style={{
           height: Math.max((size.height || 100) / 2, 350),
@@ -92,7 +135,7 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
       >
         <Line options={options} data={chartDataByCoin(currentCoinSelected)} />
       </div>
-    </div>
+    </>
   );
 };
 

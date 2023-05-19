@@ -1,0 +1,41 @@
+.type-updater {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.button-group button {
+  font-family: BM Jua;
+  color: white; /* White text */
+  height: 34px;
+  cursor: pointer; /* Pointer/hand icon */
+  float: left; /* Float the buttons side by side */
+  border: 0;
+  width: 80px;
+  font-size: 0.8em;
+  margin: 0;
+  transition: 0.5s;
+}
+
+.button-group .left {
+  border-radius: 5px 0 0 5px;
+}
+
+.button-group .right {
+  border-radius: 0 5px 5px 0;
+}
+
+.button-group:after {
+  content: "";
+  clear: both;
+  display: table;
+}
+
+.button-group button:not(:last-child) {
+  border-right: none; /* Prevent double borders */
+}
+
+
+.button-group button.active {
+  background-color: #007bff;
+  color: white;
+}
