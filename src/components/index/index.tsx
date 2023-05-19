@@ -75,7 +75,7 @@ const App = () => {
     coins: [],
   } as TopCoinsRankData);
 
-const [lastSize, setLastSize] = useState(windowSize);
+  const [lastSize, setLastSize] = useState(windowSize);
 
   const querySizeOptions = useMemo(
     () =>
@@ -117,7 +117,7 @@ const [lastSize, setLastSize] = useState(windowSize);
 
   function resizeAllCharts() {
     console.log("resizing all charts");
-    
+
     for (const id in Chart.instances) {
       Chart.instances[id].resize();
     }

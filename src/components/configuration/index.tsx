@@ -111,6 +111,9 @@ const Configuration = () => {
 
         setOthers(globalConfig.others);
       })
+      .catch((e) => {
+        toast.error("get configuration failed:", e);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -134,7 +137,7 @@ const Configuration = () => {
         setLoading(false);
 
         if (saveError) {
-          toast.error(saveError.message);
+          toast.error(saveError.message ?? saveError);
         } else {
           toast.success("Configuration updated successfully!", {
             id: "configuration-update-success",
@@ -271,7 +274,6 @@ const Configuration = () => {
   }
 
   function renderWalletForm(ws: { type: string; address: string }[]) {
-    
     return _(ws)
       .map((w, idx) => {
         return (
@@ -407,7 +409,6 @@ const Configuration = () => {
   }
 
   function handleRemoveWallet(idx: number) {
-    console.log(idx, wallets, _.filter(wallets, (_, i) => i !== idx));
     setWallets(_.filter(wallets, (_, i) => i !== idx));
   }
 
@@ -455,7 +456,7 @@ const Configuration = () => {
                 }}
                 type="checkbox"
                 name="groupUSD"
-                defaultChecked={groupUSD}
+                checked={groupUSD}
                 onChange={(e) => setGroupUSD(e.target.checked)}
               />
             </label>

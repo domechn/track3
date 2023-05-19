@@ -18,8 +18,6 @@ export class OkexExchange implements Exchanger {
 	}
 
 	fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		console.log(this.apiKey, this.secret, this.password);
-		
 		return invoke("query_okex_balance", { apiKey: this.apiKey, apiSecret: this.secret, password: this.password })
 	}
 
