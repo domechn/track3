@@ -17,6 +17,7 @@ import AssetChange from "../asset-change";
 import LatestAssetsPercentage from "../latest-assets-percentage";
 import CoinsAmountAndValueChange from "../coins-amount-and-value-change";
 import TopCoinsRank from "../top-coins-rank";
+import TopCoinsPercentageChange from "../top-coins-percentage-change";
 import HistoricalData from "../historical-data";
 import "./index.css";
 import Select, { SelectOption } from "../common/select";
@@ -25,10 +26,11 @@ import {
   AssetChangeData,
   CoinsAmountAndValueChangeData,
   LatestAssetsPercentageData,
+  TopCoinsPercentageChangeData,
   TopCoinsRankData,
 } from "../../middlelayers/types";
 import { useEffect, useMemo, useState } from "react";
-import { queryAssetChange } from "../../middlelayers/charts";
+import { queryAssetChange, queryTopCoinsPercentageChangeData } from "../../middlelayers/charts";
 import { queryCoinsAmountChange } from "../../middlelayers/charts";
 import { queryTopCoinsRank } from "../../middlelayers/charts";
 import { queryTotalValue } from "../../middlelayers/charts";
@@ -73,6 +75,10 @@ const App = () => {
     timestamps: [],
     coins: [],
   } as TopCoinsRankData);
+  const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] = useState({
+    timestamps: [],
+    coins: [],
+  } as TopCoinsPercentageChangeData);
 
   const [lastSize, setLastSize] = useState(windowSize);
 
@@ -134,6 +140,8 @@ const App = () => {
     setCoinsAmountAndValueChangeData(cac);
     const tcr = await queryTopCoinsRank(size);
     setTopCoinsRankData(tcr);
+    const tcpcd = await queryTopCoinsPercentageChangeData(size)
+    setTopCoinsPercentageChangeData(tcpcd);
   }
 
   function loadAllData(size = 10) {
@@ -170,6 +178,7 @@ const App = () => {
               width={60}
               options={querySizeOptions}
               onSelectChange={onQuerySizeChanged}
+              value={querySize+""}
             />
           </div>
         </div>
@@ -195,6 +204,8 @@ const App = () => {
         <CoinsAmountAndValueChange data={coinsAmountAndValueChangeData} />
         <hr className="nice-hr" />
         <TopCoinsRank data={topCoinsRankData} />
+        <hr className="nice-hr" />
+        <TopCoinsPercentageChange data={topCoinsPercentageChangeData} />
       </div>
     </div>
   );

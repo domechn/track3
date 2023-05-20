@@ -55,6 +55,18 @@ export type TopCoinsRankData = {
 	}[]
 }
 
+export type TopCoinsPercentageChangeData = {
+	timestamps: number[]
+	coins: {
+		coin: string
+		lineColor: string
+		percentageData: {
+			percentage: number
+			timestamp: number
+		}[]
+	}[]
+}
+
 export type TotalValueData = {
 	totalValue: number
 	changePercentage: number
