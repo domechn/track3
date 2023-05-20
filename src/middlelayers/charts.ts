@@ -181,19 +181,7 @@ export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
 
 export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercentageData> {
 	const size = 1
-	const backgroundColors = [
-		"rgba(122, 51, 255, 1)",
-		"rgba(250, 215, 90, 1)",
-		"rgba(51, 204, 255, 1)",
-		"rgba(240, 114, 91, 1)",
-		"rgba(39, 121, 242, 1)",
-		"rgba(242, 97, 168, 1)",
-		"rgba(137, 226, 145, 1)",
-		"rgba(255, 215, 56, 1)",
-		"rgba(0, 114, 178, 1)",
-		"rgba(122, 175, 8, 1)",
-		"rgba(79, 163, 252, 1)",
-	]
+	const backgroundColors = generateRandomColors(11) // top 10 and others
 
 	const assets = await queryAssets(size) || []
 	if (assets.length === 0) {
@@ -220,7 +208,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 
 	return _(res).map((v, idx) => ({
 		...v,
-		chartColor: backgroundColors[idx]
+		chartColor:`rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`
 	})).value()
 }
 
