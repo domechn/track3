@@ -19,10 +19,11 @@ export class ERC20Analyzer implements Analyzer {
 	private async query(address: string): Promise<Coin[]> {
 		const url = `${this.queryUrl}?user_addr=${address}`
 		const { data } = await sendHttpRequest<{ data: DeBankAssetResp }>("GET", url, 5000, {})
+		
 		if (!data) {
 			throw new Error("failed to query erc20 assets")
 		}
-
+		console.debug("erc20 assets", data);
 
 		return _([data.coin_list, data.token_list]).flatten().value()
 	}

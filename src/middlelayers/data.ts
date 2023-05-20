@@ -19,16 +19,21 @@ export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<C
 }
 
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<Coin[]> {
-	const coinLists = await bluebird.map([CexAnalyzer, ERC20Analyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer], async ana => {
+	const coinLists = await bluebird.map([ERC20Analyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer], async ana => {
 		console.log("loading portfolio from ", ana.name)
 
 		const a = new ana(config)
-		const portfolio = await a.loadPortfolio()
-		console.log("loaded portfolio from ", ana.name)
+		try {
+			const portfolio = await a.loadPortfolio()
+			console.log("loaded portfolio from ", ana.name)
+			return portfolio
+		} catch (e) {
+			console.error("failed to load portfolio from ", ana.name, e)
+			throw new Error("failed to load portfolio from " + ana.name)
+		}
 
-		return portfolio
 	}, {
-		concurrency: 3
+		concurrency: 3,
 	})
 	const assets = combineCoinLists(coinLists)
 	return assets

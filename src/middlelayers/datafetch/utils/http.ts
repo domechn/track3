@@ -16,5 +16,8 @@ export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout 
 			"user-agent": getCurrentUA(),
 		}
 	})
+	if (resp.status > 299) {
+		throw new Error(`Request failed with status ${resp.status}`)
+	}
 	return resp.data
 }

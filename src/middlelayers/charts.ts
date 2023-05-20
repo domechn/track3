@@ -30,7 +30,6 @@ async function queryCoinsData(): Promise<(Coin & {
 
 	let lastAssets = assets
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
-	console.error("groupUSD", groupUSD, config);
 	
 	if (groupUSD) {
 		const usdValue = _(assets).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
