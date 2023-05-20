@@ -22,9 +22,9 @@ serde_json = "1.0"
 tauri = {version = "1.2", features = ["http-all", "updater"] }
 sqlx = { version = "0.6", features = [  "runtime-tokio-rustls", "sqlite" ] }
 tokio = { version = "1", features = ["sync"] }
-rust-crypto = "^0.2"
 rand = "^0.3"
 lazy_static = "^1.4"
+magic-crypt = "3.1.12"
 
 [features]
 # by default Tauri runs in production mode
