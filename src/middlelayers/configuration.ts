@@ -15,22 +15,17 @@ export async function getConfiguration(): Promise<ConfigurationModel | undefined
 	}
 
 	const cfg = configurations[0].data
-	
+
 	// legacy logic
 	if (!cfg.startsWith(prefix)) {
 		return configurations[0]
 	}
 
-	const cfgData = cfg.substring(prefix.length)
-
-	const data = cfgData.split(",").map((v) => parseInt(v))
-	
 	// decrypt data
-	return invoke("decrypt", { data }).then((res) => {
-		const plainData = new TextDecoder("utf-8").decode(Uint8Array.from(res as number[]))
+	return invoke<string>("decrypt", { data: cfg }).then((res) => {
 		return {
 			...configurations[0],
-			data: plainData,
+			data: res,
 		}
 
 	}).catch((err) => {
@@ -47,8 +42,7 @@ export async function saveConfiguration(cfg: GlobalConfig) {
 
 	const db = await getDatabase()
 	// encrypt data
-	const byteData = [].slice.call(new TextEncoder().encode(data))
-	const encryptedBytes = await invoke("encrypt", { data: byteData }) as number[]
+	const encrypted = await invoke<string>("encrypt", { data }) 
 
-	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${fixId}, ?)`, [prefix + encryptedBytes.join(",")])
+	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${fixId}, ?)`, [encrypted])
 }
