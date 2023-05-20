@@ -2,7 +2,7 @@ import _ from 'lodash'
 import yaml from 'yaml'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase, saveCoinsToDatabase } from './database'
-import { AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
+import { AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -30,7 +30,7 @@ async function queryCoinsData(): Promise<(Coin & {
 
 	let lastAssets = assets
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
-	
+
 	if (groupUSD) {
 		const usdValue = _(assets).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
 		lastAssets = _(assets).remove(c => !STABLE_COIN.includes(c.symbol)).value()
@@ -119,6 +119,50 @@ export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
 	}
 }
 
+export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopCoinsPercentageChangeData> {
+	const assets = await queryAssets(size) || []
+
+	const reservedAssets = _(assets).reverse().value()
+
+	const getRankData = (symbol: string): {
+		timestamp: number,
+		percentage: number
+	}[] => {
+		// get first data that contains the symbol
+		const firstData = _(reservedAssets).find(asset => Object.values(asset).includes(symbol))!
+		// get value of the symbol in firstData
+		const [firstKey, _firstValue] = Object.entries(firstData).find(([key, value]) => value === symbol)!
+		const firstIdxStr = firstKey.slice("top".length)
+		const firstCoinValue = _(firstData).get("value" + firstIdxStr) as number
+
+		return _(reservedAssets).filter(asset => Object.values(asset).includes(symbol))
+			.map(asset => {
+				const [key, value] = Object.entries(asset).find(([key, value]) => value === symbol)!
+				const idxStr = key.slice("top".length)
+				const coinValue = _(asset).get("value" + idxStr) as number
+				
+				return {
+					timestamp: new Date(asset.createdAt).getTime(),
+					percentage: (coinValue - firstCoinValue) / firstCoinValue * 100 || 0.00000001 // avoid divide by zero
+				}
+			}).value()
+	}
+
+
+	const coins = getCoins(reservedAssets)
+	const colors = generateRandomColors(coins.length)
+
+
+	return {
+		timestamps: _(reservedAssets).map(t => new Date(t.createdAt).getTime()).value(),
+		coins: _(coins).map((coin, idx) => ({
+			coin,
+			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
+			percentageData: getRankData(coin),
+		})).value()
+	}
+}
+
 function getCoins(assets: AssetModel[]): string[] {
 	return _(assets).map(asset => _(asset).pickBy((k, v) => v.startsWith("top")).values().value() as string[]).flatten().compact().uniq().filter(c => c.toLowerCase() !== "others").value()
 }
@@ -137,19 +181,7 @@ export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
 
 export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercentageData> {
 	const size = 1
-	const backgroundColors = [
-		"rgba(122, 51, 255, 1)",
-		"rgba(250, 215, 90, 1)",
-		"rgba(51, 204, 255, 1)",
-		"rgba(240, 114, 91, 1)",
-		"rgba(39, 121, 242, 1)",
-		"rgba(242, 97, 168, 1)",
-		"rgba(137, 226, 145, 1)",
-		"rgba(255, 215, 56, 1)",
-		"rgba(0, 114, 178, 1)",
-		"rgba(122, 175, 8, 1)",
-		"rgba(79, 163, 252, 1)",
-	]
+	const backgroundColors = generateRandomColors(11) // top 10 and others
 
 	const assets = await queryAssets(size) || []
 	if (assets.length === 0) {
@@ -176,7 +208,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 
 	return _(res).map((v, idx) => ({
 		...v,
-		chartColor: backgroundColors[idx]
+		chartColor:`rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`
 	})).value()
 }
 
