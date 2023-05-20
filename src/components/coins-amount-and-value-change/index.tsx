@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
-import { CoinsAmountChangeData } from "../../middlelayers/types";
+import { CoinsAmountAndValueChangeData } from "../../middlelayers/types";
 import Select from "../common/select";
 import "./index.css";
 
-const App = ({ data }: { data: CoinsAmountChangeData }) => {
+const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
   const [currentCoinSelected, setCurrentCoinSelected] = useState("");
   const [currentType, setCurrentType] = useState("amount"); // ['amount', 'value'
   const size = useWindowSize();
@@ -29,7 +29,7 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
     plugins: {
       title: {
         display: true,
-        text: `Trend of Coin ${getLabel()} Value`,
+        text: `Trend of Coin ${getLabel()}`,
       },
       datalabels: {
         display: false,
@@ -71,7 +71,7 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
       datasets: [
         {
           label: coin + " " + getLabel(),
-          data: current.amounts,
+          data: currentType === "amount" ? current.amounts : current.values,
           borderColor: current.lineColor,
           backgroundColor: current.lineColor,
           borderWidth: 5,
@@ -101,10 +101,12 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
 
   return (
     <>
-      <div style={{
-        height: 34,
-      }}>
-        <div className="type-updater button-group">
+      <div
+        style={{
+          height: 34,
+        }}
+      >
+        <div className="button-group">
           <button
             id="amount"
             onClick={() => onTypeSelectChange("amount")}
@@ -120,8 +122,9 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
             Value
           </button>
         </div>
-        <div className="type-updater">
+        <div>
           <Select
+            height={34}
             options={data.map((d) => ({ value: d.coin, label: d.coin }))}
             onSelectChange={onCoinSelectChange}
             value={currentCoinSelected}
@@ -131,6 +134,7 @@ const App = ({ data }: { data: CoinsAmountChangeData }) => {
       <div
         style={{
           height: Math.max((size.height || 100) / 2, 350),
+          marginTop: 35,
         }}
       >
         <Line options={options} data={chartDataByCoin(currentCoinSelected)} />

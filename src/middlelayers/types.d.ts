@@ -71,10 +71,11 @@ export type LatestAssetsPercentageData = {
 	chartColor: string
 }[]
 
-export type CoinsAmountChangeData = {
+export type CoinsAmountAndValueChangeData = {
 	coin: string
 	lineColor: string
 	amounts: number[]
+	values: number[]
 	timestamps: number[]
 }[]
 

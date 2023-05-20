@@ -21,10 +21,9 @@ import HistoricalData from "../historical-data";
 import "./index.css";
 import Select, { SelectOption } from "../common/select";
 
-import "./index.css";
 import {
   AssetChangeData,
-  CoinsAmountChangeData,
+  CoinsAmountAndValueChangeData,
   LatestAssetsPercentageData,
   TopCoinsRankData,
 } from "../../middlelayers/types";
@@ -67,8 +66,8 @@ const App = () => {
     totalValue: 0,
     changePercentage: 0,
   });
-  const [coinsAmountChangeData, setCoinsAmountChangeData] = useState(
-    [] as CoinsAmountChangeData
+  const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] = useState(
+    [] as CoinsAmountAndValueChangeData
   );
   const [topCoinsRankData, setTopCoinsRankData] = useState({
     timestamps: [],
@@ -132,7 +131,7 @@ const App = () => {
     const ac = await queryAssetChange(size);
     setAssetChangeData(ac);
     const cac = await queryCoinsAmountChange(size);
-    setCoinsAmountChangeData(cac);
+    setCoinsAmountAndValueChangeData(cac);
     const tcr = await queryTopCoinsRank(size);
     setTopCoinsRankData(tcr);
   }
@@ -188,9 +187,13 @@ const App = () => {
       </div>
       <div>
         <TotalValue data={totalValueData} />
+        <hr className="nice-hr" />
         <LatestAssetsPercentage data={latestAssetsPercentageData} />
+        <hr className="nice-hr" />
         <AssetChange data={assetChangeData} />
-        <CoinsAmountAndValueChange data={coinsAmountChangeData} />
+        <hr className="nice-hr" />
+        <CoinsAmountAndValueChange data={coinsAmountAndValueChangeData} />
+        <hr className="nice-hr" />
         <TopCoinsRank data={topCoinsRankData} />
       </div>
     </div>

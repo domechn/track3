@@ -2,7 +2,7 @@ import _ from 'lodash'
 import yaml from 'yaml'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase, saveCoinsToDatabase } from './database'
-import { AssetChangeData, AssetModel, CoinsAmountChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
+import { AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsRankData, TotalValueData } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -181,7 +181,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	})).value()
 }
 
-export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountChangeData> {
+export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndValueChangeData> {
 	const querySize = size * 2
 
 	const assets = await queryAssets(querySize) || []
@@ -197,6 +197,7 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountChan
 
 	const getAmountsAndTimestamps = (symbol: string): {
 		amount: number,
+		value: number,
 		timestamp: number
 	}[] => {
 		return _(reservedAssets).filter(asset => !!_(asset).values().find(v => v === symbol)).map(asset => {
@@ -204,6 +205,7 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountChan
 			const idxStr = key.slice("top".length)
 			return {
 				amount: _(asset).get(`amount${idxStr}`) as unknown as number,
+				value: _(asset).get(`value${idxStr}`) as unknown as number,
 				timestamp: new Date(asset.createdAt).getTime(),
 			}
 		}).value()
@@ -217,6 +219,7 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountChan
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
 			amounts: _(aat).map('amount').reverse().take(size).reverse().value(),
+			values: _(aat).map('value').reverse().take(size).reverse().value(),
 			timestamps: _(aat).map('timestamp').reverse().take(size).reverse().value(),
 		}
 	}).value()
