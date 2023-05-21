@@ -1,4 +1,5 @@
 import _ from "lodash";
+import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 import "./index.css";
 import gearIcon from "../../assets/icons/gear-icon.png";
@@ -41,6 +42,7 @@ const selectHeight = 30;
 const supportCoins = ["btc", "erc20", "sol", "doge"];
 
 const Configuration = () => {
+  const [version, setVersion] = useState<string>("0.1.0");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [groupUSD, setGroupUSD] = useState(true);
@@ -72,9 +74,16 @@ const Configuration = () => {
 
   useEffect(() => {
     if (isModalOpen) {
+      loadVersion();
       loadConfiguration();
     }
   }, [isModalOpen]);
+
+  function loadVersion() {
+    getVersion().then((ver) => {
+      setVersion(ver);
+    });
+  }
 
   function loadConfiguration() {
     setLoading(true);
@@ -141,6 +150,7 @@ const Configuration = () => {
         } else {
           toast.success("Configuration updated successfully!", {
             id: "configuration-update-success",
+            duration: 3000000,
           });
         }
       });
@@ -493,6 +503,8 @@ const Configuration = () => {
               Save
             </button>
           </form>
+
+          <div className="version">version: {version}</div>
         </div>
       </Modal>
     </div>

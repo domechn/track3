@@ -15,10 +15,16 @@
       "fs": {
         "scope": ["$APP/*", "$RESOURCE/*"]
       },
+      "process": {
+        "relaunch": true
+      },
       "http": {
         "all": true,
         "request": true,
         "scope": ["https://**"]
+      },
+      "app": {
+        "all": true
       }
     },
     "bundle": {
@@ -69,10 +75,10 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 600,
+        "height": 800,
         "resizable": true,
         "title": "track3",
-        "width": 800
+        "width": 1000
       }
     ]
   }
