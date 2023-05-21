@@ -141,6 +141,7 @@ const Configuration = () => {
         } else {
           toast.success("Configuration updated successfully!", {
             id: "configuration-update-success",
+            duration: 3000000,
           });
         }
       });

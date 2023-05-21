@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./index.css";
 
-function Loading({ loading }: { loading: boolean }) {
+const App = ({ loading }: { loading: boolean }) => {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -23,6 +23,6 @@ function Loading({ loading }: { loading: boolean }) {
       <div className="loading-spinner" />
     </div>
   );
-}
+};
 
-export default Loading;
+export default App;

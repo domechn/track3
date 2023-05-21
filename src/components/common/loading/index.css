@@ -7,6 +7,7 @@
   background-color: rgba(0, 0, 0, 0.5); 
   z-index: 999999; 
 }
+
 .loading-spinner {
   position: fixed;
   top: 50%;
@@ -29,6 +30,7 @@
     transform: rotate(360deg);
   }
 }
+
 body.loading {
   pointer-events: none;
 }

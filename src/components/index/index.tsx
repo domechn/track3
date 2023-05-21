@@ -30,7 +30,10 @@ import {
   TopCoinsRankData,
 } from "../../middlelayers/types";
 import { useEffect, useMemo, useState } from "react";
-import { queryAssetChange, queryTopCoinsPercentageChangeData } from "../../middlelayers/charts";
+import {
+  queryAssetChange,
+  queryTopCoinsPercentageChangeData,
+} from "../../middlelayers/charts";
 import { queryCoinsAmountChange } from "../../middlelayers/charts";
 import { queryTopCoinsRank } from "../../middlelayers/charts";
 import { queryTotalValue } from "../../middlelayers/charts";
@@ -68,17 +71,17 @@ const App = () => {
     totalValue: 0,
     changePercentage: 0,
   });
-  const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] = useState(
-    [] as CoinsAmountAndValueChangeData
-  );
+  const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
+    useState([] as CoinsAmountAndValueChangeData);
   const [topCoinsRankData, setTopCoinsRankData] = useState({
     timestamps: [],
     coins: [],
   } as TopCoinsRankData);
-  const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] = useState({
-    timestamps: [],
-    coins: [],
-  } as TopCoinsPercentageChangeData);
+  const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] =
+    useState({
+      timestamps: [],
+      coins: [],
+    } as TopCoinsPercentageChangeData);
 
   const [lastSize, setLastSize] = useState(windowSize);
 
@@ -140,7 +143,7 @@ const App = () => {
     setCoinsAmountAndValueChangeData(cac);
     const tcr = await queryTopCoinsRank(size);
     setTopCoinsRankData(tcr);
-    const tcpcd = await queryTopCoinsPercentageChangeData(size)
+    const tcpcd = await queryTopCoinsPercentageChangeData(size);
     setTopCoinsPercentageChangeData(tcpcd);
   }
 
@@ -178,7 +181,7 @@ const App = () => {
               width={60}
               options={querySizeOptions}
               onSelectChange={onQuerySizeChanged}
-              value={querySize+""}
+              value={querySize + ""}
             />
           </div>
         </div>
