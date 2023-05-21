@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "track3",
-    "version": "0.1.3"
+    "version": "0.1.1"
   },
   "tauri": {
     "allowlist": {
@@ -22,6 +22,9 @@
         "all": true,
         "request": true,
         "scope": ["https://**"]
+      },
+      "app": {
+        "all": true
       }
     },
     "bundle": {

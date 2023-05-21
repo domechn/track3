@@ -19,7 +19,7 @@ coingecko = "1.0.1"
 okex = {git = "https://github.com/domechn/okex-rs.git", rev = "7126e51"}
 serde = {version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tauri = {version = "1.2", features = ["http-all", "process-relaunch", "updater"] }
+tauri = {version = "1.2", features = ["app-all", "http-all", "process-relaunch", "updater"] }
 sqlx = { version = "0.6", features = [  "runtime-tokio-rustls", "sqlite" ] }
 tokio = { version = "1", features = ["sync"] }
 rand = "^0.3"
