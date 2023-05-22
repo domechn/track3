@@ -38,6 +38,10 @@ export class CexAnalyzer implements Analyzer {
 		}).compact().value()
 	}
 
+	getAnalyzeName(): string {
+		return "Cex Analyzer"
+	}
+
 	async loadPortfolio(): Promise<Coin[]> {
 		const coinLists = await bluebird.map(this.exchanges, async ex => {
 			const portfolio = await ex.fetchTotalBalance()

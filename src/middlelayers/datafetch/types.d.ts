@@ -4,6 +4,7 @@ export type Coin = {
 }
 
 export interface Analyzer {
+	getAnalyzeName(): string
 	loadPortfolio(): Promise<Coin[]>
 }
 

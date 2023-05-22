@@ -11,6 +11,9 @@ export class DOGEAnalyzer implements Analyzer {
 	constructor(config: Pick<TokenConfig, 'doge'>) {
 		this.config = config
 	}
+	getAnalyzeName(): string {
+		return "DOGE Analyzer"
+	}
 
 	private async query(address: string): Promise<number> {
 		const resp = await sendHttpRequest<{ balance: number }>("GET", this.queryUrl + address)
