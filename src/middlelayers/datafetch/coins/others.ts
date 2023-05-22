@@ -7,6 +7,9 @@ export class OthersAnalyzer implements Analyzer {
 	constructor(config: Pick<TokenConfig, 'others'>) {
 		this.config = config
 	}
+	getAnalyzeName(): string {
+		return "Others Analyzer"
+	}
 
 	async loadPortfolio(): Promise<Coin[]> {
 		return this.config.others || []

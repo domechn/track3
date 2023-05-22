@@ -12,6 +12,10 @@ export class SOLAnalyzer implements Analyzer {
 		this.config = config
 	}
 
+	getAnalyzeName(): string {
+		return "SOL Analyzer"
+	}
+
 	private async query(address: string): Promise<number> {
 		const url = `${this.queryUrl}?address=${address}`
 		const resp = await sendHttpRequest<{ data: { lamports: number } }>("GET", url, 5000, {
