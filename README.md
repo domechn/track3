@@ -4,11 +4,10 @@ Show your crypto currency assets in centralized exchanges and web3 wallets.
 
 ## Features
 
-1. Support Binance and OKX.
-2. Support BTC, SOL, Doge and all ERC20 Tokens.
-3. Export all data to Notion Database or CSV file.
+1. **No centralized server, all data is stored locally**
+2. Support Binance and OKX.
+3. Support BTC, SOL, Doge and all ERC20 Tokens.
 4. Render a visual chart of asset changes or the proportion of each asset.
-5. **No centralized server, all data is stored locally**
 
 ## Installation
 
