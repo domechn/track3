@@ -124,9 +124,10 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 
 	const reservedAssets = _(assets).reverse().value()
 
-	const getRankData = (symbol: string): {
+	const getPercentageData = (symbol: string): {
 		timestamp: number,
-		percentage: number
+		value: number,
+		price: number,
 	}[] => {
 		// get first data that contains the symbol
 		const firstData = _(reservedAssets).find(asset => Object.values(asset).includes(symbol))!
@@ -134,16 +135,21 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 		const [firstKey, _firstValue] = Object.entries(firstData).find(([key, value]) => value === symbol)!
 		const firstIdxStr = firstKey.slice("top".length)
 		const firstCoinValue = _(firstData).get("value" + firstIdxStr) as number
+		const firstCoinAmount = _(firstData).get("amount" + firstIdxStr) as number
+		const firstCoinPrice = firstCoinAmount === 0 ? 0 : firstCoinValue / firstCoinAmount
 
 		return _(reservedAssets).filter(asset => Object.values(asset).includes(symbol))
 			.map(asset => {
 				const [key, value] = Object.entries(asset).find(([key, value]) => value === symbol)!
 				const idxStr = key.slice("top".length)
 				const coinValue = _(asset).get("value" + idxStr) as number
-				
+				const coinAmount = _(asset).get("amount" + idxStr) as number
+				const coinPrice = coinAmount === 0 ? 0 : coinValue / coinAmount
+
 				return {
 					timestamp: new Date(asset.createdAt).getTime(),
-					percentage: (coinValue - firstCoinValue) / firstCoinValue * 100 || 0.00000001 // avoid divide by zero
+					value: (coinValue - firstCoinValue) / firstCoinValue * 100 || 10 ** -21, // avoid divide by zero
+					price: (coinPrice - firstCoinPrice) / firstCoinPrice * 100 || 10 ** -21, // avoid divide by zero
 				}
 			}).value()
 	}
@@ -158,7 +164,7 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
-			percentageData: getRankData(coin),
+			percentageData: getPercentageData(coin),
 		})).value()
 	}
 }
@@ -208,7 +214,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 
 	return _(res).map((v, idx) => ({
 		...v,
-		chartColor:`rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`
+		chartColor: `rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`
 	})).value()
 }
 

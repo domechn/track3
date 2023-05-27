@@ -61,7 +61,10 @@ export type TopCoinsPercentageChangeData = {
 		coin: string
 		lineColor: string
 		percentageData: {
-			percentage: number
+			// coin values percentage
+			value: number
+			// coin price percentage
+			price: number
 			timestamp: number
 		}[]
 	}[]
