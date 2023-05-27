@@ -117,7 +117,6 @@ async fn open_debank_window_in_background(handle: tauri::AppHandle, address: Str
         ),
     )
     .inner_size(0.0, 0.0)
-    .hidden_title(true)
     .build();
 
     if let Ok(debank_window) = debank_window {
