@@ -7,9 +7,11 @@ import { CoinsAmountAndValueChangeData } from "../../middlelayers/types";
 import Select from "../common/select";
 import "./index.css";
 
+const prefix = "caaavc"
+
 const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
   const [currentCoinSelected, setCurrentCoinSelected] = useState("");
-  const [currentType, setCurrentType] = useState("amount"); // ['amount', 'value'
+  const [currentType, setCurrentType] = useState(getWholeKey("amount")); // ['caaavcAmount', 'caaavcValue']
   const size = useWindowSize();
 
   useEffect(() => {
@@ -20,7 +22,11 @@ const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
 
   function getLabel() {
     // set first char to upper case
-    return _.upperFirst(currentType);
+    return _.upperFirst(currentType.replace(prefix, ""));
+  }
+
+  function getWholeKey(key: string) {
+    return prefix + _.upperFirst(key);
   }
 
   const options = {
@@ -71,7 +77,7 @@ const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
       datasets: [
         {
           label: coin + " " + getLabel(),
-          data: currentType === "amount" ? current.amounts : current.values,
+          data: currentType === getWholeKey("amount") ? current.amounts : current.values,
           borderColor: current.lineColor,
           backgroundColor: current.lineColor,
           borderWidth: 5,
@@ -93,7 +99,9 @@ const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
     const buttons = document.getElementsByClassName("active");
 
     for (let i = 0; i < buttons.length; i++) {
-      buttons[i].classList.remove("active");
+      if ([getWholeKey("amount"), getWholeKey("value")].includes(buttons[i].id)) {
+        buttons[i].classList.remove("active");
+      }
     }
 
     document.getElementById(type)?.classList.add("active");
@@ -108,15 +116,15 @@ const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
       >
         <div className="button-group">
           <button
-            id="amount"
-            onClick={() => onTypeSelectChange("amount")}
+            id={getWholeKey("amount")}
+            onClick={() => onTypeSelectChange(getWholeKey("amount"))}
             className="left active"
           >
             Amount
           </button>
           <button
-            id="value"
-            onClick={() => onTypeSelectChange("value")}
+            id={getWholeKey("value")}
+            onClick={() => onTypeSelectChange(getWholeKey("value"))}
             className="right"
           >
             Value
