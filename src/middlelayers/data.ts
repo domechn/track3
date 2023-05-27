@@ -8,6 +8,7 @@ import { OthersAnalyzer } from './datafetch/coins/others'
 import { SOLAnalyzer } from './datafetch/coins/sol'
 import { ERC20Analyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
+import { CacheCenter } from './datafetch/utils/cache'
 
 export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]: number }> {
 	return await invoke("query_coins_prices", { symbols })
@@ -19,7 +20,8 @@ export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<C
 }
 
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<Coin[]> {
-	const coinLists = await bluebird.map([ERC20Analyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer], async ana => {
+	const anas = [ERC20Analyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
+	const coinLists = await bluebird.map(anas, async ana => {
 		
 		const a = new ana(config)
 		const anaName = a.getAnalyzeName()
@@ -34,8 +36,10 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<
 		}
 
 	}, {
-		concurrency: 3,
+		concurrency: anas.length,
 	})
+	// clean cache after all analyzers finished successfully
+	CacheCenter.getInstance().clearCache()
 	const assets = combineCoinLists(coinLists)
 	return assets
 }

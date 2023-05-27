@@ -16,6 +16,10 @@ export class BinanceExchange implements Exchanger {
 		this.secret = secret
 	}
 
+	getIdentity(): string {
+		return "binance-" + this.apiKey
+	}
+
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
 		return invoke("query_binance_balance", { apiKey: this.apiKey, apiSecret: this.secret })
 	}

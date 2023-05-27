@@ -11,6 +11,10 @@ export class OtherCexExchanges implements Exchanger {
 
 	}
 
+	getIdentity(): string {
+		throw new Error('Method not implemented.')
+	}
+
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
 		throw new Error('Method not implemented.')
 	}
