@@ -41,6 +41,8 @@ import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import Loading from "../common/loading";
 import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
+import { WebviewWindow } from "@tauri-apps/api/window";
+import { invoke } from '@tauri-apps/api'
 
 ChartJS.register(
   ArcElement,

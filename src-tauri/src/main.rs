@@ -7,8 +7,9 @@ use std::{
 };
 
 use sqlx::{Connection, Executor, SqliteConnection};
-use tokio::{runtime::Runtime};
-use track3::{binance::Binance, okex::Okex, price::get_price_querier, ent::Ent};
+use tauri::Manager;
+use tokio::runtime::Runtime;
+use track3::{binance::Binance, ent::Ent, okex::Okex, price::get_price_querier};
 
 lazy_static! {
     static ref ENT: Ent = Ent::new();
@@ -79,9 +80,7 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
     windows_subsystem = "windows"
 )]
 #[tauri::command]
-fn encrypt(
-    data: String,
-) -> Result<String, String> {
+fn encrypt(data: String) -> Result<String, String> {
     let res = ENT.encrypt(data);
     match res {
         Ok(encrypted) => Ok(encrypted),
@@ -94,13 +93,41 @@ fn encrypt(
     windows_subsystem = "windows"
 )]
 #[tauri::command]
-fn decrypt(
-    data: String,
-) -> Result<String, String> {
+fn decrypt(data: String) -> Result<String, String> {
     let res = ENT.decrypt(data);
     match res {
         Ok(encrypted) => Ok(encrypted),
         Err(e) => Err(format!("decrypt error: {:?}", e)),
+    }
+}
+
+#[tauri::command]
+async fn open_debank_window_in_background(handle: tauri::AppHandle, address: String) {
+    let debank_window = tauri::WindowBuilder::new(
+        &handle,
+        "debank-refresh", /* the unique window label */
+        tauri::WindowUrl::External(
+            format!("https://debank.com/profile/{address}") // eth contract address
+                .parse()
+                .unwrap(),
+        ),
+    )
+    .inner_size(0.0, 0.0)
+    .hidden_title(true)
+    .build();
+
+    if let Ok(debank_window) = debank_window {
+        debank_window.hide().unwrap();
+    }
+}
+
+#[tauri::command]
+async fn close_debank_window(handle: tauri::AppHandle) {
+
+    // get window
+    let debank_window = handle.get_window("debank-refresh");
+    if let Some(debank_window) = debank_window {
+        debank_window.close().unwrap();
     }
 }
 
@@ -123,6 +150,8 @@ fn main() {
             query_okex_balance,
             encrypt,
             decrypt,
+            open_debank_window_in_background,
+            close_debank_window,
         ])
         .plugin(tauri_plugin_sql::Builder::default().build())
         .run(tauri::generate_context!())
@@ -156,5 +185,4 @@ fn init_resources(app_dir: &Path, resource_dir: &Path) {
         conn.close().await.unwrap();
         println!("init resources in tokio spawn done");
     });
-
 }
