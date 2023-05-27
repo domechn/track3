@@ -4,8 +4,10 @@ import bluebird from 'bluebird'
 import { OtherCexExchanges } from './others'
 import { BinanceExchange } from './binance'
 import { OkexExchange } from './okex'
+import { CacheCenter } from '../../utils/cache'
 
 export interface Exchanger {
+	getIdentity(): string
 	// return all coins in exchange
 	// key is coin symbol, value is amount
 	fetchTotalBalance(): Promise<{ [k: string]: number }>
@@ -21,7 +23,6 @@ export class CexAnalyzer implements Analyzer {
 		this.config = config
 
 		this.exchanges = _(_(config).get("exchanges", [])).map(exCfg => {
-			
 			console.log("loading exchange", exCfg.name);
 			switch (exCfg.name) {
 				case "binance":
@@ -42,9 +43,24 @@ export class CexAnalyzer implements Analyzer {
 		return "Cex Analyzer"
 	}
 
+	async fetchTotalBalance(ex: Exchanger, ttl = 600): Promise<{ [k: string]: number }> {
+		const cc = CacheCenter.getInstance()
+		const cacheKey = `${ex.getIdentity()}_total_balance`
+		
+		const cacheResult = cc.getCache<{ [k: string]: number }>(cacheKey)
+		if (cacheResult) {
+			console.debug(`cache hit for exchange`)
+			return cacheResult
+		}
+
+		const portfolio = await ex.fetchTotalBalance()
+		cc.setCache(cacheKey, portfolio, ttl)
+		return portfolio
+	}
+
 	async loadPortfolio(): Promise<Coin[]> {
 		const coinLists = await bluebird.map(this.exchanges, async ex => {
-			const portfolio = await ex.fetchTotalBalance()
+			const portfolio = await this.fetchTotalBalance(ex)
 
 			// filter all keys are capital
 			return filterCoinsInPortfolio(portfolio)
