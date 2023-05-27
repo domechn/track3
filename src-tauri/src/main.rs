@@ -101,6 +101,10 @@ fn decrypt(data: String) -> Result<String, String> {
     }
 }
 
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 #[tauri::command]
 async fn open_debank_window_in_background(handle: tauri::AppHandle, address: String) {
     let debank_window = tauri::WindowBuilder::new(
@@ -121,6 +125,10 @@ async fn open_debank_window_in_background(handle: tauri::AppHandle, address: Str
     }
 }
 
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 #[tauri::command]
 async fn close_debank_window(handle: tauri::AppHandle) {
 
