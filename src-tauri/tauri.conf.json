@@ -13,6 +13,8 @@
     "allowlist": {
       "all": false,
       "fs": {
+        "readFile": true,
+        "writeFile": true,
         "scope": ["$APP/*", "$RESOURCE/*"]
       },
       "process": {
@@ -25,6 +27,10 @@
       },
       "app": {
         "all": true
+      },
+      "dialog": {
+        "open": true,
+        "save": true
       }
     },
     "bundle": {

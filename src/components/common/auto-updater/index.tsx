@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { checkUpdate, installUpdate } from "@tauri-apps/api/updater";
 import { relaunch } from "@tauri-apps/api/process";
 import toast from "react-hot-toast";
@@ -13,10 +13,13 @@ const App = () => {
     autoCheckUpdater();
   }, []);
 
+  // cannot use useState here
+  let buttonEnabled = true;
+
   function autoCheckUpdater() {
     checkUpdate().then((res) => {
       if (res.shouldUpdate && res.manifest?.version) {
-        toast.custom(renderUpdater(res.manifest.version), {
+        toast.custom(renderUpdater(res.manifest?.version), {
           id: toastId,
           duration: i32Max,
           position: "bottom-right",
@@ -26,22 +29,29 @@ const App = () => {
   }
 
   function installAndRelaunch() {
+    if (!buttonEnabled) {
+      return;
+    }
+
+    buttonEnabled = false;
     const buttonLoading = document.getElementById("auto-updater-loading-icon");
     buttonLoading!.style.display = "inline-block";
-    const loadingId = toastId + "-loading"
+    const loadingId = toastId + "-loading";
 
     toast.loading("Downloading update...", {
       id: loadingId,
       duration: i32Max,
-    })
+    });
     installUpdate()
       .then(() => {
         relaunch();
       })
       .catch((err) => {
         toast.error(err);
-      }).finally(() => {
+      })
+      .finally(() => {
         toast.remove(loadingId);
+        buttonEnabled = true;
       });
   }
 
@@ -103,7 +113,7 @@ const App = () => {
           }}
         >
           <img
-          id="auto-updater-loading-icon"
+            id="auto-updater-loading-icon"
             src={loadingIcon}
             style={{
               height: "0.8em",

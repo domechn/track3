@@ -1,14 +1,14 @@
 import "./index.css";
 import refreshIcon from "../../assets/icons/refresh-icon.png";
-import Loading from "../common/loading";
-import { useState } from "react";
+import { useContext } from "react";
 import { refreshAllData } from "../../middlelayers/charts";
 import { toast } from "react-hot-toast";
+import { LoadingContext } from '../../App'
 
 const App = ({afterRefresh}:{
   afterRefresh?: (success:boolean) => unknown
 }) => {
-  const [loading, setLoading] = useState(false);
+  const {setLoading} = useContext(LoadingContext);
 
   const handleButtonClick = () => {
     setLoading(true);
@@ -34,7 +34,6 @@ const App = ({afterRefresh}:{
 
   return (
     <div>
-      <Loading loading={loading} />
       <button className="refresh-button" onClick={handleButtonClick}>
         <img
           src={refreshIcon}

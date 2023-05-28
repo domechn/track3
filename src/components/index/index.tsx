@@ -9,7 +9,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import Configuration from "../configuration";
+import Setting from "../settings";
 import RefreshData from "../refresh-data";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import TotalValue from "../total-value";
@@ -29,7 +29,7 @@ import {
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
 } from "../../middlelayers/types";
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   queryAssetChange,
   queryTopCoinsPercentageChangeData,
@@ -38,11 +38,9 @@ import { queryCoinsAmountChange } from "../../middlelayers/charts";
 import { queryTopCoinsRank } from "../../middlelayers/charts";
 import { queryTotalValue } from "../../middlelayers/charts";
 import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
-import Loading from "../common/loading";
 import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
-import { WebviewWindow } from "@tauri-apps/api/window";
-import { invoke } from '@tauri-apps/api'
+import { LoadingContext } from '../../App'
 
 ChartJS.register(
   ArcElement,
@@ -59,7 +57,7 @@ ChartJS.register(
 const resizeDelay = 200; // 200 ms
 
 const App = () => {
-  const [loading, setLoading] = useState(false);
+  const {setLoading} = useContext(LoadingContext);
   const [querySize, setQuerySize] = useState(10);
   const windowSize = useWindowSize();
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
@@ -163,7 +161,6 @@ const App = () => {
 
   return (
     <div>
-      <Loading loading={loading} />
       <div className="top-buttons-wrapper">
         <div className="left-buttons">
           <div>
@@ -195,7 +192,7 @@ const App = () => {
             <RefreshData afterRefresh={() => loadAllData(querySize)} />
           </div>
           <div style={{ display: "inline-block" }}>
-            <Configuration />
+            <Setting />
           </div>
         </div>
       </div>

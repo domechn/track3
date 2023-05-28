@@ -10,3 +10,14 @@
 .history-button:hover {
   transform: rotate(-360deg);
 }
+
+.export {
+  border: none;
+  cursor: pointer;
+  appearance: none;
+  position: absolute;
+  background-color: inherit;
+  top: 5px;
+  right: 0;
+  padding: 10px;
+}

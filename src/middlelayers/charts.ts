@@ -45,7 +45,11 @@ async function queryCoinsData(): Promise<(Coin & {
 
 async function queryAssets(size = 1): Promise<AssetModel[]> {
 	const db = await getDatabase()
-	const assets = await db.select<AssetModel[]>(`SELECT * FROM assets ORDER BY createdAt DESC LIMIT ${size}`)
+	let sql = `SELECT * FROM assets ORDER BY createdAt DESC`
+	if (size > 0 ) {
+		sql += ` LIMIT ${size}`
+	}
+	const assets = await db.select<AssetModel[]>(sql)
 	return assets
 }
 

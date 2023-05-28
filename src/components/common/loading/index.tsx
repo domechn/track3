@@ -18,7 +18,7 @@ const App = ({ loading }: { loading: boolean }) => {
   }
 
   return (
-    <div className="loading-container">
+    <div className="loading-container" >
       <div className="loading-overlay" />
       <div className="loading-spinner" />
     </div>
