@@ -28,13 +28,20 @@ const App = () => {
   function installAndRelaunch() {
     const buttonLoading = document.getElementById("auto-updater-loading-icon");
     buttonLoading!.style.display = "inline-block";
+    const loadingId = toastId + "-loading"
 
+    toast.loading("Downloading update...", {
+      id: loadingId,
+      duration: i32Max,
+    })
     installUpdate()
       .then(() => {
         relaunch();
       })
       .catch((err) => {
         toast.error(err);
+      }).finally(() => {
+        toast.remove(loadingId);
       });
   }
 
