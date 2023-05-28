@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
+import { save } from "@tauri-apps/api/dialog";
+import { writeTextFile } from "@tauri-apps/api/fs";
 import {
   deleteHistoricalDataById,
   queryHistoricalData,
@@ -8,12 +10,14 @@ import { HistoricalData } from "../../middlelayers/types";
 import Modal from "../common/modal";
 import historyIcon from "../../assets/icons/history-icon.png";
 import deleteIcon from "../../assets/icons/delete-icon.png";
+import exportIcon from "../../assets/icons/export-icon.png";
 import Table from "../common/table";
 import _ from "lodash";
 
 import "./index.css";
 import { toast } from "react-hot-toast";
 import { useWindowSize } from "../../utils/hook";
+import { LoadingContext } from "../../App";
 
 type RankData = {
   id: number;
@@ -31,7 +35,7 @@ const App = ({
 }) => {
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
-  const [loading, setLoading] = useState(false);
+  const {setLoading} = useContext(LoadingContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const size = useWindowSize();
   const leftTableWidth = 350;
@@ -180,6 +184,31 @@ const App = ({
     return (Math.min(modalMaxSize, twoTablesWidth) - leftTableWidth) / 2;
   }
 
+  async function onExportButtonClick() {
+    console.log(123);
+    const filePath = await save({
+      filters: [
+        {
+          name: "track3-export-data",
+          extensions: ["json"],
+        },
+      ],
+      defaultPath: "track3-export-data.json",
+    });
+
+    if (!filePath) {
+      return;
+    }
+
+    const data = await queryHistoricalData(-1);
+    const content = JSON.stringify({
+      historicalData: _.map(data, (obj) => _.omit(obj, "id")),
+    });
+
+    // save to filePath
+    await writeTextFile(filePath, content);
+  }
+
   return (
     <div>
       <button className="history-button" onClick={handleButtonClick}>
@@ -194,8 +223,18 @@ const App = ({
         />
       </button>
       <Modal visible={isModalOpen} onClose={onModalClose}>
-        <Loading loading={loading} />
         <h2>Historical Data</h2>
+        <button className="export" onClick={onExportButtonClick}>
+          <img
+            src={exportIcon}
+            alt="export"
+            style={{
+              border: 0,
+              height: 25,
+              width: 25,
+            }}
+          />
+        </button>
         <div
           style={{
             position: "relative",

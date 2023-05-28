@@ -1,20 +1,17 @@
 import _ from "lodash";
-import { getVersion } from "@tauri-apps/api/app";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import "./index.css";
-import gearIcon from "../../assets/icons/gear-icon.png";
 import {
   getConfiguration,
   saveConfiguration,
 } from "../../middlelayers/configuration";
 import Loading from "../common/loading";
 import { toast } from "react-hot-toast";
-import Modal from "../common/modal";
 import yaml from "yaml";
 import deleteIcon from "../../assets/icons/delete-icon.png";
 import { GlobalConfig, TokenConfig } from "../../middlelayers/datafetch/types";
 import Select from "../common/select";
-import { useWindowSize } from "../../utils/hook";
+import { LoadingContext } from "../../App";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -41,10 +38,12 @@ const selectHeight = 30;
 
 const supportCoins = ["btc", "erc20", "sol", "doge"];
 
-const Configuration = () => {
-  const [version, setVersion] = useState<string>("0.1.0");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+const Configuration = ({
+  onConfigurationSave,
+}: {
+  onConfigurationSave?: () => void;
+}) => {
+  const { setLoading } = useContext(LoadingContext);
   const [groupUSD, setGroupUSD] = useState(true);
 
   const [wallets, setWallets] = useState<
@@ -70,24 +69,11 @@ const Configuration = () => {
     }[]
   >([]);
 
-  const size = useWindowSize();
-
   useEffect(() => {
-    if (isModalOpen) {
-      loadVersion();
-      loadConfiguration();
-    }
-  }, [isModalOpen]);
-
-  function loadVersion() {
-    getVersion().then((ver) => {
-      setVersion(ver);
-    });
-  }
+    loadConfiguration();
+  }, []);
 
   function loadConfiguration() {
-    setLoading(true);
-
     getConfiguration()
       .then((d) => {
         const globalConfig = d?.data
@@ -122,16 +108,7 @@ const Configuration = () => {
       })
       .catch((e) => {
         toast.error("get configuration failed:", e);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  const handleButtonClick = () => {
-    setIsModalOpen(true);
-  };
-
-  function onModalClose() {
-    setIsModalOpen(false);
+      });
   }
 
   function onFormSubmit() {
@@ -140,11 +117,10 @@ const Configuration = () => {
     let saveError: Error | undefined;
 
     saveConfiguration(globalConfig)
-      .then(() => setIsModalOpen(false))
+      .then(() => onConfigurationSave && onConfigurationSave())
       .catch((e) => (saveError = e))
       .finally(() => {
         setLoading(false);
-
         if (saveError) {
           toast.error(saveError.message ?? saveError);
         } else {
@@ -429,83 +405,59 @@ const Configuration = () => {
 
   return (
     <div className="configuration">
-      <Loading loading={loading} />
-      <button className="gear-button" onClick={handleButtonClick}>
-        <img
-          src={gearIcon}
-          alt="gear"
-          style={{
-            border: 0,
-            height: 30,
-            width: 30,
-          }}
-        />
-      </button>
-      <Modal visible={isModalOpen} onClose={onModalClose}>
-        <div
-          style={{
-            height: Math.min(700, size.height! - 100), // make sure modal is not too high to hint max-hight of the modal, otherwise it will make view fuzzy
-          }}
-        >
-          <h2>Configuration</h2>
-          <form onSubmit={onFormSubmit}>
-            <label>
-              <span
-                style={{
-                  display: "inline-block",
-                }}
-              >
-                GroupUSD
-              </span>
-              <input
-                style={{
-                  width: 50,
-                  height: 16,
-                  cursor: "pointer",
-                }}
-                type="checkbox"
-                name="groupUSD"
-                checked={groupUSD}
-                onChange={(e) => setGroupUSD(e.target.checked)}
-              />
-            </label>
-            <h3>Exchanges</h3>
-            <button
-              type="button"
-              className="add-button"
-              onClick={handleAddExchange}
+      <div>
+        <h2>Configuration</h2>
+        <form onSubmit={onFormSubmit}>
+          <label>
+            <span
+              style={{
+                display: "inline-block",
+              }}
             >
-              Add
-            </button>
-            {renderExchangeForm(exchanges)}
-            <h3>Wallets</h3>
-            <button
-              type="button"
-              className="add-button"
-              onClick={handleAddWallet}
-            >
-              Add
-            </button>
-            {renderWalletForm(wallets)}
-            <h3>Others</h3>
-            <button
-              type="button"
-              className="add-button"
-              onClick={handleAddOther}
-            >
-              Add
-            </button>
-            {renderOthersForm()}
-            <br />
-            <br />
-            <button className="save" type="button" onClick={onFormSubmit}>
-              Save
-            </button>
-          </form>
-
-          <div className="version">version: {version}</div>
-        </div>
-      </Modal>
+              GroupUSD
+            </span>
+            <input
+              style={{
+                width: 50,
+                height: 16,
+                cursor: "pointer",
+              }}
+              type="checkbox"
+              name="groupUSD"
+              checked={groupUSD}
+              onChange={(e) => setGroupUSD(e.target.checked)}
+            />
+          </label>
+          <h3>Exchanges</h3>
+          <button
+            type="button"
+            className="add-button"
+            onClick={handleAddExchange}
+          >
+            Add
+          </button>
+          {renderExchangeForm(exchanges)}
+          <h3>Wallets</h3>
+          <button
+            type="button"
+            className="add-button"
+            onClick={handleAddWallet}
+          >
+            Add
+          </button>
+          {renderWalletForm(wallets)}
+          <h3>Others</h3>
+          <button type="button" className="add-button" onClick={handleAddOther}>
+            Add
+          </button>
+          {renderOthersForm()}
+          <br />
+          <br />
+          <button className="save" type="button" onClick={onFormSubmit}>
+            Save
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

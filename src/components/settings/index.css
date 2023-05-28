@@ -1,0 +1,18 @@
+.gear-button {
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  appearance: none;
+  background-color: inherit;
+  transition: transform 0.7s ease-in-out;
+}
+
+.gear-button:hover {
+  transform: rotate(60deg);
+}
+
+.version {
+  color: #6c757d;
+  font-size: 0.8em;
+  text-align: right;
+}
