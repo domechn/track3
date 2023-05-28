@@ -1,11 +1,8 @@
 import { useContext, useState } from "react";
-import { save } from "@tauri-apps/api/dialog";
-import { writeTextFile } from "@tauri-apps/api/fs";
 import {
   deleteHistoricalDataById,
   queryHistoricalData,
 } from "../../middlelayers/charts";
-import Loading from "../common/loading";
 import { HistoricalData } from "../../middlelayers/types";
 import Modal from "../common/modal";
 import historyIcon from "../../assets/icons/history-icon.png";
@@ -18,6 +15,7 @@ import "./index.css";
 import { toast } from "react-hot-toast";
 import { useWindowSize } from "../../utils/hook";
 import { LoadingContext } from "../../App";
+import { exportHistoricalData } from "../../middlelayers/data";
 
 type RankData = {
   id: number;
@@ -35,7 +33,7 @@ const App = ({
 }) => {
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
-  const {setLoading} = useContext(LoadingContext);
+  const { setLoading } = useContext(LoadingContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const size = useWindowSize();
   const leftTableWidth = 350;
@@ -185,28 +183,7 @@ const App = ({
   }
 
   async function onExportButtonClick() {
-    console.log(123);
-    const filePath = await save({
-      filters: [
-        {
-          name: "track3-export-data",
-          extensions: ["json"],
-        },
-      ],
-      defaultPath: "track3-export-data.json",
-    });
-
-    if (!filePath) {
-      return;
-    }
-
-    const data = await queryHistoricalData(-1);
-    const content = JSON.stringify({
-      historicalData: _.map(data, (obj) => _.omit(obj, "id")),
-    });
-
-    // save to filePath
-    await writeTextFile(filePath, content);
+    await exportHistoricalData();
   }
 
   return (

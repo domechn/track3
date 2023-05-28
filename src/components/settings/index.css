@@ -14,5 +14,53 @@
 .version {
   color: #6c757d;
   font-size: 0.8em;
-  text-align: right;
+
+  position: absolute;
+  bottom: 10px;
+  left: 25px;
+
+  text-align: left;
+}
+
+.settings {
+  font-family: "Inter, Avenir, Helvetica, Arial, sans-serif";
+}
+
+.settings h2 {
+  text-align: left;
+}
+
+.settings-sidebar {
+  display: inline-block;
+  float: left;
+  /* fix at left: ; */
+  padding: 10px 5px;
+  height: 100%;
+  text-align: left;
+  width: 18%;
+  border-right: solid 1px #b8babc;
+}
+
+.settings-sidebar .sidebar-item {
+  font-family: BM Jua;
+
+  padding: 3px 3px 8px 5px;
+
+  cursor: pointer;
+
+  border-radius: 5px;
+}
+
+.settings-sidebar .sidebar-item.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.settings-content {
+  display: inline-block;
+  padding: 10px 10px 10px 20px;
+  height: 100%;
+  width: 75%;
+  float: right;
+  overflow: auto;
 }

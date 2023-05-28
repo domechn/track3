@@ -74,6 +74,7 @@ const Configuration = ({
   }, []);
 
   function loadConfiguration() {
+    setLoading(true);
     getConfiguration()
       .then((d) => {
         const globalConfig = d?.data
@@ -108,7 +109,7 @@ const Configuration = ({
       })
       .catch((e) => {
         toast.error("get configuration failed:", e);
-      });
+      }).finally(() => setLoading(false));
   }
 
   function onFormSubmit() {
@@ -296,7 +297,7 @@ const Configuration = ({
                 placeholder="wallet address"
                 value={w.address}
                 style={{
-                  width: 410,
+                  width: 275,
                 }}
                 onChange={(e) =>
                   handleWalletChange(idx, "address", e.target.value)
