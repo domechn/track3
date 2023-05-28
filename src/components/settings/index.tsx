@@ -7,6 +7,7 @@ import Modal from "../common/modal";
 import { useWindowSize } from "../../utils/hook";
 
 import Configuration from "../configuration";
+import DataManagement from "../data-management";
 import "./index.css";
 
 const App = () => {
@@ -34,8 +35,83 @@ const App = () => {
     setIsModalOpen(false);
   }
 
+  function setActiveOnSidebarItem(activeId: string) {
+    const allowedIds = ["configuration", "data"];
+    const allowedContentIds = _(allowedIds)
+      .map((id) => `${id}Content`)
+      .value();
+    const sidebarItems = document.getElementsByClassName("sidebar-item");
+    const contentItems = document.getElementsByClassName("content-item");
+    _.forEach(sidebarItems, (item) => {
+      if (allowedIds.includes(item.id)) {
+        item.classList.remove("active");
+      }
+    });
+
+    _.forEach(contentItems, (item) => {
+      if (allowedContentIds.includes(item.id)) {
+        (item as any).style.display = "none";
+      }
+    });
+
+    const activeSidebarItem = document.getElementById(activeId);
+    if (activeSidebarItem) {
+      activeSidebarItem.classList.add("active");
+    }
+
+    const activeContentItem = document.getElementById(`${activeId}Content`);
+
+    if (activeContentItem) {
+      activeContentItem.style.display = "block";
+    }
+  }
+
+  function onConfigurationSidebarClick() {
+    // add active class to the clicked item
+    setActiveOnSidebarItem("configuration");
+  }
+  function onDataSidebarClick() {
+    // add active class to the clicked item
+    setActiveOnSidebarItem("data");
+  }
+
+  function renderMenu() {
+    return (
+      <>
+        <div className="settings-sidebar">
+          <div
+            id="configuration"
+            className="sidebar-item active"
+            onClick={onConfigurationSidebarClick}
+          >
+            Configuration
+          </div>
+          <div id="data" className="sidebar-item" onClick={onDataSidebarClick}>
+            Data
+          </div>
+          <div className="version">version: {version}</div>
+        </div>
+
+        <div className="settings-content">
+          <div id="configurationContent" className="content-item">
+            <Configuration onConfigurationSave={() => setIsModalOpen(false)} />
+          </div>
+          <div
+            id="dataContent"
+            className="content-item"
+            style={{
+              display: "none",
+            }}
+          >
+            <DataManagement />
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
-    <div className="setting">
+    <div className="settings">
       <button className="gear-button" onClick={handleButtonClick}>
         <img
           src={gearIcon}
@@ -53,8 +129,7 @@ const App = () => {
             height: Math.min(700, size.height! - 100), // make sure modal is not too high to hint max-hight of the modal, otherwise it will make view fuzzy
           }}
         >
-          <Configuration onConfigurationSave={()=>setIsModalOpen(false)} />
-          <div className="version">version: {version}</div>
+          {renderMenu()}
         </div>
       </Modal>
     </div>

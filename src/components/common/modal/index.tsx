@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import "./index.css";
 
 const App = (props: {
-	  visible: boolean;
-	  onClose: () => void;
-	  children: React.ReactNode;
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(props.visible);
 
@@ -18,7 +18,7 @@ const App = (props: {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "auto";
-      props.onClose()
+      props.onClose();
     }
   }, [isModalOpen]);
 
@@ -30,7 +30,13 @@ const App = (props: {
     <>
       {isModalOpen && (
         <div className="modal-overlay" onClick={handleModalClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: "#f5f5f5",
+            }}
+          >
             {props.children}
           </div>
         </div>
