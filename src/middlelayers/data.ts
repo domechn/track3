@@ -91,12 +91,17 @@ export async function importHistoricalData() {
 	const { historicalData: assets } = JSON.parse(contents) as { historicalData: any[] }
 
 	if (!assets || !_(assets).isArray() || assets.length === 0) {
-		throw new Error("invalid data")
+		throw new Error("invalid data: errorCode 001")
 	}
 
-	_(assets).forEach((asset) => {
-		// todo validate asset
+	const requiredKeys = ["createdAt", "top01", "amount01", "value01", "top02", "amount02", "value02", "top03", "amount03", "value03", "top04", "amount04", "value04", "top05", "amount05", "value05", "top06", "amount06", "value06", "top07", "amount07", "value07", "top08", "amount08", "value08", "top09", "amount09", "value09", "top10", "amount10", "value10", "topOthers", "amountOthers", "valueOthers", "total"]
 
+	_(assets).forEach((asset) => {
+		_(requiredKeys).forEach(k => {
+			if (!_(asset).has(k)) {
+				throw new Error(`invalid data: errorCode 002`)
+			}
+		})
 	})
 
 
@@ -105,7 +110,6 @@ export async function importHistoricalData() {
 	const valuesArrayStr = new Array(assets.length).fill(values).join(',')
 
 	const insertSql = `INSERT INTO assets (${Object.keys(assets[0]).join(',')}) VALUES ${valuesArrayStr}`
-
 
 	const db = await getDatabase()
 	await db.execute(insertSql, _(assets as AssetModel[]).map(a => _(a).values().value()).flatten().value())
