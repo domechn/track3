@@ -12,7 +12,7 @@ type DeBankAssetResp = {
 interface DeBank429ErrorResolver {
 	isTried(): boolean
 
-	tryResolve(): Promise<void>
+	tryResolve(address?: string): Promise<void>
 
 	resolved(): Promise<void>
 }
@@ -34,10 +34,10 @@ class DeBank429ErrorResolverImpl implements DeBank429ErrorResolver {
 		return this.tried
 	}
 
-	async tryResolve(): Promise<void> {
+	async tryResolve(address?: string): Promise<void> {
 		this.tried = true
 		await invoke("open_debank_window_in_background", {
-			address: this.defaultAddress
+			address: address || this.defaultAddress
 		})
 	}
 
@@ -96,7 +96,7 @@ export class ERC20Analyzer implements Analyzer {
 			if (e instanceof Error && e.message.includes("429")) {
 				console.error("failed to query erc20 assets due to 429, retrying...")
 				if (!this.errorResolver.isTried()) {
-					await this.errorResolver.tryResolve()
+					await this.errorResolver.tryResolve(this.config.erc20.addresses?.[0])
 				}
 				// sleep 5s
 				await new Promise(resolve => setTimeout(resolve, 5000))
