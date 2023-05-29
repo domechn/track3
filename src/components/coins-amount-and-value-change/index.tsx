@@ -73,7 +73,7 @@ const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
       };
     }
     return {
-      labels: current.timestamps.map(timestampToDate),
+      labels: current.timestamps.map(x => timestampToDate(x)),
       datasets: [
         {
           label: coin + " " + getLabel(),

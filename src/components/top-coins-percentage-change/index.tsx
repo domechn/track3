@@ -71,7 +71,7 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
 
   function lineData() {
     return {
-      labels: data.timestamps.map(timestampToDate),
+      labels: data.timestamps.map((x) => timestampToDate(x)),
       datasets: data.coins.map((coin) => ({
         label: coin.coin,
         data: coinPercentageData(data.timestamps, coin.percentageData),

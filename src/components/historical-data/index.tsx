@@ -16,6 +16,7 @@ import { toast } from "react-hot-toast";
 import { useWindowSize } from "../../utils/hook";
 import { LoadingContext } from "../../App";
 import { exportHistoricalData } from "../../middlelayers/data";
+import { timestampToDate } from "../../utils/date";
 
 type RankData = {
   id: number;
@@ -63,6 +64,16 @@ const App = ({
       key: "createdAt",
       dataIndex: "createdAt",
       title: "Date",
+      render: (id: number | string) => (
+        <>
+          {timestampToDate(
+            new Date(
+              _(data).find((d) => d.id === id)!.createdAt as string
+            ).getTime(),
+            true
+          )}
+        </>
+      ),
     },
     {
       key: "total",

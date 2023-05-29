@@ -12,6 +12,9 @@ export class OthersAnalyzer implements Analyzer {
 	}
 
 	async loadPortfolio(): Promise<Coin[]> {
-		return this.config.others || []
+		return _(this.config.others).map(c => ({
+			symbol: c.symbol,
+			amount: +c.amount,
+		})).value()
 	}
 }

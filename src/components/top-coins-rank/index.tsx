@@ -55,7 +55,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
 
   function lineData() {
     return {
-      labels: data.timestamps.map(timestampToDate),
+      labels: data.timestamps.map((x) => timestampToDate(x)),
       datasets: data.coins.map((coin) => ({
         label: coin.coin,
         data: coinRankData(data.timestamps, coin.rankData),

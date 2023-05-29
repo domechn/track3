@@ -47,7 +47,7 @@ const App = ({data}: {data: AssetChangeData}) => {
 
   function lineData() {
     return {
-      labels: data.timestamps.map(timestampToDate),
+      labels: data.timestamps.map(x => timestampToDate(x)),
       datasets: [
         {
           label: "USD Value",

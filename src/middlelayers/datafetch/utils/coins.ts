@@ -10,7 +10,8 @@ export function combineCoinLists(coinLists: Coin[][]): Coin[] {
 
 export function calculateTotalValue(coinList: Coin[], priceMap: { [k: string]: number }): (Coin & { price: number, usdValue: number })[] {
 	return _(coinList).map(c => ({
-		...c,
+		symbol: c.symbol,
+		amount: +c.amount,
 		price: priceMap[c.symbol] ?? 0,
 		usdValue: c.amount * (priceMap[c.symbol] ?? 0)
 	})
