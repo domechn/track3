@@ -1,3 +1,4 @@
+import { toast } from "react-hot-toast";
 import {
   exportHistoricalData,
   importHistoricalData,
@@ -10,7 +11,9 @@ const App = () => {
   }
 
   async function onImportDataClick() {
-    await importHistoricalData();
+    return importHistoricalData().catch((err) => {
+      toast.error(err.message || err);
+    });
   }
 
   return (
