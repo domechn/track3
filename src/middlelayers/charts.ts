@@ -82,7 +82,7 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 	}
 
 	return {
-		totalValue: latest.total,
+		totalValue: latest.total || 0,
 		changePercentage
 	}
 }
