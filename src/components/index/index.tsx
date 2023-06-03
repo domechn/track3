@@ -38,6 +38,7 @@ import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
 import { LoadingContext } from "../../App";
+import { getQuerySize } from "../../middlelayers/configuration";
 
 ChartJS.register(
   ArcElement,
@@ -56,7 +57,7 @@ const resizeDelay = 200; // 200 ms
 const App = () => {
   const { setLoading } = useContext(LoadingContext);
   const windowSize = useWindowSize();
-  const [querySize, setQuerySize] = useState(10);
+  const [querySize, setQuerySize] = useState(0);
   const [lastSize, setLastSize] = useState(windowSize);
 
   const [showMenu, setShowMenu] = useState(false);
@@ -85,27 +86,14 @@ const App = () => {
       coins: [],
     } as TopCoinsPercentageChangeData);
 
-  const querySizeOptions = useMemo(
-    () =>
-      [
-        {
-          value: "10",
-          label: "10",
-        },
-        {
-          value: "20",
-          label: "20",
-        },
-        {
-          value: "50",
-          label: "50",
-        },
-      ] as SelectOption[],
-    []
-  );
+  useEffect(() => {
+    loadQuerySize();
+  }, []);
 
   useEffect(() => {
-    loadAllData(querySize);
+    if (querySize > 0) {
+      loadAllData(querySize);
+    }
   }, [querySize]);
 
   useEffect(() => {
@@ -141,8 +129,8 @@ const App = () => {
     }
   }
 
-  function onQuerySizeChanged(val: string) {
-    setQuerySize(parseInt(val, 10));
+  function loadQuerySize() {
+    getQuerySize().then((size) => setQuerySize(size));
   }
 
   async function loadAllDataAsync(size = 10) {
@@ -161,7 +149,7 @@ const App = () => {
     setTopCoinsPercentageChangeData(tcpcd);
   }
 
-  function loadAllData(size = 10) {
+  async function loadAllData(size = 10) {
     setLoading(true);
     // set a loading delay to show the loading animation
     setTimeout(() => {
@@ -174,7 +162,6 @@ const App = () => {
   }
 
   function closeMenu() {
-    // todo: not work in comparison
     if (!showMenu) {
       return;
     }
@@ -236,7 +223,10 @@ const App = () => {
             <RefreshData afterRefresh={() => loadAllData(querySize)} />
           </div>
           <div style={{ display: "inline-block" }}>
-            <Setting />
+            <Setting
+              onConfigurationSave={() => loadQuerySize()}
+              onDataImported={() => loadAllData(querySize)}
+            />
           </div>
         </div>
       </div>

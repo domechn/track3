@@ -11,6 +11,7 @@ export interface Analyzer {
 export type GlobalConfig = CexConfig & TokenConfig & {
 	configs: {
 		groupUSD: boolean
+		querySize: number
 	}
 }
 

@@ -51,8 +51,8 @@ const App = () => {
       }
 
       // if baseDate is not set, set it to the second latest date
-      if (!baseDate && options.length > 1) {
-        setBaseId(+options[1].value);
+      if (!baseDate && options.length > 0) {
+        setBaseId(+(options[1]?.value || options[0].value));
       }
 
       setDateOptions(options);
