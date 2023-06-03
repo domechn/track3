@@ -100,6 +100,21 @@ const App = () => {
       .map("symbol")
       .uniq()
       .value();
+
+    const others = "Others";
+
+    // add others to last
+    symbols.sort((a, b) => {
+      if (a === others) {
+        return 1;
+      }
+      if (b === others) {
+        return -1;
+      }
+      // origin order
+      return 0;
+    });
+
     // make total value and amount as the first two items
     const baseTotal = _(base).sumBy("value");
     const headTotal = _(head).sumBy("value");
