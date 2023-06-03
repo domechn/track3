@@ -1,4 +1,5 @@
 import { toast } from "react-hot-toast";
+import { relaunch } from "@tauri-apps/api/process";
 import {
   exportHistoricalData,
   importHistoricalData,
@@ -8,12 +9,18 @@ import "./index.css";
 const App = () => {
   async function onExportDataClick() {
     await exportHistoricalData();
+    toast.success("export data successfully");
   }
 
   async function onImportDataClick() {
-    return importHistoricalData().catch((err) => {
-      toast.error(err.message || err);
-    });
+    return importHistoricalData()
+      .then(() => {
+        toast.success("import data successfully, relaunching...");
+        setTimeout(() => relaunch(), 1000);
+      })
+      .catch((err) => {
+        toast.error(err.message || err);
+      });
   }
 
   return (

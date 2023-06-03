@@ -117,7 +117,8 @@ const App = () => {
   useEffect(() => {
     if (
       lastSize.width === windowSize.width &&
-      lastSize.height === windowSize.height
+      lastSize.height === windowSize.height &&
+      activeMenu === "overview"
     ) {
       resizeAllCharts();
     }
@@ -179,6 +180,14 @@ const App = () => {
     }
     setShowMenu(false);
   }
+
+  useEffect(() => {
+    if (activeMenu === "overview") {
+      setTimeout(() => {
+        resizeAllCharts();
+      }, resizeDelay);
+    }
+  }, [activeMenu]);
 
   function renderMenu() {
     const onMenuClicked = (clicked: string) => {
