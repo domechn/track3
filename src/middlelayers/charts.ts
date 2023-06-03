@@ -2,7 +2,7 @@ import _ from 'lodash'
 import yaml from 'yaml'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase, saveCoinsToDatabase } from './database'
-import { AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData } from './types'
+import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -46,11 +46,20 @@ async function queryCoinsData(): Promise<(Coin & {
 async function queryAssets(size = 1): Promise<AssetModel[]> {
 	const db = await getDatabase()
 	let sql = `SELECT * FROM assets ORDER BY createdAt DESC`
-	if (size > 0 ) {
+	if (size > 0) {
 		sql += ` LIMIT ${size}`
 	}
 	const assets = await db.select<AssetModel[]>(sql)
 	return assets
+}
+
+async function queryAssetById(id: number): Promise<AssetModel> {
+	const db = await getDatabase()
+	const [asset] = await db.select<AssetModel[]>(`SELECT * FROM assets WHERE id = ?`, [id])
+	if (!asset) {
+		throw new Error(`asset with id ${id} not found`)
+	}
+	return asset
 }
 
 async function deleteAsset(id: number): Promise<void> {
@@ -272,4 +281,31 @@ export async function queryHistoricalData(size = 30): Promise<HistoricalData[]> 
 
 export async function deleteHistoricalDataById(id: number): Promise<void> {
 	return deleteAsset(id)
+}
+
+export async function queryCoinDataById(id: number): Promise<CoinData[]> {
+	const model = await queryAssetById(id)
+
+	const res: CoinData[] = []
+	_(model).forEach((v, k) => {
+		if (!v) {
+			return
+		}
+		if (k.startsWith("top")) {
+			const idxStr = k.slice("top".length)
+			const amountRaw = _(model).get(`amount${idxStr}`)
+			const valueRaw = _(model).get(`value${idxStr}`)
+
+			const amount = _(amountRaw).isNumber() ? amountRaw as unknown as number : 0
+			const value = _(valueRaw).isNumber() ? valueRaw as unknown as number : 0
+			const price = amount === 0 ? 0 : value / amount
+			res.push({
+				symbol: v as string,
+				amount: amount,
+				value: value,
+				price,
+			})
+		}
+	})
+	return res
 }

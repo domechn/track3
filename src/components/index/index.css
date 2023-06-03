@@ -28,15 +28,6 @@
   z-index: 999;
 }
 
-.nice-hr {
-  margin-top: 20px;
-  margin-bottom: 20px;
-  height: 2px;
-  border: none;
-  background-color: #eeeeee;
-  width: 95%;
-}
-
 .menu-button {
   border: none;
   border-radius: 50%;

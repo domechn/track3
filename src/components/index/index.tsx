@@ -14,6 +14,7 @@ import RefreshData from "../refresh-data";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import HistoricalData from "../historical-data";
 import Overview from "../overview";
+import Comparison from "../comparison";
 import "./index.css";
 import { SelectOption } from "../common/select";
 import menuIcon from "../../assets/icons/menu-icon.png";
@@ -172,6 +173,7 @@ const App = () => {
   }
 
   function closeMenu() {
+    // todo: not work in comparison
     if (!showMenu) {
       return;
     }
@@ -246,7 +248,11 @@ const App = () => {
           />
         </div>
 
-        {activeMenu === "comparison" && <div id="comparison"></div>}
+        {activeMenu === "comparison" && (
+          <div id="comparison">
+            <Comparison />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import LatestAssetsPercentage from "../latest-assets-percentage";
 import CoinsAmountAndValueChange from "../coins-amount-and-value-change";
 import TopCoinsRank from "../top-coins-rank";
 import TopCoinsPercentageChange from "../top-coins-percentage-change";
+import "./index.css";
 
 import {
   AssetChangeData,

@@ -1,0 +1,33 @@
+.comparison-container {
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+  white-space: nowrap;
+  font-family: BM Jua;
+}
+
+.comparison-container .comparison-row {
+  height: 30px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  /* font-weight: bold; */
+}
+
+.comparison-container .comparison-row:last-child {
+  margin-bottom: 0;
+}
+
+.comparison-container .comparison-row .comparison-column {
+  display: inline-block;
+  width: 26%;
+  padding: 5px;
+  margin-right: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  /* background-color: #f2f2f2; */
+  box-sizing: border-box;
+}
+
+.comparison-container .comparison-row .comparison-column:last-child {
+  margin-right: 0;
+}
