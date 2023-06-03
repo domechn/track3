@@ -8,6 +8,7 @@ import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
 import { CexConfig, Coin, TokenConfig } from './datafetch/types'
+import { timestampToDate } from '../utils/date'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -308,4 +309,18 @@ export async function queryCoinDataById(id: number): Promise<CoinData[]> {
 		}
 	})
 	return res
+}
+
+export async function queryAllDataDates(): Promise<{
+	id: number
+	date: string
+}[]> {
+	const assets = await queryAssets(-1)
+
+	return _(assets)
+		.map(a => ({
+			id: a.id,
+			date: timestampToDate(new Date(a.createdAt).getTime())
+		}))
+		.value()
 }

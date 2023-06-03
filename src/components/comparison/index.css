@@ -6,11 +6,24 @@
   font-family: BM Jua;
 }
 
+.comparison-container .comparison-date-picker {
+  height: 50px;
+}
+
+.comparison-container .comparison-date-picker .comparison-date-picker-item {
+  display: inline-block;
+  width: 50%;
+}
+
 .comparison-container .comparison-row {
   height: 30px;
   margin-bottom: 10px;
   font-size: 14px;
-  /* font-weight: bold; */
+}
+
+.comparison-container .comparison-row:nth-child(3n+1) {
+  background-color: #e6e6e6;
+
 }
 
 .comparison-container .comparison-row:last-child {
@@ -24,7 +37,6 @@
   margin-right: 10px;
   border-radius: 5px;
   overflow: hidden;
-  /* background-color: #f2f2f2; */
   box-sizing: border-box;
 }
 

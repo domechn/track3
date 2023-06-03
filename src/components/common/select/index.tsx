@@ -31,9 +31,9 @@ const App = ({
             height: height ? `${height}px` : "",
           }}
         >
-          {options.map((d) => {
+          {options.map((d, idx) => {
             return (
-              <option key={d.label} value={d.value}>
+              <option key={d.label + idx} value={d.value}>
                 {d.label}
               </option>
             );
