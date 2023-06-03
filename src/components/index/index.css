@@ -36,3 +36,46 @@
   background-color: #eeeeee;
   width: 95%;
 }
+
+.menu-button {
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  appearance: none;
+  background-color: inherit;
+}
+
+.menu {
+  position: relative;
+}
+
+.menu-list {
+  position: absolute;
+  width: 200px;
+  left: -20px;
+  max-height: 0;
+  background-color: #f0f0f0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+  font-family: BM Jua;
+}
+
+.menu-list ul {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.menu-list li {
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+  cursor: pointer;
+}
+
+.menu-list li:active {
+  background-color: #ccc;
+}
+
+.menu-list li:last-child {
+  border-bottom: none;
+}

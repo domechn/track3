@@ -12,15 +12,11 @@ import {
 import Setting from "../settings";
 import RefreshData from "../refresh-data";
 import ChartDataLabels from "chartjs-plugin-datalabels";
-import TotalValue from "../total-value";
-import AssetChange from "../asset-change";
-import LatestAssetsPercentage from "../latest-assets-percentage";
-import CoinsAmountAndValueChange from "../coins-amount-and-value-change";
-import TopCoinsRank from "../top-coins-rank";
-import TopCoinsPercentageChange from "../top-coins-percentage-change";
 import HistoricalData from "../historical-data";
+import Overview from "../overview";
 import "./index.css";
-import Select, { SelectOption } from "../common/select";
+import { SelectOption } from "../common/select";
+import menuIcon from "../../assets/icons/menu-icon.png";
 
 import {
   AssetChangeData,
@@ -40,7 +36,7 @@ import { queryTotalValue } from "../../middlelayers/charts";
 import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
-import { LoadingContext } from '../../App'
+import { LoadingContext } from "../../App";
 
 ChartJS.register(
   ArcElement,
@@ -57,9 +53,14 @@ ChartJS.register(
 const resizeDelay = 200; // 200 ms
 
 const App = () => {
-  const {setLoading} = useContext(LoadingContext);
-  const [querySize, setQuerySize] = useState(10);
+  const { setLoading } = useContext(LoadingContext);
   const windowSize = useWindowSize();
+  const [querySize, setQuerySize] = useState(10);
+  const [lastSize, setLastSize] = useState(windowSize);
+
+  const [showMenu, setShowMenu] = useState(false);
+  const [activeMenu, setActiveMenu] = useState("overview");
+
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData
   );
@@ -82,8 +83,6 @@ const App = () => {
       timestamps: [],
       coins: [],
     } as TopCoinsPercentageChangeData);
-
-  const [lastSize, setLastSize] = useState(windowSize);
 
   const querySizeOptions = useMemo(
     () =>
@@ -123,12 +122,25 @@ const App = () => {
     }
   }, [lastSize]);
 
+  useEffect(() => {
+    const maxHeight = showMenu ? "1000px" : "0px";
+    const style = document.getElementById("menu-list")?.style;
+
+    if (style) {
+      style.maxHeight = maxHeight;
+    }
+  }, [showMenu]);
+
   function resizeAllCharts() {
     console.log("resizing all charts");
 
     for (const id in Chart.instances) {
       Chart.instances[id].resize();
     }
+  }
+
+  function onQuerySizeChanged(val: string) {
+    setQuerySize(parseInt(val, 10));
   }
 
   async function loadAllDataAsync(size = 10) {
@@ -155,33 +167,54 @@ const App = () => {
     }, 200);
   }
 
-  function onQuerySizeChanged(val: string) {
-    setQuerySize(parseInt(val, 10));
+  function onMenuClicked() {
+    setShowMenu(!showMenu);
+  }
+
+  function closeMenu() {
+    if (!showMenu) {
+      return;
+    }
+    setShowMenu(false);
+  }
+
+  function renderMenu() {
+    const onMenuClicked = (clicked: string) => {
+      setActiveMenu(clicked);
+      closeMenu();
+    };
+    return (
+      <div id="menu-list" className="menu-list">
+        <ul>
+          <li onClick={() => onMenuClicked("overview")}>Overview</li>
+          <li onClick={() => onMenuClicked("comparison")}>Comparison</li>
+        </ul>
+      </div>
+    );
   }
 
   return (
     <div>
       <div className="top-buttons-wrapper">
         <div className="left-buttons">
-          <div>
-            <span
-              style={{
-                fontFamily: "BM Jua",
-                fontWeight: "bold",
-                color: "white",
-                display: "inline-block",
-                lineHeight: "40px",
-                marginRight: "10px",
-              }}
-            >
-              Size{" "}
-            </span>
-            <Select
-              width={60}
-              options={querySizeOptions}
-              onSelectChange={onQuerySizeChanged}
-              value={querySize + ""}
-            />
+          <div
+            className="menu"
+            style={{
+              display: "inline-block",
+            }}
+          >
+            <button className="menu-button" onClick={onMenuClicked}>
+              <img
+                src={menuIcon}
+                alt="menu"
+                width={30}
+                height={30}
+                style={{
+                  border: "none",
+                }}
+              />
+            </button>
+            {renderMenu()}
           </div>
         </div>
         <div className="right-buttons">
@@ -196,18 +229,24 @@ const App = () => {
           </div>
         </div>
       </div>
-      <div>
-        <TotalValue data={totalValueData} />
-        <hr className="nice-hr" />
-        <LatestAssetsPercentage data={latestAssetsPercentageData} />
-        <hr className="nice-hr" />
-        <AssetChange data={assetChangeData} />
-        <hr className="nice-hr" />
-        <CoinsAmountAndValueChange data={coinsAmountAndValueChangeData} />
-        <hr className="nice-hr" />
-        <TopCoinsRank data={topCoinsRankData} />
-        <hr className="nice-hr" />
-        <TopCoinsPercentageChange data={topCoinsPercentageChangeData} />
+      <div onMouseDown={closeMenu}>
+        <div
+          id="overview"
+          style={{
+            display: activeMenu === "overview" ? "block" : "none",
+          }}
+        >
+          <Overview
+            latestAssetsPercentageData={latestAssetsPercentageData}
+            assetChangeData={assetChangeData}
+            totalValueData={totalValueData}
+            coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
+            topCoinsRankData={topCoinsRankData}
+            topCoinsPercentageChangeData={topCoinsPercentageChangeData}
+          />
+        </div>
+
+        {activeMenu === "comparison" && <div id="comparison"></div>}
       </div>
     </div>
   );
