@@ -12,15 +12,12 @@ import {
 import Setting from "../settings";
 import RefreshData from "../refresh-data";
 import ChartDataLabels from "chartjs-plugin-datalabels";
-import TotalValue from "../total-value";
-import AssetChange from "../asset-change";
-import LatestAssetsPercentage from "../latest-assets-percentage";
-import CoinsAmountAndValueChange from "../coins-amount-and-value-change";
-import TopCoinsRank from "../top-coins-rank";
-import TopCoinsPercentageChange from "../top-coins-percentage-change";
 import HistoricalData from "../historical-data";
+import Overview from "../overview";
+import Comparison from "../comparison";
 import "./index.css";
-import Select, { SelectOption } from "../common/select";
+import { SelectOption } from "../common/select";
+import menuIcon from "../../assets/icons/menu-icon.png";
 
 import {
   AssetChangeData,
@@ -40,7 +37,8 @@ import { queryTotalValue } from "../../middlelayers/charts";
 import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
-import { LoadingContext } from '../../App'
+import { LoadingContext } from "../../App";
+import { getQuerySize } from "../../middlelayers/configuration";
 
 ChartJS.register(
   ArcElement,
@@ -57,9 +55,14 @@ ChartJS.register(
 const resizeDelay = 200; // 200 ms
 
 const App = () => {
-  const {setLoading} = useContext(LoadingContext);
-  const [querySize, setQuerySize] = useState(10);
+  const { setLoading } = useContext(LoadingContext);
   const windowSize = useWindowSize();
+  const [querySize, setQuerySize] = useState(0);
+  const [lastSize, setLastSize] = useState(windowSize);
+
+  const [showMenu, setShowMenu] = useState(false);
+  const [activeMenu, setActiveMenu] = useState("overview");
+
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData
   );
@@ -83,29 +86,14 @@ const App = () => {
       coins: [],
     } as TopCoinsPercentageChangeData);
 
-  const [lastSize, setLastSize] = useState(windowSize);
-
-  const querySizeOptions = useMemo(
-    () =>
-      [
-        {
-          value: "10",
-          label: "10",
-        },
-        {
-          value: "20",
-          label: "20",
-        },
-        {
-          value: "50",
-          label: "50",
-        },
-      ] as SelectOption[],
-    []
-  );
+  useEffect(() => {
+    loadQuerySize();
+  }, []);
 
   useEffect(() => {
-    loadAllData(querySize);
+    if (querySize > 0) {
+      loadAllData(querySize);
+    }
   }, [querySize]);
 
   useEffect(() => {
@@ -117,11 +105,21 @@ const App = () => {
   useEffect(() => {
     if (
       lastSize.width === windowSize.width &&
-      lastSize.height === windowSize.height
+      lastSize.height === windowSize.height &&
+      activeMenu === "overview"
     ) {
       resizeAllCharts();
     }
   }, [lastSize]);
+
+  useEffect(() => {
+    const maxHeight = showMenu ? "1000px" : "0px";
+    const style = document.getElementById("menu-list")?.style;
+
+    if (style) {
+      style.maxHeight = maxHeight;
+    }
+  }, [showMenu]);
 
   function resizeAllCharts() {
     console.log("resizing all charts");
@@ -129,6 +127,10 @@ const App = () => {
     for (const id in Chart.instances) {
       Chart.instances[id].resize();
     }
+  }
+
+  function loadQuerySize() {
+    getQuerySize().then((size) => setQuerySize(size));
   }
 
   async function loadAllDataAsync(size = 10) {
@@ -155,33 +157,62 @@ const App = () => {
     }, 200);
   }
 
-  function onQuerySizeChanged(val: string) {
-    setQuerySize(parseInt(val, 10));
+  function onMenuClicked() {
+    setShowMenu(!showMenu);
+  }
+
+  function closeMenu() {
+    if (!showMenu) {
+      return;
+    }
+    setShowMenu(false);
+  }
+
+  useEffect(() => {
+    if (activeMenu === "overview") {
+      setTimeout(() => {
+        resizeAllCharts();
+      }, resizeDelay);
+    }
+  }, [activeMenu]);
+
+  function renderMenu() {
+    const onMenuClicked = (clicked: string) => {
+      setActiveMenu(clicked);
+      closeMenu();
+    };
+    return (
+      <div id="menu-list" className="menu-list">
+        <ul>
+          <li onClick={() => onMenuClicked("overview")}>Overview</li>
+          <li onClick={() => onMenuClicked("comparison")}>Comparison</li>
+        </ul>
+      </div>
+    );
   }
 
   return (
     <div>
       <div className="top-buttons-wrapper">
         <div className="left-buttons">
-          <div>
-            <span
-              style={{
-                fontFamily: "BM Jua",
-                fontWeight: "bold",
-                color: "white",
-                display: "inline-block",
-                lineHeight: "40px",
-                marginRight: "10px",
-              }}
-            >
-              Size{" "}
-            </span>
-            <Select
-              width={60}
-              options={querySizeOptions}
-              onSelectChange={onQuerySizeChanged}
-              value={querySize + ""}
-            />
+          <div
+            className="menu"
+            style={{
+              display: "inline-block",
+            }}
+          >
+            <button className="menu-button" onClick={onMenuClicked}>
+              <img
+                src={menuIcon}
+                alt="menu"
+                width={30}
+                height={30}
+                style={{
+                  border: "none",
+                }}
+              />
+            </button>
+            {renderMenu()}
           </div>
         </div>
         <div className="right-buttons">
@@ -192,22 +223,35 @@ const App = () => {
             <RefreshData afterRefresh={() => loadAllData(querySize)} />
           </div>
           <div style={{ display: "inline-block" }}>
-            <Setting />
+            <Setting
+              onConfigurationSave={() => loadQuerySize()}
+              onDataImported={() => loadAllData(querySize)}
+            />
           </div>
         </div>
       </div>
-      <div>
-        <TotalValue data={totalValueData} />
-        <hr className="nice-hr" />
-        <LatestAssetsPercentage data={latestAssetsPercentageData} />
-        <hr className="nice-hr" />
-        <AssetChange data={assetChangeData} />
-        <hr className="nice-hr" />
-        <CoinsAmountAndValueChange data={coinsAmountAndValueChangeData} />
-        <hr className="nice-hr" />
-        <TopCoinsRank data={topCoinsRankData} />
-        <hr className="nice-hr" />
-        <TopCoinsPercentageChange data={topCoinsPercentageChangeData} />
+      <div onMouseDown={closeMenu}>
+        <div
+          id="overview"
+          style={{
+            display: activeMenu === "overview" ? "block" : "none",
+          }}
+        >
+          <Overview
+            latestAssetsPercentageData={latestAssetsPercentageData}
+            assetChangeData={assetChangeData}
+            totalValueData={totalValueData}
+            coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
+            topCoinsRankData={topCoinsRankData}
+            topCoinsPercentageChangeData={topCoinsPercentageChangeData}
+          />
+        </div>
+
+        {activeMenu === "comparison" && (
+          <div id="comparison">
+            <Comparison />
+          </div>
+        )}
       </div>
     </div>
   );

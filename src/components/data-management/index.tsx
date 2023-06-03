@@ -5,20 +5,27 @@ import {
 } from "../../middlelayers/data";
 import "./index.css";
 
-const App = () => {
+const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function onExportDataClick() {
     await exportHistoricalData();
+    toast.success("export data successfully");
   }
 
   async function onImportDataClick() {
-    return importHistoricalData().catch((err) => {
-      toast.error(err.message || err);
-    });
+    return importHistoricalData()
+      .then(() => {
+        toast.success("import data successfully");
+
+        onDataImported && onDataImported();
+      })
+      .catch((err) => {
+        toast.error(err.message || err);
+      });
   }
 
   return (
     <div className="dataManagement">
-      <h2>Historical Data</h2>
+      <h2>Data Center</h2>
       <div>
         <button onClick={onImportDataClick}>import data</button>
       </div>

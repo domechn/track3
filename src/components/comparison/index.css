@@ -1,0 +1,45 @@
+.comparison-container {
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+  white-space: nowrap;
+  font-family: BM Jua;
+}
+
+.comparison-container .comparison-date-picker {
+  height: 50px;
+}
+
+.comparison-container .comparison-date-picker .comparison-date-picker-item {
+  display: inline-block;
+  width: 50%;
+}
+
+.comparison-container .comparison-row {
+  height: 30px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.comparison-container .comparison-row:nth-child(3n+1) {
+  background-color: #e6e6e6;
+
+}
+
+.comparison-container .comparison-row:last-child {
+  margin-bottom: 0;
+}
+
+.comparison-container .comparison-row .comparison-column {
+  display: inline-block;
+  width: 26%;
+  padding: 5px;
+  margin-right: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.comparison-container .comparison-row .comparison-column:last-child {
+  margin-right: 0;
+}

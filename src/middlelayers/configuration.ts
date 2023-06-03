@@ -42,7 +42,17 @@ export async function saveConfiguration(cfg: GlobalConfig) {
 
 	const db = await getDatabase()
 	// encrypt data
-	const encrypted = await invoke<string>("encrypt", { data }) 
+	const encrypted = await invoke<string>("encrypt", { data })
 
 	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${fixId}, ?)`, [encrypted])
+}
+
+export async function getQuerySize(): Promise<number> {
+	const cfg = await getConfiguration()
+	if (!cfg) {
+		return 10
+	}
+
+	const data = yaml.parse(cfg.data)
+	return data.configs.querySize || 10
 }

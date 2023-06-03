@@ -10,7 +10,13 @@ import Configuration from "../configuration";
 import DataManagement from "../data-management";
 import "./index.css";
 
-const App = () => {
+const App = ({
+  onConfigurationSave,
+  onDataImported,
+}: {
+  onConfigurationSave?: () => void;
+  onDataImported?: () => void;
+}) => {
   const [version, setVersion] = useState<string>("0.1.0");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const size = useWindowSize();
@@ -75,6 +81,16 @@ const App = () => {
     setActiveOnSidebarItem("data");
   }
 
+  function _onConfigurationSave() {
+    setIsModalOpen(false);
+    onConfigurationSave && onConfigurationSave();
+  }
+
+  function _onDataImported() {
+    setIsModalOpen(false);
+    onDataImported && onDataImported();
+  }
+
   function renderMenu() {
     return (
       <>
@@ -94,7 +110,7 @@ const App = () => {
 
         <div className="settings-content">
           <div id="configurationContent" className="content-item">
-            <Configuration onConfigurationSave={() => setIsModalOpen(false)} />
+            <Configuration onConfigurationSave={_onConfigurationSave} />
           </div>
           <div
             id="dataContent"
@@ -103,7 +119,7 @@ const App = () => {
               display: "none",
             }}
           >
-            <DataManagement />
+            <DataManagement onDataImported={_onDataImported} />
           </div>
         </div>
       </>

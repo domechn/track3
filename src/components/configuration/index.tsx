@@ -1,5 +1,5 @@
 import _ from "lodash";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import "./index.css";
 import {
   getConfiguration,
@@ -10,12 +10,13 @@ import { toast } from "react-hot-toast";
 import yaml from "yaml";
 import deleteIcon from "../../assets/icons/delete-icon.png";
 import { GlobalConfig, TokenConfig } from "../../middlelayers/datafetch/types";
-import Select from "../common/select";
+import Select, { SelectOption } from "../common/select";
 import { LoadingContext } from "../../App";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
     groupUSD: true,
+    querySize: 10,
   },
   exchanges: [],
   erc20: {
@@ -45,6 +46,7 @@ const Configuration = ({
 }) => {
   const { setLoading } = useContext(LoadingContext);
   const [groupUSD, setGroupUSD] = useState(true);
+  const [querySize, setQuerySize] = useState(0);
 
   const [wallets, setWallets] = useState<
     {
@@ -69,6 +71,26 @@ const Configuration = ({
     }[]
   >([]);
 
+  const querySizeOptions = useMemo(
+    () =>
+      [
+        {
+          value: "10",
+          label: "10",
+        },
+        {
+          value: "20",
+          label: "20",
+        },
+        {
+          value: "50",
+          label: "50",
+        },
+      ] as SelectOption[],
+    []
+  );
+
+
   useEffect(() => {
     loadConfiguration();
   }, []);
@@ -82,6 +104,7 @@ const Configuration = ({
           : initialConfiguration;
 
         setGroupUSD(globalConfig.configs.groupUSD);
+        setQuerySize(globalConfig.configs.querySize || 10);
 
         setExchanges(
           _(globalConfig.exchanges)
@@ -109,7 +132,8 @@ const Configuration = ({
       })
       .catch((e) => {
         toast.error("get configuration failed:", e);
-      }).finally(() => setLoading(false));
+      })
+      .finally(() => setLoading(false));
   }
 
   function onFormSubmit() {
@@ -156,6 +180,7 @@ const Configuration = ({
     return {
       configs: {
         groupUSD,
+        querySize,
       },
       exchanges: exchangesData,
       // expand wallet
@@ -318,6 +343,10 @@ const Configuration = ({
     setOthers([...nos]);
   }
 
+  function onQuerySizeChanged(val: string) {
+    setQuerySize(parseInt(val, 10));
+  }
+
   function renderOthersForm() {
     return _(others)
       .map((o, idx) => (
@@ -427,6 +456,22 @@ const Configuration = ({
               name="groupUSD"
               checked={groupUSD}
               onChange={(e) => setGroupUSD(e.target.checked)}
+            />
+          </label>
+          <label>
+            <span
+              style={{
+                display: "inline-block",
+                marginRight: 10,
+              }}
+            >
+              QuerySize
+            </span>
+            <Select
+              width={60}
+              options={querySizeOptions}
+              onSelectChange={onQuerySizeChanged}
+              value={querySize + ""}
             />
           </label>
           <h3>Exchanges</h3>

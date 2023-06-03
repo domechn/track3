@@ -132,3 +132,10 @@ export type HistoricalData = {
 	valueOthers: number
 	total: number
 }
+
+export type CoinData = {
+	symbol: string
+	amount: number
+	value: number
+	price: number
+}
