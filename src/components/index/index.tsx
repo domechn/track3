@@ -149,7 +149,7 @@ const App = () => {
     setTopCoinsPercentageChangeData(tcpcd);
   }
 
-  async function loadAllData(size = 10) {
+  function loadAllData(size = 10) {
     setLoading(true);
     // set a loading delay to show the loading animation
     setTimeout(() => {
