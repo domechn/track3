@@ -2,14 +2,16 @@
 extern crate lazy_static;
 use std::{
     collections::HashMap,
-    fs::{self, File},
-    path::Path,
 };
 
-use sqlx::{Connection, Executor, SqliteConnection};
 use tauri::Manager;
-use tokio::runtime::Runtime;
-use track3::{binance::Binance, ent::Ent, okex::Okex, price::get_price_querier};
+use track3::{
+    binance::Binance,
+    ent::Ent,
+    okex::Okex,
+    price::get_price_querier,
+     migration::{is_first_run, init_resources, is_from_v01_to_v02, migrate_from_v01_to_v02},
+};
 
 lazy_static! {
     static ref ENT: Ent = Ent::new();
@@ -130,7 +132,6 @@ async fn open_debank_window_in_background(handle: tauri::AppHandle, address: Str
 )]
 #[tauri::command]
 async fn close_debank_window(handle: tauri::AppHandle) {
-
     // get window
     let debank_window = handle.get_window("debank-refresh");
     if let Some(debank_window) = debank_window {
@@ -149,6 +150,11 @@ fn main() {
             if is_first_run(app_dir.as_path()) {
                 init_resources(app_dir.as_path(), resource_dir.as_path());
             }
+
+            if is_from_v01_to_v02() {
+                // upgrade from v0.1 to v0.2
+                migrate_from_v01_to_v02(app_dir.as_path(), resource_dir.as_path());
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -163,33 +169,4 @@ fn main() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-fn is_first_run(path: &Path) -> bool {
-    // check sqlite file exists
-    if path.join("track3.db").exists() {
-        false
-    } else {
-        true
-    }
-}
-
-fn init_resources(app_dir: &Path, resource_dir: &Path) {
-    println!("init resources in rust");
-    let sqlite_path = String::from(app_dir.join("track3.db").to_str().unwrap());
-    File::create(&sqlite_path).unwrap();
-
-    let assets = fs::read_to_string(resource_dir.join("migrations/init/assets_up.sql")).unwrap();
-    let configuration =
-        fs::read_to_string(resource_dir.join("migrations/init/configuration_up.sql")).unwrap();
-
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async move {
-        println!("init resources in tokio spawn");
-        let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
-        conn.execute(assets.as_str()).await.unwrap();
-        conn.execute(configuration.as_str()).await.unwrap();
-        conn.close().await.unwrap();
-        println!("init resources in tokio spawn done");
-    });
 }
