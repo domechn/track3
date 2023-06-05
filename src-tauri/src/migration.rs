@@ -28,18 +28,22 @@ pub fn init_resources(app_dir: &Path, resource_dir: &Path) {
 
     let configuration =
         fs::read_to_string(resource_dir.join("migrations/init/configuration_up.sql")).unwrap();
+    let assets_v2 =
+        fs::read_to_string(resource_dir.join("migrations/init/assets_v2_up.sql")).unwrap();
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
         println!("init resources in tokio spawn");
         let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
         conn.execute(configuration.as_str()).await.unwrap();
+        conn.execute(assets_v2.as_str()).await.unwrap();
         conn.close().await.unwrap();
         println!("init resources in tokio spawn done");
     });
 }
 
 pub fn is_from_v01_to_v02() -> bool {
+    // if there is "assets" table in db
     return true;
 }
 
