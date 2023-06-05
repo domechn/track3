@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS assets_v2 (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-	symbol TEXT,
-	amount REAL,
-	value REAL,
-	price REAL
+	symbol TEXT NOT NULL,
+	amount REAL NOT NULL,
+	value REAL NOT NULL,
+	price REAL  NOT NULL
 );
