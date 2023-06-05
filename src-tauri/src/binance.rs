@@ -1,4 +1,6 @@
-use binance::{account::Account, api::Binance as BinanceApi, wallet::Wallet, futures::{account::FuturesAccount}};
+use binance::{
+    account::Account, api::Binance as BinanceApi, futures::account::FuturesAccount, wallet::Wallet,
+};
 use std::collections::HashMap;
 
 pub struct Binance {
@@ -19,7 +21,8 @@ impl Binance {
             BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
         let funding: Wallet =
             BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
-        let futures : FuturesAccount = BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
+        let futures: FuturesAccount =
+            BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
         let acc = account.get_account().await?;
         // spot
         let mut res = acc
@@ -47,16 +50,17 @@ impl Binance {
 
         // futures
         let futures_balances = futures.account_balance().await?;
-        futures_balances.into_iter()
-        .map(|b| (b.asset.clone(), b.balance))
-        .for_each(|(k, v)| {
-            if res.contains_key(&k) {
-                let val = res.get(&k).unwrap();
-                res.insert(k.to_owned(), val + v);
-            } else {
-                res.insert(k.to_owned(), v);
-            }
-        });
+        futures_balances
+            .into_iter()
+            .map(|b| (b.asset.clone(), b.balance))
+            .for_each(|(k, v)| {
+                if res.contains_key(&k) {
+                    let val = res.get(&k).unwrap();
+                    res.insert(k.to_owned(), val + v);
+                } else {
+                    res.insert(k.to_owned(), v);
+                }
+            });
 
         Ok(res)
     }

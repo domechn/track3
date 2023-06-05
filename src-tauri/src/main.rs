@@ -1,16 +1,14 @@
 #[macro_use]
 extern crate lazy_static;
-use std::{
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
 use tauri::Manager;
 use track3::{
     binance::Binance,
     ent::Ent,
+    migration::{init_resources, is_first_run, is_from_v01_to_v02, migrate_from_v01_to_v02},
     okex::Okex,
     price::get_price_querier,
-     migration::{is_first_run, init_resources, is_from_v01_to_v02, migrate_from_v01_to_v02},
 };
 
 lazy_static! {

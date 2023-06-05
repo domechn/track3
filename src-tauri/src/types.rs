@@ -1,4 +1,4 @@
-use sqlx::{FromRow};
+use sqlx::FromRow;
 
 pub struct Addresses {
     pub addresses: Vec<String>,
@@ -56,7 +56,6 @@ pub struct AssetsV1 {
     pub valueOthers: Option<f64>,
     pub total: Option<f64>,
 }
-
 
 #[derive(FromRow, Debug)]
 pub struct AssetsV2 {

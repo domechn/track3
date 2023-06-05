@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use okex::rest::{BalanceRequest, OkExRest, SavingsBalanceRequest, FundingBalanceRequest};
+use okex::rest::{BalanceRequest, FundingBalanceRequest, OkExRest, SavingsBalanceRequest};
 pub struct Okex {
     api_key: String,
     secret_key: String,
@@ -48,7 +48,7 @@ impl Okex {
             });
 
         // funding
-        let req =  FundingBalanceRequest { ccy: None };
+        let req = FundingBalanceRequest { ccy: None };
         let resp = client.request(req).await?;
 
         resp.into_iter()
