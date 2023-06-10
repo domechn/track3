@@ -15,7 +15,7 @@ type ComparisonData = {
 };
 
 const App = () => {
-  const [baseId, setBaseId] = useState<number>(0);
+  const [baseId, setBaseId] = useState<string>("");
   const [dateOptions, setDateOptions] = useState<
     {
       label: string;
@@ -26,7 +26,7 @@ const App = () => {
   const baseDate = useMemo(() => {
     return _.find(dateOptions, { value: "" + baseId })?.label;
   }, [dateOptions, baseId]);
-  const [headId, setHeadId] = useState<number>(0);
+  const [headId, setHeadId] = useState<string>("");
   const headDate = useMemo(() => {
     return _.find(dateOptions, { value: "" + headId })?.label;
   }, [dateOptions, headId]);
@@ -47,12 +47,12 @@ const App = () => {
 
       // if headDate is not set, set it to the latest date
       if (!headDate && options.length > 0) {
-        setHeadId(+options[0].value);
+        setHeadId(options[0].value);
       }
 
       // if baseDate is not set, set it to the second latest date
       if (!baseDate && options.length > 0) {
-        setBaseId(+(options[1]?.value || options[0].value));
+        setBaseId(options[1]?.value || options[0].value);
       }
 
       setDateOptions(options);
@@ -79,18 +79,18 @@ const App = () => {
 
   async function loadAllSelectDates(): Promise<
     {
-      id: number;
+      id: string;
       date: string;
     }[]
   > {
     return queryAllDataDates();
   }
 
-  function onBaseSelectChange(id: number) {
+  function onBaseSelectChange(id: string) {
     setBaseId(id);
   }
 
-  function onHeadSelectChange(id: number) {
+  function onHeadSelectChange(id: string) {
     setHeadId(id);
   }
 
@@ -135,6 +135,11 @@ const App = () => {
         base: baseItem?.value || 0,
         head: headItem?.value || 0,
       });
+
+      if (symbol === others) {
+        return;
+      }
+
       res.push({
         name: symbol + " Amount",
         base: baseItem?.amount || 0,
@@ -150,11 +155,29 @@ const App = () => {
     return res;
   }
 
-  async function loadDataById(id: number): Promise<CoinData[]> {
+  async function loadDataById(id: string): Promise<CoinData[]> {
     // return queryCoinDataById(id);
     const data = await queryCoinDataById(id);
 
-    return data;
+    // only take first 10, and group others into others
+    const others = "Others";
+    const symbols = _(data).map("symbol").uniq().value();
+    const othersSymbols = _(symbols).slice(10).value();
+    const othersData = _(data)
+      .filter((d) => othersSymbols.includes(d.symbol))
+      .value();
+
+    const res = [
+      ..._(data).take(10).value(),
+      {
+        symbol: others,
+        value: _(othersData).sumBy('value'),
+        amount: 0,
+        price: 0,
+      },
+    ];
+
+    return res;
   }
 
   function getComparisonResultNumber(base: number, head: number): number {
@@ -198,7 +221,7 @@ const App = () => {
           <div className="comparison-date-picker-item">
             <Select
               options={dateOptions}
-              onSelectChange={(v) => onBaseSelectChange(+v)}
+              onSelectChange={(v) => onBaseSelectChange(v)}
               value={"" + baseId}
               width={150}
             />
@@ -206,7 +229,7 @@ const App = () => {
           <div className="comparison-date-picker-item">
             <Select
               options={dateOptions}
-              onSelectChange={(v) => onHeadSelectChange(+v)}
+              onSelectChange={(v) => onHeadSelectChange(v)}
               value={"" + headId}
               width={150}
             />

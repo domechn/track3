@@ -24,7 +24,8 @@ export class BTCAnalyzer implements Analyzer {
 	async query(address: string): Promise<number> {
 		for (const btcQuerier of this.btcQueriers) {
 			try {
-				return btcQuerier.query(address)
+				const res = await btcQuerier.query(address)
+				return res
 			} catch (e) {
 				console.error(e)
 			}

@@ -1,40 +1,11 @@
 export type AssetModel = {
 	id: number
+	uuid: string
 	createdAt: string
-	top01: string
-	amount01: number
-	value01: number
-	top02: string
-	amount02: number
-	value02: number
-	top03: string
-	amount03: number
-	value03: number
-	top04: string
-	amount04: number
-	value04: number
-	top05: string
-	amount05: number
-	value05: number
-	top06: string
-	amount06: number
-	value06: number
-	top07: string
-	amount07: number
-	value07: number
-	top08: string
-	amount08: number
-	value08: number
-	top09: string
-	amount09: number
-	value09: number
-	top10: string
-	amount10: number
-	value10: number
-	topOthers: string
-	amountOthers: string
-	valueOthers: number
-	total: number
+	symbol: string
+	amount: number
+	value: number
+	price: number
 }
 
 export type ConfigurationModel = {
@@ -95,41 +66,11 @@ export type CoinsAmountAndValueChangeData = {
 }[]
 
 export type HistoricalData = {
-	id: number
+	id: string
 	createdAt: string
-	top01: string
-	amount01: number
-	value01: number
-	top02: string
-	amount02: number
-	value02: number
-	top03: string
-	amount03: number
-	value03: number
-	top04: string
-	amount04: number
-	value04: number
-	top05: string
-	amount05: number
-	value05: number
-	top06: string
-	amount06: number
-	value06: number
-	top07: string
-	amount07: number
-	value07: number
-	top08: string
-	amount08: number
-	value08: number
-	top09: string
-	amount09: number
-	value09: number
-	top10: string
-	amount10: number
-	value10: number
-	topOthers: string
-	amountOthers: string
-	valueOthers: number
+
+	assets: AssetModel[]
+
 	total: number
 }
 

@@ -1,7 +1,9 @@
 import _ from "lodash"
 import Database from "tauri-plugin-sql-api"
+import { v4 as uuidv4 } from 'uuid'
 import { Coin, CoinModel } from './datafetch/types'
 import { AssetModel } from './types'
+import { ASSETS_TABLE_NAME } from './charts'
 
 export const databaseName = "track3.db"
 
@@ -28,33 +30,35 @@ export async function saveCoinsToDatabase(coins: (Coin & {
 	})).value())
 }
 
+// will auto skip models whose amount is 0
 async function saveToDatabase(db: Database, models: CoinModel[]): Promise<void> {
-	const getIndex = (i: number): string => {
-		return i > 9 ? `${i}` : `0${i}`
-	}
+	const now = new Date().toISOString()
+	// generate uuid v4
+
+	const uid = uuidv4()
+
+
 	const getDBModel = (models: CoinModel[]) => {
-		const top10 = _(models).sortBy(m => m.value).reverse().take(10).value()
-		const others = _(models).sortBy(m => m.value).reverse().drop(10).value()
 
-		const top10Props = _(top10).map((t, i) => ({
-			[`top${getIndex(i + 1)}`]: t.symbol,
-			[`amount${getIndex(i + 1)}`]: t.amount,
-			[`value${getIndex(i + 1)}`]: t.value,
-		})).reduce((acc, cur) => _.merge(acc, cur), {})
+		return _(models).filter(m=>m.amount !== 0).map(m => ({
+			createdAt: now,
+			uuid: uid,
+			symbol: m.symbol,
+			amount: m.amount,
+			value: m.value,
+			price: m.value / m.amount,
+		} as AssetModel)).value()
 
-		const othersProps = {
-			topOthers: "Others",
-			amountOthers: "N/A",
-			valueOthers: _(others).sumBy(m => m.value),
-		}
-
-		return {
-			...top10Props,
-			...othersProps,
-			total: _(models).sumBy(m => m.value),
-		} as AssetModel
 	}
-	const dbModel = getDBModel(models)
-	const insertSql = `INSERT INTO assets (${Object.keys(dbModel).join(',')}) VALUES (${Object.keys(dbModel).map(() => '?').join(',')})`
-	await db.execute(insertSql, Object.values(dbModel))
+	const dbModels = getDBModel(models)
+	if (dbModels.length === 0) {
+		return
+	}
+
+	const first = dbModels[0]
+	const keys = Object.keys(first)
+	const valuesArrayStr = new Array(dbModels.length).fill(`(${keys.map(() => '?').join(',')})`).join(',')
+	const insertSql = `INSERT INTO ${ASSETS_TABLE_NAME} (${keys.join(',')}) VALUES ${valuesArrayStr}`
+	const values = _(dbModels).map(m => _(keys).map(k => _(m).get(k)).value()).flatten().value();
+	await db.execute(insertSql, values)
 }

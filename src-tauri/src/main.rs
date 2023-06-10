@@ -149,7 +149,7 @@ fn main() {
                 init_resources(app_dir.as_path(), resource_dir.as_path());
             }
 
-            if is_from_v01_to_v02() {
+            if is_from_v01_to_v02(app_dir.as_path()).unwrap() {
                 // upgrade from v0.1 to v0.2
                 migrate_from_v01_to_v02(app_dir.as_path(), resource_dir.as_path());
             }

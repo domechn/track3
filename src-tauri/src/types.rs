@@ -60,6 +60,7 @@ pub struct AssetsV1 {
 #[derive(FromRow, Debug)]
 pub struct AssetsV2 {
     pub id: i32,
+    pub uuid: String,
     pub created_at: String,
 
     pub symbol: String,

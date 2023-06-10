@@ -23,7 +23,8 @@ export class DOGEAnalyzer implements Analyzer {
 	private async query(address: string): Promise<number> {
 		for (const q of this.dogeQueriers) {
 			try {
-				return q.query(address)
+				const res = await q.query(address)
+				return res
 			}
 			catch (e) {
 				console.error(e)
