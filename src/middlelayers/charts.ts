@@ -185,7 +185,8 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 }
 
 function getCoins(assets: AssetModel[][]): string[] {
-	return _(assets).flatten().map(a => a.symbol).uniq().value()
+	// only take top 10 coins in each item
+	return _(assets).map(as => _(as).sortBy('value').reverse().take(10).value()).flatten().map(a => a.symbol).uniq().value()
 }
 
 export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
