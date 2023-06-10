@@ -7,13 +7,18 @@ import "./index.css";
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function onExportDataClick() {
-    await exportHistoricalData();
-    toast.success("export data successfully");
+    const exported = await exportHistoricalData();
+    if (exported) {
+      toast.success("export data successfully");
+    }
   }
 
   async function onImportDataClick() {
     return importHistoricalData()
-      .then(() => {
+      .then((imported) => {
+        if (!imported) {
+          return
+        }
         toast.success("import data successfully");
 
         onDataImported && onDataImported();

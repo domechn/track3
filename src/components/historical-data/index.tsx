@@ -171,7 +171,10 @@ const App = ({
   }
 
   async function onExportButtonClick() {
-    await exportHistoricalData();
+    const exported = await exportHistoricalData();
+    if (exported) {
+      toast.success("export data successfully");
+    }
   }
 
   return (

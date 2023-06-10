@@ -51,7 +51,7 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<
 	return assets
 }
 
-export async function exportHistoricalData() {
+export async function exportHistoricalData(): Promise<boolean> {
 	const filePath = await save({
 		filters: [
 			{
@@ -63,7 +63,7 @@ export async function exportHistoricalData() {
 	})
 
 	if (!filePath) {
-		return
+		return false
 	}
 
 	const data = await queryHistoricalData(-1)
@@ -73,9 +73,10 @@ export async function exportHistoricalData() {
 
 	// save to filePath
 	await writeTextFile(filePath, content)
+	return true
 }
 
-export async function importHistoricalData() {
+export async function importHistoricalData(): Promise<boolean> {
 	const selected = await open({
 		multiple: false,
 		filters: [{
@@ -85,7 +86,7 @@ export async function importHistoricalData() {
 		}]
 	})
 	if (!selected || !_(selected).isString()) {
-		return
+		return false
 	}
 	const contents = await readTextFile(selected as string)
 
@@ -120,7 +121,8 @@ export async function importHistoricalData() {
 	const insertSql = `INSERT INTO ${ASSETS_TABLE_NAME} (${keys.join(',')}) VALUES ${valuesArrayStr}`
 
 	const db = await getDatabase()
-	const executeValues = _(assets as AssetModel[]).sortBy(a => new Date(a.createdAt).getTime()).reverse().map(a => _(keys).map(k=>_(a).get(k)).value()).flatten().value()
-	
+	const executeValues = _(assets as AssetModel[]).sortBy(a => new Date(a.createdAt).getTime()).reverse().map(a => _(keys).map(k => _(a).get(k)).value()).flatten().value()
+
 	await db.execute(insertSql, executeValues)
+	return true
 }
