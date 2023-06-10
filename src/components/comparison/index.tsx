@@ -7,6 +7,8 @@ import {
 } from "../../middlelayers/charts";
 import _ from "lodash";
 import Select from "../common/select";
+import viewIcon from "../../assets/icons/view-icon.png";
+import hideIcon from "../../assets/icons/hide-icon.png";
 
 type ComparisonData = {
   name: string;
@@ -35,6 +37,8 @@ const App = () => {
   const [headData, setHeadData] = useState<CoinData[]>([]);
 
   const [data, setData] = useState<ComparisonData[]>([]);
+
+  const [showDetail, setShowDetail] = useState<boolean>(true);
 
   useEffect(() => {
     loadAllSelectDates().then((data) => {
@@ -92,6 +96,10 @@ const App = () => {
 
   function onHeadSelectChange(id: string) {
     setHeadId(id);
+  }
+
+  function onViewOrHideClick() {
+    setShowDetail(!showDetail);
   }
 
   function loadData(base: CoinData[], head: CoinData[]): ComparisonData[] {
@@ -158,11 +166,11 @@ const App = () => {
   async function loadDataById(id: string): Promise<CoinData[]> {
     // return queryCoinDataById(id);
     const data = await queryCoinDataById(id);
-    const reversedData = _(data).sortBy('value').reverse().value();
+    const reversedData = _(data).sortBy("value").reverse().value();
 
     // only take first 10, and group others into others
     const others = "Others";
-    const othersSymbols = _(reversedData).map('symbol').slice(10).value();
+    const othersSymbols = _(reversedData).map("symbol").slice(10).value();
     const othersData = _(data)
       .filter((d) => othersSymbols.includes(d.symbol))
       .value();
@@ -171,7 +179,7 @@ const App = () => {
       ..._(reversedData).take(10).value(),
       {
         symbol: others,
-        value: _(othersData).sumBy('value'),
+        value: _(othersData).sumBy("value"),
         amount: 0,
         price: 0,
       },
@@ -199,7 +207,10 @@ const App = () => {
     return prettyNumber(per, false) + "%";
   }
 
-  function prettyNumber(number: number, keepDecimal: boolean): string {
+  function prettyNumber(number: number, keepDecimal: boolean, showRealNumber = true): string {
+    if (!showRealNumber) {
+      return "***"
+    }
     if (!number) {
       return "-";
     }
@@ -214,7 +225,28 @@ const App = () => {
 
   return (
     <>
-      <h1>Comparison</h1>
+      <h1
+        style={{
+          display: "inline-block",
+        }}
+      >
+        Comparison
+      </h1>
+
+      <a
+        href="#"
+        style={{
+          marginLeft: 10,
+        }}
+        onClick={onViewOrHideClick}
+      >
+        <img
+          src={showDetail ? viewIcon : hideIcon}
+          alt="view-or-hide"
+          width={25}
+          height={25}
+        />
+      </a>
 
       <div id="comparison-container" className="comparison-container">
         <div className="comparison-date-picker">
@@ -280,7 +312,8 @@ const App = () => {
             <div className="comparison-column">
               {prettyNumber(
                 item.base,
-                item.name.includes("Amount") || item.name.includes("Price")
+                item.name.includes("Amount") || item.name.includes("Price"),
+                showDetail,
               )}
             </div>
             <div
@@ -300,7 +333,8 @@ const App = () => {
             <div className="comparison-column">
               {prettyNumber(
                 item.head,
-                item.name.includes("Amount") || item.name.includes("Price")
+                item.name.includes("Amount") || item.name.includes("Price"),
+                showDetail,
               )}
             </div>
           </div>
