@@ -162,8 +162,8 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 		return _(coinDataList)
 			.map(a => ({
 				timestamp: new Date(a.createdAt).getTime(),
-				value: (a.value - firstCoinValue) / firstCoinValue * 100 || 10 ** -21, // avoid divide by zero
-				price: (a.price - firstCoinPrice) / firstCoinPrice * 100 || 10 ** -21, // avoid divide by zero
+				value: (a.value - firstCoinValue) / firstCoinValue * 100,
+				price: (a.price - firstCoinPrice) / firstCoinPrice * 100,
 			}))
 			.value()
 

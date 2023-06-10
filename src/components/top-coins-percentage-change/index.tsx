@@ -66,7 +66,7 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
           : percentageData.price
       );
     });
-    return timestamps.map((date) => coinRankDataMap.get(date) || null);
+    return timestamps.map((date) => coinRankDataMap.get(date) ?? null);
   }
 
   function lineData() {
