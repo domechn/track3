@@ -21,6 +21,7 @@
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
     "tauri-plugin-sql-api": "https://github.com/tauri-apps/tauri-plugin-sql",
+    "uuid": "^9.0.0",
     "yaml": "^2.2.2"
   },
   "devDependencies": {
@@ -32,6 +33,7 @@
     "@types/node": "^18.7.10",
     "@types/react": "^18.0.15",
     "@types/react-dom": "^18.0.6",
+    "@types/uuid": "^9.0.2",
     "@types/yaml": "^1.9.7",
     "@vitejs/plugin-react": "^2.0.0",
     "node-fetch": "^3.3.1",

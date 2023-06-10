@@ -5,7 +5,6 @@ import {
   getConfiguration,
   saveConfiguration,
 } from "../../middlelayers/configuration";
-import Loading from "../common/loading";
 import { toast } from "react-hot-toast";
 import yaml from "yaml";
 import deleteIcon from "../../assets/icons/delete-icon.png";

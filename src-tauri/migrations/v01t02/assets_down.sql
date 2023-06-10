@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS assets_bak AS SELECT * FROM assets;
+DROP TABLE IF EXISTS assets;

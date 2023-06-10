@@ -1,5 +1,5 @@
 use magic_crypt::{new_magic_crypt, MagicCrypt256, MagicCryptTrait};
-use rand::{Rng};
+use rand::Rng;
 
 pub struct Ent {
     salt: String,
@@ -51,7 +51,6 @@ impl Ent {
         // push iv as string to the beginning of data
         let mut iv_data = iv.clone();
         iv_data.push_str(data.as_str());
-        
 
         // add salt to data
         let mut data_with_salt = iv_data.clone();
@@ -86,7 +85,6 @@ impl Ent {
         // remove iv from data
         let mut data = data.clone();
         data.replace_range(0..16, "");
-
 
         // decrypt
 

@@ -16,7 +16,6 @@ import HistoricalData from "../historical-data";
 import Overview from "../overview";
 import Comparison from "../comparison";
 import "./index.css";
-import { SelectOption } from "../common/select";
 import menuIcon from "../../assets/icons/menu-icon.png";
 
 import {

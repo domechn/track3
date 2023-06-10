@@ -1,6 +1,6 @@
 import { useContext, useState } from "react";
 import {
-  deleteHistoricalDataById,
+  deleteHistoricalDataByUUID,
   queryHistoricalData,
 } from "../../middlelayers/charts";
 import { HistoricalData } from "../../middlelayers/types";
@@ -30,7 +30,7 @@ type RankData = {
 const App = ({
   afterDataDeleted,
 }: {
-  afterDataDeleted: (id: number) => unknown;
+  afterDataDeleted: (id: string) => unknown;
 }) => {
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
@@ -47,7 +47,7 @@ const App = ({
       dataIndex: "id",
       key: "operations",
       render: (id: number | string) => (
-        <a href="#" onClick={() => onDeleteClick(id as number)}>
+        <a href="#" onClick={() => onDeleteClick(id as string)}>
           <img
             src={deleteIcon}
             alt="delete"
@@ -117,7 +117,7 @@ const App = ({
 
   function loadAllData() {
     setLoading(true);
-    queryHistoricalData()
+    queryHistoricalData(-1)
       .then((d) => setData(d))
       .finally(() => setLoading(false));
   }
@@ -128,13 +128,15 @@ const App = ({
     setRankData([]);
   }
 
-  function onDeleteClick(id: number) {
+  function onDeleteClick(id: string) {
     setLoading(true);
-    deleteHistoricalDataById(id)
+    deleteHistoricalDataByUUID(id)
       .then(() => {
         toast.success("Record deleted");
         loadAllData();
         afterDataDeleted(id);
+        // hide rank data when some data is deleted
+        setRankData([]);
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
@@ -146,46 +148,21 @@ const App = ({
       return;
     }
 
-    const rankData = _([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-      .map((i) => {
-        const idxStr = i.toString().padStart(2, "0");
-
-        const top = _(d).get(`top${idxStr}`) as string | undefined;
-        const amount = _(d).get(`amount${idxStr}`) as number | undefined;
-        const value = _(d).get(`value${idxStr}`) as number | undefined;
-
-        if (!top || !amount || !value) {
-          return;
-        }
-
-        return {
-          id: i,
-          rank: i,
-          symbol: top,
-          amount: amount.toFixed(5),
-          value: +value.toFixed(4),
-          price: (value / amount).toFixed(4),
-        } as RankData;
-      })
-      .compact()
-      .value();
-
-    // others
-    const top = _(d).get("topOthers") as string | undefined;
-    const value = _(d).get("valueOthers") as number | undefined;
-
-    if (top && value) {
-      rankData.push({
-        id: 11,
-        rank: 11,
-        symbol: top,
-        amount: "N/A",
-        value: value,
-        price: "N/A",
-      });
-    }
-
-    setRankData(rankData);
+    const revAssets = _(d.assets).sortBy("value").reverse().value();
+    setRankData(
+      _(d.assets)
+        .map((asset, idx) => ({
+          id: idx,
+          rank: _(revAssets).findIndex((a) => a.symbol === asset.symbol) + 1,
+          amount: asset.amount,
+          symbol: asset.symbol,
+          value: asset.value,
+          price: asset.price,
+        }))
+        .filter((d) => d.value > 1) // ignore value less than 1 dollar
+        .sortBy("rank")
+        .value()
+    );
   }
 
   function getLeftPosition() {

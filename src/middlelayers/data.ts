@@ -9,7 +9,7 @@ import { SOLAnalyzer } from './datafetch/coins/sol'
 import { ERC20Analyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
 import { CacheCenter } from './datafetch/utils/cache'
-import { queryHistoricalData } from './charts'
+import { ASSETS_TABLE_NAME, queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
@@ -27,7 +27,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<C
 
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<Coin[]> {
 	const anas = [ERC20Analyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
-	// const anas = [OthersAnalyzer]
+	// const anas = [ DOGEAnalyzer,OthersAnalyzer]
 	const coinLists = await bluebird.map(anas, async ana => {
 
 		const a = new ana(config)
@@ -89,13 +89,18 @@ export async function importHistoricalData() {
 	}
 	const contents = await readTextFile(selected as string)
 
-	const { historicalData: assets } = JSON.parse(contents) as { historicalData: any[] }
+	const { historicalData } = JSON.parse(contents) as { historicalData: any[] }
 
-	if (!assets || !_(assets).isArray() || assets.length === 0) {
+	if (!historicalData || !_(historicalData).isArray() || historicalData.length === 0) {
 		throw new Error("invalid data: errorCode 001")
 	}
 
-	const requiredKeys = ["createdAt", "top01", "amount01", "value01", "top02", "amount02", "value02", "top03", "amount03", "value03", "top04", "amount04", "value04", "top05", "amount05", "value05", "top06", "amount06", "value06", "top07", "amount07", "value07", "top08", "amount08", "value08", "top09", "amount09", "value09", "top10", "amount10", "value10", "topOthers", "amountOthers", "valueOthers", "total"]
+	const assets = _(historicalData).map('assets').flatten().value()
+
+	if (assets.length === 0) {
+		throw new Error("no data need to be imported: errorCode 003")
+	}
+	const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
 
 	_(assets).forEach((asset) => {
 		_(requiredKeys).forEach(k => {
@@ -105,13 +110,17 @@ export async function importHistoricalData() {
 		})
 	})
 
+	// remove if there are id file in keys
+	const keys = _(Object.keys(assets[0])).filter(k => k !== "id").value()
 
-	const values = "(" + Object.keys(assets[0]).map(() => '?').join(',') + ")"
+	const values = "(" + keys.map(() => '?').join(',') + ")"
 
 	const valuesArrayStr = new Array(assets.length).fill(values).join(',')
 
-	const insertSql = `INSERT INTO assets (${Object.keys(assets[0]).join(',')}) VALUES ${valuesArrayStr}`
+	const insertSql = `INSERT INTO ${ASSETS_TABLE_NAME} (${keys.join(',')}) VALUES ${valuesArrayStr}`
 
 	const db = await getDatabase()
-	await db.execute(insertSql, _(assets as AssetModel[]).map(a => _(a).values().value()).flatten().value())
+	const executeValues = _(assets as AssetModel[]).sortBy(a => new Date(a.createdAt).getTime()).reverse().map(a => _(keys).map(k=>_(a).get(k)).value()).flatten().value()
+	
+	await db.execute(insertSql, executeValues)
 }

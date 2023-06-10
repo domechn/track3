@@ -25,6 +25,7 @@ tokio = { version = "1", features = ["sync"] }
 rand = "^0.3"
 lazy_static = "^1.4"
 magic-crypt = "3.1.12"
+uuid = "1.3.3"
 
 [features]
 # by default Tauri runs in production mode
@@ -35,6 +36,6 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies.tauri-plugin-sql]
-branch = "dev"
+branch = "v1"
 features = ["sqlite"] # or "postgres", or "mysql"
 git = "https://github.com/tauri-apps/plugins-workspace"
