@@ -135,6 +135,8 @@ const App = ({
         toast.success("Record deleted");
         loadAllData();
         afterDataDeleted(id);
+        // hide rank data when some data is deleted
+        setRankData([]);
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
