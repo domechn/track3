@@ -23,6 +23,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [verificationCode, setVerificationCode] = useState<string>("");
   const [isLogin, setIsLogin] = useState<boolean>(false);
   const [publicKey, setPublicKey] = useState<string>("");
+  const [loginEmail, setLoginEmail] = useState<string>("");
   const sendVerifyCodeRef = useRef<HTMLButtonElement>(null);
   const signInRef = useRef<HTMLButtonElement>(null);
   const { setLoading } = useContext(LoadingContext);
@@ -33,9 +34,8 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       if (!authState) {
         return;
       }
-      if (authState.publicKey) {
-        setPublicKey(authState.publicKey);
-      }
+      setPublicKey(authState.publicKey);
+      setLoginEmail(authState.email);
     });
   }, []);
 
@@ -158,16 +158,19 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       <div>
         <h3>Cloud Data Sync {!isLogin && "( Need Login )"}</h3>
         {isLogin ? (
-          <button
-            style={{
-              marginTop: 0,
-              backgroundColor: "#FF4500",
-              color: "white",
-            }}
-            onClick={onSignClick}
-          >
-            Sign Out
-          </button>
+          <div>
+            <h4>User: {loginEmail}</h4>
+            <button
+              style={{
+                marginTop: 0,
+                backgroundColor: "#FF4500",
+                color: "white",
+              }}
+              onClick={onSignClick}
+            >
+              Sign Out
+            </button>
+          </div>
         ) : (
           <div>
             <div>
@@ -212,7 +215,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
       {isLogin && (
         <div>
-          <button onClick={syncDataBetweenCloudAndLocal}>Sync Data ( Beta )</button>
+          <button onClick={syncDataBetweenCloudAndLocal}>
+            Sync Data ( Beta )
+          </button>
         </div>
       )}
 
