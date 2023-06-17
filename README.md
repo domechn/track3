@@ -8,6 +8,7 @@ Show your crypto currency assets in centralized exchanges and web3 wallets.
 2. Support Binance and OKX.
 3. Support BTC, SOL, Doge and all ERC20 Tokens.
 4. Render a visual chart of asset changes or the proportion of each asset.
+5. Support Cloud Sync, users can sync their data to cloud and restore it on another device.
 
 ## Installation
 
@@ -18,6 +19,14 @@ Show your crypto currency assets in centralized exchanges and web3 wallets.
 ![sc1](./images/demo/sc1.png)
 ![sc2](./images/demo/sc2.png)
 ![sc3](./images/demo/sc3.png)
+
+## Cloud Sync
+
+Track3 use [Polybase](https://polybase.xyz/) to sync data. Polybase is a decentralized database powered by zero knowledge proofs, with attributes of a blockchain and the speed & privacy of a database.
+
+### Notice
+
+**All your data is private, only you can access it. And track3 will never sync your configurations into cloud, they are always stored locally with encryption. So your wallet addresses and api keys are totally safe.**
 
 ## Known Issues
 
