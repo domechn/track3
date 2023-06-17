@@ -8,6 +8,24 @@ export type AssetModel = {
 	price: number
 }
 
+export type CloudAssetModel = {
+	id: string
+
+	owner: CloudUser
+
+	uuid: string
+
+	// json stringify from AssetModel[]
+	records: string
+
+	createdAt: number
+}
+
+export type CloudUser = {
+	id: string
+	publicKey: string
+}
+
 export type ConfigurationModel = {
 	id: number
 	data: string

@@ -31,6 +31,8 @@ pub fn init_resources(app_dir: &Path, resource_dir: &Path) {
         fs::read_to_string(resource_dir.join("migrations/init/configuration_up.sql")).unwrap();
     let assets_v2 =
         fs::read_to_string(resource_dir.join("migrations/init/assets_v2_up.sql")).unwrap();
+    let cloud_sync =
+        fs::read_to_string(resource_dir.join("migrations/init/cloud_sync_up.sql")).unwrap();
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
@@ -38,6 +40,7 @@ pub fn init_resources(app_dir: &Path, resource_dir: &Path) {
         let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
         conn.execute(configuration.as_str()).await.unwrap();
         conn.execute(assets_v2.as_str()).await.unwrap();
+        conn.execute(cloud_sync.as_str()).await.unwrap();
         conn.close().await.unwrap();
         println!("init resources in tokio spawn done");
     });

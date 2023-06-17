@@ -64,6 +64,13 @@ async function queryAssets(size = 1): Promise<AssetModel[][]> {
 	return _(assets).groupBy("createdAt").values().value()
 }
 
+export async function queryAssetsAfterCreatedAt(createdAt?: number): Promise<AssetModel[]> {
+	const db = await getDatabase()
+	const ts = createdAt ? new Date(createdAt).toISOString() : new Date(0).toISOString()
+	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE createdAt >= ?`, [ts])
+	return assets
+}
+
 async function queryAssetByUUID(id: string): Promise<AssetModel[]> {
 	const db = await getDatabase()
 	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE uuid = ?`, [id])
@@ -216,7 +223,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	const sortedLatest = _(latest).sortBy('value').reverse().value()
 	const top10 = _(sortedLatest).take(10).value()
 	const others = _(sortedLatest).drop(10).value()
-	
+
 	const res: { coin: string, percentage: number }[] = []
 
 	_(top10).forEach(t => {
@@ -304,12 +311,12 @@ export async function queryCoinDataById(id: string): Promise<CoinData[]> {
 	const models = await queryAssetByUUID(id)
 
 	const res: CoinData[] = _(models)
-	.map(m=>({
-		symbol: m.symbol,
-		amount: m.amount,
-		value: m.value,
-		price: m.price
-	})).value()
+		.map(m => ({
+			symbol: m.symbol,
+			amount: m.amount,
+			value: m.value,
+			price: m.price
+		})).value()
 	return res
 }
 

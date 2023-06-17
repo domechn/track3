@@ -51,13 +51,14 @@
 }
 
 .configuration .add-button:hover{
-  background-color: #007bff;
+  background-color: #0062cc;
 }
 
 .configuration button {
   cursor: pointer;
   border: 0;
   color: white;
+  background-color: #007bff;
   border-radius: 5px;
   font-size: 0.8em;
 }

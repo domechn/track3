@@ -25,3 +25,4 @@ dist-ssr
 .vscode/
 
 .local/
+src-tauri/configs/polybase.namespace
