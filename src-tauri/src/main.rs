@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 
 use tauri::Manager;
 use track3::{
@@ -137,6 +137,22 @@ async fn close_debank_window(handle: tauri::AppHandle) {
     }
 }
 
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+async fn get_polybase_namespace(handle: tauri::AppHandle) -> Result<String, String>{
+    let ns = fs::read_to_string(
+    handle.path_resolver().resource_dir().unwrap().as_path().join("configs/polybase.namespace")
+    );
+
+    match ns {
+        Ok(ns) => Ok(ns),
+        Err(e) => Err(format!("get polybase namespace error: {:?}", e)),
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -163,6 +179,7 @@ fn main() {
             decrypt,
             open_debank_window_in_background,
             close_debank_window,
+            get_polybase_namespace,
         ])
         .plugin(tauri_plugin_sql::Builder::default().build())
         .run(tauri::generate_context!())

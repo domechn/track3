@@ -1,0 +1,31 @@
+collection Record {
+	id: string;
+
+    @read
+    @delegate
+	owner: User;
+  
+    @read
+    @delegate
+    uuid: string;
+
+    @read
+    @delegate
+    records: string;
+
+    @read
+    @delegate
+    createdAt: number;
+
+    
+	constructor (id: string, owner: User, uuid: string, records: string, createdAt: number) {
+	  this.id = id;
+	  
+	  this.owner = owner;
+      
+      this.uuid = uuid;
+      this.records = records;
+      this.createdAt = createdAt;
+	}
+
+}

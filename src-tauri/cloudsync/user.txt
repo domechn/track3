@@ -1,0 +1,17 @@
+collection User {
+	id: string;
+
+    @delegate
+    @read
+	publicKey: PublicKey;
+
+	constructor () {
+      if (!ctx.publicKey) {
+        error("you must sign the txn");
+      }
+	  this.id = ctx.publicKey.toHex();
+	  
+	  this.publicKey = ctx.publicKey;
+      
+	}
+}

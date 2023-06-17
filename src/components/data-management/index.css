@@ -15,5 +15,15 @@
 }
 
 .dataManagement button:active {
-  background-color:  #a1a1a1;
+  background-color: #a1a1a1;
+}
+
+.dataManagement input {
+  width: 300px;
+  height: 30px;
+  margin-top: 20px;
+  text-indent: 10px;
+  border-radius: 5px;
+  border: none;
+  font-size: large;
 }

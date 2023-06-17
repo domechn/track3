@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "track3",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "tauri": {
     "allowlist": {
@@ -56,9 +56,7 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [
-        "migrations/**/*"
-      ],
+      "resources": ["migrations/**/*", "configs/**/*"],
       "shortDescription": "",
       "targets": "all",
       "windows": {
@@ -67,9 +65,7 @@
         "timestampUrl": ""
       }
     },
-    "security": {
-      "csp": null
-    },
+    "security": {},
     "updater": {
       "active": true,
       "endpoints": [
