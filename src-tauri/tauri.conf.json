@@ -56,10 +56,7 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [
-        "migrations/**/*",
-        "configs/**/*"
-      ],
+      "resources": ["migrations/**/*", "configs/**/*"],
       "shortDescription": "",
       "targets": "all",
       "windows": {
@@ -68,10 +65,7 @@
         "timestampUrl": ""
       }
     },
-    "security": {
-      "csp": "",
-      "devCsp": ""
-    },
+    "security": {},
     "updater": {
       "active": true,
       "endpoints": [

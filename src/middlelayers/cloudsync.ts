@@ -20,11 +20,6 @@ type AuthState = {
 
 let db: Polybase | undefined
 
-invoke("get_polybase_namespace").then((ns) => {
-	console.log("polybase namespace", ns);
-})
-	
-
 async function getPolybaseDB(): Promise<Polybase> {
 	if (db) {
 		return db
