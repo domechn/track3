@@ -7,7 +7,6 @@ import _ from 'lodash'
 import Database from 'tauri-plugin-sql-api'
 import { getCurrentUA } from './datafetch/utils/http'
 import { Body, getClient } from '@tauri-apps/api/http'
-import Cookies from 'js-cookie'
 import bluebird from 'bluebird'
 import { invoke } from '@tauri-apps/api'
 
@@ -98,7 +97,7 @@ export async function signIn(email: string, code: string): Promise<string> {
 	}
 
 	// set token to cookies by js-cookie
-	Cookies.set(tokenPath, resp.token)
+	window.localStorage.setItem(tokenPath, resp.token)
 	updateAuthState(authState)
 
 	await createUserIfNotExists(resp.publicKey)
@@ -108,16 +107,16 @@ export async function signIn(email: string, code: string): Promise<string> {
 
 function updateAuthState(authState?: AuthState) {
 	if (!authState) {
-		Cookies.remove(authPath)
+		window.localStorage.removeItem(tokenPath)
 		executeAuthStateUpdateCallbacks()
 		return
 	}
-	Cookies.set(authPath, JSON.stringify(authState))
+	window.localStorage.setItem(authPath, JSON.stringify(authState))
 	executeAuthStateUpdateCallbacks(authState)
 }
 
 function getToken(): string {
-	const t = Cookies.get(tokenPath)
+	const t = window.localStorage.getItem(tokenPath)
 	if (!t) {
 		throw new Error("not login")
 	}
@@ -133,7 +132,7 @@ async function ethPersonalSign(msg: string): Promise<string> {
 
 export function onAuthStateUpdate(callback: (authState?: AuthState) => void) {
 	// trigger callback immediately
-	const c = Cookies.get(authPath)
+	const c = window.localStorage.getItem(authPath)
 	if (c) {
 		const as = JSON.parse(c) as AuthState
 		callback(as)
@@ -151,7 +150,7 @@ function executeAuthStateUpdateCallbacks(authState?: AuthState) {
 
 export async function signOut() {
 	updateAuthState()
-	Cookies.remove(tokenPath)
+	window.localStorage.removeItem(tokenPath)
 }
 
 async function createUserIfNotExists(publicKey: string) {
@@ -166,7 +165,7 @@ async function createUserIfNotExists(publicKey: string) {
 }
 
 export async function getPublicKey() {
-	const authString = Cookies.get(authPath)
+	const authString = window.localStorage.getItem(authPath)
 	if (!authString) {
 		throw new Error("not login")
 	}
