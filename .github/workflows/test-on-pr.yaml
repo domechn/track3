@@ -11,6 +11,9 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v3
+      - name: replace polybase namespace
+        run: |
+          mkdir -p src-tauri/configs
       - name: setup node
         uses: actions/setup-node@v3
         with:
