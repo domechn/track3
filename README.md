@@ -6,7 +6,7 @@
 
 <div align="center">
 
-### Show your crypto currency assets both in centralized exchanges and web3 wallets.
+### Analyze your crypto assets on centralized exchanges and web3 wallets
 
 [![author][author-image]][author-url]
 [![license][license-image]][license-url]
