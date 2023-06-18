@@ -31,6 +31,10 @@ export type ConfigurationModel = {
 	data: string
 }
 
+export type CloudSyncConfiguration = {
+	enableAutoSync: boolean
+}
+
 
 export type TopCoinsRankData = {
 	timestamps: number[]

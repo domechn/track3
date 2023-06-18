@@ -94,8 +94,17 @@ h1 {
   border-right: none; /* Prevent double borders */
 }
 
-
 .button-group button.active {
   background-color: #007bff;
   color: white;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
 }

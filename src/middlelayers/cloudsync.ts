@@ -2,13 +2,15 @@ import { Polybase } from '@polybase/client'
 import { getDatabase } from './database'
 import { v4 as uuidv4 } from 'uuid'
 import { ASSETS_TABLE_NAME, queryAssetsAfterCreatedAt } from './charts'
-import { AssetModel, CloudAssetModel } from './types'
+import { AssetModel, CloudAssetModel, CloudSyncConfiguration } from './types'
+import { getCloudSyncConfiguration as getCloudSyncConfigurationModel, saveCloudSyncConfiguration as saveCloudSyncConfigurationModel } from './configuration'
 import _ from 'lodash'
 import Database from 'tauri-plugin-sql-api'
 import { getCurrentUA } from './datafetch/utils/http'
 import { Body, getClient } from '@tauri-apps/api/http'
 import bluebird from 'bluebird'
 import { invoke } from '@tauri-apps/api'
+import YAML from 'yaml'
 
 type AuthState = {
 	type: 'email',
@@ -72,10 +74,6 @@ export async function getLocalLastSyncTime(publicKey: string): Promise<number | 
 	return new Date(syncRecords[0].updatedAt).getTime()
 }
 
-export async function getCloudLastSyncTime(publicKey: string): Promise<number | undefined> {
-	return undefined
-}
-
 export async function sendVerifyCode(email: string): Promise<void> {
 	await sendPostRequest('/api/email/code', {
 		email
@@ -107,7 +105,7 @@ export async function signIn(email: string, code: string): Promise<string> {
 
 function updateAuthState(authState?: AuthState) {
 	if (!authState) {
-		window.localStorage.removeItem(tokenPath)
+		window.localStorage.removeItem(authPath)
 		executeAuthStateUpdateCallbacks()
 		return
 	}
@@ -178,6 +176,7 @@ async function dumpAssetsFromCloudAfterCreatedAt(createdAt?: number): Promise<As
 	const p = await getPolybaseDB()
 	// filter assets > createdAt from cloud, if createdAt is not provided, get all assets
 	const records = await p.collection<CloudAssetModel>(RECORD_COLLECTION_NAME).where("createdAt", ">=", createdAt || 0).sort("createdAt", "desc").get()
+	
 	const needSyncedAssets = _(records.data).
 		map('data').
 		map(record => record.records ? JSON.parse(record.records) as AssetModel[] : []).
@@ -227,6 +226,8 @@ export async function syncAssetsToCloudAndLocal(publicKey: string, createdAt?: n
 	const needSyncedAssetsToDB = _(cloudAssets).differenceBy(localAssets, 'uuid').value()
 	if (needSyncedAssetsToDB.length > 0) {
 		// write data to local
+		console.log('needSyncedAssetsToDB', needSyncedAssetsToDB);
+		
 		synced += await writeAssetsToDB(d, needSyncedAssetsToDB)
 	}
 
@@ -298,4 +299,48 @@ async function sendPostRequest<T>(path: string, body: object, token?: string): P
 	}
 
 	return resp.data
+}
+
+export async function getCloudSyncConfiguration(): Promise<CloudSyncConfiguration> {
+
+	const model = await getCloudSyncConfigurationModel()
+	if (!model) {
+		return {
+			enableAutoSync: false,
+		}
+	}
+
+
+	return YAML.parse(model.data)
+}
+
+export async function saveCloudSyncConfiguration(cfg: CloudSyncConfiguration) {
+	return saveCloudSyncConfigurationModel(cfg)
+}
+
+export async function autoSyncData(force=false) {
+	const cfg = await getCloudSyncConfiguration()
+	if (!cfg.enableAutoSync) {
+		console.debug("auto sync is disabled")
+		return
+	}
+
+	try {
+		const publicKey = await getPublicKey()
+		const lastSyncTime = await getLocalLastSyncTime(publicKey)
+		// if last sync time is less than 1 day, skip sync
+		if (!force && lastSyncTime && new Date().getTime() - new Date(lastSyncTime).getTime() < 24 * 60 * 60 * 1000) {
+			console.debug("last sync time is less than 1 day, skip sync")
+			return
+		}
+
+		const synced = await syncAssetsToCloudAndLocal(publicKey, lastSyncTime)
+		console.log(`synced ${synced} records`)
+		return synced
+	} catch (e) {
+		if (e instanceof Error && e.message === "not login") {
+			return
+		}
+		throw e
+	}
 }
