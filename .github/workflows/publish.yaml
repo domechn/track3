@@ -19,7 +19,7 @@ jobs:
       - name: replace polybase namespace
         run: |
           mkdir -p src-tauri/configs
-          echo ${{ secrets.POLYBASE_NAMESPACE }} > src-tauri/configs/polybase.namespace
+          echo -n "${{ secrets.POLYBASE_NAMESPACE }}" > src-tauri/configs/polybase.namespace
       - name: setup node
         uses: actions/setup-node@v3
         with:
