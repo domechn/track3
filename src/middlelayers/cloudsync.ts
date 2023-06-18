@@ -153,13 +153,21 @@ export async function signOut() {
 
 async function createUserIfNotExists(publicKey: string) {
 	const p = await getPolybaseDB()
-	let user = await p.collection(USER_COLLECTION_NAME).record(publicKey).get()
+	try {
+		let user = await p.collection(USER_COLLECTION_NAME).record(publicKey).get()
 
-	if (!user.exists()) {
-		user = await p.collection(USER_COLLECTION_NAME).create([])
+		if (!user.exists()) {
+			user = await p.collection(USER_COLLECTION_NAME).create([])
+		}
+		return user
+	} catch (e) {
+		if (e instanceof Error) {
+			if (e.message.includes("not-found")) {
+				return await p.collection(USER_COLLECTION_NAME).create([])
+			}
+		}
+		throw e
 	}
-
-	return user
 }
 
 export async function getPublicKey() {
@@ -176,7 +184,7 @@ async function dumpAssetsFromCloudAfterCreatedAt(createdAt?: number): Promise<As
 	const p = await getPolybaseDB()
 	// filter assets > createdAt from cloud, if createdAt is not provided, get all assets
 	const records = await p.collection<CloudAssetModel>(RECORD_COLLECTION_NAME).where("createdAt", ">=", createdAt || 0).sort("createdAt", "desc").get()
-	
+
 	const needSyncedAssets = _(records.data).
 		map('data').
 		map(record => record.records ? JSON.parse(record.records) as AssetModel[] : []).
@@ -226,8 +234,8 @@ export async function syncAssetsToCloudAndLocal(publicKey: string, createdAt?: n
 	const needSyncedAssetsToDB = _(cloudAssets).differenceBy(localAssets, 'uuid').value()
 	if (needSyncedAssetsToDB.length > 0) {
 		// write data to local
-		console.log('needSyncedAssetsToDB', needSyncedAssetsToDB);
-		
+		console.log('needSyncedAssetsToDB', needSyncedAssetsToDB)
+
 		synced += await writeAssetsToDB(d, needSyncedAssetsToDB)
 	}
 
@@ -302,7 +310,6 @@ async function sendPostRequest<T>(path: string, body: object, token?: string): P
 }
 
 export async function getCloudSyncConfiguration(): Promise<CloudSyncConfiguration> {
-
 	const model = await getCloudSyncConfigurationModel()
 	if (!model) {
 		return {
@@ -318,7 +325,7 @@ export async function saveCloudSyncConfiguration(cfg: CloudSyncConfiguration) {
 	return saveCloudSyncConfigurationModel(cfg)
 }
 
-export async function autoSyncData(force=false) {
+export async function autoSyncData(force = false) {
 	const cfg = await getCloudSyncConfiguration()
 	if (!cfg.enableAutoSync) {
 		console.debug("auto sync is disabled")
