@@ -198,10 +198,18 @@ const App = ({
     <div className="dataManagement">
       <h2>Data Center</h2>
       <div>
-        <h3>Cloud Data Sync {!isLogin && "( Need Login )"}</h3>
+        <h3 style={{
+          marginBottom: 0,
+        }}>Cloud Data Sync {!isLogin && "( Need Login )"}</h3>
+        <sub style={{
+          color: "gray",
+        }}>Powered by polybase.xyz</sub>
         {isLogin ? (
           <div>
-            <h4>User: {loginEmail}</h4>
+            <h4 style={{
+              marginTop: 5,
+              marginBottom: 5,
+            }}>User: {loginEmail}</h4>
             <button
               style={{
                 marginTop: 0,
