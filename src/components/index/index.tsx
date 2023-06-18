@@ -88,6 +88,8 @@ const App = () => {
 
   useEffect(() => {
     loadQuerySize();
+
+    autoSyncData();
   }, []);
 
   useEffect(() => {
