@@ -29,7 +29,7 @@ class DeBank429ErrorResolverImpl implements DeBank429ErrorResolver {
 	}
 
 	isTried(): boolean {
-		console.debut("isTried", this.tried)
+		console.debug("isTried", this.tried)
 
 		return this.tried
 	}
