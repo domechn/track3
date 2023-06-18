@@ -142,13 +142,19 @@ async fn close_debank_window(handle: tauri::AppHandle) {
     windows_subsystem = "windows"
 )]
 #[tauri::command]
-async fn get_polybase_namespace(handle: tauri::AppHandle) -> Result<String, String>{
+async fn get_polybase_namespace(handle: tauri::AppHandle) -> Result<String, String> {
     let ns = fs::read_to_string(
-    handle.path_resolver().resource_dir().unwrap().as_path().join("configs/polybase.namespace")
+        handle
+            .path_resolver()
+            .resource_dir()
+            .unwrap()
+            .as_path()
+            .join("configs/polybase.namespace"),
     );
 
     match ns {
-        Ok(ns) => Ok(ns),
+        // remove \n
+        Ok(ns) => Ok(ns.replace("\n", "")),
         Err(e) => Err(format!("get polybase namespace error: {:?}", e)),
     }
 }

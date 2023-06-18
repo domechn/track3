@@ -269,7 +269,7 @@ async function writeAssetsToCloud(publicKey: string, assets: AssetModel[]): Prom
 async function writeAssetsToDB(d: Database, assets: AssetModel[]): Promise<number> {
 	const insertValuesStr = assets.map(() => `(?, ?, ?, ?, ?, ?)`).join(", ")
 
-	const res = await d.execute(`INSERT INTO ${ASSETS_TABLE_NAME} (uuid, createdAt, symbol, amount, value, price) VALUES ${insertValuesStr}`, _(assets).map((asset) => [
+	await d.execute(`INSERT INTO ${ASSETS_TABLE_NAME} (uuid, createdAt, symbol, amount, value, price) VALUES ${insertValuesStr}`, _(assets).map((asset) => [
 		asset.uuid,
 		asset.createdAt,
 		asset.symbol,
@@ -278,7 +278,7 @@ async function writeAssetsToDB(d: Database, assets: AssetModel[]): Promise<numbe
 		asset.price,
 	]).flatten().value())
 
-	return res.rowsAffected
+	return assets.length
 }
 
 async function updateLastSyncTime(d: Database, publicKey: string) {
