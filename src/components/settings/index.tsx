@@ -13,9 +13,11 @@ import "./index.css";
 const App = ({
   onConfigurationSave,
   onDataImported,
+  onDataSynced,
 }: {
   onConfigurationSave?: () => void;
   onDataImported?: () => void;
+  onDataSynced?: () => void;
 }) => {
   const [version, setVersion] = useState<string>("0.1.0");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -91,6 +93,10 @@ const App = ({
     onDataImported && onDataImported();
   }
 
+  function _onDataSynced() {
+    onDataSynced && onDataSynced();
+  }
+
   function renderMenu() {
     return (
       <>
@@ -119,7 +125,10 @@ const App = ({
               display: "none",
             }}
           >
-            <DataManagement onDataImported={_onDataImported} />
+            <DataManagement
+              onDataImported={_onDataImported}
+              onDataSynced={_onDataSynced}
+            />
           </div>
         </div>
       </>

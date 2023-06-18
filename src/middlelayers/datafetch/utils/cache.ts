@@ -38,7 +38,7 @@ export class CacheCenter {
 	}
 
 	public clearCache() {
-		console.log("clear cache");
+		console.debug("clear cache");
 		
 		this.cache.clear()
 	}

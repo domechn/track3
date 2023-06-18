@@ -8,17 +8,26 @@ import { useContext, useEffect, useRef, useState } from "react";
 
 import _ from "lodash";
 import {
+  getCloudSyncConfiguration,
   getLocalLastSyncTime,
   getPublicKey,
   onAuthStateUpdate,
+  saveCloudSyncConfiguration,
   sendVerifyCode,
   signIn,
   signOut,
   syncAssetsToCloudAndLocal,
 } from "../../middlelayers/cloudsync";
 import { LoadingContext } from "../../App";
+import { timestampToDate } from "../../utils/date";
 
-const App = ({ onDataImported }: { onDataImported?: () => void }) => {
+const App = ({
+  onDataImported,
+  onDataSynced,
+}: {
+  onDataImported?: () => void;
+  onDataSynced?: () => void;
+}) => {
   const [email, setEmail] = useState<string>("");
   const [verificationCode, setVerificationCode] = useState<string>("");
   const [isLogin, setIsLogin] = useState<boolean>(false);
@@ -27,6 +36,8 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const sendVerifyCodeRef = useRef<HTMLButtonElement>(null);
   const signInRef = useRef<HTMLButtonElement>(null);
   const { setLoading } = useContext(LoadingContext);
+  const [lastSyncAt, setLastSyncAt] = useState<number>(0);
+  const [enableAutoSync, setEnableAutoSync] = useState<boolean>(false);
 
   useEffect(() => {
     onAuthStateUpdate((authState) => {
@@ -37,7 +48,21 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       setPublicKey(authState.publicKey);
       setLoginEmail(authState.email);
     });
+
+    getCloudSyncConfiguration().then((config) => {
+      setEnableAutoSync(config.enableAutoSync);
+    })
   }, []);
+
+  useEffect(() => {
+    updateLastSyncAt();
+  }, [publicKey]);
+
+  useEffect(() => {
+    saveCloudSyncConfiguration({
+      enableAutoSync,
+    })
+  }, [enableAutoSync]);
 
   async function syncDataBetweenCloudAndLocal() {
     setLoading(true);
@@ -48,14 +73,26 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
       const updated = await syncAssetsToCloudAndLocal(pk, lastSyncAt);
       if (updated) {
-        toast.success("sync data successfully");
+        toast.success("data is synced successfully");
       } else {
-        toast.success("no data need to sync");
+        toast.success("no data need to be synced");
       }
+
+      // update lastSyncAt
+      await updateLastSyncAt();
+      // callback
+      onDataSynced && onDataSynced();
     } catch (e: any) {
       toast.error(e.message || e);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function updateLastSyncAt() {
+    if (publicKey) {
+      const lst = await getLocalLastSyncTime(publicKey);
+      setLastSyncAt(lst || 0);
     }
   }
 
@@ -103,6 +140,11 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         }
       }
     } catch (e: any) {
+      const msg = e.message || e;
+      if (msg.includes("400")) {
+        toast.error("invalid verification code");
+        return
+      }
       toast.error(e.message || e);
     } finally {
       setLoading(false);
@@ -188,6 +230,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value)}
                 placeholder="code"
+                type='number'
                 style={{
                   width: "130px",
                 }}
@@ -215,7 +258,41 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
       {isLogin && (
         <div>
-          <button onClick={syncDataBetweenCloudAndLocal}>
+          <h4
+            style={{
+              marginBottom: 10,
+            }}
+          >
+            Last Sync At:{" "}
+            {lastSyncAt ? timestampToDate(lastSyncAt, true) : "Never"}
+          </h4>
+          <div>
+            <input
+              style={{
+                width: 25,
+                height: 16,
+                marginTop: 0,
+                cursor: "pointer",
+              }}
+              type="checkbox"
+              name="enableAutoSync"
+              checked={enableAutoSync}
+              onChange={(e) => setEnableAutoSync(e.target.checked)}
+            />
+            <span
+              style={{
+                display: "inline-block",
+              }}
+            >
+              Enable AutoSync ( 24h )
+            </span>
+          </div>
+          <button
+            style={{
+              marginTop: 10,
+            }}
+            onClick={syncDataBetweenCloudAndLocal}
+          >
             Sync Data ( Beta )
           </button>
         </div>

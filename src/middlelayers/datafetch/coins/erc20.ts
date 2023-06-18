@@ -29,7 +29,7 @@ class DeBank429ErrorResolverImpl implements DeBank429ErrorResolver {
 	}
 
 	isTried(): boolean {
-		console.log("isTried", this.tried)
+		console.debut("isTried", this.tried)
 
 		return this.tried
 	}
@@ -43,7 +43,7 @@ class DeBank429ErrorResolverImpl implements DeBank429ErrorResolver {
 
 	async resolved(): Promise<void> {
 		this.tried = false
-		console.log("resolved")
+		console.debug("resolved 429")
 
 		await invoke("close_debank_window")
 	}

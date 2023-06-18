@@ -1,15 +1,45 @@
 import { invoke } from '@tauri-apps/api'
 import { getDatabase } from './database'
 import { GlobalConfig } from './datafetch/types'
-import { ConfigurationModel } from './types'
+import { CloudSyncConfiguration, ConfigurationModel } from './types'
 import yaml from 'yaml'
 
 const prefix = "!ent:"
 const fixId = "1"
+const cloudSyncFixId = "2"
 
 export async function getConfiguration(): Promise<ConfigurationModel | undefined> {
+	return getConfigurationById(fixId)
+}
+
+export async function saveConfiguration(cfg: GlobalConfig) {
+	// validate data is yaml
+	const data = yaml.stringify(cfg)
+
+	await saveConfigurationById(fixId, data)
+}
+
+export async function getCloudSyncConfiguration(): Promise<ConfigurationModel | undefined> {
+	return getConfigurationById(cloudSyncFixId)
+}
+
+export async function saveCloudSyncConfiguration(cfg: CloudSyncConfiguration) {
+	const data = yaml.stringify(cfg)
+
+	await saveConfigurationById(cloudSyncFixId, data)
+}
+
+async function saveConfigurationById(id: string, cfg: string) {
 	const db = await getDatabase()
-	const configurations = await db.select<ConfigurationModel[]>(`SELECT * FROM configuration where id = ${fixId}`)
+	// encrypt data
+	const encrypted = await invoke<string>("encrypt", { data: cfg })
+
+	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${id}, ?)`, [encrypted])
+}
+
+async function getConfigurationById(id: string): Promise<ConfigurationModel | undefined> {
+	const db = await getDatabase()
+	const configurations = await db.select<ConfigurationModel[]>(`SELECT * FROM configuration where id = ${id}`)
 	if (configurations.length === 0) {
 		return undefined
 	}
@@ -34,17 +64,6 @@ export async function getConfiguration(): Promise<ConfigurationModel | undefined
 		}
 		throw err
 	})
-}
-
-export async function saveConfiguration(cfg: GlobalConfig) {
-	// validate data is yaml
-	const data = yaml.stringify(cfg)
-
-	const db = await getDatabase()
-	// encrypt data
-	const encrypted = await invoke<string>("encrypt", { data })
-
-	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${fixId}, ?)`, [encrypted])
 }
 
 export async function getQuerySize(): Promise<number> {

@@ -38,6 +38,7 @@ import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
 import { LoadingContext } from "../../App";
 import { getQuerySize } from "../../middlelayers/configuration";
+import { autoSyncData } from '../../middlelayers/cloudsync'
 
 ChartJS.register(
   ArcElement,
@@ -87,6 +88,8 @@ const App = () => {
 
   useEffect(() => {
     loadQuerySize();
+
+    autoSyncData();
   }, []);
 
   useEffect(() => {
@@ -219,12 +222,17 @@ const App = () => {
             <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
           </div>
           <div style={{ display: "inline-block" }}>
-            <RefreshData afterRefresh={() => loadAllData(querySize)} />
+            <RefreshData afterRefresh={() => {
+              loadAllData(querySize)
+              // auto sync data in background
+              autoSyncData(true)
+            }} />
           </div>
           <div style={{ display: "inline-block" }}>
             <Setting
               onConfigurationSave={() => loadQuerySize()}
               onDataImported={() => loadAllData(querySize)}
+              onDataSynced={() => loadAllData(querySize)}
             />
           </div>
         </div>

@@ -28,6 +28,8 @@ Track3 use [Polybase](https://polybase.xyz/) to sync data. Polybase is a decentr
 
 **All your data is private, only you can access it. And track3 will never sync your configurations into cloud, they are always stored locally with encryption. So your wallet addresses and api keys are totally safe.**
 
+But currently track3 are using polybase testnet, so your data may be lost on cloud, but this will not affect your local data.
+
 ## Known Issues
 
 - [ ] Cannot list assets in earn wallet in OKX
