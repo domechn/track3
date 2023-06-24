@@ -2,10 +2,11 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
 import { TopCoinsRankData } from "../../middlelayers/types";
-import { useRef } from 'react'
-import { ChartJSOrUndefined } from 'react-chartjs-2/dist/types'
-import { BubbleDataPoint, Point } from 'chart.js'
-import _ from 'lodash'
+import { useRef } from "react";
+import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
+import { BubbleDataPoint, Point } from "chart.js";
+import _ from "lodash";
+import { legendOnClick } from "../../utils/legend";
 
 const App = ({ data }: { data: TopCoinsRankData }) => {
   const size = useWindowSize();
@@ -30,32 +31,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
         display: false,
       },
       legend: {
-        onClick: function (e: any, legendItem: { datasetIndex: number }, legend: any) {
-          const idx = legendItem.datasetIndex;
-          const chart = chartRef.current;
-          if (!chart) {
-            return;
-          }
-          const arc = chart.getDatasetMeta(idx);
-          // always set arc shown if user clicks on it
-          arc.hidden = false;
-
-          const maxLegend = _(data.coins).size();
-
-          const currentHidden = _(_.range(maxLegend))
-            .filter((i) => i !== idx)
-            .map((i) => chart.getDatasetMeta(i))
-            .map((m) => m.hidden)
-            .every((h) => !!h)
-
-          for (let i = 0; i < maxLegend; i++) {
-            const other = chart.getDatasetMeta(i);
-            if (i !== idx) {
-              other.hidden = !currentHidden;
-            }
-          }
-          chart.update();
-        },
+        onClick: legendOnClick(_(data.coins).size(), chartRef.current),
       },
     },
     scales: {
