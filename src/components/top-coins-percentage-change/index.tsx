@@ -2,14 +2,24 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
 import { TopCoinsPercentageChangeData } from "../../middlelayers/types";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import _ from "lodash";
+import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
+import { BubbleDataPoint, Point } from "chart.js";
 
 const prefix = "tcpc";
 
 const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
   const size = useWindowSize();
   const [currentType, setCurrentType] = useState(getWholeKey("value")); // ['tcpcValue', 'tcpcPrice']
+  const chartRef =
+    useRef<
+      ChartJSOrUndefined<
+        "line",
+        (number | [number, number] | Point | BubbleDataPoint | null)[],
+        unknown
+      >
+    >(null);
 
   const options = {
     maintainAspectRatio: false,
@@ -21,6 +31,34 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
       },
       datalabels: {
         display: false,
+      },
+      legend: {
+        onClick: function (e: any, legendItem: { datasetIndex: number }, legend: any) {
+          const idx = legendItem.datasetIndex;
+          const chart = chartRef.current;
+          if (!chart) {
+            return;
+          }
+          const arc = chart.getDatasetMeta(idx);
+          // always set arc shown if user clicks on it
+          arc.hidden = false;
+
+          const maxLegend = _(data.coins).size();
+
+          const currentHidden = _(_.range(maxLegend))
+            .filter((i) => i !== idx)
+            .map((i) => chart.getDatasetMeta(i))
+            .map((m) => m.hidden)
+            .every((h) => !!h)
+
+          for (let i = 0; i < maxLegend; i++) {
+            const other = chart.getDatasetMeta(i);
+            if (i !== idx) {
+              other.hidden = !currentHidden;
+            }
+          }
+          chart.update();
+        },
       },
     },
     scales: {
@@ -134,7 +172,7 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
           height: Math.max((size.height || 100) / 2, 350),
         }}
       >
-        <Line options={options as any} data={lineData()} />
+        <Line ref={chartRef} options={options as any} data={lineData()} />
       </div>
     </>
   );

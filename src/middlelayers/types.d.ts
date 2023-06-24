@@ -42,7 +42,7 @@ export type TopCoinsRankData = {
 		coin: string
 		lineColor: string
 		rankData: {
-			rank: number
+			rank?: number
 			timestamp: number
 		}[]
 	}[]
