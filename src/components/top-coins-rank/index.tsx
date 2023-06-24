@@ -60,9 +60,9 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
 
   function coinRankData(
     timestamps: number[],
-    coinRankData: { rank: number; timestamp: number }[]
+    coinRankData: { rank?: number; timestamp: number }[]
   ) {
-    const coinRankDataMap = new Map<number, number>();
+    const coinRankDataMap = new Map<number, number | undefined>();
     coinRankData.forEach((rankData) => {
       coinRankDataMap.set(rankData.timestamp, rankData.rank);
     });
@@ -92,7 +92,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
           height: Math.max((size.height || 100) / 2, 350),
         }}
       >
-        <Line ref={chartRef} options={options} data={lineData()} />
+        <Line ref={chartRef} options={options as any} data={lineData()} />
       </div>
     </>
   );
