@@ -6,7 +6,7 @@ use tauri::Manager;
 use track3::{
     binance::Binance,
     ent::Ent,
-    migration::{init_resources, is_first_run, is_from_v01_to_v02, migrate_from_v01_to_v02},
+    migration::{init_sqlite_tables, is_first_run, is_from_v01_to_v02, migrate_from_v01_to_v02, init_sqlite_file},
     okex::Okex,
     price::get_price_querier,
 };
@@ -168,8 +168,9 @@ fn main() {
             println!("app_dir: {:?}, resource_dir: {:?}", app_dir, resource_dir);
 
             if is_first_run(app_dir.as_path()) {
-                init_resources(app_dir.as_path(), resource_dir.as_path());
+                init_sqlite_file(app_dir.as_path());
             }
+            init_sqlite_tables(app_dir.as_path(), resource_dir.as_path());
 
             if is_from_v01_to_v02(app_dir.as_path()).unwrap() {
                 // upgrade from v0.1 to v0.2
