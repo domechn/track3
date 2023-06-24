@@ -48,3 +48,10 @@ export type CoinQueryDetail = {
 	model: CoinModel
 	date: Date
 }
+
+export type CurrencyRate = {
+	currency: string
+	// rate to usd
+	// 1 usd = rate symbol
+	rate: number
+}

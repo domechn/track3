@@ -22,28 +22,36 @@ fn get_sqlite_file_path(path: &Path) -> String {
     String::from(path.join("track3.db").to_str().unwrap())
 }
 
-pub fn init_resources(app_dir: &Path, resource_dir: &Path) {
-    println!("init resources in rust");
+pub fn init_sqlite_tables(app_dir: &Path, resource_dir: &Path) {
+    println!("start initing sqlite tables in rust");
     let sqlite_path = get_sqlite_file_path(app_dir);
-    File::create(&sqlite_path).unwrap();
-
     let configuration =
         fs::read_to_string(resource_dir.join("migrations/init/configuration_up.sql")).unwrap();
     let assets_v2 =
         fs::read_to_string(resource_dir.join("migrations/init/assets_v2_up.sql")).unwrap();
     let cloud_sync =
         fs::read_to_string(resource_dir.join("migrations/init/cloud_sync_up.sql")).unwrap();
+    let currency_rates_sync =
+        fs::read_to_string(resource_dir.join("migrations/init/currency_rates_up.sql")).unwrap();
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
-        println!("init resources in tokio spawn");
+        println!("init sqlite tables in tokio spawn");
         let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
         conn.execute(configuration.as_str()).await.unwrap();
         conn.execute(assets_v2.as_str()).await.unwrap();
         conn.execute(cloud_sync.as_str()).await.unwrap();
+        conn.execute(currency_rates_sync.as_str()).await.unwrap();
         conn.close().await.unwrap();
-        println!("init resources in tokio spawn done");
+        println!("init sqlite tables in tokio spawn done");
     });
+}
+
+pub fn init_sqlite_file(app_dir: &Path) {
+    println!("init sqlite file in rust");
+    let sqlite_path = get_sqlite_file_path(app_dir);
+    File::create(&sqlite_path).unwrap();
+    println!("init sqlite file in rust done");
 }
 
 pub fn is_from_v01_to_v02(path: &Path) -> Result<bool, Box<dyn std::error::Error>> {

@@ -4,6 +4,7 @@ import { useContext } from "react";
 import { refreshAllData } from "../../middlelayers/charts";
 import { toast } from "react-hot-toast";
 import { LoadingContext } from "../../App";
+import { updateAllCurrencyRates } from "../../middlelayers/currency";
 
 const retries = 3;
 const retryInterval = 3000; // 3s
@@ -43,13 +44,14 @@ const App = ({
     let refreshError: Error | undefined;
 
     retry(refreshAllData, retries, retryInterval)
+      .then(async () => updateAllCurrencyRates())
       .catch((err) => {
         refreshError = err;
       })
       .finally(() => {
         setLoading(false);
         if (refreshError) {
-          toast.error(refreshError.message);
+          toast.error(refreshError.message || (refreshError as any));
         } else {
           toast.success("Refresh successfully!");
         }
