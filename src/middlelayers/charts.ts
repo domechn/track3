@@ -123,13 +123,21 @@ export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
 
 	const getRankData = (symbol: string): {
 		timestamp: number,
-		rank: number
+		rank?: number
 	}[] => {
 		return _(reservedAssets).filter(assets => !!_(assets).find(a => a.symbol === symbol))
 			.map(ass => ({
 				timestamp: new Date(ass[0]?.createdAt).getTime(),
 				rank: _(ass).sortBy("value").reverse().findIndex(a => a.symbol === symbol) + 1
-			})).value()
+			})).map(d => {
+				if (d.rank > 10) {
+					return {
+						...d,
+						rank: undefined,
+					}
+				}
+				return d
+			}).value()
 	}
 
 

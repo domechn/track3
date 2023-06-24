@@ -2,9 +2,22 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
 import { TopCoinsRankData } from "../../middlelayers/types";
+import { useRef } from "react";
+import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
+import { BubbleDataPoint, Point } from "chart.js";
+import _ from "lodash";
+import { legendOnClick } from "../../utils/legend";
 
 const App = ({ data }: { data: TopCoinsRankData }) => {
   const size = useWindowSize();
+  const chartRef =
+    useRef<
+      ChartJSOrUndefined<
+        "line",
+        (number | [number, number] | Point | BubbleDataPoint | null)[],
+        unknown
+      >
+    >(null);
 
   const options = {
     maintainAspectRatio: false,
@@ -16,6 +29,9 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
       },
       datalabels: {
         display: false,
+      },
+      legend: {
+        onClick: legendOnClick(_(data.coins).size(), chartRef.current),
       },
     },
     scales: {
@@ -76,7 +92,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
           height: Math.max((size.height || 100) / 2, 350),
         }}
       >
-        <Line options={options} data={lineData()} />
+        <Line ref={chartRef} options={options} data={lineData()} />
       </div>
     </>
   );

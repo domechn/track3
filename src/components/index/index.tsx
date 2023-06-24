@@ -49,7 +49,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ChartDataLabels
+  ChartDataLabels,
 );
 
 const resizeDelay = 200; // 200 ms

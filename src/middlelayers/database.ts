@@ -17,6 +17,7 @@ export async function getDatabase(): Promise<Database> {
 	return dbInstance
 }
 
+// skip where value is less than 1
 export async function saveCoinsToDatabase(coins: (Coin & {
 	price: number,
 	usdValue: number,
@@ -27,7 +28,7 @@ export async function saveCoinsToDatabase(coins: (Coin & {
 		symbol: t.symbol,
 		amount: t.amount,
 		value: t.usdValue,
-	})).value())
+	})).filter(v => v.value > 1).value())
 }
 
 // will auto skip models whose amount is 0
@@ -40,7 +41,7 @@ async function saveToDatabase(db: Database, models: CoinModel[]): Promise<void> 
 
 	const getDBModel = (models: CoinModel[]) => {
 
-		return _(models).filter(m=>m.amount !== 0).map(m => ({
+		return _(models).filter(m => m.amount !== 0).map(m => ({
 			createdAt: now,
 			uuid: uid,
 			symbol: m.symbol,
@@ -59,6 +60,6 @@ async function saveToDatabase(db: Database, models: CoinModel[]): Promise<void> 
 	const keys = Object.keys(first)
 	const valuesArrayStr = new Array(dbModels.length).fill(`(${keys.map(() => '?').join(',')})`).join(',')
 	const insertSql = `INSERT INTO ${ASSETS_TABLE_NAME} (${keys.join(',')}) VALUES ${valuesArrayStr}`
-	const values = _(dbModels).map(m => _(keys).map(k => _(m).get(k)).value()).flatten().value();
+	const values = _(dbModels).map(m => _(keys).map(k => _(m).get(k)).value()).flatten().value()
 	await db.execute(insertSql, values)
 }
