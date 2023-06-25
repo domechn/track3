@@ -22,10 +22,13 @@ const App = ({
   const [version, setVersion] = useState<string>("0.1.0");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const size = useWindowSize();
+  const [isSmallScreenAndSidecarActive, setIsSmallScreenAndSidecarActive] =
+    useState(true);
 
   useEffect(() => {
     if (isModalOpen) {
       loadVersion();
+      setIsSmallScreenAndSidecarActive(true)
     }
   }, [isModalOpen]);
 
@@ -43,7 +46,7 @@ const App = ({
     setIsModalOpen(false);
   }
 
-  function setActiveOnSidebarItem(activeId: string) {
+  function setActiveOnSidebarItem(activeId?: string) {
     const allowedIds = ["configuration", "data"];
     const allowedContentIds = _(allowedIds)
       .map((id) => `${id}Content`)
@@ -61,6 +64,9 @@ const App = ({
         (item as any).style.display = "none";
       }
     });
+    if (!activeId) {
+      return
+    }
 
     const activeSidebarItem = document.getElementById(activeId);
     if (activeSidebarItem) {
@@ -74,13 +80,24 @@ const App = ({
     }
   }
 
+  function getSettingWidth() {
+    const width = Math.floor(size.width ? size.width * 0.8 : 800);
+    // keep it even
+    if (width % 2 === 1) {
+      return width - 1;
+    }
+    return width;
+  }
+
   function onConfigurationSidebarClick() {
     // add active class to the clicked item
     setActiveOnSidebarItem("configuration");
+    setIsSmallScreenAndSidecarActive(false)
   }
   function onDataSidebarClick() {
     // add active class to the clicked item
     setActiveOnSidebarItem("data");
+    setIsSmallScreenAndSidecarActive(false)
   }
 
   function _onConfigurationSave() {
@@ -95,6 +112,10 @@ const App = ({
 
   function _onDataSynced() {
     onDataSynced && onDataSynced();
+  }
+
+  function smallScreen(): boolean {
+    return getSettingWidth() < 600;
   }
 
   function renderMenu() {
@@ -135,6 +156,70 @@ const App = ({
     );
   }
 
+  function renderSmallScreenMenu() {
+    return (
+      <>
+        <div
+          className="settings-sidebar"
+          style={{
+            display: isSmallScreenAndSidecarActive ? "inline-block" : "none",
+            width: "100%",
+            borderRight: "none",
+            textAlign: "center",
+          }}
+        >
+          <div
+            id="configuration"
+            className="sidebar-item"
+            onClick={onConfigurationSidebarClick}
+          >
+            Configuration
+          </div>
+          <div id="data" className="sidebar-item" onClick={onDataSidebarClick}>
+            Data
+          </div>
+          <div className="version">version: {version}</div>
+        </div>
+
+        <div
+          className="settings-content"
+          style={{
+            display: isSmallScreenAndSidecarActive ? "none" : "inline-block",
+            width: "90%",
+          }}
+        >
+          <div style={{
+            textAlign: "left",
+            marginBottom: "10px",
+            cursor: "pointer",
+            fontFamily: "monospace",
+            fontSize: "14px",
+            color: "#0078d4"
+          }} onClick={()=>{
+            setIsSmallScreenAndSidecarActive(true)
+            // clear active class
+            setActiveOnSidebarItem()
+          }}>{'< back'}</div>
+          <div id="configurationContent" className="content-item">
+            <Configuration onConfigurationSave={_onConfigurationSave} />
+          </div>
+          <div
+            id="dataContent"
+            className="content-item"
+            style={{
+              display: "none",
+            }}
+          >
+            <DataManagement
+              onDataImported={_onDataImported}
+              onDataSynced={_onDataSynced}
+            />
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="settings">
       <button className="gear-button" onClick={handleButtonClick}>
@@ -152,9 +237,10 @@ const App = ({
         <div
           style={{
             height: Math.min(700, size.height! - 100), // make sure modal is not too high to hint max-hight of the modal, otherwise it will make view fuzzy
+            width: getSettingWidth(),
           }}
         >
-          {renderMenu()}
+          {smallScreen() ? renderSmallScreenMenu() : renderMenu()}
         </div>
       </Modal>
     </div>
