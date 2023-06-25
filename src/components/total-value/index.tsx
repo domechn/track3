@@ -1,16 +1,23 @@
+import { CurrencyRateDetail } from "../../middlelayers/types";
+import { currencyWrapper } from "../../utils/currency";
 import "./index.css";
 
-const App = ({data}:{
+const App = ({
+  data,
+  currency,
+}: {
+  currency: CurrencyRateDetail;
   data: {
-    totalValue: number,
-    changePercentage: number,
-  }
+    totalValue: number;
+    changePercentage: number;
+  };
 }) => {
   const baseFontSize = 6;
 
-
   function formatTotalValue() {
-    return `$${data.totalValue.toLocaleString()}`;
+    return `${currency.symbol}${currencyWrapper(currency)(
+      data.totalValue
+    ).toLocaleString()}`;
   }
 
   function formatChangePercentage() {
@@ -40,9 +47,14 @@ const App = ({data}:{
 
   return (
     <div>
-      <div className="chartTitle" style={{
-        marginBottom: 15,
-      }}>Total Value</div>
+      <div
+        className="chartTitle"
+        style={{
+          marginBottom: 15,
+        }}
+      >
+        Total Value
+      </div>
       <div
         style={{
           minHeight: totalValueFontSize(),

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./index.css";
-import { CoinData } from "../../middlelayers/types";
+import { CoinData, CurrencyRateDetail } from "../../middlelayers/types";
 import {
   queryAllDataDates,
   queryCoinDataById,
@@ -9,6 +9,7 @@ import _ from "lodash";
 import Select from "../common/select";
 import viewIcon from "../../assets/icons/view-icon.png";
 import hideIcon from "../../assets/icons/hide-icon.png";
+import { currencyWrapper } from "../../utils/currency";
 
 type ComparisonData = {
   name: string;
@@ -16,7 +17,7 @@ type ComparisonData = {
   head: number;
 };
 
-const App = () => {
+const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const [baseId, setBaseId] = useState<string>("");
   const [dateOptions, setDateOptions] = useState<
     {
@@ -207,20 +208,33 @@ const App = () => {
     return prettyNumber(per, false) + "%";
   }
 
-  function prettyNumber(number: number, keepDecimal: boolean, showRealNumber = true): string {
+  function prettyNumber(
+    number: number,
+    keepDecimal: boolean,
+    showRealNumber = true,
+    convertCurrency = false
+  ): string {
     if (!showRealNumber) {
-      return "***"
+      return "***";
     }
     if (!number) {
       return "-";
     }
-    if (keepDecimal) {
-      return "" + number;
+    let convertedNumber = number;
+    if (convertCurrency) {
+      convertedNumber = currencyWrapper(currency)(number);
     }
-    return number.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    let res = "" + convertedNumber;
+    if (!keepDecimal) {
+      res = convertedNumber.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+    if (convertCurrency) {
+      return `${currency.symbol} ${res}`;
+    }
+    return res;
   }
 
   return (
@@ -232,7 +246,6 @@ const App = () => {
       >
         Comparison
       </h1>
-
       <a
         href="#"
         style={{
@@ -313,7 +326,9 @@ const App = () => {
               {prettyNumber(
                 item.base,
                 item.name.includes("Amount") || item.name.includes("Price"),
-                showDetail,
+                // don't hide price
+                showDetail || item.name.includes("Price"),
+                item.name.includes("Price") || item.name.includes("Value")
               )}
             </div>
             <div
@@ -334,7 +349,9 @@ const App = () => {
               {prettyNumber(
                 item.head,
                 item.name.includes("Amount") || item.name.includes("Price"),
-                showDetail,
+                // don't hide price
+                showDetail || item.name.includes("Price"),
+                item.name.includes("Price") || item.name.includes("Value")
               )}
             </div>
           </div>

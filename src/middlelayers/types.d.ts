@@ -102,3 +102,20 @@ export type CoinData = {
 	value: number
 	price: number
 }
+
+export type CurrencyRateModel = {
+	id: number
+	currency: string
+	rate: number
+	alias: string
+	symbol: string
+	priority: number
+	updateAt: string
+}
+
+export type CurrencyRateDetail = {
+	currency: string
+	rate: number
+	alias: string
+	symbol: string
+}
