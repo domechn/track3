@@ -10,6 +10,7 @@ import Select from "../common/select";
 import viewIcon from "../../assets/icons/view-icon.png";
 import hideIcon from "../../assets/icons/hide-icon.png";
 import { currencyWrapper } from "../../utils/currency";
+import { useWindowSize } from "../../utils/hook";
 
 type ComparisonData = {
   name: string;
@@ -25,6 +26,8 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       value: string;
     }[]
   >([]);
+
+  const windowSize = useWindowSize();
 
   const baseDate = useMemo(() => {
     return _.find(dateOptions, { value: "" + baseId })?.label;
@@ -237,6 +240,19 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     return res;
   }
 
+  function showColumnVal(
+    item: ComparisonData,
+    valType: "base" | "head"
+  ): string {
+    return prettyNumber(
+      _(item).get(valType),
+      item.name.includes("Amount") || item.name.includes("Price"),
+      // don't hide price
+      showDetail || item.name.includes("Price"),
+      item.name.includes("Price") || item.name.includes("Value")
+    );
+  }
+
   return (
     <>
       <h1
@@ -288,7 +304,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
             style={{
               fontWeight: "bold",
               color: "#ededed",
-              fontSize: "1.2em",
+              fontSize: Math.min(18, windowSize.width! / 35) + "px",
               backgroundColor: "#777777",
             }}
           >
@@ -322,14 +338,11 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
             >
               {item.name}
             </div>
-            <div className="comparison-column">
-              {prettyNumber(
-                item.base,
-                item.name.includes("Amount") || item.name.includes("Price"),
-                // don't hide price
-                showDetail || item.name.includes("Price"),
-                item.name.includes("Price") || item.name.includes("Value")
-              )}
+            <div
+              className="comparison-column"
+              title={showColumnVal(item, "base")}
+            >
+              {showColumnVal(item, "base")}
             </div>
             <div
               className="comparison-column"
@@ -342,17 +355,15 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
                     : "red",
                 maxWidth: "200px",
               }}
+              title={prettyComparisonResult(item.base, item.head)}
             >
               {prettyComparisonResult(item.base, item.head)}
             </div>
-            <div className="comparison-column">
-              {prettyNumber(
-                item.head,
-                item.name.includes("Amount") || item.name.includes("Price"),
-                // don't hide price
-                showDetail || item.name.includes("Price"),
-                item.name.includes("Price") || item.name.includes("Value")
-              )}
+            <div
+              className="comparison-column"
+              title={showColumnVal(item, "head")}
+            >
+              {showColumnVal(item, "head")}
             </div>
           </div>
         ))}
