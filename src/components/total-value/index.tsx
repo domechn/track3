@@ -1,5 +1,6 @@
 import { CurrencyRateDetail } from "../../middlelayers/types";
 import { currencyWrapper } from "../../utils/currency";
+import { useWindowSize } from "../../utils/hook";
 import "./index.css";
 
 const App = ({
@@ -13,6 +14,8 @@ const App = ({
   };
 }) => {
   const baseFontSize = 6;
+
+  const windowSize = useWindowSize();
 
   function formatTotalValue() {
     return `${currency.symbol}${currencyWrapper(currency)(
@@ -30,11 +33,17 @@ const App = ({
 
   function totalValueFontSize() {
     const size = baseFontSize / fontCount();
+    if (windowSize.width) {
+      return `${size + Math.max(0, (1000 - windowSize.width) / 150)}vw`;
+    }
     return `${size}vw`;
   }
 
   function changePercentageFontSize() {
     const size = baseFontSize / fontCount() / 2.5;
+    if (windowSize.width) {
+      return `${size + Math.max(0, (1000 - windowSize.width) / 300)}vw`;
+    }
     return `${size}vw`;
   }
 
