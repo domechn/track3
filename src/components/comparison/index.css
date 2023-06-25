@@ -32,11 +32,13 @@
 
 .comparison-container .comparison-row .comparison-column {
   display: inline-block;
-  width: 26%;
+  width: 24%;
   padding: 5px;
   margin-right: 10px;
   border-radius: 5px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   box-sizing: border-box;
 }
 
