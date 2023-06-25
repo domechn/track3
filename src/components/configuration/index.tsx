@@ -11,11 +11,14 @@ import deleteIcon from "../../assets/icons/delete-icon.png";
 import { GlobalConfig, TokenConfig } from "../../middlelayers/datafetch/types";
 import Select, { SelectOption } from "../common/select";
 import { LoadingContext } from "../../App";
+import { CurrencyRateDetail } from "../../middlelayers/types";
+import { listAllCurrencyRates } from "../../middlelayers/currency";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
     groupUSD: true,
     querySize: 10,
+    preferCurrency: "USD",
   },
   exchanges: [],
   erc20: {
@@ -46,6 +49,9 @@ const Configuration = ({
   const { setLoading } = useContext(LoadingContext);
   const [groupUSD, setGroupUSD] = useState(true);
   const [querySize, setQuerySize] = useState(0);
+  const [preferCurrency, setPreferCurrency] = useState("USD");
+
+  const [currencies, setCurrencies] = useState<CurrencyRateDetail[]>([]);
 
   const [wallets, setWallets] = useState<
     {
@@ -89,10 +95,26 @@ const Configuration = ({
     []
   );
 
+  const preferCurrencyOptions = useMemo(
+    () =>
+      _(currencies)
+        .map((c) => ({
+          value: c.currency,
+          label: `${c.currency} - ${c.alias}`,
+        }))
+        .value(),
+    [currencies]
+  );
 
   useEffect(() => {
     loadConfiguration();
+    loadSupportedCurrencies();
   }, []);
+
+  async function loadSupportedCurrencies() {
+    const currencies = await listAllCurrencyRates();
+    setCurrencies(currencies);
+  }
 
   function loadConfiguration() {
     setLoading(true);
@@ -104,6 +126,7 @@ const Configuration = ({
 
         setGroupUSD(globalConfig.configs.groupUSD);
         setQuerySize(globalConfig.configs.querySize || 10);
+        setPreferCurrency(globalConfig.configs.preferCurrency || "USD");
 
         setExchanges(
           _(globalConfig.exchanges)
@@ -180,6 +203,7 @@ const Configuration = ({
       configs: {
         groupUSD,
         querySize,
+        preferCurrency,
       },
       exchanges: exchangesData,
       // expand wallet
@@ -346,6 +370,10 @@ const Configuration = ({
     setQuerySize(parseInt(val, 10));
   }
 
+  function onPreferCurrencyChanged(val: string) {
+    setPreferCurrency(val);
+  }
+
   function renderOthersForm() {
     return _(others)
       .map((o, idx) => (
@@ -471,6 +499,23 @@ const Configuration = ({
               options={querySizeOptions}
               onSelectChange={onQuerySizeChanged}
               value={querySize + ""}
+            />
+          </label>
+          <br/>
+          <label>
+            <span
+              style={{
+                display: "inline-block",
+                marginRight: 10,
+              }}
+            >
+              Prefer Currency
+            </span>
+            <Select
+              width={200}
+              options={preferCurrencyOptions}
+              onSelectChange={onPreferCurrencyChanged}
+              value={preferCurrency}
             />
           </label>
           <h3>Exchanges</h3>

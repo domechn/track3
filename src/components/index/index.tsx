@@ -21,6 +21,7 @@ import menuIcon from "../../assets/icons/menu-icon.png";
 import {
   AssetChangeData,
   CoinsAmountAndValueChangeData,
+  CurrencyRateDetail,
   LatestAssetsPercentageData,
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
@@ -37,8 +38,12 @@ import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
 import { useWindowSize } from "../../utils/hook";
 import { Chart } from "chart.js";
 import { LoadingContext } from "../../App";
-import { getQuerySize } from "../../middlelayers/configuration";
-import { autoSyncData } from '../../middlelayers/cloudsync'
+import {
+  getCurrentPreferCurrency,
+  getQuerySize,
+} from "../../middlelayers/configuration";
+import { autoSyncData } from "../../middlelayers/cloudsync";
+import { getDefaultCurrencyRate } from "../../middlelayers/currency";
 
 ChartJS.register(
   ArcElement,
@@ -49,7 +54,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ChartDataLabels,
+  ChartDataLabels
 );
 
 const resizeDelay = 200; // 200 ms
@@ -59,6 +64,9 @@ const App = () => {
   const windowSize = useWindowSize();
   const [querySize, setQuerySize] = useState(0);
   const [lastSize, setLastSize] = useState(windowSize);
+  const [currentCurrency, setCurrentCurrency] = useState<CurrencyRateDetail>(
+    getDefaultCurrencyRate()
+  );
 
   const [showMenu, setShowMenu] = useState(false);
   const [activeMenu, setActiveMenu] = useState("overview");
@@ -87,7 +95,7 @@ const App = () => {
     } as TopCoinsPercentageChangeData);
 
   useEffect(() => {
-    loadQuerySize();
+    loadConfiguration();
 
     autoSyncData();
   }, []);
@@ -131,8 +139,17 @@ const App = () => {
     }
   }
 
+  function loadConfiguration() {
+    loadQuerySize();
+    loadCurrentCurrency();
+  }
+
   function loadQuerySize() {
     getQuerySize().then((size) => setQuerySize(size));
+  }
+
+  function loadCurrentCurrency() {
+    getCurrentPreferCurrency().then((c) => setCurrentCurrency(c));
   }
 
   async function loadAllDataAsync(size = 10) {
@@ -222,15 +239,17 @@ const App = () => {
             <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
           </div>
           <div style={{ display: "inline-block" }}>
-            <RefreshData afterRefresh={() => {
-              loadAllData(querySize)
-              // auto sync data in background
-              autoSyncData(true)
-            }} />
+            <RefreshData
+              afterRefresh={() => {
+                loadAllData(querySize);
+                // auto sync data in background
+                autoSyncData(true);
+              }}
+            />
           </div>
           <div style={{ display: "inline-block" }}>
             <Setting
-              onConfigurationSave={() => loadQuerySize()}
+              onConfigurationSave={() => loadConfiguration()}
               onDataImported={() => loadAllData(querySize)}
               onDataSynced={() => loadAllData(querySize)}
             />
@@ -245,6 +264,7 @@ const App = () => {
           }}
         >
           <Overview
+            currency={currentCurrency}
             latestAssetsPercentageData={latestAssetsPercentageData}
             assetChangeData={assetChangeData}
             totalValueData={totalValueData}
@@ -256,7 +276,7 @@ const App = () => {
 
         {activeMenu === "comparison" && (
           <div id="comparison">
-            <Comparison />
+            <Comparison currency={currentCurrency}/>
           </div>
         )}
       </div>

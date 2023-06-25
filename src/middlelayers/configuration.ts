@@ -1,8 +1,9 @@
 import { invoke } from '@tauri-apps/api'
 import { getDatabase } from './database'
 import { GlobalConfig } from './datafetch/types'
-import { CloudSyncConfiguration, ConfigurationModel } from './types'
+import { CloudSyncConfiguration, ConfigurationModel, CurrencyRateDetail } from './types'
 import yaml from 'yaml'
+import { getCurrencyRate, getDefaultCurrencyRate } from './currency'
 
 const prefix = "!ent:"
 const fixId = "1"
@@ -74,4 +75,18 @@ export async function getQuerySize(): Promise<number> {
 
 	const data = yaml.parse(cfg.data)
 	return data.configs.querySize || 10
+}
+
+export async function getCurrentPreferCurrency() : Promise<CurrencyRateDetail> {
+	const model = await getConfiguration()
+	if (!model) {
+		return getDefaultCurrencyRate()
+	}
+
+	const pc: string = yaml.parse(model.data).configs.preferCurrency 
+	if (!pc) {
+		return getDefaultCurrencyRate()
+	}
+
+	return getCurrencyRate(pc)
 }

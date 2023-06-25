@@ -9,12 +9,14 @@ import "./index.css";
 import {
   AssetChangeData,
   CoinsAmountAndValueChangeData,
+  CurrencyRateDetail,
   LatestAssetsPercentageData,
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
 } from "../../middlelayers/types";
 
 const App = ({
+  currency,
   totalValueData,
   latestAssetsPercentageData,
   assetChangeData,
@@ -22,6 +24,7 @@ const App = ({
   topCoinsRankData,
   topCoinsPercentageChangeData,
 }: {
+  currency: CurrencyRateDetail,
   totalValueData: {
     totalValue: number;
     changePercentage: number;
@@ -34,13 +37,13 @@ const App = ({
 }) => {
   return (
     <>
-      <TotalValue data={totalValueData} />
+      <TotalValue currency={currency} data={totalValueData} />
       <hr className="nice-hr" />
       <LatestAssetsPercentage data={latestAssetsPercentageData} />
       <hr className="nice-hr" />
-      <AssetChange data={assetChangeData} />
+      <AssetChange currency={currency} data={assetChangeData} />
       <hr className="nice-hr" />
-      <CoinsAmountAndValueChange data={coinsAmountAndValueChangeData} />
+      <CoinsAmountAndValueChange currency={currency} data={coinsAmountAndValueChangeData} />
       <hr className="nice-hr" />
       <TopCoinsRank data={topCoinsRankData} />
       <hr className="nice-hr" />

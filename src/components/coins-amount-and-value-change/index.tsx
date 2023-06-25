@@ -3,13 +3,23 @@ import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "../../utils/hook";
 import { timestampToDate } from "../../utils/date";
-import { CoinsAmountAndValueChangeData } from "../../middlelayers/types";
+import {
+  CoinsAmountAndValueChangeData,
+  CurrencyRateDetail,
+} from "../../middlelayers/types";
 import Select from "../common/select";
 import "./index.css";
+import { currencyWrapper } from "../../utils/currency";
 
-const prefix = "caaavc"
+const prefix = "caaavc";
 
-const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
+const App = ({
+  currency,
+  data,
+}: {
+  currency: CurrencyRateDetail;
+  data: CoinsAmountAndValueChangeData;
+}) => {
   const [currentCoinSelected, setCurrentCoinSelected] = useState("");
   const [currentType, setCurrentType] = useState(getWholeKey("amount")); // ['caaavcAmount', 'caaavcValue']
   const size = useWindowSize();
@@ -22,7 +32,12 @@ const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
 
   function getLabel() {
     // set first char to upper case
-    return _.upperFirst(currentType.replace(prefix, ""));
+    const val  =  _.upperFirst(currentType.replace(prefix, ""));
+    if (val !== "Value") {
+      return val
+    }
+
+    return `${currency.currency} ${val}`
   }
 
   function getWholeKey(key: string) {
@@ -73,11 +88,16 @@ const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
       };
     }
     return {
-      labels: current.timestamps.map(x => timestampToDate(x)),
+      labels: current.timestamps.map((x) => timestampToDate(x)),
       datasets: [
         {
           label: coin + " " + getLabel(),
-          data: currentType === getWholeKey("amount") ? current.amounts : current.values,
+          data:
+            currentType === getWholeKey("amount")
+              ? current.amounts
+              : _(current.values)
+                  .map((v) => currencyWrapper(currency)(v))
+                  .value(),
           borderColor: current.lineColor,
           backgroundColor: current.lineColor,
           borderWidth: 5,
@@ -99,7 +119,9 @@ const App = ({ data }: { data: CoinsAmountAndValueChangeData }) => {
     const buttons = document.getElementsByClassName("active");
 
     for (let i = 0; i < buttons.length; i++) {
-      if ([getWholeKey("amount"), getWholeKey("value")].includes(buttons[i].id)) {
+      if (
+        [getWholeKey("amount"), getWholeKey("value")].includes(buttons[i].id)
+      ) {
         buttons[i].classList.remove("active");
       }
     }

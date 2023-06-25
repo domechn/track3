@@ -1,7 +1,10 @@
 CREATE TABLE IF NOT EXISTS "currency_rates" (
 	id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
 	currency TEXT NOT NULL,
+	alias TEXT NOT NULL,
+	symbol TEXT NOT NULL,
 	rate REAL NOT NULL, -- rate based on usd
+	priority INTEGER NOT NULL DEFAULT 0,
 	updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS unique_currency ON currency_rates (currency);

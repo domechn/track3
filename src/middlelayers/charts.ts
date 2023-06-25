@@ -15,8 +15,8 @@ const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 export const ASSETS_TABLE_NAME = "assets_v2"
 
 export async function refreshAllData() {
-	const coins = await queryCoinsData()
-	await saveCoinsToDatabase(coins)
+	// const coins = await queryCoinsData()
+	// await saveCoinsToDatabase(coins)
 }
 
 async function queryCoinsData(): Promise<(Coin & {

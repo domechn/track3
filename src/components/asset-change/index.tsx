@@ -1,11 +1,17 @@
 import { Line } from "react-chartjs-2";
-import {
-  useWindowSize,
-} from "../../utils/hook";
-import { timestampToDate } from '../../utils/date'
-import { AssetChangeData } from '../../middlelayers/types'
+import { useWindowSize } from "../../utils/hook";
+import { timestampToDate } from "../../utils/date";
+import { AssetChangeData, CurrencyRateDetail } from "../../middlelayers/types";
+import _ from 'lodash'
+import { currencyWrapper } from '../../utils/currency'
 
-const App = ({data}: {data: AssetChangeData}) => {
+const App = ({
+  data,
+  currency,
+}: {
+  data: AssetChangeData;
+  currency: CurrencyRateDetail;
+}) => {
   const lineColor = "rgba(255, 99, 71, 1)";
 
   const size = useWindowSize();
@@ -16,11 +22,11 @@ const App = ({data}: {data: AssetChangeData}) => {
     plugins: {
       title: {
         display: true,
-        text: "Trend of Asset USD Value",
+        text: `Trend of Asset ${currency.currency} Value`,
       },
       datalabels: {
         display: false,
-      }
+      },
     },
     scales: {
       x: {
@@ -32,7 +38,7 @@ const App = ({data}: {data: AssetChangeData}) => {
       y: {
         title: {
           display: true,
-          text: "USD",
+          text: currency.currency,
         },
         offset: true,
         ticks: {
@@ -47,11 +53,11 @@ const App = ({data}: {data: AssetChangeData}) => {
 
   function lineData() {
     return {
-      labels: data.timestamps.map(x => timestampToDate(x)),
+      labels: data.timestamps.map((x) => timestampToDate(x)),
       datasets: [
         {
-          label: "USD Value",
-          data: data.data,
+          label: "Value",
+          data: _(data.data).map(d => currencyWrapper(currency)(d)).value(),
           borderColor: lineColor,
           backgroundColor: lineColor,
           borderWidth: 5,
