@@ -1,4 +1,4 @@
-import { HttpVerb, getClient, Body } from '@tauri-apps/api/http'
+import { HttpVerb, getClient, Body, HttpOptions } from '@tauri-apps/api/http'
 import _ from 'lodash'
 
 export function getCurrentUA() {
@@ -15,13 +15,17 @@ export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout 
 	if (!_(json).isEmpty()) {
 		hs["content-type"] = "application/json"
 	}
-	const resp = await client.request<T>({
+	const payload = {
 		method,
 		url,
 		timeout,
 		headers: hs,
-		body: Body.json(json),
-	})
+	} as HttpOptions
+	if (!_(json).isEmpty()) {
+		payload.body = Body.json(json)
+	}
+	const resp = await client.request<T>(payload)
+	
 	if (resp.status > 299) {
 		throw new Error(`Request failed with status ${resp.status}`)
 	}
