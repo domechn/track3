@@ -119,7 +119,7 @@ function updateAuthState(authState?: AuthState) {
 function getToken(): string {
 	const t = window.localStorage.getItem(tokenPath)
 	const ea = window.localStorage.getItem(tokenExpiredAtPath)
-	if (!t || !ea || Date.now() > parseInt(ea)) { 
+	if (!t || !ea || Date.now() > parseInt(ea)) {
 		throw new Error("not login")
 	}
 	return t
@@ -247,6 +247,32 @@ export async function syncAssetsToCloudAndLocal(publicKey: string, createdAt?: n
 	return synced
 }
 
+// delete all data in cloud
+export async function forceSyncAssetsToCloudFromLocal(publicKey: string): Promise<number> {
+	const d = await getDatabase()
+	// select all assets in local
+	const localAssets = await dumpAssetsFromDBAfterCreatedAt()
+	// select all assets in cloud
+	const cloudAssets = await dumpAssetsFromCloudAfterCreatedAt()
+
+	let synced = 0
+
+	// add data to cloud if not in cloud
+	const needSyncedAssetsToCloud = _(localAssets).differenceBy(cloudAssets, 'uuid').value()
+	if (needSyncedAssetsToCloud.length > 0) {
+		// write data to cloud
+		synced += await writeAssetsToCloud(publicKey, needSyncedAssetsToCloud)
+	}
+	// remove data in cloud if not in local
+	const needRemovedInCloud = _(cloudAssets).differenceBy(localAssets, 'uuid').value()
+	if (needRemovedInCloud.length > 0) {
+		synced += await removeAssetsInCloud(needRemovedInCloud)
+	}
+
+	await updateLastSyncTime(d, publicKey)
+	return synced
+}
+
 async function writeAssetsToCloud(publicKey: string, assets: AssetModel[]): Promise<number> {
 	const gas = _(assets).groupBy('uuid').value()
 	const p = await getPolybaseDB()
@@ -263,6 +289,24 @@ async function writeAssetsToCloud(publicKey: string, assets: AssetModel[]): Prom
 			// time string to number
 			new Date(gas[uuid][0].createdAt).getTime(),
 		])
+		return 1
+	}, { concurrency: 5 })
+
+	return _(res).sum()
+}
+
+async function removeAssetsInCloud(assets: AssetModel[]): Promise<number> {
+	const p = await getPolybaseDB()
+	const res = await bluebird.map(_(assets).map('uuid').uniq().value(), async (uid: string) => {
+		console.log('removeAssetsInCloud', uid);
+		
+		const records = await p.collection<CloudAssetModel>(RECORD_COLLECTION_NAME).where("uuid", "==", uid).get()
+		if (records.data.length === 0) {
+			return 0
+		}
+		await bluebird.map(records.data, async (record) => {
+			return p.collection<CloudAssetModel>(RECORD_COLLECTION_NAME).record(record.data.id).call("del", [])
+		}, { concurrency: 5 })
 		return 1
 	}, { concurrency: 5 })
 

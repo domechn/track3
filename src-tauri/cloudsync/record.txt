@@ -28,4 +28,16 @@ collection Record {
       this.createdAt = createdAt;
 	}
 
+    del () {
+        if (!ctx.publicKey) {
+          error("you must sign the txn");
+        }
+      
+        if (this.owner.id != ctx.publicKey.toHex()) {
+          throw error("you cannot delete others' data");
+        }
+        
+        selfdestruct();
+    }
+
 }
