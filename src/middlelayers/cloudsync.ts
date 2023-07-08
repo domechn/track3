@@ -52,6 +52,7 @@ const CLOUD_SYNC_TABLE_NAME = "cloud_sync"
 const POLYBASE_STORAGE_PREFIX = "polybase.auth."
 const authPath = `${POLYBASE_STORAGE_PREFIX}auth`
 const tokenPath = `${POLYBASE_STORAGE_PREFIX}token`
+const tokenExpiredAtPath = `${POLYBASE_STORAGE_PREFIX}token.expired_at`
 
 const POLYBASE_AUTH_URL = "https://auth.testnet.polybase.xyz"
 
@@ -96,6 +97,8 @@ export async function signIn(email: string, code: string): Promise<string> {
 
 	// set token to cookies by js-cookie
 	window.localStorage.setItem(tokenPath, resp.token)
+	// 14d
+	window.localStorage.setItem(tokenExpiredAtPath, (Date.now() + 14 * 24 * 60 * 60 * 1000).toString())
 	updateAuthState(authState)
 
 	await createUserIfNotExists(resp.publicKey)
@@ -115,7 +118,8 @@ function updateAuthState(authState?: AuthState) {
 
 function getToken(): string {
 	const t = window.localStorage.getItem(tokenPath)
-	if (!t) {
+	const ea = window.localStorage.getItem(tokenExpiredAtPath)
+	if (!t || !ea || Date.now() > parseInt(ea)) { 
 		throw new Error("not login")
 	}
 	return t
