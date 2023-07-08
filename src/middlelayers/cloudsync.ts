@@ -135,7 +135,8 @@ async function ethPersonalSign(msg: string): Promise<string> {
 export function onAuthStateUpdate(callback: (authState?: AuthState) => void) {
 	// trigger callback immediately
 	const c = window.localStorage.getItem(authPath)
-	if (c) {
+	const te = window.localStorage.getItem(tokenExpiredAtPath)
+	if (c && te && Date.now() < parseInt(te)) {
 		const as = JSON.parse(c) as AuthState
 		callback(as)
 	} else {
