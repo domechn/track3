@@ -8,6 +8,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 
 import _ from "lodash";
 import {
+  forceSyncAssetsToCloudFromLocal,
   getCloudSyncConfiguration,
   getLocalLastSyncTime,
   getPublicKey,
@@ -51,7 +52,7 @@ const App = ({
 
     getCloudSyncConfiguration().then((config) => {
       setEnableAutoSync(config.enableAutoSync);
-    })
+    });
   }, []);
 
   useEffect(() => {
@@ -61,17 +62,21 @@ const App = ({
   useEffect(() => {
     saveCloudSyncConfiguration({
       enableAutoSync,
-    })
+    });
   }, [enableAutoSync]);
 
-  async function syncDataBetweenCloudAndLocal() {
+  // if force is true, replace all data in cloud with local data
+  // if force is false, only sync data that is updated after lastSyncAt
+  async function syncDataBetweenCloudAndLocal(force = false) {
     setLoading(true);
     try {
       // query last cloud sync time
       const pk = publicKey || (await getPublicKey());
       const lastSyncAt = await getLocalLastSyncTime(pk);
 
-      const updated = await syncAssetsToCloudAndLocal(pk, lastSyncAt);
+      const updated = force
+        ? await forceSyncAssetsToCloudFromLocal(pk)
+        : await syncAssetsToCloudAndLocal(pk, lastSyncAt);
       if (updated) {
         toast.success("data is synced successfully");
       } else {
@@ -143,7 +148,7 @@ const App = ({
       const msg = e.message || e;
       if (msg.includes("400")) {
         toast.error("invalid verification code");
-        return
+        return;
       }
       toast.error(e.message || e);
     } finally {
@@ -198,18 +203,30 @@ const App = ({
     <div className="dataManagement">
       <h2>Data Center</h2>
       <div>
-        <h3 style={{
-          marginBottom: 0,
-        }}>Cloud Data Sync {!isLogin && "( Need Login )"}</h3>
-        <sub style={{
-          color: "gray",
-        }}>Powered by polybase.xyz</sub>
+        <h3
+          style={{
+            marginBottom: 0,
+          }}
+        >
+          Cloud Data Sync {!isLogin && "( Need Login )"}
+        </h3>
+        <sub
+          style={{
+            color: "gray",
+          }}
+        >
+          Powered by polybase.xyz
+        </sub>
         {isLogin ? (
           <div>
-            <h4 style={{
-              marginTop: 5,
-              marginBottom: 5,
-            }}>User: {loginEmail}</h4>
+            <h4
+              style={{
+                marginTop: 5,
+                marginBottom: 5,
+              }}
+            >
+              User: {loginEmail}
+            </h4>
             <button
               style={{
                 marginTop: 0,
@@ -238,7 +255,7 @@ const App = ({
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value)}
                 placeholder="code"
-                type='number'
+                type="number"
                 style={{
                   width: "130px",
                 }}
@@ -299,9 +316,20 @@ const App = ({
             style={{
               marginTop: 10,
             }}
-            onClick={syncDataBetweenCloudAndLocal}
+            onClick={()=>syncDataBetweenCloudAndLocal()}
           >
             Sync Data ( Beta )
+          </button>
+          <br />
+          <button
+            style={{
+              marginTop: 10,
+              backgroundColor: "#FF4500",
+              color: "white",
+            }}
+            onClick={()=>syncDataBetweenCloudAndLocal(true)}
+          >
+            Hard Sync Data ( Beta )
           </button>
         </div>
       )}
