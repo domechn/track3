@@ -306,7 +306,7 @@ async function removeAssetsInCloud(assets: AssetModel[]): Promise<number> {
 		}
 		await bluebird.map(records.data, async (record) => {
 			return p.collection<CloudAssetModel>(RECORD_COLLECTION_NAME).record(record.data.id).call("del", [])
-		})
+		}, { concurrency: 5 })
 		return 1
 	}, { concurrency: 5 })
 
