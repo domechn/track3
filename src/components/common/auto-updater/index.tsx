@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { checkUpdate, installUpdate } from "@tauri-apps/api/updater";
 import { relaunch } from "@tauri-apps/api/process";
 import toast from "react-hot-toast";
-import loadingIcon from "../../../assets/icons/loading.png";
 import "./index.css";
 
 const i32Max = 2147483647;
@@ -10,56 +9,38 @@ const toastId = "auto-updater";
 
 const App = () => {
   useEffect(() => {
-    autoCheckUpdater();
+    autoInstallLatestVersion();
   }, []);
 
-  // cannot use useState here
-  let buttonEnabled = true;
-
-  function autoCheckUpdater() {
-    checkUpdate().then((res) => {
-      if (res.shouldUpdate && res.manifest?.version) {
-        toast.custom(renderUpdater(res.manifest?.version), {
-          id: toastId,
-          duration: i32Max,
-          position: "bottom-right",
-        });
-      }
-    });
+  function autoInstallLatestVersion() {
+    checkUpdate()
+      .then(async (res) => {
+        if (res.shouldUpdate && res.manifest?.version) {
+           await installUpdate();
+           return true
+        }
+        return false
+      })
+      .then((installed) => {
+        if (installed) {
+          toast.custom(renderUpdater(), {
+            id: toastId,
+            duration: i32Max,
+            position: "bottom-right",
+          });
+        }
+      });
   }
 
-  function installAndRelaunch() {
-    if (!buttonEnabled) {
-      return;
-    }
-
-    buttonEnabled = false;
-    const buttonLoading = document.getElementById("auto-updater-loading-icon");
-    buttonLoading!.style.display = "inline-block";
-    const loadingId = toastId + "-loading";
-
-    toast.loading("Downloading update...", {
-      id: loadingId,
-      duration: i32Max,
-    });
-    installUpdate()
-      .then(() => {
-        relaunch();
-      })
-      .catch((err) => {
-        toast.error(err);
-      })
-      .finally(() => {
-        toast.remove(loadingId);
-        buttonEnabled = true;
-      });
+  function reloadApp() {
+    return relaunch();
   }
 
   function onToastCloseClick() {
     toast.remove(toastId);
   }
 
-  function renderUpdater(version: string) {
+  function renderUpdater() {
     return (
       <div
         className="auto-updater"
@@ -71,14 +52,14 @@ const App = () => {
           willChange: "transform",
           boxShadow:
             "0 3px 10px rgba(0, 0, 0, 0.1), 0 3px 3px rgba(0, 0, 0, 0.05)",
-          width: "350px",
+          width: "250px",
           pointerEvents: "auto",
           padding: "8px 25px",
           borderRadius: "8px",
         }}
       >
         <div className="auto-updater-row title">
-          🔥 Update v{version} available
+          🔥 New version available!
         </div>
         <a
           onClick={onToastCloseClick}
@@ -107,25 +88,12 @@ const App = () => {
         </a>
         <button
           className="auto-updater-row"
-          onClick={installAndRelaunch}
+          onClick={reloadApp}
           style={{
             textAlign: "center",
           }}
         >
-          <img
-            id="auto-updater-loading-icon"
-            src={loadingIcon}
-            style={{
-              height: "0.8em",
-              width: "0.8em",
-              position: "relative",
-              top: "0.1em",
-              left: "-0.3em",
-              animation: "spin 1s linear infinite",
-              display: "none",
-            }}
-          />
-          Install update and relaunch
+          Reload
         </button>
       </div>
     );
