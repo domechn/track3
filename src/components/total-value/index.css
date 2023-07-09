@@ -1,6 +1,6 @@
 .totalValue {
+  display: inline-block;
   font-weight: bold;
-  width: 60%;
   color: black;
 }
 
