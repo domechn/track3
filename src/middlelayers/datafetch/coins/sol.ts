@@ -3,6 +3,7 @@ import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
+import { getAddressList } from '../utils/address'
 
 export class SOLAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'sol'>
@@ -31,7 +32,7 @@ export class SOLAnalyzer implements Analyzer {
 	}
 
 	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await asyncMap(this.config.sol.addresses || [], async addr => this.query(addr), 1, 1000)
+		const coinLists = await asyncMap(getAddressList(this.config.sol) || [], async addr => this.query(addr), 1, 1000)
 		return [{
 			symbol: "SOL",
 			amount: _(coinLists).sum(),
