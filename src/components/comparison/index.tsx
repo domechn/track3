@@ -253,6 +253,13 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     );
   }
 
+  function buttonGroupItemStyle() {
+    return {
+      height: 25,
+      width: 40,
+    };
+  }
+
   return (
     <>
       <h1
@@ -278,6 +285,37 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       </a>
 
       <div id="comparison-container" className="comparison-container">
+        <div
+          style={{
+            marginBottom: 10,
+          }}
+        >
+          <div
+            style={{
+              display: "inline-block",
+              color: "gray",
+              width: (windowSize.width ?? 0) * 0.8 - 190,
+              fontSize: "15px",
+              overflow: "auto",
+              textAlign: "right",
+            }}
+          >
+            Quick Compare
+          </div>
+          <div
+            className="button-group"
+            style={{
+              display: "inline-block",
+              minWidth: "20%",
+              float: "right",
+            }}
+          >
+            <button style={buttonGroupItemStyle()}>7D</button>
+            <button style={buttonGroupItemStyle()}>1M</button>
+            <button style={buttonGroupItemStyle()}>1Q</button>
+            <button style={buttonGroupItemStyle()}>1Y</button>
+          </div>
+        </div>
         <div className="comparison-date-picker">
           <div className="comparison-date-picker-item">
             <Select
