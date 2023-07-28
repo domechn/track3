@@ -3,6 +3,12 @@ import { currencyWrapper } from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
 import "./index.css";
 
+const emojiMap = {
+  up: "😄",
+  down: "😢",
+  else: "😑",
+};
+
 const App = ({
   data,
   currency,
@@ -47,11 +53,25 @@ const App = ({
     return `${size}vw`;
   }
 
+  function changePercentageEmoji() {
+    if (data.changePercentage === 0) {
+      return emojiMap["else"];
+    }
+    return data.changePercentage > 0 ? emojiMap["up"] : emojiMap["down"];
+  }
+
   function changePercentageColorClass() {
     if (data.changePercentage === 0) {
       return "";
     }
     return data.changePercentage > 0 ? "positive" : "negative";
+  }
+
+  function totalValueStyle() {
+    return {
+      fontSize: totalValueFontSize(),
+      lineHeight: totalValueFontSize(),
+    };
   }
 
   return (
@@ -72,9 +92,15 @@ const App = ({
         <span
           className="totalValue"
           style={{
-            fontSize: totalValueFontSize(),
-            lineHeight: totalValueFontSize(),
+            ...totalValueStyle(),
+            marginRight: 5,
           }}
+        >
+          {changePercentageEmoji()}
+        </span>
+        <span
+          className="totalValue"
+          style={totalValueStyle()}
         >
           {formatTotalValue()}
         </span>
