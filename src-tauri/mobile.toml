@@ -1,0 +1,8 @@
+[app]
+name = "track3"
+stylized-name = "Track3"
+domain = "track3.dev"
+template-pack = "wry"
+
+[apple]
+development-team = "domechn"

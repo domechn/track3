@@ -39,3 +39,6 @@ custom-protocol = ["tauri/custom-protocol"]
 branch = "v1"
 features = ["sqlite"] # or "postgres", or "mysql"
 git = "https://github.com/tauri-apps/plugins-workspace"
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
