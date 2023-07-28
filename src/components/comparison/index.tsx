@@ -11,12 +11,15 @@ import viewIcon from "../../assets/icons/view-icon.png";
 import hideIcon from "../../assets/icons/hide-icon.png";
 import { currencyWrapper } from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
+import { parseDateToTS } from "../../utils/date";
 
 type ComparisonData = {
   name: string;
   base: number;
   head: number;
 };
+
+type QuickCompareType = "7D" | "1M" | "1Q" | "1Y";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const [baseId, setBaseId] = useState<string>("");
@@ -26,6 +29,9 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       value: string;
     }[]
   >([]);
+
+  const [currentQuickCompare, setCurrentQuickCompare] =
+    useState<QuickCompareType | null>(null);
 
   const windowSize = useWindowSize();
 
@@ -85,6 +91,76 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     loadDataById(headId).then((data) => setHeadData(data));
   }, [headId]);
 
+  // update button style
+  useEffect(() => {
+    const buttons = document.getElementsByClassName("active");
+    for (let i = 0; i < buttons.length; i++) {
+      if (
+        ["7D", "1M", "1Q", "1Y"]
+          .map((i) => getQuickCompareWholeKey(i as QuickCompareType))
+          .includes(buttons[i].id)
+      ) {
+        buttons[i].classList.remove("active");
+      }
+    }
+
+    if (!currentQuickCompare) {
+      return;
+    }
+
+    document
+      .getElementById(
+        getQuickCompareWholeKey(currentQuickCompare as QuickCompareType)
+      )
+      ?.classList.add("active");
+  }, [currentQuickCompare]);
+
+  // update quick compare data ( baseId and headId )
+  useEffect(() => {
+    if (!currentQuickCompare) {
+      return;
+    }
+
+    // set headId to latest
+    const latestDate = dateOptions[0];
+    setHeadId(latestDate.value);
+
+    // get days from QuickCompareType
+    const days = parseDaysQuickCompareType(currentQuickCompare);
+    const baseDate = new Date(
+      parseDateToTS(latestDate.label) - days * 24 * 60 * 60 * 1000
+    );
+
+    // find the closest date
+    const closestDate = _(dateOptions)
+      .map((d) => ({
+        ...d,
+        diff: Math.abs(parseDateToTS(d.label) - baseDate.getTime()),
+      }))
+      .sortBy("diff")
+      .first();
+
+    if (!closestDate) {
+      return;
+    }
+    setBaseId(closestDate?.value);
+  }, [currentQuickCompare]);
+
+  function parseDaysQuickCompareType(type: QuickCompareType): number {
+    switch (type) {
+      case "7D":
+        return 7;
+      case "1M":
+        return 30;
+      case "1Q":
+        return 90;
+      case "1Y":
+        return 365;
+      default:
+        return 0;
+    }
+  }
+
   async function loadAllSelectDates(): Promise<
     {
       id: string;
@@ -95,11 +171,20 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   }
 
   function onBaseSelectChange(id: string) {
-    setBaseId(id);
+    return onSelectChange(id, "base");
   }
 
   function onHeadSelectChange(id: string) {
-    setHeadId(id);
+    return onSelectChange(id, "head");
+  }
+
+  function onSelectChange(id: string, type: "base" | "head") {
+    setCurrentQuickCompare(null);
+    if (type === "base") {
+      setBaseId(id);
+    } else {
+      setHeadId(id);
+    }
   }
 
   function onViewOrHideClick() {
@@ -253,6 +338,21 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     );
   }
 
+  function buttonGroupItemStyle() {
+    return {
+      height: 25,
+      width: 40,
+    };
+  }
+
+  function getQuickCompareWholeKey(type: QuickCompareType) {
+    return "quick-compare-" + type;
+  }
+
+  function onQuickCompareButtonClick(type: QuickCompareType) {
+    setCurrentQuickCompare(type);
+  }
+
   return (
     <>
       <h1
@@ -278,6 +378,65 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       </a>
 
       <div id="comparison-container" className="comparison-container">
+        <div
+          style={{
+            marginBottom: 10,
+          }}
+        >
+          <div
+            style={{
+              display: "inline-block",
+              color: "gray",
+              width: (windowSize.width ?? 0) * 0.8 - 190,
+              fontSize: 15,
+              overflow: "auto",
+              textAlign: "right",
+            }}
+          >
+            Quick Compare
+          </div>
+          <div
+            className="button-group"
+            style={{
+              display: "inline-block",
+              minWidth: "20%",
+              float: "right",
+            }}
+          >
+            <button
+              id={getQuickCompareWholeKey("7D")}
+              className="quick-compare-button"
+              style={buttonGroupItemStyle()}
+              onClick={() => onQuickCompareButtonClick("7D")}
+            >
+              7D
+            </button>
+            <button
+              id={getQuickCompareWholeKey("1M")}
+              className="quick-compare-button"
+              style={buttonGroupItemStyle()}
+              onClick={() => onQuickCompareButtonClick("1M")}
+            >
+              1M
+            </button>
+            <button
+              id={getQuickCompareWholeKey("1Q")}
+              className="quick-compare-button"
+              style={buttonGroupItemStyle()}
+              onClick={() => onQuickCompareButtonClick("1Q")}
+            >
+              1Q
+            </button>
+            <button
+              id={getQuickCompareWholeKey("1Y")}
+              className="quick-compare-button"
+              style={buttonGroupItemStyle()}
+              onClick={() => onQuickCompareButtonClick("1Y")}
+            >
+              1Y
+            </button>
+          </div>
+        </div>
         <div className="comparison-date-picker">
           <div className="comparison-date-picker-item">
             <Select
