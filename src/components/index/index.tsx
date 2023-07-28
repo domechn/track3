@@ -173,7 +173,7 @@ const App = () => {
     // set a loading delay to show the loading animation
     setTimeout(() => {
       loadAllDataAsync(size).finally(() => setLoading(false));
-    }, 200);
+    }, 100);
   }
 
   function onMenuClicked() {
