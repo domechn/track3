@@ -70,8 +70,7 @@ const App = () => {
   );
 
   const [showMenu, setShowMenu] = useState(false);
-  // todo: revert to overview
-  const [activeMenu, setActiveMenu] = useState("comparison");
+  const [activeMenu, setActiveMenu] = useState("overview");
 
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData

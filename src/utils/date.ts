@@ -13,3 +13,8 @@ export const timestampToDate = (timestamp: number, showTime = false) => {
 	const timeStr = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 	return `${dateStr} ${timeStr}`
 }
+
+export const parseDateToTS = (dateStr: string): number => {
+	const [year, month, day] = dateStr.split('-').map(Number)
+	return new Date(year, month - 1, day).getTime()
+}
