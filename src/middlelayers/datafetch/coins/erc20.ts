@@ -3,6 +3,7 @@ import _ from 'lodash'
 import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
 import { invoke } from '@tauri-apps/api'
+import { getAddressList } from '../utils/address'
 
 type DeBankAssetResp = {
 	coin_list: Coin[]
@@ -89,14 +90,14 @@ export class ERC20Analyzer implements Analyzer {
 			if (max <= 0) {
 				throw new Error("failed to query erc20 assets")
 			}
-			const coinLists = await asyncMap(this.config.erc20.addresses || [], async addr => this.query(addr), 1, 1000)
+			const coinLists = await asyncMap(getAddressList(this.config.erc20), async addr => this.query(addr), 1, 1000)
 
 			return _(coinLists).flatten().value()
 		} catch (e) {
 			if (e instanceof Error && e.message.includes("429")) {
 				console.error("failed to query erc20 assets due to 429, retrying...")
 				if (!this.errorResolver.isTried()) {
-					await this.errorResolver.tryResolve(this.config.erc20.addresses?.[0])
+					await this.errorResolver.tryResolve(getAddressList(this.config.erc20)[0])
 				}
 				// sleep 5s
 				await new Promise(resolve => setTimeout(resolve, 5000))

@@ -8,7 +8,11 @@ import {
 import { toast } from "react-hot-toast";
 import yaml from "yaml";
 import deleteIcon from "../../assets/icons/delete-icon.png";
-import { GlobalConfig, TokenConfig } from "../../middlelayers/datafetch/types";
+import {
+  Addresses,
+  GlobalConfig,
+  TokenConfig,
+} from "../../middlelayers/datafetch/types";
 import Select, { SelectOption } from "../common/select";
 import { LoadingContext } from "../../App";
 import { CurrencyRateDetail } from "../../middlelayers/types";
@@ -56,12 +60,14 @@ const Configuration = ({
   const [wallets, setWallets] = useState<
     {
       type: string;
+      alias?: string;
       address: string;
     }[]
   >([]);
 
   const [exchanges, setExchanges] = useState<
     {
+      alias?: string;
       type: string;
       apiKey: string;
       secret: string;
@@ -132,18 +138,31 @@ const Configuration = ({
           _(globalConfig.exchanges)
             .map((ex) => ({
               type: ex.name,
+              alias: ex.alias,
               apiKey: ex.initParams.apiKey,
               secret: ex.initParams.secret,
               password: ex.initParams.password,
             }))
             .value()
         );
+        console.log(globalConfig);
+
         setWallets(
           _(globalConfig)
             .pick(supportCoins)
-            .map((v: any, k) =>
+            .map((v: any, k: string) =>
               _(v.addresses)
-                .map((a) => ({ type: k, address: a }))
+                .map((a) => {
+                  if (_(a).isString()) {
+                    return { type: k, address: a };
+                  }
+                  const na = a as { address: string; alias?: string };
+                  return {
+                    type: k,
+                    address: na.address,
+                    alias: na.alias,
+                  };
+                })
                 .value()
             )
             .flatten()
@@ -182,6 +201,7 @@ const Configuration = ({
     const exchangesData = _(exchanges)
       .map((ex) => ({
         name: ex.type,
+        alias: ex.alias,
         initParams: {
           apiKey: ex.apiKey,
           secret: ex.secret,
@@ -194,7 +214,10 @@ const Configuration = ({
       .groupBy("type")
       .mapValues((ws) => ({
         addresses: _(ws)
-          .map((w) => w.address)
+          .map((w) => ({
+            alias: w.alias,
+            address: w.address,
+          }))
           .value(),
       }))
       .value() as any as TokenConfig;
@@ -219,6 +242,7 @@ const Configuration = ({
   function renderExchangeForm(
     exs: {
       type: string;
+      alias?: string;
       apiKey: string;
       secret: string;
       password?: string;
@@ -227,9 +251,9 @@ const Configuration = ({
     const getInputWidth = (type: string) => {
       switch (type) {
         case "binance":
-          return 200;
+          return 190;
         case "okex":
-          return 130;
+          return 120;
         default:
           return 200;
       }
@@ -248,6 +272,20 @@ const Configuration = ({
                 value={ex.type}
                 width={selectWidth}
                 height={selectHeight}
+              />
+            </label>
+            <label>
+              <input
+                type="text"
+                name="alias"
+                placeholder="alias"
+                value={ex.alias}
+                style={{
+                  width: 55,
+                }}
+                onChange={(e) =>
+                  handleExchangeChange(idx, "alias", e.target.value)
+                }
               />
             </label>
             <label>
@@ -307,7 +345,9 @@ const Configuration = ({
     setWallets([...newWs]);
   }
 
-  function renderWalletForm(ws: { type: string; address: string }[]) {
+  function renderWalletForm(
+    ws: { type: string; alias?: string; address: string }[]
+  ) {
     return _(ws)
       .map((w, idx) => {
         return (
@@ -336,6 +376,20 @@ const Configuration = ({
                 value={w.type}
                 width={selectWidth}
                 height={selectHeight}
+              />
+            </label>
+            <label>
+              <input
+                type="text"
+                name="alias"
+                placeholder="alias"
+                value={w.alias}
+                style={{
+                  width: 55,
+                }}
+                onChange={(e) =>
+                  handleWalletChange(idx, "alias", e.target.value)
+                }
               />
             </label>
             <label>
@@ -501,7 +555,7 @@ const Configuration = ({
               value={querySize + ""}
             />
           </label>
-          <br/>
+          <br />
           <label>
             <span
               style={{

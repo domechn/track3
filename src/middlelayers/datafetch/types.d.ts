@@ -18,16 +18,21 @@ export type GlobalConfig = CexConfig & TokenConfig & {
 
 export type CexConfig = {
 	exchanges: {
-		name: string, initParams: {
+		name: string,
+		initParams: {
 			apiKey: string
 			secret: string
 			password?: string
-		}
+		},
+		alias?: string
 	}[]
 }
 
-type Addresses = {
-	addresses?: string[]
+export type Addresses = {
+	addresses?: (string | {
+		address: string
+		alias?: string
+	})[]
 }
 
 export type TokenConfig = {

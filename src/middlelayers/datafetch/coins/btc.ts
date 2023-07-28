@@ -2,6 +2,7 @@ import { Analyzer, Coin, TokenConfig } from '../types'
 import _ from 'lodash'
 import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
+import { getAddressList } from '../utils/address'
 
 interface BTCQuerier {
 	query(address: string): Promise<number>
@@ -34,7 +35,7 @@ export class BTCAnalyzer implements Analyzer {
 	}
 
 	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await asyncMap(this.config.btc.addresses || [], async addr => this.query(addr), 1, 1000)
+		const coinLists = await asyncMap(getAddressList(this.config.btc) || [], async addr => this.query(addr), 1, 1000)
 		return [{
 			symbol: "BTC",
 			amount: _(coinLists).sum(),
