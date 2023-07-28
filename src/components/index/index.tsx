@@ -15,6 +15,7 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import HistoricalData from "../historical-data";
 import Overview from "../overview";
 import Comparison from "../comparison";
+import WalletAnalyzer from "../wallet-analyzer";
 import "./index.css";
 import menuIcon from "../../assets/icons/menu-icon.png";
 
@@ -205,6 +206,7 @@ const App = () => {
         <ul>
           <li onClick={() => onMenuClicked("overview")}>Overview</li>
           <li onClick={() => onMenuClicked("comparison")}>Comparison</li>
+          {/* <li onClick={() => onMenuClicked("wallets")}>Wallets</li> */}
         </ul>
       </div>
     );
@@ -276,7 +278,13 @@ const App = () => {
 
         {activeMenu === "comparison" && (
           <div id="comparison">
-            <Comparison currency={currentCurrency}/>
+            <Comparison currency={currentCurrency} />
+          </div>
+        )}
+
+        {activeMenu === "wallets" && (
+          <div id="wallets">
+            <WalletAnalyzer />
           </div>
         )}
       </div>
