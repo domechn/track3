@@ -104,6 +104,10 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       }
     }
 
+    if (!currentQuickCompare) {
+      return;
+    }
+
     document
       .getElementById(
         getQuickCompareWholeKey(currentQuickCompare as QuickCompareType)

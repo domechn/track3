@@ -1,5 +1,3 @@
-const offset = -(new Date().getTimezoneOffset() * 60 * 1000)
-
 const pad = (n: number) => n < 10 ? `0${n}` : '' + n
 
 export const timestampToDate = (timestamp: number, showTime = false) => {
