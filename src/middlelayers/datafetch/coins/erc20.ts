@@ -1,4 +1,4 @@
-import { Analyzer, Coin, TokenConfig } from '../types'
+import { Analyzer, Coin, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
@@ -48,7 +48,6 @@ class DeBank429ErrorResolverImpl implements DeBank429ErrorResolver {
 
 		await invoke("close_debank_window")
 	}
-
 }
 
 export class ERC20Analyzer implements Analyzer {
@@ -65,7 +64,7 @@ export class ERC20Analyzer implements Analyzer {
 		return "ERC20 Analyzer"
 	}
 
-	private async query(address: string): Promise<Coin[]> {
+	private async query(address: string): Promise<WalletCoin[]> {
 		const url = `${this.queryUrl}?user_addr=${address}`
 		const { data } = await sendHttpRequest<{ data: DeBankAssetResp }>("GET", url, 5000, {})
 		if (!data) {
@@ -73,10 +72,13 @@ export class ERC20Analyzer implements Analyzer {
 		}
 		console.debug("erc20 assets", data)
 
-		return _([data.coin_list, data.token_list]).flatten().value()
+		return _([data.coin_list, data.token_list]).flatten().map(c=>({
+			...c,
+			wallet: address
+		})).value()
 	}
 
-	async loadPortfolio(): Promise<Coin[]> {
+	async loadPortfolio(): Promise<WalletCoin[]> {
 		return this.loadPortfolioWith429Retry(5)
 			.finally(async () => {
 				if (this.errorResolver.isTried()) {
@@ -85,7 +87,7 @@ export class ERC20Analyzer implements Analyzer {
 			})
 	}
 
-	async loadPortfolioWith429Retry(max: number): Promise<Coin[]> {
+	async loadPortfolioWith429Retry(max: number): Promise<WalletCoin[]> {
 		try {
 			if (max <= 0) {
 				throw new Error("failed to query erc20 assets")

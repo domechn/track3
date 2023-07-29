@@ -1,9 +1,10 @@
 import _ from "lodash"
 import Database from "tauri-plugin-sql-api"
 import { v4 as uuidv4 } from 'uuid'
-import { Coin, CoinModel } from './datafetch/types'
+import { Coin, CoinModel, WalletCoin } from './datafetch/types'
 import { AssetModel } from './types'
 import { ASSETS_TABLE_NAME } from './charts'
+import md5 from 'md5'
 
 export const databaseName = "track3.db"
 
@@ -18,13 +19,14 @@ export async function getDatabase(): Promise<Database> {
 }
 
 // skip where value is less than 1
-export async function saveCoinsToDatabase(coins: (Coin & {
+export async function saveCoinsToDatabase(coins: (WalletCoin & {
 	price: number,
 	usdValue: number,
 })[]) {
 	const db = await getDatabase()
 
 	return saveToDatabase(db, _(coins).map(t => ({
+		wallet: t.wallet,
 		symbol: t.symbol,
 		amount: t.amount,
 		value: t.usdValue,
@@ -38,7 +40,6 @@ async function saveToDatabase(db: Database, models: CoinModel[]): Promise<void> 
 
 	const uid = uuidv4()
 
-
 	const getDBModel = (models: CoinModel[]) => {
 
 		return _(models).filter(m => m.amount !== 0).map(m => ({
@@ -48,6 +49,8 @@ async function saveToDatabase(db: Database, models: CoinModel[]): Promise<void> 
 			amount: m.amount,
 			value: m.value,
 			price: m.value / m.amount,
+			// md5 of wallet
+			wallet: md5(m.wallet),
 		} as AssetModel)).value()
 
 	}

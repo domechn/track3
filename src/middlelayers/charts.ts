@@ -7,7 +7,7 @@ import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, H
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
-import { CexConfig, Coin, TokenConfig } from './datafetch/types'
+import { CexConfig, Coin, TokenConfig, WalletCoin } from './datafetch/types'
 import { timestampToDate } from '../utils/date'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
@@ -19,7 +19,7 @@ export async function refreshAllData() {
 	await saveCoinsToDatabase(coins)
 }
 
-async function queryCoinsData(): Promise<(Coin & {
+async function queryCoinsData(): Promise<(WalletCoin & {
 	price: number,
 	usdValue: number,
 })[]> {
@@ -31,15 +31,21 @@ async function queryCoinsData(): Promise<(Coin & {
 	const assets = await loadPortfolios(config)
 	const priceMap = await queryCoinPrices(_(assets).map("symbol").push("USDT").uniq().value())
 
-	let lastAssets = assets
+	let lastAssets = _.clone(assets)
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
 
 	if (groupUSD) {
-		const usdValue = _(assets).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
-		lastAssets = _(assets).remove(c => !STABLE_COIN.includes(c.symbol)).value()
-		lastAssets.push({
-			symbol: "USDT",
-			amount: usdValue,
+		_(assets).groupBy('wallet').forEach((coins, wallet) => {
+			const usdAmount = _(coins).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
+			const removedUSDCoins = _(coins).filter(c => !STABLE_COIN.includes(c.symbol)).value()
+			lastAssets = _(lastAssets).filter(a=>a.wallet !== wallet).concat(removedUSDCoins).value()
+			if (usdAmount > 0) {
+				lastAssets.push({
+					symbol: "USDT",
+					amount: usdAmount,
+					wallet,
+				})
+			}
 		})
 	}
 	const totals = calculateTotalValue(lastAssets, priceMap)

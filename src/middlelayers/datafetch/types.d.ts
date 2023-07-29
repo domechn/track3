@@ -3,9 +3,11 @@ export type Coin = {
 	amount: number
 }
 
+export type WalletCoin = Coin & { wallet: string }
+
 export interface Analyzer {
 	getAnalyzeName(): string
-	loadPortfolio(): Promise<Coin[]>
+	loadPortfolio(): Promise<WalletCoin[]>
 }
 
 export type GlobalConfig = CexConfig & TokenConfig & {
@@ -46,7 +48,7 @@ export type TokenConfig = {
 	}[]
 }
 
-export type CoinModel = Coin & {
+export type CoinModel = WalletCoin & {
 	value: number
 }
 

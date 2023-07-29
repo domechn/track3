@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS assets_v2 (
 	uuid TEXT NOT NULL,
 	createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
 	wallet TEXT,
-	walletAlias TEXT,
 	symbol TEXT NOT NULL,
 	amount REAL NOT NULL,
 	value REAL NOT NULL,

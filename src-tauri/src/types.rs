@@ -69,7 +69,6 @@ pub struct AssetsV2 {
     pub price: f64,
 
     pub wallet: Option<String>,
-    pub wallet_alias: Option<String>,
 }
 
 #[derive(FromRow, Debug)]

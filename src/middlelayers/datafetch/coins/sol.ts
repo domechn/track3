@@ -1,4 +1,4 @@
-import { Analyzer, Coin, TokenConfig } from '../types'
+import { Analyzer, Coin, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import { asyncMap } from '../utils/async'
@@ -31,12 +31,18 @@ export class SOLAnalyzer implements Analyzer {
 		return amount
 	}
 
-	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await asyncMap(getAddressList(this.config.sol) || [], async addr => this.query(addr), 1, 1000)
-		return [{
-			symbol: "SOL",
-			amount: _(coinLists).sum(),
-		}]
+	async loadPortfolio(): Promise<WalletCoin[]> {
+		const coinLists = await asyncMap(getAddressList(this.config.sol) || [], async wallet => {
+			const amount = await this.query(wallet)
+			return {
+				amount,
+				wallet,
+			}
+		}, 1, 1000)
+		return _(coinLists).map(c => ({
+			...c,
+			symbol: "SOL"
+		})).value()
 	}
 }
 

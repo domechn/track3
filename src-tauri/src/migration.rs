@@ -221,7 +221,6 @@ fn asset_v1_model_to_v2(
         price: value / amount,
         created_at,
         wallet: None,
-        wallet_alias: None,
     };
 
     return Some(data);
@@ -376,7 +375,6 @@ fn move_data_from_assets_to_v2(data: Vec<AssetsV1>) -> Vec<AssetsV2> {
                     price: 1.0,
                     created_at: ca.clone(),
                     wallet: None,
-                    wallet_alias: None,
                 });
             }
         }

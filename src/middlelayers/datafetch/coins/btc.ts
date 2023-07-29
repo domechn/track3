@@ -1,4 +1,4 @@
-import { Analyzer, Coin, TokenConfig } from '../types'
+import { Analyzer, Coin, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
@@ -34,12 +34,18 @@ export class BTCAnalyzer implements Analyzer {
 		throw new Error("All BTC queriers failed")
 	}
 
-	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await asyncMap(getAddressList(this.config.btc) || [], async addr => this.query(addr), 1, 1000)
-		return [{
-			symbol: "BTC",
-			amount: _(coinLists).sum(),
-		}]
+	async loadPortfolio(): Promise<WalletCoin[]> {
+		const coinLists = await asyncMap(getAddressList(this.config.btc) || [], async wallet => {
+			const amount = await this.query(wallet)
+			return {
+				amount,
+				wallet,
+			}
+		}, 1, 1000)
+		return _(coinLists).map(c => ({
+			...c,
+			symbol: "BTC"
+		})).value()
 	}
 }
 
