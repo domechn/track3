@@ -318,13 +318,15 @@ async function removeAssetsInCloud(assets: AssetModel[]): Promise<number> {
 async function writeAssetsToDB(d: Database, assets: AssetModel[]): Promise<number> {
 	const insertValuesStr = assets.map(() => `(?, ?, ?, ?, ?, ?)`).join(", ")
 
-	await d.execute(`INSERT INTO ${ASSETS_TABLE_NAME} (uuid, createdAt, symbol, amount, value, price) VALUES ${insertValuesStr}`, _(assets).map((asset) => [
+	await d.execute(`INSERT INTO ${ASSETS_TABLE_NAME} (uuid, createdAt, symbol, amount, value, price, wallet, walletAlias) VALUES ${insertValuesStr}`, _(assets).map((asset) => [
 		asset.uuid,
 		asset.createdAt,
 		asset.symbol,
 		asset.amount,
 		asset.value,
 		asset.price,
+		asset.wallet,
+		asset.walletAlias,
 	]).flatten().value())
 
 	return assets.length
