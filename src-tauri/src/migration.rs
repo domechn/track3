@@ -6,8 +6,11 @@ use std::{
 use sqlx::{Connection, Executor, SqliteConnection};
 use tokio::runtime::Runtime;
 use uuid::Uuid;
+use version_compare::{compare_to, Cmp};
 
-use crate::types::{AssetsV1, AssetsV2};
+use crate::types::{AssetsV1, AssetsV2, Configuration};
+
+static VERSION_CONFIGURATION_ID: i32 = 999;
 
 pub fn is_first_run(path: &Path) -> bool {
     // check sqlite file exists
@@ -85,6 +88,36 @@ pub fn is_from_v01_to_v02(path: &Path) -> Result<bool, Box<dyn std::error::Error
     })?);
 }
 
+pub fn is_from_v02_to_v03(path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
+    let sqlite_path = get_sqlite_file_path(path);
+    let rt = Runtime::new().unwrap();
+    return Ok(rt.block_on(async move {
+        println!("check if from v0.2 to v0.3 in tokio spawn");
+        let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+        let data = sqlx::query_as::<_, Configuration>("select * from configuration where id = ?")
+            .bind(VERSION_CONFIGURATION_ID)
+            .fetch_one(&mut conn)
+            .await;
+        conn.close().await.unwrap();
+
+
+        let res = match data {
+            Ok(data) => Ok(compare_to(data.data ,"v0.3", Cmp::Lt) == Ok(true)),
+            Err(e) => {
+                // if error is RowNotFound, not need to migrate
+                match e {
+                    sqlx::Error::RowNotFound => Ok(true),
+                    _ => Err(e),
+                }
+            }
+        };
+
+        println!("check if from v0.2 to v0.3 in tokio spawn done, {:?}", res);
+
+        res
+    })?);
+}
+
 pub fn migrate_from_v01_to_v02(app_dir: &Path, resource_dir: &Path) {
     println!("migrate from v0.1 to v0.2");
     let sqlite_path = get_sqlite_file_path(app_dir);
@@ -135,6 +168,31 @@ pub fn migrate_from_v01_to_v02(app_dir: &Path, resource_dir: &Path) {
 	});
 }
 
+pub fn migrate_from_v02_to_v03(app_dir: &Path, resource_dir: &Path) {
+    println!("migrate from v0.2 to v0.3"); 
+    let sqlite_path = get_sqlite_file_path(app_dir);
+    let assets_v2 =
+        fs::read_to_string(resource_dir.join("migrations/v02t03/assets_v2_migrate.sql")).unwrap();
+
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async move {
+	    println!("migrate from v0.2 to v0.3 in tokio spawn");
+	    let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+	    conn.execute(assets_v2.as_str()).await.unwrap();
+
+        sqlx::query("INSERT INTO configuration (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = ?")
+            .bind(VERSION_CONFIGURATION_ID)
+            .bind("v0.3")
+            .bind("v0.3")
+            .execute(&mut conn)
+            .await
+            .unwrap();
+
+	    conn.close().await.unwrap();
+	    println!("migrate from v0.2 to v0.3 in tokio spawn done");
+	});
+}
+
 fn asset_v1_model_to_v2(
     uuid: String,
     created_at: String,
@@ -162,6 +220,8 @@ fn asset_v1_model_to_v2(
         value,
         price: value / amount,
         created_at,
+        wallet: None,
+        wallet_alias: None,
     };
 
     return Some(data);
@@ -315,6 +375,8 @@ fn move_data_from_assets_to_v2(data: Vec<AssetsV1>) -> Vec<AssetsV2> {
                     value: data_others.value,
                     price: 1.0,
                     created_at: ca.clone(),
+                    wallet: None,
+                    wallet_alias: None,
                 });
             }
         }

@@ -67,4 +67,13 @@ pub struct AssetsV2 {
     pub amount: f64,
     pub value: f64,
     pub price: f64,
+
+    pub wallet: Option<String>,
+    pub wallet_alias: Option<String>,
+}
+
+#[derive(FromRow, Debug)]
+pub struct Configuration {
+    pub id: i32,
+    pub data: String,
 }
