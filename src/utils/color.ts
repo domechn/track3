@@ -1,4 +1,4 @@
-import _, { random } from 'lodash'
+import _ from 'lodash'
 import ColorDiff from 'color-diff'
 
 const niceColors = [
@@ -16,20 +16,20 @@ const niceColors = [
 ]
 
 function generateRandomColor(): { R: number; G: number; B: number } {
-	let r = random(0, 255)
-	let g = random(0, 255)
-	let b = random(0, 255)
+	let r = _.random(0, 255)
+	let g = _.random(0, 255)
+	let b = _.random(0, 255)
 	// Check the color's brightness
 	let brightness = Math.sqrt(0.299 * r ** 2 + 0.587 * g ** 2 + 0.114 * b ** 2)
 	// Limit the brightness range
 	if (brightness < 130) {
-		brightness = random(130, 255)
+		brightness = _.random(130, 255)
 	}
 	// Check for clashing colors
 	if (r > 200 && g > 200 && b > 200) {
-		r = random(0, 200)
-		g = random(0, 200)
-		b = random(0, 200)
+		r = _.random(0, 200)
+		g = _.random(0, 200)
+		b = _.random(0, 200)
 	}
 	return {
 		R: r,

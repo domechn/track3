@@ -64,6 +64,22 @@ async function queryAssets(size = 1): Promise<AssetModel[][]> {
 	return _(assets).groupBy("createdAt").values().value()
 }
 
+function groupAssetModelsListBySymbol(models: AssetModel[][]): AssetModel[][] {
+	// sum by symbol
+	const res: AssetModel[][] = []
+
+	_(models).forEach(ms => res.push(groupAssetModelsBySymbol(ms)))
+	return res
+}
+
+function groupAssetModelsBySymbol(models: AssetModel[]): AssetModel[] {
+	return _(models).groupBy("symbol").values().map(assets => ({
+		..._(assets).first()!,
+		amount: _(assets).sumBy("amount"),
+		value: _(assets).sumBy("value"),
+	})).value()
+}
+
 export async function queryAssetsAfterCreatedAt(createdAt?: number): Promise<AssetModel[]> {
 	const db = await getDatabase()
 	const ts = createdAt ? new Date(createdAt).toISOString() : new Date(0).toISOString()
@@ -86,7 +102,7 @@ async function deleteAssetByUUID(uuid: string): Promise<void> {
 }
 
 export async function queryTotalValue(): Promise<TotalValueData> {
-	const results = await queryAssets(2)
+	const results = groupAssetModelsListBySymbol(await queryAssets(2))
 
 	if (results.length === 0) {
 		return {
@@ -117,7 +133,7 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 
 export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
 
-	const assets = await queryAssets(size) || []
+	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -155,7 +171,7 @@ export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
 }
 
 export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopCoinsPercentageChangeData> {
-	const assets = await queryAssets(size) || []
+	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -206,7 +222,7 @@ function getCoins(assets: AssetModel[][]): string[] {
 
 export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
 
-	const assets = await queryAssets(size) || []
+	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -220,7 +236,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	const size = 1
 	const backgroundColors = generateRandomColors(11) // top 10 and others
 
-	const assets = await queryAssets(size) || []
+	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
 	if (assets.length === 0) {
 		return []
 	}
@@ -257,7 +273,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndValueChangeData> {
 	const querySize = size * 2
 
-	const assets = await queryAssets(querySize) || []
+	const assets = groupAssetModelsListBySymbol(await queryAssets(querySize) || [])
 	if (!assets) {
 		return []
 	}
@@ -297,7 +313,7 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndV
 }
 
 export async function queryHistoricalData(size = 30): Promise<HistoricalData[]> {
-	const models = await queryAssets(size)
+	const models = groupAssetModelsListBySymbol(await queryAssets(size))
 
 	const assetsModelsToHistoricalData = (ams: AssetModel[]): HistoricalData => {
 		return {
@@ -316,7 +332,7 @@ export async function deleteHistoricalDataByUUID(uuid: string): Promise<void> {
 }
 
 export async function queryCoinDataById(id: string): Promise<CoinData[]> {
-	const models = await queryAssetByUUID(id)
+	const models = groupAssetModelsBySymbol(await queryAssetByUUID(id))
 
 	const res: CoinData[] = _(models)
 		.map(m => ({
@@ -332,7 +348,7 @@ export async function queryAllDataDates(): Promise<{
 	id: string
 	date: string
 }[]> {
-	const assets = await queryAssets(-1)
+	const assets = groupAssetModelsListBySymbol(await queryAssets(-1))
 
 	return _(assets)
 		.map(ass => _(ass).first())

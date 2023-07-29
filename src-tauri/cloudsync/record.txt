@@ -1,21 +1,21 @@
 collection Record {
 	id: string;
 
-    @read
-    @delegate
+  @read
+  @delegate
 	owner: User;
   
-    @read
-    @delegate
-    uuid: string;
+  @read
+  @delegate
+  uuid: string;
 
-    @read
-    @delegate
-    records: string;
+  @read
+  @delegate
+  records: string;
 
-    @read
-    @delegate
-    createdAt: number;
+  @read
+  @delegate
+  createdAt: number;
 
     
 	constructor (id: string, owner: User, uuid: string, records: string, createdAt: number) {
@@ -23,23 +23,23 @@ collection Record {
 	  
 	  this.owner = owner;
       
-      this.uuid = uuid;
-      this.records = records;
-      this.createdAt = createdAt;
+    this.uuid = uuid;
+    this.records = records;
+    this.createdAt = createdAt;
 	}
 
-    @call
-    @delegate
-    del () {
-        if (!ctx.publicKey) {
-          error("you must sign the txn");
-        }
+  @call
+  @delegate
+  del () {
+      if (!ctx.publicKey) {
+        error("you must sign the txn");
+      }
+    
+      if (this.owner.id != ctx.publicKey.toHex()) {
+        throw error("you cannot delete others' data");
+      }
       
-        if (this.owner.id != ctx.publicKey.toHex()) {
-          throw error("you cannot delete others' data");
-        }
-        
-        selfdestruct();
-    }
+      selfdestruct();
+  }
 
 }
