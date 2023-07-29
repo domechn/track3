@@ -1,7 +1,7 @@
 import _ from "lodash"
 import Database from "tauri-plugin-sql-api"
 import { v4 as uuidv4 } from 'uuid'
-import { Coin, CoinModel, WalletCoin } from './datafetch/types'
+import { CoinModel, WalletCoin } from './datafetch/types'
 import { AssetModel } from './types'
 import { ASSETS_TABLE_NAME } from './charts'
 import md5 from 'md5'

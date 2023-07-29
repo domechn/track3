@@ -1,5 +1,5 @@
 import _ from "lodash"
-import { Analyzer, CexConfig, Coin, WalletCoin } from '../../types'
+import { Analyzer, CexConfig, WalletCoin } from '../../types'
 import bluebird from 'bluebird'
 import { OtherCexExchanges } from './others'
 import { BinanceExchange } from './binance'

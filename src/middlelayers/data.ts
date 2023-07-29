@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api'
 import bluebird from 'bluebird'
-import { CexConfig, Coin, TokenConfig, WalletCoin } from './datafetch/types'
+import { CexConfig, TokenConfig, WalletCoin } from './datafetch/types'
 import { BTCAnalyzer } from './datafetch/coins/btc'
 import { combineCoinLists } from './datafetch/utils/coins'
 import { DOGEAnalyzer } from './datafetch/coins/doge'

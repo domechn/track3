@@ -1,4 +1,4 @@
-import { Coin, WalletCoin } from '../types'
+import { WalletCoin } from '../types'
 import _ from 'lodash'
 
 export function combineCoinLists(coinLists: WalletCoin[][]): WalletCoin[] {

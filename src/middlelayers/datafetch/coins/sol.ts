@@ -1,4 +1,4 @@
-import { Analyzer, Coin, TokenConfig, WalletCoin } from '../types'
+import { Analyzer, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import { asyncMap } from '../utils/async'

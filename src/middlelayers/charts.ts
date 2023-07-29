@@ -7,7 +7,7 @@ import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, H
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
-import { CexConfig, Coin, TokenConfig, WalletCoin } from './datafetch/types'
+import { CexConfig, TokenConfig, WalletCoin } from './datafetch/types'
 import { timestampToDate } from '../utils/date'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
