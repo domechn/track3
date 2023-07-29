@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api'
 import bluebird from 'bluebird'
-import { CexConfig, Coin, TokenConfig } from './datafetch/types'
+import { CexConfig, TokenConfig, WalletCoin } from './datafetch/types'
 import { BTCAnalyzer } from './datafetch/coins/btc'
 import { combineCoinLists } from './datafetch/utils/coins'
 import { DOGEAnalyzer } from './datafetch/coins/doge'
@@ -20,14 +20,14 @@ export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]:
 	return await invoke("query_coins_prices", { symbols })
 }
 
-export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<Coin[]> {
+export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
 
 	return loadPortfoliosByConfig(config)
 }
 
-async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<Coin[]> {
+async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
 	const anas = [ERC20Analyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
-	// const anas = [ ERC20Analyzer]
+	// const anas = [  CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
 	const coinLists = await bluebird.map(anas, async ana => {
 
 		const a = new ana(config)

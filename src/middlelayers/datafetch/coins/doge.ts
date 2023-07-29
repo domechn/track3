@@ -1,4 +1,4 @@
-import { Analyzer, Coin, TokenConfig } from '../types'
+import { Analyzer, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
@@ -34,12 +34,18 @@ export class DOGEAnalyzer implements Analyzer {
 		throw new Error("All DOGE queriers failed")
 	}
 
-	async loadPortfolio(): Promise<Coin[]> {
-		const coinLists = await asyncMap(getAddressList(this.config.doge), async addr => this.query(addr), 1, 1000)
-		return [{
-			symbol: "DOGE",
-			amount: _(coinLists).sum(),
-		}]
+	async loadPortfolio(): Promise<WalletCoin[]> {
+		const coinLists = await asyncMap(getAddressList(this.config.doge), async wallet => {
+			const amount = await this.query(wallet)
+			return {
+				amount,
+				wallet,
+			}
+		}, 1, 1000)
+		return _(coinLists).map(c => ({
+			...c,
+			symbol: "DOGE"
+		})).value()
 	}
 }
 

@@ -1,5 +1,5 @@
 import _ from "lodash"
-import { Analyzer, CexConfig, Coin } from '../../types'
+import { Analyzer, CexConfig, WalletCoin } from '../../types'
 import bluebird from 'bluebird'
 import { OtherCexExchanges } from './others'
 import { BinanceExchange } from './binance'
@@ -23,7 +23,7 @@ export class CexAnalyzer implements Analyzer {
 		this.config = config
 
 		this.exchanges = _(_(config).get("exchanges", [])).map(exCfg => {
-			console.log("loading exchange", exCfg.name);
+			console.log("loading exchange", exCfg.name)
 			switch (exCfg.name) {
 				case "binance":
 					return new BinanceExchange(exCfg.initParams.apiKey, exCfg.initParams.secret)
@@ -46,7 +46,7 @@ export class CexAnalyzer implements Analyzer {
 	async fetchTotalBalance(ex: Exchanger, ttl = 600): Promise<{ [k: string]: number }> {
 		const cc = CacheCenter.getInstance()
 		const cacheKey = `${ex.getIdentity()}_total_balance`
-		
+
 		const cacheResult = cc.getCache<{ [k: string]: number }>(cacheKey)
 		if (cacheResult) {
 			console.debug(`cache hit for exchange`)
@@ -58,12 +58,12 @@ export class CexAnalyzer implements Analyzer {
 		return portfolio
 	}
 
-	async loadPortfolio(): Promise<Coin[]> {
+	async loadPortfolio(): Promise<WalletCoin[]> {
 		const coinLists = await bluebird.map(this.exchanges, async ex => {
 			const portfolio = await this.fetchTotalBalance(ex)
 
 			// filter all keys are capital
-			return filterCoinsInPortfolio(portfolio)
+			return filterCoinsInPortfolio(ex.getIdentity(), portfolio)
 		}, {
 			concurrency: 2,
 		})
@@ -72,14 +72,15 @@ export class CexAnalyzer implements Analyzer {
 	}
 }
 
-export function filterCoinsInPortfolio(portfolio: { [k: string]: number }): Coin[] {
+export function filterCoinsInPortfolio(wallet: string, portfolio: { [k: string]: number }): WalletCoin[] {
 	return _(portfolio).keys()
 		.filter(k => portfolio[k] > 0) // amount > 0
 		.filter(k => !!coinSymbolHandler(k))
 		.map(k => ({
 			symbol: coinSymbolHandler(k),
-			amount: portfolio[k]
-		} as Coin)).value()
+			amount: portfolio[k],
+			wallet,
+		} as WalletCoin)).value()
 }
 
 function coinSymbolHandler(name: string): string | undefined {

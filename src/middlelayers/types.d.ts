@@ -7,7 +7,6 @@ export type AssetModel = {
 	value: number
 	price: number
 	wallet?: string
-	walletAlias?: string
 }
 
 export type CloudAssetModel = {
