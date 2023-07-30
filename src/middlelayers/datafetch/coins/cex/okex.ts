@@ -5,16 +5,27 @@ export class OkexExchange implements Exchanger {
 	private readonly apiKey: string
 	private readonly secret: string
 	private readonly password: string
-
+	private readonly alias?: string
+	
 	constructor(
 		apiKey: string,
 		secret: string,
 		password: string,
+		alias?: string,
 	) {
 
 		this.apiKey = apiKey
 		this.secret = secret
 		this.password = password
+		this.alias = alias
+	}
+
+	getExchangeName(): string {
+		return "Okex"
+	}
+
+	getAlias(): string | undefined {
+		return this.alias
 	}
 
 	getIdentity(): string {

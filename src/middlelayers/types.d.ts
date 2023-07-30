@@ -80,6 +80,15 @@ export type LatestAssetsPercentageData = {
 	chartColor: string
 }[]
 
+// show usd value percentage of assets in each wallet
+export type WalletAssetsPercentageData = {
+	wallet: string
+	walletAlias?: string
+	percentage: number
+	value: number
+	chartColor: string
+}[]
+
 export type CoinsAmountAndValueChangeData = {
 	coin: string
 	lineColor: string

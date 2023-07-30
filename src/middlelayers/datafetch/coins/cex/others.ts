@@ -6,9 +6,17 @@ export class OtherCexExchanges implements Exchanger {
 		apiKey: string
 		secret: string
 		password?: string
-	}) {
+	}, alias?: string) {
 
 
+	}
+
+	getExchangeName(): string {
+		throw new Error('Method not implemented.')
+	}
+
+	getAlias(): string | undefined {
+		throw new Error('Method not implemented.')
 	}
 
 	getIdentity(): string {

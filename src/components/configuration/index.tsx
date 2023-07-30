@@ -126,9 +126,7 @@ const Configuration = ({
     setLoading(true);
     getConfiguration()
       .then((d) => {
-        const globalConfig = d?.data
-          ? (yaml.parse(d.data) as GlobalConfig)
-          : initialConfiguration;
+        const globalConfig = d ?? initialConfiguration;
 
         setGroupUSD(globalConfig.configs.groupUSD);
         setQuerySize(globalConfig.configs.querySize || 10);
@@ -145,7 +143,6 @@ const Configuration = ({
             }))
             .value()
         );
-        console.log(globalConfig);
 
         setWallets(
           _(globalConfig)
