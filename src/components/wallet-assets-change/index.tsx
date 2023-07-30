@@ -2,7 +2,7 @@ import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
 } from "../../middlelayers/types";
-import { currencyWrapper } from '../../utils/currency'
+import { currencyWrapper } from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
 import "./index.css";
 
@@ -85,7 +85,10 @@ const App = ({
                     width: "50%",
                   }}
                 >
-                  <span>{d.walletAlias ?? d.wallet}</span>
+                  <span>
+                    {d.walletAlias ??
+                      (!d.wallet || d.wallet === "null" ? "main" : d.wallet)}
+                  </span>
                 </td>
                 <td
                   style={{
@@ -107,7 +110,9 @@ const App = ({
                   <span className={getChangeClassName(d.changeValue)}>
                     {getArrow(d.changeValue)}
                     {currency.symbol}
-                    {currencyWrapper(currency)(getPositiveValue(d.changeValue)).toFixed(2)}
+                    {currencyWrapper(currency)(
+                      getPositiveValue(d.changeValue)
+                    ).toFixed(2)}
                   </span>
                 </td>
               </tr>
