@@ -28,7 +28,7 @@ const App = ({
 
   useEffect(() => {
     setChangedValueOrPercentage(formatChangePercentage());
-  }, []);
+  }, [data]);
 
   function formatTotalValue() {
     return (
@@ -36,21 +36,28 @@ const App = ({
     );
   }
 
+  function getUpOrDown(val: number) {
+    const p = val > 0 ? "+" : val === 0 ? "" : "-";
+    return p;
+  }
+
   function formatChangePercentage() {
-    let val = data.changePercentage
-    const p = val > 0 ? "+" : val === 0 ? "" : "-"
+    let val = data.changePercentage;
+    const p = getUpOrDown(val);
     if (val < 0) {
-      val = -val
+      val = -val;
     }
     return `${p}${val.toFixed(2)}%`;
   }
 
   function formatChangeValue() {
-    let val = data.changePercentage * currencyWrapper(currency)(data.totalValue) / 100
-    const symbol = currency.symbol
-    const p = val > 0 ? "+" : val === 0 ? "" : "-"
+    let val =
+      (data.changePercentage * currencyWrapper(currency)(data.totalValue)) /
+      100;
+    const symbol = currency.symbol;
+    const p = getUpOrDown(val);
     if (val < 0) {
-      val = -val
+      val = -val;
     }
     return p + symbol + val.toFixed(2);
   }
