@@ -89,6 +89,13 @@ export type WalletAssetsPercentageData = {
 	chartColor: string
 }[]
 
+export type WalletAssetsChangeData = {
+	wallet: string
+	walletAlias?: string
+	changePercentage: number
+	changeValue: number
+}[]
+
 export type CoinsAmountAndValueChangeData = {
 	coin: string
 	lineColor: string

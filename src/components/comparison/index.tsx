@@ -290,10 +290,10 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     }
 
     if (per > 0) {
-      return "+" + prettyNumber(per, false) + "%";
+      return "↑ " + prettyNumber(per, false) + "%";
     }
 
-    return prettyNumber(per, false) + "%";
+    return "↓ " + -prettyNumber(per, false) + "%";
   }
 
   function prettyNumber(

@@ -112,7 +112,7 @@ export async function importHistoricalData(): Promise<boolean> {
 	})
 
 	// remove if there are id file in keys
-	const keys = _(Object.keys(assets[0])).filter(k => k !== "id").value()
+	const keys = _(_(assets).map(x => Object.keys(x)).value()).flatten().uniq().compact().filter(k => k !== "id").value()
 
 	const values = "(" + keys.map(() => '?').join(',') + ")"
 

@@ -1,0 +1,37 @@
+.wallet-assets-change {
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+  white-space: nowrap;
+  font-family: Arial, sans-serif;
+}
+
+.wallet-assets-change table {
+  /* no border */
+  border-collapse: collapse;
+  text-align: left;
+  width: "100%";
+}
+
+.wallet-assets-change table th {
+  /* no border */
+  border: 0;
+}
+
+.wallet-assets-change table td {
+  /* no border */
+  border: 0;
+  
+}
+
+.wallet-assets-change .negative {
+  color: red;
+}
+
+.wallet-assets-change .positive {
+  color: green;
+}
+
+.wallet-assets-change .none {
+  color: gray;
+}

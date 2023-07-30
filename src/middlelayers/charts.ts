@@ -8,11 +8,13 @@ import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
 import { WalletCoin } from './datafetch/types'
 import { timestampToDate } from '../utils/date'
-import { listWalletAliases } from './wallet'
+import { WalletAnalyzer } from './wallet'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
 export const ASSETS_TABLE_NAME = "assets_v2"
+
+export const WALLET_ANALYZER = new WalletAnalyzer(queryAssets)
 
 export async function refreshAllData() {
 	const coins = await queryCoinsData()
@@ -134,35 +136,6 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 		totalValue: latestTotal,
 		changePercentage
 	}
-}
-
-export async function queryWalletAssetsPercentage(): Promise<WalletAssetsPercentageData> {
-	const assets = (await queryAssets(1))[0]
-	// check if there is wallet column
-	const hasWallet = _(assets).find(a => !!a.wallet)
-	if (!assets || !hasWallet) {
-		return []
-	}
-	const walletAssets = _(assets).groupBy('wallet')
-		.map((walletAssets, wallet) => {
-			const total = _(walletAssets).sumBy("value")
-			return {
-				wallet,
-				total,
-			}
-		}).value()
-	const total = _(walletAssets).sumBy("total") || 0.0001
-	const wallets = _(walletAssets).map('wallet').uniq().compact().value()
-	const backgroundColors = generateRandomColors(wallets.length)
-	const walletAliases = await listWalletAliases(wallets)
-
-	return _(walletAssets).map((wa, idx) => ({
-		wallet: wa.wallet,
-		walletAlias: walletAliases[wa.wallet],
-		chartColor: `rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`,
-		percentage: wa.total / total * 100,
-		value: wa.total,
-	})).sortBy("percentage").reverse().value()
 }
 
 export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {

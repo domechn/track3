@@ -1,16 +1,21 @@
 import { useContext, useEffect, useState } from "react";
-import { queryWalletAssetsPercentage } from "../../middlelayers/charts";
 import WalletAssetsPercentage from "../wallet-assets-percentage";
+import WalletAssetsChange from "../wallet-assets-change";
 import { LoadingContext } from "../../App";
 import {
   CurrencyRateDetail,
+  WalletAssetsChangeData,
   WalletAssetsPercentageData,
 } from "../../middlelayers/types";
+import { WALLET_ANALYZER } from "../../middlelayers/charts";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const { setLoading } = useContext(LoadingContext);
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
     useState<WalletAssetsPercentageData>([]);
+
+  const [walletAssetsChange, setWalletAssetsChange] =
+    useState<WalletAssetsChangeData>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -19,8 +24,10 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
 
   async function loadAllDataAsync() {
     console.log("loading all wallet data...");
-    const wap = await queryWalletAssetsPercentage();
+    const wap = await WALLET_ANALYZER.queryWalletAssetsPercentage();
     setWalletAssetsPercentage(wap);
+    const wac = await WALLET_ANALYZER.queryWalletAssetsChange();
+    setWalletAssetsChange(wac);
   }
 
   return (
@@ -31,6 +38,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         currency={currency}
       />
       <hr className="nice-hr" />
+      <WalletAssetsChange data={walletAssetsChange} currency={currency} />
     </>
   );
 };
