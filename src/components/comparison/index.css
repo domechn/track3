@@ -21,7 +21,7 @@
   font-size: 14px;
 }
 
-.comparison-container .comparison-row:nth-child(3n + 1) {
+.comparison-container .comparison-row:nth-child(3n + 2) {
   background-color: #e6e6e6;
 }
 
