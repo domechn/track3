@@ -98,7 +98,7 @@ export async function signIn(email: string, code: string): Promise<string> {
 	// set token to cookies by js-cookie
 	window.localStorage.setItem(tokenPath, resp.token)
 	// 14d
-	window.localStorage.setItem(tokenExpiredAtPath, (Date.now() + 14 * 24 * 60 * 60 * 1000).toString())
+	window.localStorage.setItem(tokenExpiredAtPath, (Date.now() + 7 * 24 * 60 * 60 * 1000).toString())
 	updateAuthState(authState)
 
 	await createUserIfNotExists(resp.publicKey)
