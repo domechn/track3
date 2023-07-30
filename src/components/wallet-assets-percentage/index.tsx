@@ -39,7 +39,7 @@ const App = ({
       datalabels: {
         display: "auto",
         align: "top",
-        offset: 7,
+        offset: Math.max(0, 16 - _(data).size()),
         formatter: (value: number) => {
           return `${((value / totalValue) * 100).toFixed(2)}%`;
         },

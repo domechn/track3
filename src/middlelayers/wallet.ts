@@ -145,8 +145,9 @@ export class WalletAnalyzer {
 				if (!previous) {
 					res.push({
 						wallet,
-						changePercentage: -100,
-						changeValue: -latest,
+						walletAlias: walletAliases[wallet],
+						changePercentage: 100,
+						changeValue: latest,
 					})
 					return
 				}
