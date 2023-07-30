@@ -73,8 +73,8 @@ const App = () => {
   );
 
   const [showMenu, setShowMenu] = useState(false);
-  // const [activeMenu, setActiveMenu] = useState("overview");
-  const [activeMenu, setActiveMenu] = useState("wallets");
+  const [activeMenu, setActiveMenu] = useState("overview");
+  // const [activeMenu, setActiveMenu] = useState("wallets");
 
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData

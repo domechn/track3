@@ -20,7 +20,6 @@ const App = ({
     responsive: false,
     indexAxis: "y",
     barPercentage: 0.9,
-    // categoryPercentage: 0.7,
     plugins: {
       title: { display: true, text: "Percentage of Wallet" },
       legend: {
@@ -59,45 +58,6 @@ const App = ({
       ],
     };
   }
-  // const options = {
-  //   maintainAspectRatio: false,
-  //   responsive: false,
-  //   plugins: {
-  //     title: { display: true, text: "Percentage of Wallet" },
-  //     legend: { labels: { font: {} } },
-  //     datalabels: {
-  //       color: "white",
-  //       font: {
-  //         weight: "bold",
-  //       },
-  //       display: "auto",
-  //       formatter: (
-  //         value: number,
-  //         context: {
-  //           chart: { data: { labels: { [x: string]: any } } };
-  //           dataIndex: string | number;
-  //         }
-  //       ) => {
-  //         const label = context.chart.data.labels[context.dataIndex];
-  //         return `${label}: ${value.toLocaleString()}%`;
-  //       },
-  //     },
-  //   },
-  // };
-
-  // function lineData() {
-  //   return {
-  //     labels: data.map((d) => d.walletAlias || d.wallet),
-  //     datasets: [
-  //       {
-  //         data: data.map((d) => d.percentage),
-  //         borderColor: data.map((d) => d.chartColor),
-  //         backgroundColor: data.map((d) => d.chartColor),
-  //         borderWidth: 1,
-  //       },
-  //     ],
-  //   };
-  // }
 
   return (
     <div>
