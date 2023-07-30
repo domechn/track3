@@ -1,5 +1,6 @@
 import {
   Chart as ChartJS,
+  registerables,
   CategoryScale,
   LinearScale,
   PointElement,
@@ -27,7 +28,7 @@ import {
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
 } from "../../middlelayers/types";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import {
   queryAssetChange,
   queryTopCoinsPercentageChangeData,
@@ -45,8 +46,10 @@ import {
 } from "../../middlelayers/configuration";
 import { autoSyncData } from "../../middlelayers/cloudsync";
 import { getDefaultCurrencyRate } from "../../middlelayers/currency";
+import _ from "lodash";
 
 ChartJS.register(
+  ...registerables,
   ArcElement,
   CategoryScale,
   LinearScale,
@@ -71,6 +74,7 @@ const App = () => {
 
   const [showMenu, setShowMenu] = useState(false);
   const [activeMenu, setActiveMenu] = useState("overview");
+  // const [activeMenu, setActiveMenu] = useState("wallets");
 
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData
@@ -117,7 +121,7 @@ const App = () => {
     if (
       lastSize.width === windowSize.width &&
       lastSize.height === windowSize.height &&
-      activeMenu === "overview"
+      (activeMenu === "overview" || activeMenu === "wallets")
     ) {
       resizeAllCharts();
     }
@@ -133,10 +137,32 @@ const App = () => {
   }, [showMenu]);
 
   function resizeAllCharts() {
+    const overviewsCharts = [
+      "Trend of Asset",
+      "Trend of Coin",
+      "Percentage of Assets",
+      "Change of Top Coins",
+      "Trend of Top Coins Rank",
+    ];
+    const walletsCharts = ["Percentage of Wallet"];
+    let chartsTitles: string[] = [];
+    if (activeMenu === "overview") {
+      chartsTitles = overviewsCharts;
+    } else if (activeMenu === "wallets") {
+      chartsTitles = walletsCharts;
+    }
     console.log("resizing all charts");
 
     for (const id in Chart.instances) {
-      Chart.instances[id].resize();
+      const text = Chart.instances[id].options.plugins?.title?.text as
+        | string
+        | undefined;
+      if (
+        !text ||
+        !!_(chartsTitles).find((x) => text === x || text.startsWith(x))
+      ) {
+        Chart.instances[id].resize();
+      }
     }
   }
 
@@ -189,10 +215,10 @@ const App = () => {
   }
 
   useEffect(() => {
-    if (activeMenu === "overview") {
+    if (activeMenu === "overview" || activeMenu === "wallets") {
       setTimeout(() => {
         resizeAllCharts();
-      }, resizeDelay);
+      }, resizeDelay / 2);
     }
   }, [activeMenu]);
 
@@ -206,7 +232,7 @@ const App = () => {
         <ul>
           <li onClick={() => onMenuClicked("overview")}>Overview</li>
           <li onClick={() => onMenuClicked("comparison")}>Comparison</li>
-          {/* <li onClick={() => onMenuClicked("wallets")}>Wallets</li> */}
+          <li onClick={() => onMenuClicked("wallets")}>Wallets</li>
         </ul>
       </div>
     );
@@ -259,22 +285,24 @@ const App = () => {
         </div>
       </div>
       <div onMouseDown={closeMenu}>
-        <div
-          id="overview"
-          style={{
-            display: activeMenu === "overview" ? "block" : "none",
-          }}
-        >
-          <Overview
-            currency={currentCurrency}
-            latestAssetsPercentageData={latestAssetsPercentageData}
-            assetChangeData={assetChangeData}
-            totalValueData={totalValueData}
-            coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
-            topCoinsRankData={topCoinsRankData}
-            topCoinsPercentageChangeData={topCoinsPercentageChangeData}
-          />
-        </div>
+        {activeMenu === "overview" && (
+          <div
+            id="overview"
+            // style={{
+            //   display: activeMenu === "overview" ? "block" : "none",
+            // }}
+          >
+            <Overview
+              currency={currentCurrency}
+              latestAssetsPercentageData={latestAssetsPercentageData}
+              assetChangeData={assetChangeData}
+              totalValueData={totalValueData}
+              coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
+              topCoinsRankData={topCoinsRankData}
+              topCoinsPercentageChangeData={topCoinsPercentageChangeData}
+            />
+          </div>
+        )}
 
         {activeMenu === "comparison" && (
           <div id="comparison">
@@ -284,7 +312,7 @@ const App = () => {
 
         {activeMenu === "wallets" && (
           <div id="wallets">
-            <WalletAnalyzer />
+            <WalletAnalyzer currency={currentCurrency}/>
           </div>
         )}
       </div>

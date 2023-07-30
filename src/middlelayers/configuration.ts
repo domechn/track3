@@ -9,8 +9,14 @@ const prefix = "!ent:"
 const fixId = "1"
 const cloudSyncFixId = "2"
 
-export async function getConfiguration(): Promise<ConfigurationModel | undefined> {
-	return getConfigurationById(fixId)
+export async function getConfiguration(): Promise<GlobalConfig | undefined> {
+	const model = await getConfigurationById(fixId)
+	if (!model) {
+		return
+	}
+
+	const data = yaml.parse(model.data)
+	return data
 }
 
 export async function saveConfiguration(cfg: GlobalConfig) {
@@ -73,17 +79,16 @@ export async function getQuerySize(): Promise<number> {
 		return 10
 	}
 
-	const data = yaml.parse(cfg.data)
-	return data.configs.querySize || 10
+	return cfg.configs.querySize || 10
 }
 
-export async function getCurrentPreferCurrency() : Promise<CurrencyRateDetail> {
-	const model = await getConfiguration()
-	if (!model) {
+export async function getCurrentPreferCurrency(): Promise<CurrencyRateDetail> {
+	const cfg = await getConfiguration()
+	if (!cfg) {
 		return getDefaultCurrencyRate()
 	}
 
-	const pc: string = yaml.parse(model.data).configs.preferCurrency 
+	const pc: string = cfg.configs.preferCurrency
 	if (!pc) {
 		return getDefaultCurrencyRate()
 	}

@@ -7,7 +7,11 @@ import { OkexExchange } from './okex'
 import { CacheCenter } from '../../utils/cache'
 
 export interface Exchanger {
+	getExchangeName(): string
+
 	getIdentity(): string
+
+	getAlias(): string | undefined
 	// return all coins in exchange
 	// key is coin symbol, value is amount
 	fetchTotalBalance(): Promise<{ [k: string]: number }>
@@ -26,15 +30,15 @@ export class CexAnalyzer implements Analyzer {
 			console.log("loading exchange", exCfg.name)
 			switch (exCfg.name) {
 				case "binance":
-					return new BinanceExchange(exCfg.initParams.apiKey, exCfg.initParams.secret)
+					return new BinanceExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				case "okex":
 				case "okx":
 					if (!exCfg.initParams.password) {
 						throw new Error("okex password is required")
 					}
-					return new OkexExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.password)
+					return new OkexExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.password, exCfg.alias)
 				default:
-					return new OtherCexExchanges(exCfg.name, exCfg.initParams)
+					return new OtherCexExchanges(exCfg.name, exCfg.initParams, exCfg.alias)
 			}
 		}).compact().value()
 	}
@@ -69,6 +73,14 @@ export class CexAnalyzer implements Analyzer {
 		})
 
 		return _(coinLists).flatten().value()
+	}
+
+	public listExchangeIdentities(): { exchangeName: string, identity: string, alias?: string }[] {
+		return _(this.exchanges).map(ex => ({
+			exchangeName: ex.getExchangeName(),
+			identity: ex.getIdentity(),
+			alias: ex.getAlias()
+		})).value()
 	}
 }
 

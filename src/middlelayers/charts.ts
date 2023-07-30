@@ -1,14 +1,14 @@
 import _ from 'lodash'
-import yaml from 'yaml'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase, saveCoinsToDatabase } from './database'
-import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData } from './types'
+import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, WalletAssetsPercentageData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
-import { CexConfig, TokenConfig, WalletCoin } from './datafetch/types'
+import { WalletCoin } from './datafetch/types'
 import { timestampToDate } from '../utils/date'
+import { listWalletAliases } from './wallet'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -23,11 +23,10 @@ async function queryCoinsData(): Promise<(WalletCoin & {
 	price: number,
 	usdValue: number,
 })[]> {
-	const configModel = await getConfiguration()
-	if (!configModel) {
+	const config = await getConfiguration()
+	if (!config) {
 		throw new Error("no configuration found,\n please add configuration first")
 	}
-	const config = yaml.parse(configModel.data) as CexConfig & TokenConfig
 	const assets = await loadPortfolios(config)
 	const priceMap = await queryCoinPrices(_(assets).map("symbol").push("USDT").uniq().value())
 
@@ -38,7 +37,7 @@ async function queryCoinsData(): Promise<(WalletCoin & {
 		_(assets).groupBy('wallet').forEach((coins, wallet) => {
 			const usdAmount = _(coins).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
 			const removedUSDCoins = _(coins).filter(c => !STABLE_COIN.includes(c.symbol)).value()
-			lastAssets = _(lastAssets).filter(a=>a.wallet !== wallet).concat(removedUSDCoins).value()
+			lastAssets = _(lastAssets).filter(a => a.wallet !== wallet).concat(removedUSDCoins).value()
 			if (usdAmount > 0) {
 				lastAssets.push({
 					symbol: "USDT",
@@ -135,6 +134,35 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 		totalValue: latestTotal,
 		changePercentage
 	}
+}
+
+export async function queryWalletAssetsPercentage(): Promise<WalletAssetsPercentageData> {
+	const assets = (await queryAssets(1))[0]
+	// check if there is wallet column
+	const hasWallet = _(assets).find(a => !!a.wallet)
+	if (!assets || !hasWallet) {
+		return []
+	}
+	const walletAssets = _(assets).groupBy('wallet')
+		.map((walletAssets, wallet) => {
+			const total = _(walletAssets).sumBy("value")
+			return {
+				wallet,
+				total,
+			}
+		}).value()
+	const total = _(walletAssets).sumBy("total") || 0.0001
+	const wallets = _(walletAssets).map('wallet').uniq().compact().value()
+	const backgroundColors = generateRandomColors(wallets.length)
+	const walletAliases = await listWalletAliases(wallets)
+
+	return _(walletAssets).map((wa, idx) => ({
+		wallet: wa.wallet,
+		walletAlias: walletAliases[wa.wallet],
+		chartColor: `rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`,
+		percentage: wa.total / total * 100,
+		value: wa.total,
+	})).sortBy("percentage").reverse().value()
 }
 
 export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
