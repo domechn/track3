@@ -4,7 +4,9 @@ import {
   CurrencyRateDetail,
   WalletAssetsPercentageData,
 } from "../../middlelayers/types";
-import { currencyWrapper } from '../../utils/currency'
+import { currencyWrapper } from "../../utils/currency";
+import _ from "lodash";
+import { useEffect, useState } from "react";
 
 const App = ({
   data,
@@ -15,29 +17,44 @@ const App = ({
 }) => {
   const size = useWindowSize();
 
+  const [totalValue, setTotalValue] = useState(0);
+
+  useEffect(() => {
+    setTotalValue(currencyWrapper(currency)(_(data).sumBy("value")) || 0.0001);
+  }, [data, currency]);
+
   const options = {
     maintainAspectRatio: false,
     responsive: false,
     indexAxis: "y",
     barPercentage: 0.9,
     plugins: {
-      title: { display: true, text: "Percentage of Wallet" },
+      title: {
+        display: true,
+        text: `Percentage And Total Value of Each Wallet`,
+      },
       legend: {
         display: false,
       },
       datalabels: {
         display: "auto",
         align: "top",
-        offset: 6,
-        formatter: (
-          value: number,
-          context: {
-            chart: { data: { labels: { [x: string]: any } } };
-            dataIndex: string | number;
-          }
-        ) => {
-          // const label = context.chart.data.labels[context.dataIndex];
-          return `${currency.symbol}${value.toFixed(2)}`;
+        offset: 7,
+        formatter: (value: number) => {
+          return `${((value / totalValue) * 100).toFixed(2)}%`;
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          precision: 2,
+          callback: function (value: number) {
+            if (value === 0) {
+              return value;
+            }
+            return currency.symbol + value;
+          },
         },
       },
     },
@@ -50,7 +67,7 @@ const App = ({
         {
           alias: "y",
           fill: false,
-          data: data.map((d) => currencyWrapper(currency)(d.value)),
+          data: data.map((d) => currencyWrapper(currency)(d.value).toFixed(2)),
           borderColor: data.map((d) => d.chartColor),
           backgroundColor: data.map((d) => d.chartColor),
           borderWidth: 1,
@@ -66,7 +83,6 @@ const App = ({
           height: Math.max((size.height || 100) / 2, 400),
         }}
       >
-        {/* <Pie options={options as any} data={lineData()} /> */}
         <Bar options={options as any} data={lineData()} />
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { CurrencyRateDetail } from "../../middlelayers/types";
 import { currencyWrapper } from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
@@ -23,14 +24,42 @@ const App = ({
 
   const windowSize = useWindowSize();
 
+  const [changedValueOrPercentage, setChangedValueOrPercentage] = useState("");
+
+  useEffect(() => {
+    setChangedValueOrPercentage(formatChangePercentage());
+  }, [data]);
+
   function formatTotalValue() {
-    return `${currency.symbol}${currencyWrapper(currency)(
-      data.totalValue
-    ).toLocaleString()}`;
+    return (
+      currency.symbol + currencyWrapper(currency)(data.totalValue).toFixed(2)
+    );
+  }
+
+  function getUpOrDown(val: number) {
+    const p = val > 0 ? "+" : val === 0 ? "" : "-";
+    return p;
   }
 
   function formatChangePercentage() {
-    return `${data.changePercentage.toLocaleString()}%`;
+    let val = data.changePercentage;
+    const p = getUpOrDown(val);
+    if (val < 0) {
+      val = -val;
+    }
+    return `${p}${val.toFixed(2)}%`;
+  }
+
+  function formatChangeValue() {
+    let val =
+      (data.changePercentage * currencyWrapper(currency)(data.totalValue)) /
+      100;
+    const symbol = currency.symbol;
+    const p = getUpOrDown(val);
+    if (val < 0) {
+      val = -val;
+    }
+    return p + symbol + val.toFixed(2);
   }
 
   function fontCount() {
@@ -98,19 +127,21 @@ const App = ({
         >
           {changePercentageEmoji()}
         </span>
-        <span
-          className="totalValue"
-          style={totalValueStyle()}
-        >
+        <span className="totalValue" style={totalValueStyle()}>
           {formatTotalValue()}
         </span>
         <span
           className={`changePercentage ${changePercentageColorClass()}`}
+          onMouseEnter={() => setChangedValueOrPercentage(formatChangeValue())}
+          onMouseLeave={() =>
+            setChangedValueOrPercentage(formatChangePercentage())
+          }
           style={{
             fontSize: changePercentageFontSize(),
           }}
         >
-          {formatChangePercentage()}
+          {/* {formatChangePercentage()} */}
+          {changedValueOrPercentage}
         </span>
       </div>
     </div>
