@@ -8,7 +8,9 @@ import { generateRandomColors } from '../utils/color'
 
 export class WalletAnalyzer {
 
-	private walletAliases: { [k: string]: string | undefined } = {}
+	// key is wallet address md5 hash
+	// "wallet" in value is original wallet address
+	private walletAliases: { [k: string]: { wallet: string, alias: string, type: string } | undefined } = {}
 
 	private queryAssets: (size?: number) => Promise<AssetModel[][]>
 
@@ -16,8 +18,8 @@ export class WalletAnalyzer {
 		this.queryAssets = queryAssets
 	}
 
-	private async listWalletAliases(wallets: string[]): Promise<{ [k: string]: string | undefined }> {
-		const unknownAliasWallets = _(wallets).filter(w => !_(this.walletAliases).has(w)).value()
+	private async listWalletAliases(walletMd5s: string[]): Promise<{ [k: string]: { wallet: string, alias: string, type: string } | undefined }> {
+		const unknownAliasWallets = _(walletMd5s).filter(w => !_(this.walletAliases).has(w)).value()
 
 		if (unknownAliasWallets.length === 0) {
 			return this.walletAliases
@@ -32,6 +34,7 @@ export class WalletAnalyzer {
 			// wallet hash
 			walletType: string
 			wallet: string
+			walletMd5: string
 			alias: string
 		}[] = []
 
@@ -41,7 +44,8 @@ export class WalletAnalyzer {
 			aliases.push({
 				walletType: x.exchangeName,
 				// need md5 here, because when we store it in database, it is md5 hashed
-				wallet: md5(x.identity),
+				walletMd5: md5(x.identity),
+				wallet: x.identity,
 				alias: x.alias || x.identity,
 			})
 		})
@@ -52,11 +56,11 @@ export class WalletAnalyzer {
 				const address = _(x).isString() ? x as string : (x as { alias: string, address: string }).address
 				aliases.push({
 					walletType,
-					wallet: md5(address),
+					walletMd5: md5(address),
+					wallet: address,
 					alias: alias || address,
 				})
 			})
-
 		}
 
 		// BTC
@@ -74,14 +78,20 @@ export class WalletAnalyzer {
 		// Others
 		aliases.push({
 			walletType: Others,
-			wallet: md5(others),
+			walletMd5: md5(others),
+			wallet: others,
 			alias: Others,
 		})
 
-		const newAliases = _(unknownAliasWallets).map(w => {
-			const alias = _(aliases).find(x => x.wallet === w)
+		const newAliases: { [k: string]: { wallet: string, alias: string, type: string } | undefined } = _(unknownAliasWallets).map(w => {
+			const alias = _(aliases).find(x => x.walletMd5 === w)
 			return {
-				[w]: alias ? alias.walletType === Others ? alias.walletType : alias?.walletType + "-" + alias?.alias : undefined
+				[w]: alias ? {
+					// limit alias to 64 characters
+					alias: alias.walletType === Others ? alias.walletType : alias.alias,
+					wallet: alias.wallet,
+					type: alias.walletType,
+				} : undefined
 			}
 		}).reduce((a, b) => ({ ...a, ...b }), {})
 
@@ -118,8 +128,9 @@ export class WalletAnalyzer {
 		const walletAliases = await this.listWalletAliases(wallets)
 
 		return _(walletAssets).map((wa, idx) => ({
-			wallet: wa.wallet,
-			walletAlias: walletAliases[wa.wallet],
+			wallet: walletAliases[wa.wallet]?.wallet ?? wa.wallet,
+			walletType: walletAliases[wa.wallet]?.type,
+			walletAlias: walletAliases[wa.wallet]?.alias,
 			chartColor: `rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`,
 			percentage: wa.total / total * 100,
 			value: wa.total,
@@ -144,8 +155,9 @@ export class WalletAnalyzer {
 
 				if (!previous) {
 					res.push({
-						wallet,
-						walletAlias: walletAliases[wallet],
+						wallet: walletAliases[wallet]?.wallet ?? wallet,
+						walletType: walletAliases[wallet]?.type,
+						walletAlias: walletAliases[wallet]?.alias,
 						changePercentage: 100,
 						changeValue: latest,
 					})
@@ -153,8 +165,9 @@ export class WalletAnalyzer {
 				}
 
 				res.push({
-					wallet,
-					walletAlias: walletAliases[wallet],
+					wallet: walletAliases[wallet]?.wallet ?? wallet,
+					walletType: walletAliases[wallet]?.type,
+					walletAlias: walletAliases[wallet]?.alias,
 					changePercentage: (latest - previous) / previous * 100,
 					changeValue: latest - previous,
 				})

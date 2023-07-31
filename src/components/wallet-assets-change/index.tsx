@@ -1,9 +1,11 @@
+import _ from "lodash";
 import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
 } from "../../middlelayers/types";
 import { currencyWrapper } from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
+import { insertEllipsis } from "../../utils/string";
 import "./index.css";
 
 const App = ({
@@ -39,6 +41,10 @@ const App = ({
     return value;
   }
 
+  function tweakWalletType(walletType: string) {
+    return <span>{walletType}</span>;
+  }
+
   return (
     <div>
       <h4>Changes</h4>
@@ -52,11 +58,19 @@ const App = ({
             <tr>
               <th
                 style={{
-                  minWidth: 150,
-                  width: "50%",
+                  minWidth: 80,
+                  width: "15%",
                 }}
               >
-                Wallet
+                Wallet Type
+              </th>
+              <th
+                style={{
+                  minWidth: 150,
+                  width: "35%",
+                }}
+              >
+                Wallet Alias
               </th>
               <th
                 style={{
@@ -81,13 +95,26 @@ const App = ({
               <tr key={d.wallet}>
                 <td
                   style={{
+                    minWidth: 80,
+                    width: "15%",
+                  }}
+                >
+                  {!d.walletType || d.walletType === "null"
+                    ? "Unknown"
+                    : tweakWalletType(d.walletType)}
+                </td>
+                <td
+                  style={{
                     minWidth: 150,
-                    width: "50%",
+                    width: "35%",
                   }}
                 >
                   <span>
                     {d.walletAlias ??
-                      (!d.wallet || d.wallet === "null" ? "main" : d.wallet)}
+                      insertEllipsis(
+                        !d.wallet || d.wallet === "null" ? "Unknown" : d.wallet,
+                        32
+                      )}
                   </span>
                 </td>
                 <td

@@ -83,6 +83,7 @@ export type LatestAssetsPercentageData = {
 // show usd value percentage of assets in each wallet
 export type WalletAssetsPercentageData = {
 	wallet: string
+	walletType?: string
 	walletAlias?: string
 	percentage: number
 	value: number
@@ -91,6 +92,7 @@ export type WalletAssetsPercentageData = {
 
 export type WalletAssetsChangeData = {
 	wallet: string
+	walletType?: string
 	walletAlias?: string
 	changePercentage: number
 	changeValue: number

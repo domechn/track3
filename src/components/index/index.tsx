@@ -231,8 +231,8 @@ const App = () => {
       <div id="menu-list" className="menu-list">
         <ul>
           <li onClick={() => onMenuClicked("overview")}>Overview</li>
-          <li onClick={() => onMenuClicked("comparison")}>Comparison</li>
           <li onClick={() => onMenuClicked("wallets")}>Wallets</li>
+          <li onClick={() => onMenuClicked("comparison")}>Comparison</li>
         </ul>
       </div>
     );
