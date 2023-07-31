@@ -117,6 +117,8 @@ const App = ({
         style={{
           minHeight: totalValueFontSize(),
         }}
+          onMouseEnter={() => setChangedValueOrPercentage(formatChangeValue())}
+          onMouseLeave={() => setChangedValueOrPercentage(formatChangePercentage()) }
       >
         <span
           className="totalValue"
@@ -132,10 +134,6 @@ const App = ({
         </span>
         <span
           className={`changePercentage ${changePercentageColorClass()}`}
-          onMouseEnter={() => setChangedValueOrPercentage(formatChangeValue())}
-          onMouseLeave={() =>
-            setChangedValueOrPercentage(formatChangePercentage())
-          }
           style={{
             fontSize: changePercentageFontSize(),
           }}

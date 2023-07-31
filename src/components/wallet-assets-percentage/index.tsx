@@ -7,6 +7,7 @@ import {
 import { currencyWrapper } from "../../utils/currency";
 import _ from "lodash";
 import { useEffect, useState } from "react";
+import { insertEllipsis } from '../../utils/string'
 
 const App = ({
   data,
@@ -39,7 +40,7 @@ const App = ({
       datalabels: {
         display: "auto",
         align: "top",
-        offset: Math.max(0, 16 - _(data).size()),
+        offset: Math.max(0, 15 - _(data).size()),
         formatter: (value: number) => {
           return `${((value / totalValue) * 100).toFixed(2)}%`;
         },
@@ -47,6 +48,10 @@ const App = ({
     },
     scales: {
       x: {
+        title: {
+          display: true,
+          text: `${currency.currency} Value`,
+        },
         ticks: {
           precision: 2,
           callback: function (value: number) {
@@ -57,12 +62,21 @@ const App = ({
           },
         },
       },
+      y: {
+        offset: true,
+        ticks: {
+          precision: 2,
+        },
+        grid: {
+          display: false,
+        }
+      }
     },
   };
 
   function lineData() {
     return {
-      labels: data.map((d) => d.walletAlias || d.wallet),
+      labels: data.map((d) => d.walletAlias ? `${d.walletType}-${d.walletAlias}` : insertEllipsis(d.wallet, 16)),
       datasets: [
         {
           alias: "y",
