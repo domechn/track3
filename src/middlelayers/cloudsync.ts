@@ -316,7 +316,7 @@ async function removeAssetsInCloud(assets: AssetModel[]): Promise<number> {
 
 // return updated how many records
 async function writeAssetsToDB(d: Database, assets: AssetModel[]): Promise<number> {
-	const insertValuesStr = assets.map(() => `(?, ?, ?, ?, ?, ?)`).join(", ")
+	const insertValuesStr = assets.map(() => `(?, ?, ?, ?, ?, ?, ?)`).join(", ")
 
 	await d.execute(`INSERT INTO ${ASSETS_TABLE_NAME} (uuid, createdAt, symbol, amount, value, price, wallet) VALUES ${insertValuesStr}`, _(assets).map((asset) => [
 		asset.uuid,
