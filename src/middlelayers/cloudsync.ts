@@ -203,6 +203,7 @@ async function dumpAssetsFromCloudAfterCreatedAt(createdAt?: number): Promise<As
 			amount: record.amount,
 			value: record.value,
 			price: record.price,
+			wallet: record.wallet,
 		}))
 		.value()
 	return _(needSyncedAssets).map((asset) => ({
@@ -213,6 +214,7 @@ async function dumpAssetsFromCloudAfterCreatedAt(createdAt?: number): Promise<As
 		amount: asset.amount,
 		value: asset.value,
 		price: asset.price,
+		wallet: asset.wallet,
 	})).value()
 }
 
