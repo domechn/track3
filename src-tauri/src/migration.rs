@@ -11,6 +11,7 @@ use version_compare::{compare_to, Cmp};
 use crate::types::{AssetsV1, AssetsV2, Configuration};
 
 static VERSION_CONFIGURATION_ID: i32 = 999;
+static CURRENT_VERSION: &str = "v0.3";
 
 pub fn is_first_run(path: &Path) -> bool {
     // check sqlite file exists
@@ -45,6 +46,15 @@ pub fn init_sqlite_tables(app_dir: &Path, resource_dir: &Path) {
         conn.execute(assets_v2.as_str()).await.unwrap();
         conn.execute(cloud_sync.as_str()).await.unwrap();
         conn.execute(currency_rates_sync.as_str()).await.unwrap();
+
+        sqlx::query("INSERT INTO configuration (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = ?")
+        .bind(VERSION_CONFIGURATION_ID)
+        .bind(CURRENT_VERSION)
+        .bind(CURRENT_VERSION)
+        .execute(&mut conn)
+        .await
+        .unwrap();
+
         conn.close().await.unwrap();
         println!("init sqlite tables in tokio spawn done");
     });
@@ -174,6 +184,8 @@ pub fn migrate_from_v02_to_v03(app_dir: &Path, resource_dir: &Path) {
     let assets_v2 =
         fs::read_to_string(resource_dir.join("migrations/v02t03/assets_v2_migrate.sql")).unwrap();
 
+    let new_version: &str = "v0.3";
+
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
 	    println!("migrate from v0.2 to v0.3 in tokio spawn");
@@ -182,8 +194,8 @@ pub fn migrate_from_v02_to_v03(app_dir: &Path, resource_dir: &Path) {
 
         sqlx::query("INSERT INTO configuration (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = ?")
             .bind(VERSION_CONFIGURATION_ID)
-            .bind("v0.3")
-            .bind("v0.3")
+            .bind(new_version)
+            .bind(new_version)
             .execute(&mut conn)
             .await
             .unwrap();
