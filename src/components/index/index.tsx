@@ -318,7 +318,7 @@ const App = () => {
 
         {activeMenu === "historical-data" && (
           <div id="historical-data">
-            <HistoricalData />
+            <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
           </div>
         )}
       </div>
