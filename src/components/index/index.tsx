@@ -74,7 +74,7 @@ const App = () => {
 
   const [showMenu, setShowMenu] = useState(false);
   const [activeMenu, setActiveMenu] = useState("overview");
-  // const [activeMenu, setActiveMenu] = useState("wallets");
+  // const [activeMenu, setActiveMenu] = useState("historical-data");
 
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData
@@ -233,6 +233,9 @@ const App = () => {
           <li onClick={() => onMenuClicked("overview")}>Overview</li>
           <li onClick={() => onMenuClicked("wallets")}>Wallets</li>
           <li onClick={() => onMenuClicked("comparison")}>Comparison</li>
+          <li onClick={() => onMenuClicked("historical-data")}>
+            Historical Data
+          </li>
         </ul>
       </div>
     );
@@ -263,9 +266,6 @@ const App = () => {
           </div>
         </div>
         <div className="right-buttons">
-          <div style={{ display: "inline-block" }}>
-            <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
-          </div>
           <div style={{ display: "inline-block" }}>
             <RefreshData
               afterRefresh={() => {
@@ -312,7 +312,13 @@ const App = () => {
 
         {activeMenu === "wallets" && (
           <div id="wallets">
-            <WalletAnalyzer currency={currentCurrency}/>
+            <WalletAnalyzer currency={currentCurrency} />
+          </div>
+        )}
+
+        {activeMenu === "historical-data" && (
+          <div id="historical-data">
+            <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
           </div>
         )}
       </div>

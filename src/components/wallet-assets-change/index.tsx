@@ -92,7 +92,7 @@ const App = ({
           </thead>
           <tbody>
             {data.map((d) => (
-              <tr key={d.wallet}>
+              <tr key={d.wallet} className="wallet-assets-change-row">
                 <td
                   style={{
                     minWidth: 80,

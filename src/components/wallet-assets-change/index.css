@@ -35,3 +35,7 @@
 .wallet-assets-change .none {
   color: gray;
 }
+
+.wallet-assets-change .wallet-assets-change-row:nth-child(2n) {
+  background-color: #e6e6e6;
+}
