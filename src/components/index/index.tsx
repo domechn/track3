@@ -229,12 +229,18 @@ const App = () => {
     };
     return (
       <div id="menu-list" className="menu-list">
-        <ul>
-          <li onClick={() => onMenuClicked("overview")}>Overview</li>
-          <li onClick={() => onMenuClicked("wallets")}>Wallets</li>
-          <li onClick={() => onMenuClicked("comparison")}>Comparison</li>
+        <ul
+          style={{
+            textAlign: "left",
+            paddingLeft: 20,
+            paddingRight: 20,
+          }}
+        >
+          <li onClick={() => onMenuClicked("overview")}>📁 Overview</li>
+          <li onClick={() => onMenuClicked("wallets")}>💼 Wallets</li>
+          <li onClick={() => onMenuClicked("comparison")}>📊 Comparison</li>
           <li onClick={() => onMenuClicked("historical-data")}>
-            Historical Data
+            📜 History
           </li>
         </ul>
       </div>
@@ -286,12 +292,7 @@ const App = () => {
       </div>
       <div onMouseDown={closeMenu}>
         {activeMenu === "overview" && (
-          <div
-            id="overview"
-            // style={{
-            //   display: activeMenu === "overview" ? "block" : "none",
-            // }}
-          >
+          <div id="overview">
             <Overview
               currency={currentCurrency}
               latestAssetsPercentageData={latestAssetsPercentageData}

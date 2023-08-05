@@ -10,7 +10,6 @@ import _ from "lodash";
 
 import "./index.css";
 import { toast } from "react-hot-toast";
-import { useWindowSize } from "../../utils/hook";
 import { LoadingContext } from "../../App";
 import { timestampToDate } from "../../utils/date";
 
@@ -31,7 +30,6 @@ const App = ({
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
   const { setLoading } = useContext(LoadingContext);
-  const size = useWindowSize();
 
   const columns = [
     {
@@ -167,7 +165,6 @@ const App = ({
           <Table
             data={rankData}
             columns={rankColumns}
-            onRowClick={onRowClick}
           />
           <h3>👆 Details</h3>
         </div>
