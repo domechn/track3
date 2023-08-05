@@ -141,7 +141,7 @@ const App = ({
       try {
         await signIn(email, verificationCode);
 
-        await trackEventWithClientID("sign_in")
+        trackEventWithClientID("sign_in")
       } finally {
         if (signInRef.current) {
           signInRef.current!.disabled = false;

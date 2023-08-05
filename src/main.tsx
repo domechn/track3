@@ -27,4 +27,4 @@ function disableContextmenu() {
 disableContextmenu();
 
 // track event
-(async () => trackEventWithClientID("app_started"))();
+trackEventWithClientID("app_started");
