@@ -28,6 +28,7 @@
     "react-dom": "^18.2.0",
     "react-ga4": "^2.1.0",
     "react-hot-toast": "^2.4.1",
+    "react-tooltip": "^5.20.0",
     "tauri-plugin-sql-api": "https://github.com/tauri-apps/tauri-plugin-sql",
     "uuid": "^9.0.0",
     "yaml": "^2.2.2"

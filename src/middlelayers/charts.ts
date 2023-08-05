@@ -222,6 +222,15 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 	}
 }
 
+export async function queryLastRefreshAt() : Promise<string | null>{
+	const assets = await queryAssets(1)
+	if (_(assets).isEmpty() || _(assets[0]).isEmpty()) {
+		return null
+	}
+
+	return timestampToDate(new Date(assets[0][0].createdAt).getTime(), true)
+}
+
 function getCoins(assets: AssetModel[][]): string[] {
 	// only take top 10 coins in each item
 	return _(assets).map(as => _(as).sortBy('value').reverse().take(10).value()).flatten().map(a => a.symbol).uniq().value()

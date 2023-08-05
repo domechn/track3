@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { Tooltip as ReactTooltip } from "react-tooltip";
 import Setting from "../settings";
 import RefreshData from "../refresh-data";
 import ChartDataLabels from "chartjs-plugin-datalabels";
@@ -31,6 +32,7 @@ import {
 import { useContext, useEffect, useState } from "react";
 import {
   queryAssetChange,
+  queryLastRefreshAt,
   queryTopCoinsPercentageChangeData,
 } from "../../middlelayers/charts";
 import { queryCoinsAmountChange } from "../../middlelayers/charts";
@@ -68,6 +70,7 @@ const App = () => {
   const windowSize = useWindowSize();
   const [querySize, setQuerySize] = useState(0);
   const [lastSize, setLastSize] = useState(windowSize);
+  const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null);
   const [currentCurrency, setCurrentCurrency] = useState<CurrencyRateDetail>(
     getDefaultCurrencyRate()
   );
@@ -193,6 +196,9 @@ const App = () => {
     setTopCoinsRankData(tcr);
     const tcpcd = await queryTopCoinsPercentageChangeData(size);
     setTopCoinsPercentageChangeData(tcpcd);
+
+    const lra = await queryLastRefreshAt();
+    setLastRefreshAt(lra)
   }
 
   function loadAllData(size = 10) {
@@ -239,9 +245,7 @@ const App = () => {
           <li onClick={() => onMenuClicked("overview")}>📁 Overview</li>
           <li onClick={() => onMenuClicked("wallets")}>💼 Wallets</li>
           <li onClick={() => onMenuClicked("comparison")}>📊 Comparison</li>
-          <li onClick={() => onMenuClicked("historical-data")}>
-            📜 History
-          </li>
+          <li onClick={() => onMenuClicked("historical-data")}>📜 History</li>
         </ul>
       </div>
     );
@@ -249,6 +253,11 @@ const App = () => {
 
   return (
     <div>
+      <ReactTooltip
+        id="last-refresh-at"
+        place="bottom"
+        content={lastRefreshAt ? "Last Refresh At: " + lastRefreshAt : "Never Refresh Before"}
+      />
       <div className="top-buttons-wrapper">
         <div className="left-buttons">
           <div
@@ -272,7 +281,7 @@ const App = () => {
           </div>
         </div>
         <div className="right-buttons">
-          <div style={{ display: "inline-block" }}>
+          <div style={{ display: "inline-block" }} data-tooltip-id="last-refresh-at">
             <RefreshData
               afterRefresh={() => {
                 loadAllData(querySize);
@@ -319,7 +328,10 @@ const App = () => {
 
         {activeMenu === "historical-data" && (
           <div id="historical-data">
-            <HistoricalData currency={currentCurrency}  afterDataDeleted={() => loadAllData(querySize)} />
+            <HistoricalData
+              currency={currentCurrency}
+              afterDataDeleted={() => loadAllData(querySize)}
+            />
           </div>
         )}
       </div>
