@@ -1,12 +1,16 @@
 #[macro_use]
 extern crate lazy_static;
 use std::{collections::HashMap, fs};
+use tauri_plugin_aptabase::EventTracker;
 
 use tauri::Manager;
 use track3::{
     binance::Binance,
     ent::Ent,
-    migration::{init_sqlite_tables, is_first_run, is_from_v01_to_v02, migrate_from_v01_to_v02, init_sqlite_file, is_from_v02_to_v03, migrate_from_v02_to_v03},
+    migration::{
+        init_sqlite_file, init_sqlite_tables, is_first_run, is_from_v01_to_v02, is_from_v02_to_v03,
+        migrate_from_v01_to_v02, migrate_from_v02_to_v03,
+    },
     okex::Okex,
     price::get_price_querier,
 };
@@ -161,6 +165,8 @@ async fn get_polybase_namespace(handle: tauri::AppHandle) -> Result<String, Stri
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_aptabase::Builder::new("A-EU-6972874637").build())
         .setup(|app| {
             let app_version = app.package_info().version.to_string();
             let resource_path = app.path_resolver();
@@ -177,7 +183,7 @@ fn main() {
                 // upgrade from v0.1 to v0.2
                 migrate_from_v01_to_v02(app_dir.as_path(), resource_dir.as_path());
             }
-            
+
             if is_from_v02_to_v03(app_dir.as_path()).unwrap() {
                 migrate_from_v02_to_v03(app_dir.as_path(), resource_dir.as_path());
             }
@@ -193,7 +199,6 @@ fn main() {
             close_debank_window,
             get_polybase_namespace,
         ])
-        .plugin(tauri_plugin_sql::Builder::default().build())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
