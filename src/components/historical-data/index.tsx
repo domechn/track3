@@ -3,7 +3,7 @@ import {
   deleteHistoricalDataByUUID,
   queryHistoricalData,
 } from "../../middlelayers/charts";
-import { HistoricalData } from "../../middlelayers/types";
+import { CurrencyRateDetail, HistoricalData } from "../../middlelayers/types";
 import deleteIcon from "../../assets/icons/delete-icon.png";
 import Table from "../common/table";
 import _ from "lodash";
@@ -12,20 +12,23 @@ import "./index.css";
 import { toast } from "react-hot-toast";
 import { LoadingContext } from "../../App";
 import { timestampToDate } from "../../utils/date";
+import { currencyWrapper } from "../../utils/currency";
 
 type RankData = {
   id: number;
   rank: number;
   symbol: string;
   value: number;
-  amount: number | string;
-  price: number | string;
+  amount: number;
+  price: number;
 };
 
 const App = ({
   afterDataDeleted,
+  currency,
 }: {
   afterDataDeleted?: (id: string) => unknown;
+  currency: CurrencyRateDetail;
 }) => {
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
@@ -51,6 +54,18 @@ const App = ({
       key: "total",
       dataIndex: "total",
       title: "Total",
+      render: (id: number | string) => {
+        const curData = _(data).find((d) => d.id === id);
+
+        return (
+          <>
+            {curData
+              ? currency.symbol +
+                currencyWrapper(currency)(curData.total).toFixed(2)
+              : "-"}
+          </>
+        );
+      },
     },
     {
       title: "Opt",
@@ -92,11 +107,34 @@ const App = ({
       key: "value",
       dataIndex: "value",
       title: "Value",
+      render: (id: number | string) => {
+        const curData = _(rankData).find((d) => d.id === id);
+
+        return (
+          <>
+            {curData
+              ? currency.symbol +
+                currencyWrapper(currency)(curData.value).toFixed(2)
+              : "-"}
+          </>
+        );
+      },
     },
     {
       key: "price",
       dataIndex: "price",
       title: "Price",
+      render: (id: number | string) => {
+        const curData = _(rankData).find((d) => d.id === id);
+
+        return (
+          <>
+            {curData
+              ? currency.symbol + currencyWrapper(currency)(curData.price)
+              : "-"}
+          </>
+        );
+      },
     },
   ];
 
@@ -162,10 +200,7 @@ const App = ({
             verticalAlign: "top",
           }}
         >
-          <Table
-            data={rankData}
-            columns={rankColumns}
-          />
+          <Table data={rankData} columns={rankColumns} />
           <h3>👆 Details</h3>
         </div>
         <div
