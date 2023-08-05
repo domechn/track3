@@ -2,9 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./style.css";
-import ReactGA from "react-ga4";
-import { getClientID, getVersion } from './utils/app'
-
+import { getClientID, getVersion } from "./utils/app";
+import { trackEvent } from "@aptabase/tauri";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
@@ -13,36 +12,28 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 );
 
 function disableContextmenu() {
-  if (window.location.hostname !== 'tauri.localhost') {
-      return
+  if (window.location.hostname !== "tauri.localhost") {
+    return;
   }
-  document.addEventListener('contextmenu', e => {
+  document.addEventListener(
+    "contextmenu",
+    (e) => {
       e.preventDefault();
       return false;
-  }, { capture: true })
+    },
+    { capture: true }
+  );
 }
 
-disableContextmenu()
+disableContextmenu();
 
 // ga4
-;(async () => {
-  const GAID = "G-QTHN28P1Q3"
+(async () => {
   try {
-      const cid = await getClientID()
-      const version = await getVersion()
-      ReactGA.initialize([{
-          trackingId: GAID,
-          gaOptions: {
-              app_version: version,
-              clientId: cid
-          },
-          gtagOptions: {
-              app_version: version,
-              clientId: cid
-          }
-      }])
+    const cid = await getClientID();
+    trackEvent("app_started", { clientId: cid || "unknown" });
   } catch (e) {
-      ReactGA.initialize(GAID)
-      throw e
+    trackEvent("app_started");
+    throw e;
   }
-})()
+})();

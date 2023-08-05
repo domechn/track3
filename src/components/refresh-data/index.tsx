@@ -5,6 +5,7 @@ import { refreshAllData } from "../../middlelayers/charts";
 import { toast } from "react-hot-toast";
 import { LoadingContext } from "../../App";
 import { updateAllCurrencyRates } from "../../middlelayers/currency";
+import { trackEvent } from '@aptabase/tauri'
 
 const retries = 3;
 const retryInterval = 3000; // 3s
@@ -50,6 +51,7 @@ const App = ({
       })
       .finally(() => {
         setLoading(false);
+        trackEvent("data_refreshed")
         if (refreshError) {
           toast.error(refreshError.message || (refreshError as any));
         } else {
