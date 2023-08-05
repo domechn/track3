@@ -8,6 +8,7 @@ import { getCurrencyRate, getDefaultCurrencyRate } from './currency'
 const prefix = "!ent:"
 const fixId = "1"
 const cloudSyncFixId = "2"
+const clientInfoFixId = "998"
 
 export async function getConfiguration(): Promise<GlobalConfig | undefined> {
 	const model = await getConfigurationById(fixId)
@@ -94,4 +95,9 @@ export async function getCurrentPreferCurrency(): Promise<CurrencyRateDetail> {
 	}
 
 	return getCurrencyRate(pc)
+}
+
+export async function getClientIDConfiguration(): Promise<string | undefined> {
+	const model = await getConfigurationById(clientInfoFixId)
+	return model?.data
 }
