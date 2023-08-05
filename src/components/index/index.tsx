@@ -319,7 +319,7 @@ const App = () => {
 
         {activeMenu === "historical-data" && (
           <div id="historical-data">
-            <HistoricalData afterDataDeleted={() => loadAllData(querySize)} />
+            <HistoricalData currency={currentCurrency}  afterDataDeleted={() => loadAllData(querySize)} />
           </div>
         )}
       </div>
