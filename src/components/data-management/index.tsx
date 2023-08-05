@@ -21,6 +21,7 @@ import {
 } from "../../middlelayers/cloudsync";
 import { LoadingContext } from "../../App";
 import { timestampToDate } from "../../utils/date";
+import { trackEventWithClientID } from '../../utils/app'
 
 const App = ({
   onDataImported,
@@ -139,6 +140,8 @@ const App = ({
       }
       try {
         await signIn(email, verificationCode);
+
+        await trackEventWithClientID("sign_in")
       } finally {
         if (signInRef.current) {
           signInRef.current!.disabled = false;
