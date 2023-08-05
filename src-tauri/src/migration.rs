@@ -4,14 +4,17 @@ use std::{
 };
 
 use sqlx::{Connection, Executor, SqliteConnection};
+use tauri::api::version;
 use tokio::runtime::Runtime;
-use uuid::Uuid;
-use version_compare::{compare_to, Cmp};
+use uuid::{Uuid};
 
 use crate::types::{AssetsV1, AssetsV2, Configuration};
 
+static CLIENT_ID_CONFIGURATION_ID: i32 = 998;
 static VERSION_CONFIGURATION_ID: i32 = 999;
-static CURRENT_VERSION: &str = "v0.3";
+
+static CONFIGURATION_TABLE_NAME: &str = "configuration";
+static ASSETS_V2_TABLE_NAME: &str = "assets_v2";
 
 pub fn is_first_run(path: &Path) -> bool {
     // check sqlite file exists
@@ -26,7 +29,7 @@ fn get_sqlite_file_path(path: &Path) -> String {
     String::from(path.join("track3.db").to_str().unwrap())
 }
 
-pub fn init_sqlite_tables(app_dir: &Path, resource_dir: &Path) {
+pub fn init_sqlite_tables(app_version:String, app_dir: &Path, resource_dir: &Path) {
     println!("start initing sqlite tables in rust");
     let sqlite_path = get_sqlite_file_path(app_dir);
     let configuration =
@@ -47,13 +50,24 @@ pub fn init_sqlite_tables(app_dir: &Path, resource_dir: &Path) {
         conn.execute(cloud_sync.as_str()).await.unwrap();
         conn.execute(currency_rates_sync.as_str()).await.unwrap();
 
-        sqlx::query("INSERT INTO configuration (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = ?")
+        // record current app version
+        sqlx::query(format!("INSERT INTO {} (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = ?", CONFIGURATION_TABLE_NAME).as_str())
         .bind(VERSION_CONFIGURATION_ID)
-        .bind(CURRENT_VERSION)
-        .bind(CURRENT_VERSION)
+        .bind(app_version.as_str())
+        .bind(app_version.as_str())
         .execute(&mut conn)
         .await
         .unwrap();
+
+        let client_id = Uuid::new_v4();
+            // record client id
+            sqlx::query(format!("INSERT OR IGNORE INTO {} (id, data) VALUES (?, ?)", CONFIGURATION_TABLE_NAME).as_str())
+            .bind(CLIENT_ID_CONFIGURATION_ID)
+            .bind(client_id.to_string())
+            .execute(&mut conn)
+            .await
+            .unwrap();
+
 
         conn.close().await.unwrap();
         println!("init sqlite tables in tokio spawn done");
@@ -104,7 +118,7 @@ pub fn is_from_v02_to_v03(path: &Path) -> Result<bool, Box<dyn std::error::Error
     return Ok(rt.block_on(async move {
         println!("check if from v0.2 to v0.3 in tokio spawn");
         let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
-        let data = sqlx::query_as::<_, Configuration>("select * from configuration where id = ?")
+        let data = sqlx::query_as::<_, Configuration>(format!("select * from {} where id = ?", CONFIGURATION_TABLE_NAME).as_str())
             .bind(VERSION_CONFIGURATION_ID)
             .fetch_one(&mut conn)
             .await;
@@ -112,7 +126,7 @@ pub fn is_from_v02_to_v03(path: &Path) -> Result<bool, Box<dyn std::error::Error
 
 
         let res = match data {
-            Ok(data) => Ok(compare_to(data.data ,"v0.3", Cmp::Lt) == Ok(true)),
+            Ok(data) => Ok(version::compare(&data.data, "v0.3").unwrap_or(-1) > 0),
             Err(e) => {
                 // if error is RowNotFound, not need to migrate
                 match e {
@@ -157,7 +171,7 @@ pub fn migrate_from_v01_to_v02(app_dir: &Path, resource_dir: &Path) {
     
 	    // insert data_v2 to assets_v2
 	    for row in data_v2 {
-		sqlx::query("insert into assets_v2 (uuid, symbol, amount, value, price, createdAt) values (?, ?, ?, ?, ?, ?)")
+		sqlx::query(format!("insert into {} (uuid, symbol, amount, value, price, createdAt) values (?, ?, ?, ?, ?, ?)", ASSETS_V2_TABLE_NAME).as_str())
 		.bind(row.uuid)
 		    .bind(row.symbol)
 		    .bind(row.amount)
@@ -192,7 +206,7 @@ pub fn migrate_from_v02_to_v03(app_dir: &Path, resource_dir: &Path) {
 	    let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
 	    conn.execute(assets_v2.as_str()).await.unwrap();
 
-        sqlx::query("INSERT INTO configuration (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = ?")
+        sqlx::query(format!("INSERT INTO {} (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = ?", CONFIGURATION_TABLE_NAME).as_str())
             .bind(VERSION_CONFIGURATION_ID)
             .bind(new_version)
             .bind(new_version)

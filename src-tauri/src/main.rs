@@ -162,6 +162,7 @@ async fn get_polybase_namespace(handle: tauri::AppHandle) -> Result<String, Stri
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
+            let app_version = app.package_info().version.to_string();
             let resource_path = app.path_resolver();
             let resource_dir = resource_path.resource_dir().unwrap();
             let app_dir = resource_path.app_data_dir().unwrap();
@@ -170,7 +171,7 @@ fn main() {
             if is_first_run(app_dir.as_path()) {
                 init_sqlite_file(app_dir.as_path());
             }
-            init_sqlite_tables(app_dir.as_path(), resource_dir.as_path());
+            init_sqlite_tables(app_version, app_dir.as_path(), resource_dir.as_path());
 
             if is_from_v01_to_v02(app_dir.as_path()).unwrap() {
                 // upgrade from v0.1 to v0.2
