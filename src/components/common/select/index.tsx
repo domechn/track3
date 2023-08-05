@@ -3,6 +3,7 @@ import "./index.css";
 export type SelectOption = { value: string; label: string };
 
 const App = ({
+  id,
   options,
   onSelectChange,
   defaultValue,
@@ -10,6 +11,7 @@ const App = ({
   width,
   height,
 }: {
+  id?: string;
   options: SelectOption[];
   defaultValue?: string;
   value?: string;
@@ -33,7 +35,7 @@ const App = ({
         >
           {options.map((d, idx) => {
             return (
-              <option key={d.label + idx} value={d.value}>
+              <option key={`${id ?? ""}-${d.label}-${idx}`} value={d.value}>
                 {d.label}
               </option>
             );

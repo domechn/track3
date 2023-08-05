@@ -381,65 +381,72 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         <div
           style={{
             marginBottom: 10,
+            height: 25,
           }}
         >
           <div
             style={{
-              display: "inline-block",
-              color: "gray",
-              width: (windowSize.width ?? 0) * 0.8 - 190,
-              fontSize: 15,
-              overflow: "auto",
-              textAlign: "right",
-            }}
-          >
-            Quick Compare
-          </div>
-          <div
-            className="button-group"
-            style={{
-              display: "inline-block",
-              minWidth: "20%",
               float: "right",
             }}
           >
-            <button
-              id={getQuickCompareWholeKey("7D")}
-              className="quick-compare-button"
-              style={buttonGroupItemStyle()}
-              onClick={() => onQuickCompareButtonClick("7D")}
+            <div
+              style={{
+                display: "inline-block",
+                color: "gray",
+                fontSize: 15,
+                overflow: "auto",
+                textAlign: "right",
+                marginRight: 20,
+              }}
             >
-              7D
-            </button>
-            <button
-              id={getQuickCompareWholeKey("1M")}
-              className="quick-compare-button"
-              style={buttonGroupItemStyle()}
-              onClick={() => onQuickCompareButtonClick("1M")}
+              Quick Compare
+            </div>
+            <div
+              className="button-group"
+              style={{
+                display: "inline-block",
+                minWidth: "20%",
+              }}
             >
-              1M
-            </button>
-            <button
-              id={getQuickCompareWholeKey("1Q")}
-              className="quick-compare-button"
-              style={buttonGroupItemStyle()}
-              onClick={() => onQuickCompareButtonClick("1Q")}
-            >
-              1Q
-            </button>
-            <button
-              id={getQuickCompareWholeKey("1Y")}
-              className="quick-compare-button"
-              style={buttonGroupItemStyle()}
-              onClick={() => onQuickCompareButtonClick("1Y")}
-            >
-              1Y
-            </button>
+              <button
+                id={getQuickCompareWholeKey("7D")}
+                className="quick-compare-button"
+                style={buttonGroupItemStyle()}
+                onClick={() => onQuickCompareButtonClick("7D")}
+              >
+                7D
+              </button>
+              <button
+                id={getQuickCompareWholeKey("1M")}
+                className="quick-compare-button"
+                style={buttonGroupItemStyle()}
+                onClick={() => onQuickCompareButtonClick("1M")}
+              >
+                1M
+              </button>
+              <button
+                id={getQuickCompareWholeKey("1Q")}
+                className="quick-compare-button"
+                style={buttonGroupItemStyle()}
+                onClick={() => onQuickCompareButtonClick("1Q")}
+              >
+                1Q
+              </button>
+              <button
+                id={getQuickCompareWholeKey("1Y")}
+                className="quick-compare-button"
+                style={buttonGroupItemStyle()}
+                onClick={() => onQuickCompareButtonClick("1Y")}
+              >
+                1Y
+              </button>
+            </div>
           </div>
         </div>
         <div className="comparison-date-picker">
           <div className="comparison-date-picker-item">
             <Select
+              id="base"
               options={dateOptions}
               onSelectChange={(v) => onBaseSelectChange(v)}
               value={"" + baseId}
@@ -448,6 +455,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
           </div>
           <div className="comparison-date-picker-item">
             <Select
+              id="head"
               options={dateOptions}
               onSelectChange={(v) => onHeadSelectChange(v)}
               value={"" + headId}
