@@ -176,7 +176,7 @@ fn main() {
 
             if is_first_run(app_dir.as_path()) {
                 init_sqlite_file(app_dir.as_path());
-                init_sqlite_tables(app_dir.as_path(), resource_dir.as_path());
+                init_sqlite_tables(app_version.clone(), app_dir.as_path(), resource_dir.as_path());
             }
 
             if is_from_v01_to_v02(app_dir.as_path()).unwrap() {
@@ -188,7 +188,7 @@ fn main() {
                 migrate_from_v02_to_v03(app_dir.as_path(), resource_dir.as_path());
             }
 
-            prepare_required_data(app_version, app_dir.as_path());
+            prepare_required_data(app_version.clone(), app_dir.as_path());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

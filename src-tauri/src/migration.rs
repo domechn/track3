@@ -29,7 +29,7 @@ fn get_sqlite_file_path(path: &Path) -> String {
     String::from(path.join("track3.db").to_str().unwrap())
 }
 
-pub fn init_sqlite_tables(app_dir: &Path, resource_dir: &Path) {
+pub fn init_sqlite_tables(app_version:String, app_dir: &Path, resource_dir: &Path) {
     println!("start initing sqlite tables in rust");
     let sqlite_path = get_sqlite_file_path(app_dir);
     let configuration =
@@ -49,6 +49,14 @@ pub fn init_sqlite_tables(app_dir: &Path, resource_dir: &Path) {
         conn.execute(assets_v2.as_str()).await.unwrap();
         conn.execute(cloud_sync.as_str()).await.unwrap();
         conn.execute(currency_rates_sync.as_str()).await.unwrap();
+
+        // record current app version
+        sqlx::query(format!("INSERT INTO {} (id, data) VALUES (?, ?)", CONFIGURATION_TABLE_NAME).as_str())
+        .bind(VERSION_CONFIGURATION_ID)
+        .bind(app_version.as_str())
+        .execute(&mut conn)
+        .await
+        .unwrap();
 
         conn.close().await.unwrap();
         println!("init sqlite tables in tokio spawn done");
