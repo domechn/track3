@@ -28,8 +28,7 @@ collection Record {
     this.createdAt = createdAt;
 	}
 
-  @call
-  @delegate
+  @call(owner)
   del () {
       if (!ctx.publicKey) {
         error("you must sign the txn");

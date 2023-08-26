@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@aptabase/tauri": "^0.2.0",
-    "@polybase/client": "^0.6.2",
-    "@polybase/eth": "^0.6.2",
+    "@polybase/client": "^0.6.6",
+    "@polybase/eth": "^0.6.6",
     "bluebird": "^3.7.2",
     "chart.js": "^4.3.0",
     "chartjs-plugin-datalabels": "^2.2.0",
