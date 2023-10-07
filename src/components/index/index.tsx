@@ -198,7 +198,7 @@ const App = () => {
     setTopCoinsPercentageChangeData(tcpcd);
 
     const lra = await queryLastRefreshAt();
-    setLastRefreshAt(lra)
+    setLastRefreshAt(lra);
   }
 
   function loadAllData(size = 10) {
@@ -256,7 +256,11 @@ const App = () => {
       <ReactTooltip
         id="last-refresh-at"
         place="bottom"
-        content={lastRefreshAt ? "Last Refresh At: " + lastRefreshAt : "Never Refresh Before"}
+        content={
+          lastRefreshAt
+            ? "Last Refresh At: " + lastRefreshAt
+            : "Never Refresh Before"
+        }
       />
       <div className="top-buttons-wrapper">
         <div className="left-buttons">
@@ -281,7 +285,10 @@ const App = () => {
           </div>
         </div>
         <div className="right-buttons">
-          <div style={{ display: "inline-block" }} data-tooltip-id="last-refresh-at">
+          <div
+            style={{ display: "inline-block" }}
+            data-tooltip-id="last-refresh-at"
+          >
             <RefreshData
               afterRefresh={() => {
                 loadAllData(querySize);
