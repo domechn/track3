@@ -1,6 +1,7 @@
 import _ from 'lodash'
 import { CurrencyRate } from '../types'
 import { sendHttpRequest } from '../utils/http'
+import { getClientID } from '../../../utils/app'
 
 export interface CurrencyRateQuerier {
 	listAllCurrencyRates(): Promise<CurrencyRate[]>
@@ -17,7 +18,9 @@ export class ExchangeRate implements CurrencyRateQuerier {
 			rates: {
 				[key: string]: number
 			}
-		}>("GET", this.queryUrl + currentDate)
+		}>("GET", this.queryUrl + currentDate, 10000, {
+			"x-track3-client-id": await getClientID(),
+		})
 		if (!resp.success) {
 			throw new Error("Failed to fetch currency rates")
 		}
