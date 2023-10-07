@@ -70,6 +70,5 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 - https://blockcypher.com
 - https://dogechain.info
 - https://debank.com
-- ~~https://solscan.io~~ https://phantom.app
+- https://phantom.app
 - https://coingecko.com
-- https://exchangerate.host
