@@ -8,15 +8,16 @@ export interface CurrencyRateQuerier {
 
 export class ExchangeRate implements CurrencyRateQuerier {
 
-	private readonly queryUrl = "https://api.exchangerate.host/latest"
+	private readonly queryUrl = "https://currency-rate-api.domc.me/api/currency-rate/"
 	async listAllCurrencyRates(): Promise<CurrencyRate[]> {
+		const currentDate = new Date().toISOString().split('T')[0]
 		const resp = await sendHttpRequest<{
 			success: boolean,
 			base: string,
 			rates: {
 				[key: string]: number
 			}
-		}>("GET", this.queryUrl)
+		}>("GET", this.queryUrl + currentDate)
 		if (!resp.success) {
 			throw new Error("Failed to fetch currency rates")
 		}
