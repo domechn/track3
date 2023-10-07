@@ -15,10 +15,12 @@ const App = ({
   columns,
   data,
   onRowClick,
+  colorChangedOnRowClick,
 }: {
   columns: ColumnData[];
   data: ({ id: string | number } & unknown)[];
   onRowClick?: (id: string | number) => unknown;
+  colorChangedOnRowClick?: boolean;
 }) => {
   const randomId = useMemo(() => "" + Math.floor(Math.random() * 1000000), []);
   const getColStyle = (column: ColumnData): React.CSSProperties => {
@@ -40,10 +42,15 @@ const App = ({
     const realId = (i: string | number) => "row-" + i + "-" + randomId;
 
     // set clicked background
-    if (clickedRow !== null) {
-      document.getElementById(realId(clickedRow))?.classList.remove("clicked");
+    if (colorChangedOnRowClick) {
+      if (clickedRow !== null) {
+        document
+          .getElementById(realId(clickedRow))
+          ?.classList.remove("clicked");
+      }
+      document.getElementById(realId(idx))?.classList.add("clicked");
     }
-    document.getElementById(realId(idx))?.classList.add("clicked");
+
     setClickedRow(idx);
   }
 

@@ -13,6 +13,7 @@ import { toast } from "react-hot-toast";
 import { LoadingContext } from "../../App";
 import { timestampToDate } from "../../utils/date";
 import { currencyWrapper } from "../../utils/currency";
+import Modal from "../common/modal";
 
 type RankData = {
   id: number;
@@ -33,59 +34,10 @@ const App = ({
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
   const { setLoading } = useContext(LoadingContext);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const columns = [
-    {
-      key: "createdAt",
-      dataIndex: "createdAt",
-      title: "Date",
-      render: (id: number | string) => (
-        <>
-          {timestampToDate(
-            new Date(
-              _(data).find((d) => d.id === id)!.createdAt as string
-            ).getTime(),
-            true
-          )}
-        </>
-      ),
-    },
-    {
-      key: "total",
-      dataIndex: "total",
-      title: "Total",
-      render: (id: number | string) => {
-        const curData = _(data).find((d) => d.id === id);
-
-        return (
-          <>
-            {curData
-              ? currency.symbol +
-                currencyWrapper(currency)(curData.total).toFixed(2)
-              : "-"}
-          </>
-        );
-      },
-    },
-    {
-      title: "Opt",
-      dataIndex: "id",
-      key: "operations",
-      render: (id: number | string) => (
-        <a href="#" onClick={() => onDeleteClick(id as string)}>
-          <img
-            src={deleteIcon}
-            alt="delete"
-            style={{
-              border: 0,
-              height: 20,
-              width: 20,
-            }}
-          />
-        </a>
-      ),
-    },
-  ];
+  const [pageNum, setPageNum] = useState(1);
+  const pageSize = 10;
 
   const rankColumns = [
     {
@@ -186,12 +138,109 @@ const App = ({
         .sortBy("rank")
         .value()
     );
+
+    setIsModalOpen(true);
+  }
+
+  function onModalClose() {
+    setIsModalOpen(false);
+  }
+
+  function getUpOrDown(val: number) {
+    const p = val > 0 ? "+" : val === 0 ? "" : "-";
+    return p;
+  }
+
+  function renderHistoricalDataList() {
+    // split data into pages
+    const idx = (pageNum - 1) * pageSize;
+    return _(data)
+      .slice(idx, idx + pageSize)
+      .map((d, idx) => {
+        return (
+          <div
+            key={d.id}
+            className="historical-data-card"
+            onClick={() => onRowClick(d.id)}
+          >
+            <div>
+              <div className="historical-data-card-created-at">
+                {timestampToDate(new Date(d.createdAt).getTime(), true)}
+              </div>
+              <div className="historical-data-card-total">
+                {currency.symbol +
+                  currencyWrapper(currency)(d.total).toFixed(2)}
+              </div>
+            </div>
+
+            <div className="historical-data-card-bottom">
+              <div className="historical-data-card-bottom-operations">
+                <a href="#" onClick={() => onDeleteClick(d.id)}>
+                  <img
+                    src={deleteIcon}
+                    alt="delete"
+                    style={{
+                      border: 0,
+                      height: 20,
+                      width: 20,
+                    }}
+                  />
+                </a>
+              </div>
+              <div
+                className="historical-data-card-bottom-changes"
+                style={{
+                  color: d.total - data[idx + 1]?.total > 0 ? "green" : "red",
+                }}
+              >
+                {idx < data.length - 1
+                  ? getUpOrDown(d.total - data[idx + 1].total) +
+                    currency.symbol +
+                    currencyWrapper(currency)(
+                      Math.abs(d.total - data[idx + 1].total)
+                    ).toFixed(2)
+                  : ""}
+              </div>
+            </div>
+          </div>
+        );
+      })
+      .value();
+  }
+
+  function page() {
+    return _(data.length / pageSize)
+      .range()
+      .map((i) => {
+        const curPageNum = i + 1;
+
+        return (
+          <a
+            href="#"
+            key={"his-page-" + curPageNum}
+            onClick={() => setPageNum(curPageNum)}
+            style={{
+              color: curPageNum === pageNum ? "rgb(37, 37, 244)" : "gray",
+              marginRight: 10,
+            }}
+          >
+            {curPageNum}
+          </a>
+        );
+      })
+      .value();
   }
 
   return (
     <div>
-      <h2>Historical Data</h2>
-      <div className="historical-data">
+      <h2
+        style={{
+          marginBottom: 5,
+        }}
+      >
+        Historical Data
+      </h2>
+      <Modal visible={isModalOpen} onClose={onModalClose}>
         <div
           id="detail-view"
           style={{
@@ -201,18 +250,38 @@ const App = ({
           }}
         >
           <Table data={rankData} columns={rankColumns} />
-          <h3>👆 Details</h3>
         </div>
-        <div
-          id="simple-view"
+      </Modal>
+      <div
+        style={{
+          marginBottom: 10,
+          color: "gray",
+        }}
+      >
+        <a
+          href="#"
+          onClick={() => (pageNum > 1 ? setPageNum(pageNum - 1) : null)}
           style={{
-            display: "inline-block",
-            verticalAlign: "top",
+            marginRight: 10,
+            color: "gray",
           }}
         >
-          <Table data={data} columns={columns} onRowClick={onRowClick} />
-        </div>
+          {"<"}
+        </a>
+        {page()}
+        <a
+          href="#"
+          onClick={() =>
+            pageNum < data.length / pageSize ? setPageNum(pageNum + 1) : null
+          }
+          style={{
+            color: "gray",
+          }}
+        >
+          {">"}
+        </a>
       </div>
+      <div className="historical-data">{renderHistoricalDataList()}</div>
     </div>
   );
 };
