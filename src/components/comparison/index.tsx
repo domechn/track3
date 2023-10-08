@@ -9,7 +9,7 @@ import _ from "lodash";
 import Select from "../common/select";
 import viewIcon from "../../assets/icons/view-icon.png";
 import hideIcon from "../../assets/icons/hide-icon.png";
-import { currencyWrapper } from "../../utils/currency";
+import { currencyWrapper, prettyNumberToLocaleString } from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
 import { parseDateToTS } from "../../utils/date";
 
@@ -314,10 +314,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     }
     let res = "" + convertedNumber;
     if (!keepDecimal) {
-      res = convertedNumber.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
+      res = prettyNumberToLocaleString(convertedNumber)
     }
     if (convertCurrency) {
       return `${currency.symbol} ${res}`;

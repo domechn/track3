@@ -12,7 +12,10 @@ import "./index.css";
 import { toast } from "react-hot-toast";
 import { LoadingContext } from "../../App";
 import { timestampToDate } from "../../utils/date";
-import { currencyWrapper } from "../../utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+} from "../../utils/currency";
 import Modal from "../common/modal";
 
 type RankData = {
@@ -66,7 +69,9 @@ const App = ({
           <>
             {curData
               ? currency.symbol +
-                currencyWrapper(currency)(curData.value).toFixed(2)
+                prettyNumberToLocaleString(
+                  currencyWrapper(currency)(curData.value)
+                )
               : "-"}
           </>
         );
@@ -169,7 +174,9 @@ const App = ({
               </div>
               <div className="historical-data-card-total">
                 {currency.symbol +
-                  currencyWrapper(currency)(d.total).toFixed(2)}
+                  prettyNumberToLocaleString(
+                    currencyWrapper(currency)(d.total)
+                  )}
               </div>
             </div>
 
@@ -196,9 +203,11 @@ const App = ({
                 {idx < data.length - 1
                   ? getUpOrDown(d.total - data[idx + 1].total) +
                     currency.symbol +
-                    currencyWrapper(currency)(
-                      Math.abs(d.total - data[idx + 1].total)
-                    ).toFixed(2)
+                    prettyNumberToLocaleString(
+                      currencyWrapper(currency)(
+                        Math.abs(d.total - data[idx + 1].total)
+                      )
+                    )
                   : ""}
               </div>
             </div>
@@ -220,7 +229,7 @@ const App = ({
             key={"his-page-" + curPageNum}
             onClick={() => setPageNum(curPageNum)}
             style={{
-              color: curPageNum === pageNum ? "rgb(37, 37, 244)" : "gray",
+              color: curPageNum === pageNum ? "black" : "gray",
               marginRight: 10,
             }}
           >

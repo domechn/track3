@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { CurrencyRateDetail } from "../../middlelayers/types";
-import { currencyWrapper } from "../../utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+} from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
 import "./index.css";
 
@@ -32,7 +35,8 @@ const App = ({
 
   function formatTotalValue() {
     return (
-      currency.symbol + currencyWrapper(currency)(data.totalValue).toFixed(2)
+      currency.symbol +
+      prettyNumberToLocaleString(currencyWrapper(currency)(data.totalValue))
     );
   }
 
@@ -47,7 +51,7 @@ const App = ({
     if (val < 0) {
       val = -val;
     }
-    return `${p}${val.toFixed(2)}%`;
+    return `${p}${prettyNumberToLocaleString(val)}%`;
   }
 
   function formatChangeValue() {
@@ -59,7 +63,7 @@ const App = ({
     if (val < 0) {
       val = -val;
     }
-    return p + symbol + val.toFixed(2);
+    return p + symbol + prettyNumberToLocaleString(val);
   }
 
   function fontCount() {
@@ -117,8 +121,10 @@ const App = ({
         style={{
           minHeight: totalValueFontSize(),
         }}
-          onMouseEnter={() => setChangedValueOrPercentage(formatChangeValue())}
-          onMouseLeave={() => setChangedValueOrPercentage(formatChangePercentage()) }
+        onMouseEnter={() => setChangedValueOrPercentage(formatChangeValue())}
+        onMouseLeave={() =>
+          setChangedValueOrPercentage(formatChangePercentage())
+        }
       >
         <span
           className="totalValue"
@@ -138,7 +144,6 @@ const App = ({
             fontSize: changePercentageFontSize(),
           }}
         >
-          {/* {formatChangePercentage()} */}
           {changedValueOrPercentage}
         </span>
       </div>
