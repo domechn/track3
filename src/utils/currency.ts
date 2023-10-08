@@ -5,3 +5,10 @@ export function currencyWrapper(currencyInfo: CurrencyRateDetail) {
 		return valueInUsd * currencyInfo.rate
 	}
 }
+
+export function prettyNumberToLocaleString(value: number) {
+	return value.toLocaleString("en-US", {
+		minimumFractionDigits: 2,
+		maximumFractionDigits: 2,
+	})
+}

@@ -3,7 +3,7 @@ import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
 } from "../../middlelayers/types";
-import { currencyWrapper } from "../../utils/currency";
+import { currencyWrapper, prettyNumberToLocaleString } from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
 import { insertEllipsis } from "../../utils/string";
 import "./index.css";
@@ -125,7 +125,7 @@ const App = ({
                 >
                   <span className={getChangeClassName(d.changePercentage)}>
                     {getArrow(d.changePercentage)}
-                    {getPositiveValue(d.changePercentage).toFixed(2)}%
+                    {prettyNumberToLocaleString(getPositiveValue(d.changePercentage))}%
                   </span>
                 </td>
                 <td
@@ -137,9 +137,9 @@ const App = ({
                   <span className={getChangeClassName(d.changeValue)}>
                     {getArrow(d.changeValue)}
                     {currency.symbol}
-                    {currencyWrapper(currency)(
-                      getPositiveValue(d.changeValue)
-                    ).toFixed(2)}
+                    {prettyNumberToLocaleString(
+                      currencyWrapper(currency)(getPositiveValue(d.changeValue))
+                    )}
                   </span>
                 </td>
               </tr>

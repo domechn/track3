@@ -4,7 +4,7 @@ import {
   CurrencyRateDetail,
   WalletAssetsPercentageData,
 } from "../../middlelayers/types";
-import { currencyWrapper } from "../../utils/currency";
+import { currencyWrapper, prettyNumberToLocaleString } from "../../utils/currency";
 import _ from "lodash";
 import { useEffect, useState } from "react";
 import { insertEllipsis } from '../../utils/string'
@@ -42,7 +42,7 @@ const App = ({
         align: "top",
         offset: Math.max(0, 15 - _(data).size()),
         formatter: (value: number) => {
-          return `${((value / totalValue) * 100).toFixed(2)}%`;
+          return `${prettyNumberToLocaleString((value / totalValue) * 100)}%`;
         },
       },
     },
