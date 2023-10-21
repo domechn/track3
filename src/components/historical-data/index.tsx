@@ -160,7 +160,6 @@ const App = ({
     // split data into pages
     const idx = (pageNum - 1) * pageSize;
     return _(data)
-      .slice(idx, idx + pageSize)
       .map((d, idx) => {
         return (
           <div
@@ -214,6 +213,7 @@ const App = ({
           </div>
         );
       })
+      .slice(idx, idx + pageSize)
       .value();
   }
 
