@@ -119,7 +119,10 @@ const App = ({
         setRankData([]);
       })
       .catch((e) => toast.error(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setIsModalOpen(false);
+        setLoading(false);
+      });
   }
 
   function onRowClick(id: number | string) {
