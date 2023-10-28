@@ -24,6 +24,7 @@ type ExportData = {
 	md5: string
 }
 
+// TODO: query by token address not symbol, because there are multiple coins with same symbol
 export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]: number }> {
 	return await invoke("query_coins_prices", { symbols })
 }

@@ -60,6 +60,7 @@ impl CoinGecko {
         symbols: Vec<String>,
     ) -> Result<HashMap<String, f64>, Box<dyn std::error::Error>> {
         let all_coins = self.list_all_coin_ids(symbols).await?;
+        // todo: if there are multi coins with same symbol, we should find by tokenAddress
         let all_ids = all_coins.iter().map(|c| &c.id).collect::<Vec<_>>();
         let all_prices = self
             .client
