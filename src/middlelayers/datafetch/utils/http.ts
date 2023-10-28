@@ -9,8 +9,8 @@ export function getCurrentUA() {
 export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout = 5000, headers = {}, json = {}): Promise<T> {
 	const client = await getClient()
 	const hs: { [k: string]: string } = {
-		...headers,
 		"user-agent": getCurrentUA(),
+		...headers,
 	}
 	if (!_(json).isEmpty()) {
 		hs["content-type"] = "application/json"

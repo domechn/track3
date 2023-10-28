@@ -1,4 +1,5 @@
 export type Coin = {
+	tokenAddress?: string
 	symbol: string
 	amount: number
 }

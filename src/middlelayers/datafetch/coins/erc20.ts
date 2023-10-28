@@ -2,59 +2,104 @@ import { Analyzer, Coin, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
-import { invoke } from '@tauri-apps/api'
 import { getAddressList } from '../utils/address'
+import bluebird from 'bluebird'
 
-type DeBankAssetResp = {
-	coin_list: Coin[]
+type QueryAssetResp = {
 	token_list: Coin[]
 }
 
-interface DeBank429ErrorResolver {
-	isTried(): boolean
+interface ERC20Querier {
+	query(address: string): Promise<Coin[]>
 
-	tryResolve(address?: string): Promise<void>
-
-	resolved(): Promise<void>
+	clean(): void
 }
 
-class DeBank429ErrorResolverImpl implements DeBank429ErrorResolver {
+type EthplorerResp = {
+	address: string
+	ETH: {
+		balance: number
+	}
+	tokens: {
+		tokenInfo: {
+			address: string
+			name: string
+			symbol: string
+			decimals: string
+			price: EthplorerPriceResp | boolean
+		},
+		balance: number
+	}[]
+}
 
-	private defaultAddress: string
+type EthplorerPriceResp = {
+	rate: number
+	currency: string
+	volume24h: number
+}
 
-	private tried = false
+class EthplorerERC20Query implements ERC20Querier {
+	private mainSymbol: 'ETH' | 'BNB'
+	private queryUrl: string
+	// rate limit: 2 per second, 30/min, 200/hour, 1000/24hours, 3000/week.
+	private readonly accessKey = "freekey"
 
-	constructor() {
-		this.defaultAddress = "0x2170ed0880ac9a755fd29b2688956bd959f933f8"
+	// add cache in one times query to avoid retry error
+	private cache: { [k: string]: Coin[] } = {}
 
+	constructor(mainSymbol: 'ETH' | 'BNB', queryUrl: string) {
+		this.mainSymbol = mainSymbol
+		this.queryUrl = queryUrl
 	}
 
-	isTried(): boolean {
-		console.debug("isTried", this.tried)
-
-		return this.tried
-	}
-
-	async tryResolve(address?: string): Promise<void> {
-		this.tried = true
-		await invoke("open_debank_window_in_background", {
-			address: address || this.defaultAddress
+	async query(address: string): Promise<Coin[]> {
+		if (this.cache[address]) {
+			return this.cache[address]
+		}
+		const url = `${this.queryUrl}/${address}?apiKey=${this.accessKey}`
+		const data = await sendHttpRequest<EthplorerResp>("GET", url, 5000, {
+			"user-agent": '',
 		})
+		if (!data) {
+			throw new Error("failed to query erc20 assets")
+		}
+		const mainCoin: Coin = {
+			symbol: this.mainSymbol,
+			amount: data.ETH.balance,
+		}
+
+		// ignore tokens without price or its price is false or its volume24h less than 1k
+		const resp = _(data.tokens).filter(t => t.tokenInfo.price && (t.tokenInfo.price as EthplorerPriceResp).volume24h > 1000).map(t => ({
+			tokenAddress: t.tokenInfo.address,
+			symbol: t.tokenInfo.symbol,
+			amount: t.balance / Math.pow(10, +t.tokenInfo.decimals),
+		} as Coin)).push(mainCoin).value()
+
+		this.cache[address] = resp
+		return resp
 	}
 
-	async resolved(): Promise<void> {
-		this.tried = false
-		console.debug("resolved 429")
-
-		await invoke("close_debank_window")
+	clean(): void {
+		this.cache = {}
 	}
 }
+
+class EthERC20Query extends EthplorerERC20Query {
+	constructor() {
+		super('ETH', "https://api.ethplorer.io/getAddressInfo")
+	}
+}
+
+class BscERC20Query extends EthplorerERC20Query {
+	constructor() {
+		super('BNB', "https://api.binplorer.com/getAddressInfo")
+	}
+}
+
 
 export class ERC20Analyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'erc20'>
-	private readonly queryUrl = "https://api.debank.com/asset/classify"
-
-	private readonly errorResolver: DeBank429ErrorResolver = new DeBank429ErrorResolverImpl()
+	private readonly queries = [new EthERC20Query(), new BscERC20Query()]
 
 	constructor(config: Pick<TokenConfig, 'erc20'>) {
 		this.config = config
@@ -65,14 +110,11 @@ export class ERC20Analyzer implements Analyzer {
 	}
 
 	private async query(address: string): Promise<WalletCoin[]> {
-		const url = `${this.queryUrl}?user_addr=${address}`
-		const { data } = await sendHttpRequest<{ data: DeBankAssetResp }>("GET", url, 5000, {})
-		if (!data) {
-			throw new Error("failed to query erc20 assets")
-		}
-		console.debug("erc20 assets", data)
+		const coins = await bluebird.map(this.queries, async q => q.query(address), {
+			concurrency: 2
+		})
 
-		return _([data.coin_list, data.token_list]).flatten().map(c=>({
+		return _(coins).flatten().map(c => ({
 			...c,
 			wallet: address
 		})).value()
@@ -80,17 +122,16 @@ export class ERC20Analyzer implements Analyzer {
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		return this.loadPortfolioWith429Retry(5)
-			.finally(async () => {
-				if (this.errorResolver.isTried()) {
-					await this.errorResolver.resolved()
-				}
+			.finally(() => {
+				// clean cache in the end
+				this.queries.forEach(q => q.clean())
 			})
 	}
 
 	async loadPortfolioWith429Retry(max: number): Promise<WalletCoin[]> {
 		try {
 			if (max <= 0) {
-				throw new Error("failed to query erc20 assets")
+				throw new Error("failed to query erc20 assets, with max retry")
 			}
 			const coinLists = await asyncMap(getAddressList(this.config.erc20), async addr => this.query(addr), 1, 1000)
 
@@ -98,11 +139,8 @@ export class ERC20Analyzer implements Analyzer {
 		} catch (e) {
 			if (e instanceof Error && e.message.includes("429")) {
 				console.error("failed to query erc20 assets due to 429, retrying...")
-				if (!this.errorResolver.isTried()) {
-					await this.errorResolver.tryResolve(getAddressList(this.config.erc20)[0])
-				}
-				// sleep 5s
-				await new Promise(resolve => setTimeout(resolve, 5000))
+				// sleep 2s
+				await new Promise(resolve => setTimeout(resolve, 2000))
 
 				// try again
 				return this.loadPortfolioWith429Retry(max - 1)
