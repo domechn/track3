@@ -28,8 +28,8 @@ export async function saveConfiguration(cfg: GlobalConfig) {
 }
 
 // used for import data
-export async function saveRawConfiguration(data: string) {
-	await saveConfigurationById(fixId, data)
+export async function importRawConfiguration(data: string) {
+	await saveConfigurationById(fixId, data, false)
 }
 
 export async function getCloudSyncConfiguration(): Promise<ConfigurationModel | undefined> {
@@ -42,12 +42,12 @@ export async function saveCloudSyncConfiguration(cfg: CloudSyncConfiguration) {
 	await saveConfigurationById(cloudSyncFixId, data)
 }
 
-async function saveConfigurationById(id: string, cfg: string) {
+async function saveConfigurationById(id: string, cfg: string, encrypt = true) {
 	const db = await getDatabase()
 	// encrypt data
-	const encrypted = await invoke<string>("encrypt", { data: cfg })
+	const saveStr = encrypt ? await invoke<string>("encrypt", { data: cfg }) : cfg
 
-	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${id}, ?)`, [encrypted])
+	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${id}, ?)`, [saveStr])
 }
 
 export async function exportConfigurationString(): Promise<string | undefined> {

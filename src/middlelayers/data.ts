@@ -15,7 +15,7 @@ import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
 import { AssetModel, HistoricalData } from './types'
 import { getDatabase } from './database'
-import { exportConfigurationString, saveRawConfiguration } from './configuration'
+import { exportConfigurationString, importRawConfiguration } from './configuration'
 
 type ExportData = {
 	exportAt: string
@@ -134,7 +134,7 @@ export async function importHistoricalData(): Promise<boolean> {
 
 	// import configuration if exported
 	if (configuration) {
-		await saveRawConfiguration(configuration)
+		await importRawConfiguration(configuration)
 	}
 
 	return true
