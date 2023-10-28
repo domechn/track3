@@ -10,7 +10,10 @@ export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout 
 	const client = await getClient()
 	const hs: { [k: string]: string } = {
 		...headers,
-		"user-agent": getCurrentUA(),
+	}
+	// if ua in headers, use it
+	if (!hs.hasOwnProperty("user-agent")) {
+		hs["user-agent"] = getCurrentUA()
 	}
 	if (!_(json).isEmpty()) {
 		hs["content-type"] = "application/json"
@@ -25,6 +28,8 @@ export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout 
 		payload.body = Body.json(json)
 	}
 	const resp = await client.request<T>(payload)
+	console.log(resp);
+	
 	
 	if (resp.status > 299) {
 		throw new Error(`Request failed with status ${resp.status}`)

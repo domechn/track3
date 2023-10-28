@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
 use std::{collections::HashMap, fs};
-use tauri_plugin_aptabase::EventTracker;
 
 use tauri::Manager;
 use track3::{
@@ -110,42 +109,6 @@ fn decrypt(data: String) -> Result<String, String> {
     windows_subsystem = "windows"
 )]
 #[tauri::command]
-async fn open_debank_window_in_background(handle: tauri::AppHandle, address: String) {
-    let debank_window = tauri::WindowBuilder::new(
-        &handle,
-        "debank-refresh", /* the unique window label */
-        tauri::WindowUrl::External(
-            format!("https://debank.com/profile/{address}") // eth contract address
-                .parse()
-                .unwrap(),
-        ),
-    )
-    .inner_size(0.0, 0.0)
-    .build();
-
-    if let Ok(debank_window) = debank_window {
-        debank_window.hide().unwrap();
-    }
-}
-
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-#[tauri::command]
-async fn close_debank_window(handle: tauri::AppHandle) {
-    // get window
-    let debank_window = handle.get_window("debank-refresh");
-    if let Some(debank_window) = debank_window {
-        debank_window.close().unwrap();
-    }
-}
-
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-#[tauri::command]
 async fn get_polybase_namespace(handle: tauri::AppHandle) -> Result<String, String> {
     let ns = fs::read_to_string(
         handle
@@ -197,8 +160,6 @@ fn main() {
             query_okex_balance,
             encrypt,
             decrypt,
-            open_debank_window_in_background,
-            close_debank_window,
             get_polybase_namespace,
         ])
         .run(tauri::generate_context!())

@@ -27,7 +27,6 @@ export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<W
 
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
 	const anas = [ERC20Analyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
-	// const anas = [  CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
 	const coinLists = await bluebird.map(anas, async ana => {
 
 		const a = new ana(config)
