@@ -109,6 +109,16 @@ fn decrypt(data: String) -> Result<String, String> {
     windows_subsystem = "windows"
 )]
 #[tauri::command]
+fn md5(data: String) -> Result<String, String> {
+    let digest = md5::compute(data.as_bytes());
+    Ok(format!("{:x}", digest))
+}
+
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
 async fn get_polybase_namespace(handle: tauri::AppHandle) -> Result<String, String> {
     let ns = fs::read_to_string(
         handle
@@ -160,6 +170,7 @@ fn main() {
             query_okex_balance,
             encrypt,
             decrypt,
+            md5,
             get_polybase_namespace,
         ])
         .run(tauri::generate_context!())

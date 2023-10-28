@@ -21,7 +21,8 @@ import {
 } from "../../middlelayers/cloudsync";
 import { LoadingContext } from "../../App";
 import { timestampToDate } from "../../utils/date";
-import { trackEventWithClientID } from '../../utils/app'
+import { trackEventWithClientID } from "../../utils/app";
+import Modal from "../common/modal";
 
 const App = ({
   onDataImported,
@@ -40,6 +41,8 @@ const App = ({
   const { setLoading } = useContext(LoadingContext);
   const [lastSyncAt, setLastSyncAt] = useState<number>(0);
   const [enableAutoSync, setEnableAutoSync] = useState<boolean>(false);
+
+  const [exportConfiguration, setExportConfiguration] = useState(false);
 
   useEffect(() => {
     onAuthStateUpdate((authState) => {
@@ -103,7 +106,7 @@ const App = ({
   }
 
   async function onExportDataClick() {
-    const exported = await exportHistoricalData();
+    const exported = await exportHistoricalData(exportConfiguration);
     if (exported) {
       toast.success("export data successfully");
     }
@@ -141,7 +144,7 @@ const App = ({
       try {
         await signIn(email, verificationCode);
 
-        trackEventWithClientID("sign_in")
+        trackEventWithClientID("sign_in");
       } finally {
         if (signInRef.current) {
           signInRef.current!.disabled = false;
@@ -319,7 +322,7 @@ const App = ({
             style={{
               marginTop: 10,
             }}
-            onClick={()=>syncDataBetweenCloudAndLocal()}
+            onClick={() => syncDataBetweenCloudAndLocal()}
           >
             Sync Data ( Beta )
           </button>
@@ -330,7 +333,7 @@ const App = ({
               backgroundColor: "#FF4500",
               color: "white",
             }}
-            onClick={()=>syncDataBetweenCloudAndLocal(true)}
+            onClick={() => syncDataBetweenCloudAndLocal(true)}
           >
             Hard Sync Data ( Beta )
           </button>
@@ -351,6 +354,27 @@ const App = ({
       </div>
 
       <div>
+        <h4 style={{
+          marginBottom: 10,
+        }}>Select Exported Data</h4>
+        <div>
+          <input
+            className="exportDataCheckbox"
+            type="checkbox"
+            checked={exportConfiguration}
+            onChange={(e) => setExportConfiguration(e.target.checked)}
+          />
+          <span>Export Configuration</span>
+        </div>
+        <div>
+          <input
+            className="exportDataCheckbox"
+            type="checkbox"
+            checked={true}
+            disabled
+          />
+          <span>Export Historical Data</span>
+        </div>
         <button onClick={onExportDataClick}>Export Data</button>
       </div>
     </div>
