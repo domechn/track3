@@ -13,8 +13,16 @@ import { ASSETS_TABLE_NAME, queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
-import { AssetModel } from './types'
+import { AssetModel, HistoricalData } from './types'
 import { getDatabase } from './database'
+import { exportConfigurationString, saveRawConfiguration } from './configuration'
+
+type ExportData = {
+	exportAt: string
+	configuration?: string
+	historicalData: Pick<HistoricalData, "createdAt" | "assets" | "total">[]
+	md5: string
+}
 
 export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]: number }> {
 	return await invoke("query_coins_prices", { symbols })
@@ -50,7 +58,7 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<
 	return assets
 }
 
-export async function exportHistoricalData(): Promise<boolean> {
+export async function exportHistoricalData(exportConfiguration = false): Promise<boolean> {
 	const filePath = await save({
 		filters: [
 			{
@@ -66,9 +74,20 @@ export async function exportHistoricalData(): Promise<boolean> {
 	}
 
 	const data = await queryHistoricalData(-1)
-	const content = JSON.stringify({
+
+	const exportAt = new Date().toISOString()
+
+	const cfg = exportConfiguration ? await exportConfigurationString() : undefined
+
+	const exportData = {
+		exportAt,
 		historicalData: _.map(data, (obj) => _.omit(obj, "id")),
-	})
+		configuration: cfg
+	}
+	const content = JSON.stringify({
+		...exportData,
+		md5: await invoke<string>("md5", { data: JSON.stringify(exportData) }),
+	} as ExportData)
 
 	// save to filePath
 	await writeTextFile(filePath, content)
@@ -89,7 +108,16 @@ export async function importHistoricalData(): Promise<boolean> {
 	}
 	const contents = await readTextFile(selected as string)
 
-	const { historicalData } = JSON.parse(contents) as { historicalData: any[] }
+	const { exportAt, md5, configuration, historicalData } = JSON.parse(contents) as ExportData
+
+	// !compatible with older versions logic ( before 0.3.3 )
+	if (md5) {
+		// verify md5
+		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, configuration }) })
+		if (currentMd5 !== md5) {
+			throw new Error("invalid data, md5 check failed: errorCode 000")
+		}
+	}
 
 	if (!historicalData || !_(historicalData).isArray() || historicalData.length === 0) {
 		throw new Error("invalid data: errorCode 001")
@@ -100,8 +128,20 @@ export async function importHistoricalData(): Promise<boolean> {
 	if (assets.length === 0) {
 		throw new Error("no data need to be imported: errorCode 003")
 	}
-	const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
 
+	// start to import
+	await saveHistoricalDataAssets(assets)
+
+	// import configuration if exported
+	if (configuration) {
+		await saveRawConfiguration(configuration)
+	}
+
+	return true
+}
+
+async function saveHistoricalDataAssets(assets: AssetModel[]) {
+	const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
 	_(assets).forEach((asset) => {
 		_(requiredKeys).forEach(k => {
 			if (!_(asset).has(k)) {
@@ -123,5 +163,4 @@ export async function importHistoricalData(): Promise<boolean> {
 	const executeValues = _(assets as AssetModel[]).sortBy(a => new Date(a.createdAt).getTime()).reverse().map(a => _(keys).map(k => _(a).get(k)).value()).flatten().value()
 
 	await db.execute(insertSql, executeValues)
-	return true
 }

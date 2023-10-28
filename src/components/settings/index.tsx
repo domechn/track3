@@ -21,6 +21,7 @@ const App = ({
 }) => {
   const [version, setVersion] = useState<string>("0.1.0");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string>("configuration");
   const size = useWindowSize();
   const [isSmallScreenAndSidecarActive, setIsSmallScreenAndSidecarActive] =
     useState(true);
@@ -28,7 +29,8 @@ const App = ({
   useEffect(() => {
     if (isModalOpen) {
       loadVersion();
-      setIsSmallScreenAndSidecarActive(true)
+
+      setIsSmallScreenAndSidecarActive(true);
     }
   }, [isModalOpen]);
 
@@ -46,40 +48,6 @@ const App = ({
     setIsModalOpen(false);
   }
 
-  function setActiveOnSidebarItem(activeId?: string) {
-    const allowedIds = ["configuration", "data"];
-    const allowedContentIds = _(allowedIds)
-      .map((id) => `${id}Content`)
-      .value();
-    const sidebarItems = document.getElementsByClassName("sidebar-item");
-    const contentItems = document.getElementsByClassName("content-item");
-    _.forEach(sidebarItems, (item) => {
-      if (allowedIds.includes(item.id)) {
-        item.classList.remove("active");
-      }
-    });
-
-    _.forEach(contentItems, (item) => {
-      if (allowedContentIds.includes(item.id)) {
-        (item as any).style.display = "none";
-      }
-    });
-    if (!activeId) {
-      return
-    }
-
-    const activeSidebarItem = document.getElementById(activeId);
-    if (activeSidebarItem) {
-      activeSidebarItem.classList.add("active");
-    }
-
-    const activeContentItem = document.getElementById(`${activeId}Content`);
-
-    if (activeContentItem) {
-      activeContentItem.style.display = "block";
-    }
-  }
-
   function getSettingWidth() {
     const width = Math.floor(size.width ? size.width * 0.8 : 800);
     // keep it even
@@ -91,13 +59,13 @@ const App = ({
 
   function onConfigurationSidebarClick() {
     // add active class to the clicked item
-    setActiveOnSidebarItem("configuration");
-    setIsSmallScreenAndSidecarActive(false)
+    setActiveId("configuration");
+    setIsSmallScreenAndSidecarActive(false);
   }
   function onDataSidebarClick() {
     // add active class to the clicked item
-    setActiveOnSidebarItem("data");
-    setIsSmallScreenAndSidecarActive(false)
+    setActiveId("data");
+    setIsSmallScreenAndSidecarActive(false);
   }
 
   function _onConfigurationSave() {
@@ -124,26 +92,40 @@ const App = ({
         <div className="settings-sidebar">
           <div
             id="configuration"
-            className="sidebar-item active"
+            className={`sidebar-item ${
+              !smallScreen() && activeId === "configuration" ? "active" : ""
+            }`}
             onClick={onConfigurationSidebarClick}
           >
             Configuration
           </div>
-          <div id="data" className="sidebar-item" onClick={onDataSidebarClick}>
+          <div
+            id="data"
+            className={`sidebar-item ${
+              !smallScreen() && activeId === "data" ? "active" : ""
+            }`}
+            onClick={onDataSidebarClick}
+          >
             Data
           </div>
           <div className="version">version: {version}</div>
         </div>
 
         <div className="settings-content">
-          <div id="configurationContent" className="content-item">
+          <div
+            id="configurationContent"
+            className="content-item"
+            style={{
+              display: activeId === "configuration" ? "block" : "none",
+            }}
+          >
             <Configuration onConfigurationSave={_onConfigurationSave} />
           </div>
           <div
             id="dataContent"
             className="content-item"
             style={{
-              display: "none",
+              display: activeId === "data" ? "block" : "none",
             }}
           >
             <DataManagement
@@ -188,26 +170,37 @@ const App = ({
             width: "90%",
           }}
         >
-          <div style={{
-            textAlign: "left",
-            marginBottom: "10px",
-            cursor: "pointer",
-            fontFamily: "monospace",
-            fontSize: "14px",
-            color: "#0078d4"
-          }} onClick={()=>{
-            setIsSmallScreenAndSidecarActive(true)
-            // clear active class
-            setActiveOnSidebarItem()
-          }}>{'< back'}</div>
-          <div id="configurationContent" className="content-item">
+          <div
+            style={{
+              textAlign: "left",
+              marginBottom: "10px",
+              cursor: "pointer",
+              fontFamily: "monospace",
+              fontSize: "14px",
+              color: "#0078d4",
+            }}
+            onClick={() => {
+              setIsSmallScreenAndSidecarActive(true);
+              // clear active class
+              setActiveId("");
+            }}
+          >
+            {"< back"}
+          </div>
+          <div
+            id="configurationContent"
+            className="content-item"
+            style={{
+              display: activeId === "configuration" ? "block" : "none",
+            }}
+          >
             <Configuration onConfigurationSave={_onConfigurationSave} />
           </div>
           <div
             id="dataContent"
             className="content-item"
             style={{
-              display: "none",
+              display: activeId === "data" ? "block" : "none",
             }}
           >
             <DataManagement

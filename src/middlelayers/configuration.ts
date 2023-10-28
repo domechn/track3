@@ -27,6 +27,11 @@ export async function saveConfiguration(cfg: GlobalConfig) {
 	await saveConfigurationById(fixId, data)
 }
 
+// used for import data
+export async function saveRawConfiguration(data: string) {
+	await saveConfigurationById(fixId, data)
+}
+
 export async function getCloudSyncConfiguration(): Promise<ConfigurationModel | undefined> {
 	return getConfigurationById(cloudSyncFixId)
 }
@@ -45,30 +50,34 @@ async function saveConfigurationById(id: string, cfg: string) {
 	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${id}, ?)`, [encrypted])
 }
 
+export async function exportConfigurationString(): Promise<string | undefined> {
+	const model = await getConfigurationModelById(fixId)
+	return model?.data
+}
+
 async function getConfigurationById(id: string): Promise<ConfigurationModel | undefined> {
-	const db = await getDatabase()
-	const configurations = await db.select<ConfigurationModel[]>(`SELECT * FROM configuration where id = ${id}`)
-	if (configurations.length === 0) {
-		return undefined
+	const model = await getConfigurationModelById(id)
+	if (!model) {
+		return
 	}
 
-	const cfg = configurations[0].data
+	const cfg = model.data
 
 	// legacy logic
 	if (!cfg.startsWith(prefix)) {
-		return configurations[0]
+		return model
 	}
 
 	// decrypt data
 	return invoke<string>("decrypt", { data: cfg }).then((res) => {
 		return {
-			...configurations[0],
+			...model,
 			data: res,
 		}
 
 	}).catch((err) => {
 		if (err.includes("not ent")) {
-			return configurations[0]
+			return model
 		}
 		throw err
 	})
@@ -100,4 +109,14 @@ export async function getCurrentPreferCurrency(): Promise<CurrencyRateDetail> {
 export async function getClientIDConfiguration(): Promise<string | undefined> {
 	const model = await getConfigurationById(clientInfoFixId)
 	return model?.data
+}
+
+async function getConfigurationModelById(id: string): Promise<ConfigurationModel | undefined> {
+	const db = await getDatabase()
+	const configurations = await db.select<ConfigurationModel[]>(`SELECT * FROM configuration where id = ${id}`)
+	if (configurations.length === 0) {
+		return undefined
+	}
+
+	return configurations[0]
 }
