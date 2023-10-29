@@ -62,3 +62,10 @@
   right: 0;
   color: gray;
 }
+
+.historical-data-detail-row {
+  display: inline-block;
+  height: 40px;
+  font-size: 17px;
+  line-height: 40px;
+}
