@@ -14,11 +14,13 @@ import { timestampToDate } from "../../utils/date";
 import {
   currencyWrapper,
   prettyNumberToLocaleString,
+  prettyPriceNumberToLocaleString,
 } from "../../utils/currency";
 import Modal from "../common/modal";
 import { downloadCoinLogos } from "../../middlelayers/data";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { convertFileSrc } from "@tauri-apps/api/tauri";
+import { useWindowSize } from "../../utils/hook";
 
 type RankData = {
   id: number;
@@ -41,6 +43,8 @@ const App = ({
   const { setLoading } = useContext(LoadingContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [appCacheDir, setAppCacheDir] = useState("");
+
+  const wsize = useWindowSize();
 
   const [pageNum, setPageNum] = useState(1);
   const pageSize = 10;
@@ -266,18 +270,51 @@ const App = ({
         const filePath = `${appCacheDir}assets/coins/${d.symbol.toLowerCase()}.png`;
         const apiPath = convertFileSrc(filePath);
         return (
-          <div key={d.id}>
-            <img
-              src={apiPath}
-              alt={d.symbol}
-              style={{ width: 20, height: 20 }}
-            />
-            <div>{d.rank}</div>
-            <div>{d.symbol}</div>
-            <div>{d.amount}</div>
-            <div>{d.value}</div>
-            <div>{d.price}</div>
-          </div>
+          <tr key={d.id}>
+            <td>
+              <p className="historical-data-detail-row">{d.rank}</p>
+            </td>
+            <td
+              style={{
+                textAlign: "start",
+              }}
+            >
+              <img
+                src={apiPath}
+                alt={d.symbol}
+                style={{ width: 20, height: 20, marginRight: 5 }}
+              />
+              <p className="historical-data-detail-row">{d.symbol}</p>
+            </td>
+            <td
+              style={{
+                textAlign: "end",
+              }}
+            >
+              <p className="historical-data-detail-row">
+                {currency.symbol + prettyPriceNumberToLocaleString(currencyWrapper(currency)(d.price))}
+              </p>
+            </td>
+            <td
+              style={{
+                textAlign: "end",
+              }}
+            >
+              <p className="historical-data-detail-row">{d.amount}</p>
+            </td>
+            <td
+              style={{
+                textAlign: "end",
+              }}
+            >
+              <p className="historical-data-detail-row">
+                {currency.symbol +
+                  prettyNumberToLocaleString(
+                    currencyWrapper(currency)(d.value)
+                  )}
+              </p>
+            </td>
+          </tr>
         );
       })
       .value();
@@ -297,12 +334,56 @@ const App = ({
           id="detail-view"
           style={{
             display: rankData.length > 0 ? "inline-block" : "none",
-            marginRight: 10,
-            verticalAlign: "top",
+            width: (wsize.width ?? 800) * 0.7,
           }}
         >
-          {/* <Table data={rankData} columns={rankColumns} /> */}
-          {detailPage(rankData)}
+          <table>
+            <thead>
+              <tr>
+                <th
+                  style={{
+                    width: 50,
+                  }}
+                >
+                  #
+                </th>
+                <th
+                  style={{
+                    width: '30%',
+                    minWidth: 180,
+                    textAlign: "start",
+                  }}
+                >
+                  Name
+                </th>
+                <th
+                  style={{
+                    width: '20%',
+                    textAlign: "end",
+                  }}
+                >
+                  Price
+                </th>
+                <th
+                  style={{
+                    width: '25%',
+                    textAlign: "end",
+                  }}
+                >
+                  Amount
+                </th>
+                <th
+                  style={{
+                    width: '20%',
+                    textAlign: "end",
+                  }}
+                >
+                  Value
+                </th>
+              </tr>
+            </thead>
+            <tbody>{detailPage(rankData)}</tbody>
+          </table>
         </div>
       </Modal>
       <div
