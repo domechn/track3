@@ -24,7 +24,7 @@ const App = ({
   topCoinsRankData,
   topCoinsPercentageChangeData,
 }: {
-  currency: CurrencyRateDetail,
+  currency: CurrencyRateDetail;
   totalValueData: {
     totalValue: number;
     changePercentage: number;
@@ -43,7 +43,10 @@ const App = ({
       <hr className="nice-hr" />
       <AssetChange currency={currency} data={assetChangeData} />
       <hr className="nice-hr" />
-      <CoinsAmountAndValueChange currency={currency} data={coinsAmountAndValueChangeData} />
+      <CoinsAmountAndValueChange
+        currency={currency}
+        data={coinsAmountAndValueChangeData}
+      />
       <hr className="nice-hr" />
       <TopCoinsRank data={topCoinsRankData} />
       <hr className="nice-hr" />
