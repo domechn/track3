@@ -21,6 +21,7 @@ import { downloadCoinLogos } from "../../middlelayers/data";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { convertFileSrc } from "@tauri-apps/api/tauri";
 import { useWindowSize } from "../../utils/hook";
+import ImageStack from "../common/image-stack";
 
 type RankData = {
   id: number;
@@ -218,6 +219,23 @@ const App = ({
                 </a>
               </div>
               <div
+                style={{
+                  position: "absolute",
+                  left: '30%',
+                }}
+              >
+                <ImageStack
+                  imageSrcs={_(d.assets)
+                    .sortBy("value")
+                    .reverse()
+                    .take(7)
+                    .map((a) => getImageApiPath(a.symbol))
+                    .value()}
+                  imageWidth={25}
+                  imageHeight={25}
+                />
+              </div>
+              <div
                 className="historical-data-card-bottom-changes"
                 style={{
                   color: d.total - data[idx + 1]?.total > 0 ? "green" : "red",
@@ -264,11 +282,15 @@ const App = ({
       .value();
   }
 
-  function detailPage(data: RankData[]) {
+  function getImageApiPath(symbol: string) {
+    const filePath = `${appCacheDir}assets/coins/${symbol.toLowerCase()}.png`;
+    return convertFileSrc(filePath);
+  }
+
+  function renderDetailPage(data: RankData[]) {
     return _(data)
       .map((d) => {
-        const filePath = `${appCacheDir}assets/coins/${d.symbol.toLowerCase()}.png`;
-        const apiPath = convertFileSrc(filePath);
+        const apiPath = getImageApiPath(d.symbol);
         return (
           <tr key={d.id}>
             <td>
@@ -292,7 +314,10 @@ const App = ({
               }}
             >
               <p className="historical-data-detail-row">
-                {currency.symbol + prettyPriceNumberToLocaleString(currencyWrapper(currency)(d.price))}
+                {currency.symbol +
+                  prettyPriceNumberToLocaleString(
+                    currencyWrapper(currency)(d.price)
+                  )}
               </p>
             </td>
             <td
@@ -349,7 +374,7 @@ const App = ({
                 </th>
                 <th
                   style={{
-                    width: '30%',
+                    width: "30%",
                     minWidth: 180,
                     textAlign: "start",
                   }}
@@ -358,7 +383,7 @@ const App = ({
                 </th>
                 <th
                   style={{
-                    width: '20%',
+                    width: "20%",
                     textAlign: "end",
                   }}
                 >
@@ -366,7 +391,7 @@ const App = ({
                 </th>
                 <th
                   style={{
-                    width: '25%',
+                    width: "25%",
                     textAlign: "end",
                   }}
                 >
@@ -374,7 +399,7 @@ const App = ({
                 </th>
                 <th
                   style={{
-                    width: '20%',
+                    width: "20%",
                     textAlign: "end",
                   }}
                 >
@@ -382,7 +407,7 @@ const App = ({
                 </th>
               </tr>
             </thead>
-            <tbody>{detailPage(rankData)}</tbody>
+            <tbody>{renderDetailPage(rankData)}</tbody>
           </table>
         </div>
       </Modal>
