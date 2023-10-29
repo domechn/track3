@@ -264,7 +264,7 @@ const App = ({
     return _(data)
       .map((d) => {
         const filePath = `${appCacheDir}assets/coins/${d.symbol.toLowerCase()}.png`;
-        let apiPath = convertFileSrc(filePath);
+        const apiPath = convertFileSrc(filePath);
         return (
           <div key={d.id}>
             <img
