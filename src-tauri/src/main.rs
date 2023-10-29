@@ -11,7 +11,7 @@ use track3::{
         migrate_from_v01_to_v02, migrate_from_v02_to_v03, prepare_required_data,
     },
     okex::Okex,
-    price::get_price_querier,
+    info::get_coin_info_provider,
 };
 
 lazy_static! {
@@ -59,7 +59,7 @@ async fn query_okex_balance(
 )]
 #[tauri::command]
 async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>, String> {
-    let client = get_price_querier();
+    let client = get_coin_info_provider();
     // push "USDT" into symbols if not exists
     let symbols = if symbols.contains(&"USDT".to_string()) {
         symbols
@@ -74,6 +74,28 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
 
     match res {
         Ok(prices) => Ok(prices),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+async fn download_coins_logos(
+    handle: tauri::AppHandle,
+    symbols: Vec<String>,
+) -> Result<(), String> {
+    let resource_dir = handle.path_resolver().app_cache_dir().unwrap().to_str().unwrap().to_string();
+    let client = get_coin_info_provider();
+
+    let res = client
+        .download_coins_logos(symbols, resource_dir)
+        .await;
+
+    match res {
+        Ok(_) => Ok(()),
         Err(e) => Err(e.to_string()),
     }
 }
@@ -149,7 +171,11 @@ fn main() {
 
             if is_first_run(app_dir.as_path()) {
                 init_sqlite_file(app_dir.as_path());
-                init_sqlite_tables(app_version.clone(), app_dir.as_path(), resource_dir.as_path());
+                init_sqlite_tables(
+                    app_version.clone(),
+                    app_dir.as_path(),
+                    resource_dir.as_path(),
+                );
             }
 
             if is_from_v01_to_v02(app_dir.as_path()).unwrap() {
@@ -172,6 +198,7 @@ fn main() {
             decrypt,
             md5,
             get_polybase_namespace,
+            download_coins_logos,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
