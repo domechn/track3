@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   deleteHistoricalDataByUUID,
   queryHistoricalData,
@@ -18,7 +18,7 @@ import {
 import Modal from "../common/modal";
 import { downloadCoinLogos } from "../../middlelayers/data";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { convertFileSrc } from '@tauri-apps/api/tauri';
+import { convertFileSrc } from "@tauri-apps/api/tauri";
 
 type RankData = {
   id: number;
@@ -46,11 +46,7 @@ const App = ({
   const pageSize = 10;
 
   useEffect(() => {
-    getAppCacheDir()
-      .then((d) => setAppCacheDir(d))
-      .then(() => {
-        console.log("appCacheDir", appCacheDir);
-      });
+    getAppCacheDir().then((d) => setAppCacheDir(d));
   }, []);
 
   useEffect(() => {
@@ -267,8 +263,8 @@ const App = ({
   function detailPage(data: RankData[]) {
     return _(data)
       .map((d) => {
-        const filePath = `${appCacheDir}assets/coins/${d.symbol.toLowerCase()}.png`
-        let apiPath = convertFileSrc(filePath)
+        const filePath = `${appCacheDir}assets/coins/${d.symbol.toLowerCase()}.png`;
+        let apiPath = convertFileSrc(filePath);
         return (
           <div key={d.id}>
             <img
