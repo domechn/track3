@@ -15,7 +15,14 @@
       "fs": {
         "readFile": true,
         "writeFile": true,
-        "scope": ["$APP/*", "$RESOURCE/*"]
+        "scope": ["$APP/**", "$RESOURCE/**", "$APPCACHE/**"]
+      },
+      "path": {
+        "all": true
+      },
+      "protocol": {
+        "asset": true,
+        "assetScope": ["$RESOURCE/**", "$APPCACHE/**"]
       },
       "process": {
         "relaunch": true

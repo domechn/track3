@@ -1,11 +1,10 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   deleteHistoricalDataByUUID,
   queryHistoricalData,
 } from "../../middlelayers/charts";
 import { CurrencyRateDetail, HistoricalData } from "../../middlelayers/types";
 import deleteIcon from "../../assets/icons/delete-icon.png";
-import Table from "../common/table";
 import _ from "lodash";
 
 import "./index.css";
@@ -17,6 +16,9 @@ import {
   prettyNumberToLocaleString,
 } from "../../utils/currency";
 import Modal from "../common/modal";
+import { downloadCoinLogos } from "../../middlelayers/data";
+import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
+import { convertFileSrc } from "@tauri-apps/api/tauri";
 
 type RankData = {
   id: number;
@@ -38,9 +40,24 @@ const App = ({
   const [rankData, setRankData] = useState([] as RankData[]);
   const { setLoading } = useContext(LoadingContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [appCacheDir, setAppCacheDir] = useState("");
 
   const [pageNum, setPageNum] = useState(1);
   const pageSize = 10;
+
+  useEffect(() => {
+    getAppCacheDir().then((d) => setAppCacheDir(d));
+  }, []);
+
+  useEffect(() => {
+    const symbols = _(data)
+      .map((d) => d.assets)
+      .flatten()
+      .map((d) => d.symbol)
+      .uniq()
+      .value();
+    downloadCoinLogos(symbols);
+  }, [data]);
 
   const rankColumns = [
     {
@@ -243,6 +260,29 @@ const App = ({
       .value();
   }
 
+  function detailPage(data: RankData[]) {
+    return _(data)
+      .map((d) => {
+        const filePath = `${appCacheDir}assets/coins/${d.symbol.toLowerCase()}.png`;
+        const apiPath = convertFileSrc(filePath);
+        return (
+          <div key={d.id}>
+            <img
+              src={apiPath}
+              alt={d.symbol}
+              style={{ width: 20, height: 20 }}
+            />
+            <div>{d.rank}</div>
+            <div>{d.symbol}</div>
+            <div>{d.amount}</div>
+            <div>{d.value}</div>
+            <div>{d.price}</div>
+          </div>
+        );
+      })
+      .value();
+  }
+
   return (
     <div>
       <h2
@@ -261,7 +301,8 @@ const App = ({
             verticalAlign: "top",
           }}
         >
-          <Table data={rankData} columns={rankColumns} />
+          {/* <Table data={rankData} columns={rankColumns} /> */}
+          {detailPage(rankData)}
         </div>
       </Modal>
       <div

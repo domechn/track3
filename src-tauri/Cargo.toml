@@ -15,7 +15,7 @@ tauri-build = {version = "1.1", features = [] }
 
 [dependencies]
 binance-rs-async = {version = "1.3.1", features = ["wallet_api", "futures_api", "savings_api"] }
-coingecko = "1.0.1"
+coingecko = {git = "https://github.com/domechn/coingecko-rs.git", rev = "41e819e"}
 lazy_static = "^1.4"
 magic-crypt = "3.1.12"
 okex = {git = "https://github.com/domechn/okex-rs.git", rev = "7126e51"}
@@ -23,11 +23,12 @@ rand = "^0.3"
 serde = {version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sqlx = {version = "0.6", features = ["runtime-tokio-rustls", "sqlite"] }
-tauri = {version = "1.2", features = ["app-all", "dialog-open", "dialog-save", "fs-read-file", "fs-write-file", "http-all", "process-relaunch", "updater"] }
+tauri = {version = "1.2", features = ["app-all", "dialog-open", "dialog-save", "fs-read-file", "fs-write-file", "http-all", "path-all", "process-relaunch", "protocol-asset", "updater"] }
 tokio = {version = "1", features = ["sync"] }
 uuid = "1.3.3"
 tauri-plugin-aptabase = "0.3"
 md5 = "0.7.0"
+reqwest = "0.11.22"
 
 [features]
 # by default Tauri runs in production mode
