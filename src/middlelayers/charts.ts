@@ -108,6 +108,11 @@ async function deleteAssetByUUID(uuid: string): Promise<void> {
 	await db.execute(`DELETE FROM ${ASSETS_TABLE_NAME} WHERE uuid = ?`, [uuid])
 }
 
+async function deleteAssetByID(id: number): Promise<void> {
+	const db = await getDatabase()
+	await db.execute(`DELETE FROM ${ASSETS_TABLE_NAME} WHERE id = ?`, [id])
+}
+
 export async function queryTotalValue(): Promise<TotalValueData> {
 	const results = groupAssetModelsListBySymbol(await queryAssets(2))
 
@@ -222,7 +227,7 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 	}
 }
 
-export async function queryLastRefreshAt() : Promise<string | null>{
+export async function queryLastRefreshAt(): Promise<string | null> {
 	const assets = await queryAssets(1)
 	if (_(assets).isEmpty() || _(assets[0]).isEmpty()) {
 		return null
@@ -343,8 +348,14 @@ export async function queryHistoricalData(size = 30): Promise<HistoricalData[]> 
 	return _(models).map(m => assetsModelsToHistoricalData(m)).value()
 }
 
+// delete batch records by uuid
 export async function deleteHistoricalDataByUUID(uuid: string): Promise<void> {
 	return deleteAssetByUUID(uuid)
+}
+
+// delete single record by id
+export async function deleteHistoricalDataDetailById(id: number): Promise<void> {
+	return deleteAssetByID(id)
 }
 
 export async function queryCoinDataById(id: string): Promise<CoinData[]> {
