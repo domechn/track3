@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import {
   deleteHistoricalDataByUUID,
+  deleteHistoricalDataDetailById,
   queryHistoricalData,
 } from "../../middlelayers/charts";
 import { CurrencyRateDetail, HistoricalData } from "../../middlelayers/types";
@@ -25,6 +26,8 @@ import ImageStack from "../common/image-stack";
 
 type RankData = {
   id: number;
+  // real id in db
+  assetId: number;
   rank: number;
   symbol: string;
   value: number;
@@ -36,7 +39,9 @@ const App = ({
   afterDataDeleted,
   currency,
 }: {
-  afterDataDeleted?: (id: string) => unknown;
+  // uuid is id for batch data
+  // id is for single data
+  afterDataDeleted?: (uuid?: string, id?: number) => unknown;
   currency: CurrencyRateDetail;
 }) => {
   const [data, setData] = useState([] as HistoricalData[]);
@@ -128,14 +133,14 @@ const App = ({
       .finally(() => setLoading(false));
   }
 
-  function onDeleteClick(id: string) {
+  function onHistoricalDataDeleteClick(uuid: string) {
     setLoading(true);
-    deleteHistoricalDataByUUID(id)
+    deleteHistoricalDataByUUID(uuid)
       .then(() => {
         toast.success("Record deleted");
         loadAllData();
         if (afterDataDeleted) {
-          afterDataDeleted(id);
+          afterDataDeleted(uuid);
         }
         // hide rank data when some data is deleted
         setRankData([]);
@@ -143,6 +148,28 @@ const App = ({
       .catch((e) => toast.error(e.message))
       .finally(() => {
         setIsModalOpen(false);
+        setLoading(false);
+      });
+  }
+
+  function onHistoricalDataDetailDeleteClick(id: number) {
+    setLoading(true);
+    deleteHistoricalDataDetailById(id)
+      .then(() => {
+        toast.success("Record deleted");
+        loadAllData();
+        if (afterDataDeleted) {
+          afterDataDeleted(undefined, id);
+        }
+
+        setRankData(
+          _(rankData)
+            .filter((d) => d.assetId !== id)
+            .value()
+        );
+      })
+      .catch((e) => toast.error(e.message))
+      .finally(() => {
         setLoading(false);
       });
   }
@@ -158,6 +185,7 @@ const App = ({
       _(d.assets)
         .map((asset, idx) => ({
           id: idx,
+          assetId: asset.id,
           rank: _(revAssets).findIndex((a) => a.symbol === asset.symbol) + 1,
           amount: asset.amount,
           symbol: asset.symbol,
@@ -206,7 +234,7 @@ const App = ({
 
             <div className="historical-data-card-bottom">
               <div className="historical-data-card-bottom-operations">
-                <a href="#" onClick={() => onDeleteClick(d.id)}>
+                <a href="#" onClick={() => onHistoricalDataDeleteClick(d.id)}>
                   <img
                     src={deleteIcon}
                     alt="delete"
@@ -221,7 +249,7 @@ const App = ({
               <div
                 style={{
                   position: "absolute",
-                  left: '30%',
+                  left: "30%",
                 }}
               >
                 <ImageStack
@@ -339,6 +367,22 @@ const App = ({
                   )}
               </p>
             </td>
+            <td>
+              <a
+                href="#"
+                onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}
+              >
+                <img
+                  src={deleteIcon}
+                  alt="delete"
+                  style={{
+                    border: 0,
+                    height: 20,
+                    width: 20,
+                  }}
+                />
+              </a>
+            </td>
           </tr>
         );
       })
@@ -404,6 +448,14 @@ const App = ({
                   }}
                 >
                   Value
+                </th>
+                <th
+                  style={{
+                    width: "2%",
+                    textAlign: "end",
+                  }}
+                >
+                  Opt
                 </th>
               </tr>
             </thead>
