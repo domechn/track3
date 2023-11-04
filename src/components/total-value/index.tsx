@@ -4,14 +4,8 @@ import {
   currencyWrapper,
   prettyNumberToLocaleString,
 } from "../../utils/currency";
-import { useWindowSize } from "../../utils/hook";
 import "./index.css";
-
-const emojiMap = {
-  up: "😄",
-  down: "😢",
-  else: "😑",
-};
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const App = ({
   data,
@@ -23,10 +17,6 @@ const App = ({
     changePercentage: number;
   };
 }) => {
-  const baseFontSize = 6;
-
-  const windowSize = useWindowSize();
-
   const [changedValueOrPercentage, setChangedValueOrPercentage] = useState("");
 
   useEffect(() => {
@@ -70,29 +60,6 @@ const App = ({
     return Math.max(data.totalValue.toString().length / 10, 1);
   }
 
-  function totalValueFontSize() {
-    const size = baseFontSize / fontCount();
-    if (windowSize.width) {
-      return `${size + Math.max(0, (1000 - windowSize.width) / 150)}vw`;
-    }
-    return `${size}vw`;
-  }
-
-  function changePercentageFontSize() {
-    const size = baseFontSize / fontCount() / 2.5;
-    if (windowSize.width) {
-      return `${size + Math.max(0, (1000 - windowSize.width) / 300)}vw`;
-    }
-    return `${size}vw`;
-  }
-
-  function changePercentageEmoji() {
-    if (data.changePercentage === 0) {
-      return emojiMap["else"];
-    }
-    return data.changePercentage > 0 ? emojiMap["up"] : emojiMap["down"];
-  }
-
   function changePercentageColorClass() {
     if (data.changePercentage === 0) {
       return "";
@@ -100,53 +67,64 @@ const App = ({
     return data.changePercentage > 0 ? "positive" : "negative";
   }
 
-  function totalValueStyle() {
-    return {
-      fontSize: totalValueFontSize(),
-      lineHeight: totalValueFontSize(),
-    };
-  }
-
   return (
-    <div>
-      <div
-        className="chartTitle"
-        style={{
-          marginBottom: 15,
-        }}
-      >
-        Total Value
-      </div>
-      <div
-        style={{
-          minHeight: totalValueFontSize(),
-        }}
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+      <Card
         onMouseEnter={() => setChangedValueOrPercentage(formatChangeValue())}
         onMouseLeave={() =>
           setChangedValueOrPercentage(formatChangePercentage())
         }
       >
-        <span
-          className="totalValue"
-          style={{
-            ...totalValueStyle(),
-            marginRight: 5,
-          }}
-        >
-          {changePercentageEmoji()}
-        </span>
-        <span className="totalValue" style={totalValueStyle()}>
-          {formatTotalValue()}
-        </span>
-        <span
-          className={`changePercentage ${changePercentageColorClass()}`}
-          style={{
-            fontSize: changePercentageFontSize(),
-          }}
-        >
-          {changedValueOrPercentage}
-        </span>
-      </div>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            className="h-4 w-4 text-muted-foreground"
+          >
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formatTotalValue()}</div>
+          <p className="text-xs text-muted-foreground">
+            <span
+              className={`changePercentage ${changePercentageColorClass()}`}
+            >
+              {changedValueOrPercentage}
+            </span>{" "}
+            from last time
+          </p>
+        </CardContent>
+      </Card>
+      {/* <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            Total Balance In BTC
+          </CardTitle>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            className="h-4 w-4 text-muted-foreground"
+          >
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">$45,231.89</div>
+          <p className="text-xs text-muted-foreground">+20.1% from last time</p>
+        </CardContent>
+      </Card> */}
     </div>
   );
 };

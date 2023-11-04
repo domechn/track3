@@ -78,7 +78,7 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 		return false
 	}
 
-	const data = await queryHistoricalData(-1)
+	const data = await queryHistoricalData(-1, false)
 
 	const exportAt = new Date().toISOString()
 

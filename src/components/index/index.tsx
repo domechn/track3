@@ -19,7 +19,13 @@ import Overview from "../overview";
 import Comparison from "../comparison";
 import WalletAnalyzer from "../wallet-analyzer";
 import "./index.css";
-import menuIcon from "../../assets/icons/menu-icon.png";
+import {
+  Route,
+  Routes,
+  HashRouter,
+  Outlet,
+  useLocation,
+} from "react-router-dom";
 
 import {
   AssetChangeData,
@@ -49,6 +55,7 @@ import {
 import { autoSyncData } from "../../middlelayers/cloudsync";
 import { getDefaultCurrencyRate } from "../../middlelayers/currency";
 import _ from "lodash";
+import { MainNav } from "./main-nav";
 
 ChartJS.register(
   ...registerables,
@@ -75,9 +82,7 @@ const App = () => {
     getDefaultCurrencyRate()
   );
 
-  const [showMenu, setShowMenu] = useState(false);
   const [activeMenu, setActiveMenu] = useState("overview");
-  // const [activeMenu, setActiveMenu] = useState("wallets");
 
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
     [] as LatestAssetsPercentageData
@@ -129,15 +134,6 @@ const App = () => {
       resizeAllCharts();
     }
   }, [lastSize]);
-
-  useEffect(() => {
-    const maxHeight = showMenu ? "1000px" : "0px";
-    const style = document.getElementById("menu-list")?.style;
-
-    if (style) {
-      style.maxHeight = maxHeight;
-    }
-  }, [showMenu]);
 
   function resizeAllCharts() {
     const overviewsCharts = [
@@ -209,44 +205,58 @@ const App = () => {
     }, 100);
   }
 
-  function onMenuClicked() {
-    setShowMenu(!showMenu);
-  }
-
-  function closeMenu() {
-    if (!showMenu) {
-      return;
-    }
-    setShowMenu(false);
-  }
-
   useEffect(() => {
     if (activeMenu === "overview" || activeMenu === "wallets") {
-      setTimeout(() => {
-        resizeAllCharts();
-      }, resizeDelay / 2);
+      resizeAllCharts();
     }
   }, [activeMenu]);
 
-  function renderMenu() {
-    const onMenuClicked = (clicked: string) => {
-      setActiveMenu(clicked);
-      closeMenu();
-    };
+  function Layout() {
+    const lo = useLocation();
+
+    useEffect(() => {
+      const loPath = lo.pathname;
+
+      switch (loPath) {
+        case "/":
+          setActiveMenu("overview");
+          break;
+        case "/wallets":
+          setActiveMenu("wallets");
+          break;
+        case "/comparison":
+          setActiveMenu("comparison");
+          break;
+        case "/history":
+          setActiveMenu("historical-data");
+          break;
+
+        default:
+          break;
+      }
+    }, [lo.pathname]);
+
     return (
-      <div id="menu-list" className="menu-list">
-        <ul
-          style={{
-            textAlign: "left",
-            paddingLeft: 20,
-            paddingRight: 20,
-          }}
-        >
-          <li onClick={() => onMenuClicked("overview")}>📁 Overview</li>
-          <li onClick={() => onMenuClicked("wallets")}>💼 Wallets</li>
-          <li onClick={() => onMenuClicked("comparison")}>📊 Comparison</li>
-          <li onClick={() => onMenuClicked("historical-data")}>📜 History</li>
-        </ul>
+      <div>
+        <div className="hidden flex-col md:flex">
+          <div className="border-b mb-4">
+            <div className="flex h-12 items-center px-4">
+              <MainNav className="mx-0" />
+              <div className="ml-auto flex items-center space-x-4">
+                <div data-tooltip-id="last-refresh-at">
+                  <RefreshData
+                    afterRefresh={() => {
+                      loadAllData(querySize);
+                      // auto sync data in background
+                      autoSyncData(true);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <Outlet></Outlet>
       </div>
     );
   }
@@ -262,86 +272,53 @@ const App = () => {
             : "Never Refresh Before"
         }
       />
-      <div className="top-buttons-wrapper">
-        <div className="left-buttons">
-          <div
-            className="menu"
-            style={{
-              display: "inline-block",
-            }}
-          >
-            <button className="menu-button" onClick={onMenuClicked}>
-              <img
-                src={menuIcon}
-                alt="menu"
-                width={30}
-                height={30}
-                style={{
-                  border: "none",
-                }}
+      <HashRouter>
+        <Layout />
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Overview
+                currency={currentCurrency}
+                latestAssetsPercentageData={latestAssetsPercentageData}
+                assetChangeData={assetChangeData}
+                totalValueData={totalValueData}
+                coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
+                topCoinsRankData={topCoinsRankData}
+                topCoinsPercentageChangeData={topCoinsPercentageChangeData}
               />
-            </button>
-            {renderMenu()}
-          </div>
-        </div>
-        <div className="right-buttons">
-          <div
-            style={{ display: "inline-block" }}
-            data-tooltip-id="last-refresh-at"
-          >
-            <RefreshData
-              afterRefresh={() => {
-                loadAllData(querySize);
-                // auto sync data in background
-                autoSyncData(true);
-              }}
-            />
-          </div>
-          <div style={{ display: "inline-block" }}>
-            <Setting
-              onConfigurationSave={() => loadConfiguration()}
-              onDataImported={() => loadAllData(querySize)}
-              onDataSynced={() => loadAllData(querySize)}
-            />
-          </div>
-        </div>
-      </div>
-      <div onMouseDown={closeMenu}>
-        {activeMenu === "overview" && (
-          <div id="overview">
-            <Overview
-              currency={currentCurrency}
-              latestAssetsPercentageData={latestAssetsPercentageData}
-              assetChangeData={assetChangeData}
-              totalValueData={totalValueData}
-              coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
-              topCoinsRankData={topCoinsRankData}
-              topCoinsPercentageChangeData={topCoinsPercentageChangeData}
-            />
-          </div>
-        )}
-
-        {activeMenu === "comparison" && (
-          <div id="comparison">
-            <Comparison currency={currentCurrency} />
-          </div>
-        )}
-
-        {activeMenu === "wallets" && (
-          <div id="wallets">
-            <WalletAnalyzer currency={currentCurrency} />
-          </div>
-        )}
-
-        {activeMenu === "historical-data" && (
-          <div id="historical-data">
-            <HistoricalData
-              currency={currentCurrency}
-              afterDataDeleted={() => loadAllData(querySize)}
-            />
-          </div>
-        )}
-      </div>
+            }
+          ></Route>
+          <Route
+            path="/wallets"
+            element={<WalletAnalyzer currency={currentCurrency} />}
+          />
+          <Route
+            path="/comparison"
+            element={<Comparison currency={currentCurrency} />}
+          />
+          <Route
+            path="/history"
+            element={
+              <HistoricalData
+                currency={currentCurrency}
+                afterDataDeleted={() => loadAllData(querySize)}
+              />
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <Setting
+                onConfigurationSave={() => loadConfiguration()}
+                onDataImported={() => loadAllData(querySize)}
+                onDataSynced={() => loadAllData(querySize)}
+              />
+            }
+          />
+          <Route path="*" element={<div>not found</div>} />
+        </Routes>
+      </HashRouter>
     </div>
   );
 };

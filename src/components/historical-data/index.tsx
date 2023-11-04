@@ -69,59 +69,6 @@ const App = ({
     downloadCoinLogos(symbols);
   }, [data]);
 
-  const rankColumns = [
-    {
-      key: "rank",
-      dataIndex: "rank",
-      title: "Rank",
-    },
-    {
-      key: "symbol",
-      dataIndex: "symbol",
-      title: "Symbol",
-    },
-    {
-      key: "amount",
-      dataIndex: "amount",
-      title: "Amount",
-    },
-    {
-      key: "value",
-      dataIndex: "value",
-      title: "Value",
-      render: (id: number | string) => {
-        const curData = _(rankData).find((d) => d.id === id);
-
-        return (
-          <>
-            {curData
-              ? currency.symbol +
-                prettyNumberToLocaleString(
-                  currencyWrapper(currency)(curData.value)
-                )
-              : "-"}
-          </>
-        );
-      },
-    },
-    {
-      key: "price",
-      dataIndex: "price",
-      title: "Price",
-      render: (id: number | string) => {
-        const curData = _(rankData).find((d) => d.id === id);
-
-        return (
-          <>
-            {curData
-              ? currency.symbol + currencyWrapper(currency)(curData.price)
-              : "-"}
-          </>
-        );
-      },
-    },
-  ];
-
   useEffect(() => {
     loadAllData();
   }, []);
@@ -391,13 +338,6 @@ const App = ({
 
   return (
     <div>
-      <h2
-        style={{
-          marginBottom: 5,
-        }}
-      >
-        Historical Data
-      </h2>
       <Modal visible={isModalOpen} onClose={onModalClose}>
         <div
           id="detail-view"

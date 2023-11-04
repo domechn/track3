@@ -20,32 +20,17 @@ const App = ({
   onDataSynced?: () => void;
 }) => {
   const [version, setVersion] = useState<string>("0.1.0");
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeId, setActiveId] = useState<string>("configuration");
   const size = useWindowSize();
-  const [isSmallScreenAndSidecarActive, setIsSmallScreenAndSidecarActive] =
-    useState(true);
 
   useEffect(() => {
-    if (isModalOpen) {
-      loadVersion();
-
-      setIsSmallScreenAndSidecarActive(true);
-    }
-  }, [isModalOpen]);
+    loadVersion();
+  }, []);
 
   function loadVersion() {
     getVersion().then((ver) => {
       setVersion(ver);
     });
-  }
-
-  const handleButtonClick = () => {
-    setIsModalOpen(true);
-  };
-
-  function onModalClose() {
-    setIsModalOpen(false);
   }
 
   function getSettingWidth() {
@@ -60,21 +45,17 @@ const App = ({
   function onConfigurationSidebarClick() {
     // add active class to the clicked item
     setActiveId("configuration");
-    setIsSmallScreenAndSidecarActive(false);
   }
   function onDataSidebarClick() {
     // add active class to the clicked item
     setActiveId("data");
-    setIsSmallScreenAndSidecarActive(false);
   }
 
   function _onConfigurationSave() {
-    setIsModalOpen(false);
     onConfigurationSave && onConfigurationSave();
   }
 
   function _onDataImported() {
-    setIsModalOpen(false);
     onDataImported && onDataImported();
   }
 
@@ -137,107 +118,7 @@ const App = ({
       </>
     );
   }
-
-  function renderSmallScreenMenu() {
-    return (
-      <>
-        <div
-          className="settings-sidebar"
-          style={{
-            display: isSmallScreenAndSidecarActive ? "inline-block" : "none",
-            width: "100%",
-            borderRight: "none",
-            textAlign: "center",
-          }}
-        >
-          <div
-            id="configuration"
-            className="sidebar-item"
-            onClick={onConfigurationSidebarClick}
-          >
-            Configuration
-          </div>
-          <div id="data" className="sidebar-item" onClick={onDataSidebarClick}>
-            Data
-          </div>
-          <div className="version">version: {version}</div>
-        </div>
-
-        <div
-          className="settings-content"
-          style={{
-            display: isSmallScreenAndSidecarActive ? "none" : "inline-block",
-            width: "90%",
-          }}
-        >
-          <div
-            style={{
-              textAlign: "left",
-              marginBottom: "10px",
-              cursor: "pointer",
-              fontFamily: "monospace",
-              fontSize: "14px",
-              color: "#0078d4",
-            }}
-            onClick={() => {
-              setIsSmallScreenAndSidecarActive(true);
-              // clear active class
-              setActiveId("");
-            }}
-          >
-            {"< back"}
-          </div>
-          <div
-            id="configurationContent"
-            className="content-item"
-            style={{
-              display: activeId === "configuration" ? "block" : "none",
-            }}
-          >
-            <Configuration onConfigurationSave={_onConfigurationSave} />
-          </div>
-          <div
-            id="dataContent"
-            className="content-item"
-            style={{
-              display: activeId === "data" ? "block" : "none",
-            }}
-          >
-            <DataManagement
-              onDataImported={_onDataImported}
-              onDataSynced={_onDataSynced}
-            />
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  return (
-    <div className="settings">
-      <button className="gear-button" onClick={handleButtonClick}>
-        <img
-          src={gearIcon}
-          alt="gear"
-          style={{
-            border: 0,
-            height: 30,
-            width: 30,
-          }}
-        />
-      </button>
-      <Modal visible={isModalOpen} onClose={onModalClose}>
-        <div
-          style={{
-            height: Math.min(700, size.height! - 100), // make sure modal is not too high to hint max-hight of the modal, otherwise it will make view fuzzy
-            width: getSettingWidth(),
-          }}
-        >
-          {smallScreen() ? renderSmallScreenMenu() : renderMenu()}
-        </div>
-      </Modal>
-    </div>
-  );
+  return <div className="settings">{renderMenu()}</div>;
 };
 
 export default App;

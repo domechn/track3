@@ -7,6 +7,7 @@ import _ from "lodash";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import { legendOnClick } from "../../utils/legend";
+import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
 
 const prefix = "tcpc";
 
@@ -121,27 +122,14 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
 
   return (
     <>
-      <div
-        style={{
-          height: 34,
-        }}
-      >
-        <div className="button-group">
-          <button
-            id={getWholeKey("value")}
-            onClick={() => onTypeSelectChange(getWholeKey("value"))}
-            className="left active"
-          >
-            Value
-          </button>
-          <button
-            id={getWholeKey("price")}
-            onClick={() => onTypeSelectChange(getWholeKey("price"))}
-            className="right"
-          >
-            Price
-          </button>
-        </div>
+      <div>
+        <ButtonGroup
+          defaultValue="value"
+          onValueChange={(val: string) => onTypeSelectChange(getWholeKey(val))}
+        >
+          <ButtonGroupItem value="value">Value</ButtonGroupItem>
+          <ButtonGroupItem value="price">Price</ButtonGroupItem>
+        </ButtonGroup>
       </div>
       <div
         style={{

@@ -10,6 +10,7 @@ import {
 import Select from "../common/select";
 import "./index.css";
 import { currencyWrapper } from "../../utils/currency";
+import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
 
 const prefix = "caaavc";
 
@@ -32,12 +33,12 @@ const App = ({
 
   function getLabel() {
     // set first char to upper case
-    const val  =  _.upperFirst(currentType.replace(prefix, ""));
+    const val = _.upperFirst(currentType.replace(prefix, ""));
     if (val !== "Value") {
-      return val
+      return val;
     }
 
-    return `${currency.currency} ${val}`
+    return `${currency.currency} ${val}`;
   }
 
   function getWholeKey(key: string) {
@@ -131,28 +132,15 @@ const App = ({
 
   return (
     <>
-      <div
-        style={{
-          height: 34,
-        }}
-      >
-        <div className="button-group">
-          <button
-            id={getWholeKey("amount")}
-            onClick={() => onTypeSelectChange(getWholeKey("amount"))}
-            className="left active"
-          >
-            Amount
-          </button>
-          <button
-            id={getWholeKey("value")}
-            onClick={() => onTypeSelectChange(getWholeKey("value"))}
-            className="right"
-          >
-            Value
-          </button>
-        </div>
-        <div>
+      <div className="flex">
+        <ButtonGroup
+          defaultValue="amount"
+          onValueChange={(val: string) => onTypeSelectChange(getWholeKey(val))}
+        >
+          <ButtonGroupItem value="amount">Amount</ButtonGroupItem>
+          <ButtonGroupItem value="value">Value</ButtonGroupItem>
+        </ButtonGroup>
+        <div className="ml-5 mt-1">
           <Select
             height={34}
             options={data.map((d) => ({ value: d.coin, label: d.coin }))}
@@ -164,7 +152,6 @@ const App = ({
       <div
         style={{
           height: Math.max((size.height || 100) / 2, 350),
-          marginTop: 35,
         }}
       >
         <Line options={options} data={chartDataByCoin(currentCoinSelected)} />

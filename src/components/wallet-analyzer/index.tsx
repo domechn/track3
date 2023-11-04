@@ -32,7 +32,6 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
 
   return (
     <>
-      <h1>Wallet Analyzer</h1>
       <WalletAssetsPercentage
         data={walletAssetsPercentage}
         currency={currency}

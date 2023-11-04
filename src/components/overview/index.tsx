@@ -38,7 +38,7 @@ const App = ({
   return (
     <>
       <TotalValue currency={currency} data={totalValueData} />
-      <hr className="nice-hr" />
+      {/* <hr className="nice-hr" /> */}
       <LatestAssetsPercentage data={latestAssetsPercentageData} />
       <hr className="nice-hr" />
       <AssetChange currency={currency} data={assetChangeData} />
