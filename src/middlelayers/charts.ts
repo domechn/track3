@@ -334,7 +334,7 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndV
 }
 
 export async function queryHistoricalData(size = 30): Promise<HistoricalData[]> {
-	const models = groupAssetModelsListBySymbol(await queryAssets(size))
+	const models = await queryAssets(size)
 
 	const assetsModelsToHistoricalData = (ams: AssetModel[]): HistoricalData => {
 		return {

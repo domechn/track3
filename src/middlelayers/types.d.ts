@@ -109,7 +109,6 @@ export type CoinsAmountAndValueChangeData = {
 export type HistoricalData = {
 	id: string
 	createdAt: string
-
 	assets: AssetModel[]
 
 	total: number
