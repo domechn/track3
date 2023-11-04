@@ -17,6 +17,7 @@ import Select, { SelectOption } from "../common/select";
 import { LoadingContext } from "../../App";
 import { CurrencyRateDetail } from "../../middlelayers/types";
 import { listAllCurrencyRates } from "../../middlelayers/currency";
+import { Separator } from "../ui/separator";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -328,7 +329,7 @@ const Configuration = ({
                 }
               />
             </label>
-            <a href="#" onClick={() => handleRemoveExchange(idx)}>
+            <a onClick={() => handleRemoveExchange(idx)}>
               <img src={deleteIcon} alt="delete" />
             </a>
           </div>
@@ -403,7 +404,7 @@ const Configuration = ({
                 }
               />
             </label>
-            <a href="#" onClick={() => handleRemoveWallet(idx)}>
+            <a onClick={() => handleRemoveWallet(idx)}>
               <img src={deleteIcon} alt="delete" />
             </a>
           </div>
@@ -454,7 +455,7 @@ const Configuration = ({
               }
             />
           </label>
-          <a href="#" onClick={() => handleRemoveOther(idx)}>
+          <a onClick={() => handleRemoveOther(idx)}>
             <img src={deleteIcon} alt="delete" />
           </a>
         </div>
@@ -552,7 +553,7 @@ const Configuration = ({
               value={querySize + ""}
             />
           </label>
-          <br />
+          <Separator className="my-6" />
           <label>
             <span
               style={{
@@ -569,6 +570,7 @@ const Configuration = ({
               value={preferCurrency}
             />
           </label>
+          <Separator className="my-6" />
           <h3>Exchanges</h3>
           <button
             type="button"
@@ -578,6 +580,7 @@ const Configuration = ({
             Add
           </button>
           {renderExchangeForm(exchanges)}
+          <Separator className="my-6" />
           <h3>Wallets</h3>
           <button
             type="button"
@@ -587,13 +590,13 @@ const Configuration = ({
             Add
           </button>
           {renderWalletForm(wallets)}
+          <Separator className="my-6" />
           <h3>Others</h3>
           <button type="button" className="add-button" onClick={handleAddOther}>
             Add
           </button>
           {renderOthersForm()}
-          <br />
-          <br />
+          <Separator className="my-6" />
           <button className="save" type="button" onClick={onFormSubmit}>
             Save
           </button>

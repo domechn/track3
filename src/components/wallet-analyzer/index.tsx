@@ -8,6 +8,7 @@ import {
   WalletAssetsPercentageData,
 } from "../../middlelayers/types";
 import { WALLET_ANALYZER } from "../../middlelayers/charts";
+import { Separator } from "../ui/separator";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const { setLoading } = useContext(LoadingContext);
@@ -36,7 +37,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         data={walletAssetsPercentage}
         currency={currency}
       />
-      <hr className="nice-hr" />
+      <Separator className="my-6" />
       <WalletAssetsChange data={walletAssetsChange} currency={currency} />
     </>
   );

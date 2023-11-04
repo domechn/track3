@@ -14,6 +14,7 @@ import {
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
 } from "../../middlelayers/types";
+import { Separator } from "../ui/separator";
 
 const App = ({
   currency,
@@ -40,16 +41,16 @@ const App = ({
       <TotalValue currency={currency} data={totalValueData} />
       {/* <hr className="nice-hr" /> */}
       <LatestAssetsPercentage data={latestAssetsPercentageData} />
-      <hr className="nice-hr" />
+      <Separator className="my-6" />
       <AssetChange currency={currency} data={assetChangeData} />
-      <hr className="nice-hr" />
+      <Separator className="my-6" />
       <CoinsAmountAndValueChange
         currency={currency}
         data={coinsAmountAndValueChangeData}
       />
-      <hr className="nice-hr" />
+      <Separator className="my-6" />
       <TopCoinsRank data={topCoinsRankData} />
-      <hr className="nice-hr" />
+      <Separator className="my-6" />
       <TopCoinsPercentageChange data={topCoinsPercentageChangeData} />
     </>
   );

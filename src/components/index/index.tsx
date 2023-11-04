@@ -25,6 +25,7 @@ import {
   HashRouter,
   Outlet,
   useLocation,
+  Navigate,
 } from "react-router-dom";
 
 import {
@@ -56,6 +57,8 @@ import { autoSyncData } from "../../middlelayers/cloudsync";
 import { getDefaultCurrencyRate } from "../../middlelayers/currency";
 import _ from "lodash";
 import { MainNav } from "./main-nav";
+import Configuration from "../configuration";
+import DataManagement from "../data-management";
 
 ChartJS.register(
   ...registerables,
@@ -218,20 +221,15 @@ const App = () => {
       const loPath = lo.pathname;
 
       switch (loPath) {
-        case "/":
+        case "/overview":
           setActiveMenu("overview");
           break;
         case "/wallets":
           setActiveMenu("wallets");
           break;
-        case "/comparison":
-          setActiveMenu("comparison");
-          break;
-        case "/history":
-          setActiveMenu("historical-data");
-          break;
-
         default:
+          // not important
+          setActiveMenu("");
           break;
       }
     }, [lo.pathname]);
@@ -275,8 +273,9 @@ const App = () => {
       <HashRouter>
         <Layout />
         <Routes>
+          <Route path="/" element={<Navigate to="/overview" />}></Route>
           <Route
-            path="/"
+            path="/overview"
             element={
               <Overview
                 currency={currentCurrency}
@@ -288,7 +287,8 @@ const App = () => {
                 topCoinsPercentageChangeData={topCoinsPercentageChangeData}
               />
             }
-          ></Route>
+          />
+
           <Route
             path="/wallets"
             element={<WalletAnalyzer currency={currentCurrency} />}
@@ -306,16 +306,25 @@ const App = () => {
               />
             }
           />
-          <Route
-            path="/settings"
-            element={
-              <Setting
-                onConfigurationSave={() => loadConfiguration()}
-                onDataImported={() => loadAllData(querySize)}
-                onDataSynced={() => loadAllData(querySize)}
-              />
-            }
-          />
+          <Route path="/settings" element={<Setting />}>
+            <Route
+              path="configuration"
+              element={
+                <Configuration
+                  onConfigurationSave={() => loadConfiguration()}
+                />
+              }
+            />
+            <Route
+              path="data"
+              element={
+                <DataManagement
+                  onDataImported={() => loadAllData(querySize)}
+                  onDataSynced={() => loadAllData(querySize)}
+                />
+              }
+            />
+          </Route>
           <Route path="*" element={<div>not found</div>} />
         </Routes>
       </HashRouter>

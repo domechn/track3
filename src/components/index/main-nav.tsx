@@ -7,7 +7,7 @@ export function MainNav({
 }: React.HTMLAttributes<HTMLElement>) {
   function CustomLink({ children, to, ...props }: LinkProps) {
     const resolved = useResolvedPath(to);
-    const match = useMatch({ path: resolved.pathname, end: true });
+    const match = useMatch({ path: resolved.pathname, end: false });
 
     return (
       <Link
@@ -28,7 +28,7 @@ export function MainNav({
       className={cn("flex items-center space-x-4 lg:space-x-6", className)}
       {...props}
     >
-      <CustomLink to="/">Overview</CustomLink>
+      <CustomLink to="/overview">Overview</CustomLink>
       <CustomLink to="/wallets">Wallets</CustomLink>
       <CustomLink to="/comparison">Comparison</CustomLink>
       <CustomLink to="/history">History</CustomLink>

@@ -2,27 +2,25 @@ import _ from "lodash";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 import "./index.css";
-import gearIcon from "../../assets/icons/gear-icon.png";
-import Modal from "../common/modal";
-import { useWindowSize } from "../../utils/hook";
 
-import Configuration from "../configuration";
-import DataManagement from "../data-management";
 import "./index.css";
+import { SidebarNav } from "./sidebar-nav";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 
-const App = ({
-  onConfigurationSave,
-  onDataImported,
-  onDataSynced,
-}: {
-  onConfigurationSave?: () => void;
-  onDataImported?: () => void;
-  onDataSynced?: () => void;
-}) => {
+const sidebarNavItems = [
+  {
+    title: "Configuration",
+    href: "/settings/configuration",
+  },
+  {
+    title: "Data",
+    href: "/settings/data",
+  },
+];
+
+const App = () => {
   const [version, setVersion] = useState<string>("0.1.0");
-  const [activeId, setActiveId] = useState<string>("configuration");
-  const size = useWindowSize();
-
+  const lo = useLocation();
   useEffect(() => {
     loadVersion();
   }, []);
@@ -33,92 +31,22 @@ const App = ({
     });
   }
 
-  function getSettingWidth() {
-    const width = Math.floor(size.width ? size.width * 0.8 : 800);
-    // keep it even
-    if (width % 2 === 1) {
-      return width - 1;
-    }
-    return width;
-  }
-
-  function onConfigurationSidebarClick() {
-    // add active class to the clicked item
-    setActiveId("configuration");
-  }
-  function onDataSidebarClick() {
-    // add active class to the clicked item
-    setActiveId("data");
-  }
-
-  function _onConfigurationSave() {
-    onConfigurationSave && onConfigurationSave();
-  }
-
-  function _onDataImported() {
-    onDataImported && onDataImported();
-  }
-
-  function _onDataSynced() {
-    onDataSynced && onDataSynced();
-  }
-
-  function smallScreen(): boolean {
-    return getSettingWidth() < 600;
-  }
-
-  function renderMenu() {
-    return (
-      <>
-        <div className="settings-sidebar">
-          <div
-            id="configuration"
-            className={`sidebar-item ${
-              !smallScreen() && activeId === "configuration" ? "active" : ""
-            }`}
-            onClick={onConfigurationSidebarClick}
-          >
-            Configuration
-          </div>
-          <div
-            id="data"
-            className={`sidebar-item ${
-              !smallScreen() && activeId === "data" ? "active" : ""
-            }`}
-            onClick={onDataSidebarClick}
-          >
-            Data
-          </div>
-          <div className="version">version: {version}</div>
+  return (
+    <div className="hidden space-y-6 p-10 pb-16 md:block">
+      <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
+        <aside className="-mx-4 lg:w-1/5">
+          <SidebarNav items={sidebarNavItems} />
+        </aside>
+        <div>{version}</div>
+        <div className="flex-1 lg:max-w-2xl">
+          <Outlet></Outlet>
+          {lo.pathname === "/settings" && (
+            <Navigate to="/settings/configuration" />
+          )}
         </div>
-
-        <div className="settings-content">
-          <div
-            id="configurationContent"
-            className="content-item"
-            style={{
-              display: activeId === "configuration" ? "block" : "none",
-            }}
-          >
-            <Configuration onConfigurationSave={_onConfigurationSave} />
-          </div>
-          <div
-            id="dataContent"
-            className="content-item"
-            style={{
-              display: activeId === "data" ? "block" : "none",
-            }}
-          >
-            <DataManagement
-              onDataImported={_onDataImported}
-              onDataSynced={_onDataSynced}
-            />
-          </div>
-        </div>
-      </>
-    );
-  }
-  return <div className="settings">{renderMenu()}</div>;
+      </div>
+    </div>
+  );
 };
 
 export default App;

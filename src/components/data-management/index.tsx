@@ -23,6 +23,7 @@ import { LoadingContext } from "../../App";
 import { timestampToDate } from "../../utils/date";
 import { trackEventWithClientID } from "../../utils/app";
 import Modal from "../common/modal";
+import { Separator } from '../ui/separator'
 
 const App = ({
   onDataImported,
@@ -326,7 +327,7 @@ const App = ({
           >
             Sync Data ( Beta )
           </button>
-          <br />
+          <Separator className="my-6" />
           <button
             style={{
               marginTop: 10,

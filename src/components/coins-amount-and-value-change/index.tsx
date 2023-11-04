@@ -8,7 +8,6 @@ import {
   CurrencyRateDetail,
 } from "../../middlelayers/types";
 import Select from "../common/select";
-import "./index.css";
 import { currencyWrapper } from "../../utils/currency";
 import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
 

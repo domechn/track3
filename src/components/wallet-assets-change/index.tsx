@@ -3,10 +3,19 @@ import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
 } from "../../middlelayers/types";
-import { currencyWrapper, prettyNumberToLocaleString } from "../../utils/currency";
-import { useWindowSize } from "../../utils/hook";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+} from "../../utils/currency";
 import { insertEllipsis } from "../../utils/string";
-import "./index.css";
+import {
+  TableHead,
+  TableRow,
+  TableHeader,
+  TableCell,
+  TableBody,
+  Table,
+} from "@/components/ui/table";
 
 const App = ({
   data,
@@ -15,7 +24,6 @@ const App = ({
   data: WalletAssetsChangeData;
   currency: CurrencyRateDetail;
 }) => {
-  const size = useWindowSize();
   function getArrow(value: number) {
     if (value < 0) {
       return "↓";
@@ -27,11 +35,11 @@ const App = ({
 
   function getChangeClassName(value: number) {
     if (value < 0) {
-      return "negative";
+      return "red";
     } else if (value > 0) {
-      return "positive";
+      return "green";
     }
-    return "none";
+    return "gray";
   }
 
   function getPositiveValue(value: number) {
@@ -46,108 +54,64 @@ const App = ({
   }
 
   return (
-    <div>
-      <h4>Changes</h4>
-      <div className="wallet-assets-change">
-        <table
-          style={{
-            width: (size.width ?? 1000) * 0.8,
-          }}
-        >
-          <thead>
-            <tr>
-              <th
-                style={{
-                  minWidth: 80,
-                  width: "15%",
-                }}
-              >
-                Wallet Type
-              </th>
-              <th
-                style={{
-                  minWidth: 150,
-                  width: "35%",
-                }}
-              >
-                Wallet Alias
-              </th>
-              <th
-                style={{
-                  minWidth: 100,
-                  width: "25%",
-                }}
-              >
-                Percentage
-              </th>
-              <th
-                style={{
-                  minWidth: 100,
-                  width: "25%",
-                }}
-              >
-                Value
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((d) => (
-              <tr key={d.wallet} className="wallet-assets-change-row">
-                <td
-                  style={{
-                    minWidth: 80,
-                    width: "15%",
-                  }}
-                >
-                  {!d.walletType || d.walletType === "null"
-                    ? "Unknown"
-                    : tweakWalletType(d.walletType)}
-                </td>
-                <td
-                  style={{
-                    minWidth: 150,
-                    width: "35%",
-                  }}
-                >
-                  <span>
+    <>
+      <h2 className="text-2xl font-bold text-left py-4 ml-10">Value Changes</h2>
+      <div className="flex justify-center items-center">
+        <div className="w-4/5 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Wallet Type</TableHead>
+                <TableHead>Wallet Alias</TableHead>
+                <TableHead>Percentage</TableHead>
+                <TableHead className="text-right">Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((d) => (
+                <TableRow key={d.wallet}>
+                  <TableCell className="font-medium">
+                    {!d.walletType || d.walletType === "null"
+                      ? "Unknown"
+                      : tweakWalletType(d.walletType)}
+                  </TableCell>
+                  <TableCell>
                     {d.walletAlias ??
                       insertEllipsis(
                         !d.wallet || d.wallet === "null" ? "Unknown" : d.wallet,
                         32
                       )}
-                  </span>
-                </td>
-                <td
-                  style={{
-                    minWidth: 100,
-                    width: "25%",
-                  }}
-                >
-                  <span className={getChangeClassName(d.changePercentage)}>
+                  </TableCell>
+                  <TableCell
+                    className={`text-${getChangeClassName(
+                      d.changePercentage
+                    )}-500`}
+                  >
+                    {" "}
                     {getArrow(d.changePercentage)}
-                    {prettyNumberToLocaleString(getPositiveValue(d.changePercentage))}%
-                  </span>
-                </td>
-                <td
-                  style={{
-                    minWidth: 100,
-                    width: "25%",
-                  }}
-                >
-                  <span className={getChangeClassName(d.changeValue)}>
+                    {prettyNumberToLocaleString(
+                      getPositiveValue(d.changePercentage)
+                    )}
+                    %
+                  </TableCell>
+                  <TableCell
+                    className={`text-right text-${getChangeClassName(
+                      d.changePercentage
+                    )}-500`}
+                  >
                     {getArrow(d.changeValue)}
                     {currency.symbol}
                     {prettyNumberToLocaleString(
                       currencyWrapper(currency)(getPositiveValue(d.changeValue))
                     )}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
