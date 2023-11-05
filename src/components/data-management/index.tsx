@@ -3,7 +3,6 @@ import {
   exportHistoricalData,
   importHistoricalData,
 } from "../../middlelayers/data";
-import "./index.css";
 import { useEffect, useState } from "react";
 
 import _ from "lodash";

@@ -236,7 +236,7 @@ const App = () => {
 
     return (
       <div>
-        <div className="hidden flex-col md:flex">
+        <div className=" flex-col md:flex">
           <div className="border-b mb-4">
             <div className="flex h-12 items-center px-4">
               <MainNav className="mx-0" />

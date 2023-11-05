@@ -1,9 +1,6 @@
 import _ from "lodash";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
-import "./index.css";
-
-import "./index.css";
 import { SidebarNav } from "./sidebar-nav";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 
@@ -32,7 +29,7 @@ const App = () => {
   }
 
   return (
-    <div className="hidden space-y-6 p-5 pb-8 md:block">
+    <div className="space-y-6 p-5 pb-8 md:block">
       <div className="flex flex-col space-y-4 lg:flex-row lg:space-x-6 lg:space-y-0">
         <aside className="-mx-4 lg:w-1/5">
           <SidebarNav items={sidebarNavItems} />
