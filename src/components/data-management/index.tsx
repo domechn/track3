@@ -3,8 +3,7 @@ import {
   exportHistoricalData,
   importHistoricalData,
 } from "../../middlelayers/data";
-import "./index.css";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import _ from "lodash";
 import {
@@ -19,10 +18,19 @@ import {
   signOut,
   syncAssetsToCloudAndLocal,
 } from "../../middlelayers/cloudsync";
-import { LoadingContext } from "../../App";
 import { timestampToDate } from "../../utils/date";
 import { trackEventWithClientID } from "../../utils/app";
-import Modal from "../common/modal";
+import { Separator } from "../ui/separator";
+import { Checkbox } from "../ui/checkbox";
+import { Label } from "../ui/label";
+import { Button } from "../ui/button";
+import {
+  ReloadIcon,
+  UploadIcon,
+  ExitIcon,
+  EnterIcon,
+} from "@radix-ui/react-icons";
+import { Input } from "../ui/input";
 
 const App = ({
   onDataImported,
@@ -36,12 +44,16 @@ const App = ({
   const [isLogin, setIsLogin] = useState<boolean>(false);
   const [publicKey, setPublicKey] = useState<string>("");
   const [loginEmail, setLoginEmail] = useState<string>("");
-  const sendVerifyCodeRef = useRef<HTMLButtonElement>(null);
-  const signInRef = useRef<HTMLButtonElement>(null);
-  const { setLoading } = useContext(LoadingContext);
+  const [sendVerifyCodeDisabledSeconds, setSendVerifyCodeDisabledSeconds] =
+    useState<number>(0);
+  const [signLoading, setSignLoading] = useState<boolean>(false);
   const [lastSyncAt, setLastSyncAt] = useState<number>(0);
   const [enableAutoSync, setEnableAutoSync] = useState<boolean>(false);
+  const [sendEmailLoading, setSendEmailLoading] = useState<boolean>(false);
 
+  const [syncDataLoading, setSyncDataLoading] = useState<boolean>(false);
+  const [forceSyncDataLoading, setForceSyncDataLoading] =
+    useState<boolean>(false);
   const [exportConfiguration, setExportConfiguration] = useState(false);
 
   useEffect(() => {
@@ -72,7 +84,11 @@ const App = ({
   // if force is true, replace all data in cloud with local data
   // if force is false, only sync data that is updated after lastSyncAt
   async function syncDataBetweenCloudAndLocal(force = false) {
-    setLoading(true);
+    if (force) {
+      setForceSyncDataLoading(true);
+    } else {
+      setSyncDataLoading(true);
+    }
     try {
       // query last cloud sync time
       const pk = publicKey || (await getPublicKey());
@@ -94,7 +110,11 @@ const App = ({
     } catch (e: any) {
       toast.error(e.message || e);
     } finally {
-      setLoading(false);
+      if (force) {
+        setForceSyncDataLoading(false);
+      } else {
+        setSyncDataLoading(false);
+      }
     }
   }
 
@@ -129,7 +149,7 @@ const App = ({
 
   async function onSignClick() {
     try {
-      setLoading(true);
+      setSignLoading(true);
       if (isLogin) {
         await signOut();
         return;
@@ -138,18 +158,9 @@ const App = ({
         toast.error("email or verification code is empty");
         return;
       }
-      if (signInRef.current) {
-        signInRef.current!.disabled = true;
-      }
-      try {
-        await signIn(email, verificationCode);
+      await signIn(email, verificationCode);
 
-        trackEventWithClientID("sign_in");
-      } finally {
-        if (signInRef.current) {
-          signInRef.current!.disabled = false;
-        }
-      }
+      trackEventWithClientID("sign_in");
     } catch (e: any) {
       const msg = e.message || e;
       if (msg.includes("400")) {
@@ -158,7 +169,7 @@ const App = ({
       }
       toast.error(e.message || e);
     } finally {
-      setLoading(false);
+      setSignLoading(false);
     }
   }
 
@@ -179,203 +190,181 @@ const App = ({
     }
 
     try {
-      setLoading(true);
+      setSendEmailLoading(true);
       await sendVerifyCode(email);
       toast.success("verification code sent");
       // set button to disabled, and count down 60s
       let countDown = 60;
+      setSendVerifyCodeDisabledSeconds(countDown);
       const interval = setInterval(() => {
         countDown--;
-        if (countDown <= 0) {
+        setSendVerifyCodeDisabledSeconds(countDown);
+        if (countDown === 0) {
           clearInterval(interval);
-          if (sendVerifyCodeRef.current) {
-            sendVerifyCodeRef.current!.disabled = false;
-          }
-          return;
-        }
-        if (sendVerifyCodeRef.current) {
-          sendVerifyCodeRef.current!.disabled = true;
-          sendVerifyCodeRef.current!.innerText = `Send Code (${countDown})`;
         }
       }, 1000);
     } catch (e: any) {
       toast.error(e.message || e);
     } finally {
-      setLoading(false);
+      setSendEmailLoading(false);
     }
   }
 
   return (
-    <div className="dataManagement">
-      <h2>Data Center</h2>
+    <div className="space-y-6">
       <div>
-        <h3
-          style={{
-            marginBottom: 0,
-          }}
-        >
+        <h3 className="text-lg font-medium">Data Center</h3>
+        <p className="text-sm text-muted-foreground">
+          Sync your data to cloud, and access it from anywhere.
+        </p>
+      </div>
+      <Separator />
+
+      <div>
+        <div className="text-l font-bold text-left">
           Cloud Data Sync {!isLogin && "( Need Login )"}
-        </h3>
-        <sub
-          style={{
-            color: "gray",
-          }}
-        >
+        </div>
+        <div className="text-sm text-left text-gray-400">
           Powered by polybase.xyz
-        </sub>
+        </div>
         {isLogin ? (
           <div>
-            <h4
-              style={{
-                marginTop: 5,
-                marginBottom: 5,
-              }}
-            >
-              User: {loginEmail}
-            </h4>
-            <button
-              style={{
-                marginTop: 0,
-                backgroundColor: "#FF4500",
-                color: "white",
-              }}
-              onClick={onSignClick}
-            >
+            <div className="mt-2 mb-2">User: {loginEmail}</div>
+            <Button variant="destructive" onClick={onSignClick}>
+              <ExitIcon className="mr-2 h-4 w-4" />
               Sign Out
-            </button>
+            </Button>
           </div>
         ) : (
           <div>
-            <div>
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={{
-                  marginTop: 0,
-                }}
-                placeholder="email"
-              />
-            </div>
-            <div>
-              <input
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              className="w-80 mb-2 mt-2"
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <div className="flex mb-2 mt-2">
+              <Input
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value)}
                 placeholder="code"
                 type="number"
-                style={{
-                  width: "130px",
-                }}
+                className="w-40"
               />
-              <button
+              <Button
                 id="send-verification-code"
-                ref={sendVerifyCodeRef}
                 onClick={onVerificationButtonClick}
-                style={{
-                  marginLeft: "10px",
-                  width: "160px",
-                  fontSize: "12px",
-                }}
+                className="ml-1 wd-40"
+                disabled={sendVerifyCodeDisabledSeconds > 0}
               >
+                {sendEmailLoading ? (
+                  <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  sendVerifyCodeDisabledSeconds > 0 && (
+                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                  )
+                )}
                 Send Code
-              </button>
+                {sendVerifyCodeDisabledSeconds > 0 &&
+                  ` (${sendVerifyCodeDisabledSeconds}s)`}
+              </Button>
             </div>
 
-            <button ref={signInRef} onClick={onSignClick}>
+            <Button onClick={onSignClick} disabled={signLoading}>
+              {signLoading ? (
+                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <EnterIcon className="mr-2 h-4 w-4" />
+              )}
               Sign In
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
       {isLogin && (
         <div>
-          <h4
-            style={{
-              marginBottom: 10,
-            }}
-          >
+          <div className="text-gray-600 mb-2">
             Last Sync At:{" "}
             {lastSyncAt ? timestampToDate(lastSyncAt, true) : "Never"}
-          </h4>
-          <div>
-            <input
-              style={{
-                width: 25,
-                height: 16,
-                marginTop: 0,
-                cursor: "pointer",
-              }}
-              type="checkbox"
-              name="enableAutoSync"
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="enableAutoSync"
               checked={enableAutoSync}
-              onChange={(e) => setEnableAutoSync(e.target.checked)}
+              onCheckedChange={(v) => setEnableAutoSync(!!v)}
             />
-            <span
-              style={{
-                display: "inline-block",
-              }}
+            <Label
+              htmlFor="enableAutoSync"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
               Enable AutoSync ( 24h )
-            </span>
+            </Label>
           </div>
-          <button
-            style={{
-              marginTop: 10,
-            }}
+          <Button
+            className="mt-2"
             onClick={() => syncDataBetweenCloudAndLocal()}
+            disabled={forceSyncDataLoading || syncDataLoading}
           >
+            {syncDataLoading ? (
+              <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <UploadIcon className="mr-2 h-4 w-4" />
+            )}
             Sync Data ( Beta )
-          </button>
-          <br />
-          <button
-            style={{
-              marginTop: 10,
-              backgroundColor: "#FF4500",
-              color: "white",
-            }}
+          </Button>
+          <Button
+            variant="destructive"
+            className="ml-2"
             onClick={() => syncDataBetweenCloudAndLocal(true)}
+            disabled={forceSyncDataLoading || syncDataLoading}
           >
+            {forceSyncDataLoading ? (
+              <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <UploadIcon className="mr-2 h-4 w-4" />
+            )}
             Hard Sync Data ( Beta )
-          </button>
+          </Button>
         </div>
       )}
 
-      <h3>Data Management</h3>
+      <Separator className="my-6" />
+      <div className='space-y-3'>
+        <div className="text-l font-bold text-left">Data Management</div>
+        <div className="text-sm font-bold text-left">Import Data</div>
 
-      <div>
-        <button
-          onClick={onImportDataClick}
-          style={{
-            marginTop: 0,
-          }}
-        >
-          Import Data
-        </button>
-      </div>
+        <Button onClick={onImportDataClick}>Import</Button>
 
-      <div>
-        <h4 style={{
-          marginBottom: 10,
-        }}>Select Exported Data</h4>
         <div>
-          <input
-            className="exportDataCheckbox"
-            type="checkbox"
-            checked={exportConfiguration}
-            onChange={(e) => setExportConfiguration(e.target.checked)}
-          />
-          <span>Export Configuration</span>
+          <div className="text-sm font-bold text-left py-2">
+            Select Exported Data
+          </div>
+          <div className="flex items-center space-x-2 mb-2">
+            <Checkbox
+              id="exportConfigurationCheckbox"
+              checked={exportConfiguration}
+              onCheckedChange={(v) => setExportConfiguration(!!v)}
+            />
+            <Label
+              htmlFor="exportConfigurationCheckbox"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Export Configuration
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2 mb-2">
+            <Checkbox id="exportDataCheckbox" checked={true} disabled />
+            <Label
+              htmlFor="exportDataCheckbox"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Export Historical Data
+            </Label>
+          </div>
         </div>
-        <div>
-          <input
-            className="exportDataCheckbox"
-            type="checkbox"
-            checked={true}
-            disabled
-          />
-          <span>Export Historical Data</span>
-        </div>
-        <button onClick={onExportDataClick}>Export Data</button>
+        <Button onClick={onExportDataClick}>Export</Button>
       </div>
     </div>
   );

@@ -333,8 +333,10 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndV
 	}).value()
 }
 
-export async function queryHistoricalData(size = 30): Promise<HistoricalData[]> {
-	const models = await queryAssets(size)
+// gather: if true, group asset models by same symbol
+export async function queryHistoricalData(size = 30, gather = true): Promise<HistoricalData[]> {
+	const models = gather ? groupAssetModelsListBySymbol(await queryAssets(size)) : await queryAssets(size)
+
 
 	const assetsModelsToHistoricalData = (ams: AssetModel[]): HistoricalData => {
 		return {

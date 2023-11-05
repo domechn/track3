@@ -69,59 +69,6 @@ const App = ({
     downloadCoinLogos(symbols);
   }, [data]);
 
-  const rankColumns = [
-    {
-      key: "rank",
-      dataIndex: "rank",
-      title: "Rank",
-    },
-    {
-      key: "symbol",
-      dataIndex: "symbol",
-      title: "Symbol",
-    },
-    {
-      key: "amount",
-      dataIndex: "amount",
-      title: "Amount",
-    },
-    {
-      key: "value",
-      dataIndex: "value",
-      title: "Value",
-      render: (id: number | string) => {
-        const curData = _(rankData).find((d) => d.id === id);
-
-        return (
-          <>
-            {curData
-              ? currency.symbol +
-                prettyNumberToLocaleString(
-                  currencyWrapper(currency)(curData.value)
-                )
-              : "-"}
-          </>
-        );
-      },
-    },
-    {
-      key: "price",
-      dataIndex: "price",
-      title: "Price",
-      render: (id: number | string) => {
-        const curData = _(rankData).find((d) => d.id === id);
-
-        return (
-          <>
-            {curData
-              ? currency.symbol + currencyWrapper(currency)(curData.price)
-              : "-"}
-          </>
-        );
-      },
-    },
-  ];
-
   useEffect(() => {
     loadAllData();
   }, []);
@@ -234,7 +181,7 @@ const App = ({
 
             <div className="historical-data-card-bottom">
               <div className="historical-data-card-bottom-operations">
-                <a href="#" onClick={() => onHistoricalDataDeleteClick(d.id)}>
+                <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
                   <img
                     src={deleteIcon}
                     alt="delete"
@@ -295,7 +242,6 @@ const App = ({
 
         return (
           <a
-            href="#"
             key={"his-page-" + curPageNum}
             onClick={() => setPageNum(curPageNum)}
             style={{
@@ -330,6 +276,7 @@ const App = ({
               }}
             >
               <img
+                className="inline-block"
                 src={apiPath}
                 alt={d.symbol}
                 style={{ width: 20, height: 20, marginRight: 5 }}
@@ -368,10 +315,7 @@ const App = ({
               </p>
             </td>
             <td>
-              <a
-                href="#"
-                onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}
-              >
+              <a onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}>
                 <img
                   src={deleteIcon}
                   alt="delete"
@@ -391,19 +335,12 @@ const App = ({
 
   return (
     <div>
-      <h2
-        style={{
-          marginBottom: 5,
-        }}
-      >
-        Historical Data
-      </h2>
       <Modal visible={isModalOpen} onClose={onModalClose}>
         <div
           id="detail-view"
           style={{
             display: rankData.length > 0 ? "inline-block" : "none",
-            width: (wsize.width ?? 800) * 0.7,
+            width: (wsize.width ?? 800) * 0.8,
           }}
         >
           <table>
@@ -451,12 +388,11 @@ const App = ({
                 </th>
                 <th
                   style={{
-                    width: "2%",
+                    width: "3%",
+                    minWidth: 30,
                     textAlign: "end",
                   }}
-                >
-                  Opt
-                </th>
+                ></th>
               </tr>
             </thead>
             <tbody>{renderDetailPage(rankData)}</tbody>
@@ -464,13 +400,13 @@ const App = ({
         </div>
       </Modal>
       <div
-        style={{
-          marginBottom: 10,
-          color: "gray",
-        }}
+        // style={{
+        //   marginBottom: 10,
+        //   color: "gray",
+        // }}
+        className='flex justify-center items-center mb-5 text-gray-500 cursor-pointer'
       >
         <a
-          href="#"
           onClick={() => (pageNum > 1 ? setPageNum(pageNum - 1) : null)}
           style={{
             marginRight: 10,
@@ -481,7 +417,6 @@ const App = ({
         </a>
         {page()}
         <a
-          href="#"
           onClick={() =>
             pageNum < data.length / pageSize ? setPageNum(pageNum + 1) : null
           }

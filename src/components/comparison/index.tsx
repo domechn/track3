@@ -9,9 +9,13 @@ import _ from "lodash";
 import Select from "../common/select";
 import viewIcon from "../../assets/icons/view-icon.png";
 import hideIcon from "../../assets/icons/hide-icon.png";
-import { currencyWrapper, prettyNumberToLocaleString } from "../../utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+} from "../../utils/currency";
 import { useWindowSize } from "../../utils/hook";
 import { parseDateToTS } from "../../utils/date";
+import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
 
 type ComparisonData = {
   name: string;
@@ -90,30 +94,6 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     }
     loadDataById(headId).then((data) => setHeadData(data));
   }, [headId]);
-
-  // update button style
-  useEffect(() => {
-    const buttons = document.getElementsByClassName("active");
-    for (let i = 0; i < buttons.length; i++) {
-      if (
-        ["7D", "1M", "1Q", "1Y"]
-          .map((i) => getQuickCompareWholeKey(i as QuickCompareType))
-          .includes(buttons[i].id)
-      ) {
-        buttons[i].classList.remove("active");
-      }
-    }
-
-    if (!currentQuickCompare) {
-      return;
-    }
-
-    document
-      .getElementById(
-        getQuickCompareWholeKey(currentQuickCompare as QuickCompareType)
-      )
-      ?.classList.add("active");
-  }, [currentQuickCompare]);
 
   // update quick compare data ( baseId and headId )
   useEffect(() => {
@@ -314,7 +294,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     }
     let res = "" + convertedNumber;
     if (!keepDecimal) {
-      res = prettyNumberToLocaleString(convertedNumber)
+      res = prettyNumberToLocaleString(convertedNumber);
     }
     if (convertCurrency) {
       return `${currency.symbol} ${res}`;
@@ -335,113 +315,44 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     );
   }
 
-  function buttonGroupItemStyle() {
-    return {
-      height: 25,
-      width: 40,
-    };
-  }
-
-  function getQuickCompareWholeKey(type: QuickCompareType) {
-    return "quick-compare-" + type;
-  }
-
   function onQuickCompareButtonClick(type: QuickCompareType) {
     setCurrentQuickCompare(type);
   }
 
   return (
     <>
-      <h1
-        style={{
-          display: "inline-block",
-        }}
-      >
-        Comparison
-      </h1>
-      <a
-        href="#"
-        style={{
-          marginLeft: 10,
-        }}
-        onClick={onViewOrHideClick}
-      >
-        <img
-          src={showDetail ? viewIcon : hideIcon}
-          alt="view-or-hide"
-          width={25}
-          height={25}
-        />
-      </a>
-
       <div id="comparison-container" className="comparison-container">
-        <div
-          style={{
-            marginBottom: 10,
-            height: 25,
-          }}
-        >
-          <div
-            style={{
-              float: "right",
-            }}
-          >
-            <div
-              style={{
-                display: "inline-block",
-                color: "gray",
-                fontSize: 15,
-                overflow: "auto",
-                textAlign: "right",
-                marginRight: 20,
-              }}
-            >
+        <div>
+          <div className="flex mb-4 items-center justify-end">
+            <div className="mr-5">
+              <a onClick={onViewOrHideClick}>
+                <img
+                  className="view-or-hide-icon"
+                  src={showDetail ? viewIcon : hideIcon}
+                  alt="view-or-hide"
+                  width={25}
+                  height={25}
+                />
+              </a>
+            </div>
+            <div className="mr-2 text-gray-400 text-m flex items-center">
               Quick Compare
             </div>
-            <div
-              className="button-group"
-              style={{
-                display: "inline-block",
-                minWidth: "20%",
-              }}
+            <ButtonGroup
+              value={currentQuickCompare || ""}
+              onValueChange={(val: string) =>
+                onQuickCompareButtonClick(val as QuickCompareType)
+              }
             >
-              <button
-                id={getQuickCompareWholeKey("7D")}
-                className="quick-compare-button"
-                style={buttonGroupItemStyle()}
-                onClick={() => onQuickCompareButtonClick("7D")}
-              >
-                7D
-              </button>
-              <button
-                id={getQuickCompareWholeKey("1M")}
-                className="quick-compare-button"
-                style={buttonGroupItemStyle()}
-                onClick={() => onQuickCompareButtonClick("1M")}
-              >
-                1M
-              </button>
-              <button
-                id={getQuickCompareWholeKey("1Q")}
-                className="quick-compare-button"
-                style={buttonGroupItemStyle()}
-                onClick={() => onQuickCompareButtonClick("1Q")}
-              >
-                1Q
-              </button>
-              <button
-                id={getQuickCompareWholeKey("1Y")}
-                className="quick-compare-button"
-                style={buttonGroupItemStyle()}
-                onClick={() => onQuickCompareButtonClick("1Y")}
-              >
-                1Y
-              </button>
-            </div>
+              <ButtonGroupItem value="7D">7D</ButtonGroupItem>
+              <ButtonGroupItem value="1M">1M</ButtonGroupItem>
+              <ButtonGroupItem value="1Q">1Q</ButtonGroupItem>
+              <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
+            </ButtonGroup>
           </div>
         </div>
-        <div className="comparison-date-picker">
-          <div className="comparison-date-picker-item">
+        <div className="grid grid-cols-6 gap-4 mb-5">
+          <div className="col-start-2 col-end-4">
             <Select
               id="base"
               options={dateOptions}
@@ -450,7 +361,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
               width={150}
             />
           </div>
-          <div className="comparison-date-picker-item">
+          <div className="col-end-7 col-span-2">
             <Select
               id="head"
               options={dateOptions}
