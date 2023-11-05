@@ -7,7 +7,6 @@ import {
 import { toast } from "react-hot-toast";
 import deleteIcon from "../../assets/icons/delete-icon.png";
 import { GlobalConfig, TokenConfig } from "../../middlelayers/datafetch/types";
-import BetterSelect, { SelectOption } from "../common/select";
 import { LoadingContext } from "../../App";
 import { CurrencyRateDetail } from "../../middlelayers/types";
 import { listAllCurrencyRates } from "../../middlelayers/currency";
@@ -106,6 +105,21 @@ const walletOptions = [
   },
 ];
 
+const querySizeOptions = [
+  {
+    value: "10",
+    label: "10",
+  },
+  {
+    value: "20",
+    label: "20",
+  },
+  {
+    value: "50",
+    label: "50",
+  },
+];
+
 const Configuration = ({
   onConfigurationSave,
 }: {
@@ -115,6 +129,10 @@ const Configuration = ({
   const [groupUSD, setGroupUSD] = useState(true);
   const [querySize, setQuerySize] = useState(0);
   const [preferCurrency, setPreferCurrency] = useState("USD");
+  const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
+  const [addWalletDialogOpen, setAddWalletDialogOpen] = useState(false);
+  const [addOtherDialogOpen, setAddOtherDialogOpen] = useState(false);
+
   const [addExchangeConfig, setAddExchangeConfig] = useState<
     | {
         type: string;
@@ -167,25 +185,6 @@ const Configuration = ({
       amount: number;
     }[]
   >([]);
-
-  const querySizeOptions = useMemo(
-    () =>
-      [
-        {
-          value: "10",
-          label: "10",
-        },
-        {
-          value: "20",
-          label: "20",
-        },
-        {
-          value: "50",
-          label: "50",
-        },
-      ] as SelectOption[],
-    []
-  );
 
   const preferCurrencyOptions = useMemo(
     () =>
@@ -542,65 +541,6 @@ const Configuration = ({
                 </p>
               </CardContent>
             </Card>
-            // <div key={"wallet" + idx} className="wallets">
-            //   <label>
-            //     <BetterSelect
-            //       options={[
-            //         {
-            //           value: "btc",
-            //           label: "BTC",
-            //         },
-            //         {
-            //           value: "erc20",
-            //           label: "ERC20",
-            //         },
-            //         {
-            //           value: "sol",
-            //           label: "SOL",
-            //         },
-            //         {
-            //           value: "doge",
-            //           label: "DOGE",
-            //         },
-            //       ]}
-            //       onSelectChange={(v) => handleWalletChange(idx, "type", v)}
-            //       value={w.type}
-            //       width={selectWidth}
-            //       height={selectHeight}
-            //     />
-            //   </label>
-            //   <label>
-            //     <input
-            //       type="text"
-            //       name="alias"
-            //       placeholder="alias"
-            //       value={w.alias}
-            //       style={{
-            //         width: 55,
-            //       }}
-            //       onChange={(e) =>
-            //         handleWalletChange(idx, "alias", e.target.value)
-            //       }
-            //     />
-            //   </label>
-            //   <label>
-            //     <input
-            //       type="text"
-            //       name="address"
-            //       placeholder="wallet address"
-            //       value={w.address}
-            //       style={{
-            //         width: 275,
-            //       }}
-            //       onChange={(e) =>
-            //         handleWalletChange(idx, "address", e.target.value)
-            //       }
-            //     />
-            //   </label>
-            //   <a onClick={() => handleRemoveWallet(idx)}>
-            //     <img src={deleteIcon} alt="delete" />
-            //   </a>
-            // </div>
           );
         })
         .value();
@@ -657,24 +597,12 @@ const Configuration = ({
     setExchanges(_.filter(exchanges, (_, i) => i !== idx));
   }
 
-  function handleAddWallet() {
-    setWallets([
-      ...wallets,
-      {
-        type: "btc",
-        address: "",
-      },
-    ]);
+  function handleAddWallet(val: { type: string; address: string }) {
+    setWallets([...wallets, val]);
   }
 
-  function handleAddOther() {
-    setOthers([
-      ...others,
-      {
-        symbol: "",
-        amount: 0,
-      },
-    ]);
+  function handleAddOther(val: { symbol: string; amount: number }) {
+    setOthers([...others, val]);
   }
 
   function handleRemoveOther(idx: number) {
@@ -685,15 +613,46 @@ const Configuration = ({
     setWallets(_.filter(wallets, (_, i) => i !== idx));
   }
 
-  function handleExchangeChange(idx: number, key: string, val: string) {
-    const newExs = _.set(exchanges, [idx, key], val);
+  function handleExchangeChange(val: {
+    type: string;
+    apiKey: string;
+    secret: string;
+    password?: string;
+    alias?: string;
+  }) {
+    setExchanges([...exchanges, val]);
+  }
 
-    setExchanges([...newExs]);
+  // submit button clicked in add exchange form
+  function onAddExchangeFormSubmit() {
+    if (
+      !addExchangeConfig ||
+      !addExchangeConfig.type ||
+      !addExchangeConfig.apiKey ||
+      !addExchangeConfig.secret
+    ) {
+      toast.error("Exchange type, api key and secret is required");
+      return;
+    }
+
+    if (addExchangeConfig.type === "okex" && !addExchangeConfig.password) {
+      toast.error("Password is required for okex");
+      return;
+    }
+
+    handleExchangeChange(addExchangeConfig);
+
+    // clear
+    setAddExchangeConfig(undefined);
+    setAddExchangeDialogOpen(false);
   }
 
   function renderAddExchangeForm() {
     return (
-      <Dialog>
+      <Dialog
+        open={addExchangeDialogOpen}
+        onOpenChange={setAddExchangeDialogOpen}
+      >
         <DialogTrigger asChild>
           <Button>Add</Button>
         </DialogTrigger>
@@ -803,16 +762,33 @@ const Configuration = ({
             )}
           </div>
           <DialogFooter>
-            <Button type="submit">Save changes</Button>
+            <Button type="submit" onClick={onAddExchangeFormSubmit}>
+              Save changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     );
   }
 
+  // submit button clicked in add wallet form
+  function onAddWalletFormSubmit() {
+    if (!addWalletConfig || !addWalletConfig.type || !addWalletConfig.address) {
+      // alert
+      toast.error("Wallet type and address is required");
+      return;
+    }
+    handleAddWallet(addWalletConfig);
+
+    // clear
+    setAddWalletConfig(undefined);
+
+    setAddWalletDialogOpen(false);
+  }
+
   function renderAddWalletForm() {
     return (
-      <Dialog>
+      <Dialog open={addWalletDialogOpen} onOpenChange={setAddWalletDialogOpen}>
         <DialogTrigger asChild>
           <Button>Add</Button>
         </DialogTrigger>
@@ -886,16 +862,31 @@ const Configuration = ({
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Save changes</Button>
+            <Button type="submit" onClick={onAddWalletFormSubmit}>
+              Save changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     );
   }
 
+  // submit button clicked in add other form
+  function onAddOtherFormSubmit() {
+    if (!addOtherConfig || !addOtherConfig.symbol) {
+      // alert
+      toast.error("Symbol is required");
+      return;
+    }
+    handleAddOther(addOtherConfig);
+    // clear
+    setAddOtherConfig(undefined);
+    setAddOtherDialogOpen(false);
+  }
+
   function renderAddOtherForm() {
     return (
-      <Dialog>
+      <Dialog open={addOtherDialogOpen} onOpenChange={setAddOtherDialogOpen}>
         <DialogTrigger asChild>
           <Button>Add</Button>
         </DialogTrigger>
@@ -942,7 +933,9 @@ const Configuration = ({
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Save changes</Button>
+            <Button type="submit" onClick={onAddOtherFormSubmit}>
+              Save changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
