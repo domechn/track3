@@ -339,7 +339,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
               Quick Compare
             </div>
             <ButtonGroup
-              defaultValue=""
+              value={currentQuickCompare || ""}
               onValueChange={(val: string) =>
                 onQuickCompareButtonClick(val as QuickCompareType)
               }
