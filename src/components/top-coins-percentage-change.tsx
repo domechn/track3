@@ -1,12 +1,12 @@
 import { Line } from "react-chartjs-2";
-import { useWindowSize } from "../utils/hook";
-import { timestampToDate } from "../utils/date";
-import { TopCoinsPercentageChangeData } from "../middlelayers/types";
+import { useWindowSize } from "@/utils/hook";
+import { timestampToDate } from "@/utils/date";
+import { TopCoinsPercentageChangeData } from "@/middlelayers/types";
 import { useRef, useState } from "react";
 import _ from "lodash";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
-import { legendOnClick } from "../utils/legend";
+import { legendOnClick } from "@/utils/legend";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 
 const prefix = "tcpc";

@@ -5,9 +5,8 @@ import {
   saveConfiguration,
 } from "../middlelayers/configuration";
 import { toast } from "react-hot-toast";
-import deleteIcon from "../../assets/icons/delete-icon.png";
+import deleteIcon from "@/assets/icons/delete-icon.png";
 import { GlobalConfig, TokenConfig } from "../middlelayers/datafetch/types";
-import { LoadingContext } from "../App";
 import { CurrencyRateDetail } from "../middlelayers/types";
 import { listAllCurrencyRates } from "../middlelayers/currency";
 import { Separator } from "./ui/separator";

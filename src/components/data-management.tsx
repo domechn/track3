@@ -2,7 +2,7 @@ import { toast } from "react-hot-toast";
 import {
   exportHistoricalData,
   importHistoricalData,
-} from "../middlelayers/data";
+} from "@/middlelayers/data";
 import { useEffect, useState } from "react";
 
 import _ from "lodash";
@@ -17,9 +17,9 @@ import {
   signIn,
   signOut,
   syncAssetsToCloudAndLocal,
-} from "../middlelayers/cloudsync";
-import { timestampToDate } from "../utils/date";
-import { trackEventWithClientID } from "../utils/app";
+} from "@/middlelayers/cloudsync";
+import { timestampToDate } from "@/utils/date";
+import { trackEventWithClientID } from "@/utils/app";
 import { Separator } from "./ui/separator";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
