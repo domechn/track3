@@ -1,14 +1,14 @@
 import { useContext, useEffect, useState } from "react";
-import WalletAssetsPercentage from "../wallet-assets-percentage";
-import WalletAssetsChange from "../wallet-assets-change";
-import { LoadingContext } from "../../App";
+import WalletAssetsPercentage from "./wallet-assets-percentage";
+import WalletAssetsChange from "./wallet-assets-change";
+import { LoadingContext } from "@/App";
 import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
   WalletAssetsPercentageData,
-} from "../../middlelayers/types";
-import { WALLET_ANALYZER } from "../../middlelayers/charts";
-import { Separator } from "../ui/separator";
+} from "@/middlelayers/types";
+import { WALLET_ANALYZER } from "@/middlelayers/charts";
+import { Separator } from "./ui/separator";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const { setLoading } = useContext(LoadingContext);

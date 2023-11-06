@@ -1,9 +1,9 @@
 import { Line } from "react-chartjs-2";
-import { useWindowSize } from "../../utils/hook";
-import { timestampToDate } from "../../utils/date";
-import { AssetChangeData, CurrencyRateDetail } from "../../middlelayers/types";
+import { useWindowSize } from "@/utils/hook";
+import { timestampToDate } from "@/utils/date";
+import { AssetChangeData, CurrencyRateDetail } from "@/middlelayers/types";
 import _ from 'lodash'
-import { currencyWrapper } from '../../utils/currency'
+import { currencyWrapper } from '@/utils/currency'
 
 const App = ({
   data,

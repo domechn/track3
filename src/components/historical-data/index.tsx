@@ -3,25 +3,25 @@ import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
   queryHistoricalData,
-} from "../../middlelayers/charts";
-import { CurrencyRateDetail, HistoricalData } from "../../middlelayers/types";
-import deleteIcon from "../../assets/icons/delete-icon.png";
+} from "@/middlelayers/charts";
+import { CurrencyRateDetail, HistoricalData } from "@/middlelayers/types";
+import deleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
 
 import "./index.css";
 import { toast } from "react-hot-toast";
-import { LoadingContext } from "../../App";
-import { timestampToDate } from "../../utils/date";
+import { LoadingContext } from "@/App";
+import { timestampToDate } from "@/utils/date";
 import {
   currencyWrapper,
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
-} from "../../utils/currency";
+} from "@/utils/currency";
 import Modal from "../common/modal";
-import { downloadCoinLogos } from "../../middlelayers/data";
+import { downloadCoinLogos } from "@/middlelayers/data";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { convertFileSrc } from "@tauri-apps/api/tauri";
-import { useWindowSize } from "../../utils/hook";
+import { useWindowSize } from "@/utils/hook";
 import ImageStack from "../common/image-stack";
 
 type RankData = {

@@ -2,12 +2,12 @@ import _ from "lodash";
 import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
-} from "../../middlelayers/types";
+} from "@/middlelayers/types";
 import {
   currencyWrapper,
   prettyNumberToLocaleString,
-} from "../../utils/currency";
-import { insertEllipsis } from "../../utils/string";
+} from "@/utils/currency";
+import { insertEllipsis } from "@/utils/string";
 import {
   TableHead,
   TableRow,
