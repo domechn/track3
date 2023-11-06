@@ -1,3 +1,4 @@
+import React from 'react'
 import _ from "lodash";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
