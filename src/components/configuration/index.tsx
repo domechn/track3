@@ -34,6 +34,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import React from "react";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -128,6 +129,7 @@ const Configuration = ({
   const { setLoading } = useContext(LoadingContext);
   const [groupUSD, setGroupUSD] = useState(true);
   const [querySize, setQuerySize] = useState(0);
+  const [formChanged, setFormChanged] = useState(false);
   const [preferCurrency, setPreferCurrency] = useState("USD");
   const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
   const [addWalletDialogOpen, setAddWalletDialogOpen] = useState(false);
@@ -208,7 +210,7 @@ const Configuration = ({
   }
 
   function loadConfiguration() {
-    setLoading(true);
+    setLoading(false);
     getConfiguration()
       .then((d) => {
         const globalConfig = d ?? initialConfiguration;
@@ -259,22 +261,27 @@ const Configuration = ({
       .finally(() => setLoading(false));
   }
 
-  function onFormSubmit() {
+  function onGroupUSDSelectChange(v: boolean) {
+    setGroupUSD(!!v);
+
+    // mark form is changed
+    markFormChanged();
+  }
+
+  function markFormChanged() {
+    setFormChanged(true);
+  }
+
+  function submitConfiguration() {
     const globalConfig = convertFormDataToConfigurationData();
-    setLoading(true);
     let saveError: Error | undefined;
 
     saveConfiguration(globalConfig)
       .then(() => onConfigurationSave && onConfigurationSave())
       .catch((e) => (saveError = e))
       .finally(() => {
-        setLoading(false);
         if (saveError) {
           toast.error(saveError.message ?? saveError);
-        } else {
-          toast.success("Configuration updated successfully!", {
-            id: "configuration-update-success",
-          });
         }
       });
   }
@@ -483,6 +490,9 @@ const Configuration = ({
   function handleWalletChange(idx: number, key: string, val: string) {
     const newWs = _.set(wallets, [idx, key], val);
     setWallets([...newWs]);
+
+    // mark form is changed
+    markFormChanged();
   }
 
   function renderWalletForm(
@@ -552,17 +562,39 @@ const Configuration = ({
     );
   }
 
+  // save to db, when these values change
+  useEffect(() => {
+    if (formChanged) {
+      submitConfiguration();
+    }
+  }, [
+    formChanged,
+    groupUSD,
+    querySize,
+    preferCurrency,
+    exchanges,
+    wallets,
+    others,
+  ]);
+
   function handleOthersChange(idx: number, key: string, val: string) {
     const nos = _.set(others, [idx, key], val);
     setOthers([...nos]);
+    // mark form is changed
+    markFormChanged();
   }
 
   function onQuerySizeChanged(val: string) {
     setQuerySize(parseInt(val, 10));
+
+    // mark form is changed
+    markFormChanged();
   }
 
   function onPreferCurrencyChanged(val: string) {
     setPreferCurrency(val);
+    // mark form is changed
+    markFormChanged();
   }
 
   function renderOthersForm(vals: { symbol: string; amount: number }[]) {
@@ -595,22 +627,37 @@ const Configuration = ({
 
   function handleRemoveExchange(idx: number) {
     setExchanges(_.filter(exchanges, (_, i) => i !== idx));
+
+    // mark form is changed
+    markFormChanged();
   }
 
   function handleAddWallet(val: { type: string; address: string }) {
     setWallets([...wallets, val]);
+
+    // mark form is changed
+    markFormChanged();
   }
 
   function handleAddOther(val: { symbol: string; amount: number }) {
     setOthers([...others, val]);
+
+    // mark form is changed
+    markFormChanged();
   }
 
   function handleRemoveOther(idx: number) {
     setOthers(_.filter(others, (_, i) => i !== idx));
+
+    // mark form is changed
+    markFormChanged();
   }
 
   function handleRemoveWallet(idx: number) {
     setWallets(_.filter(wallets, (_, i) => i !== idx));
+
+    // mark form is changed
+    markFormChanged();
   }
 
   function handleExchangeChange(val: {
@@ -621,6 +668,9 @@ const Configuration = ({
     alias?: string;
   }) {
     setExchanges([...exchanges, val]);
+
+    // mark form is changed
+    markFormChanged();
   }
 
   // submit button clicked in add exchange form
@@ -958,7 +1008,7 @@ const Configuration = ({
           <Checkbox
             id="groupUSD"
             checked={groupUSD}
-            onCheckedChange={(v) => setGroupUSD(!!v)}
+            onCheckedChange={(v) => onGroupUSDSelectChange(!!v)}
           />
           <Label
             htmlFor="groupUSD"
