@@ -235,9 +235,10 @@ const App = () => {
     }, [lo.pathname]);
 
     return (
-      <div>
-        <div className=" flex-col md:flex">
-          <div className="border-b mb-4">
+      <div className='pb-12'
+      >
+        <div className="fixed top-0 left-4 right-0 z-10 bg-white flex-col md:flex">
+          <div className="border-b">
             <div className="flex h-12 items-center px-4">
               <MainNav className="mx-0" />
               <div className="ml-auto flex items-center space-x-4">
@@ -254,7 +255,9 @@ const App = () => {
             </div>
           </div>
         </div>
-        <Outlet></Outlet>
+        <div className='mt-4'>
+          <Outlet></Outlet>
+        </div>
       </div>
     );
   }
