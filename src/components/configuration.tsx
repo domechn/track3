@@ -3,16 +3,16 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import {
   getConfiguration,
   saveConfiguration,
-} from "../../middlelayers/configuration";
+} from "../middlelayers/configuration";
 import { toast } from "react-hot-toast";
 import deleteIcon from "../../assets/icons/delete-icon.png";
-import { GlobalConfig, TokenConfig } from "../../middlelayers/datafetch/types";
-import { LoadingContext } from "../../App";
-import { CurrencyRateDetail } from "../../middlelayers/types";
-import { listAllCurrencyRates } from "../../middlelayers/currency";
-import { Separator } from "../ui/separator";
-import { Checkbox } from "../ui/checkbox";
-import { Label } from "../ui/label";
+import { GlobalConfig, TokenConfig } from "../middlelayers/datafetch/types";
+import { LoadingContext } from "../App";
+import { CurrencyRateDetail } from "../middlelayers/types";
+import { listAllCurrencyRates } from "../middlelayers/currency";
+import { Separator } from "./ui/separator";
+import { Checkbox } from "./ui/checkbox";
+import { Label } from "./ui/label";
 import {
   Select,
   SelectContent,
@@ -21,8 +21,8 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "../ui/select";
-import { Button } from "../ui/button";
+} from "./ui/select";
+import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
@@ -31,9 +31,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "../ui/dialog";
-import { Input } from "../ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import React from "react";
 
 const initialConfiguration: GlobalConfig = {
@@ -126,7 +126,6 @@ const Configuration = ({
 }: {
   onConfigurationSave?: () => void;
 }) => {
-  const { setLoading } = useContext(LoadingContext);
   const [groupUSD, setGroupUSD] = useState(true);
   const [querySize, setQuerySize] = useState(0);
   const [formChanged, setFormChanged] = useState(false);
@@ -210,7 +209,6 @@ const Configuration = ({
   }
 
   function loadConfiguration() {
-    setLoading(false);
     getConfiguration()
       .then((d) => {
         const globalConfig = d ?? initialConfiguration;
@@ -257,8 +255,7 @@ const Configuration = ({
       })
       .catch((e) => {
         toast.error("get configuration failed:", e);
-      })
-      .finally(() => setLoading(false));
+      });
   }
 
   function onGroupUSDSelectChange(v: boolean) {

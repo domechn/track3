@@ -1,6 +1,6 @@
 import { Doughnut } from "react-chartjs-2";
-import { useWindowSize } from "../../utils/hook";
-import { LatestAssetsPercentageData } from "../../middlelayers/types";
+import { useWindowSize } from "../utils/hook";
+import { LatestAssetsPercentageData } from "../middlelayers/types";
 
 const App = ({ data }: { data: LatestAssetsPercentageData }) => {
   const size = useWindowSize();

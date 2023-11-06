@@ -6,7 +6,6 @@ import {
   queryCoinDataById,
 } from "../../middlelayers/charts";
 import _ from "lodash";
-import Select from "../common/select";
 import viewIcon from "../../assets/icons/view-icon.png";
 import hideIcon from "../../assets/icons/hide-icon.png";
 import {
@@ -16,6 +15,15 @@ import {
 import { useWindowSize } from "../../utils/hook";
 import { parseDateToTS } from "../../utils/date";
 import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 type ComparisonData = {
   name: string;
@@ -353,22 +361,38 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         </div>
         <div className="grid grid-cols-6 gap-4 mb-5">
           <div className="col-start-2 col-end-4">
-            <Select
-              id="base"
-              options={dateOptions}
-              onSelectChange={(v) => onBaseSelectChange(v)}
-              value={"" + baseId}
-              width={150}
-            />
+            <Select onValueChange={onBaseSelectChange} value={baseId}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Select Base Date" />
+              </SelectTrigger>
+              <SelectContent className="overflow-y-auto max-h-[20rem]">
+                <SelectGroup>
+                  <SelectLabel>Base Dates</SelectLabel>
+                  {dateOptions.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
           <div className="col-end-7 col-span-2">
-            <Select
-              id="head"
-              options={dateOptions}
-              onSelectChange={(v) => onHeadSelectChange(v)}
-              value={"" + headId}
-              width={150}
-            />
+            <Select onValueChange={onHeadSelectChange} value={headId}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Select Head Date" />
+              </SelectTrigger>
+              <SelectContent className="overflow-y-auto max-h-[20rem]">
+                <SelectGroup>
+                  <SelectLabel>Head Dates</SelectLabel>
+                  {dateOptions.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         {_(data).isEmpty() ? (

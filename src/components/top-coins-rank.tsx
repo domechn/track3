@@ -1,12 +1,12 @@
 import { Line } from "react-chartjs-2";
-import { useWindowSize } from "../../utils/hook";
-import { timestampToDate } from "../../utils/date";
-import { TopCoinsRankData } from "../../middlelayers/types";
+import { useWindowSize } from "../utils/hook";
+import { timestampToDate } from "../utils/date";
+import { TopCoinsRankData } from "../middlelayers/types";
 import { useRef } from "react";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
-import { legendOnClick } from "../../utils/legend";
+import { legendOnClick } from "../utils/legend";
 
 const App = ({ data }: { data: TopCoinsRankData }) => {
   const size = useWindowSize();

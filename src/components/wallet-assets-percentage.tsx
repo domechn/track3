@@ -1,13 +1,13 @@
 import { Bar } from "react-chartjs-2";
-import { useWindowSize } from "../../utils/hook";
+import { useWindowSize } from "../utils/hook";
 import {
   CurrencyRateDetail,
   WalletAssetsPercentageData,
-} from "../../middlelayers/types";
-import { currencyWrapper, prettyNumberToLocaleString } from "../../utils/currency";
+} from "../middlelayers/types";
+import { currencyWrapper, prettyNumberToLocaleString } from "../utils/currency";
 import _ from "lodash";
 import { useEffect, useState } from "react";
-import { insertEllipsis } from '../../utils/string'
+import { insertEllipsis } from '../utils/string'
 
 const App = ({
   data,

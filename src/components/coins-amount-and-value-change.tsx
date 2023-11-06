@@ -1,15 +1,16 @@
 import _ from "lodash";
+import React from "react";
 import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
-import { useWindowSize } from "../../utils/hook";
-import { timestampToDate } from "../../utils/date";
+import { useWindowSize } from "../utils/hook";
+import { timestampToDate } from "../utils/date";
 import {
   CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
-} from "../../middlelayers/types";
-import Select from "../common/select";
-import { currencyWrapper } from "../../utils/currency";
-import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
+} from "../middlelayers/types";
+import { currencyWrapper } from "../utils/currency";
+import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select'
 
 const prefix = "caaavc";
 
@@ -141,11 +142,23 @@ const App = ({
         </ButtonGroup>
         <div className="ml-5 mt-1">
           <Select
-            height={34}
-            options={data.map((d) => ({ value: d.coin, label: d.coin }))}
-            onSelectChange={onCoinSelectChange}
+            onValueChange={onCoinSelectChange}
             value={currentCoinSelected}
-          />
+          >
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Select Coin" />
+            </SelectTrigger>
+            <SelectContent className="overflow-y-auto max-h-[20rem]">
+              <SelectGroup>
+                <SelectLabel>Coins</SelectLabel>
+                {data.map((d) => (
+                  <SelectItem key={d.coin} value={d.coin}>
+                    {d.coin}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <div
