@@ -54,7 +54,6 @@ export class WalletAnalyzer {
 			_(addrs.addresses).forEach(x => {
 				const alias = _(x).isString() ? undefined : (x as { alias: string, address: string }).alias
 				const address = _(x).isString() ? x as string : (x as { alias: string, address: string }).address
-				console.log(address, md5(address));
 				
 				aliases.push({
 					walletType,
