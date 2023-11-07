@@ -1,11 +1,17 @@
 import _ from "lodash";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getConfiguration,
   saveConfiguration,
 } from "../middlelayers/configuration";
 import { toast } from "react-hot-toast";
-import deleteIcon from "@/assets/icons/delete-icon.png";
+import DeleteIcon from "@/assets/icons/delete-icon.png";
+import BinanceLogo from "@/assets/icons/binance-logo.svg";
+import OkexLogo from "@/assets/icons/okex-logo.svg";
+import BTCLogo from "@/assets/icons/btc-logo.svg";
+import ETHLogo from "@/assets/icons/eth-logo.svg";
+import SOLLogo from "@/assets/icons/sol-logo.svg";
+import DOGELogo from "@/assets/icons/doge-logo.svg";
 import { GlobalConfig, TokenConfig } from "../middlelayers/datafetch/types";
 import { CurrencyRateDetail } from "../middlelayers/types";
 import { listAllCurrencyRates } from "../middlelayers/currency";
@@ -343,124 +349,24 @@ const Configuration = ({
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
               <CardTitle className="text-sm font-medium">{ex.type}</CardTitle>
               <div className="flex ">
-                <svg
-                  viewBox="0 0 1024 1024"
-                  version="1.1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  p-id="2306"
+                <img
+                  src={DeleteIcon}
                   className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
                   onClick={() => handleRemoveExchange(idx)}
-                >
-                  <path
-                    d="M768 384c-19.2 0-32 12.8-32 32l0 377.6c0 25.6-19.2 38.4-38.4 38.4L326.4 832c-25.6 0-38.4-19.2-38.4-38.4L288 416C288 396.8 275.2 384 256 384S224 396.8 224 416l0 377.6c0 57.6 44.8 102.4 102.4 102.4l364.8 0c57.6 0 102.4-44.8 102.4-102.4L793.6 416C800 396.8 787.2 384 768 384z"
-                    fill="#d81e06"
-                    p-id="2307"
-                  ></path>
-                  <path
-                    d="M460.8 736l0-320C460.8 396.8 448 384 435.2 384S396.8 396.8 396.8 416l0 320c0 19.2 12.8 32 32 32S460.8 755.2 460.8 736z"
-                    fill="#d81e06"
-                    p-id="2308"
-                  ></path>
-                  <path
-                    d="M627.2 736l0-320C627.2 396.8 608 384 588.8 384S563.2 396.8 563.2 416l0 320C563.2 755.2 576 768 588.8 768S627.2 755.2 627.2 736z"
-                    fill="#d81e06"
-                    p-id="2309"
-                  ></path>
-                  <path
-                    d="M832 256l-160 0L672 211.2C672 166.4 633.6 128 588.8 128L435.2 128C390.4 128 352 166.4 352 211.2L352 256 192 256C172.8 256 160 268.8 160 288S172.8 320 192 320l640 0c19.2 0 32-12.8 32-32S851.2 256 832 256zM416 211.2C416 198.4 422.4 192 435.2 192l153.6 0c12.8 0 19.2 6.4 19.2 19.2L608 256l-192 0L416 211.2z"
-                    fill="#d81e06"
-                    p-id="2310"
-                  ></path>
-                </svg>
+                />
                 {/* binance */}
                 {ex.type === "binance" && (
-                  <svg
-                    viewBox="0 0 126.61 126.61"
-                    xmlns="http://www.w3.org/2000/svg"
+                  <img
                     className="h-4 w-4 text-muted-foreground"
-                  >
-                    <g fill="#f3ba2f">
-                      <path d="m38.73 53.2 24.59-24.58 24.6 24.6 14.3-14.31-38.9-38.91-38.9 38.9z" />
-                      <path d="m0 63.31 14.3-14.31 14.31 14.31-14.31 14.3z" />
-                      <path d="m38.73 73.41 24.59 24.59 24.6-24.6 14.31 14.29-38.9 38.91-38.91-38.88z" />
-                      <path d="m98 63.31 14.3-14.31 14.31 14.3-14.31 14.32z" />
-                      <path d="m77.83 63.3-14.51-14.52-10.73 10.73-1.24 1.23-2.54 2.54 14.51 14.5 14.51-14.47z" />
-                    </g>
-                  </svg>
+                    src={BinanceLogo}
+                  ></img>
                 )}
                 {/* okex */}
                 {ex.type === "okex" && (
-                  <svg
-                    viewBox="0 0 400.66 400.67"
-                    xmlns="http://www.w3.org/2000/svg"
+                  <img
                     className="h-4 w-4 text-muted-foreground"
-                  >
-                    <path d="m0 400.67v-400.67" fill="#dbd9d9" />
-                    <path
-                      d="m178.77 178.77a90.69 90.69 0 0 0 43.14 0 90.84 90.84 0 0 1 66.52-66.52 90.69 90.69 0 1 0 -176.19 0 90.81 90.81 0 0 1 66.53 66.52z"
-                      fill="#7abdf7"
-                    />
-                    <path
-                      d="m221.91 221.89a90.69 90.69 0 0 0 -43.14 0 90.84 90.84 0 0 1 -66.52 66.52 90.69 90.69 0 1 0 176.19 0 90.81 90.81 0 0 1 -66.53-66.52z"
-                      fill="#0d74f5"
-                    />
-                    <path
-                      d="m310 109.64a90.59 90.59 0 0 0 -21.56 2.6 90.79 90.79 0 0 1 -66.51 66.51 90.69 90.69 0 0 0 0 43.14 90.81 90.81 0 0 1 66.51 66.52 90.69 90.69 0 1 0 21.56-178.79z"
-                      fill="#4494f7"
-                    />
-                    <path
-                      d="m178.77 221.89a90.69 90.69 0 0 0 0-43.14 90.81 90.81 0 0 1 -66.52-66.51 90.69 90.69 0 1 0 0 176.19 90.82 90.82 0 0 1 66.52-66.54z"
-                      fill="#005cf4"
-                    />
-                    <path
-                      d="m221.91 178.77a90.84 90.84 0 0 0 66.52-66.52 90.84 90.84 0 0 0 -66.52 66.52z"
-                      fill="#186ef9"
-                    />
-                    <path
-                      d="m221.91 221.89a90.81 90.81 0 0 0 66.52 66.52 90.84 90.84 0 0 0 -66.52-66.52z"
-                      fill="#0246f2"
-                    />
-                    <path
-                      d="m178.77 178.77a90.84 90.84 0 0 0 -66.52-66.52 90.84 90.84 0 0 0 66.52 66.52z"
-                      fill="#0046f8"
-                    />
-                    <path
-                      d="m178.77 221.89a90.84 90.84 0 0 0 -66.52 66.52 90.84 90.84 0 0 0 66.52-66.52z"
-                      fill="#0729f1"
-                    />
-                    <path
-                      d="m178.77 178.77a90.69 90.69 0 0 0 43.14 0 90.84 90.84 0 0 1 66.52-66.52 90.69 90.69 0 1 0 -176.19 0 90.81 90.81 0 0 1 66.53 66.52z"
-                      fill="#7abdf7"
-                    />
-                    <path
-                      d="m221.91 221.89a90.69 90.69 0 0 0 -43.14 0 90.84 90.84 0 0 1 -66.52 66.52 90.69 90.69 0 1 0 176.19 0 90.81 90.81 0 0 1 -66.53-66.52z"
-                      fill="#0d74f5"
-                    />
-                    <path
-                      d="m310 109.64a90.59 90.59 0 0 0 -21.56 2.6 90.79 90.79 0 0 1 -66.51 66.51 90.69 90.69 0 0 0 0 43.14 90.81 90.81 0 0 1 66.51 66.52 90.69 90.69 0 1 0 21.56-178.79z"
-                      fill="#4494f7"
-                    />
-                    <path
-                      d="m178.77 221.89a90.69 90.69 0 0 0 0-43.14 90.81 90.81 0 0 1 -66.52-66.51 90.69 90.69 0 1 0 0 176.19 90.82 90.82 0 0 1 66.52-66.54z"
-                      fill="#005cf4"
-                    />
-                    <path
-                      d="m221.91 178.77a90.84 90.84 0 0 0 66.52-66.52 90.84 90.84 0 0 0 -66.52 66.52z"
-                      fill="#186ef9"
-                    />
-                    <path
-                      d="m221.91 221.89a90.81 90.81 0 0 0 66.52 66.52 90.84 90.84 0 0 0 -66.52-66.52z"
-                      fill="#0246f2"
-                    />
-                    <path
-                      d="m178.77 178.77a90.84 90.84 0 0 0 -66.52-66.52 90.84 90.84 0 0 0 66.52 66.52z"
-                      fill="#0046f8"
-                    />
-                    <path
-                      d="m178.77 221.89a90.84 90.84 0 0 0 -66.52 66.52 90.84 90.84 0 0 0 66.52-66.52z"
-                      fill="#0729f1"
-                    />
-                  </svg>
+                    src={OkexLogo}
+                  />
                 )}
               </div>
             </CardHeader>
@@ -507,35 +413,35 @@ const Configuration = ({
                   {w.type.toUpperCase()}
                 </CardTitle>
                 <div className="flex ">
-                  <svg
-                    viewBox="0 0 1024 1024"
-                    version="1.1"
-                    xmlns="http://www.w3.org/2000/svg"
-                    p-id="2306"
+                  <img
+                    src={DeleteIcon}
                     className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
                     onClick={() => handleRemoveWallet(idx)}
-                  >
-                    <path
-                      d="M768 384c-19.2 0-32 12.8-32 32l0 377.6c0 25.6-19.2 38.4-38.4 38.4L326.4 832c-25.6 0-38.4-19.2-38.4-38.4L288 416C288 396.8 275.2 384 256 384S224 396.8 224 416l0 377.6c0 57.6 44.8 102.4 102.4 102.4l364.8 0c57.6 0 102.4-44.8 102.4-102.4L793.6 416C800 396.8 787.2 384 768 384z"
-                      fill="#d81e06"
-                      p-id="2307"
-                    ></path>
-                    <path
-                      d="M460.8 736l0-320C460.8 396.8 448 384 435.2 384S396.8 396.8 396.8 416l0 320c0 19.2 12.8 32 32 32S460.8 755.2 460.8 736z"
-                      fill="#d81e06"
-                      p-id="2308"
-                    ></path>
-                    <path
-                      d="M627.2 736l0-320C627.2 396.8 608 384 588.8 384S563.2 396.8 563.2 416l0 320C563.2 755.2 576 768 588.8 768S627.2 755.2 627.2 736z"
-                      fill="#d81e06"
-                      p-id="2309"
-                    ></path>
-                    <path
-                      d="M832 256l-160 0L672 211.2C672 166.4 633.6 128 588.8 128L435.2 128C390.4 128 352 166.4 352 211.2L352 256 192 256C172.8 256 160 268.8 160 288S172.8 320 192 320l640 0c19.2 0 32-12.8 32-32S851.2 256 832 256zM416 211.2C416 198.4 422.4 192 435.2 192l153.6 0c12.8 0 19.2 6.4 19.2 19.2L608 256l-192 0L416 211.2z"
-                      fill="#d81e06"
-                      p-id="2310"
-                    ></path>
-                  </svg>
+                  />
+                  {w.type === "btc" && (
+                    <img
+                      src={BTCLogo}
+                      className="h-4 w-4 text-muted-foreground mr-2"
+                    />
+                  )}
+                  {w.type === "erc20" && (
+                    <img
+                      src={ETHLogo}
+                      className="h-4 w-4 text-muted-foreground mr-2"
+                    />
+                  )}
+                  {w.type === "doge" && (
+                    <img
+                      src={DOGELogo}
+                      className="h-4 w-4 text-muted-foreground mr-2"
+                    />
+                  )}
+                  {w.type === "sol" && (
+                    <img
+                      src={SOLLogo}
+                      className="h-4 w-4 text-muted-foreground mr-2"
+                    />
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -614,7 +520,7 @@ const Configuration = ({
             onChange={(e) => handleOthersChange(idx, "amount", e.target.value)}
           />
           <a onClick={() => handleRemoveOther(idx)}>
-            <img src={deleteIcon} alt="delete" className="w-4 h-4 mt-2" />
+            <img src={DeleteIcon} alt="delete" className="w-4 h-4 mt-2" />
           </a>
         </div>
       ))
