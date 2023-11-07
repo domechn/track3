@@ -1,7 +1,6 @@
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import WalletAssetsPercentage from "./wallet-assets-percentage";
 import WalletAssetsChange from "./wallet-assets-change";
-import { LoadingContext } from "@/App";
 import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
@@ -11,7 +10,6 @@ import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { Separator } from "./ui/separator";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
-  const { setLoading } = useContext(LoadingContext);
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
     useState<WalletAssetsPercentageData>([]);
 
@@ -19,8 +17,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     useState<WalletAssetsChangeData>([]);
 
   useEffect(() => {
-    setLoading(true);
-    loadAllDataAsync().finally(() => setLoading(false));
+    loadAllDataAsync();
   }, []);
 
   async function loadAllDataAsync() {

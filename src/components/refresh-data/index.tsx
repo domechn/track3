@@ -1,11 +1,12 @@
 import "./index.css";
-import refreshIcon from "../../assets/icons/refresh-icon.png";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { refreshAllData } from "../../middlelayers/charts";
 import { toast } from "react-hot-toast";
 import { LoadingContext } from "../../App";
 import { updateAllCurrencyRates } from "../../middlelayers/currency";
-import { trackEventWithClientID } from '../../utils/app'
+import { trackEventWithClientID } from "../../utils/app";
+import { Button } from "../ui/button";
+import { ReloadIcon } from "@radix-ui/react-icons";
 
 const retries = 3;
 const retryInterval = 3000; // 3s
@@ -15,7 +16,7 @@ const App = ({
 }: {
   afterRefresh?: (success: boolean) => unknown;
 }) => {
-  const { setLoading } = useContext(LoadingContext);
+  const [refreshLoading, setRefreshLoading] = useState(false);
 
   const retry = async (
     fn: () => Promise<unknown>,
@@ -40,8 +41,7 @@ const App = ({
   };
 
   const handleButtonClick = () => {
-    setLoading(true);
-
+    setRefreshLoading(true);
     let refreshError: Error | undefined;
 
     retry(refreshAllData, retries, retryInterval)
@@ -50,8 +50,8 @@ const App = ({
         refreshError = err;
       })
       .finally(() => {
-        setLoading(false);
-        trackEventWithClientID("data_refreshed")
+        setRefreshLoading(false);
+        trackEventWithClientID("data_refreshed");
         if (refreshError) {
           toast.error(refreshError.message || (refreshError as any));
         } else {
@@ -66,17 +66,13 @@ const App = ({
 
   return (
     <div>
-      <button className="refresh-button" onClick={handleButtonClick}>
-        <img
-          src={refreshIcon}
-          alt="refresh"
-          style={{
-            border: 0,
-            height: 30,
-            width: 30,
-          }}
+      <Button onClick={handleButtonClick} disabled={refreshLoading}>
+        {/*  animate-spin */}
+        <ReloadIcon
+          className={`mr-2 h-4 w-4 ${refreshLoading && "animate-spin"}`}
         />
-      </button>
+        Refresh
+      </Button>
     </div>
   );
 };

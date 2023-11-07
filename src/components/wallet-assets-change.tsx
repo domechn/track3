@@ -3,10 +3,7 @@ import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
 } from "@/middlelayers/types";
-import {
-  currencyWrapper,
-  prettyNumberToLocaleString,
-} from "@/utils/currency";
+import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { insertEllipsis } from "@/utils/string";
 import {
   TableHead,
@@ -87,7 +84,6 @@ const App = ({
                       d.changePercentage
                     )}-500`}
                   >
-                    {" "}
                     {getArrow(d.changePercentage)}
                     {prettyNumberToLocaleString(
                       getPositiveValue(d.changePercentage)

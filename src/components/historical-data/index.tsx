@@ -74,14 +74,10 @@ const App = ({
   }, []);
 
   function loadAllData() {
-    setLoading(true);
-    queryHistoricalData(-1)
-      .then((d) => setData(d))
-      .finally(() => setLoading(false));
+    queryHistoricalData(-1).then((d) => setData(d));
   }
 
   function onHistoricalDataDeleteClick(uuid: string) {
-    setLoading(true);
     deleteHistoricalDataByUUID(uuid)
       .then(() => {
         toast.success("Record deleted");
@@ -95,12 +91,10 @@ const App = ({
       .catch((e) => toast.error(e.message))
       .finally(() => {
         setIsModalOpen(false);
-        setLoading(false);
       });
   }
 
   function onHistoricalDataDetailDeleteClick(id: number) {
-    setLoading(true);
     deleteHistoricalDataDetailById(id)
       .then(() => {
         toast.success("Record deleted");
@@ -115,10 +109,7 @@ const App = ({
             .value()
         );
       })
-      .catch((e) => toast.error(e.message))
-      .finally(() => {
-        setLoading(false);
-      });
+      .catch((e) => toast.error(e.message));
   }
 
   function onRowClick(id: number | string) {
@@ -404,7 +395,7 @@ const App = ({
         //   marginBottom: 10,
         //   color: "gray",
         // }}
-        className='flex justify-center items-center mb-5 text-gray-500 cursor-pointer'
+        className="flex justify-center items-center mb-5 text-gray-500 cursor-pointer"
       >
         <a
           onClick={() => (pageNum > 1 ? setPageNum(pageNum - 1) : null)}

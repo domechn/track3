@@ -205,7 +205,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     const headTotal = _(head).sumBy("value");
     if (!_(symbols).isEmpty()) {
       res.push({
-        name: "USD Total Value",
+        name: "Total Value",
         base: baseTotal,
         head: headTotal,
       });

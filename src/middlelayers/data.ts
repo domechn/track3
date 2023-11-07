@@ -118,6 +118,7 @@ export async function importHistoricalData(): Promise<boolean> {
 	// !compatible with older versions logic ( before 0.3.3 )
 	if (md5) {
 		// verify md5
+		// todo: use md5 in typescript
 		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, configuration }) })
 		if (currentMd5 !== md5) {
 			throw new Error("invalid data, md5 check failed: errorCode 000")
