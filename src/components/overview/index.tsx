@@ -47,7 +47,6 @@ const App = ({
       {/* <hr className="nice-hr" /> */}
       <LatestAssetsPercentage data={latestAssetsPercentageData} />
       <Separator className="my-6" />
-      <Separator className="my-6" />
       <CoinsAmountAndValueChange
         currency={currency}
         data={coinsAmountAndValueChangeData}

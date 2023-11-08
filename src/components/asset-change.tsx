@@ -41,7 +41,7 @@ const App = ({
             console.log(index === 0 || index === _(data.timestamps).size() - 1);
             const total = _(data.timestamps).size() - 1;
 
-            // Hide every 2nd tick label
+            // only show start and end date
             return index === 0 || index === total - 1
               ? timestampToDate(data.timestamps[index])
               : "";
@@ -88,7 +88,7 @@ const App = ({
   }
 
   return (
-    <div>
+    <div className='h-30'>
       <Line options={options as any} data={lineData()} />
     </div>
   );
