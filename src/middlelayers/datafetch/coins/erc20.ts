@@ -99,7 +99,8 @@ class BscERC20Query extends EthplorerERC20Query {
 
 export class ERC20Analyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'erc20'>
-	private readonly queries = [new EthERC20Query(), new BscERC20Query()]
+	// !bsc first, because of this provider has some bug, if call eth first, balance of bsc will be the same as eth
+	private readonly queries = [new BscERC20Query(), new EthERC20Query()]
 
 	constructor(config: Pick<TokenConfig, 'erc20'>) {
 		this.config = config
@@ -110,9 +111,12 @@ export class ERC20Analyzer implements Analyzer {
 	}
 
 	private async query(address: string): Promise<WalletCoin[]> {
-		const coins = await bluebird.map(this.queries, async q => q.query(address), {
-			concurrency: 2
-		})
+		const coins: Coin[][] = []
+		// currency must be 1, because of bug of ethplorer.io
+		for (const q of this.queries) {
+			const coin = await q.query(address)
+			coins.push(coin)
+		}
 
 		return _(coins).flatten().map(c => ({
 			...c,
@@ -133,7 +137,7 @@ export class ERC20Analyzer implements Analyzer {
 			if (max <= 0) {
 				throw new Error("failed to query erc20 assets, with max retry")
 			}
-			const coinLists = await asyncMap(getAddressList(this.config.erc20), async addr => this.query(addr), 1, 1000)
+			const coinLists = await asyncMap(getAddressList(this.config.erc20), async addr => this.query(addr), 2, 1000)
 
 			return _(coinLists).flatten().value()
 		} catch (e) {
