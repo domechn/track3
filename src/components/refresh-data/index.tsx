@@ -71,7 +71,7 @@ const App = ({
         <ReloadIcon
           className={`mr-2 h-4 w-4 ${refreshLoading && "animate-spin"}`}
         />
-        Refresh
+        <p className='hidden sm:inline-block'>Refresh</p>
       </Button>
     </div>
   );

@@ -30,7 +30,8 @@ async function queryCoinsData(): Promise<(WalletCoin & {
 		throw new Error("no configuration found,\n please add configuration first")
 	}
 	const assets = await loadPortfolios(config)
-	const priceMap = await queryCoinPrices(_(assets).map("symbol").push("USDT").uniq().value())
+	// always query btc and usdt price
+	const priceMap = await queryCoinPrices(_(assets).map("symbol").push("USDT").push("BTC").uniq().value())
 
 	let lastAssets = _.clone(assets)
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false

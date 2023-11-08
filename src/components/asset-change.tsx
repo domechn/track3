@@ -1,9 +1,8 @@
 import { Line } from "react-chartjs-2";
-import { useWindowSize } from "@/utils/hook";
 import { timestampToDate } from "@/utils/date";
 import { AssetChangeData, CurrencyRateDetail } from "@/middlelayers/types";
-import _ from 'lodash'
-import { currencyWrapper } from '@/utils/currency'
+import _ from "lodash";
+import { currencyWrapper } from "@/utils/currency";
 
 const App = ({
   data,
@@ -14,30 +13,47 @@ const App = ({
 }) => {
   const lineColor = "rgba(255, 99, 71, 1)";
 
-  const size = useWindowSize();
-
   const options = {
     maintainAspectRatio: false,
     responsive: false,
     plugins: {
       title: {
-        display: true,
-        text: `Trend of Asset ${currency.currency} Value`,
+        display: false,
       },
       datalabels: {
+        display: false,
+      },
+      legend: {
         display: false,
       },
     },
     scales: {
       x: {
         title: {
-          display: true,
+          display: false,
           text: "Date",
+        },
+        ticks: {
+          maxTicksLimit: 2,
+          autoSkip: false,
+          labelOffset: -5,
+          callback: function (val: number, index: number) {
+            console.log(index === 0 || index === _(data.timestamps).size() - 1);
+            const total = _(data.timestamps).size() - 1;
+
+            // only show start and end date
+            return index === 0 || index === total - 1
+              ? timestampToDate(data.timestamps[index])
+              : "";
+          },
+        },
+        grid: {
+          display: false,
         },
       },
       y: {
         title: {
-          display: true,
+          display: false,
           text: currency.currency,
         },
         offset: true,
@@ -57,12 +73,14 @@ const App = ({
       datasets: [
         {
           label: "Value",
-          data: _(data.data).map(d => currencyWrapper(currency)(d)).value(),
+          data: _(data.data)
+            .map((d) => currencyWrapper(currency)(d))
+            .value(),
           borderColor: lineColor,
           backgroundColor: lineColor,
-          borderWidth: 5,
+          borderWidth: data.data.length > 20 ? 2 : 4,
           tension: 0.1,
-          pointRadius: 1,
+          pointRadius: data.data.length > 20 ? 0 : 0.3,
           pointStyle: "rotRect",
         },
       ],
@@ -70,14 +88,8 @@ const App = ({
   }
 
   return (
-    <div>
-      <div
-        style={{
-          height: Math.max((size.height || 100) / 2, 350),
-        }}
-      >
-        <Line options={options} data={lineData()} />
-      </div>
+    <div className='h-30'>
+      <Line options={options as any} data={lineData()} />
     </div>
   );
 };

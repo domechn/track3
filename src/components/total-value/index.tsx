@@ -10,12 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const App = ({
   data,
   currency,
+  children,
 }: {
   currency: CurrencyRateDetail;
   data: {
     totalValue: number;
     changePercentage: number;
   };
+  children: React.ReactNode;
 }) => {
   const [changedValueOrPercentage, setChangedValueOrPercentage] = useState("");
 
@@ -62,13 +64,13 @@ const App = ({
 
   function changePercentageColorClass() {
     if (data.changePercentage === 0) {
-      return "";
+      return "text-gray-500";
     }
-    return data.changePercentage > 0 ? "positive" : "negative";
+    return data.changePercentage > 0 ? "text-green-500" : "text-red-500";
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+    <div>
       <Card
         onMouseEnter={() => setChangedValueOrPercentage(formatChangeValue())}
         onMouseLeave={() =>
@@ -93,13 +95,12 @@ const App = ({
         <CardContent>
           <div className="text-2xl font-bold">{formatTotalValue()}</div>
           <p className="text-xs text-muted-foreground">
-            <span
-              className={`changePercentage ${changePercentageColorClass()}`}
-            >
+            <span className={changePercentageColorClass()}>
               {changedValueOrPercentage}
             </span>{" "}
             from last time
           </p>
+          {children}
         </CardContent>
       </Card>
     </div>
