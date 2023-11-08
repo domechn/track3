@@ -15,6 +15,7 @@ import {
   TopCoinsRankData,
 } from "../../middlelayers/types";
 import { Separator } from "../ui/separator";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 const App = ({
   currency,
@@ -38,11 +39,14 @@ const App = ({
 }) => {
   return (
     <>
-      <TotalValue currency={currency} data={totalValueData} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+        <TotalValue currency={currency} data={totalValueData}>
+          <AssetChange currency={currency} data={assetChangeData} />
+        </TotalValue>
+      </div>
       {/* <hr className="nice-hr" /> */}
       <LatestAssetsPercentage data={latestAssetsPercentageData} />
       <Separator className="my-6" />
-      <AssetChange currency={currency} data={assetChangeData} />
       <Separator className="my-6" />
       <CoinsAmountAndValueChange
         currency={currency}
