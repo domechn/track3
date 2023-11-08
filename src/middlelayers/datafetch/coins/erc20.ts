@@ -133,9 +133,15 @@ export class ERC20Analyzer implements Analyzer {
 			wallet: address
 		})).value()
 	}
-
+	async preLoad(): Promise<void> {
+	}
+	async postLoad(): Promise<void> {
+		for (const q of this.queries) {
+			q.clean()
+		}
+	}
 	async loadPortfolio(): Promise<WalletCoin[]> {
-		return this.loadPortfolioWith429Retry(5)
+		return this.loadPortfolioWith429Retry(10)
 			.finally(async () => {
 				if (this.errorResolver.isTried()) {
 					await this.errorResolver.resolved()
@@ -157,8 +163,8 @@ export class ERC20Analyzer implements Analyzer {
 				if (!this.errorResolver.isTried()) {
 					await this.errorResolver.tryResolve(getAddressList(this.config.erc20)[0])
 				}
-				// sleep 5s
-				await new Promise(resolve => setTimeout(resolve, 2000))
+				// sleep 500ms
+				await new Promise(resolve => setTimeout(resolve, 500))
 
 				// try again
 				return this.loadPortfolioWith429Retry(max - 1)

@@ -7,7 +7,9 @@ export type WalletCoin = Coin & { wallet: string }
 
 export interface Analyzer {
 	getAnalyzeName(): string
+	preLoad(): Promise<void>
 	loadPortfolio(): Promise<WalletCoin[]>
+	postLoad(): Promise<void>
 }
 
 export type GlobalConfig = CexConfig & TokenConfig & {

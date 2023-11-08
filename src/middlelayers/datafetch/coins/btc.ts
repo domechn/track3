@@ -18,6 +18,11 @@ export class BTCAnalyzer implements Analyzer {
 		this.btcQueriers = [new BlockCypher(), new Blockchain()]
 	}
 
+	async preLoad(): Promise<void> {
+	}
+	async postLoad(): Promise<void> {
+	}
+
 	getAnalyzeName(): string {
 		return "BTC Analyzer"
 	}

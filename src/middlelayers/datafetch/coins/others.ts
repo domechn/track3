@@ -12,7 +12,10 @@ export class OthersAnalyzer implements Analyzer {
 	getAnalyzeName(): string {
 		return "Others Analyzer"
 	}
-
+	async preLoad(): Promise<void> {
+	}
+	async postLoad(): Promise<void> {
+	}
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		return _(this.config.others).map(c => ({
 			symbol: c.symbol,
