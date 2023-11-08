@@ -1,6 +1,4 @@
 export type Coin = {
-	// used to query price if there are multiple coins with same symbol
-	tokenAddress?: string
 	symbol: string
 	amount: number
 }
