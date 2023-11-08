@@ -15,9 +15,6 @@
 .historical-data-card:hover {
   box-shadow: 0 0 5px #aaa;
 
-  .historical-data-card-bottom .historical-data-card-bottom-operations {
-    display: flex;
-  }
 }
 
 .historical-data-card-total {
@@ -48,10 +45,6 @@
   position: relative;
 
   display: flex;
-}
-
-.historical-data-card-bottom-operations {
-  display: none;
 }
 
 /* fix bottom right */

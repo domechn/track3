@@ -155,7 +155,7 @@ const App = ({
         return (
           <div
             key={d.id}
-            className="historical-data-card"
+            className="historical-data-card group"
             onClick={() => onRowClick(d.id)}
           >
             <div>
@@ -171,7 +171,7 @@ const App = ({
             </div>
 
             <div className="historical-data-card-bottom">
-              <div className="historical-data-card-bottom-operations">
+              <div className="hidden group-hover:inline-block">
                 <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
                   <img
                     src={deleteIcon}
