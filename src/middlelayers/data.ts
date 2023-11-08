@@ -46,8 +46,10 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<
 		const anaName = a.getAnalyzeName()
 		console.log("loading portfolio from ", anaName)
 		try {
+			await a.preLoad()
 			const portfolio = await a.loadPortfolio()
 			console.log("loaded portfolio from ", anaName)
+			await a.postLoad()
 			return portfolio
 		} catch (e) {
 			console.error("failed to load portfolio from ", anaName, e)

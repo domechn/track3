@@ -17,7 +17,10 @@ export class SOLAnalyzer implements Analyzer {
 	getAnalyzeName(): string {
 		return "SOL Analyzer"
 	}
-
+	async preLoad(): Promise<void> {
+	}
+	async postLoad(): Promise<void> {
+	}
 	private async query(address: string): Promise<number> {
 		const resp = await sendHttpRequest<{ result: { value: string } }>("POST", this.queryUrl, 5000, {},
 			{

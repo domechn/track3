@@ -62,6 +62,11 @@ export class CexAnalyzer implements Analyzer {
 		return portfolio
 	}
 
+	async preLoad(): Promise<void> {
+	}
+	async postLoad(): Promise<void> {
+	}
+
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		const coinLists = await bluebird.map(this.exchanges, async ex => {
 			const portfolio = await this.fetchTotalBalance(ex)

@@ -20,7 +20,10 @@ export class DOGEAnalyzer implements Analyzer {
 	getAnalyzeName(): string {
 		return "DOGE Analyzer"
 	}
-
+	async preLoad(): Promise<void> {
+	}
+	async postLoad(): Promise<void> {
+	}
 	private async query(address: string): Promise<number> {
 		for (const q of this.dogeQueriers) {
 			try {

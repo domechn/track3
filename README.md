@@ -56,7 +56,6 @@ But currently track3 are using polybase testnet, so your data may be lost on clo
 
 - [ ] Cannot list assets in earn wallet in OKX
 - [ ] Cannot list assets in Launchpool in Binance
-- [ ] If there is no BNB in BSC for ERC20 Wallet, it will mistakenly regard the balance of ETH on the ETH chain as the balance of BNB on BSC
 
 ## Sponsor
 
@@ -69,7 +68,6 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 
 - https://blockchain.info
 - https://blockcypher.com
-- https://ethplorer.io
 - https://debank.com
 - https://dogechain.info
 - https://phantom.app

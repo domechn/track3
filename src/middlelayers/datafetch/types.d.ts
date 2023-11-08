@@ -1,6 +1,4 @@
 export type Coin = {
-	// used to query price if there are multiple coins with same symbol
-	tokenAddress?: string
 	symbol: string
 	amount: number
 }
@@ -9,7 +7,9 @@ export type WalletCoin = Coin & { wallet: string }
 
 export interface Analyzer {
 	getAnalyzeName(): string
+	preLoad(): Promise<void>
 	loadPortfolio(): Promise<WalletCoin[]>
+	postLoad(): Promise<void>
 }
 
 export type GlobalConfig = CexConfig & TokenConfig & {
