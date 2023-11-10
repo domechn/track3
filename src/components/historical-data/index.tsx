@@ -5,7 +5,7 @@ import {
   queryHistoricalData,
 } from "@/middlelayers/charts";
 import { CurrencyRateDetail, HistoricalData } from "@/middlelayers/types";
-import deleteIcon from "@/assets/icons/delete-icon.png";
+import DeleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
 
 import "./index.css";
@@ -174,7 +174,7 @@ const App = ({
               <div className="hidden group-hover:inline-block">
                 <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
                   <img
-                    src={deleteIcon}
+                    src={DeleteIcon}
                     alt="delete"
                     style={{
                       border: 0,
@@ -308,7 +308,7 @@ const App = ({
             <td>
               <a onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}>
                 <img
-                  src={deleteIcon}
+                  src={DeleteIcon}
                   alt="delete"
                   style={{
                     border: 0,
