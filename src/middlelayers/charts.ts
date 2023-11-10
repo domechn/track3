@@ -9,6 +9,7 @@ import { calculateTotalValue } from './datafetch/utils/coins'
 import { WalletCoin } from './datafetch/types'
 import { timestampToDate } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
+import { OthersAnalyzer } from './datafetch/coins/others'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -48,6 +49,16 @@ async function queryCoinsData(): Promise<(WalletCoin & {
 					wallet,
 				})
 			}
+		})
+	}
+
+	// add btc value if not exist
+	const btcData = _(assets).find(c => c.symbol === "BTC")
+	if (!btcData) {
+		lastAssets.push({
+			symbol: "BTC",
+			amount: 0,
+			wallet: OthersAnalyzer.wallet,
 		})
 	}
 	const totals = calculateTotalValue(lastAssets, priceMap)
@@ -120,7 +131,7 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 	if (results.length === 0) {
 		return {
 			totalValue: 0,
-			changePercentage: 0
+			prevTotalValue: 0
 		}
 	}
 
@@ -128,19 +139,18 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 
 	const latestTotal = _(latest).sumBy("value") || 0
 
-	let changePercentage = 0
+	let previousTotal = 0
 
 	if (results.length === 2) {
 		const previous = results[1]
 
-		const previousTotal = _(previous).sumBy("value")
+		previousTotal = _(previous).sumBy("value")
 
-		changePercentage = (latestTotal - previousTotal) / previousTotal * 100
 	}
 
 	return {
 		totalValue: latestTotal,
-		changePercentage
+		prevTotalValue: previousTotal,
 	}
 }
 
@@ -250,7 +260,10 @@ export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
 
 	return {
 		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
-		data: _(reservedAssets).map(ass => _(ass).sumBy("value")).value(),
+		data: _(reservedAssets).map(ass => ({
+			usdValue: _(ass).sumBy("value"),
+			btcPrice: _(ass).find(a => a.symbol === "BTC")?.price,
+		})).value(),
 	}
 }
 
