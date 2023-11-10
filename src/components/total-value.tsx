@@ -95,6 +95,9 @@ class BTCTotalValue implements TotalValueShower {
 
   formatTotalValue(): string {
     const bp = this.latestBtcPrice;
+    if (!bp) {
+      return this.symbol + "0";
+    }
     return this.symbol + (this.latestValue / bp).toFixed(8);
   }
 
@@ -103,11 +106,11 @@ class BTCTotalValue implements TotalValueShower {
   }
 
   changePercentage(): number {
-    if (!this.prevValue) {
-      return 100;
-    }
     const preBTC = this.getBTCAmount(this.prevValue, this.preBtcPrice);
     const latestBTC = this.getBTCAmount(this.latestValue, this.latestBtcPrice);
+    if (!preBTC) {
+      return !!latestBTC ? 100 : 0;
+    }
     return ((latestBTC - preBTC) / preBTC) * 100;
   }
 
