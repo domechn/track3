@@ -9,6 +9,7 @@ const prefix = "!ent:"
 const fixId = "1"
 const cloudSyncFixId = "2"
 const clientInfoFixId = "998"
+const licenseFixId = "997"
 
 export async function getConfiguration(): Promise<GlobalConfig | undefined> {
 	const model = await getConfigurationById(fixId)
@@ -119,4 +120,14 @@ async function getConfigurationModelById(id: string): Promise<ConfigurationModel
 	}
 
 	return configurations[0]
+}
+
+export async function saveLicense(license: string) {
+	return saveConfigurationById(licenseFixId, license)
+}
+
+// if user has pro license, return license string
+export async function getLicenseIfIsPro(): Promise<string | undefined> {
+	const model = await getConfigurationById(licenseFixId)
+	return model?.data
 }

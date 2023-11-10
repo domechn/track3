@@ -5,6 +5,8 @@ import { sendHttpRequest } from '../utils/http'
 import { getAddressList } from '../utils/address'
 import bluebird from 'bluebird'
 import { invoke } from '@tauri-apps/api'
+import { getLicenseIfIsPro } from '@/middlelayers/configuration'
+import { getClientID } from '@/utils/app'
 
 type QueryAssetResp = {
 	data: {
@@ -112,8 +114,8 @@ class BscERC20Query extends DeBankERC20Query {
 }
 
 
-export class ERC20Analyzer implements Analyzer {
-	private readonly config: Pick<TokenConfig, 'erc20'>
+export class ERC20NormalAnalyzer implements Analyzer {
+	protected readonly config: Pick<TokenConfig, 'erc20'>
 	private readonly queries = [new BscERC20Query(), new EthERC20Query()]
 
 	private readonly errorResolver: DeBank429ErrorResolver = new DeBank429ErrorResolverImpl()
@@ -172,5 +174,57 @@ export class ERC20Analyzer implements Analyzer {
 				throw e
 			}
 		}
+	}
+}
+
+export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
+	private readonly queryUrl = "https://track3-pro-api.domc.me/api/erc20/assetsBalances"
+
+	constructor(config: Pick<TokenConfig, 'erc20'>) {
+		super(config)
+	}
+
+	async loadPortfolio(): Promise<WalletCoin[]> {
+		const license = await getLicenseIfIsPro()
+
+		// if not pro license, use normal analyzer
+		if (!license) {
+			// return super.loadPortfolio()
+			console.debug("not pro license, fallback to normal erc20 analyzer")
+			return super.loadPortfolio()
+		}
+
+		try {
+			const res = await this.loadPortfolioPro(license)
+			return res
+		} catch (e) {
+			// fallback to normal analyzer
+			console.error("failed to query pro erc20 assets, fallback to normal erc20 analyzer", e)
+			return super.loadPortfolio()
+		}
+
+	}
+
+	async loadPortfolioPro(license: string): Promise<WalletCoin[]> {
+		const wallets = getAddressList(this.config.erc20)
+		const resp = await sendHttpRequest<{
+			data: {
+				wallet: string
+				assets: {
+					symbol: string
+					amount: number
+				}[]
+			}[]
+		}>("POST", this.queryUrl, 10000, {
+			"x-track3-client-id": await getClientID(),
+			'x-track3-api-key': license
+		}, {
+			wallets,
+		})
+
+		return _(resp.data).map(d => _(d.assets).map(a => ({
+			...a,
+			wallet: d.wallet
+		})).value()).flatten().value()
 	}
 }

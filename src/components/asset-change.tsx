@@ -38,7 +38,6 @@ const App = ({
           autoSkip: false,
           labelOffset: -5,
           callback: function (val: number, index: number) {
-            console.log(index === 0 || index === _(data.timestamps).size() - 1);
             const total = _(data.timestamps).size() - 1;
 
             // only show start and end date
