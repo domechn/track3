@@ -6,7 +6,7 @@ import { combineCoinLists } from './datafetch/utils/coins'
 import { DOGEAnalyzer } from './datafetch/coins/doge'
 import { OthersAnalyzer } from './datafetch/coins/others'
 import { SOLAnalyzer } from './datafetch/coins/sol'
-import { ERC20Analyzer } from './datafetch/coins/erc20'
+import { ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
 import { CacheCenter } from './datafetch/utils/cache'
 import { ASSETS_TABLE_NAME, queryHistoricalData } from './charts'
@@ -39,7 +39,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<W
 }
 
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
-	const anas = [ERC20Analyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
+	const anas = [ERC20ProAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
 	const coinLists = await bluebird.map(anas, async ana => {
 
 		const a = new ana(config)
