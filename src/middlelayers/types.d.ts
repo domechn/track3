@@ -66,12 +66,15 @@ export type TopCoinsPercentageChangeData = {
 
 export type TotalValueData = {
 	totalValue: number
-	changePercentage: number
+	prevTotalValue: number
 }
 
 export type AssetChangeData = {
 	timestamps: number[]
-	data: number[]
+	data: {
+		usdValue: number
+		btcPrice?: number
+	}[]
 }
 
 export type LatestAssetsPercentageData = {

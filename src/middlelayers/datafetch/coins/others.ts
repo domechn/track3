@@ -4,7 +4,7 @@ import _ from 'lodash'
 export class OthersAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'others'>
 
-	private static wallet = "others"
+	public static wallet = "others"
 
 	constructor(config: Pick<TokenConfig, 'others'>) {
 		this.config = config

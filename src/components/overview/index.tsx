@@ -1,5 +1,4 @@
 import TotalValue from "../total-value";
-import AssetChange from "../asset-change";
 import LatestAssetsPercentage from "../latest-assets-percentage";
 import CoinsAmountAndValueChange from "../coins-amount-and-value-change";
 import TopCoinsRank from "../top-coins-rank";
@@ -13,9 +12,9 @@ import {
   LatestAssetsPercentageData,
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
+  TotalValueData,
 } from "../../middlelayers/types";
 import { Separator } from "../ui/separator";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 const App = ({
   currency,
@@ -27,10 +26,7 @@ const App = ({
   topCoinsPercentageChangeData,
 }: {
   currency: CurrencyRateDetail;
-  totalValueData: {
-    totalValue: number;
-    changePercentage: number;
-  };
+  totalValueData: TotalValueData;
   latestAssetsPercentageData: LatestAssetsPercentageData;
   assetChangeData: AssetChangeData;
   coinsAmountAndValueChangeData: CoinsAmountAndValueChangeData;
@@ -40,11 +36,12 @@ const App = ({
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-        <TotalValue currency={currency} data={totalValueData}>
-          <AssetChange currency={currency} data={assetChangeData} />
-        </TotalValue>
+        <TotalValue
+          currency={currency}
+          assetChangeData={assetChangeData}
+          totalValueData={totalValueData}
+        ></TotalValue>
       </div>
-      {/* <hr className="nice-hr" /> */}
       <LatestAssetsPercentage data={latestAssetsPercentageData} />
       <Separator className="my-6" />
       <CoinsAmountAndValueChange
