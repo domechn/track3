@@ -186,7 +186,7 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		const license = await getLicenseIfIsPro()
-		
+
 		// if not pro license, use normal analyzer
 		if (!license) {
 			// return super.loadPortfolio()
