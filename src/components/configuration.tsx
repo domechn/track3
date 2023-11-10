@@ -39,7 +39,6 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import React from "react";
 
 const initialConfiguration: GlobalConfig = {
   configs: {

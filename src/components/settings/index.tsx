@@ -1,7 +1,4 @@
-import React from 'react'
 import _ from "lodash";
-import { getVersion } from "@tauri-apps/api/app";
-import { useEffect, useState } from "react";
 import { SidebarNav } from "./sidebar-nav";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 
@@ -14,20 +11,14 @@ const sidebarNavItems = [
     title: "Data",
     href: "/settings/data",
   },
+  {
+    title: "System",
+    href: "/settings/systemInfo",
+  },
 ];
 
 const App = () => {
-  const [version, setVersion] = useState<string>("0.1.0");
   const lo = useLocation();
-  useEffect(() => {
-    loadVersion();
-  }, []);
-
-  function loadVersion() {
-    getVersion().then((ver) => {
-      setVersion(ver);
-    });
-  }
 
   return (
     <div className="space-y-6 p-5 pb-8 md:block">

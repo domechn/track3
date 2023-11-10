@@ -35,30 +35,31 @@ import {
   LatestAssetsPercentageData,
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
-} from "../../middlelayers/types";
+} from "@/middlelayers/types";
 import { useContext, useEffect, useState } from "react";
 import {
   queryAssetChange,
   queryLastRefreshAt,
   queryTopCoinsPercentageChangeData,
-} from "../../middlelayers/charts";
-import { queryCoinsAmountChange } from "../../middlelayers/charts";
-import { queryTopCoinsRank } from "../../middlelayers/charts";
-import { queryTotalValue } from "../../middlelayers/charts";
-import { queryLatestAssetsPercentage } from "../../middlelayers/charts";
-import { useWindowSize } from "../../utils/hook";
+} from "@/middlelayers/charts";
+import { queryCoinsAmountChange } from "@/middlelayers/charts";
+import { queryTopCoinsRank } from "@/middlelayers/charts";
+import { queryTotalValue } from "@/middlelayers/charts";
+import { queryLatestAssetsPercentage } from "@/middlelayers/charts";
+import { useWindowSize } from "@/utils/hook";
 import { Chart } from "chart.js";
-import { LoadingContext } from "../../App";
+import { LoadingContext } from "@/App";
 import {
   getCurrentPreferCurrency,
   getQuerySize,
-} from "../../middlelayers/configuration";
-import { autoSyncData } from "../../middlelayers/cloudsync";
-import { getDefaultCurrencyRate } from "../../middlelayers/currency";
+} from "@/middlelayers/configuration";
+import { autoSyncData } from "@/middlelayers/cloudsync";
+import { getDefaultCurrencyRate } from "@/middlelayers/currency";
 import _ from "lodash";
-import { MainNav } from "./main-nav";
-import Configuration from "../configuration";
-import DataManagement from "../data-management";
+import { MainNav } from "@/components/index/main-nav";
+import Configuration from "@/components/configuration";
+import DataManagement from "@/components/data-management";
+import SystemInfo from "@/components/system-info";
 
 ChartJS.register(
   ...registerables,
@@ -235,8 +236,7 @@ const App = () => {
     }, [lo.pathname]);
 
     return (
-      <div className='pb-12'
-      >
+      <div className="pb-12">
         <div className="fixed top-0 left-4 right-0 z-10 bg-white flex-col md:flex">
           <div className="border-b">
             <div className="flex h-12 items-center px-4">
@@ -255,7 +255,7 @@ const App = () => {
             </div>
           </div>
         </div>
-        <div className='mt-4'>
+        <div className="mt-4">
           <Outlet></Outlet>
         </div>
       </div>
@@ -324,6 +324,13 @@ const App = () => {
                 <DataManagement
                   onDataImported={() => loadAllData(querySize)}
                   onDataSynced={() => loadAllData(querySize)}
+                />
+              }
+            />
+            <Route
+              path="systemInfo"
+              element={
+                <SystemInfo
                 />
               }
             />

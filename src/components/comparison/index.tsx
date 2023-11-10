@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import "./index.css";
-import { CoinData, CurrencyRateDetail } from "../../middlelayers/types";
+import { CoinData, CurrencyRateDetail } from "@/middlelayers/types";
 import {
   queryAllDataDates,
   queryCoinDataById,
-} from "../../middlelayers/charts";
+} from "@/middlelayers/charts";
 import _ from "lodash";
-import viewIcon from "../../assets/icons/view-icon.png";
-import hideIcon from "../../assets/icons/hide-icon.png";
+import ViewIcon from "@/assets/icons/view-icon.png";
+import HideIcon from "@/assets/icons/hide-icon.png";
 import {
   currencyWrapper,
   prettyNumberToLocaleString,
-} from "../../utils/currency";
-import { useWindowSize } from "../../utils/hook";
-import { parseDateToTS } from "../../utils/date";
+} from "@/utils/currency";
+import { useWindowSize } from "@/utils/hook";
+import { parseDateToTS } from "@/utils/date";
 import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
 import {
   Select,
@@ -336,7 +336,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
               <a onClick={onViewOrHideClick}>
                 <img
                   className="view-or-hide-icon"
-                  src={showDetail ? viewIcon : hideIcon}
+                  src={showDetail ? ViewIcon : HideIcon}
                   alt="view-or-hide"
                   width={25}
                   height={25}
