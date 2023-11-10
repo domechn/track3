@@ -191,7 +191,7 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 		if (!license) {
 			// return super.loadPortfolio()
 			console.debug("not pro license, fallback to normal erc20 analyzer")
-			return []
+			return super.loadPortfolio()
 		}
 
 		try {
