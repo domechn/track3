@@ -102,7 +102,7 @@ class BTCTotalValue implements TotalValueShower {
   }
 
   currencyName(): string {
-    return "BTC"
+    return "BTC";
   }
 
   changePercentage(): number {
@@ -215,6 +215,7 @@ const App = ({
   }
 
   function formatLineData() {
+    getTotalValueShower;
     if (btcAsBase) {
       return _(assetChangeData.data)
         .map((d) => (d.btcPrice ? d.usdValue / d.btcPrice : 0))
