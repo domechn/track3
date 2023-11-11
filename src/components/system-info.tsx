@@ -8,6 +8,8 @@ import HideIcon from "@/assets/icons/hide-icon.png";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
+import { LicenseCenter } from "@/middlelayers/license";
+import toast from "react-hot-toast";
 
 const App = () => {
   const [version, setVersion] = useState<string>("0.1.0");
@@ -43,7 +45,19 @@ const App = () => {
     }
     setSaveLicenseLoading(true);
 
-    saveLicense(license).then(() => {});
+    LicenseCenter.getInstance()
+      .validateLicense(license)
+      .then((result) => {
+        if (result.isPro) {
+          saveLicense(license);
+          toast.success("License Key Saved");
+        } else {
+          toast.error("Invalid License Key");
+        }
+      })
+      .finally(() => {
+        setSaveLicenseLoading(false);
+      });
   }
 
   function onLicenseInputChange(val: string) {
@@ -102,7 +116,7 @@ const App = () => {
             onClick={onSaveLicenseClick}
             disabled={saveLicenseLoading || !licenseChanged}
           >
-            {saveLicenseLoading ?? (
+            {saveLicenseLoading && (
               <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
             )}
             Active
