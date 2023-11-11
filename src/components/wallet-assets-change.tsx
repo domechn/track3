@@ -13,6 +13,7 @@ import {
   TableBody,
   Table,
 } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
 const App = ({
   data,
@@ -51,63 +52,73 @@ const App = ({
   }
 
   return (
-    <>
-      <h2 className="text-2xl font-bold text-left py-4 ml-10">Value Changes</h2>
-      <div className="flex justify-center items-center">
-        <div className="w-4/5 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Wallet Type</TableHead>
-                <TableHead>Wallet Alias</TableHead>
-                <TableHead>Percentage</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((d) => (
-                <TableRow key={d.wallet}>
-                  <TableCell className="font-medium">
-                    {!d.walletType || d.walletType === "null"
-                      ? "Unknown"
-                      : tweakWalletType(d.walletType)}
-                  </TableCell>
-                  <TableCell>
-                    {d.walletAlias ??
-                      insertEllipsis(
-                        !d.wallet || d.wallet === "null" ? "Unknown" : d.wallet,
-                        32
-                      )}
-                  </TableCell>
-                  <TableCell
-                    className={`text-${getChangeClassName(
-                      d.changePercentage
-                    )}-500`}
-                  >
-                    {getArrow(d.changePercentage)}
-                    {prettyNumberToLocaleString(
-                      getPositiveValue(d.changePercentage)
-                    )}
-                    %
-                  </TableCell>
-                  <TableCell
-                    className={`text-right text-${getChangeClassName(
-                      d.changePercentage
-                    )}-500`}
-                  >
-                    {getArrow(d.changeValue)}
-                    {currency.symbol}
-                    {prettyNumberToLocaleString(
-                      currencyWrapper(currency)(getPositiveValue(d.changeValue))
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    </>
+    <div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium font-bold">Value Changes</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex ">
+            <div className="w-[100%] overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Wallet Type</TableHead>
+                    <TableHead>Wallet Alias</TableHead>
+                    <TableHead>Percentage</TableHead>
+                    <TableHead className="text-right">Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.map((d) => (
+                    <TableRow key={d.wallet}>
+                      <TableCell className="font-medium">
+                        {!d.walletType || d.walletType === "null"
+                          ? "Unknown"
+                          : tweakWalletType(d.walletType)}
+                      </TableCell>
+                      <TableCell>
+                        {d.walletAlias ??
+                          insertEllipsis(
+                            !d.wallet || d.wallet === "null"
+                              ? "Unknown"
+                              : d.wallet,
+                            32
+                          )}
+                      </TableCell>
+                      <TableCell
+                        className={`text-${getChangeClassName(
+                          d.changePercentage
+                        )}-500`}
+                      >
+                        {getArrow(d.changePercentage)}
+                        {prettyNumberToLocaleString(
+                          getPositiveValue(d.changePercentage)
+                        )}
+                        %
+                      </TableCell>
+                      <TableCell
+                        className={`text-right text-${getChangeClassName(
+                          d.changePercentage
+                        )}-500`}
+                      >
+                        {getArrow(d.changeValue)}
+                        {currency.symbol}
+                        {prettyNumberToLocaleString(
+                          currencyWrapper(currency)(
+                            getPositiveValue(d.changeValue)
+                          )
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

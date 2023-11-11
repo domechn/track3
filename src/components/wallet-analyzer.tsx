@@ -29,14 +29,13 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   }
 
   return (
-    <>
+    <div className='space-y-2'>
       <WalletAssetsPercentage
         data={walletAssetsPercentage}
         currency={currency}
       />
-      <Separator className="my-6" />
       <WalletAssetsChange data={walletAssetsChange} currency={currency} />
-    </>
+    </div>
   );
 };
 

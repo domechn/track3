@@ -10,7 +10,16 @@ import {
 } from "@/middlelayers/types";
 import { currencyWrapper } from "@/utils/currency";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 const prefix = "caaavc";
 
@@ -50,24 +59,26 @@ const App = ({
     responsive: false,
     plugins: {
       title: {
-        display: true,
+        display: false,
+        // text is set for resizing
         text: `Trend of Coin ${getLabel()}`,
       },
       datalabels: {
+        display: false,
+      },
+      legend: {
         display: false,
       },
     },
     scales: {
       x: {
         title: {
-          display: true,
-          text: "Date",
+          display: false,
         },
       },
       y: {
         title: {
-          display: true,
-          text: getLabel(),
+          display: false,
         },
         offset: true,
         ticks: {
@@ -101,9 +112,9 @@ const App = ({
                   .value(),
           borderColor: current.lineColor,
           backgroundColor: current.lineColor,
-          borderWidth: 5,
+          borderWidth: 4,
           tension: 0.1,
-          pointRadius: 1,
+          pointRadius: 0.2,
           pointStyle: "rotRect",
         },
       ],
@@ -131,44 +142,58 @@ const App = ({
   }
 
   return (
-    <>
-      <div className="flex">
-        <ButtonGroup
-          defaultValue="amount"
-          onValueChange={(val: string) => onTypeSelectChange(getWholeKey(val))}
-        >
-          <ButtonGroupItem value="amount">Amount</ButtonGroupItem>
-          <ButtonGroupItem value="value">Value</ButtonGroupItem>
-        </ButtonGroup>
-        <div className="ml-5 mt-1">
-          <Select
-            onValueChange={onCoinSelectChange}
-            value={currentCoinSelected}
+    <div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium font-bold">
+            Trend of Coin {getLabel()}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex">
+            <ButtonGroup
+              defaultValue="amount"
+              onValueChange={(val: string) =>
+                onTypeSelectChange(getWholeKey(val))
+              }
+            >
+              <ButtonGroupItem value="amount">Amount</ButtonGroupItem>
+              <ButtonGroupItem value="value">Value</ButtonGroupItem>
+            </ButtonGroup>
+            <div className="ml-5">
+              <Select
+                onValueChange={onCoinSelectChange}
+                value={currentCoinSelected}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Select Coin" />
+                </SelectTrigger>
+                <SelectContent className="overflow-y-auto max-h-[20rem]">
+                  <SelectGroup>
+                    <SelectLabel>Coins</SelectLabel>
+                    {data.map((d) => (
+                      <SelectItem key={d.coin} value={d.coin}>
+                        {d.coin}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div
+            style={{
+              height: Math.max((size.height || 100) / 2, 350),
+            }}
           >
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Select Coin" />
-            </SelectTrigger>
-            <SelectContent className="overflow-y-auto max-h-[20rem]">
-              <SelectGroup>
-                <SelectLabel>Coins</SelectLabel>
-                {data.map((d) => (
-                  <SelectItem key={d.coin} value={d.coin}>
-                    {d.coin}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div
-        style={{
-          height: Math.max((size.height || 100) / 2, 350),
-        }}
-      >
-        <Line options={options} data={chartDataByCoin(currentCoinSelected)} />
-      </div>
-    </>
+            <Line
+              options={options}
+              data={chartDataByCoin(currentCoinSelected)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

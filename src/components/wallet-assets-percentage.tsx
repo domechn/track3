@@ -7,7 +7,8 @@ import {
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import _ from "lodash";
 import { useEffect, useState } from "react";
-import { insertEllipsis } from '@/utils/string'
+import { insertEllipsis } from "@/utils/string";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 const App = ({
   data,
@@ -31,7 +32,7 @@ const App = ({
     barPercentage: 0.9,
     plugins: {
       title: {
-        display: true,
+        display: false,
         text: `Percentage And Total Value of Each Wallet`,
       },
       legend: {
@@ -69,14 +70,18 @@ const App = ({
         },
         grid: {
           display: false,
-        }
-      }
+        },
+      },
     },
   };
 
   function lineData() {
     return {
-      labels: data.map((d) => d.walletAlias ? `${d.walletType}-${d.walletAlias}` : insertEllipsis(d.wallet, 16)),
+      labels: data.map((d) =>
+        d.walletAlias
+          ? `${d.walletType}-${d.walletAlias}`
+          : insertEllipsis(d.wallet, 16)
+      ),
       datasets: [
         {
           alias: "y",
@@ -92,13 +97,22 @@ const App = ({
 
   return (
     <div>
-      <div
-        style={{
-          height: Math.max((size.height || 100) / 2, 400),
-        }}
-      >
-        <Bar options={options as any} data={lineData()} />
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium font-bold">
+            Percentage And Total Value of Each Wallet
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div
+            style={{
+              height: Math.max((size.height || 100) / 2, 400),
+            }}
+          >
+            <Bar options={options as any} data={lineData()} />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -7,6 +7,7 @@ import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
 import { legendOnClick } from "@/utils/legend";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 const App = ({ data }: { data: TopCoinsRankData }) => {
   const size = useWindowSize();
@@ -24,7 +25,7 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
     responsive: false,
     plugins: {
       title: {
-        display: true,
+        display: false,
         text: "Trend of Top Coins Rank",
       },
       datalabels: {
@@ -37,19 +38,25 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
     scales: {
       x: {
         title: {
-          display: true,
+          display: false,
           text: "Date",
+        },
+        ticks: {
+          autoSkip: true,
         },
       },
       y: {
         title: {
-          display: true,
+          display: false,
           text: "Rank",
         },
         offset: true,
         reverse: true,
         ticks: {
           precision: 0,
+          callback: function (value: number) {
+            return "#" + value;
+          },
         },
         grid: {
           display: false,
@@ -77,24 +84,33 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
         data: coinRankData(data.timestamps, coin.rankData),
         borderColor: coin.lineColor,
         backgroundColor: coin.lineColor,
-        borderWidth: 5,
+        borderWidth: 4,
         tension: 0.1,
-        pointRadius: 1,
+        pointRadius: 0.2,
         pointStyle: "rotRect",
       })),
     };
   }
 
   return (
-    <>
-      <div
-        style={{
-          height: Math.max((size.height || 100) / 2, 350),
-        }}
-      >
-        <Line ref={chartRef} options={options as any} data={lineData()} />
-      </div>
-    </>
+    <div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium font-bold">
+            Trend of Top Coins Rank
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div
+            style={{
+              height: Math.max((size.height || 100) / 2, 350),
+            }}
+          >
+            <Line ref={chartRef} options={options as any} data={lineData()} />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

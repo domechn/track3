@@ -1,6 +1,7 @@
 import { Doughnut } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { LatestAssetsPercentageData } from "@/middlelayers/types";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 const App = ({ data }: { data: LatestAssetsPercentageData }) => {
   const size = useWindowSize();
@@ -9,7 +10,8 @@ const App = ({ data }: { data: LatestAssetsPercentageData }) => {
     maintainAspectRatio: false,
     responsive: false,
     plugins: {
-      title: { display: true, text: "Percentage of Assets" },
+      // text is set for resizing
+      title: { display: false, text: "Percentage of Assets" },
       legend: { labels: { font: {} } },
       datalabels: {
         color: "white",
@@ -47,13 +49,22 @@ const App = ({ data }: { data: LatestAssetsPercentageData }) => {
 
   return (
     <div>
-      <div
-        style={{
-          height: Math.max((size.height || 100) / 2, 400),
-        }}
-      >
-        <Doughnut options={options as any} data={lineData()} />
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium font-bold">
+            Percentage of Assets
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div
+            style={{
+              height: Math.max((size.height || 100) / 2, 400),
+            }}
+          >
+            <Doughnut options={options as any} data={lineData()} />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

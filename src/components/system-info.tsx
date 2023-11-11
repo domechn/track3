@@ -17,6 +17,9 @@ const App = () => {
   const [licenseChanged, setLicenseChanged] = useState<boolean>(false);
   const [saveLicenseLoading, setSaveLicenseLoading] = useState(false);
 
+  // to show hidden function
+  const [versionClickTimes, setVersionClickTimes] = useState<number>(0);
+
   useEffect(() => {
     loadVersion();
     loadLicense();
@@ -64,7 +67,12 @@ const App = () => {
 
       <div className="space-y-3">
         <div className="text-l font-bold text-left">Version</div>
-        <div className="text-sm text-left text-gray-400">{version}</div>
+        <div
+          className="text-sm text-left text-gray-400"
+          onClick={() => setVersionClickTimes(versionClickTimes + 1)}
+        >
+          {version}
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -72,7 +80,7 @@ const App = () => {
         <div className="text-sm text-left text-gray-400">
           Enter License Key To Active Pro Version ( Coming Soon )
         </div>
-        <div className="flex">
+        <div className={versionClickTimes >= 5 ? "flex" : "hidden"}>
           <Input
             id="license"
             value={license ?? ""}
