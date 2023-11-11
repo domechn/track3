@@ -33,6 +33,7 @@ import {
   CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
   LatestAssetsPercentageData,
+  PNLData,
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
   TotalValueData,
@@ -41,6 +42,7 @@ import { useContext, useEffect, useState } from "react";
 import {
   queryAssetChange,
   queryLastRefreshAt,
+  queryPNLValue,
   queryTopCoinsPercentageChangeData,
 } from "@/middlelayers/charts";
 import { queryCoinsAmountChange } from "@/middlelayers/charts";
@@ -89,28 +91,30 @@ const App = () => {
 
   const [activeMenu, setActiveMenu] = useState("overview");
 
-  const [latestAssetsPercentageData, setLatestAssetsPercentageData] = useState(
-    [] as LatestAssetsPercentageData
-  );
-  const [assetChangeData, setAssetChangeData] = useState({
+  const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
+    useState<LatestAssetsPercentageData>([]);
+  const [pnlData, setPnlData] = useState<PNLData>({
+    data: [],
+  });
+  const [assetChangeData, setAssetChangeData] = useState<AssetChangeData>({
     timestamps: [],
     data: [],
-  } as AssetChangeData);
+  });
   const [totalValueData, setTotalValueData] = useState<TotalValueData>({
     totalValue: 0,
     prevTotalValue: 0,
   });
   const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
-    useState([] as CoinsAmountAndValueChangeData);
+    useState<CoinsAmountAndValueChangeData>([]);
   const [topCoinsRankData, setTopCoinsRankData] = useState({
     timestamps: [],
     coins: [],
   } as TopCoinsRankData);
   const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] =
-    useState({
+    useState<TopCoinsPercentageChangeData>({
       timestamps: [],
       coins: [],
-    } as TopCoinsPercentageChangeData);
+    });
 
   useEffect(() => {
     loadConfiguration();
@@ -143,6 +147,7 @@ const App = () => {
   function resizeAllCharts() {
     const overviewsCharts = [
       "Trend of Asset",
+      "PNL of Asset",
       "Trend of Coin",
       "Percentage of Assets",
       "Change of Top Coins",
@@ -197,6 +202,8 @@ const App = () => {
     setTopCoinsRankData(tcr);
     const tcpcd = await queryTopCoinsPercentageChangeData(size);
     setTopCoinsPercentageChangeData(tcpcd);
+    const pd = await queryPNLValue(size);
+    setPnlData(pd);
 
     const lra = await queryLastRefreshAt();
     setLastRefreshAt(lra);
@@ -284,6 +291,7 @@ const App = () => {
               <Overview
                 currency={currentCurrency}
                 latestAssetsPercentageData={latestAssetsPercentageData}
+                pnlData={pnlData}
                 assetChangeData={assetChangeData}
                 totalValueData={totalValueData}
                 coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
@@ -328,13 +336,7 @@ const App = () => {
                 />
               }
             />
-            <Route
-              path="systemInfo"
-              element={
-                <SystemInfo
-                />
-              }
-            />
+            <Route path="systemInfo" element={<SystemInfo />} />
           </Route>
           <Route path="*" element={<div>not found</div>} />
         </Routes>

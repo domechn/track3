@@ -69,6 +69,26 @@ export type TotalValueData = {
 	prevTotalValue: number
 }
 
+export type PNLData = {
+	data: {
+		totalValue: number
+		timestamp: number
+	}[]
+
+	todayPNL?: {
+		value: number
+		timestamp: number
+	}
+	sevenTPnl?: {
+		value: number
+		timestamp: number
+	}
+	thirtyPNL?: {
+		value: number
+		timestamp: number
+	}
+}
+
 export type AssetChangeData = {
 	timestamps: number[]
 	data: {
