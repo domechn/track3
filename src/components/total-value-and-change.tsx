@@ -257,25 +257,26 @@ const App = ({
         ticks: {
           maxTicksLimit: 2,
           autoSkip: false,
-          labelOffset: -5,
+          labelOffset: -1,
           callback: function (val: number, index: number) {
-            const total = _(assetChangeData.timestamps).size() - 1;
             const data = assetChangeData.timestamps;
-
+            
+            const size = _(data).size();
+            
+            const start = 0;
             // !to fix display issue
-            if (total < 40) {
-              // only show start and end date
-              return index === 0 || index === total - 1
-                ? timestampToDate(data[index])
-                : "";
+            const end = size < 40 ? size - 2 : size - 4;
+            console.log(end);
+
+            // only show start and end date
+            if (index === start) {
+              return timestampToDate(data[start]);
             }
 
-            if (index === 0) {
-              return timestampToDate(data[index]);
+            if (index === end) {
+              return timestampToDate(data[size - 1]);
             }
-            if (index === total - 3) {
-              return timestampToDate(data[total]);
-            }
+
             return "";
           },
         },

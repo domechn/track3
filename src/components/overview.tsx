@@ -1,9 +1,9 @@
-import TotalValue from "./total-value-and-change";
-import PNL from "./pnl";
-import LatestAssetsPercentage from "./latest-assets-percentage";
-import CoinsAmountAndValueChange from "./coins-amount-and-value-change";
-import TopCoinsRank from "./top-coins-rank";
-import TopCoinsPercentageChange from "./top-coins-percentage-change";
+import TotalValue from "@/components/total-value-and-change";
+import PNL from "@/components/pnl";
+import LatestAssetsPercentage from "@/components/latest-assets-percentage";
+import CoinsAmountAndValueChange from "@/components/coins-amount-and-value-change";
+import TopCoinsRank from "@/components/top-coins-rank";
+import TopCoinsPercentageChange from "@/components/top-coins-percentage-change";
 
 import {
   AssetChangeData,

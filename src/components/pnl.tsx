@@ -36,25 +36,24 @@ const App = ({
         ticks: {
           maxTicksLimit: 2,
           autoSkip: false,
-          labelOffset: -5,
+          labelOffset: -1,
           callback: function (val: number, index: number) {
             const { data } = pnlData;
-            const total = _(data).size() - 1;
+            const size = _(data).size();
 
+            const start = 0;
             // !to fix display issue
-            if (total < 40) {
-              // only show start and end date
-              return index === 0 || index === total - 1
-                ? timestampToDate(data[index].timestamp)
-                : "";
+            const end = size < 40 ? size - 2 : size - 4;
+
+            // only show start and end date
+            if (index === start) {
+              return timestampToDate(data[start].timestamp);
             }
 
-            if (index === 0) {
-              return timestampToDate(data[index].timestamp);
+            if (index === end) {
+              return timestampToDate(data[size - 1].timestamp);
             }
-            if (index === total - 3) {
-              return timestampToDate(data[total].timestamp);
-            }
+
             return "";
           },
         },
