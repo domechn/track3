@@ -35,6 +35,7 @@ import {
   LatestAssetsPercentageData,
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
+  TotalValueData,
 } from "@/middlelayers/types";
 import { useContext, useEffect, useState } from "react";
 import {
@@ -95,9 +96,9 @@ const App = () => {
     timestamps: [],
     data: [],
   } as AssetChangeData);
-  const [totalValueData, setTotalValueData] = useState({
+  const [totalValueData, setTotalValueData] = useState<TotalValueData>({
     totalValue: 0,
-    changePercentage: 0,
+    prevTotalValue: 0,
   });
   const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
     useState([] as CoinsAmountAndValueChangeData);

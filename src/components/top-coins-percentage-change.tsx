@@ -8,6 +8,7 @@ import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import { legendOnClick } from "@/utils/legend";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 const prefix = "tcpc";
 
@@ -28,7 +29,7 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
     responsive: false,
     plugins: {
       title: {
-        display: true,
+        display: false,
         text: `Change of Top Coins ${getLabel()} Percentage`,
       },
       datalabels: {
@@ -41,13 +42,13 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
     scales: {
       x: {
         title: {
-          display: true,
+          display: false,
           text: "Date",
         },
       },
       y: {
         title: {
-          display: true,
+          display: false,
           text: "Percentage",
         },
         offset: true,
@@ -92,9 +93,9 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
         data: coinPercentageData(data.timestamps, coin.percentageData),
         borderColor: coin.lineColor,
         backgroundColor: coin.lineColor,
-        borderWidth: 5,
+        borderWidth: 4,
         tension: 0.1,
-        pointRadius: 1,
+        pointRadius: 0.2,
         pointStyle: "rotRect",
       })),
     };
@@ -121,24 +122,35 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
   }
 
   return (
-    <>
-      <div>
-        <ButtonGroup
-          defaultValue="value"
-          onValueChange={(val: string) => onTypeSelectChange(getWholeKey(val))}
-        >
-          <ButtonGroupItem value="value">Value</ButtonGroupItem>
-          <ButtonGroupItem value="price">Price</ButtonGroupItem>
-        </ButtonGroup>
-      </div>
-      <div
-        style={{
-          height: Math.max((size.height || 100) / 2, 350),
-        }}
-      >
-        <Line ref={chartRef} options={options as any} data={lineData()} />
-      </div>
-    </>
+    <div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium font-bold">
+            Change of Top Coins {getLabel()} Percentage
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div>
+            <ButtonGroup
+              defaultValue="value"
+              onValueChange={(val: string) =>
+                onTypeSelectChange(getWholeKey(val))
+              }
+            >
+              <ButtonGroupItem value="value">Value</ButtonGroupItem>
+              <ButtonGroupItem value="price">Price</ButtonGroupItem>
+            </ButtonGroup>
+          </div>
+          <div
+            style={{
+              height: Math.max((size.height || 100) / 2, 350),
+            }}
+          >
+            <Line ref={chartRef} options={options as any} data={lineData()} />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

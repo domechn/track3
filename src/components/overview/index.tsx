@@ -1,9 +1,8 @@
-import TotalValue from "../total-value";
+import TotalValue from "../total-value-and-change";
 import LatestAssetsPercentage from "../latest-assets-percentage";
 import CoinsAmountAndValueChange from "../coins-amount-and-value-change";
 import TopCoinsRank from "../top-coins-rank";
 import TopCoinsPercentageChange from "../top-coins-percentage-change";
-import "./index.css";
 
 import {
   AssetChangeData,
@@ -34,7 +33,7 @@ const App = ({
   topCoinsPercentageChangeData: TopCoinsPercentageChangeData;
 }) => {
   return (
-    <>
+    <div className="space-y-2">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
         <TotalValue
           currency={currency}
@@ -43,16 +42,14 @@ const App = ({
         ></TotalValue>
       </div>
       <LatestAssetsPercentage data={latestAssetsPercentageData} />
-      <Separator className="my-6" />
       <CoinsAmountAndValueChange
         currency={currency}
         data={coinsAmountAndValueChangeData}
       />
-      <Separator className="my-6" />
       <TopCoinsRank data={topCoinsRankData} />
-      <Separator className="my-6" />
       <TopCoinsPercentageChange data={topCoinsPercentageChangeData} />
-    </>
+      <div className="mb-2"></div>
+    </div>
   );
 };
 
