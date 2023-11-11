@@ -266,7 +266,6 @@ const App = ({
             const start = 0;
             // !to fix display issue
             const end = size < 40 ? size - 2 : size - 4;
-            console.log(end);
 
             // only show start and end date
             if (index === start) {
