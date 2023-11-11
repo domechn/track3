@@ -178,11 +178,11 @@ const App = ({
   }
 
   function getLatestBTCPrice() {
-    return assetChangeData.data[assetChangeData.data.length - 1].btcPrice ?? 0;
+    return assetChangeData.data[assetChangeData.data.length - 1]?.btcPrice ?? 0;
   }
 
   function getPreviousBTCPrice() {
-    return assetChangeData.data[assetChangeData.data.length - 2].btcPrice ?? 0;
+    return assetChangeData.data[assetChangeData.data.length - 2]?.btcPrice ?? 0;
   }
 
   function getUpOrDown(val: number) {
@@ -260,11 +260,23 @@ const App = ({
           labelOffset: -5,
           callback: function (val: number, index: number) {
             const total = _(assetChangeData.timestamps).size() - 1;
+            const data = assetChangeData.timestamps;
 
-            // only show start and end date
-            return index === 0 || index === total - 1
-              ? timestampToDate(assetChangeData.timestamps[index])
-              : "";
+            // !to fix display issue
+            if (total < 40) {
+              // only show start and end date
+              return index === 0 || index === total - 1
+                ? timestampToDate(data[index])
+                : "";
+            }
+
+            if (index === 0) {
+              return timestampToDate(data[index]);
+            }
+            if (index === total - 3) {
+              return timestampToDate(data[total]);
+            }
+            return "";
           },
         },
         grid: {
@@ -337,7 +349,7 @@ const App = ({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatTotalValue()}</div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground mb-2">
             <span className={changePercentageColorClass()}>
               {changedValueOrPercentage}
             </span>{" "}
