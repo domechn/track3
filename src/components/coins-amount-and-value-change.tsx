@@ -1,5 +1,4 @@
 import _ from "lodash";
-import React from "react";
 import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
@@ -9,7 +8,7 @@ import {
   CurrencyRateDetail,
 } from "@/middlelayers/types";
 import { currencyWrapper } from "@/utils/currency";
-import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import {
   Select,
   SelectContent,
@@ -18,8 +17,8 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const prefix = "caaavc";
 

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getConfiguration,
   saveConfiguration,
-} from "../middlelayers/configuration";
-import { toast } from "react-hot-toast";
+} from "@/middlelayers/configuration";
+import { useToast } from "@/components/ui/use-toast";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import BinanceLogo from "@/assets/icons/binance-logo.svg";
 import OkexLogo from "@/assets/icons/okex-logo.svg";
@@ -12,12 +12,12 @@ import BTCLogo from "@/assets/icons/btc-logo.svg";
 import ETHLogo from "@/assets/icons/eth-logo.svg";
 import SOLLogo from "@/assets/icons/sol-logo.svg";
 import DOGELogo from "@/assets/icons/doge-logo.svg";
-import { GlobalConfig, TokenConfig } from "../middlelayers/datafetch/types";
-import { CurrencyRateDetail } from "../middlelayers/types";
-import { listAllCurrencyRates } from "../middlelayers/currency";
-import { Separator } from "./ui/separator";
-import { Checkbox } from "./ui/checkbox";
-import { Label } from "./ui/label";
+import { GlobalConfig, TokenConfig } from "@/middlelayers/datafetch/types";
+import { CurrencyRateDetail } from "@/middlelayers/types";
+import { listAllCurrencyRates } from "@/middlelayers/currency";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,8 +26,8 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Button } from "./ui/button";
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -36,9 +36,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "./ui/dialog";
-import { Input } from "./ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -125,11 +125,8 @@ const querySizeOptions = [
   },
 ];
 
-const Configuration = ({
-  onConfigurationSave,
-}: {
-  onConfigurationSave?: () => void;
-}) => {
+const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
+  const { toast } = useToast();
   const [groupUSD, setGroupUSD] = useState(true);
   const [querySize, setQuerySize] = useState(0);
   const [formChanged, setFormChanged] = useState(false);
@@ -258,7 +255,10 @@ const Configuration = ({
         setOthers(globalConfig.others);
       })
       .catch((e) => {
-        toast.error("get configuration failed:", e);
+        toast({
+          description: "get configuration failed:" + (e.message || e),
+          variant: "destructive",
+        });
       });
   }
 
@@ -282,7 +282,10 @@ const Configuration = ({
       .catch((e) => (saveError = e))
       .finally(() => {
         if (saveError) {
-          toast.error(saveError.message ?? saveError);
+          toast({
+            description: saveError.message ?? saveError,
+            variant: "destructive",
+          });
         }
       });
   }
@@ -582,12 +585,18 @@ const Configuration = ({
       !addExchangeConfig.apiKey ||
       !addExchangeConfig.secret
     ) {
-      toast.error("Exchange type, api key and secret is required");
+      toast({
+        description: "Exchange type, api key and secret is required",
+        variant: "destructive",
+      });
       return;
     }
 
     if (addExchangeConfig.type === "okex" && !addExchangeConfig.password) {
-      toast.error("Password is required for okex");
+      toast({
+        description: "Password is required for okex",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -726,7 +735,10 @@ const Configuration = ({
   function onAddWalletFormSubmit() {
     if (!addWalletConfig || !addWalletConfig.type || !addWalletConfig.address) {
       // alert
-      toast.error("Wallet type and address is required");
+      toast({
+        description: "Wallet type and address is required",
+        variant: "destructive",
+      });
       return;
     }
     handleAddWallet(addWalletConfig);
@@ -826,7 +838,10 @@ const Configuration = ({
   function onAddOtherFormSubmit() {
     if (!addOtherConfig || !addOtherConfig.symbol) {
       // alert
-      toast.error("Symbol is required");
+      toast({
+        description: "Symbol is required",
+        variant: "destructive",
+      });
       return;
     }
     handleAddOther(addOtherConfig);
@@ -970,6 +985,7 @@ const Configuration = ({
         {renderAddWalletForm()}
         {renderWalletForm(wallets)}
       </div>
+      <Separator />
       <div className="space-y-2">
         <div className="text-l font-bold text-left">Others</div>
         {renderAddOtherForm()}
@@ -979,4 +995,4 @@ const Configuration = ({
   );
 };
 
-export default Configuration;
+export default App;

@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
-import WalletAssetsPercentage from "./wallet-assets-percentage";
-import WalletAssetsChange from "./wallet-assets-change";
+import WalletAssetsPercentage from "@/components/wallet-assets-percentage";
+import WalletAssetsChange from "@/components/wallet-assets-change";
 import {
   CurrencyRateDetail,
   WalletAssetsChangeData,
   WalletAssetsPercentageData,
 } from "@/middlelayers/types";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
-import { Separator } from "./ui/separator";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const [walletAssetsPercentage, setWalletAssetsPercentage] =

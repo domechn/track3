@@ -1,17 +1,18 @@
 import _ from "lodash";
-import { Separator } from "./ui/separator";
+import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
 import { getVersion } from "@/utils/app";
 import { getLicenseIfIsPro, saveLicense } from "@/middlelayers/configuration";
 import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { LicenseCenter } from "@/middlelayers/license";
-import toast from "react-hot-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 const App = () => {
+  const { toast } = useToast();
   const [version, setVersion] = useState<string>("0.1.0");
 
   const [license, setLicense] = useState<string | undefined>();
@@ -50,9 +51,14 @@ const App = () => {
       .then((result) => {
         if (result.isPro) {
           saveLicense(license);
-          toast.success("License Key Saved");
+          toast({
+            description: "License Key Saved",
+          });
         } else {
-          toast.error("Invalid License Key");
+          toast({
+            description: "Invalid License Key",
+            variant: "destructive"
+          });
         }
       })
       .finally(() => {
