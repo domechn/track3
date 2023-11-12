@@ -4,7 +4,7 @@ import {
   getConfiguration,
   saveConfiguration,
 } from "../middlelayers/configuration";
-import { toast } from "react-hot-toast";
+import { useToast } from "@/components/ui/use-toast";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import BinanceLogo from "@/assets/icons/binance-logo.svg";
 import OkexLogo from "@/assets/icons/okex-logo.svg";
@@ -125,11 +125,8 @@ const querySizeOptions = [
   },
 ];
 
-const Configuration = ({
-  onConfigurationSave,
-}: {
-  onConfigurationSave?: () => void;
-}) => {
+const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
+  const { toast } = useToast();
   const [groupUSD, setGroupUSD] = useState(true);
   const [querySize, setQuerySize] = useState(0);
   const [formChanged, setFormChanged] = useState(false);
@@ -258,7 +255,10 @@ const Configuration = ({
         setOthers(globalConfig.others);
       })
       .catch((e) => {
-        toast.error("get configuration failed:", e);
+        toast({
+          description: "get configuration failed:" + (e.message || e),
+          variant: "destructive"
+        });
       });
   }
 
@@ -282,7 +282,10 @@ const Configuration = ({
       .catch((e) => (saveError = e))
       .finally(() => {
         if (saveError) {
-          toast.error(saveError.message ?? saveError);
+          toast({
+            description: saveError.message ?? saveError,
+            variant: "destructive"
+          });
         }
       });
   }
@@ -582,12 +585,18 @@ const Configuration = ({
       !addExchangeConfig.apiKey ||
       !addExchangeConfig.secret
     ) {
-      toast.error("Exchange type, api key and secret is required");
+      toast({
+        description: "Exchange type, api key and secret is required",
+        variant: "destructive"
+      });
       return;
     }
 
     if (addExchangeConfig.type === "okex" && !addExchangeConfig.password) {
-      toast.error("Password is required for okex");
+      toast({
+        description: "Password is required for okex",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -726,7 +735,10 @@ const Configuration = ({
   function onAddWalletFormSubmit() {
     if (!addWalletConfig || !addWalletConfig.type || !addWalletConfig.address) {
       // alert
-      toast.error("Wallet type and address is required");
+      toast({
+        description: "Wallet type and address is required",
+        variant: "destructive"
+      });
       return;
     }
     handleAddWallet(addWalletConfig);
@@ -826,7 +838,10 @@ const Configuration = ({
   function onAddOtherFormSubmit() {
     if (!addOtherConfig || !addOtherConfig.symbol) {
       // alert
-      toast.error("Symbol is required");
+      toast({
+        description: "Symbol is required",
+        variant: "destructive"
+      });
       return;
     }
     handleAddOther(addOtherConfig);
@@ -979,4 +994,4 @@ const Configuration = ({
   );
 };
 
-export default Configuration;
+export default App;

@@ -1,4 +1,4 @@
-import { toast } from "react-hot-toast";
+import { useToast } from "@/components/ui/use-toast";
 import {
   exportHistoricalData,
   importHistoricalData,
@@ -39,6 +39,7 @@ const App = ({
   onDataImported?: () => void;
   onDataSynced?: () => void;
 }) => {
+  const { toast } = useToast();
   const [email, setEmail] = useState<string>("");
   const [verificationCode, setVerificationCode] = useState<string>("");
   const [isLogin, setIsLogin] = useState<boolean>(false);
@@ -98,9 +99,13 @@ const App = ({
         ? await forceSyncAssetsToCloudFromLocal(pk)
         : await syncAssetsToCloudAndLocal(pk, lastSyncAt);
       if (updated) {
-        toast.success("data is synced successfully");
+        toast({
+          description: "data is synced successfully",
+        });
       } else {
-        toast.success("no data need to be synced");
+        toast({
+          description: "no data need to be synced",
+        });
       }
 
       // update lastSyncAt
@@ -108,7 +113,10 @@ const App = ({
       // callback
       onDataSynced && onDataSynced();
     } catch (e: any) {
-      toast.error(e.message || e);
+      toast({
+        description: e.message || e,
+        variant: "destructive"
+      });
     } finally {
       if (force) {
         setForceSyncDataLoading(false);
@@ -128,7 +136,9 @@ const App = ({
   async function onExportDataClick() {
     const exported = await exportHistoricalData(exportConfiguration);
     if (exported) {
-      toast.success("export data successfully");
+      toast({
+        description: "export data successfully",
+      });
     }
   }
 
@@ -138,12 +148,17 @@ const App = ({
         if (!imported) {
           return;
         }
-        toast.success("import data successfully");
+        toast({
+          description: "import data successfully",
+        });
 
         onDataImported && onDataImported();
       })
       .catch((err) => {
-        toast.error(err.message || err);
+        toast({
+          description: err.message || err,
+          variant: "destructive"
+        });
       });
   }
 
@@ -155,7 +170,10 @@ const App = ({
         return;
       }
       if (!email || !verificationCode) {
-        toast.error("email or verification code is empty");
+        toast({
+          description: "email or verification code is empty",
+          variant: "destructive"
+        });
         return;
       }
       await signIn(email, verificationCode);
@@ -164,10 +182,16 @@ const App = ({
     } catch (e: any) {
       const msg = e.message || e;
       if (msg.includes("400")) {
-        toast.error("invalid verification code");
+        toast({
+          description: "invalid verification code",
+          variant: "destructive"
+        });
         return;
       }
-      toast.error(e.message || e);
+      toast({
+        description: e.message || e,
+        variant: "destructive"
+      });
     } finally {
       setSignLoading(false);
     }
@@ -175,7 +199,10 @@ const App = ({
 
   async function onVerificationButtonClick() {
     if (!email) {
-      toast.error("email is empty");
+      toast({
+        description: "email is empty",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -185,14 +212,19 @@ const App = ({
       "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+.[a-zA-Z0-9-.]+$"
     );
     if (!emailRegex.test(email)) {
-      toast.error("invalid email");
+      toast({
+        description: "invalid email",
+        variant: "destructive"
+      });
       return;
     }
 
     try {
       setSendEmailLoading(true);
       await sendVerifyCode(email);
-      toast.success("verification code sent");
+      toast({
+        description: "verification code sent",
+      });
       // set button to disabled, and count down 60s
       let countDown = 60;
       setSendVerifyCodeDisabledSeconds(countDown);
@@ -204,7 +236,10 @@ const App = ({
         }
       }, 1000);
     } catch (e: any) {
-      toast.error(e.message || e);
+      toast({
+        description: e.message || e,
+        variant: "destructive"
+      });
     } finally {
       setSendEmailLoading(false);
     }
@@ -331,7 +366,7 @@ const App = ({
       )}
 
       <Separator className="my-6" />
-      <div className='space-y-3'>
+      <div className="space-y-3">
         <div className="text-l font-bold text-left">Data Management</div>
         <div className="text-sm font-bold text-left">Import Data</div>
 

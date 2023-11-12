@@ -1,10 +1,9 @@
 import "./index.css";
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { refreshAllData } from "../../middlelayers/charts";
-import { toast } from "react-hot-toast";
-import { LoadingContext } from "../../App";
 import { updateAllCurrencyRates } from "../../middlelayers/currency";
 import { trackEventWithClientID } from "../../utils/app";
+import { useToast } from "@/components/ui/use-toast";
 import { Button } from "../ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
 
@@ -16,6 +15,7 @@ const App = ({
 }: {
   afterRefresh?: (success: boolean) => unknown;
 }) => {
+  const { toast } = useToast();
   const [refreshLoading, setRefreshLoading] = useState(false);
 
   const retry = async (
@@ -31,11 +31,11 @@ const App = ({
         throw error;
       }
       await new Promise((resolve) => setTimeout(resolve, interval));
-      toast.error(
-        `${(error as Error).message || error}, Retrying... ${
+      toast({
+        description: `${(error as Error).message || error}, Retrying... ${
           retries - times + 1
-        }`
-      );
+        }`,
+      });
       return retry(fn, times - 1, interval);
     }
   };
@@ -53,9 +53,14 @@ const App = ({
         setRefreshLoading(false);
         trackEventWithClientID("data_refreshed");
         if (refreshError) {
-          toast.error(refreshError.message || (refreshError as any));
+          toast({
+            description: refreshError.message || (refreshError as any),
+            variant: "destructive"
+          });
         } else {
-          toast.success("Refresh successfully!");
+          toast({
+            description: "Refresh successfully!",
+          });
         }
 
         if (afterRefresh) {
@@ -71,7 +76,7 @@ const App = ({
         <ReloadIcon
           className={`mr-2 h-4 w-4 ${refreshLoading && "animate-spin"}`}
         />
-        <p className='hidden sm:inline-block'>Refresh</p>
+        <p className="hidden sm:inline-block">Refresh</p>
       </Button>
     </div>
   );

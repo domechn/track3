@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
@@ -9,8 +9,7 @@ import DeleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
 
 import "./index.css";
-import { toast } from "react-hot-toast";
-import { LoadingContext } from "@/App";
+import { useToast } from "@/components/ui/use-toast";
 import { timestampToDate } from "@/utils/date";
 import {
   currencyWrapper,
@@ -44,9 +43,9 @@ const App = ({
   afterDataDeleted?: (uuid?: string, id?: number) => unknown;
   currency: CurrencyRateDetail;
 }) => {
+  const { toast } = useToast();
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
-  const { setLoading } = useContext(LoadingContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [appCacheDir, setAppCacheDir] = useState("");
 
@@ -80,7 +79,9 @@ const App = ({
   function onHistoricalDataDeleteClick(uuid: string) {
     deleteHistoricalDataByUUID(uuid)
       .then(() => {
-        toast.success("Record deleted");
+        toast({
+          description: "Record deleted",
+        });
         loadAllData();
         if (afterDataDeleted) {
           afterDataDeleted(uuid);
@@ -88,7 +89,12 @@ const App = ({
         // hide rank data when some data is deleted
         setRankData([]);
       })
-      .catch((e) => toast.error(e.message))
+      .catch((e) =>
+        toast({
+          description: e.message,
+          variant: "destructive"
+        })
+      )
       .finally(() => {
         setIsModalOpen(false);
       });
@@ -97,7 +103,9 @@ const App = ({
   function onHistoricalDataDetailDeleteClick(id: number) {
     deleteHistoricalDataDetailById(id)
       .then(() => {
-        toast.success("Record deleted");
+        toast({
+          description: "Record deleted",
+        });
         loadAllData();
         if (afterDataDeleted) {
           afterDataDeleted(undefined, id);
@@ -109,7 +117,12 @@ const App = ({
             .value()
         );
       })
-      .catch((e) => toast.error(e.message));
+      .catch((e) =>
+        toast({
+          description: e.message,
+          variant: "destructive"
+        })
+      );
   }
 
   function onRowClick(id: number | string) {
