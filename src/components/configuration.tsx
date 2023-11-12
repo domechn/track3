@@ -257,7 +257,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       .catch((e) => {
         toast({
           description: "get configuration failed:" + (e.message || e),
-          variant: "destructive"
+          variant: "destructive",
         });
       });
   }
@@ -284,7 +284,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         if (saveError) {
           toast({
             description: saveError.message ?? saveError,
-            variant: "destructive"
+            variant: "destructive",
           });
         }
       });
@@ -587,7 +587,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     ) {
       toast({
         description: "Exchange type, api key and secret is required",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -595,7 +595,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     if (addExchangeConfig.type === "okex" && !addExchangeConfig.password) {
       toast({
         description: "Password is required for okex",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -737,7 +737,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       // alert
       toast({
         description: "Wallet type and address is required",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -840,7 +840,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       // alert
       toast({
         description: "Symbol is required",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -985,6 +985,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         {renderAddWalletForm()}
         {renderWalletForm(wallets)}
       </div>
+      <Separator />
       <div className="space-y-2">
         <div className="text-l font-bold text-left">Others</div>
         {renderAddOtherForm()}
