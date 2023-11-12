@@ -4,6 +4,8 @@ import { relaunch } from "@tauri-apps/api/process";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 
+const maxInt = 2147483647;
+
 const App = () => {
   const { toast } = useToast();
   useEffect(() => {
@@ -23,6 +25,7 @@ const App = () => {
         if (installed) {
           toast({
             title: "🔥 New version available!",
+            duration: maxInt,
             action: (
               <ToastAction
                 altText={"reload"}
