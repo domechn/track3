@@ -195,6 +195,10 @@ const App = ({
   }
 
   function getPercentageChange() {
+    // to handle empty data
+    if (totalValueData.totalValue === totalValueData.prevTotalValue) {
+      return 0;
+    }
     if (totalValueData.prevTotalValue === 0) {
       return 100;
     }
@@ -260,9 +264,9 @@ const App = ({
           labelOffset: -1,
           callback: function (val: number, index: number) {
             const data = assetChangeData.timestamps;
-            
+
             const size = _(data).size();
-            
+
             const start = 0;
             // !to fix display issue
             const end = size < 40 ? size - 2 : size - 4;
