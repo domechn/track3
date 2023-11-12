@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getConfiguration,
   saveConfiguration,
-} from "../middlelayers/configuration";
+} from "@/middlelayers/configuration";
 import { useToast } from "@/components/ui/use-toast";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import BinanceLogo from "@/assets/icons/binance-logo.svg";
@@ -12,12 +12,12 @@ import BTCLogo from "@/assets/icons/btc-logo.svg";
 import ETHLogo from "@/assets/icons/eth-logo.svg";
 import SOLLogo from "@/assets/icons/sol-logo.svg";
 import DOGELogo from "@/assets/icons/doge-logo.svg";
-import { GlobalConfig, TokenConfig } from "../middlelayers/datafetch/types";
-import { CurrencyRateDetail } from "../middlelayers/types";
-import { listAllCurrencyRates } from "../middlelayers/currency";
-import { Separator } from "./ui/separator";
-import { Checkbox } from "./ui/checkbox";
-import { Label } from "./ui/label";
+import { GlobalConfig, TokenConfig } from "@/middlelayers/datafetch/types";
+import { CurrencyRateDetail } from "@/middlelayers/types";
+import { listAllCurrencyRates } from "@/middlelayers/currency";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,8 +26,8 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Button } from "./ui/button";
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -36,9 +36,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "./ui/dialog";
-import { Input } from "./ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const initialConfiguration: GlobalConfig = {
   configs: {

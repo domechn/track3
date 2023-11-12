@@ -20,17 +20,17 @@ import {
 } from "@/middlelayers/cloudsync";
 import { timestampToDate } from "@/utils/date";
 import { trackEventWithClientID } from "@/utils/app";
-import { Separator } from "./ui/separator";
-import { Checkbox } from "./ui/checkbox";
-import { Label } from "./ui/label";
-import { Button } from "./ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   ReloadIcon,
   UploadIcon,
   ExitIcon,
   EnterIcon,
 } from "@radix-ui/react-icons";
-import { Input } from "./ui/input";
+import { Input } from "@/components/ui/input";
 
 const App = ({
   onDataImported,

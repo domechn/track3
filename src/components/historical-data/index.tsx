@@ -404,10 +404,6 @@ const App = ({
         </div>
       </Modal>
       <div
-        // style={{
-        //   marginBottom: 10,
-        //   color: "gray",
-        // }}
         className="flex justify-center items-center mb-5 text-gray-500 cursor-pointer"
       >
         <a

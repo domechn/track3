@@ -1,8 +1,7 @@
-import IndexApp from "./components/index";
-import AutoUpdater from "./components/auto-updater";
-import "./App.css";
+import IndexApp from "@/components/index";
+import AutoUpdater from "@/components/auto-updater";
 import { Toaster } from "@/components/ui/toaster"
-import Loading from "./components/common/loading";
+import Loading from "@/components/common/loading";
 import { useState } from "react";
 import React from "react";
 
