@@ -195,7 +195,7 @@ const App = ({
                 {formatPNLPercentage(pnlData.todayPNL?.value)}
               </div>
               <p
-                className={`text-xs text-muted-foreground ${getPNLTextColor(
+                className={`text-xs ${getPNLTextColor(
                   pnlData.todayPNL?.value
                 )}`}
               >
@@ -215,7 +215,7 @@ const App = ({
                 {formatPNLPercentage(pnlData.sevenTPnl?.value)}
               </div>
               <p
-                className={`text-xs text-muted-foreground ${getPNLTextColor(
+                className={`text-xs ${getPNLTextColor(
                   pnlData.sevenTPnl?.value
                 )}`}
               >
@@ -235,7 +235,7 @@ const App = ({
                 {formatPNLPercentage(pnlData.thirtyPNL?.value)}
               </div>
               <p
-                className={`text-xs text-muted-foreground ${getPNLTextColor(
+                className={`text-xs ${getPNLTextColor(
                   pnlData.thirtyPNL?.value
                 )}`}
               >
