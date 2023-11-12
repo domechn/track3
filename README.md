@@ -42,9 +42,10 @@
 
 ## Screenshots
 
-![sc1](./images/demo/sc1.png)
-![sc2](./images/demo/sc2.png)
-![sc3](./images/demo/sc3.png)
+![sc1](./images/demo/sc1.jpg)
+![sc2](./images/demo/sc2.jpg)
+![sc3](./images/demo/sc3.jpg)
+![sc4](./images/demo/sc4.jpg)
 
 ## Cloud Sync
 
