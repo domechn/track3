@@ -87,7 +87,7 @@ const cexOptions = [
   },
   {
     value: "okex",
-    label: "OKex",
+    label: "OKX",
   },
 ];
 
@@ -349,7 +349,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             className="cursor-pointer hover:shadow-lg group"
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
-              <CardTitle className="text-sm font-medium">{ex.type}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type}
+              </CardTitle>
               <div className="flex ">
                 <img
                   src={DeleteIcon}
