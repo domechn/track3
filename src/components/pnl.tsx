@@ -36,7 +36,7 @@ const App = ({
         ticks: {
           maxTicksLimit: 2,
           autoSkip: false,
-          labelOffset: -1,
+          labelOffset: -2,
           callback: function (val: number, index: number) {
             const { data } = pnlData;
             const size = _(data).size();
