@@ -28,13 +28,13 @@
 
 1. **No backend server, all data is stored locally by default**
 2. Support Binance and OKX. How to create api key: [Binance](https://www.binance.com/en-BH/support/faq/how-to-create-api-360002502072), [OKX](https://use.autoview.com/hc/en-us/articles/360004576632-OKEx-Creating-an-API)
-3. Support BTC, ETH, BNB, SOL and Doge ( Base Users ).
+3. Support BTC, ETH ( ERC20 Tokens ), BNB ( ERC20 Tokens ), SOL and Doge ( Base Users ).
 4. Support dozens of charts to analyze data such as wallet proportion, proportion of each currency asset, changes, etc.
 5. Support Cloud Sync, users can sync their data to cloud and restore it on another device.
 
 ## Pro Users
 
-1. Support 15+ ERC20 Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base.
+1. Support 15+ EVM compatible Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base.
 
 ## Installation
 
