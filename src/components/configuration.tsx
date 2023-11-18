@@ -393,14 +393,6 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     );
   }
 
-  function handleWalletChange(idx: number, key: string, val: string) {
-    const newWs = _.set(wallets, [idx, key], val);
-    setWallets([...newWs]);
-
-    // mark form is changed
-    markFormChanged();
-  }
-
   function renderWalletForm(
     ws: { type: string; alias?: string; address: string }[]
   ) {
@@ -609,6 +601,25 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     setAddExchangeDialogOpen(false);
   }
 
+  function validateWalletAddress(type: string, address: string): boolean {
+    if (!supportCoins.includes(type)) {
+      throw new Error("Unsupported wallet type");
+    }
+
+    switch (type) {
+      case "btc":
+        return /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/.test(address);
+      case "erc20":
+        return /^(0x)?[0-9a-fA-F]{40}$/.test(address);
+      case "sol":
+        return /^[1-9A-HJ-NP-Za-km-z]{44}$/i.test(address);
+      case "doge":
+        return /^D{1}[5-9A-HJ-NP-U]{1}[1-9A-HJ-NP-Za-km-z]{32}$/.test(address);
+      default:
+        return false;
+    }
+  }
+
   function renderAddExchangeForm() {
     return (
       <Dialog
@@ -743,6 +754,15 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       });
       return;
     }
+    const valid = validateWalletAddress(addWalletConfig.type, addWalletConfig.address);
+    if (!valid) {
+      toast({
+        description: "Invalid address",
+        variant: "destructive",
+      });
+      return;
+    }
+
     handleAddWallet(addWalletConfig);
 
     // clear
