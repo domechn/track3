@@ -9,6 +9,7 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Line } from "react-chartjs-2";
+import { useWindowSize } from "@/utils/hook";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -155,6 +156,8 @@ const App = ({
 
   const [showValue, setShowValue] = useState(false);
 
+  const usize = useWindowSize();
+
   useEffect(() => {
     if (showValue) {
       setChangedValueOrPercentage(formatChangeValue());
@@ -265,25 +268,24 @@ const App = ({
           display: false,
         },
         ticks: {
-          maxTicksLimit: 2,
+          maxRotation: 0,
+          minRotation: 0,
+          align: "center",
           autoSkip: false,
-          labelOffset: -1,
           callback: function (val: number, index: number) {
             const data = assetChangeData.timestamps;
 
-            const size = _(data).size();
-
+            const size = data.length;
             const start = 0;
-            // !to fix display issue
-            const end = size < 40 ? size - 2 : size - 4;
+            const end = size - 1;
 
             // only show start and end date
             if (index === start) {
-              return timestampToDate(data[start]);
+              return timestampToDate(data[index]);
             }
 
             if (index === end) {
-              return timestampToDate(data[size - 1]);
+              return timestampToDate(data[index]);
             }
 
             return "";

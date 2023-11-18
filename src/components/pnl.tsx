@@ -34,24 +34,25 @@ const App = ({
           display: false,
         },
         ticks: {
-          maxTicksLimit: 2,
+          maxRotation: 0,
+          minRotation: 0,
+          align: "center",
           autoSkip: false,
-          labelOffset: -2,
           callback: function (val: number, index: number) {
-            const { data } = pnlData;
-            const size = _(data).size();
+            const data = pnlData.data;
 
+            // -1, because we remove first element in labels, but not in pnlData.data
+            const size = data.length - 1;
+            // both add 1, because the first one is the title
             const start = 0;
-            // !to fix display issue
-            const end = size < 40 ? size - 2 : size - 4;
-
+            const end = size - 1;
             // only show start and end date
             if (index === start) {
-              return timestampToDate(data[start].timestamp);
+              return timestampToDate(data[index + 1].timestamp);
             }
 
             if (index === end) {
-              return timestampToDate(data[size - 1].timestamp);
+              return timestampToDate(data[index + 1].timestamp);
             }
 
             return "";
@@ -101,6 +102,7 @@ const App = ({
   function lineData() {
     return {
       labels: _(pnlData.data)
+        .tail()
         .map((x) => timestampToDate(x.timestamp))
         .value(),
       // two datasets for different colors
