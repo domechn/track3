@@ -17,10 +17,20 @@ export class SOLAnalyzer implements Analyzer {
 	getAnalyzeName(): string {
 		return "SOL Analyzer"
 	}
+
 	async preLoad(): Promise<void> {
 	}
+
 	async postLoad(): Promise<void> {
 	}
+
+	async verifyConfigs(): Promise<boolean> {
+		const regex = /^[1-9A-HJ-NP-Za-km-z]{44}$/
+
+		const valid = _(getAddressList(this.config.sol)).every((address) => regex.test(address))
+		return valid
+	}
+
 	private async query(address: string): Promise<number> {
 		const resp = await sendHttpRequest<{ result: { value: string } }>("POST", this.queryUrl, 5000, {},
 			{

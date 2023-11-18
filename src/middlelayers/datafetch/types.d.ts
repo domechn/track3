@@ -9,6 +9,7 @@ export interface Analyzer {
 	getAnalyzeName(): string
 	preLoad(): Promise<void>
 	loadPortfolio(): Promise<WalletCoin[]>
+	verifyConfigs(): Promise<boolean>
 	postLoad(): Promise<void>
 }
 

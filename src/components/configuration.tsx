@@ -12,7 +12,11 @@ import BTCLogo from "@/assets/icons/btc-logo.svg";
 import ETHLogo from "@/assets/icons/eth-logo.svg";
 import SOLLogo from "@/assets/icons/sol-logo.svg";
 import DOGELogo from "@/assets/icons/doge-logo.svg";
-import { GlobalConfig, TokenConfig } from "@/middlelayers/datafetch/types";
+import {
+  Analyzer,
+  GlobalConfig,
+  TokenConfig,
+} from "@/middlelayers/datafetch/types";
 import { CurrencyRateDetail } from "@/middlelayers/types";
 import { listAllCurrencyRates } from "@/middlelayers/currency";
 import { Separator } from "@/components/ui/separator";
@@ -39,6 +43,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CexAnalyzer } from "@/middlelayers/datafetch/coins/cex/cex";
+import { ReloadIcon } from "@radix-ui/react-icons";
+import { BTCAnalyzer } from "@/middlelayers/datafetch/coins/btc";
+import { DOGEAnalyzer } from "@/middlelayers/datafetch/coins/doge";
+import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
+import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -134,6 +144,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
   const [addWalletDialogOpen, setAddWalletDialogOpen] = useState(false);
   const [addOtherDialogOpen, setAddOtherDialogOpen] = useState(false);
+
+  const [saveCexConfigLoading, setSaveCexConfigLoading] = useState(false);
+  const [saveWalletConfigLoading, setSaveWalletConfigLoading] = useState(false);
 
   const [addExchangeConfig, setAddExchangeConfig] = useState<
     | {
@@ -393,14 +406,6 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     );
   }
 
-  function handleWalletChange(idx: number, key: string, val: string) {
-    const newWs = _.set(wallets, [idx, key], val);
-    setWallets([...newWs]);
-
-    // mark form is changed
-    markFormChanged();
-  }
-
   function renderWalletForm(
     ws: { type: string; alias?: string; address: string }[]
   ) {
@@ -579,6 +584,29 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     markFormChanged();
   }
 
+  function validateExchangeConfig(cfg: {
+    type: string;
+    apiKey: string;
+    secret: string;
+    password?: string;
+    alias?: string;
+  }) {
+    const ana = new CexAnalyzer({
+      exchanges: [
+        {
+          name: cfg.type,
+          initParams: {
+            apiKey: cfg.apiKey,
+            secret: cfg.secret,
+            password: cfg.password,
+          },
+        },
+      ],
+    });
+
+    return ana.verifyConfigs();
+  }
+
   // submit button clicked in add exchange form
   function onAddExchangeFormSubmit() {
     if (
@@ -602,11 +630,78 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       return;
     }
 
-    handleExchangeChange(addExchangeConfig);
+    setSaveCexConfigLoading(true);
 
-    // clear
-    setAddExchangeConfig(undefined);
-    setAddExchangeDialogOpen(false);
+    validateExchangeConfig(addExchangeConfig)
+      .then((valid) => {
+        if (!valid) {
+          toast({
+            description: "Invalid api key or secret",
+            variant: "destructive",
+          });
+          return;
+        }
+        handleExchangeChange(addExchangeConfig);
+
+        // clear
+        setAddExchangeConfig(undefined);
+        setAddExchangeDialogOpen(false);
+      })
+      .catch((e) => {
+        toast({
+          description: e.message ?? e,
+          variant: "destructive",
+        });
+      })
+      .finally(() => setSaveCexConfigLoading(false));
+  }
+
+  async function validateWalletAddress(cfg: {
+    type: string;
+    address: string;
+  }): Promise<boolean> {
+    const { type, address } = cfg;
+    if (!supportCoins.includes(type)) {
+      throw new Error("Unsupported wallet type");
+    }
+
+    let ana: Analyzer | null;
+
+    const initPayload = {
+      addresses: [address],
+    };
+
+    switch (type) {
+      case "btc":
+        ana = new BTCAnalyzer({
+          btc: initPayload,
+        });
+        break;
+      case "erc20":
+        ana = new ERC20ProAnalyzer({
+          erc20: initPayload,
+        });
+        break;
+      case "sol":
+        ana = new SOLAnalyzer({
+          sol: initPayload,
+        });
+        break;
+      case "doge":
+        ana = new DOGEAnalyzer({
+          doge: initPayload,
+        });
+        break;
+      default:
+        ana = null;
+        break;
+    }
+
+    if (!ana) {
+      throw new Error("Unsupported wallet type");
+    }
+
+    return ana.verifyConfigs();
   }
 
   function renderAddExchangeForm() {
@@ -724,7 +819,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             )}
           </div>
           <DialogFooter>
-            <Button type="submit" onClick={onAddExchangeFormSubmit}>
+            <Button
+              type="submit"
+              onClick={onAddExchangeFormSubmit}
+              disabled={saveCexConfigLoading}
+            >
+              {saveCexConfigLoading && (
+                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Save changes
             </Button>
           </DialogFooter>
@@ -743,12 +845,31 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       });
       return;
     }
-    handleAddWallet(addWalletConfig);
+    setSaveWalletConfigLoading(true);
+    validateWalletAddress(addWalletConfig)
+      .then((valid) => {
+        if (!valid) {
+          toast({
+            description: `Invalid ${addWalletConfig.type.toUpperCase()} address`,
+            variant: "destructive",
+          });
+          return;
+        }
 
-    // clear
-    setAddWalletConfig(undefined);
+        handleAddWallet(addWalletConfig);
 
-    setAddWalletDialogOpen(false);
+        // clear
+        setAddWalletConfig(undefined);
+
+        setAddWalletDialogOpen(false);
+      })
+      .catch((e) => {
+        toast({
+          description: e.message ?? e,
+          variant: "destructive",
+        });
+      })
+      .finally(() => setSaveWalletConfigLoading(false));
   }
 
   function renderAddWalletForm() {
@@ -827,7 +948,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" onClick={onAddWalletFormSubmit}>
+            <Button
+              type="submit"
+              onClick={onAddWalletFormSubmit}
+              disabled={saveWalletConfigLoading}
+            >
+              {saveWalletConfigLoading && (
+                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Save changes
             </Button>
           </DialogFooter>

@@ -135,13 +135,23 @@ export class ERC20NormalAnalyzer implements Analyzer {
 			wallet: address
 		})).value()
 	}
+
 	async preLoad(): Promise<void> {
 	}
+
 	async postLoad(): Promise<void> {
 		for (const q of this.queries) {
 			q.clean()
 		}
 	}
+
+	async verifyConfigs(): Promise<boolean> {
+		const regex = /^(0x)?[0-9a-fA-F]{40}$/
+
+		const valid = _(getAddressList(this.config.erc20)).every((address) => regex.test(address))
+		return valid
+	}
+
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		return this.loadPortfolioWith429Retry(10)
 			.finally(async () => {

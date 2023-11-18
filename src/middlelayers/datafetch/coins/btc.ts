@@ -20,8 +20,17 @@ export class BTCAnalyzer implements Analyzer {
 
 	async preLoad(): Promise<void> {
 	}
+
 	async postLoad(): Promise<void> {
 	}
+
+	async verifyConfigs(): Promise<boolean> {
+		const regex = /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/
+
+		const valid = _(getAddressList(this.config.btc)).every((address) => regex.test(address))
+		return valid
+	}
+
 
 	getAnalyzeName(): string {
 		return "BTC Analyzer"
