@@ -102,6 +102,7 @@ const App = ({
   function lineData() {
     return {
       labels: _(pnlData.data)
+        // !remove the first element, because it is the comparison of the first and second element
         .tail()
         .map((x) => timestampToDate(x.timestamp))
         .value(),

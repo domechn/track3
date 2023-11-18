@@ -9,7 +9,6 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Line } from "react-chartjs-2";
-import { useWindowSize } from "@/utils/hook";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -155,8 +154,6 @@ const App = ({
   const [btcAsBase, setBtcAsBase] = useState(false);
 
   const [showValue, setShowValue] = useState(false);
-
-  const usize = useWindowSize();
 
   useEffect(() => {
     if (showValue) {
