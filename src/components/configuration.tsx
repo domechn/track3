@@ -146,6 +146,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const [addOtherDialogOpen, setAddOtherDialogOpen] = useState(false);
 
   const [saveCexConfigLoading, setSaveCexConfigLoading] = useState(false);
+  const [saveWalletConfigLoading, setSaveWalletConfigLoading] = useState(false);
 
   const [addExchangeConfig, setAddExchangeConfig] = useState<
     | {
@@ -834,6 +835,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       });
       return;
     }
+    setSaveWalletConfigLoading(true);
     validateWalletAddress(addWalletConfig.type, addWalletConfig.address)
       .then((valid) => {
         if (!valid) {
@@ -856,7 +858,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           description: e.message ?? e,
           variant: "destructive",
         });
-      });
+      })
+      .finally(() => setSaveWalletConfigLoading(false));
   }
 
   function renderAddWalletForm() {
@@ -935,7 +938,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" onClick={onAddWalletFormSubmit}>
+            <Button
+              type="submit"
+              onClick={onAddWalletFormSubmit}
+              disabled={saveWalletConfigLoading}
+            >
+              {saveWalletConfigLoading && (
+                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Save changes
             </Button>
           </DialogFooter>
