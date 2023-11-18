@@ -584,6 +584,29 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     markFormChanged();
   }
 
+  function validateExchangeConfig(cfg: {
+    type: string;
+    apiKey: string;
+    secret: string;
+    password?: string;
+    alias?: string;
+  }) {
+    const ana = new CexAnalyzer({
+      exchanges: [
+        {
+          name: cfg.type,
+          initParams: {
+            apiKey: cfg.apiKey,
+            secret: cfg.secret,
+            password: cfg.password,
+          },
+        },
+      ],
+    });
+
+    return ana.verifyConfigs();
+  }
+
   // submit button clicked in add exchange form
   function onAddExchangeFormSubmit() {
     if (
@@ -607,23 +630,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       return;
     }
 
-    const ana = new CexAnalyzer({
-      exchanges: [
-        {
-          name: addExchangeConfig.type,
-          initParams: {
-            apiKey: addExchangeConfig.apiKey,
-            secret: addExchangeConfig.secret,
-            password: addExchangeConfig.password,
-          },
-        },
-      ],
-    });
-
     setSaveCexConfigLoading(true);
 
-    ana
-      .verifyConfigs()
+    validateExchangeConfig(addExchangeConfig)
       .then((valid) => {
         if (!valid) {
           toast({
@@ -647,10 +656,11 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       .finally(() => setSaveCexConfigLoading(false));
   }
 
-  async function validateWalletAddress(
-    type: string,
-    address: string
-  ): Promise<boolean> {
+  async function validateWalletAddress(cfg: {
+    type: string;
+    address: string;
+  }): Promise<boolean> {
+    const { type, address } = cfg;
     if (!supportCoins.includes(type)) {
       throw new Error("Unsupported wallet type");
     }
@@ -836,7 +846,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       return;
     }
     setSaveWalletConfigLoading(true);
-    validateWalletAddress(addWalletConfig.type, addWalletConfig.address)
+    validateWalletAddress(addWalletConfig)
       .then((valid) => {
         if (!valid) {
           toast({
