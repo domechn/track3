@@ -9,13 +9,21 @@ export class OthersAnalyzer implements Analyzer {
 	constructor(config: Pick<TokenConfig, 'others'>) {
 		this.config = config
 	}
+
 	getAnalyzeName(): string {
 		return "Others Analyzer"
 	}
+
 	async preLoad(): Promise<void> {
 	}
+
 	async postLoad(): Promise<void> {
 	}
+
+	async verifyConfigs(): Promise<boolean> {
+		return true
+	}
+
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		return _(this.config.others).map(c => ({
 			symbol: c.symbol,

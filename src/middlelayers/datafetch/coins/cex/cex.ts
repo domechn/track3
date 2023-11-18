@@ -15,6 +15,8 @@ export interface Exchanger {
 	// return all coins in exchange
 	// key is coin symbol, value is amount
 	fetchTotalBalance(): Promise<{ [k: string]: number }>
+
+	verifyConfig(): Promise<boolean>
 }
 
 export class CexAnalyzer implements Analyzer {
@@ -64,7 +66,18 @@ export class CexAnalyzer implements Analyzer {
 
 	async preLoad(): Promise<void> {
 	}
+
 	async postLoad(): Promise<void> {
+	}
+
+	async verifyConfigs(): Promise<boolean> {
+		const verifyResults = await bluebird.map(this.exchanges, async ex => {
+			return await ex.verifyConfig()
+		}, {
+			concurrency: 2,
+		})
+
+		return _(verifyResults).every()
 	}
 
 	async loadPortfolio(): Promise<WalletCoin[]> {

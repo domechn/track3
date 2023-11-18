@@ -12,7 +12,11 @@ import BTCLogo from "@/assets/icons/btc-logo.svg";
 import ETHLogo from "@/assets/icons/eth-logo.svg";
 import SOLLogo from "@/assets/icons/sol-logo.svg";
 import DOGELogo from "@/assets/icons/doge-logo.svg";
-import { GlobalConfig, TokenConfig } from "@/middlelayers/datafetch/types";
+import {
+  Analyzer,
+  GlobalConfig,
+  TokenConfig,
+} from "@/middlelayers/datafetch/types";
 import { CurrencyRateDetail } from "@/middlelayers/types";
 import { listAllCurrencyRates } from "@/middlelayers/currency";
 import { Separator } from "@/components/ui/separator";
@@ -39,6 +43,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CexAnalyzer } from "@/middlelayers/datafetch/coins/cex/cex";
+import { ReloadIcon } from "@radix-ui/react-icons";
+import { BTCAnalyzer } from "@/middlelayers/datafetch/coins/btc";
+import { DOGEAnalyzer } from "@/middlelayers/datafetch/coins/doge";
+import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
+import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -134,6 +144,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
   const [addWalletDialogOpen, setAddWalletDialogOpen] = useState(false);
   const [addOtherDialogOpen, setAddOtherDialogOpen] = useState(false);
+
+  const [saveCexConfigLoading, setSaveCexConfigLoading] = useState(false);
 
   const [addExchangeConfig, setAddExchangeConfig] = useState<
     | {
@@ -594,30 +606,91 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       return;
     }
 
-    handleExchangeChange(addExchangeConfig);
+    const ana = new CexAnalyzer({
+      exchanges: [
+        {
+          name: addExchangeConfig.type,
+          initParams: {
+            apiKey: addExchangeConfig.apiKey,
+            secret: addExchangeConfig.secret,
+            password: addExchangeConfig.password,
+          },
+        },
+      ],
+    });
 
-    // clear
-    setAddExchangeConfig(undefined);
-    setAddExchangeDialogOpen(false);
+    setSaveCexConfigLoading(true);
+
+    ana
+      .verifyConfigs()
+      .then((valid) => {
+        if (!valid) {
+          toast({
+            description: "Invalid api key or secret",
+            variant: "destructive",
+          });
+          return;
+        }
+        handleExchangeChange(addExchangeConfig);
+
+        // clear
+        setAddExchangeConfig(undefined);
+        setAddExchangeDialogOpen(false);
+      })
+      .catch((e) => {
+        toast({
+          description: e.message ?? e,
+          variant: "destructive",
+        });
+      })
+      .finally(() => setSaveCexConfigLoading(false));
   }
 
-  function validateWalletAddress(type: string, address: string): boolean {
+  async function validateWalletAddress(
+    type: string,
+    address: string
+  ): Promise<boolean> {
     if (!supportCoins.includes(type)) {
       throw new Error("Unsupported wallet type");
     }
 
+    let ana: Analyzer | null;
+
+    const initPayload = {
+      addresses: [address],
+    };
+
     switch (type) {
       case "btc":
-        return /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/.test(address);
+        ana = new BTCAnalyzer({
+          btc: initPayload,
+        });
+        break;
       case "erc20":
-        return /^(0x)?[0-9a-fA-F]{40}$/.test(address);
+        ana = new ERC20ProAnalyzer({
+          erc20: initPayload,
+        });
+        break;
       case "sol":
-        return /^[1-9A-HJ-NP-Za-km-z]{44}$/i.test(address);
+        ana = new SOLAnalyzer({
+          sol: initPayload,
+        });
+        break;
       case "doge":
-        return /^D{1}[5-9A-HJ-NP-U]{1}[1-9A-HJ-NP-Za-km-z]{32}$/.test(address);
+        ana = new DOGEAnalyzer({
+          doge: initPayload,
+        });
+        break;
       default:
-        return false;
+        ana = null;
+        break;
     }
+
+    if (!ana) {
+      throw new Error("Unsupported wallet type");
+    }
+
+    return ana.verifyConfigs();
   }
 
   function renderAddExchangeForm() {
@@ -735,7 +808,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             )}
           </div>
           <DialogFooter>
-            <Button type="submit" onClick={onAddExchangeFormSubmit}>
+            <Button
+              type="submit"
+              onClick={onAddExchangeFormSubmit}
+              disabled={saveCexConfigLoading}
+            >
+              {saveCexConfigLoading && (
+                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Save changes
             </Button>
           </DialogFooter>
@@ -754,21 +834,29 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       });
       return;
     }
-    const valid = validateWalletAddress(addWalletConfig.type, addWalletConfig.address);
-    if (!valid) {
-      toast({
-        description: "Invalid address",
-        variant: "destructive",
+    validateWalletAddress(addWalletConfig.type, addWalletConfig.address)
+      .then((valid) => {
+        if (!valid) {
+          toast({
+            description: `Invalid ${addWalletConfig.type.toUpperCase()} address`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        handleAddWallet(addWalletConfig);
+
+        // clear
+        setAddWalletConfig(undefined);
+
+        setAddWalletDialogOpen(false);
+      })
+      .catch((e) => {
+        toast({
+          description: e.message ?? e,
+          variant: "destructive",
+        });
       });
-      return;
-    }
-
-    handleAddWallet(addWalletConfig);
-
-    // clear
-    setAddWalletConfig(undefined);
-
-    setAddWalletDialogOpen(false);
   }
 
   function renderAddWalletForm() {

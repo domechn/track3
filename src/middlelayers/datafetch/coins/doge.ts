@@ -17,13 +17,24 @@ export class DOGEAnalyzer implements Analyzer {
 		this.config = config
 		this.dogeQueriers = [new DogeInfo(), new BlockCypher()]
 	}
+
 	getAnalyzeName(): string {
 		return "DOGE Analyzer"
 	}
+
 	async preLoad(): Promise<void> {
 	}
+
 	async postLoad(): Promise<void> {
 	}
+
+	async verifyConfigs(): Promise<boolean> {
+		const regex = /^D{1}[5-9A-HJ-NP-U]{1}[1-9A-HJ-NP-Za-km-z]{32}$/
+
+		const valid = _(getAddressList(this.config.doge)).every((address) => regex.test(address))
+		return valid
+	}
+
 	private async query(address: string): Promise<number> {
 		for (const q of this.dogeQueriers) {
 			try {
