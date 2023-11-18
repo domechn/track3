@@ -1,22 +1,27 @@
 import "./index.css";
-import { useState } from "react";
+import { useContext } from "react";
 import { refreshAllData } from "../../middlelayers/charts";
 import { updateAllCurrencyRates } from "../../middlelayers/currency";
 import { trackEventWithClientID } from "../../utils/app";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "../ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
+import { RefreshButtonLoadingContext } from "../index";
 
 const retries = 3;
 const retryInterval = 3000; // 3s
 
 const App = ({
+  loading: refreshLoading,
   afterRefresh,
 }: {
+  loading: boolean;
   afterRefresh?: (success: boolean) => unknown;
 }) => {
   const { toast } = useToast();
-  const [refreshLoading, setRefreshLoading] = useState(false);
+  const { setButtonLoading: setRefreshLoading } = useContext(
+    RefreshButtonLoadingContext
+  );
 
   const retry = async (
     fn: () => Promise<unknown>,
@@ -42,6 +47,7 @@ const App = ({
 
   const handleButtonClick = () => {
     setRefreshLoading(true);
+
     let refreshError: Error | undefined;
 
     retry(refreshAllData, retries, retryInterval)
@@ -55,7 +61,7 @@ const App = ({
         if (refreshError) {
           toast({
             description: refreshError.message || (refreshError as any),
-            variant: "destructive"
+            variant: "destructive",
           });
         } else {
           toast({

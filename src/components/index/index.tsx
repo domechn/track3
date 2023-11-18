@@ -63,6 +63,7 @@ import { MainNav } from "@/components/index/main-nav";
 import Configuration from "@/components/configuration";
 import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
+import React from "react";
 
 ChartJS.register(
   ...registerables,
@@ -79,8 +80,14 @@ ChartJS.register(
 
 const resizeDelay = 200; // 200 ms
 
+export const RefreshButtonLoadingContext = React.createContext<{
+  buttonLoading: boolean;
+  setButtonLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}>(null as any);
+
 const App = () => {
   const { setLoading } = useContext(LoadingContext);
+  const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const windowSize = useWindowSize();
   const [querySize, setQuerySize] = useState(0);
   const [lastSize, setLastSize] = useState(windowSize);
@@ -251,13 +258,21 @@ const App = () => {
               <MainNav className="mx-0" />
               <div className="ml-auto flex items-center space-x-4">
                 <div data-tooltip-id="last-refresh-at">
-                  <RefreshData
-                    afterRefresh={() => {
-                      loadAllData(querySize);
-                      // auto sync data in background
-                      autoSyncData(true);
-                    }}
-                  />
+                  <RefreshButtonLoadingContext.Provider
+                    value={{ 
+                      buttonLoading: refreshButtonLoading,
+                      setButtonLoading: setRefreshButtonLoading,
+                     }}
+                  >
+                    <RefreshData
+                      loading={refreshButtonLoading}
+                      afterRefresh={() => {
+                        loadAllData(querySize);
+                        // auto sync data in background
+                        autoSyncData(true);
+                      }}
+                    />
+                  </RefreshButtonLoadingContext.Provider>
                 </div>
               </div>
             </div>
