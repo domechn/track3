@@ -153,9 +153,15 @@ const App = ({
 
   const [btcAsBase, setBtcAsBase] = useState(false);
 
+  const [showValue, setShowValue] = useState(false);
+
   useEffect(() => {
+    if (showValue) {
+      setChangedValueOrPercentage(formatChangeValue());
+      return;
+    }
     setChangedValueOrPercentage(formatChangePercentage());
-  }, [totalValueData]);
+  }, [totalValueData, btcAsBase, showValue]);
 
   function getTotalValueShower() {
     if (btcAsBase) {
@@ -324,10 +330,8 @@ const App = ({
   return (
     <div>
       <Card
-        onMouseEnter={() => setChangedValueOrPercentage(formatChangeValue())}
-        onMouseLeave={() =>
-          setChangedValueOrPercentage(formatChangePercentage())
-        }
+        onMouseEnter={() => setShowValue(true)}
+        onMouseLeave={() => setShowValue(false)}
       >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">
