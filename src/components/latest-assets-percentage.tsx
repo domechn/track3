@@ -126,7 +126,6 @@ const App = ({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium font-bold">
-            {size.width}
             Percentage of Assets
           </CardTitle>
         </CardHeader>
@@ -144,7 +143,7 @@ const App = ({
               <Table>
                 <TableBody>
                   {/* todo: paginate */}
-                  {data.map((d) => (
+                  {data.slice(0, 8).map((d) => (
                     <TableRow key={d.coin}>
                       <TableCell>
                         <div className="flex flex-row items-center">
