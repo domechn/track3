@@ -227,6 +227,28 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     setCurrencies(currencies);
   }
 
+  function getLogo(type: string) {
+    switch (type) {
+      case "binance":
+        return BinanceLogo;
+      case "okex":
+        return OkexLogo;
+      case "gate":
+        return GateLogo;
+      case "btc":
+        return BTCLogo;
+      case "erc20":
+        return ETHLogo;
+      case "sol":
+        return SOLLogo;
+      case "doge":
+        return DOGELogo;
+
+      default:
+        return "";
+    }
+  }
+
   function loadConfiguration() {
     getConfiguration()
       .then((d) => {
@@ -376,26 +398,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
                   onClick={() => handleRemoveExchange(idx)}
                 />
-                {/* binance */}
-                {ex.type === "binance" && (
-                  <img
-                    className="h-4 w-4 text-muted-foreground"
-                    src={BinanceLogo}
-                  ></img>
-                )}
-                {ex.type === "gate" && (
-                  <img
-                    className="h-4 w-4 text-muted-foreground"
-                    src={GateLogo}
-                  ></img>
-                )}
-                {/* okex */}
-                {ex.type === "okex" && (
-                  <img
-                    className="h-4 w-4 text-muted-foreground"
-                    src={OkexLogo}
-                  />
-                )}
+                <img
+                  className="h-4 w-4 text-muted-foreground"
+                  src={getLogo(ex.type)}
+                ></img>
               </div>
             </CardHeader>
             <CardContent>
@@ -438,30 +444,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
                     onClick={() => handleRemoveWallet(idx)}
                   />
-                  {w.type === "btc" && (
-                    <img
-                      src={BTCLogo}
-                      className="h-4 w-4 text-muted-foreground mr-2"
-                    />
-                  )}
-                  {w.type === "erc20" && (
-                    <img
-                      src={ETHLogo}
-                      className="h-4 w-4 text-muted-foreground mr-2"
-                    />
-                  )}
-                  {w.type === "doge" && (
-                    <img
-                      src={DOGELogo}
-                      className="h-4 w-4 text-muted-foreground mr-2"
-                    />
-                  )}
-                  {w.type === "sol" && (
-                    <img
-                      src={SOLLogo}
-                      className="h-4 w-4 text-muted-foreground mr-2"
-                    />
-                  )}
+                  <img
+                    src={getLogo(w.type)}
+                    className="h-4 w-4 text-muted-foreground mr-2"
+                  />
                 </div>
               </CardHeader>
               <CardContent>
@@ -753,6 +739,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     <SelectLabel>Cex</SelectLabel>
                     {cexOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
+                        <img
+                          className="h-4 w-4 text-muted-foreground inline-block mr-2"
+                          src={getLogo(o.value)}
+                        ></img>
                         {o.label}
                       </SelectItem>
                     ))}
@@ -918,6 +908,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     <SelectLabel>Wallet Type</SelectLabel>
                     {walletOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
+                        <img
+                          className="h-4 w-4 text-muted-foreground inline-block mr-2"
+                          src={getLogo(o.value)}
+                        ></img>
                         {o.label}
                       </SelectItem>
                     ))}
