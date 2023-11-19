@@ -149,6 +149,6 @@ export class GateExchange implements Exchanger {
 	}
 
 	async verifyConfig(): Promise<boolean> {
-		return this.fetchTotalBalance().then(() => true).catch(() => false)
+		return this.fetchSpotBalance().then(() => true).catch(() => false)
 	}
 }
