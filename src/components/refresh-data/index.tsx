@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "../ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "../index";
+import { GateExchange } from '@/middlelayers/datafetch/coins/cex/gate'
 
 const retries = 3;
 const retryInterval = 3000; // 3s
@@ -47,6 +48,7 @@ const App = ({
 
   const handleButtonClick = () => {
     setRefreshLoading(true);
+
 
     let refreshError: Error | undefined;
 

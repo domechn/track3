@@ -7,6 +7,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import BinanceLogo from "@/assets/icons/binance-logo.svg";
+import GateLogo from "@/assets/icons/gate-logo.svg";
 import OkexLogo from "@/assets/icons/okex-logo.svg";
 import BTCLogo from "@/assets/icons/btc-logo.svg";
 import ETHLogo from "@/assets/icons/eth-logo.svg";
@@ -98,6 +99,10 @@ const cexOptions = [
   {
     value: "okex",
     label: "OKX",
+  },
+  {
+    value: "gate",
+    label: "Gate.io",
   },
 ];
 
@@ -376,6 +381,12 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   <img
                     className="h-4 w-4 text-muted-foreground"
                     src={BinanceLogo}
+                  ></img>
+                )}
+                {ex.type === "gate" && (
+                  <img
+                    className="h-4 w-4 text-muted-foreground"
+                    src={GateLogo}
                   ></img>
                 )}
                 {/* okex */}

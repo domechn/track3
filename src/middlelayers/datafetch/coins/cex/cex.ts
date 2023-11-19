@@ -5,6 +5,7 @@ import { OtherCexExchanges } from './others'
 import { BinanceExchange } from './binance'
 import { OkexExchange } from './okex'
 import { CacheCenter } from '../../utils/cache'
+import { GateExchange } from './gate'
 
 export interface Exchanger {
 	getExchangeName(): string
@@ -39,6 +40,8 @@ export class CexAnalyzer implements Analyzer {
 						throw new Error("okex password is required")
 					}
 					return new OkexExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.password, exCfg.alias)
+				case "gate":
+					return new GateExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				default:
 					return new OtherCexExchanges(exCfg.name, exCfg.initParams, exCfg.alias)
 			}
