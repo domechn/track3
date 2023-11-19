@@ -121,12 +121,56 @@ const App = ({
     };
   }
 
+  function renderDoughnut() {
+    return <Doughnut options={options as any} data={lineData()} />;
+  }
+
+  function renderTokenHoldingList() {
+    return (
+      <>
+        <div className="font-bold text-muted-foreground mb-2">
+          Token holding
+        </div>
+        <Table>
+          <TableBody>
+            {/* todo: paginate */}
+            {data.slice(0, 5).map((d) => (
+              <TableRow key={d.coin} className="h-[55px]">
+                <TableCell>
+                  <div className="flex flex-row items-center">
+                    <img
+                      className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
+                      src={getImageApiPath(appCacheDir, d.coin)}
+                      alt={d.coin}
+                    />
+                    <div className="mr-1 font-bold text-base">
+                      {prettyPriceNumberToLocaleString(d.amount)}
+                    </div>
+                    <div className="text-gray-600">{d.coin}</div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="text-gray-400">
+                    {currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(d.value)
+                      )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </>
+    );
+  }
+
   return (
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium font-bold">
-            Percentage of Assets
+            {/* Percentage of Assets */}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -137,42 +181,10 @@ const App = ({
                 height: 300,
               }}
             >
-              <Doughnut options={options as any} data={lineData()} />
+              {renderDoughnut()}
             </div>
             <div className="col-span-2 md:col-span-2 flex flex-col items-start justify-center">
-              <div className="font-bold text-muted-foreground mb-2">
-                Token Holding
-              </div>
-              <Table>
-                <TableBody>
-                  {/* todo: paginate */}
-                  {data.slice(0, 5).map((d) => (
-                    <TableRow key={d.coin} className="h-[55px]">
-                      <TableCell>
-                        <div className="flex flex-row items-center">
-                          <img
-                            className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
-                            src={getImageApiPath(appCacheDir, d.coin)}
-                            alt={d.coin}
-                          />
-                          <div className="mr-1 font-bold text-base">
-                            {prettyPriceNumberToLocaleString(d.amount)}
-                          </div>
-                          <div className="text-gray-600">{d.coin}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="text-gray-400">
-                          {currency.symbol +
-                            prettyNumberToLocaleString(
-                              currencyWrapper(currency)(d.value)
-                            )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {renderTokenHoldingList()}
             </div>
           </div>
         </CardContent>
