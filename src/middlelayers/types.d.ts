@@ -99,6 +99,8 @@ export type AssetChangeData = {
 
 export type LatestAssetsPercentageData = {
 	coin: string
+	amount: number
+	value: number
 	percentage: number
 	chartColor: string
 }[]

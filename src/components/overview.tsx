@@ -27,7 +27,7 @@ const App = ({
   topCoinsPercentageChangeData,
 }: {
   currency: CurrencyRateDetail;
-  pnlData: PNLData,
+  pnlData: PNLData;
   totalValueData: TotalValueData;
   latestAssetsPercentageData: LatestAssetsPercentageData;
   assetChangeData: AssetChangeData;
@@ -43,12 +43,9 @@ const App = ({
           assetChangeData={assetChangeData}
           totalValueData={totalValueData}
         ></TotalValue>
-        <PNL
-          currency={currency}
-          pnlData={pnlData}
-        ></PNL>
+        <PNL currency={currency} pnlData={pnlData}></PNL>
       </div>
-      <LatestAssetsPercentage data={latestAssetsPercentageData} />
+      <LatestAssetsPercentage currency={currency} data={latestAssetsPercentageData} />
       <CoinsAmountAndValueChange
         currency={currency}
         data={coinsAmountAndValueChangeData}

@@ -19,9 +19,9 @@ import {
 import Modal from "../common/modal";
 import { downloadCoinLogos } from "@/middlelayers/data";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { convertFileSrc } from "@tauri-apps/api/tauri";
 import { useWindowSize } from "@/utils/hook";
 import ImageStack from "../common/image-stack";
+import { getImageApiPath } from "@/utils/app";
 
 type RankData = {
   id: number;
@@ -92,7 +92,7 @@ const App = ({
       .catch((e) =>
         toast({
           description: e.message,
-          variant: "destructive"
+          variant: "destructive",
         })
       )
       .finally(() => {
@@ -120,7 +120,7 @@ const App = ({
       .catch((e) =>
         toast({
           description: e.message,
-          variant: "destructive"
+          variant: "destructive",
         })
       );
   }
@@ -208,7 +208,7 @@ const App = ({
                     .sortBy("value")
                     .reverse()
                     .take(7)
-                    .map((a) => getImageApiPath(a.symbol))
+                    .map((a) => getImageApiPath(appCacheDir, a.symbol))
                     .value()}
                   imageWidth={25}
                   imageHeight={25}
@@ -260,15 +260,10 @@ const App = ({
       .value();
   }
 
-  function getImageApiPath(symbol: string) {
-    const filePath = `${appCacheDir}assets/coins/${symbol.toLowerCase()}.png`;
-    return convertFileSrc(filePath);
-  }
-
   function renderDetailPage(data: RankData[]) {
     return _(data)
       .map((d) => {
-        const apiPath = getImageApiPath(d.symbol);
+        const apiPath = getImageApiPath(appCacheDir, d.symbol);
         return (
           <tr key={d.id}>
             <td>
@@ -403,9 +398,7 @@ const App = ({
           </table>
         </div>
       </Modal>
-      <div
-        className="flex justify-center items-center mb-5 text-gray-500 cursor-pointer"
-      >
+      <div className="flex justify-center items-center mb-5 text-gray-500 cursor-pointer">
         <a
           onClick={() => (pageNum > 1 ? setPageNum(pageNum - 1) : null)}
           style={{
