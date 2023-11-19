@@ -130,21 +130,24 @@ const App = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
             <div
-              className="sm:col-span-2 md:col-span-3"
+              className="col-span-2 md:col-span-3"
               style={{
-                height: Math.max((size.height || 100) / 2, 400),
+                height: 300,
               }}
             >
               <Doughnut options={options as any} data={lineData()} />
             </div>
-            <div className="sm:col-span-2 md:col-span-2">
+            <div className="col-span-2 md:col-span-2 flex flex-col items-start justify-center">
+              <div className="font-bold text-muted-foreground mb-2">
+                Token Holding
+              </div>
               <Table>
                 <TableBody>
                   {/* todo: paginate */}
-                  {data.slice(0, 8).map((d) => (
-                    <TableRow key={d.coin}>
+                  {data.slice(0, 5).map((d) => (
+                    <TableRow key={d.coin} className="h-[55px]">
                       <TableCell>
                         <div className="flex flex-row items-center">
                           <img
@@ -152,7 +155,7 @@ const App = ({
                             src={getImageApiPath(appCacheDir, d.coin)}
                             alt={d.coin}
                           />
-                          <div className="mr-1 font-bold">
+                          <div className="mr-1 font-bold text-base">
                             {prettyPriceNumberToLocaleString(d.amount)}
                           </div>
                           <div className="text-gray-600">{d.coin}</div>
