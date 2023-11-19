@@ -66,6 +66,7 @@ But currently track3 are using polybase testnet, so your data may be lost on clo
 
 - Use this [referral link](https://accounts.binance.com/register?ref=123810997) to register on Binance, both you and i will get 20% discount on trading fees or reward.
 - Use this [referral link](https://www.okx.com/join/7161626) to register on OKX, both you and i will get mystery boxes.
+- Use this [referral link](https://www.gate.io/signup/UAdFU18N?ref_type=103) to register on Gate.io, you will get 10% discount on trading fees or reward.
 
 ## Thanks
 
