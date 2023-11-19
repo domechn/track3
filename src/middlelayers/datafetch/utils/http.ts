@@ -25,9 +25,9 @@ export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout 
 		payload.body = Body.json(json)
 	}
 	const resp = await client.request<T>(payload)
-	
+
 	if (resp.status > 299) {
-		throw new Error(`Request failed with status ${resp.status}`)
+		throw new Error(`Request failed with status ${resp.status}, message: ${JSON.stringify(resp.data)}`)
 	}
 	return resp.data
 }
