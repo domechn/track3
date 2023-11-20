@@ -167,7 +167,6 @@ const App = ({
         <Separator />
         <Table>
           <TableBody>
-            {/* todo: paginate */}
             {data
               .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
               .map((d) => (
