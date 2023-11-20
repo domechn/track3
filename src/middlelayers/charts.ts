@@ -306,7 +306,6 @@ export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
 
 export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercentageData> {
 	const size = 1
-	const backgroundColors = generateRandomColors(11) // top 10 and others
 
 	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
 	if (assets.length === 0) {
@@ -314,27 +313,22 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	}
 
 	const latest = assets[0]
+	const backgroundColors = generateRandomColors(_(latest).size())
 
 	const total = _(latest).sumBy("value") + 10 ** -21 // avoid total is 0
-	const sortedLatest = _(latest).sortBy('value').reverse().value()
-	const top10 = _(sortedLatest).take(10).value()
-	const others = _(sortedLatest).drop(10).value()
 
-	const res: { coin: string, percentage: number }[] = []
+	const res: {
+		coin: string,
+		percentage: number,
+		amount: number,
+		value: number,
+	}[] = _(latest).map(t => ({
+		coin: t.symbol,
+		amount: t.amount,
+		value: t.value,
+		percentage: t.value / total * 100,
 
-	_(top10).forEach(t => {
-		res.push({
-			coin: t.symbol,
-			percentage: t.value / total * 100,
-		})
-	})
-
-	if (others.length > 0) {
-		res.push({
-			coin: 'Others',
-			percentage: _(others).sumBy('value') / total * 100,
-		})
-	}
+	})).value()
 
 	return _(res).sortBy('percentage').reverse().map((v, idx) => ({
 		...v,

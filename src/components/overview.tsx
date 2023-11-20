@@ -27,7 +27,7 @@ const App = ({
   topCoinsPercentageChangeData,
 }: {
   currency: CurrencyRateDetail;
-  pnlData: PNLData,
+  pnlData: PNLData;
   totalValueData: TotalValueData;
   latestAssetsPercentageData: LatestAssetsPercentageData;
   assetChangeData: AssetChangeData;
@@ -37,18 +37,22 @@ const App = ({
 }) => {
   return (
     <div className="space-y-2">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-        <TotalValue
-          currency={currency}
-          assetChangeData={assetChangeData}
-          totalValueData={totalValueData}
-        ></TotalValue>
-        <PNL
-          currency={currency}
-          pnlData={pnlData}
-        ></PNL>
+      <div className="grid gap-4 grid-cols-2">
+        <div className="col-span-2 md:col-span-1">
+          <TotalValue
+            currency={currency}
+            assetChangeData={assetChangeData}
+            totalValueData={totalValueData}
+          ></TotalValue>
+        </div>
+        <div className="col-span-2 md:col-span-1">
+          <PNL currency={currency} pnlData={pnlData}></PNL>
+        </div>
       </div>
-      <LatestAssetsPercentage data={latestAssetsPercentageData} />
+      <LatestAssetsPercentage
+        currency={currency}
+        data={latestAssetsPercentageData}
+      />
       <CoinsAmountAndValueChange
         currency={currency}
         data={coinsAmountAndValueChangeData}
