@@ -69,7 +69,7 @@ const App = ({
         display: true,
         position: "right",
         font: {
-          size: 14,
+          size: 13,
         },
         labels: { font: {} },
       },
