@@ -69,7 +69,7 @@ const App = ({
         display: true,
         position: "right",
         font: {
-          size: 14,
+          size: 13,
         },
         labels: { font: {} },
       },
@@ -203,21 +203,9 @@ const App = ({
   return (
     <div>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium font-bold">
-            {/* Percentage of Assets */}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
-            <div
-              className="col-span-2 md:col-span-3"
-              style={{
-                height: 300,
-              }}
-            >
-              {renderDoughnut()}
-            </div>
+            <div className="col-span-2 md:col-span-3">{renderDoughnut()}</div>
             <div className="col-span-2 md:col-span-2 flex flex-col items-start justify-top">
               {renderTokenHoldingList()}
             </div>
