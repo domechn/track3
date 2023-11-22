@@ -174,7 +174,7 @@ const App = ({
             }}
           >
             <Line
-              options={options}
+              options={options as any}
               data={chartDataByCoin(currentCoinSelected)}
             />
           </div>
