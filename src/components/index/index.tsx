@@ -155,7 +155,7 @@ const App = () => {
     const overviewsCharts = [
       "Trend of Asset",
       "PNL of Asset",
-      "Trend of Coin",
+      "Trend of Coins",
       "Percentage of Assets",
       "Change of Top Coins",
       "Trend of Top Coins Rank",
