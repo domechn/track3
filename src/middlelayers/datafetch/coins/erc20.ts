@@ -7,6 +7,7 @@ import bluebird from 'bluebird'
 import { invoke } from '@tauri-apps/api'
 import { getLicenseIfIsPro } from '@/middlelayers/configuration'
 import { getClientID } from '@/utils/app'
+import { LicenseCenter } from '@/middlelayers/license'
 
 type QueryAssetResp = {
 	data: {
@@ -153,7 +154,7 @@ export class ERC20NormalAnalyzer implements Analyzer {
 	}
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
-		return this.loadPortfolioWith429Retry(10)
+		return this.loadPortfolioWithRetry(10)
 			.finally(async () => {
 				if (this.errorResolver.isTried()) {
 					await this.errorResolver.resolved()
@@ -161,7 +162,7 @@ export class ERC20NormalAnalyzer implements Analyzer {
 			})
 	}
 
-	async loadPortfolioWith429Retry(max: number): Promise<WalletCoin[]> {
+	async loadPortfolioWithRetry(max: number): Promise<WalletCoin[]> {
 		try {
 			if (max <= 0) {
 				throw new Error("failed to query erc20 assets")
@@ -179,7 +180,7 @@ export class ERC20NormalAnalyzer implements Analyzer {
 				await new Promise(resolve => setTimeout(resolve, 500))
 
 				// try again
-				return this.loadPortfolioWith429Retry(max - 1)
+				return this.loadPortfolioWithRetry(max - 1)
 			} else {
 				throw e
 			}
@@ -198,21 +199,20 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 		const license = await getLicenseIfIsPro()
 
 		// if not pro license, use normal analyzer
-		if (!license) {
+		if (!license || await this.validateLicense(license) === false) {
 			// return super.loadPortfolio()
 			console.debug("not pro license, fallback to normal erc20 analyzer")
 			return super.loadPortfolio()
 		}
 
-		try {
-			const res = await this.loadPortfolioPro(license)
-			return res
-		} catch (e) {
-			// fallback to normal analyzer
-			console.error("failed to query pro erc20 assets, fallback to normal erc20 analyzer", e)
-			return super.loadPortfolio()
-		}
+		console.debug("pro license, use pro erc20 analyzer")
 
+		return this.loadProPortfolioWithRetry(license, 5)
+	}
+
+	async validateLicense(license: string): Promise<boolean> {
+		const { isPro } = await LicenseCenter.getInstance().validateLicense(license)
+		return isPro
 	}
 
 	async loadPortfolioPro(license: string): Promise<WalletCoin[]> {
@@ -236,5 +236,25 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 			...a,
 			wallet: d.wallet
 		})).value()).flatten().value()
+	}
+
+	async loadProPortfolioWithRetry(license: string, max: number): Promise<WalletCoin[]> {
+		try {
+			if (max <= 0) {
+				throw new Error("failed to query erc20 assets")
+			}
+			const coins = await this.loadPortfolioPro(license)
+			return coins
+		} catch (e) {
+			if (e instanceof Error && (e.message.includes("504") || e.message.includes("503"))) {
+				console.error("failed to query pro erc20 assets, retrying...")
+				// sleep 2s
+				await new Promise(resolve => setTimeout(resolve, 2000))
+
+				return this.loadProPortfolioWithRetry(license, max - 1)
+			} else {
+				throw e
+			}
+		}
 	}
 }
