@@ -1,8 +1,13 @@
-use std::{collections::HashMap, vec};
-
-use coingecko::{
-    CoinGeckoClient,
+use std::{
+    collections::HashMap,
+    f32::consts::E,
+    fs::OpenOptions,
+    io::{Bytes, Write},
+    path::Path,
+    vec,
 };
+
+use coingecko::{response::coins::CoinsMarketItem, CoinGeckoClient};
 
 pub fn get_coin_info_provider() -> CoinGecko {
     CoinGecko::new()
@@ -92,24 +97,44 @@ impl CoinGecko {
         paths.push("assets".to_string());
         paths.push("coins".to_string());
         let path_str = paths.join("/");
-        let download_dir = std::path::Path::new(path_str.as_str());
+        let download_dir = Path::new(path_str.as_str());
         // mkdir download_dr if not exists
         if !download_dir.exists() {
             std::fs::create_dir_all(download_dir)?;
         }
 
-        let non_exists_symbols = symbols.into_iter().filter(|s| {
-            let path = download_dir.clone();
-            let asset_path = path.join(format!("{}.png", s.to_lowercase()));
-            !asset_path.exists()
-        }).collect::<Vec<String>>();
+        let non_exists_symbols = symbols
+            .into_iter()
+            .filter(|s| {
+                let path = download_dir.clone();
+                let asset_path = path.join(format!("{}.png", s.to_lowercase()));
+                !asset_path.exists()
+            })
+            .collect::<Vec<String>>();
 
-        println!("non_exists_symbols: {:?}", non_exists_symbols);
+        let invalid_asset_icon_record_file_path =
+            download_dir.join("invalid_asset_icon_record.txt");
+
+        // if non_exists_symbols in invalid_asset_icon_record_file_path, filter it
+        let non_exists_symbols = if invalid_asset_icon_record_file_path.exists() {
+            let invalid_asset_icon_record_file_content =
+                std::fs::read_to_string(invalid_asset_icon_record_file_path.clone())?;
+            let invalid_asset_icon_record_file_content = invalid_asset_icon_record_file_content
+                .split("\n")
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>();
+            non_exists_symbols
+                .into_iter()
+                .filter(|s| !invalid_asset_icon_record_file_content.contains(s))
+                .collect::<Vec<String>>()
+        } else {
+            non_exists_symbols
+        };
 
         if non_exists_symbols.len() == 0 {
             return Ok(());
         }
-
+        println!("non_exists_symbols: {:?}", non_exists_symbols);
         let all_coins = self.list_all_coin_ids(non_exists_symbols.clone()).await?;
         // key: symbol, value: id
         let non_exists_ids = all_coins
@@ -136,10 +161,9 @@ impl CoinGecko {
         let markets_size = markets.len() as i64;
 
         for m in markets {
-            println!("downloading coin logo: {:?}", m.image);
-            let logo = reqwest::get(m.image).await?.bytes().await?;
-
-            std::fs::write(download_dir.join(format!("{}.png", m.symbol.to_lowercase())), logo)?;
+            let _ = self
+                .download_coin_logo(download_dir.clone(), m.clone())
+                .await;
         }
 
         if markets_size >= page_size {
@@ -152,10 +176,40 @@ impl CoinGecko {
                 let path = download_dir.clone();
                 let asset_path = path.join(format!("{}.png", symbol.to_lowercase()));
                 if !asset_path.exists() {
-                    std::fs::write(asset_path, "")?;
+                    let mut file = OpenOptions::new()
+                        .create(true)
+                        .write(true)
+                        .append(true)
+                        .open(invalid_asset_icon_record_file_path.clone())?;
+                    // append to invalid asset icon record file
+                    file.write_all(format!("{}\n", symbol).as_bytes())?;
                 }
             }
         }
+        Ok(())
+    }
+
+    async fn download_coin_logo(
+        &self,
+        download_dir: &Path,
+        m: CoinsMarketItem,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        println!("downloading coin logo: {:?}", m.image);
+        let mut res = reqwest::get(m.image).await;
+        if let Err(_) = res {
+            println!("fallback to download coin logo from github: {:?}", m.symbol);
+            let url = format!(
+                "https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/{}.png",
+                m.symbol.to_lowercase()
+            );
+            res = reqwest::get(url).await;
+        }
+        let logo = res?.bytes().await?;
+
+        std::fs::write(
+            download_dir.join(format!("{}.png", m.symbol.to_lowercase())),
+            logo,
+        )?;
         Ok(())
     }
 }

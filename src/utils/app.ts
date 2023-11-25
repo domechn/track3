@@ -1,7 +1,7 @@
 import * as api from '@tauri-apps/api'
 import { getClientIDConfiguration } from '../middlelayers/configuration'
 import { trackEvent } from '@aptabase/tauri'
-import { appCacheDir } from "@tauri-apps/api/path"
+import { exists } from '@tauri-apps/api/fs'
 import { convertFileSrc } from "@tauri-apps/api/tauri"
 
 export async function getVersion() {
@@ -25,7 +25,13 @@ export async function trackEventWithClientID(event: string, props?: { [k: string
 	}
 }
 
-export function getImageApiPath(cacheDir: string, symbol: string) {
+export async function getImageApiPath(cacheDir: string, symbol: string) {
 	const filePath = `${cacheDir}assets/coins/${symbol.toLowerCase()}.png`
-	return convertFileSrc(filePath)
+	// check if file exists
+	return exists(filePath).then((res) => {
+		if (!res) {
+			return `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${symbol.toLowerCase()}.png`
+		}
+		return convertFileSrc(filePath)
+	})
 }

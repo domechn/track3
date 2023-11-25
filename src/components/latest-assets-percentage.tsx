@@ -3,7 +3,7 @@ import {
   CurrencyRateDetail,
   LatestAssetsPercentageData,
 } from "@/middlelayers/types";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent } from "./ui/card";
 import _ from "lodash";
 import { useEffect, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
@@ -17,11 +17,12 @@ import {
 import { downloadCoinLogos } from "@/middlelayers/data";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
+import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import {
-  ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@radix-ui/react-icons";
+import bluebird from 'bluebird'
 
 const App = ({
   currency,
@@ -30,16 +31,10 @@ const App = ({
   currency: CurrencyRateDetail;
   data: LatestAssetsPercentageData;
 }) => {
-  const [appCacheDir, setAppCacheDir] = useState<string>("");
   const [dataPage, setDataPage] = useState<number>(0);
   const [maxDataPage, setMaxDataPage] = useState<number>(0);
+  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const pageSize = 5;
-
-  useEffect(() => {
-    getAppCacheDir().then((dir) => {
-      setAppCacheDir(dir);
-    });
-  }, []);
 
   const [percentageData, setPercentageData] = useState<
     {
@@ -57,7 +52,20 @@ const App = ({
 
     // set max data page
     setMaxDataPage(Math.floor(data.length / pageSize));
+
+    // set logo map
+    getLogoMap(data).then((m) => setLogoMap(m));
   }, [data]);
+
+  async function getLogoMap(d: LatestAssetsPercentageData) {
+    const acd = await getAppCacheDir();
+    const kvs = await bluebird.map(d, async (coin) => {
+      const path = await getImageApiPath(acd, coin.coin);
+      return {[coin.coin]: path}
+    })
+    
+    return _.assign({}, ...kvs)
+  }
 
   const options = {
     maintainAspectRatio: false,
@@ -99,7 +107,6 @@ const App = ({
       return d;
     }
     const top = _(d).sortBy("percentage").reverse().take(count).value();
-    console.log(top);
     const other = _(d).sortBy("percentage").reverse().drop(count).value();
 
     return _([
@@ -175,7 +182,7 @@ const App = ({
                     <div className="flex flex-row items-center">
                       <img
                         className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
-                        src={getImageApiPath(appCacheDir, d.coin)}
+                        src={logoMap[d.coin] || UnknownLogo}
                         alt={d.coin}
                       />
                       <div className="mr-1 font-bold text-base">
