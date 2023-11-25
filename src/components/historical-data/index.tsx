@@ -22,6 +22,8 @@ import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useWindowSize } from "@/utils/hook";
 import ImageStack from "../common/image-stack";
 import { getImageApiPath } from "@/utils/app";
+import UnknownLogo from "@/assets/icons/unknown-logo.svg";
+import bluebird from "bluebird";
 
 type RankData = {
   id: number;
@@ -47,16 +49,12 @@ const App = ({
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [appCacheDir, setAppCacheDir] = useState("");
+  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   const wsize = useWindowSize();
 
   const [pageNum, setPageNum] = useState(1);
   const pageSize = 10;
-
-  useEffect(() => {
-    getAppCacheDir().then((d) => setAppCacheDir(d));
-  }, []);
 
   useEffect(() => {
     const symbols = _(data)
@@ -66,11 +64,30 @@ const App = ({
       .uniq()
       .value();
     downloadCoinLogos(symbols);
+
+    getLogoMap(data).then((m) => setLogoMap(m));
   }, [data]);
 
   useEffect(() => {
     loadAllData();
   }, []);
+
+  async function getLogoMap(d: HistoricalData[]) {
+    const acd = await getAppCacheDir();
+    const kvs = await bluebird.map(
+      _(d)
+        .map((dd) => dd.assets)
+        .flatten()
+        .map("symbol")
+        .value(),
+      async (s) => {
+        const path = await getImageApiPath(acd, s);
+        return { [s]: path };
+      }
+    );
+
+    return _.assign({}, ...kvs);
+  }
 
   function loadAllData() {
     queryHistoricalData(-1).then((d) => setData(d));
@@ -208,7 +225,7 @@ const App = ({
                     .sortBy("value")
                     .reverse()
                     .take(7)
-                    .map((a) => getImageApiPath(appCacheDir, a.symbol))
+                    .map((a) => logoMap[a.symbol] || UnknownLogo)
                     .value()}
                   imageWidth={25}
                   imageHeight={25}
@@ -263,7 +280,7 @@ const App = ({
   function renderDetailPage(data: RankData[]) {
     return _(data)
       .map((d) => {
-        const apiPath = getImageApiPath(appCacheDir, d.symbol);
+        const apiPath = logoMap[d.symbol];
         return (
           <tr key={d.id}>
             <td>
