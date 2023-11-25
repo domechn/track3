@@ -15,14 +15,6 @@ const App = ({
   const options = {
     maintainAspectRatio: false,
     responsive: false,
-    hover: {
-      mode: "index",
-      intersect: false,
-    },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
     plugins: {
       title: {
         display: false,
