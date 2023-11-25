@@ -40,11 +40,11 @@ const App = ({
   const options = {
     maintainAspectRatio: false,
     responsive: false,
-    tooltips: {
+    hover: {
       mode: "index",
       intersect: false,
     },
-    hover: {
+    interaction: {
       mode: "index",
       intersect: false,
     },
@@ -108,7 +108,7 @@ const App = ({
       labels: current.timestamps.map((x) => timestampToDate(x)),
       datasets: [
         {
-          label: "Value In " + currency.currency,
+          label: `Value(${currency.currency})`,
           data: _(current.values)
             .map((v) => currencyWrapper(currency)(v))
             .value(),

@@ -27,6 +27,14 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
   const options = {
     maintainAspectRatio: false,
     responsive: false,
+    hover: {
+      mode: "nearest",
+      intersect: false,
+    },
+    interaction: {
+      mode: "nearest",
+      intersect: false,
+    },
     plugins: {
       title: {
         display: false,

@@ -23,6 +23,14 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
   const options = {
     maintainAspectRatio: false,
     responsive: false,
+    hover: {
+      mode: "nearest",
+      intersect: false,
+    },
+    interaction: {
+      mode: "nearest",
+      intersect: false,
+    },
     plugins: {
       title: {
         display: false,
