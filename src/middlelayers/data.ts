@@ -59,8 +59,6 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<
 	}, {
 		concurrency: anas.length,
 	})
-	// clean cache after all analyzers finished successfully
-	CacheCenter.getInstance().clearCache()
 	const assets = combineCoinLists(coinLists)
 	return assets
 }
