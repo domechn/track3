@@ -36,6 +36,10 @@ export class OkexExchange implements Exchanger {
 		return invoke("query_okex_balance", { apiKey: this.apiKey, apiSecret: this.secret, password: this.password })
 	}
 
+	async fetchCoinsPrice(symbols: string[]): Promise<{ [k: string]: number }> {
+		return {}
+	}
+
 	async verifyConfig(): Promise<boolean> {
 		return this.fetchTotalBalance().then(() => true).catch(() => false)
 	}

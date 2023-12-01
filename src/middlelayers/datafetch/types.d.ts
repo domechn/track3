@@ -1,5 +1,10 @@
 export type Coin = {
 	symbol: string
+	// price in usd
+	price?: {
+		value: number
+		base: 'usd' | 'usdt'
+	}
 	amount: number
 }
 

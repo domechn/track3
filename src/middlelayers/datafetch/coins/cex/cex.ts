@@ -17,6 +17,10 @@ export interface Exchanger {
 	// key is coin symbol, value is amount
 	fetchTotalBalance(): Promise<{ [k: string]: number }>
 
+	// return coins price in exchange by symbol
+	// key is coin symbol, value is price in usdt
+	fetchCoinsPrice(symbols: string[]): Promise<{ [k: string]: number }>
+
 	verifyConfig(): Promise<boolean>
 }
 
@@ -86,9 +90,18 @@ export class CexAnalyzer implements Analyzer {
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		const coinLists = await bluebird.map(this.exchanges, async ex => {
 			const portfolio = await this.fetchTotalBalance(ex)
+			const prices = await ex.fetchCoinsPrice(_(portfolio).keys().value())
 
 			// filter all keys are capital
-			return filterCoinsInPortfolio(ex.getIdentity(), portfolio)
+			const coins = filterCoinsInPortfolio(ex.getIdentity(), portfolio)
+			return _(coins).map(c => ({
+				...c,
+				price: {
+					value: prices[c.symbol],
+					base: "usdt",
+				},
+			} as WalletCoin)
+			).value()
 		}, {
 			concurrency: 2,
 		})

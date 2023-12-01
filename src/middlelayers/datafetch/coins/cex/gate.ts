@@ -72,6 +72,10 @@ export class GateExchange implements Exchanger {
 		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
 	}
 
+	async fetchCoinsPrice(symbols: string[]): Promise<{ [k: string]: number }> {
+		return {}
+	}
+
 	private async fetchSpotBalance(): Promise<{ [k: string]: number }> {
 		const path = "/spot/accounts"
 		const resp = await this.fetch<SpotAccountResp>("GET", path, "")

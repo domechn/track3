@@ -32,7 +32,7 @@ async function queryCoinsData(): Promise<(WalletCoin & {
 	}
 	const assets = await loadPortfolios(config)
 	// always query btc and usdt price
-	const priceMap = await queryCoinPrices(_(assets).map("symbol").push("USDT").push("BTC").uniq().compact().value())
+	const priceMap = await queryCoinPrices(_(assets).filter(a => !a.price).map("symbol").push("USDT").push("BTC").uniq().compact().value())
 
 	let lastAssets = _.clone(assets)
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
