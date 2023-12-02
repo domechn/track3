@@ -245,21 +245,8 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     const data = await queryCoinDataById(id);
     const reversedData = _(data).sortBy("value").reverse().value();
 
-    // only take first 10, and group others into others
-    const others = "Others";
-    const othersSymbols = _(reversedData).map("symbol").slice(10).value();
-    const othersData = _(data)
-      .filter((d) => othersSymbols.includes(d.symbol))
-      .value();
-
     const res = [
-      ..._(reversedData).take(10).value(),
-      {
-        symbol: others,
-        value: _(othersData).sumBy("value"),
-        amount: 0,
-        price: 0,
-      },
+      ..._(reversedData).value(),
     ];
 
     return res;

@@ -39,7 +39,7 @@ import {
   TopCoinsRankData,
   TotalValueData,
 } from "@/middlelayers/types";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import {
   queryAssetChange,
   queryLastRefreshAt,
