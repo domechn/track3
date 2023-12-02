@@ -223,6 +223,9 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 				assets: {
 					symbol: string
 					amount: number
+					tokenAddress: string
+					// based on usd
+					price?: number
 				}[]
 			}[]
 		}>("POST", this.queryUrl, 10000, {
@@ -233,9 +236,14 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 		})
 
 		return _(resp.data).map(d => _(d.assets).map(a => ({
-			...a,
+			symbol: a.symbol,
+			amount: a.amount,
+			price: a.price ? {
+				value: a.price,
+				base: "usd"
+			} : undefined,
 			wallet: d.wallet
-		})).value()).flatten().value()
+		} as WalletCoin)).value()).flatten().value()
 	}
 
 	async loadProPortfolioWithRetry(license: string, max: number): Promise<WalletCoin[]> {
