@@ -115,7 +115,7 @@ const App = ({
     } catch (e: any) {
       toast({
         description: e.message || e,
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       if (force) {
@@ -157,7 +157,7 @@ const App = ({
       .catch((err) => {
         toast({
           description: err.message || err,
-          variant: "destructive"
+          variant: "destructive",
         });
       });
   }
@@ -172,7 +172,7 @@ const App = ({
       if (!email || !verificationCode) {
         toast({
           description: "email or verification code is empty",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -184,13 +184,13 @@ const App = ({
       if (msg.includes("400")) {
         toast({
           description: "invalid verification code",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
       toast({
         description: e.message || e,
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setSignLoading(false);
@@ -201,7 +201,7 @@ const App = ({
     if (!email) {
       toast({
         description: "email is empty",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -214,7 +214,7 @@ const App = ({
     if (!emailRegex.test(email)) {
       toast({
         description: "invalid email",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -238,7 +238,7 @@ const App = ({
     } catch (e: any) {
       toast({
         description: e.message || e,
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setSendEmailLoading(false);
@@ -293,12 +293,8 @@ const App = ({
                 className="ml-1 wd-40"
                 disabled={sendVerifyCodeDisabledSeconds > 0}
               >
-                {sendEmailLoading ? (
+                {sendEmailLoading && (
                   <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  sendVerifyCodeDisabledSeconds > 0 && (
-                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                  )
                 )}
                 Send Code
                 {sendVerifyCodeDisabledSeconds > 0 &&
