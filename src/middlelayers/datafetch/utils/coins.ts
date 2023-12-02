@@ -21,21 +21,19 @@ export function calculateTotalValue(coinList: WalletCoin[], priceMap: { [k: stri
 	const usdtInUsd = priceMap["USDT"] ?? 1
 	const getPriceFromWalletCoin = (w: WalletCoin) => {
 		if (!w.price) {
-			return
+			return priceMap[w.symbol] ?? 0
 		}
 
-		if (w.price.base == "usd") {
-			return w.price.value
-		}
 		if (w.price.base == "usdt") {
 			return w.price.value * usdtInUsd
 		}
+		return w.price.value
 	}
 	return _(coinList).map(c => ({
 		symbol: c.symbol,
 		amount: +c.amount,
-		price: getPriceFromWalletCoin(c) ?? priceMap[c.symbol] ?? 0,
-		usdValue: c.amount * (priceMap[c.symbol] ?? 0),
+		price: getPriceFromWalletCoin(c),
+		usdValue: c.amount * getPriceFromWalletCoin(c),
 		wallet: c.wallet
 	})
 	).value()

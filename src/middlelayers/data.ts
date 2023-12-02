@@ -28,8 +28,11 @@ export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]:
 	return invoke("query_coins_prices", { symbols })
 }
 
-export async function downloadCoinLogos(symbols: string[]): Promise<void> {
-	return invoke("download_coins_logos", { symbols })
+export async function downloadCoinLogos(coins: {
+	symbol: string
+	price: number
+}[]): Promise<void> {
+	return invoke("download_coins_logos", { coins })
 }
 
 export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
@@ -38,8 +41,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<W
 }
 
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
-	// const anas = [ERC20ProAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
-	const anas = [CexAnalyzer]
+	const anas = [ERC20ProAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
 	const coinLists = await bluebird.map(anas, async ana => {
 
 		const a = new ana(config)
@@ -59,8 +61,6 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<
 	}, {
 		concurrency: anas.length,
 	})
-	console.log(coinLists);
-	
 	const assets = combineCoinLists(coinLists)
 	return assets
 }

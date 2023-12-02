@@ -60,9 +60,15 @@ const App = ({
     const symbols = _(data)
       .map((d) => d.assets)
       .flatten()
-      .map((d) => d.symbol)
-      .uniq()
+      .sortBy(d=>d.createdAt)
+      .reverse()
+      .uniqBy(d=>d.symbol)
+      .map(d=>({
+        symbol: d.symbol,
+        price: d.price,
+      }))
       .value();
+      
     downloadCoinLogos(symbols);
 
     getLogoMap(data).then((m) => setLogoMap(m));

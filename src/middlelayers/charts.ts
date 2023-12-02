@@ -6,7 +6,6 @@ import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, H
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
-import { WalletCoin } from './datafetch/types'
 import { timestampToDate } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'

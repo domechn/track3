@@ -11,7 +11,7 @@ use track3::{
         migrate_from_v01_to_v02, migrate_from_v02_to_v03, prepare_required_data,
     },
     okex::Okex,
-    info::get_coin_info_provider,
+    info::get_coin_info_provider, types::CoinWithPrice,
 };
 
 lazy_static! {
@@ -85,13 +85,13 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
 #[tauri::command]
 async fn download_coins_logos(
     handle: tauri::AppHandle,
-    symbols: Vec<String>,
+    coins: Vec<CoinWithPrice>,
 ) -> Result<(), String> {
     let resource_dir = handle.path_resolver().app_cache_dir().unwrap().to_str().unwrap().to_string();
     let client = get_coin_info_provider();
 
     let res = client
-        .download_coins_logos(symbols, resource_dir)
+        .download_coins_logos(coins, resource_dir)
         .await;
 
     match res {

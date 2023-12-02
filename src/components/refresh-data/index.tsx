@@ -8,6 +8,7 @@ import { Button } from "../ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "../index";
 import { CacheCenter } from '@/middlelayers/datafetch/utils/cache'
+import { downloadCoinLogos, queryCoinPrices } from '@/middlelayers/data'
 
 const retries = 3;
 const retryInterval = 3000; // 3s
@@ -50,6 +51,16 @@ const App = ({
     setRefreshLoading(true);
 
     let refreshError: Error | undefined;
+
+    downloadCoinLogos([{
+      symbol: "MEME",
+      price: 0.03,
+    }])
+    .then(res=>{
+      console.log(res);
+      
+    })
+    return
 
     retry(refreshAllData, retries, retryInterval)
       .then(async () => {
