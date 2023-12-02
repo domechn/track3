@@ -1,17 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import "./index.css";
 import { CoinData, CurrencyRateDetail } from "@/middlelayers/types";
-import {
-  queryAllDataDates,
-  queryCoinDataById,
-} from "@/middlelayers/charts";
+import { queryAllDataDates, queryCoinDataById } from "@/middlelayers/charts";
 import _ from "lodash";
 import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
-import {
-  currencyWrapper,
-  prettyNumberToLocaleString,
-} from "@/utils/currency";
+import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { useWindowSize } from "@/utils/hook";
 import { parseDateToTS } from "@/utils/date";
 import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
@@ -245,22 +239,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     const data = await queryCoinDataById(id);
     const reversedData = _(data).sortBy("value").reverse().value();
 
-    // only take first 10, and group others into others
-    const others = "Others";
-    const othersSymbols = _(reversedData).map("symbol").slice(10).value();
-    const othersData = _(data)
-      .filter((d) => othersSymbols.includes(d.symbol))
-      .value();
-
-    const res = [
-      ..._(reversedData).take(10).value(),
-      {
-        symbol: others,
-        value: _(othersData).sumBy("value"),
-        amount: 0,
-        price: 0,
-      },
-    ];
+    const res = _(reversedData).value();
 
     return res;
   }
