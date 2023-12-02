@@ -1,12 +1,11 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase, saveCoinsToDatabase } from './database'
-import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData } from './types'
+import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
-import { WalletCoin } from './datafetch/types'
 import { timestampToDate } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'
@@ -22,17 +21,14 @@ export async function refreshAllData() {
 	await saveCoinsToDatabase(coins)
 }
 
-async function queryCoinsData(): Promise<(WalletCoin & {
-	price: number,
-	usdValue: number,
-})[]> {
+async function queryCoinsData(): Promise<(WalletCoinUSD)[]> {
 	const config = await getConfiguration()
 	if (!config) {
 		throw new Error("no configuration found,\n please add configuration first")
 	}
 	const assets = await loadPortfolios(config)
 	// always query btc and usdt price
-	const priceMap = await queryCoinPrices(_(assets).map("symbol").push("USDT").push("BTC").uniq().compact().value())
+	const priceMap = await queryCoinPrices(_(assets).filter(a => !a.price).map("symbol").push("USDT").push("BTC").uniq().compact().value())
 
 	let lastAssets = _.clone(assets)
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false

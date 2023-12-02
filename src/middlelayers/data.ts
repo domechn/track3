@@ -28,8 +28,11 @@ export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]:
 	return invoke("query_coins_prices", { symbols })
 }
 
-export async function downloadCoinLogos(symbols: string[]): Promise<void> {
-	return invoke("download_coins_logos", { symbols })
+export async function downloadCoinLogos(coins: {
+	symbol: string
+	price: number
+}[]): Promise<void> {
+	return invoke("download_coins_logos", { coins })
 }
 
 export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {

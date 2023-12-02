@@ -162,3 +162,9 @@ export type CurrencyRateDetail = {
 	alias: string
 	symbol: string
 }
+
+export type WalletCoinUSD = Pick<WalletCoin, "amount" | "symbol" | "wallet"> & {
+	// price in usd
+	price: number,
+	usdValue: number,
+}

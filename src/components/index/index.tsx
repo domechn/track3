@@ -64,6 +64,7 @@ import Configuration from "@/components/configuration";
 import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
 import React from "react";
+import { queryCoinPrices } from "@/middlelayers/data";
 
 ChartJS.register(
   ...registerables,
@@ -259,10 +260,10 @@ const App = () => {
               <div className="ml-auto flex items-center space-x-4">
                 <div data-tooltip-id="last-refresh-at">
                   <RefreshButtonLoadingContext.Provider
-                    value={{ 
+                    value={{
                       buttonLoading: refreshButtonLoading,
                       setButtonLoading: setRefreshButtonLoading,
-                     }}
+                    }}
                   >
                     <RefreshData
                       loading={refreshButtonLoading}

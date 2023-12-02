@@ -18,11 +18,8 @@ import { downloadCoinLogos } from "@/middlelayers/data";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "@radix-ui/react-icons";
-import bluebird from 'bluebird'
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import bluebird from "bluebird";
 
 const App = ({
   currency,
@@ -48,7 +45,14 @@ const App = ({
     setPercentageData(splitTopAndOtherData(data));
 
     // download coin logos
-    downloadCoinLogos(_(data).map("coin").value());
+    downloadCoinLogos(
+      _(data)
+        .map((d) => ({
+          symbol: d.coin,
+          price: d.value / (d.amount || 1),
+        }))
+        .value()
+    );
 
     // set max data page
     setMaxDataPage(Math.floor(data.length / pageSize));
@@ -61,10 +65,10 @@ const App = ({
     const acd = await getAppCacheDir();
     const kvs = await bluebird.map(d, async (coin) => {
       const path = await getImageApiPath(acd, coin.coin);
-      return {[coin.coin]: path}
-    })
-    
-    return _.assign({}, ...kvs)
+      return { [coin.coin]: path };
+    });
+
+    return _.assign({}, ...kvs);
   }
 
   const options = {
