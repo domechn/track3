@@ -72,8 +72,21 @@ export class GateExchange implements Exchanger {
 		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
 	}
 
-	async fetchCoinsPrice(symbols: string[]): Promise<{ [k: string]: number }> {
-		return {}
+	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
+		// https://api.gateio.ws/api/v4/spot/tickers
+		const allPrices = await sendHttpRequest<{
+			currency_pair: string
+			last: string
+		}[]>("GET", this.endpoint + "/api/v4/spot/tickers")
+
+		const suffix = "_USDT"
+
+		const allPricesMap = _(allPrices).filter(p=>p.currency_pair.endsWith(suffix)).map(p =>({
+			symbol: p.currency_pair.replace(suffix, ""),
+			price: parseFloat(p.last)
+		})).keyBy("symbol").mapValues("price").value()
+
+		return allPricesMap
 	}
 
 	private async fetchSpotBalance(): Promise<{ [k: string]: number }> {

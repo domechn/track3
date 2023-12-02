@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api'
 import { Exchanger } from './cex'
+import { sendHttpRequest } from '../../utils/http'
+import _ from 'lodash'
 
 export class OkexExchange implements Exchanger {
 	private readonly apiKey: string
@@ -36,8 +38,22 @@ export class OkexExchange implements Exchanger {
 		return invoke("query_okex_balance", { apiKey: this.apiKey, apiSecret: this.secret, password: this.password })
 	}
 
-	async fetchCoinsPrice(symbols: string[]): Promise<{ [k: string]: number }> {
-		return {}
+	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
+		// https://www.okx.com/api/v5/market/tickers?instType=SPOT
+		const allPrices = await sendHttpRequest<{
+			data: {
+				instId: string
+				last: string
+			}[]
+		}>("GET", "https://www.okx.com/api/v5/market/tickers?instType=SPOT")
+
+		const suffix = "-USDT"
+		const allPricesMap = _(allPrices.data).filter(p=>p.instId.endsWith(suffix)).map(p =>({
+			symbol: p.instId.replace(suffix, ""),
+			price: parseFloat(p.last)
+		})).keyBy("symbol").mapValues("price").value()
+
+		return allPricesMap
 	}
 
 	async verifyConfig(): Promise<boolean> {

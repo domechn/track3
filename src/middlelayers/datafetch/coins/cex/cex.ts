@@ -17,9 +17,9 @@ export interface Exchanger {
 	// key is coin symbol, value is amount
 	fetchTotalBalance(): Promise<{ [k: string]: number }>
 
-	// return coins price in exchange by symbol
+	// return coins price in exchange
 	// key is coin symbol, value is price in usdt
-	fetchCoinsPrice(symbols: string[]): Promise<{ [k: string]: number }>
+	fetchCoinsPrice(): Promise<{ [k: string]: number }>
 
 	verifyConfig(): Promise<boolean>
 }
@@ -80,30 +80,52 @@ export class CexAnalyzer implements Analyzer {
 	async verifyConfigs(): Promise<boolean> {
 		const verifyResults = await bluebird.map(this.exchanges, async ex => {
 			return await ex.verifyConfig()
-		}, {
-			concurrency: 2,
 		})
 
 		return _(verifyResults).every()
 	}
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
+		// key is exchange name, value is prices
+		const cacheCoinPrices = _(await bluebird.map(_(this.exchanges).uniqBy(ex => ex.getExchangeName()).value(), async ex => {
+			const pricesMap = await ex.fetchCoinsPrice()
+			return {
+				exChangeName: ex.getExchangeName(),
+				pricesMap,
+			}
+		})).keyBy("exChangeName").mapValues("pricesMap").value()
+
+		const getPrice = (ex: string, symbol: string): { value: number, base: string } | undefined => {
+			const pm = cacheCoinPrices[ex]
+			if (!pm) {
+				return undefined
+			}
+			if (symbol === "USDT") {
+				return {
+					value: 1,
+					base: "usdt",
+				}
+			}
+			const price = pm[symbol]
+			if (!price) {
+				return undefined
+			}
+			return {
+				value: price,
+				base: "usdt",
+			}
+		}
+
 		const coinLists = await bluebird.map(this.exchanges, async ex => {
 			const portfolio = await this.fetchTotalBalance(ex)
-			const prices = await ex.fetchCoinsPrice(_(portfolio).keys().value())
 
 			// filter all keys are capital
 			const coins = filterCoinsInPortfolio(ex.getIdentity(), portfolio)
 			return _(coins).map(c => ({
 				...c,
-				price: {
-					value: prices[c.symbol],
-					base: "usdt",
-				},
+				price: getPrice(ex.getExchangeName(), c.symbol),
 			} as WalletCoin)
 			).value()
-		}, {
-			concurrency: 2,
 		})
 
 		return _(coinLists).flatten().value()

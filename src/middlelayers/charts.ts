@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase, saveCoinsToDatabase } from './database'
-import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData } from './types'
+import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -22,10 +22,7 @@ export async function refreshAllData() {
 	await saveCoinsToDatabase(coins)
 }
 
-async function queryCoinsData(): Promise<(WalletCoin & {
-	price: number,
-	usdValue: number,
-})[]> {
+async function queryCoinsData(): Promise<(WalletCoinUSD)[]> {
 	const config = await getConfiguration()
 	if (!config) {
 		throw new Error("no configuration found,\n please add configuration first")

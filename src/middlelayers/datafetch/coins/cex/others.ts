@@ -27,7 +27,7 @@ export class OtherCexExchanges implements Exchanger {
 		throw new Error('Method not implemented.')
 	}
 
-	async fetchCoinsPrice(symbols: string[]): Promise<{ [k: string]: number }> {
+	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
 		throw new Error('Method not implemented.')
 
 	}

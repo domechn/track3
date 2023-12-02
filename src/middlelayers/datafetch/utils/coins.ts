@@ -1,3 +1,4 @@
+import { WalletCoinUSD } from '@/middlelayers/types'
 import { WalletCoin } from '../types'
 import _ from 'lodash'
 
@@ -16,7 +17,7 @@ export function combineCoinLists(coinLists: WalletCoin[][]): WalletCoin[] {
 	).flatten().value()
 }
 
-export function calculateTotalValue(coinList: WalletCoin[], priceMap: { [k: string]: number }): (Pick<WalletCoin, "amount" | "symbol" | "wallet"> & { price: number, usdValue: number })[] {
+export function calculateTotalValue(coinList: WalletCoin[], priceMap: { [k: string]: number }): WalletCoinUSD[] {
 	const usdtInUsd = priceMap["USDT"] ?? 1
 	const getPriceFromWalletCoin = (w: WalletCoin) => {
 		if (!w.price) {
