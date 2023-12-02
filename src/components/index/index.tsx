@@ -17,6 +17,7 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import HistoricalData from "../historical-data";
 import Overview from "../overview";
 import Comparison from "../comparison";
+import PageWrapper from "../page-wrapper";
 import WalletAnalyzer from "../wallet-analyzer";
 import "./index.css";
 import {
@@ -38,7 +39,7 @@ import {
   TopCoinsRankData,
   TotalValueData,
 } from "@/middlelayers/types";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   queryAssetChange,
   queryLastRefreshAt,
@@ -53,6 +54,7 @@ import { useWindowSize } from "@/utils/hook";
 import { Chart } from "chart.js";
 import { LoadingContext } from "@/App";
 import {
+  getConfiguration,
   getCurrentPreferCurrency,
   getQuerySize,
 } from "@/middlelayers/configuration";
@@ -64,7 +66,6 @@ import Configuration from "@/components/configuration";
 import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
 import React from "react";
-import { queryCoinPrices } from "@/middlelayers/data";
 
 ChartJS.register(
   ...registerables,
@@ -96,6 +97,8 @@ const App = () => {
   const [currentCurrency, setCurrentCurrency] = useState<CurrencyRateDetail>(
     getDefaultCurrencyRate()
   );
+
+  const [hasData, setHasData] = useState(true);
 
   const [activeMenu, setActiveMenu] = useState("overview");
 
@@ -143,6 +146,18 @@ const App = () => {
   }, [windowSize]);
 
   useEffect(() => {
+    resizeAllChartsInPage()
+  }, [lastSize]);
+
+  useEffect(() => {
+    if (hasData) {
+      setTimeout(()=>{
+        resizeAllChartsInPage()
+      }, resizeDelay / 2);
+    }
+  }, [hasData]);
+
+  function resizeAllChartsInPage() {
     if (
       lastSize.width === windowSize.width &&
       lastSize.height === windowSize.height &&
@@ -150,7 +165,7 @@ const App = () => {
     ) {
       resizeAllCharts();
     }
-  }, [lastSize]);
+  }
 
   function resizeAllCharts() {
     const overviewsCharts = [
@@ -215,14 +230,18 @@ const App = () => {
 
     const lra = await queryLastRefreshAt();
     setLastRefreshAt(lra);
+
+    if (lap.length > 0) {
+      setHasData(true);
+    } else {
+      setHasData(false);
+    }
   }
 
   function loadAllData(size = 10) {
     setLoading(true);
     // set a loading delay to show the loading animation
-    setTimeout(() => {
-      loadAllDataAsync(size).finally(() => setLoading(false));
-    }, 100);
+    loadAllDataAsync(size).finally(() => setLoading(false));
   }
 
   useEffect(() => {
@@ -304,34 +323,46 @@ const App = () => {
           <Route
             path="/overview"
             element={
-              <Overview
-                currency={currentCurrency}
-                latestAssetsPercentageData={latestAssetsPercentageData}
-                pnlData={pnlData}
-                assetChangeData={assetChangeData}
-                totalValueData={totalValueData}
-                coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
-                topCoinsRankData={topCoinsRankData}
-                topCoinsPercentageChangeData={topCoinsPercentageChangeData}
-              />
+              <PageWrapper hasData={hasData}>
+                <Overview
+                  currency={currentCurrency}
+                  latestAssetsPercentageData={latestAssetsPercentageData}
+                  pnlData={pnlData}
+                  assetChangeData={assetChangeData}
+                  totalValueData={totalValueData}
+                  coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
+                  topCoinsRankData={topCoinsRankData}
+                  topCoinsPercentageChangeData={topCoinsPercentageChangeData}
+                />
+              </PageWrapper>
             }
           />
 
           <Route
             path="/wallets"
-            element={<WalletAnalyzer currency={currentCurrency} />}
+            element={
+              <PageWrapper hasData={hasData}>
+                <WalletAnalyzer currency={currentCurrency} />
+              </PageWrapper>
+            }
           />
           <Route
             path="/comparison"
-            element={<Comparison currency={currentCurrency} />}
+            element={
+              <PageWrapper hasData={hasData}>
+                <Comparison currency={currentCurrency} />
+              </PageWrapper>
+            }
           />
           <Route
             path="/history"
             element={
-              <HistoricalData
-                currency={currentCurrency}
-                afterDataDeleted={() => loadAllData(querySize)}
-              />
+              <PageWrapper hasData={hasData}>
+                <HistoricalData
+                  currency={currentCurrency}
+                  afterDataDeleted={() => loadAllData(querySize)}
+                />
+              </PageWrapper>
             }
           />
           <Route path="/settings" element={<Setting />}>
