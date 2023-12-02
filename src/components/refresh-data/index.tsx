@@ -52,16 +52,6 @@ const App = ({
 
     let refreshError: Error | undefined;
 
-    downloadCoinLogos([{
-      symbol: "MEME",
-      price: 0.03,
-    }])
-    .then(res=>{
-      console.log(res);
-      
-    })
-    return
-
     retry(refreshAllData, retries, retryInterval)
       .then(async () => {
         // clean cache after all analyzers finished successfully
