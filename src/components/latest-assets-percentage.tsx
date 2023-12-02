@@ -189,7 +189,7 @@ const App = ({
                         src={logoMap[d.coin] || UnknownLogo}
                         alt={d.coin}
                       />
-                      <div className="mr-1 font-bold text-base">
+                      <div className="mr-1 font-bold text-base" title={""+d.amount}>
                         {prettyPriceNumberToLocaleString(d.amount)}
                       </div>
                       <div className="text-gray-600">{d.coin}</div>
