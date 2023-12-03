@@ -1,3 +1,4 @@
+// assets_v2 table
 export type AssetModel = {
 	id: number
 	uuid: string
@@ -7,6 +8,22 @@ export type AssetModel = {
 	value: number
 	price: number
 	wallet?: string
+}
+
+// asset_prices table
+// to record the cost price or sell price of each coins, can be updated by users
+export type AssetPriceModel = {
+	id: number
+	uuid: string
+	// id in assets_v2 table
+	assetID: number
+	symbol: string
+	// when value > 0, it means cost price
+	// when value < 0, it means sell price
+	price: number
+
+	// createdAt in assets_v2 table
+	createdAt: string
 }
 
 export type CloudAssetModel = {
@@ -22,6 +39,22 @@ export type CloudAssetModel = {
 	createdAt: number
 }
 
+export type AssetAction = {
+	uuid: string
+	symbol: string
+	wallet?: string
+	amount: number
+	price: number
+	changedAt: string
+}
+
+export type Asset = {
+	symbol: string
+	amount: number
+	value: number
+	price: number
+}
+
 export type CloudUser = {
 	id: string
 	publicKey: string
@@ -35,7 +68,6 @@ export type ConfigurationModel = {
 export type CloudSyncConfiguration = {
 	enableAutoSync: boolean
 }
-
 
 export type TopCoinsRankData = {
 	timestamps: number[]

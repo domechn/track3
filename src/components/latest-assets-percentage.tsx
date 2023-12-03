@@ -20,6 +20,8 @@ import { Separator } from "./ui/separator";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import bluebird from "bluebird";
+import { useNavigate } from "react-router-dom";
+import { ArrowTopRightIcon } from "@radix-ui/react-icons";
 
 const App = ({
   currency,
@@ -32,6 +34,7 @@ const App = ({
   const [maxDataPage, setMaxDataPage] = useState<number>(0);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const pageSize = 5;
+  const navigate = useNavigate();
 
   const [percentageData, setPercentageData] = useState<
     {
@@ -54,8 +57,10 @@ const App = ({
         .value()
     );
 
+    // - 0.000000000001 is for float number precision
+    const mp = Math.floor(data.length / pageSize - 0.000000000001)
     // set max data page
-    setMaxDataPage(Math.floor(data.length / pageSize));
+    setMaxDataPage(mp >= 0 ? mp : 0);
 
     // set logo map
     getLogoMap(data).then((m) => setLogoMap(m));
@@ -181,7 +186,11 @@ const App = ({
             {data
               .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
               .map((d) => (
-                <TableRow key={d.coin} className="h-[55px]">
+                <TableRow
+                  key={d.coin}
+                  className="h-[55px] cursor-pointer group"
+                  onClick={() => navigate(`/buy-and-sell/${d.coin}`)}
+                >
                   <TableCell>
                     <div className="flex flex-row items-center">
                       <img
@@ -189,10 +198,14 @@ const App = ({
                         src={logoMap[d.coin] || UnknownLogo}
                         alt={d.coin}
                       />
-                      <div className="mr-1 font-bold text-base" title={""+d.amount}>
+                      <div
+                        className="mr-1 font-bold text-base"
+                        title={"" + d.amount}
+                      >
                         {prettyPriceNumberToLocaleString(d.amount)}
                       </div>
                       <div className="text-gray-600">{d.coin}</div>
+                      <ArrowTopRightIcon className="ml-2 h-4 w-4 hidden group-hover:inline-block text-gray-600" />
                     </div>
                   </TableCell>
                   <TableCell className="text-right">

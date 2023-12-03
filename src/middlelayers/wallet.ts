@@ -18,7 +18,7 @@ export class WalletAnalyzer {
 		this.queryAssets = queryAssets
 	}
 
-	private async listWalletAliases(walletMd5s: string[]): Promise<{ [k: string]: { wallet: string, alias: string, type: string } | undefined }> {
+	public async listWalletAliases(walletMd5s: string[]): Promise<{ [k: string]: { wallet: string, alias: string, type: string } | undefined }> {
 		const unknownAliasWallets = _(walletMd5s).filter(w => !_(this.walletAliases).has(w)).value()
 
 		if (unknownAliasWallets.length === 0) {

@@ -18,7 +18,8 @@ import HistoricalData from "../historical-data";
 import Overview from "../overview";
 import Comparison from "../comparison";
 import PageWrapper from "../page-wrapper";
-import WalletAnalyzer from "../wallet-analyzer";
+import WalletAnalysis from "../wallet-analysis";
+import BuyAndSellAnalysis from "../buy-and-sell-analysis";
 import "./index.css";
 import {
   Route,
@@ -146,13 +147,13 @@ const App = () => {
   }, [windowSize]);
 
   useEffect(() => {
-    resizeAllChartsInPage()
+    resizeAllChartsInPage();
   }, [lastSize]);
 
   useEffect(() => {
     if (hasData) {
-      setTimeout(()=>{
-        resizeAllChartsInPage()
+      setTimeout(() => {
+        resizeAllChartsInPage();
       }, resizeDelay / 2);
     }
   }, [hasData]);
@@ -336,13 +337,13 @@ const App = () => {
                 />
               </PageWrapper>
             }
-          />
+          ></Route>
 
           <Route
             path="/wallets"
             element={
               <PageWrapper hasData={hasData}>
-                <WalletAnalyzer currency={currentCurrency} />
+                <WalletAnalysis currency={currentCurrency} />
               </PageWrapper>
             }
           />
@@ -385,6 +386,12 @@ const App = () => {
             />
             <Route path="systemInfo" element={<SystemInfo />} />
           </Route>
+
+          <Route
+            path="/buy-and-sell/:symbol"
+            element={<BuyAndSellAnalysis currency={currentCurrency} />}
+          ></Route>
+
           <Route path="*" element={<div>not found</div>} />
         </Routes>
       </HashRouter>
