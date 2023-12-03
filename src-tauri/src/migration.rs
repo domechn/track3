@@ -1,4 +1,5 @@
 use std::{
+    collections::{BTreeSet, HashMap, HashSet},
     fs::{self, File},
     path::Path,
 };
@@ -15,6 +16,7 @@ static VERSION_CONFIGURATION_ID: i32 = 999;
 
 static CONFIGURATION_TABLE_NAME: &str = "configuration";
 static ASSETS_V2_TABLE_NAME: &str = "assets_v2";
+static ASSET_ACTIONS_TABLE_NAME: &str = "asset_actions";
 
 pub fn is_first_run(path: &Path) -> bool {
     // check sqlite file exists
@@ -40,6 +42,8 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         fs::read_to_string(resource_dir.join("migrations/init/cloud_sync_up.sql")).unwrap();
     let currency_rates_sync =
         fs::read_to_string(resource_dir.join("migrations/init/currency_rates_up.sql")).unwrap();
+    let asset_actions =
+        fs::read_to_string(resource_dir.join("migrations/init/asset_prices_up.sql")).unwrap();
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
@@ -49,6 +53,7 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         conn.execute(assets_v2.as_str()).await.unwrap();
         conn.execute(cloud_sync.as_str()).await.unwrap();
         conn.execute(currency_rates_sync.as_str()).await.unwrap();
+        conn.execute(asset_actions.as_str()).await.unwrap();
 
         // record current app version
         sqlx::query(
@@ -123,7 +128,6 @@ pub fn load_previous_version(path: &Path) -> Result<String, Box<dyn std::error::
     let sqlite_path = get_sqlite_file_path(path);
     let rt = Runtime::new().unwrap();
     return Ok(rt.block_on(async move {
-        println!("load previous version in tokio spawn");
         let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
         let data = sqlx::query_as::<_, Configuration>(
             format!("select * from {} where id = ?", CONFIGURATION_TABLE_NAME).as_str(),
@@ -145,6 +149,7 @@ pub fn load_previous_version(path: &Path) -> Result<String, Box<dyn std::error::
             }
         };
 
+        println!("load previous version in tokio spawn: {:?}", res);
         res
     })?);
 }
@@ -234,7 +239,7 @@ impl Migration for V1TV2 {
                 .bind(row.amount)
                 .bind(row.value)
                 .bind(row.price)
-                .bind(row.created_at)
+                .bind(row.createdAt)
                 .execute(&mut tx)
                 .await
                 .unwrap();
@@ -275,7 +280,7 @@ impl V1TV2 {
             amount,
             value,
             price: value / amount,
-            created_at,
+            createdAt: created_at,
             wallet: None,
         };
 
@@ -429,7 +434,7 @@ impl V1TV2 {
                         amount: data_others.amount,
                         value: data_others.value,
                         price: 1.0,
-                        created_at: ca.clone(),
+                        createdAt: ca.clone(),
                         wallet: None,
                     });
                 }
@@ -476,15 +481,6 @@ impl Migration for V2TV3 {
             println!("migrate from v0.2 to v0.3 in tokio spawn");
             let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
             conn.execute(assets_v2.as_str()).await.unwrap();
-
-            // sqlx::query(format!("INSERT INTO {} (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = ?", CONFIGURATION_TABLE_NAME).as_str())
-            //     .bind(VERSION_CONFIGURATION_ID)
-            //     .bind(new_version)
-            //     .bind(new_version)
-            //     .execute(&mut conn)
-            //     .await
-            //     .unwrap();
-
             conn.close().await.unwrap();
             println!("migrate from v0.2 to v0.3 in tokio spawn done");
         });
@@ -515,16 +511,15 @@ impl Migration for V3TV4 {
         let resource_dir = Path::new(&self.resource_dir);
         println!("migrate from v0.3 to v0.4");
         let sqlite_path = get_sqlite_file_path(app_dir);
-        let assets_action =
-            fs::read_to_string(resource_dir.join("migrations/v03t04/asset_actions_up.sql"))
+        let asset_prices =
+            fs::read_to_string(resource_dir.join("migrations/v03t04/asset_prices_up.sql"))
                 .unwrap();
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
             println!("migrate from v0.3 to v0.4 in tokio spawn");
             let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
-            conn.execute(assets_action.as_str()).await.unwrap();
-
+            conn.execute(asset_prices.as_str()).await.unwrap();
             conn.close().await.unwrap();
             println!("migrate from v0.3 to v0.4 in tokio spawn done");
         });

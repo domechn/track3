@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase, saveCoinsToDatabase } from './database'
-import { AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
+import { AssetAction, AssetChangeData, AssetModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -13,12 +13,75 @@ import { OthersAnalyzer } from './datafetch/coins/others'
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
 export const ASSETS_TABLE_NAME = "assets_v2"
+export const ASSETS_PRICE_TABLE_NAME = "asset_prices"
 
 export const WALLET_ANALYZER = new WalletAnalyzer(queryAssets)
 
 export async function refreshAllData() {
 	const coins = await queryCoinsData()
 	await saveCoinsToDatabase(coins)
+}
+
+// return all asset actions by analyzing all asset models
+export async function loadAllAssetActionsBySymbol(symbol: string): Promise<AssetAction[]> {
+	const assets = await queryAssets(-1, symbol)
+
+	const actions: AssetAction[] = []
+	for (let i = 0; i < assets.length; i++) {
+		const as = assets[i]
+		const actions = generateAssetActions(as, assets[i - 1])
+		actions.push(...actions)
+	}
+
+	return actions
+}
+
+
+function generateAssetActions(cur: AssetModel[], pre?: AssetModel[]): AssetAction[] {
+	console.log(cur, pre)
+
+	const res: AssetAction[] = []
+
+	_(cur).forEach(c => {
+
+		const p = _(pre).find(p => p.symbol === c.symbol && p.wallet === c.wallet)
+
+		if (!p) {
+			res.push({
+				uuid: c.uuid,
+				changedAt: c.createdAt,
+				symbol: c.symbol,
+				amount: c.amount,
+				price: c.price,
+				wallet: c.wallet
+			})
+		} else if (p.amount !== c.amount) {
+			res.push({
+				uuid: c.uuid,
+				changedAt: c.createdAt,
+				symbol: c.symbol,
+				amount: c.amount - p.amount,
+				price: c.price,
+				wallet: c.wallet
+			})
+		}
+	})
+
+	_(pre).forEach(p => {
+		const c = _(cur).find(c => c.symbol === p.symbol && c.wallet === p.wallet)
+		if (!c) {
+			res.push({
+				uuid: p.uuid,
+				changedAt: p.createdAt,
+				symbol: p.symbol,
+				amount: -p.amount,
+				price: p.price,
+				wallet: p.wallet
+			})
+		}
+	})
+
+	return res
 }
 
 async function queryCoinsData(): Promise<(WalletCoinUSD)[]> {
@@ -61,7 +124,8 @@ async function queryCoinsData(): Promise<(WalletCoinUSD)[]> {
 	return totals
 }
 
-async function queryAssets(size = 1): Promise<AssetModel[][]> {
+// if symbol is not provided, return all assets, else return assets with symbol
+async function queryAssets(size = 1, symbol?: string): Promise<AssetModel[][]> {
 	const db = await getDatabase()
 	// select top size timestamp
 	let tsSql = `SELECT distinct(createdAt) FROM ${ASSETS_TABLE_NAME} ORDER BY createdAt DESC`
@@ -74,7 +138,7 @@ async function queryAssets(size = 1): Promise<AssetModel[][]> {
 
 	// select assets which createdAt >= earliestTs
 
-	let sql = `SELECT * FROM ${ASSETS_TABLE_NAME} WHERE createdAt >= '${earliestTs}' ORDER BY createdAt DESC`
+	let sql = `SELECT * FROM ${ASSETS_TABLE_NAME} WHERE ${symbol ? "symbol=" + symbol : ''} createdAt >= '${earliestTs}' ORDER BY createdAt DESC`
 	const assets = await db.select<AssetModel[]>(sql)
 	return _(assets).groupBy("createdAt").values().value()
 }

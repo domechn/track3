@@ -68,7 +68,7 @@ pub struct AssetsV1 {
 pub struct AssetsV2 {
     pub id: i32,
     pub uuid: String,
-    pub created_at: String,
+    pub createdAt: String,
 
     pub symbol: String,
     pub amount: f64,
