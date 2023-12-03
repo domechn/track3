@@ -5,5 +5,7 @@ CREATE TABLE IF NOT EXISTS asset_prices (
 	assetID INTEGER NOT NULL,
 	symbol TEXT NOT NULL,
 	-- if amount > 0, price is cost price, else price is sell price
-	price REAL NOT NULL
+	price REAL NOT NULL,
+	-- createdAt in assets_v2
+	createdAt DATETIME NOT NULL
 );

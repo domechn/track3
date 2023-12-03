@@ -10,7 +10,8 @@ export type AssetModel = {
 	wallet?: string
 }
 
-// asset_actions table
+// asset_prices table
+// to record the cost price or sell price of each coins, can be updated by users
 export type AssetPriceModel = {
 	id: number
 	uuid: string
@@ -20,6 +21,9 @@ export type AssetPriceModel = {
 	// when value > 0, it means cost price
 	// when value < 0, it means sell price
 	price: number
+
+	// createdAt in assets_v2 table
+	createdAt: string
 }
 
 export type CloudAssetModel = {
