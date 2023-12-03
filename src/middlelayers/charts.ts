@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
 import { getDatabase, saveCoinsToDatabase } from './database'
-import { AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
+import { Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -26,8 +26,9 @@ export async function refreshAllData() {
 export async function loadAllAssetActionsBySymbol(symbol: string): Promise<AssetAction[]> {
 	const assets = await queryAssets(-1, symbol)
 	const updatedPrices = await queryAssetPrices(symbol)
+	const revAssets = _(assets).reverse().value()
 
-	const actions = _.flatMap(assets, (as, i) => {
+	const actions = _.flatMap(revAssets, (as, i) => {
 		const ass = generateAssetActions(as, updatedPrices, assets[i - 1])
 		return ass
 	})
@@ -45,9 +46,9 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 		id: p.assetID
 	})).value()
 
-	// only value changes > 1
+	// only value changes > 10
 	const isAmountChanged = (a: number, b: number, price: number) => {
-		return Math.abs(a - b) * price > 1
+		return Math.abs(a - b) * price > 10
 	}
 
 	const res: AssetAction[] = []
@@ -174,6 +175,22 @@ function groupAssetModelsBySymbol(models: AssetModel[]): AssetModel[] {
 		amount: _(assets).sumBy("amount"),
 		value: _(assets).sumBy("value"),
 	})).value()
+}
+
+export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | undefined> {
+	const models = await queryAssets(1, symbol)
+	const model = _(models).flatten().reduce((acc, cur) => ({
+		...acc,
+		amount: acc.amount + cur.amount,
+		value: acc.value + cur.value,
+	}))
+
+	return model ? {
+		symbol,
+		amount: model.amount,
+		value: model.value,
+		price: model.price,
+	} as Asset : undefined
 }
 
 export async function queryAssetsAfterCreatedAt(createdAt?: number): Promise<AssetModel[]> {

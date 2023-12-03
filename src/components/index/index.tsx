@@ -389,7 +389,7 @@ const App = () => {
 
           <Route
             path="/buy-and-sell/:symbol"
-            element={<BuyAndSellAnalysis />}
+            element={<BuyAndSellAnalysis currency={currentCurrency} />}
           ></Route>
 
           <Route path="*" element={<div>not found</div>} />

@@ -57,8 +57,10 @@ const App = ({
         .value()
     );
 
+    // - 0.000000000001 is for float number precision
+    const mp = Math.floor(data.length / pageSize - 0.000000000001)
     // set max data page
-    setMaxDataPage(Math.floor(data.length / pageSize));
+    setMaxDataPage(mp >= 0 ? mp : 0);
 
     // set logo map
     getLogoMap(data).then((m) => setLogoMap(m));

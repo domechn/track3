@@ -48,6 +48,13 @@ export type AssetAction = {
 	changedAt: string
 }
 
+export type Asset = {
+	symbol: string
+	amount: number
+	value: number
+	price: number
+}
+
 export type CloudUser = {
 	id: string
 	publicKey: string
