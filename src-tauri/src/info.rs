@@ -61,7 +61,7 @@ impl CoinGecko {
                 if filter_duplicate != None {
                     let filter_duplicate = filter_duplicate.unwrap();
                     res.push(filter_duplicate(coins));
-                }else {
+                } else {
                     res.append(&mut coins.clone());
                 }
             } else {
@@ -158,7 +158,7 @@ impl CoinGecko {
             non_exists_symbols
         };
 
-        if non_exists_symbols.len() == 0{
+        if non_exists_symbols.len() == 0 {
             return Ok(());
         }
         println!("non_exists_symbols: {:?}", non_exists_symbols);
@@ -184,9 +184,9 @@ impl CoinGecko {
 
         if dup_symbol_coins.len() > 0 {
             let dup_coin_symbols = dup_symbol_coins
-            .iter()
-            .map(|c| c.symbol.clone())
-            .collect::<Vec<String>>();
+                .iter()
+                .map(|c| c.symbol.clone())
+                .collect::<Vec<String>>();
             println!("dup_symbol_coins: {:?}", dup_coin_symbols);
             // remove dup_symbol_coins from all_coins
             all_coins = all_coins

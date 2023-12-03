@@ -6,12 +6,13 @@ use tauri::Manager;
 use track3::{
     binance::Binance,
     ent::Ent,
+    info::get_coin_info_provider,
     migration::{
-        init_sqlite_file, init_sqlite_tables, is_first_run, is_from_v01_to_v02, is_from_v02_to_v03,
-        migrate_from_v01_to_v02, migrate_from_v02_to_v03, prepare_required_data,
+        init_sqlite_file, init_sqlite_tables, is_first_run, load_previous_version,
+        prepare_required_data, Migration, V1TV2, V2TV3, V3TV4,
     },
     okex::Okex,
-    info::get_coin_info_provider, types::CoinWithPrice,
+    types::CoinWithPrice,
 };
 
 lazy_static! {
@@ -87,12 +88,16 @@ async fn download_coins_logos(
     handle: tauri::AppHandle,
     coins: Vec<CoinWithPrice>,
 ) -> Result<(), String> {
-    let resource_dir = handle.path_resolver().app_cache_dir().unwrap().to_str().unwrap().to_string();
+    let resource_dir = handle
+        .path_resolver()
+        .app_cache_dir()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     let client = get_coin_info_provider();
 
-    let res = client
-        .download_coins_logos(coins, resource_dir)
-        .await;
+    let res = client.download_coins_logos(coins, resource_dir).await;
 
     match res {
         Ok(_) => Ok(()),
@@ -213,14 +218,24 @@ fn main() {
                     resource_dir.as_path(),
                 );
             }
+            let app_dir_str = app_dir.to_str().unwrap().to_string();
+            let resource_dir_str = resource_dir.to_str().unwrap().to_string();
 
-            if is_from_v01_to_v02(app_dir.as_path()).unwrap() {
-                // upgrade from v0.1 to v0.2
-                migrate_from_v01_to_v02(app_dir.as_path(), resource_dir.as_path());
+            let v1tv2 = V1TV2::new(app_dir_str.clone(), resource_dir_str.clone());
+            let v2tv3 = V2TV3::new(app_dir_str.clone(), resource_dir_str.clone());
+            let v3tv4 = V3TV4::new(app_dir_str.clone(), resource_dir_str.clone());
+
+            let pv = load_previous_version(app_dir.as_path()).unwrap();
+            if v1tv2.need_to_run(&pv).unwrap() {
+                v1tv2.migrate();
             }
 
-            if is_from_v02_to_v03(app_dir.as_path()).unwrap() {
-                migrate_from_v02_to_v03(app_dir.as_path(), resource_dir.as_path());
+            if v2tv3.need_to_run(&pv).unwrap() {
+                v2tv3.migrate();
+            }
+
+            if v3tv4.need_to_run(&pv).unwrap() {
+                v3tv4.migrate();
             }
 
             prepare_required_data(app_version.clone(), app_dir.as_path());
