@@ -203,6 +203,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         <div className="col-span-2 md:col-span-1">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              {/* TODO: quick switch coin */}
               <CardTitle className="text-sm font-medium">Symbol</CardTitle>
               <svg
                 viewBox="0 0 1024 1024"
@@ -237,6 +238,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         </div>
         <div className="col-span-2 md:col-span-1">
           <Card>
+            {/* TODO: compare with latest price */}
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 Breakeven Price
