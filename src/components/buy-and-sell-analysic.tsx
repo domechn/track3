@@ -1,24 +1,52 @@
 import {
   loadAllAssetActionsBySymbol,
   queryLastAssetsBySymbol,
+  updateAssetPrice,
 } from "@/middlelayers/charts";
 import { Asset, AssetAction, CurrencyRateDetail } from "@/middlelayers/types";
 import _ from "lodash";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useParams } from "react-router-dom";
-import { currencyWrapper, prettyNumberToLocaleString, prettyPriceNumberToLocaleString } from "@/utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+  prettyPriceNumberToLocaleString,
+} from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
-import { Table, TableBody, TableCell, TableRow } from "./ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 import { getImageApiPath } from "@/utils/app";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
+import { timestampToDate } from "@/utils/date";
+import { Pencil2Icon } from "@radix-ui/react-icons";
+import { Input } from "./ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "./ui/button";
+import { toast } from "./ui/use-toast";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const { symbol } = useParams();
 
   const [actions, setActions] = useState<AssetAction[]>([]);
   const [latestAsset, setLatestAsset] = useState<Asset | undefined>();
+
+  const [updatePriceIndex, setUpdatePriceIndex] = useState(-1);
+  const [updatePriceValue, setUpdatePriceValue] = useState(-1);
+  const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
 
   const [breakevenPrice, setBreakevenPrice] = useState<number>(0);
   const [costPrice, setCostPrice] = useState<number>(0);
@@ -53,12 +81,12 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     ).then((res) => {
       const wam: { [k: string]: string | undefined } = {};
       _(res).forEach((k, v) => {
-        wam[v] = k?.alias || k?.wallet;
+        wam[v] = k?.alias ? `${k?.alias} (${k.type})` : k?.wallet;
       });
       setWalletAliasMap(wam);
     });
 
-    const ap = calculateBreakevenPrice(actions);
+    const ap = Math.max(0, calculateBreakevenPrice(actions));
     setBreakevenPrice(ap);
     setProfit(calculateProfit(ap));
 
@@ -67,7 +95,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
 
   function loadSymbolData(s: string) {
     loadAllAssetActionsBySymbol(s).then((res) => {
-      setActions(_(res).reverse().value());
+      setActions(_(res).sortBy('changedAt').reverse().value());
     });
 
     queryLastAssetsBySymbol(s).then((res) => {
@@ -102,12 +130,80 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       : 0;
   }
 
+  function onUpdatePriceDialogSaveClick() {
+    if (!symbol) {
+      toast({
+        description: "Invalid symbol",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (updatePriceValue < 0) {
+      toast({
+        description: "Invalid price",
+        variant: "destructive",
+      });
+      return;
+    }
+    const act = actions[updatePriceIndex];
+
+    updateAssetPrice(
+      act.uuid,
+      act.assetID,
+      symbol,
+      updatePriceValue,
+      act.changedAt
+    ).then(() => {
+      const newActions = [...actions];
+      newActions[updatePriceIndex].price = updatePriceValue;
+      setActions(newActions);
+      setUpdatePriceDialogOpen(false);
+      setUpdatePriceIndex(-1);
+      setUpdatePriceValue(-1);
+    });
+  }
+
   return (
     <div className="space-y-4">
+      <Dialog
+        open={updatePriceDialogOpen}
+        onOpenChange={setUpdatePriceDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Update Buy/Sell Price</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Input
+              type="number"
+              defaultValue={updatePriceValue}
+              onChange={(e) => {
+                if (!e.target.value || e.target.value === "0.") {
+                  return;
+                }
+                if (+e.target.value < 0) {
+                  toast({
+                    description: "Invalid price",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setUpdatePriceValue(+e.target.value);
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={onUpdatePriceDialogSaveClick}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="grid gap-4 grid-cols-4">
         <div className="col-span-2 md:col-span-1">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              {/* TODO: quick switch coin */}
               <CardTitle className="text-sm font-medium">Symbol</CardTitle>
               <svg
                 viewBox="0 0 1024 1024"
@@ -115,7 +211,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
                 xmlns="http://www.w3.org/2000/svg"
                 p-id="2876"
                 className="h-4 w-4 text-muted-foreground"
-                >
+              >
                 <path
                   d="M580.8 468.8H448c-38.4 0-68.8-30.4-68.8-64s30.4-64 68.8-64h192c25.6 0 43.2-17.6 43.2-43.2s-17.6-43.2-43.2-43.2h-84.8v-43.2c0-25.6-17.6-43.2-43.2-43.2s-43.2 17.6-43.2 43.2V256h-17.6c-84.8 0-153.6 68.8-153.6 148.8s68.8 148.8 153.6 148.8h132.8c38.4 0 68.8 30.4 68.8 64s-33.6 64-72 64H384c-25.6 0-43.2 17.6-43.2 43.2S358.4 768 384 768h84.8v43.2c0 25.6 17.6 43.2 43.2 43.2s43.2-17.6 43.2-43.2V768h25.6c84.8 0 153.6-68.8 153.6-148.8s-68.8-150.4-153.6-150.4z"
                   p-id="2877"
@@ -142,6 +238,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         </div>
         <div className="col-span-2 md:col-span-1">
           <Card>
+            {/* TODO: compare with latest price */}
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 Breakeven Price
@@ -160,9 +257,9 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
               </svg>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
                 {currency.symbol +
-                  prettyNumberToLocaleString(
+                  prettyPriceNumberToLocaleString(
                     currencyWrapper(currency)(breakevenPrice)
                   )}
               </div>
@@ -213,9 +310,9 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
               </svg>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
                 {currency.symbol +
-                  prettyNumberToLocaleString(
+                  prettyPriceNumberToLocaleString(
                     currencyWrapper(currency)(costPrice)
                   )}
               </div>
@@ -232,9 +329,17 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
           </CardHeader>
           <CardContent className="space-y-2">
             <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Amount</TableHead>
+                  <TableHead className="w-[300px]">Buy/Sell Price</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead className="text-right">Wallet</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {actions.map((act, i) => (
-                  <TableRow key={i} className="h-[55px] cursor-pointer">
+                  <TableRow key={i} className="h-[55px] group">
                     <TableCell>
                       <div className="flex flex-row items-center">
                         <div
@@ -243,13 +348,39 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
                         >
                           {act.amount > 0 ? "+" : "-"}
                           {/* use pretty price to avoid amount is supper small */}
-                          {prettyPriceNumberToLocaleString(Math.abs(act.amount))}
+                          {prettyPriceNumberToLocaleString(
+                            Math.abs(act.amount)
+                          )}
                         </div>
-                        <div className="text-gray-600">{act.price}</div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-gray-400">{act.changedAt}</div>
+                      <div className="flex space-x-2">
+                        <div className="flex">
+                          <div className="text-gray-600">{currency.symbol}</div>
+                          <div className="text-gray-600">
+                            {prettyPriceNumberToLocaleString(
+                              currencyWrapper(currency)(act.price)
+                            )}
+                          </div>
+                        </div>
+                        <Pencil2Icon
+                          className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
+                          onClick={() => {
+                            setUpdatePriceIndex(i);
+                            setUpdatePriceValue(act.price);
+                            setUpdatePriceDialogOpen(true);
+                          }}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-gray-600">
+                        {timestampToDate(
+                          new Date(act.changedAt).getTime(),
+                          true
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div>

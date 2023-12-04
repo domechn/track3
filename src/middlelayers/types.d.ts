@@ -40,6 +40,8 @@ export type CloudAssetModel = {
 }
 
 export type AssetAction = {
+	// id in assets_v2 table
+	assetID: number
 	uuid: string
 	symbol: string
 	wallet?: string
