@@ -18,8 +18,8 @@ import HistoricalData from "../historical-data";
 import Overview from "../overview";
 import Comparison from "../comparison";
 import PageWrapper from "../page-wrapper";
-import WalletAnalysis from "../wallet-analysis";
-import BuyAndSellAnalysis from "../buy-and-sell-analysis";
+import WalletAnalysis from "../wallet-analysic";
+import BuyAndSellAnalysis from "../buy-and-sell-analysic";
 import "./index.css";
 import {
   Route,

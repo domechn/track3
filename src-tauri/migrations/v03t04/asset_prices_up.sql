@@ -9,3 +9,4 @@ CREATE TABLE IF NOT EXISTS asset_prices (
 	-- createdAt in assets_v2
 	createdAt DATETIME NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS unique_uuid_asset_id ON asset_prices (uuid, assetID);

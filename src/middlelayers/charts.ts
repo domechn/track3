@@ -35,6 +35,12 @@ export async function loadAllAssetActionsBySymbol(symbol: string): Promise<Asset
 	return actions
 }
 
+export async function updateAssetPrice(uuid: string, assetID: number, symbol: string, price: number, createdAt: string) {
+	const db = await getDatabase()
+	await db.execute(`INSERT OR REPLACE INTO ${ASSETS_PRICE_TABLE_NAME} (uuid, assetID, symbol, price, createdAt) VALUES (?, ?, ?, ?, ?)`, [
+		uuid, assetID, symbol, price, createdAt
+	])
+}
 
 function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[], pre?: AssetModel[]): AssetAction[] {
 	const getGroupByKey = (p: {
@@ -46,9 +52,9 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 		id: p.assetID
 	})).value()
 
-	// only value changes > 10
+	// only value changes > 10 or price is 0
 	const isAmountChanged = (a: number, b: number, price: number) => {
-		return Math.abs(a - b) * price > 10
+		return price === 0 || Math.abs(a - b) * price > 10
 	}
 
 	const res: AssetAction[] = []
@@ -56,10 +62,11 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 	_(cur).forEach(c => {
 
 		const p = _(pre).find(p => p.symbol === c.symbol && p.wallet === c.wallet)
-		const price = up[getGroupByKey(c)]?.[0]?.price || c.price
+		const price = up[getGroupByKey(c)]?.[0]?.price ?? c.price
 
 		if (!p) {
 			res.push({
+				assetID: c.id,
 				uuid: c.uuid,
 				changedAt: c.createdAt,
 				symbol: c.symbol,
@@ -69,6 +76,7 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 			})
 		} else if (isAmountChanged(p.amount, c.amount, price)) {
 			res.push({
+				assetID: c.id,
 				uuid: c.uuid,
 				changedAt: c.createdAt,
 				symbol: c.symbol,
@@ -83,6 +91,7 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 		const c = _(cur).find(c => c.symbol === p.symbol && c.wallet === p.wallet)
 		if (!c) {
 			res.push({
+				assetID: p.id,
 				uuid: p.uuid,
 				changedAt: p.createdAt,
 				symbol: p.symbol,
