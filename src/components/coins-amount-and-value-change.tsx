@@ -1,5 +1,4 @@
 import _ from "lodash";
-import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timestampToDate } from "@/utils/date";
@@ -8,34 +7,20 @@ import {
   CurrencyRateDetail,
 } from "@/middlelayers/types";
 import { currencyWrapper } from "@/utils/currency";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const App = ({
   currency,
   data,
+  symbol
 }: {
   currency: CurrencyRateDetail;
   data: CoinsAmountAndValueChangeData;
+  symbol: string;
 }) => {
-  const [currentCoinSelected, setCurrentCoinSelected] = useState("");
   const size = useWindowSize();
   const y1Color = "#4F46E5";
   const y2Color = "#F97316";
-
-  useEffect(() => {
-    if (data.length > 0) {
-      setCurrentCoinSelected(data[0].coin);
-    }
-  }, [data]);
 
   const options = {
     maintainAspectRatio: false,
@@ -135,10 +120,6 @@ const App = ({
     };
   }
 
-  function onCoinSelectChange(coin: string) {
-    setCurrentCoinSelected(coin);
-  }
-
   return (
     <div>
       <Card>
@@ -149,7 +130,7 @@ const App = ({
         </CardHeader>
         <CardContent className="space-y-2">
           <div>
-            <Select
+            {/* <Select
               onValueChange={onCoinSelectChange}
               value={currentCoinSelected}
             >
@@ -166,7 +147,7 @@ const App = ({
                   ))}
                 </SelectGroup>
               </SelectContent>
-            </Select>
+            </Select> */}
           </div>
           <div
             style={{
@@ -175,7 +156,7 @@ const App = ({
           >
             <Line
               options={options as any}
-              data={chartDataByCoin(currentCoinSelected)}
+              data={chartDataByCoin(symbol)}
             />
           </div>
         </CardContent>

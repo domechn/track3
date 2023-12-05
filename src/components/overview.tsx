@@ -1,13 +1,11 @@
 import TotalValue from "@/components/total-value-and-change";
 import PNL from "@/components/pnl";
 import LatestAssetsPercentage from "@/components/latest-assets-percentage";
-import CoinsAmountAndValueChange from "@/components/coins-amount-and-value-change";
 import TopCoinsRank from "@/components/top-coins-rank";
 import TopCoinsPercentageChange from "@/components/top-coins-percentage-change";
 
 import {
   AssetChangeData,
-  CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
   LatestAssetsPercentageData,
   PNLData,
@@ -22,7 +20,6 @@ const App = ({
   pnlData,
   latestAssetsPercentageData,
   assetChangeData,
-  coinsAmountAndValueChangeData,
   topCoinsRankData,
   topCoinsPercentageChangeData,
 }: {
@@ -31,7 +28,6 @@ const App = ({
   totalValueData: TotalValueData;
   latestAssetsPercentageData: LatestAssetsPercentageData;
   assetChangeData: AssetChangeData;
-  coinsAmountAndValueChangeData: CoinsAmountAndValueChangeData;
   topCoinsRankData: TopCoinsRankData;
   topCoinsPercentageChangeData: TopCoinsPercentageChangeData;
 }) => {
@@ -52,10 +48,6 @@ const App = ({
       <LatestAssetsPercentage
         currency={currency}
         data={latestAssetsPercentageData}
-      />
-      <CoinsAmountAndValueChange
-        currency={currency}
-        data={coinsAmountAndValueChangeData}
       />
       <TopCoinsRank data={topCoinsRankData} />
       <TopCoinsPercentageChange data={topCoinsPercentageChangeData} />

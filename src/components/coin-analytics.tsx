@@ -3,11 +3,16 @@ import {
   queryLastAssetsBySymbol,
   updateAssetPrice,
 } from "@/middlelayers/charts";
-import { Asset, AssetAction, CurrencyRateDetail } from "@/middlelayers/types";
+import {
+  Asset,
+  AssetAction,
+  CoinsAmountAndValueChangeData,
+  CurrencyRateDetail,
+} from "@/middlelayers/types";
 import _ from "lodash";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   currencyWrapper,
   prettyNumberToLocaleString,
@@ -37,9 +42,28 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "./ui/button";
 import { toast } from "./ui/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import CoinsAmountAndValueChange from "./coins-amount-and-value-change";
 
-const App = ({ currency }: { currency: CurrencyRateDetail }) => {
-  const { symbol } = useParams();
+const App = ({
+  currency,
+  allowSymbols,
+  coinsAmountAndValueChangeData,
+}: {
+  currency: CurrencyRateDetail;
+  allowSymbols: string[];
+  coinsAmountAndValueChangeData: CoinsAmountAndValueChangeData;
+}) => {
+  const { symbol } = useParams() as { symbol: string };
+  const navigate = useNavigate();
 
   const [actions, setActions] = useState<AssetAction[]>([]);
   const [latestAsset, setLatestAsset] = useState<Asset | undefined>();
@@ -48,10 +72,6 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const [updatePriceValue, setUpdatePriceValue] = useState(-1);
   const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
 
-  const [breakevenPrice, setBreakevenPrice] = useState<number>(0);
-  const [costPrice, setCostPrice] = useState<number>(0);
-  const [profit, setProfit] = useState<number>(0);
-
   const [walletAliasMap, setWalletAliasMap] = useState<{
     [k: string]: string | undefined;
   }>({});
@@ -59,9 +79,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const [logo, setLogo] = useState("");
 
   useEffect(() => {
-    if (symbol) {
-      loadSymbolData(symbol);
-    }
+    loadSymbolData(symbol);
   }, [symbol]);
 
   async function getLogoPath(symbol: string) {
@@ -85,17 +103,67 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       });
       setWalletAliasMap(wam);
     });
-
-    const ap = Math.max(0, calculateBreakevenPrice(actions));
-    setBreakevenPrice(ap);
-    setProfit(calculateProfit(ap));
-
-    setCostPrice(calculateCostPrice(actions));
   }, [actions]);
+
+  const breakevenPrice = useMemo(
+    () => Math.max(0, calculateBreakevenPrice(actions)),
+    [actions]
+  );
+
+  const breakEvenPriceStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyPriceNumberToLocaleString(
+        currencyWrapper(currency)(breakevenPrice)
+      ),
+    [currency, breakevenPrice]
+  );
+
+  const profit = useMemo(
+    () => calculateProfit(breakevenPrice),
+    [breakevenPrice]
+  );
+
+  const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
+  const costPriceStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(costPrice)),
+    [currency, costPrice]
+  );
+  const latestPrice = useMemo(() => latestAsset?.price || 0, [latestAsset]);
+  const latestPriceStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(latestPrice)),
+    [currency, latestPrice]
+  );
+
+  const currentValue = useMemo(() => latestAsset?.value || 0, [latestAsset]);
+  const currentValueStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyNumberToLocaleString(currencyWrapper(currency)(currentValue)),
+    [currency, currentValue]
+  );
+
+  const rank = useMemo(
+    () => latestAsset?.amount.toFixed(10).replace(/0+$/, "") || 0,
+    [latestAsset]
+  );
+
+  const profitRate = useMemo(
+    () =>
+      (
+        ((latestPrice - breakevenPrice) / (breakevenPrice || 0.0000000000001)) *
+        100
+      ).toFixed(2),
+    [breakevenPrice, latestPrice]
+  );
 
   function loadSymbolData(s: string) {
     loadAllAssetActionsBySymbol(s).then((res) => {
-      setActions(_(res).sortBy('changedAt').reverse().value());
+      setActions(_(res).sortBy("changedAt").reverse().value());
     });
 
     queryLastAssetsBySymbol(s).then((res) => {
@@ -200,7 +268,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         </DialogContent>
       </Dialog>
       <div className="grid gap-4 grid-cols-4">
-        <div className="col-span-2 md:col-span-1">
+        <div className="col-span-4 md:col-span-1 sm:col-span-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               {/* TODO: quick switch coin */}
@@ -227,20 +295,45 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
             <CardContent>
               <div className="flex">
                 <img
-                  className="inline-block w-[32px] h-[32px] mr-2 rounded-full"
+                  className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
                   src={logo || UnknownLogo}
                   alt={symbol}
                 />
-                <div className="text-2xl font-bold">{symbol}</div>
+                <div className="w-[100%] h-[32px] overflow-hidden">
+                  <Select
+                    defaultValue={symbol}
+                    onValueChange={(v) => {
+                      navigate(`/coins/${v}`);
+                    }}
+                  >
+                    <SelectTrigger
+                      className={`text-2xl font-bold border-none shadow-none focus:ring-0`}
+                    >
+                      <SelectValue placeholder="Select Coin" />
+                    </SelectTrigger>
+                    <SelectContent className="overflow-y-auto max-h-[20rem]">
+                      <SelectGroup>
+                        <SelectLabel>Coins</SelectLabel>
+                        {allowSymbols.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+              <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
+                amount: {rank}
+              </p>
             </CardContent>
           </Card>
         </div>
-        <div className="col-span-2 md:col-span-1">
+        <div className="col-span-4 md:col-span-1 sm:col-span-2">
           <Card>
-            {/* TODO: compare with latest price */}
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-sm font-medium overflow-hidden whitespace-nowrap overflow-ellipsis">
                 Breakeven Price
               </CardTitle>
               <svg
@@ -258,15 +351,15 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {currency.symbol +
-                  prettyPriceNumberToLocaleString(
-                    currencyWrapper(currency)(breakevenPrice)
-                  )}
+                {breakEvenPriceStr}
               </div>
+              <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
+                profit rate: {profitRate}%
+              </p>
             </CardContent>
           </Card>
         </div>
-        <div className="col-span-2 md:col-span-1">
+        <div className="col-span-4 md:col-span-1 sm:col-span-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Profit</CardTitle>
@@ -285,14 +378,17 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
               </svg>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
                 {currency.symbol +
                   prettyNumberToLocaleString(currencyWrapper(currency)(profit))}
               </div>
+              <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
+                current value: {currentValueStr}
+              </p>
             </CardContent>
           </Card>
         </div>
-        <div className="col-span-2 md:col-span-1">
+        <div className="col-span-4 md:col-span-1 sm:col-span-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Cost Price</CardTitle>
@@ -311,14 +407,21 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {currency.symbol +
-                  prettyPriceNumberToLocaleString(
-                    currencyWrapper(currency)(costPrice)
-                  )}
+                {costPriceStr}
               </div>
+              <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
+                latest price: {latestPriceStr}
+              </p>
             </CardContent>
           </Card>
         </div>
+      </div>
+      <div>
+        <CoinsAmountAndValueChange
+          currency={currency}
+          symbol={symbol}
+          data={coinsAmountAndValueChangeData}
+        />
       </div>
       <div>
         <Card>

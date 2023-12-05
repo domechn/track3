@@ -189,7 +189,7 @@ const App = ({
                 <TableRow
                   key={d.coin}
                   className="h-[55px] cursor-pointer group"
-                  onClick={() => navigate(`/buy-and-sell/${d.coin}`)}
+                  onClick={() => navigate(`/coins/${d.coin}`)}
                 >
                   <TableCell>
                     <div className="flex flex-row items-center">
