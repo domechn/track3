@@ -18,8 +18,8 @@ import HistoricalData from "../historical-data";
 import Overview from "../overview";
 import Comparison from "../comparison";
 import PageWrapper from "../page-wrapper";
-import WalletAnalysis from "../wallet-analysic";
-import BuyAndSellAnalysis from "../buy-and-sell-analysic";
+import WalletAnalysis from "../wallet-analytics";
+import CoinAnalysis from "../coin-analytics";
 import "./index.css";
 import {
   Route,
@@ -55,7 +55,6 @@ import { useWindowSize } from "@/utils/hook";
 import { Chart } from "chart.js";
 import { LoadingContext } from "@/App";
 import {
-  getConfiguration,
   getCurrentPreferCurrency,
   getQuerySize,
 } from "@/middlelayers/configuration";
@@ -101,6 +100,8 @@ const App = () => {
 
   const [hasData, setHasData] = useState(true);
 
+  const [allSymbols, setAllSymbols] = useState<string[]>([]);
+
   const [activeMenu, setActiveMenu] = useState("overview");
 
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
@@ -133,6 +134,10 @@ const App = () => {
 
     autoSyncData();
   }, []);
+
+  useEffect(() => {
+    setAllSymbols(_(latestAssetsPercentageData).map("coin").uniq().value());
+  }, [latestAssetsPercentageData]);
 
   useEffect(() => {
     if (querySize > 0) {
@@ -172,17 +177,19 @@ const App = () => {
     const overviewsCharts = [
       "Trend of Asset",
       "PNL of Asset",
-      "Trend of Coins",
       "Percentage of Assets",
       "Change of Top Coins",
       "Trend of Top Coins Rank",
     ];
     const walletsCharts = ["Percentage And Total Value of Each Wallet"];
+    const coinsCharts = ["Trend of Coins"];
     let chartsTitles: string[] = [];
     if (activeMenu === "overview") {
       chartsTitles = overviewsCharts;
     } else if (activeMenu === "wallets") {
       chartsTitles = walletsCharts;
+    }else if (activeMenu === "coins") {
+      chartsTitles = coinsCharts;
     }
     console.log("resizing all charts");
 
@@ -246,7 +253,11 @@ const App = () => {
   }
 
   useEffect(() => {
-    if (activeMenu === "overview" || activeMenu === "wallets") {
+    if (
+      activeMenu === "overview" ||
+      activeMenu === "wallets" ||
+      activeMenu === "coins"
+    ) {
       resizeAllCharts();
     }
   }, [activeMenu]);
@@ -265,6 +276,10 @@ const App = () => {
           setActiveMenu("wallets");
           break;
         default:
+          if (lo.pathname.startsWith("/coins/")) {
+            setActiveMenu("coins");
+            break;
+          }
           // not important
           setActiveMenu("");
           break;
@@ -331,7 +346,6 @@ const App = () => {
                   pnlData={pnlData}
                   assetChangeData={assetChangeData}
                   totalValueData={totalValueData}
-                  coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
                   topCoinsRankData={topCoinsRankData}
                   topCoinsPercentageChangeData={topCoinsPercentageChangeData}
                 />
@@ -388,8 +402,14 @@ const App = () => {
           </Route>
 
           <Route
-            path="/buy-and-sell/:symbol"
-            element={<BuyAndSellAnalysis currency={currentCurrency} />}
+            path="/coins/:symbol"
+            element={
+              <CoinAnalysis
+                currency={currentCurrency}
+                allowSymbols={allSymbols}
+                coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
+              />
+            }
           ></Route>
 
           <Route path="*" element={<div>not found</div>} />
