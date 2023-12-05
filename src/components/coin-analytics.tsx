@@ -31,7 +31,11 @@ import {
 import { getImageApiPath } from "@/utils/app";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { timestampToDate } from "@/utils/date";
-import { Pencil2Icon } from "@radix-ui/react-icons";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Pencil2Icon,
+} from "@radix-ui/react-icons";
 import { Input } from "./ui/input";
 import {
   Dialog,
@@ -64,6 +68,10 @@ const App = ({
 }) => {
   const { symbol } = useParams() as { symbol: string };
   const navigate = useNavigate();
+  const pageSize = 20;
+
+  const [dataPage, setDataPage] = useState<number>(0);
+  const [maxDataPage, setMaxDataPage] = useState<number>(0);
 
   const [actions, setActions] = useState<AssetAction[]>([]);
   const [latestAsset, setLatestAsset] = useState<Asset | undefined>();
@@ -103,6 +111,12 @@ const App = ({
       });
       setWalletAliasMap(wam);
     });
+
+    // update max page
+    // - 0.000000000001 is for float number precision
+    const mp = Math.floor(actions.length / pageSize - 0.000000000001);
+    // set max data page
+    setMaxDataPage(mp >= 0 ? mp : 0);
   }, [actions]);
 
   const breakevenPrice = useMemo(
@@ -430,6 +444,27 @@ const App = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            <div className="flex space-x-2 py-4 items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
+                disabled={dataPage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <div className="text-muted-foreground text-sm">
+                {dataPage + 1} {"/"} {maxDataPage + 1}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
+                disabled={dataPage >= maxDataPage}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -440,57 +475,61 @@ const App = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {actions.map((act, i) => (
-                  <TableRow key={i} className="h-[55px] group">
-                    <TableCell>
-                      <div className="flex flex-row items-center">
-                        <div
-                          className="mr-1 font-bold text-base"
-                          title={"" + act.amount}
-                        >
-                          {act.amount > 0 ? "+" : "-"}
-                          {/* use pretty price to avoid amount is supper small */}
-                          {prettyPriceNumberToLocaleString(
-                            Math.abs(act.amount)
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <div className="flex">
-                          <div className="text-gray-600">{currency.symbol}</div>
-                          <div className="text-gray-600">
+                {actions
+                  .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
+                  .map((act, i) => (
+                    <TableRow key={i} className="h-[55px] group">
+                      <TableCell>
+                        <div className="flex flex-row items-center">
+                          <div
+                            className="mr-1 font-bold text-base"
+                            title={"" + act.amount}
+                          >
+                            {act.amount > 0 ? "+" : "-"}
+                            {/* use pretty price to avoid amount is supper small */}
                             {prettyPriceNumberToLocaleString(
-                              currencyWrapper(currency)(act.price)
+                              Math.abs(act.amount)
                             )}
                           </div>
                         </div>
-                        <Pencil2Icon
-                          className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
-                          onClick={() => {
-                            setUpdatePriceIndex(i);
-                            setUpdatePriceValue(act.price);
-                            setUpdatePriceDialogOpen(true);
-                          }}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-gray-600">
-                        {timestampToDate(
-                          new Date(act.changedAt).getTime(),
-                          true
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div>
-                        {act.wallet ? walletAliasMap[act.wallet] || "" : ""}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <div className="flex">
+                            <div className="text-gray-600">
+                              {currency.symbol}
+                            </div>
+                            <div className="text-gray-600">
+                              {prettyPriceNumberToLocaleString(
+                                currencyWrapper(currency)(act.price)
+                              )}
+                            </div>
+                          </div>
+                          <Pencil2Icon
+                            className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
+                            onClick={() => {
+                              setUpdatePriceIndex(i);
+                              setUpdatePriceValue(act.price);
+                              setUpdatePriceDialogOpen(true);
+                            }}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-gray-600">
+                          {timestampToDate(
+                            new Date(act.changedAt).getTime(),
+                            true
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>
+                          {act.wallet ? walletAliasMap[act.wallet] || "" : ""}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
           </CardContent>
