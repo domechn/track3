@@ -167,7 +167,7 @@ const App = () => {
     if (
       lastSize.width === windowSize.width &&
       lastSize.height === windowSize.height &&
-      (activeMenu === "overview" || activeMenu === "wallets")
+      (activeMenu === "overview" || activeMenu === "wallets" || activeMenu === "coins")
     ) {
       resizeAllCharts();
     }
