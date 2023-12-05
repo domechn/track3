@@ -121,7 +121,7 @@ const App = ({
 
   const profit = useMemo(
     () => calculateProfit(breakevenPrice),
-    [breakevenPrice]
+    [breakevenPrice, symbol]
   );
 
   const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
@@ -154,10 +154,9 @@ const App = ({
 
   const profitRate = useMemo(
     () =>
-      (
-        ((latestPrice - breakevenPrice) / (breakevenPrice || 0.0000000000001)) *
-        100
-      ).toFixed(2),
+      breakevenPrice === 0
+        ? "∞"
+        : (((latestPrice - breakevenPrice) / breakevenPrice) * 100).toFixed(2),
     [breakevenPrice, latestPrice]
   );
 

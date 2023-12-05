@@ -397,9 +397,9 @@ export async function queryLastRefreshAt(): Promise<string | null> {
 	return timestampToDate(new Date(assets[0][0].createdAt).getTime(), true)
 }
 
-function getCoins(assets: AssetModel[][]): string[] {
+function getCoins(assets: AssetModel[][], size = 10): string[] {
 	// only take top 10 coins in each item
-	return _(assets).map(as => _(as).sortBy('value').reverse().take(10).value()).flatten().map(a => a.symbol).uniq().value()
+	return _(assets).map(as => _(as).sortBy('value').reverse().take(size > 0 ? size : _(as).size()).value()).flatten().map(a => a.symbol).uniq().value()
 }
 
 export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
@@ -450,7 +450,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 }
 
 export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndValueChangeData> {
-	const querySize = size * 2
+	const querySize = size
 
 	const assets = groupAssetModelsListBySymbol(await queryAssets(querySize) || [])
 	if (!assets) {
@@ -459,7 +459,8 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndV
 
 	const reservedAssets = _(assets).reverse().value()
 
-	const coins = getCoins(reservedAssets)
+	// list all coins
+	const coins = getCoins(reservedAssets, -1)
 
 	const colors = generateRandomColors(coins.length)
 
