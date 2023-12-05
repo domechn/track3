@@ -284,7 +284,6 @@ const App = ({
         <div className="col-span-4 md:col-span-1 sm:col-span-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              {/* TODO: quick switch coin */}
               <CardTitle className="text-sm font-medium">Symbol</CardTitle>
               <svg
                 viewBox="0 0 1024 1024"
@@ -444,7 +443,7 @@ const App = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex space-x-2 py-4 items-center">
+            <div className="flex space-x-2 py-1 items-center">
               <Button
                 variant="outline"
                 size="sm"
