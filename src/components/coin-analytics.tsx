@@ -135,7 +135,7 @@ const App = ({
 
   const profit = useMemo(
     () => calculateProfit(breakevenPrice),
-    [breakevenPrice, symbol]
+    [latestAsset, breakevenPrice, symbol]
   );
 
   const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
@@ -164,6 +164,13 @@ const App = ({
   const rank = useMemo(
     () => latestAsset?.amount.toFixed(10).replace(/0+$/, "") || 0,
     [latestAsset]
+  );
+
+  const profitStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyNumberToLocaleString(currencyWrapper(currency)(profit)),
+    [currency, profit]
   );
 
   const profitRate = useMemo(
@@ -391,8 +398,7 @@ const App = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {currency.symbol +
-                  prettyNumberToLocaleString(currencyWrapper(currency)(profit))}
+                {profitStr}
               </div>
               <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
                 current value: {currentValueStr}
