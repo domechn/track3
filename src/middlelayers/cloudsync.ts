@@ -1,5 +1,5 @@
 import { Polybase } from '@polybase/client'
-import { getDatabase } from './database'
+import { getDatabase, saveModelsToDatabase } from './database'
 import { v4 as uuidv4 } from 'uuid'
 import { ASSETS_TABLE_NAME, queryAssetsAfterCreatedAt } from './charts'
 import { AssetModel, CloudAssetModel, CloudSyncConfiguration } from './types'
@@ -318,19 +318,8 @@ async function removeAssetsInCloud(assets: AssetModel[]): Promise<number> {
 
 // return updated how many records
 async function writeAssetsToDB(d: Database, assets: AssetModel[]): Promise<number> {
-	const insertValuesStr = assets.map(() => `(?, ?, ?, ?, ?, ?, ?)`).join(", ")
-
-	await d.execute(`INSERT INTO ${ASSETS_TABLE_NAME} (uuid, createdAt, symbol, amount, value, price, wallet) VALUES ${insertValuesStr}`, _(assets).map((asset) => [
-		asset.uuid,
-		asset.createdAt,
-		asset.symbol,
-		asset.amount,
-		asset.value,
-		asset.price,
-		asset.wallet,
-	]).flatten().value())
-
-	return assets.length
+	const res = await saveModelsToDatabase(ASSETS_TABLE_NAME, _.map(assets, (obj) => _.omit(obj, "id")))
+	return res.length
 }
 
 async function updateLastSyncTime(d: Database, publicKey: string) {

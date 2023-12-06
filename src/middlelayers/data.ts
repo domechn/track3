@@ -20,7 +20,6 @@ type ExportData = {
 	exportAt: string
 	configuration?: string
 	historicalData: Pick<HistoricalData, "createdAt" | "assets" | "total">[]
-	priceData?: AssetPriceModel[]
 	md5: string
 }
 
@@ -83,6 +82,7 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 
 	const historicalData = await queryHistoricalData(-1, false)
 	const priceData = await queryAllAssetPrices()
+	const priceDataByAssetID = _(priceData).mapKeys("assetID").mapValues().value()
 
 	const exportAt = new Date().toISOString()
 
@@ -90,8 +90,14 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 
 	const exportData = {
 		exportAt,
-		historicalData: _.map(historicalData, (obj) => _.omit(obj, "id")),
-		priceData: _.map(priceData, (obj) => _.omit(obj, "id")),
+		historicalData: _(historicalData).map(d => ({
+			createdAt: d.createdAt,
+			total: d.total,
+			assets: _(d.assets).map(a => ({
+				...a,
+				costPrice: priceDataByAssetID[a.id]?.price
+			})).value()
+		})).value(),
 		configuration: cfg
 	}
 
@@ -119,13 +125,13 @@ export async function importHistoricalData(): Promise<boolean> {
 	}
 	const contents = await readTextFile(selected as string)
 
-	const { exportAt, md5, configuration, historicalData, priceData } = JSON.parse(contents) as ExportData
+	const { exportAt, md5, configuration, historicalData } = JSON.parse(contents) as ExportData
 
 	// !compatible with older versions logic ( before 0.3.3 )
 	if (md5) {
 		// verify md5
 		// todo: use md5 in typescript
-		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, priceData, configuration }) })
+		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, configuration }) })
 		if (currentMd5 !== md5) {
 			throw new Error("invalid data, md5 check failed: errorCode 000")
 		}
@@ -149,15 +155,11 @@ export async function importHistoricalData(): Promise<boolean> {
 		await importRawConfiguration(configuration)
 	}
 
-	if (priceData) {
-		await saveAssetPricesToDatabase(priceData)
-	}
-
 	return true
 }
 
 // import historicalData from file
-async function saveHistoricalDataAssets(assets: AssetModel[]) {
+async function saveHistoricalDataAssets(assets: (AssetModel & { costPrice?: number })[]) {
 	const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
 	_(assets).forEach((asset) => {
 		_(requiredKeys).forEach(k => {
@@ -168,17 +170,25 @@ async function saveHistoricalDataAssets(assets: AssetModel[]) {
 	})
 
 	await saveModelsToDatabase(ASSETS_TABLE_NAME, assets)
-}
 
-// import asset prices from file
-async function saveAssetPricesToDatabase(models: AssetPriceModel[]) {
-	const requiredKeys = ["uuid", "assetID", "symbol", "price", "createdAt", "price"]
-	_(models).forEach((asset) => {
-		_(requiredKeys).forEach(k => {
-			if (!_(asset).has(k)) {
-				throw new Error(`invalid data: errorCode 004`)
-			}
-		})
-	})
-	return saveModelsToDatabase(ASSETS_PRICE_TABLE_NAME, models)
+	// import asset prices
+	const importedAssets = _(await queryHistoricalData(-1, false)).map(d => d.assets).flatten().value()
+	const assetPriceModels = _(assets).filter(a => a.costPrice !== undefined).map(a => {
+		console.log(a);
+		
+		const f = _(importedAssets).find(ia => ia.uuid === a.uuid && ia.symbol === a.symbol && ia.wallet === a.wallet)
+		if (!f) {
+			return
+		}
+		return {
+			uuid: a.uuid,
+			assetID: f.id,
+			symbol: a.symbol,
+			price: a.costPrice,
+			createdAt: a.createdAt
+		} as AssetPriceModel
+	}).compact().value()
+
+	await saveModelsToDatabase(ASSETS_PRICE_TABLE_NAME, assetPriceModels)
+
 }

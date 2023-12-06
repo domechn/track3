@@ -168,7 +168,8 @@ export type CoinsAmountAndValueChangeData = {
 export type HistoricalData = {
 	id: string
 	createdAt: string
-	assets: AssetModel[]
+	// costPrice only exists when exporting historical data
+	assets: (AssetModel & { costPrice?: number })[]
 
 	total: number
 }
