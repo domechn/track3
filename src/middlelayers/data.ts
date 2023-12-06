@@ -8,7 +8,7 @@ import { OthersAnalyzer } from './datafetch/coins/others'
 import { SOLAnalyzer } from './datafetch/coins/sol'
 import { ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
-import { ASSETS_TABLE_NAME, queryAllAssetPrices, queryHistoricalData } from './charts'
+import { ASSETS_PRICE_TABLE_NAME, ASSETS_TABLE_NAME, queryAllAssetPrices, queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
@@ -94,7 +94,7 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 		priceData: _.map(priceData, (obj) => _.omit(obj, "id")),
 		configuration: cfg
 	}
-	
+
 	const content = JSON.stringify({
 		...exportData,
 		md5: await invoke<string>("md5", { data: JSON.stringify(exportData) }),
@@ -125,7 +125,7 @@ export async function importHistoricalData(): Promise<boolean> {
 	if (md5) {
 		// verify md5
 		// todo: use md5 in typescript
-		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, configuration }) })
+		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, priceData, configuration }) })
 		if (currentMd5 !== md5) {
 			throw new Error("invalid data, md5 check failed: errorCode 000")
 		}
@@ -180,5 +180,5 @@ async function saveAssetPricesToDatabase(models: AssetPriceModel[]) {
 			}
 		})
 	})
-	return saveModelsToDatabase(ASSETS_TABLE_NAME, models)
+	return saveModelsToDatabase(ASSETS_PRICE_TABLE_NAME, models)
 }
