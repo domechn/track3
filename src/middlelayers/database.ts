@@ -56,9 +56,9 @@ async function saveAssetsToDatabase(db: Database, models: CoinModel[]): Promise<
 	return saveToDatabase(db, ASSETS_TABLE_NAME, dbModels)
 }
 
-export async function saveAssetPricesToDatabase(models: AssetPriceModel[]) {
+export async function saveModelsToDatabase<T extends object>(table: string, models: T[]) {
 	const db = await getDatabase()
-	return saveToDatabase(db, ASSETS_PRICE_TABLE_NAME, models)
+	return saveToDatabase(db, table, models)
 }
 
 async function saveToDatabase<T extends object>(db: Database, table: string, models: T[]) {
