@@ -164,9 +164,15 @@ async function queryAssets(size = 1, symbol?: string): Promise<AssetModel[][]> {
 	return _(assets).groupBy("createdAt").values().value()
 }
 
-async function queryAssetPrices(symbol: string): Promise<AssetPriceModel[]> {
+// return all asset prices for all symbols
+export function queryAllAssetPrices(): Promise<AssetPriceModel[]> {
+	return queryAssetPrices()
+}
+
+async function queryAssetPrices(symbol?: string): Promise<AssetPriceModel[]> {
 	const db = await getDatabase()
-	const prices = await db.select<AssetPriceModel[]>(`SELECT * FROM ${ASSETS_PRICE_TABLE_NAME} WHERE symbol = ?`, [symbol])
+	const params = symbol ? [symbol] : []
+	const prices = await db.select<AssetPriceModel[]>(`SELECT * FROM ${ASSETS_PRICE_TABLE_NAME} WHERE 1=1 ${symbol ? 'and symbol = ?' : ''}`, params)
 	return prices
 }
 

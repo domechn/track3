@@ -8,18 +8,19 @@ import { OthersAnalyzer } from './datafetch/coins/others'
 import { SOLAnalyzer } from './datafetch/coins/sol'
 import { ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
-import { ASSETS_TABLE_NAME, queryHistoricalData } from './charts'
+import { ASSETS_PRICE_TABLE_NAME, ASSETS_TABLE_NAME, queryAllAssetPrices, queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
-import { AssetModel, HistoricalData } from './types'
-import { getDatabase } from './database'
+import { AssetModel, AssetPriceModel, HistoricalData } from './types'
+import { getDatabase, saveModelsToDatabase } from './database'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
 
 type ExportData = {
 	exportAt: string
 	configuration?: string
 	historicalData: Pick<HistoricalData, "createdAt" | "assets" | "total">[]
+	priceData?: AssetPriceModel[]
 	md5: string
 }
 
@@ -80,7 +81,8 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 		return false
 	}
 
-	const data = await queryHistoricalData(-1, false)
+	const historicalData = await queryHistoricalData(-1, false)
+	const priceData = await queryAllAssetPrices()
 
 	const exportAt = new Date().toISOString()
 
@@ -88,9 +90,11 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 
 	const exportData = {
 		exportAt,
-		historicalData: _.map(data, (obj) => _.omit(obj, "id")),
+		historicalData: _.map(historicalData, (obj) => _.omit(obj, "id")),
+		priceData: _.map(priceData, (obj) => _.omit(obj, "id")),
 		configuration: cfg
 	}
+
 	const content = JSON.stringify({
 		...exportData,
 		md5: await invoke<string>("md5", { data: JSON.stringify(exportData) }),
@@ -115,13 +119,13 @@ export async function importHistoricalData(): Promise<boolean> {
 	}
 	const contents = await readTextFile(selected as string)
 
-	const { exportAt, md5, configuration, historicalData } = JSON.parse(contents) as ExportData
+	const { exportAt, md5, configuration, historicalData, priceData } = JSON.parse(contents) as ExportData
 
 	// !compatible with older versions logic ( before 0.3.3 )
 	if (md5) {
 		// verify md5
 		// todo: use md5 in typescript
-		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, configuration }) })
+		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, priceData, configuration }) })
 		if (currentMd5 !== md5) {
 			throw new Error("invalid data, md5 check failed: errorCode 000")
 		}
@@ -145,9 +149,14 @@ export async function importHistoricalData(): Promise<boolean> {
 		await importRawConfiguration(configuration)
 	}
 
+	if (priceData) {
+		await saveAssetPricesToDatabase(priceData)
+	}
+
 	return true
 }
 
+// import historicalData from file
 async function saveHistoricalDataAssets(assets: AssetModel[]) {
 	const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
 	_(assets).forEach((asset) => {
@@ -158,17 +167,18 @@ async function saveHistoricalDataAssets(assets: AssetModel[]) {
 		})
 	})
 
-	// remove if there are id file in keys
-	const keys = _(_(assets).map(x => Object.keys(x)).value()).flatten().uniq().compact().filter(k => k !== "id").value()
+	await saveModelsToDatabase(ASSETS_TABLE_NAME, assets)
+}
 
-	const values = "(" + keys.map(() => '?').join(',') + ")"
-
-	const valuesArrayStr = new Array(assets.length).fill(values).join(',')
-
-	const insertSql = `INSERT INTO ${ASSETS_TABLE_NAME} (${keys.join(',')}) VALUES ${valuesArrayStr}`
-
-	const db = await getDatabase()
-	const executeValues = _(assets as AssetModel[]).sortBy(a => new Date(a.createdAt).getTime()).reverse().map(a => _(keys).map(k => _(a).get(k)).value()).flatten().value()
-
-	await db.execute(insertSql, executeValues)
+// import asset prices from file
+async function saveAssetPricesToDatabase(models: AssetPriceModel[]) {
+	const requiredKeys = ["uuid", "assetID", "symbol", "price", "createdAt", "price"]
+	_(models).forEach((asset) => {
+		_(requiredKeys).forEach(k => {
+			if (!_(asset).has(k)) {
+				throw new Error(`invalid data: errorCode 004`)
+			}
+		})
+	})
+	return saveModelsToDatabase(ASSETS_PRICE_TABLE_NAME, models)
 }
