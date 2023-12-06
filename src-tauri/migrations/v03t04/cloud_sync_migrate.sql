@@ -1,0 +1,1 @@
+ALTER TABLE cloud_sync ADD COLUMN needsFixExisting INTEGER NOT NULL DEFAULT 0;

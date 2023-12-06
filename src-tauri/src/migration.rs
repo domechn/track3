@@ -514,12 +514,16 @@ impl Migration for V3TV4 {
         let asset_prices =
             fs::read_to_string(resource_dir.join("migrations/v03t04/asset_prices_up.sql"))
                 .unwrap();
+        let cloud_sync_migrate =
+            fs::read_to_string(resource_dir.join("migrations/v03t04/cloud_sync_migrate.sql"))
+                .unwrap();
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
             println!("migrate from v0.3 to v0.4 in tokio spawn");
             let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
             conn.execute(asset_prices.as_str()).await.unwrap();
+            conn.execute(cloud_sync_migrate.as_str()).await.unwrap();
             conn.close().await.unwrap();
             println!("migrate from v0.3 to v0.4 in tokio spawn done");
         });

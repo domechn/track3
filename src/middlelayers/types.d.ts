@@ -10,6 +10,9 @@ export type AssetModel = {
 	wallet?: string
 }
 
+// type when exporting assets to json or cloud database
+export type ExportAssetModel = AssetModel & { costPrice?: number }
+
 // asset_prices table
 // to record the cost price or sell price of each coins, can be updated by users
 export type AssetPriceModel = {
@@ -33,7 +36,7 @@ export type CloudAssetModel = {
 
 	uuid: string
 
-	// json stringify from AssetModel[]
+	// json stringify from ExportAssetModel[]
 	records: string
 
 	createdAt: number
@@ -169,7 +172,7 @@ export type HistoricalData = {
 	id: string
 	createdAt: string
 	// costPrice only exists when exporting historical data
-	assets: (AssetModel & { costPrice?: number })[]
+	assets: ExportAssetModel[]
 
 	total: number
 }

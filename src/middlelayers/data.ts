@@ -12,7 +12,7 @@ import { ASSETS_PRICE_TABLE_NAME, ASSETS_TABLE_NAME, queryAllAssetPrices, queryH
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
-import { AssetModel, AssetPriceModel, HistoricalData } from './types'
+import { AssetModel, AssetPriceModel, ExportAssetModel, HistoricalData } from './types'
 import { getDatabase, saveModelsToDatabase } from './database'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
 
@@ -159,7 +159,7 @@ export async function importHistoricalData(): Promise<boolean> {
 }
 
 // import historicalData from file
-async function saveHistoricalDataAssets(assets: (AssetModel & { costPrice?: number })[]) {
+async function saveHistoricalDataAssets(assets: ExportAssetModel[]) {
 	const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
 	_(assets).forEach((asset) => {
 		_(requiredKeys).forEach(k => {
@@ -174,8 +174,8 @@ async function saveHistoricalDataAssets(assets: (AssetModel & { costPrice?: numb
 	// import asset prices
 	const importedAssets = _(await queryHistoricalData(-1, false)).map(d => d.assets).flatten().value()
 	const assetPriceModels = _(assets).filter(a => a.costPrice !== undefined).map(a => {
-		console.log(a);
-		
+		console.log(a)
+
 		const f = _(importedAssets).find(ia => ia.uuid === a.uuid && ia.symbol === a.symbol && ia.wallet === a.wallet)
 		if (!f) {
 			return

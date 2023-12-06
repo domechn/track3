@@ -2,7 +2,7 @@ import { Polybase } from '@polybase/client'
 import { getDatabase, saveModelsToDatabase } from './database'
 import { v4 as uuidv4 } from 'uuid'
 import { ASSETS_TABLE_NAME, queryAssetsAfterCreatedAt } from './charts'
-import { AssetModel, CloudAssetModel, CloudSyncConfiguration } from './types'
+import { CloudAssetModel, CloudSyncConfiguration, ExportAssetModel } from './types'
 import { getCloudSyncConfiguration as getCloudSyncConfigurationModel, saveCloudSyncConfiguration as saveCloudSyncConfigurationModel } from './configuration'
 import _ from 'lodash'
 import Database from 'tauri-plugin-sql-api'
@@ -185,14 +185,14 @@ export async function getPublicKey() {
 }
 
 // list all assets from cloud
-async function dumpAssetsFromCloudAfterCreatedAt(createdAt?: number): Promise<AssetModel[]> {
+async function dumpAssetsFromCloudAfterCreatedAt(createdAt?: number): Promise<ExportAssetModel[]> {
 	const p = await getPolybaseDB()
 	// filter assets > createdAt from cloud, if createdAt is not provided, get all assets
 	const records = await p.collection<CloudAssetModel>(RECORD_COLLECTION_NAME).where("createdAt", ">=", createdAt || 0).sort("createdAt", "desc").get()
 
 	const needSyncedAssets = _(records.data).
 		map('data').
-		map(record => record.records ? JSON.parse(record.records) as AssetModel[] : []).
+		map(record => record.records ? JSON.parse(record.records) as ExportAssetModel[] : []).
 		flatten().
 		compact().
 		map((record) => ({
@@ -218,8 +218,11 @@ async function dumpAssetsFromCloudAfterCreatedAt(createdAt?: number): Promise<As
 	})).value()
 }
 
-async function dumpAssetsFromDBAfterCreatedAt(createdAt?: number): Promise<AssetModel[]> {
-	return queryAssetsAfterCreatedAt(createdAt)
+async function dumpAssetsFromDBAfterCreatedAt(createdAt?: number): Promise<ExportAssetModel[]> {
+	const models = await queryAssetsAfterCreatedAt(createdAt)
+
+	// todo: get cost price
+	return models
 }
 
 export async function syncAssetsToCloudAndLocal(publicKey: string, createdAt?: number): Promise<number> {
@@ -246,7 +249,7 @@ export async function syncAssetsToCloudAndLocal(publicKey: string, createdAt?: n
 		synced += await writeAssetsToDB(d, needSyncedAssetsToDB)
 	}
 
-	await updateLastSyncTime(d, publicKey)
+	await markAsSynced(d, publicKey)
 	return synced
 }
 
@@ -272,11 +275,11 @@ export async function forceSyncAssetsToCloudFromLocal(publicKey: string): Promis
 		synced += await removeAssetsInCloud(needRemovedInCloud)
 	}
 
-	await updateLastSyncTime(d, publicKey)
+	await markAsSynced(d, publicKey)
 	return synced
 }
 
-async function writeAssetsToCloud(publicKey: string, assets: AssetModel[]): Promise<number> {
+async function writeAssetsToCloud(publicKey: string, assets: ExportAssetModel[]): Promise<number> {
 	const gas = _(assets).groupBy('uuid').value()
 	const p = await getPolybaseDB()
 	const res = await bluebird.map(Object.keys(gas), async (uuid) => {
@@ -298,11 +301,11 @@ async function writeAssetsToCloud(publicKey: string, assets: AssetModel[]): Prom
 	return _(res).sum()
 }
 
-async function removeAssetsInCloud(assets: AssetModel[]): Promise<number> {
+async function removeAssetsInCloud(assets: ExportAssetModel[]): Promise<number> {
 	const p = await getPolybaseDB()
 	const res = await bluebird.map(_(assets).map('uuid').uniq().value(), async (uid: string) => {
-		console.log('removeAssetsInCloud', uid);
-		
+		console.log('removeAssetsInCloud', uid)
+
 		const records = await p.collection<CloudAssetModel>(RECORD_COLLECTION_NAME).where("uuid", "==", uid).get()
 		if (records.data.length === 0) {
 			return 0
@@ -317,13 +320,25 @@ async function removeAssetsInCloud(assets: AssetModel[]): Promise<number> {
 }
 
 // return updated how many records
-async function writeAssetsToDB(d: Database, assets: AssetModel[]): Promise<number> {
-	const res = await saveModelsToDatabase(ASSETS_TABLE_NAME, _.map(assets, (obj) => _.omit(obj, "id")))
+async function writeAssetsToDB(d: Database, assets: ExportAssetModel[]): Promise<number> {
+	const res = await saveModelsToDatabase(ASSETS_TABLE_NAME, _(assets).map(a => _(a).omit("id").omit("costPrice").value()).value())
+	const f = _(assets).find(a => a.costPrice !== undefined)
+	if (!f) {
+		// not asset_price need to be saved
+		return res.length
+	}
+	// todo save asset_price
 	return res.length
 }
 
-async function updateLastSyncTime(d: Database, publicKey: string) {
-	await d.execute(`INSERT INTO ${CLOUD_SYNC_TABLE_NAME} (publicKey, updatedAt) VALUES (?, ?) ON CONFLICT(publicKey) DO UPDATE SET updatedAt = ?`, [publicKey, new Date().toISOString(), new Date().toISOString()])
+async function markAsSynced(d: Database, publicKey: string) {
+	await d.execute(`INSERT INTO ${CLOUD_SYNC_TABLE_NAME} (publicKey, updatedAt, needsFixExisting) VALUES (?, ?, ?) ON CONFLICT(publicKey) DO UPDATE SET updatedAt = ?, needsFixExisting = ?`, [publicKey, new Date().toISOString(), 0, new Date().toISOString(), 0])
+}
+
+// if nee needsFixExisting is true, means need to override data in cloud if it is differenceBy local
+export async function updateNeedsFixExisting(publicKey: string) {
+	const d = await getDatabase()
+	await d.execute(`UPDATE ${CLOUD_SYNC_TABLE_NAME} SET needsFixExisting = 1 WHERE publicKey = ?`, [publicKey])
 }
 
 async function sendPostRequest<T>(path: string, body: object, token?: string): Promise<T> {
