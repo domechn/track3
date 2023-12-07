@@ -26,7 +26,8 @@ export type AssetPriceModel = {
 	price: number
 
 	// createdAt in assets_v2 table
-	createdAt: string
+	assetCreatedAt: string
+	updatedAt: string
 }
 
 export type CloudAssetModel = {

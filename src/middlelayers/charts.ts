@@ -37,7 +37,7 @@ export async function loadAllAssetActionsBySymbol(symbol: string): Promise<Asset
 
 export async function updateAssetPrice(uuid: string, assetID: number, symbol: string, price: number, createdAt: string) {
 	const db = await getDatabase()
-	await db.execute(`INSERT OR REPLACE INTO ${ASSETS_PRICE_TABLE_NAME} (uuid, assetID, symbol, price, createdAt) VALUES (?, ?, ?, ?, ?)`, [
+	await db.execute(`INSERT OR REPLACE INTO ${ASSETS_PRICE_TABLE_NAME} (uuid, assetID, symbol, price, assetCreatedAt) VALUES (?, ?, ?, ?, ?)`, [
 		uuid, assetID, symbol, price, createdAt
 	])
 }
@@ -169,10 +169,27 @@ export function queryAllAssetPrices(): Promise<AssetPriceModel[]> {
 	return queryAssetPrices()
 }
 
-async function queryAssetPrices(symbol?: string): Promise<AssetPriceModel[]> {
+export function queryAssetPricesAfterAssetCreatedAt(createdAt?: number): Promise<AssetPriceModel[]> {
+	const ts = createdAt ? new Date(createdAt).toISOString() : undefined
+	return queryAssetPrices(undefined, ts)
+}
+
+export function queryAssetPricesAfterUpdatedAt(updatedAt?: number): Promise<AssetPriceModel[]> {
+	const ts = updatedAt ? new Date(updatedAt).toISOString() : undefined
+	return queryAssetPrices(undefined, undefined, ts)
+}
+
+async function queryAssetPrices(symbol?: string, assetCreated?: string, updatedAt?: string): Promise<AssetPriceModel[]> {
 	const db = await getDatabase()
 	const params = symbol ? [symbol] : []
-	const prices = await db.select<AssetPriceModel[]>(`SELECT * FROM ${ASSETS_PRICE_TABLE_NAME} WHERE 1=1 ${symbol ? 'and symbol = ?' : ''}`, params)
+	if (assetCreated) {
+		params.push(assetCreated)
+	}
+	if (updatedAt) {
+		params.push(updatedAt)
+	}
+	const prices = await db.select<AssetPriceModel[]>(`SELECT * FROM ${ASSETS_PRICE_TABLE_NAME} WHERE 1=1 ${symbol ? 'and symbol = ?' : ''} ${assetCreated ? 'and assetCreatedAt > ?' : ''} ${updatedAt ? 'and updatedAt > ?' : ''}`, params)
+
 	return prices
 }
 
@@ -212,6 +229,12 @@ export async function queryAssetsAfterCreatedAt(createdAt?: number): Promise<Ass
 	const db = await getDatabase()
 	const ts = createdAt ? new Date(createdAt).toISOString() : new Date(0).toISOString()
 	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE createdAt >= ?`, [ts])
+	return assets
+}
+
+export async function queryAssetsByIDs(ids: number[]): Promise<AssetModel[]> {
+	const db = await getDatabase()
+	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE id in (${ids.join(",")})`)
 	return assets
 }
 

@@ -2,8 +2,8 @@ import _ from "lodash"
 import Database from "tauri-plugin-sql-api"
 import { v4 as uuidv4 } from 'uuid'
 import { CoinModel } from './datafetch/types'
-import { AssetPriceModel, AssetModel, WalletCoinUSD } from './types'
-import { ASSETS_PRICE_TABLE_NAME, ASSETS_TABLE_NAME } from './charts'
+import { AssetModel, WalletCoinUSD } from './types'
+import { ASSETS_TABLE_NAME } from './charts'
 import md5 from 'md5'
 
 export const databaseName = "track3.db"
