@@ -431,7 +431,10 @@ const App = ({
                 {costPriceStr}
               </div>
               <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                max pos: {maxPosition.toFixed(8).replace(/0+$/, "")}
+                max pos:{" "}
+                {Number.isInteger(maxPosition)
+                  ? maxPosition
+                  : maxPosition.toFixed(8).replace(/0+$/, "")}
               </p>
             </CardContent>
           </Card>
