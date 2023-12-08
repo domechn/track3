@@ -164,6 +164,11 @@ async function queryAssets(size = 1, symbol?: string): Promise<AssetModel[][]> {
 	return _(assets).groupBy("createdAt").values().value()
 }
 
+export async function queryAssetMaxAmountBySymbol(symbol: string): Promise<number> {
+	const res = await queryMaxAmountBySymbol(symbol) || 0
+	return res
+}
+
 // return all asset prices for all symbols
 export function queryAllAssetPrices(): Promise<AssetPriceModel[]> {
 	return queryAssetPrices()
@@ -223,6 +228,14 @@ export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | u
 		value: model.value,
 		price: model.price,
 	} as Asset : undefined
+}
+
+export async function queryMaxAmountBySymbol(symbol: string): Promise<number | undefined> {
+	const db = await getDatabase()
+	const sql = `SELECT sum(amount) as amount FROM ${ASSETS_TABLE_NAME} WHERE symbol = ? GROUP BY uuid ORDER BY amount DESC LIMIT 1`
+	const models = await db.select<{ amount: number }[]>(sql, [symbol])
+
+	return models[0]?.amount
 }
 
 export async function queryAssetsAfterCreatedAt(createdAt?: number): Promise<AssetModel[]> {

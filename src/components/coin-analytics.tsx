@@ -1,5 +1,6 @@
 import {
   loadAllAssetActionsBySymbol,
+  queryAssetMaxAmountBySymbol,
   queryLastAssetsBySymbol,
   updateAssetPrice,
 } from "@/middlelayers/charts";
@@ -80,6 +81,8 @@ const App = ({
   const [updatePriceValue, setUpdatePriceValue] = useState(-1);
   const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
 
+  const [maxPosition, setMaxPosition] = useState<number>(0);
+
   const [walletAliasMap, setWalletAliasMap] = useState<{
     [k: string]: string | undefined;
   }>({});
@@ -153,18 +156,14 @@ const App = ({
     [currency, latestPrice]
   );
 
-  const currentValue = useMemo(() => latestAsset?.value || 0, [latestAsset]);
-  const currentValueStr = useMemo(
-    () =>
-      currency.symbol +
-      prettyNumberToLocaleString(currencyWrapper(currency)(currentValue)),
-    [currency, currentValue]
-  );
+  const rank = useMemo(() => {
+    const rankNum = _(allowSymbols).indexOf(symbol) + 1;
+    if (rankNum === 0) {
+      return "-";
+    }
 
-  const rank = useMemo(
-    () => latestAsset?.amount.toFixed(10).replace(/0+$/, "") || 0,
-    [latestAsset]
-  );
+    return "#" + rankNum;
+  }, [symbol, allowSymbols]);
 
   const profitStr = useMemo(
     () =>
@@ -188,6 +187,10 @@ const App = ({
 
     queryLastAssetsBySymbol(s).then((res) => {
       setLatestAsset(res);
+    });
+
+    queryAssetMaxAmountBySymbol(s).then((res) => {
+      setMaxPosition(res);
     });
 
     getLogoPath(s).then((res) => {
@@ -344,7 +347,7 @@ const App = ({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                amount: {rank}
+                rank: {rank}
               </p>
             </CardContent>
           </Card>
@@ -373,7 +376,7 @@ const App = ({
                 {breakEvenPriceStr}
               </div>
               <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                profit rate: {profitRate}%
+                latest price: {latestPriceStr}
               </p>
             </CardContent>
           </Card>
@@ -401,7 +404,7 @@ const App = ({
                 {profitStr}
               </div>
               <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                current value: {currentValueStr}
+                profit rate: {profitRate}%
               </p>
             </CardContent>
           </Card>
@@ -428,7 +431,7 @@ const App = ({
                 {costPriceStr}
               </div>
               <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                latest price: {latestPriceStr}
+                max pos: {maxPosition.toFixed(8).replace(/0+$/, "")}
               </p>
             </CardContent>
           </Card>
