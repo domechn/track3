@@ -1,7 +1,7 @@
 import { Polybase } from '@polybase/client'
 import { getDatabase, saveModelsToDatabase } from './database'
 import { v4 as uuidv4 } from 'uuid'
-import { ASSETS_PRICE_TABLE_NAME, ASSETS_TABLE_NAME, queryAssetPricesAfterAssetCreatedAt, queryAssetPricesAfterUpdatedAt, queryAssetsAfterCreatedAt, queryAssetsByIDs } from './charts'
+import { ASSETS_PRICE_TABLE_NAME, ASSETS_TABLE_NAME, queryAssetPricesAfterAssetCreatedAt, queryAssetPricesAfterUpdatedAt, queryAssetsAfterCreatedAt, queryAssetsByIDs, queryAssetsByUUIDs } from './charts'
 import { AssetModel, AssetPriceModel, CloudAssetModel, CloudSyncConfiguration, ExportAssetModel } from './types'
 import { getCloudSyncConfiguration as getCloudSyncConfigurationModel, saveCloudSyncConfiguration as saveCloudSyncConfigurationModel } from './configuration'
 import _ from 'lodash'
@@ -256,7 +256,7 @@ export async function syncAssetsToCloudAndLocal(publicKey: string, createdAt?: n
 	const needSyncedAssetsToDB = _(cloudAssets).differenceBy(localAssets, 'uuid').value()
 	if (needSyncedAssetsToDB.length > 0) {
 		// write data to local
-		synced += await writeAssetsToDB(d, needSyncedAssetsToDB)
+		synced += await writeAssetsToDB(needSyncedAssetsToDB)
 	}
 
 	await markAsSynced(d, publicKey)
@@ -352,21 +352,24 @@ async function removeAssetsInCloud(assets: ExportAssetModel[]): Promise<number> 
 }
 
 // return updated how many records
-async function writeAssetsToDB(d: Database, assets: ExportAssetModel[]): Promise<number> {
+async function writeAssetsToDB(assets: ExportAssetModel[]): Promise<number> {
 	const res = await saveModelsToDatabase(ASSETS_TABLE_NAME, _(assets).map(a => _(a).omit("id").omit("costPrice").value()).value())
 	const f = _(assets).find(a => a.costPrice !== undefined)
+
 	if (!f) {
 		// not asset_price need to be saved
 		return res.length
 	}
+	const latestAssets = await queryAssetsByUUIDs(_(assets).filter(a => a.costPrice !== undefined).map('uuid').uniq().value())
+
 	const priceMOdels = _(assets).filter(a => a.costPrice !== undefined).map(a => ({
 		uuid: a.uuid,
-		assetID: a.id,
+		assetID: _(latestAssets).find(a2 => a2.uuid === a.uuid && a2.symbol === a.symbol && a2.wallet === a.wallet)?.id,
 		symbol: a.symbol,
 		price: a.costPrice,
 		assetCreatedAt: a.createdAt,
 		updatedAt: new Date().toISOString(),
-	} as AssetPriceModel)).value()
+	} as AssetPriceModel)).filter(a => !!a.assetID).uniqBy(a => `${a.uuid}/${a.assetID}`).value()
 
 	await saveModelsToDatabase(ASSETS_PRICE_TABLE_NAME, priceMOdels)
 	return res.length

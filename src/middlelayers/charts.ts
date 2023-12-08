@@ -251,6 +251,15 @@ export async function queryAssetsByIDs(ids: number[]): Promise<AssetModel[]> {
 	return assets
 }
 
+export async function queryAssetsByUUIDs(uuids: string[]): Promise<AssetModel[]> {
+	const db = await getDatabase()
+	if (uuids.length === 0) {
+		return []
+	}
+	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE uuid in ('${uuids.join("','")}')`)
+	return assets
+}
+
 async function queryAssetByUUID(id: string): Promise<AssetModel[]> {
 	const db = await getDatabase()
 	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE uuid = ?`, [id])
