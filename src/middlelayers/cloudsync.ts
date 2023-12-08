@@ -353,7 +353,8 @@ async function removeAssetsInCloud(assets: ExportAssetModel[]): Promise<number> 
 
 // return updated how many records
 async function writeAssetsToDB(assets: ExportAssetModel[]): Promise<number> {
-	const res = await saveModelsToDatabase(ASSETS_TABLE_NAME, _(assets).map(a => _(a).omit("id").omit("costPrice").value()).value())
+	// uniq by uuid, symbol, wallet, because writeToCloud will create a new version data not update old one
+	const res = await saveModelsToDatabase(ASSETS_TABLE_NAME, _(assets).map(a => _(a).omit("id").omit("costPrice").value()).uniqBy(a=>`${a.uuid}/${a.symbol}/${a.wallet}`).value())
 	const f = _(assets).find(a => a.costPrice !== undefined)
 
 	if (!f) {
