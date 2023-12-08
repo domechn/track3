@@ -37,8 +37,8 @@ export async function loadAllAssetActionsBySymbol(symbol: string): Promise<Asset
 
 export async function updateAssetPrice(uuid: string, assetID: number, symbol: string, price: number, createdAt: string) {
 	const db = await getDatabase()
-	await db.execute(`INSERT OR REPLACE INTO ${ASSETS_PRICE_TABLE_NAME} (uuid, assetID, symbol, price, assetCreatedAt) VALUES (?, ?, ?, ?, ?)`, [
-		uuid, assetID, symbol, price, createdAt
+	await db.execute(`INSERT OR REPLACE INTO ${ASSETS_PRICE_TABLE_NAME} (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`, [
+		uuid, assetID, symbol, price, createdAt, new Date().toISOString()
 	])
 }
 
