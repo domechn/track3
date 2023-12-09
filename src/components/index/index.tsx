@@ -93,7 +93,7 @@ const App = () => {
   const windowSize = useWindowSize();
   const [querySize, setQuerySize] = useState(0);
   const [lastSize, setLastSize] = useState(windowSize);
-  const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null);
+  const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(undefined);
   const [currentCurrency, setCurrentCurrency] = useState<CurrencyRateDetail>(
     getDefaultCurrencyRate()
   );

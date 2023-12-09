@@ -9,13 +9,14 @@ import { calculateTotalValue } from './datafetch/utils/coins'
 import { timestampToDate } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'
+import { ASSET_HANDLER } from './assets'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
 export const ASSETS_TABLE_NAME = "assets_v2"
 export const ASSETS_PRICE_TABLE_NAME = "asset_prices"
 
-export const WALLET_ANALYZER = new WalletAnalyzer(queryAssets)
+export const WALLET_ANALYZER = new WalletAnalyzer((size) => ASSET_HANDLER.listAssets(size))
 
 export async function refreshAllData() {
 	const coins = await queryCoinsData()
@@ -24,7 +25,7 @@ export async function refreshAllData() {
 
 // return all asset actions by analyzing all asset models
 export async function loadAllAssetActionsBySymbol(symbol: string): Promise<AssetAction[]> {
-	const assets = await queryAssets(-1, symbol)
+	const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol)
 	const updatedPrices = await queryAssetPrices(symbol)
 	const revAssets = _(assets).reverse().value()
 
@@ -145,28 +146,8 @@ async function queryCoinsData(): Promise<(WalletCoinUSD)[]> {
 	return totals
 }
 
-// if symbol is not provided, return all assets, else return assets with symbol
-async function queryAssets(size = 1, symbol?: string): Promise<AssetModel[][]> {
-	const db = await getDatabase()
-	// select top size timestamp
-	let tsSql = `SELECT distinct(createdAt) FROM ${ASSETS_TABLE_NAME} ORDER BY createdAt DESC`
-	if (size > 0) {
-		tsSql += ` LIMIT ${size}`
-	}
-
-	const tsList = await db.select<{ createdAt: string }[]>(tsSql)
-	const earliestTs = _(tsList).last()?.createdAt || new Date().toISOString()
-
-	// select assets which createdAt >= earliestTs
-
-	let sql = `SELECT * FROM ${ASSETS_TABLE_NAME} WHERE ${symbol ? `symbol="${symbol}" and ` : ''} createdAt >= '${earliestTs}' ORDER BY createdAt DESC`
-	const assets = await db.select<AssetModel[]>(sql)
-	return _(assets).groupBy("createdAt").values().value()
-}
-
 export async function queryAssetMaxAmountBySymbol(symbol: string): Promise<number> {
-	const res = await queryMaxAmountBySymbol(symbol) || 0
-	return res
+	return ASSET_HANDLER.getMaxAmountBySymbol(symbol)
 }
 
 // return all asset prices for all symbols
@@ -198,24 +179,8 @@ async function queryAssetPrices(symbol?: string, assetCreated?: string, updatedA
 	return prices
 }
 
-function groupAssetModelsListBySymbol(models: AssetModel[][]): AssetModel[][] {
-	// sum by symbol
-	const res: AssetModel[][] = []
-
-	_(models).forEach(ms => res.push(groupAssetModelsBySymbol(ms)))
-	return res
-}
-
-function groupAssetModelsBySymbol(models: AssetModel[]): AssetModel[] {
-	return _(models).groupBy("symbol").values().map(assets => ({
-		..._(assets).first()!,
-		amount: _(assets).sumBy("amount"),
-		value: _(assets).sumBy("value"),
-	})).value()
-}
-
 export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | undefined> {
-	const models = await queryAssets(1, symbol)
+	const models = await ASSET_HANDLER.listAssetsBySymbol(symbol, 1)
 	const model = _(models).flatten().reduce((acc, cur) => ({
 		...acc,
 		amount: acc.amount + cur.amount,
@@ -230,53 +195,24 @@ export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | u
 	} as Asset : undefined
 }
 
-export async function queryMaxAmountBySymbol(symbol: string): Promise<number | undefined> {
-	const db = await getDatabase()
-	const sql = `SELECT sum(amount) as amount FROM ${ASSETS_TABLE_NAME} WHERE symbol = ? GROUP BY uuid ORDER BY amount DESC LIMIT 1`
-	const models = await db.select<{ amount: number }[]>(sql, [symbol])
-
-	return models[0]?.amount
-}
-
 export async function queryAssetsAfterCreatedAt(createdAt?: number): Promise<AssetModel[]> {
-	const db = await getDatabase()
-	const ts = createdAt ? new Date(createdAt).toISOString() : new Date(0).toISOString()
-	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE createdAt >= ?`, [ts])
-	return assets
+	return ASSET_HANDLER.listAssetsAfterCreatedAt(createdAt)
 }
 
 export async function queryAssetsByIDs(ids: number[]): Promise<AssetModel[]> {
-	const db = await getDatabase()
-	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE id in (${ids.join(",")})`)
-	return assets
+	return ASSET_HANDLER.listAssetsByIDs(ids)
 }
 
 export async function queryAssetsByUUIDs(uuids: string[]): Promise<AssetModel[]> {
-	const db = await getDatabase()
-	if (uuids.length === 0) {
-		return []
-	}
-	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE uuid in ('${uuids.join("','")}')`)
-	return assets
-}
-
-async function queryAssetByUUID(id: string): Promise<AssetModel[]> {
-	const db = await getDatabase()
-	const assets = await db.select<AssetModel[]>(`SELECT * FROM ${ASSETS_TABLE_NAME} WHERE uuid = ?`, [id])
-	if (!assets || assets.length === 0) {
-		throw new Error(`asset with id ${id} not found`)
-	}
-	return assets
+	return ASSET_HANDLER.listAssetsByUUIDs(uuids)
 }
 
 async function deleteAssetByUUID(uuid: string): Promise<void> {
-	const db = await getDatabase()
-	await db.execute(`DELETE FROM ${ASSETS_TABLE_NAME} WHERE uuid = ?`, [uuid])
+	return ASSET_HANDLER.deleteAssetsByUUID(uuid)
 }
 
 async function deleteAssetByID(id: number): Promise<void> {
-	const db = await getDatabase()
-	await db.execute(`DELETE FROM ${ASSETS_TABLE_NAME} WHERE id = ?`, [id])
+	return ASSET_HANDLER.deleteAssetByID(id)
 }
 
 async function deleteAssetPriceByUUID(uuid: string): Promise<void> {
@@ -290,7 +226,7 @@ async function deleteAssetPriceByID(id: number): Promise<void> {
 }
 
 export async function queryTotalValue(): Promise<TotalValueData> {
-	const results = groupAssetModelsListBySymbol(await queryAssets(2))
+	const results = await ASSET_HANDLER.listSymbolGroupedAssets(2)
 
 	if (results.length === 0) {
 		return {
@@ -324,7 +260,7 @@ export async function queryPNLValue(size = 10): Promise<PNLData> {
 	const querySize = size < 30 ? 35 : size + 1
 	// const querySize = size + 1
 
-	const results = groupAssetModelsListBySymbol(await queryAssets(querySize))
+	const results = await ASSET_HANDLER.listSymbolGroupedAssets(querySize)
 
 	const data = _(results).sort((a, b) => a[0].createdAt > b[0].createdAt ? 1 : -1).map(rs => ({
 		totalValue: _(rs).sumBy("value"),
@@ -357,7 +293,7 @@ export async function queryPNLValue(size = 10): Promise<PNLData> {
 
 export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
 
-	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -395,7 +331,7 @@ export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
 }
 
 export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopCoinsPercentageChangeData> {
-	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -439,13 +375,9 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 	}
 }
 
-export async function queryLastRefreshAt(): Promise<string | null> {
-	const assets = await queryAssets(1)
-	if (_(assets).isEmpty() || _(assets[0]).isEmpty()) {
-		return null
-	}
-
-	return timestampToDate(new Date(assets[0][0].createdAt).getTime(), true)
+export async function queryLastRefreshAt(): Promise<string | undefined> {
+	const lc = await ASSET_HANDLER.getLatestCreatedAt()
+	return lc ? timestampToDate(new Date(lc).getTime(), true) : undefined
 }
 
 function getCoins(assets: AssetModel[][], size = 10): string[] {
@@ -455,7 +387,7 @@ function getCoins(assets: AssetModel[][], size = 10): string[] {
 
 export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
 
-	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -471,7 +403,7 @@ export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
 export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercentageData> {
 	const size = 1
 
-	const assets = groupAssetModelsListBySymbol(await queryAssets(size) || [])
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
 	if (assets.length === 0) {
 		return []
 	}
@@ -501,9 +433,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 }
 
 export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndValueChangeData> {
-	const querySize = size
-
-	const assets = groupAssetModelsListBySymbol(await queryAssets(querySize) || [])
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
 	if (!assets) {
 		return []
 	}
@@ -545,7 +475,7 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndV
 
 // gather: if true, group asset models by same symbol
 export async function queryHistoricalData(size = 30, gather = true): Promise<HistoricalData[]> {
-	const models = gather ? groupAssetModelsListBySymbol(await queryAssets(size)) : await queryAssets(size)
+	const models = gather ? await ASSET_HANDLER.listSymbolGroupedAssets(size) : await ASSET_HANDLER.listAssets(size)
 
 
 	const assetsModelsToHistoricalData = (ams: AssetModel[]): HistoricalData => {
@@ -574,8 +504,8 @@ export async function deleteHistoricalDataDetailById(id: number): Promise<void> 
 	await deleteAssetPriceByID(id)
 }
 
-export async function queryCoinDataById(id: string): Promise<CoinData[]> {
-	const models = groupAssetModelsBySymbol(await queryAssetByUUID(id))
+export async function queryCoinDataByUUID(uuid: string): Promise<CoinData[]> {
+	const models = await ASSET_HANDLER.listSymbolGroupedAssetsByUUID(uuid)
 
 	const res: CoinData[] = _(models)
 		.map(m => ({
@@ -591,7 +521,7 @@ export async function queryAllDataDates(): Promise<{
 	id: string
 	date: string
 }[]> {
-	const assets = groupAssetModelsListBySymbol(await queryAssets(-1))
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssets()
 
 	return _(assets)
 		.map(ass => _(ass).first())

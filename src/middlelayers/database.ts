@@ -74,3 +74,43 @@ async function saveToDatabase<T extends object>(db: Database, table: string, mod
 	await db.execute(insertSql, values)
 	return models
 }
+
+export async function selectFromDatabase<T extends object>(table: string, where: Partial<T>, limit = 0, orderBy?: {
+	[k in keyof T]?: 'asc' | 'desc'
+}, plainWhere?: string, plainWhereValues?: any[]): Promise<T[]> {
+	const db = await getDatabase()
+
+	// omit kv in where whose value is undefined
+	const filteredWhere = _(where).omitBy(v => _(v).isUndefined()).value()
+
+	const whereStr = _(filteredWhere).map((v, k) => `${k}=?`).join(' AND ')
+	const values = _(filteredWhere).map(v => v).value()
+
+
+	const limitStr = limit > 0 ? `LIMIT ${limit}` : ''
+	const orderByStr = !_(orderBy).isEmpty() ? `ORDER BY ${_(orderBy).map((v, k) => `${k} ${v}`).join(',')}` : ''
+	const sql = `SELECT * FROM ${table} WHERE 1=1 ${whereStr ? "AND " + whereStr : ''} ${plainWhere ? "AND " + plainWhere : ''} ${limitStr} ${orderByStr}`
+
+	return db.select<T[]>(sql, [...values, ...(plainWhereValues ?? [])])
+}
+
+export async function selectFromDatabaseWithSql<T extends object>(sql: string, values: any[]): Promise<T[]> {
+	const db = await getDatabase()
+	return db.select<T[]>(sql, values)
+}
+
+export async function deleteFromDatabase<T extends object>(table: string, where: Partial<T>, allowFullDelete = false) {
+	const db = await getDatabase()
+
+	const whereKeys = _(where).filter(v => !_(v).isUndefined()).keys().value()
+	if (!allowFullDelete && whereKeys.length === 0) {
+		throw new Error("Delete without where is not allowed")
+	}
+
+	const whereStr = _(whereKeys).map(k => `${k}=?`).join(' AND ')
+	const values = _(whereKeys).map(k => _(where).get(k)).value()
+
+
+	const sql = `DELETE FROM ${table} WHERE ${whereStr}`
+	return db.execute(sql, values)
+}
