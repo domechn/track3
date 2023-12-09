@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./index.css";
 import { CoinData, CurrencyRateDetail } from "@/middlelayers/types";
-import { queryAllDataDates, queryCoinDataById } from "@/middlelayers/charts";
+import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import _ from "lodash";
 import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
@@ -87,14 +87,14 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     if (!baseId) {
       return;
     }
-    loadDataById(baseId).then((data) => setBaseData(data));
+    loadDataByUUID(baseId).then((data) => setBaseData(data));
   }, [baseId]);
 
   useEffect(() => {
     if (!headId) {
       return;
     }
-    loadDataById(headId).then((data) => setHeadData(data));
+    loadDataByUUID(headId).then((data) => setHeadData(data));
   }, [headId]);
 
   // update quick compare data ( baseId and headId )
@@ -234,9 +234,9 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     return res;
   }
 
-  async function loadDataById(id: string): Promise<CoinData[]> {
+  async function loadDataByUUID(uuid: string): Promise<CoinData[]> {
     // return queryCoinDataById(id);
-    const data = await queryCoinDataById(id);
+    const data = await queryCoinDataByUUID(uuid);
     const reversedData = _(data).sortBy("value").reverse().value();
 
     const res = _(reversedData).value();
