@@ -192,7 +192,7 @@ export type CurrencyRateModel = {
 	alias: string
 	symbol: string
 	priority: number
-	updateAt: string
+	updatedAt: string
 }
 
 export type CurrencyRateDetail = {

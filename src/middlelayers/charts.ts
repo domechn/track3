@@ -1,6 +1,5 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { getDatabase, saveCoinsToDatabase } from './database'
 import { Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
@@ -9,24 +8,22 @@ import { calculateTotalValue } from './datafetch/utils/coins'
 import { timestampToDate } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'
-import { ASSET_HANDLER } from './assets'
+import { ASSET_HANDLER } from './entities/assets'
+import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
-
-export const ASSETS_TABLE_NAME = "assets_v2"
-export const ASSETS_PRICE_TABLE_NAME = "asset_prices"
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) => ASSET_HANDLER.listAssets(size))
 
 export async function refreshAllData() {
 	const coins = await queryCoinsData()
-	await saveCoinsToDatabase(coins)
+	await ASSET_HANDLER.saveCoinsToDatabase(coins)
 }
 
 // return all asset actions by analyzing all asset models
 export async function loadAllAssetActionsBySymbol(symbol: string): Promise<AssetAction[]> {
 	const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol)
-	const updatedPrices = await queryAssetPrices(symbol)
+	const updatedPrices = await ASSET_PRICE_HANDLER.listPricesBySymbol(symbol)
 	const revAssets = _(assets).reverse().value()
 
 	const actions = _.flatMap(revAssets, (as, i) => {
@@ -37,10 +34,13 @@ export async function loadAllAssetActionsBySymbol(symbol: string): Promise<Asset
 }
 
 export async function updateAssetPrice(uuid: string, assetID: number, symbol: string, price: number, createdAt: string) {
-	const db = await getDatabase()
-	await db.execute(`INSERT OR REPLACE INTO ${ASSETS_PRICE_TABLE_NAME} (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`, [
-		uuid, assetID, symbol, price, createdAt, new Date().toISOString()
-	])
+	await ASSET_PRICE_HANDLER.createOrUpdate({
+		uuid,
+		assetID,
+		symbol,
+		price,
+		assetCreatedAt: createdAt
+	} as AssetPriceModel)
 }
 
 function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[], pre?: AssetModel[]): AssetAction[] {
@@ -152,31 +152,17 @@ export async function queryAssetMaxAmountBySymbol(symbol: string): Promise<numbe
 
 // return all asset prices for all symbols
 export function queryAllAssetPrices(): Promise<AssetPriceModel[]> {
-	return queryAssetPrices()
+	return ASSET_PRICE_HANDLER.listPrices()
 }
 
 export function queryAssetPricesAfterAssetCreatedAt(createdAt?: number): Promise<AssetPriceModel[]> {
 	const ts = createdAt ? new Date(createdAt).toISOString() : undefined
-	return queryAssetPrices(undefined, ts)
+	return ASSET_PRICE_HANDLER.listPricesAfterAssetCreatedAt(ts)
 }
 
 export function queryAssetPricesAfterUpdatedAt(updatedAt?: number): Promise<AssetPriceModel[]> {
 	const ts = updatedAt ? new Date(updatedAt).toISOString() : undefined
-	return queryAssetPrices(undefined, undefined, ts)
-}
-
-async function queryAssetPrices(symbol?: string, assetCreated?: string, updatedAt?: string): Promise<AssetPriceModel[]> {
-	const db = await getDatabase()
-	const params = symbol ? [symbol] : []
-	if (assetCreated) {
-		params.push(assetCreated)
-	}
-	if (updatedAt) {
-		params.push(updatedAt)
-	}
-	const prices = await db.select<AssetPriceModel[]>(`SELECT * FROM ${ASSETS_PRICE_TABLE_NAME} WHERE 1=1 ${symbol ? 'and symbol = ?' : ''} ${assetCreated ? 'and assetCreatedAt > ?' : ''} ${updatedAt ? 'and updatedAt > ?' : ''}`, params)
-
-	return prices
+	return ASSET_PRICE_HANDLER.listPricesAfterUpdatedAt(ts)
 }
 
 export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | undefined> {
@@ -216,13 +202,11 @@ async function deleteAssetByID(id: number): Promise<void> {
 }
 
 async function deleteAssetPriceByUUID(uuid: string): Promise<void> {
-	const db = await getDatabase()
-	await db.execute(`DELETE FROM ${ASSETS_PRICE_TABLE_NAME} WHERE uuid = ?`, [uuid])
+	return ASSET_PRICE_HANDLER.deletePricesByUUID(uuid)
 }
 
 async function deleteAssetPriceByID(id: number): Promise<void> {
-	const db = await getDatabase()
-	await db.execute(`DELETE FROM ${ASSETS_PRICE_TABLE_NAME} WHERE assetID = ?`, [id])
+	return ASSET_PRICE_HANDLER.deletePricesByAssetID(id)
 }
 
 export async function queryTotalValue(): Promise<TotalValueData> {

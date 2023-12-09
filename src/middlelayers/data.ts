@@ -8,13 +8,14 @@ import { OthersAnalyzer } from './datafetch/coins/others'
 import { SOLAnalyzer } from './datafetch/coins/sol'
 import { ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
-import { ASSETS_PRICE_TABLE_NAME, ASSETS_TABLE_NAME, queryAllAssetPrices, queryHistoricalData } from './charts'
+import { queryAllAssetPrices, queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
 import { AssetPriceModel, ExportAssetModel, HistoricalData } from './types'
-import { saveModelsToDatabase } from './database'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
+import { ASSET_HANDLER } from './entities/assets'
+import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 
 type ExportData = {
 	exportAt: string
@@ -169,7 +170,7 @@ async function saveHistoricalDataAssets(assets: ExportAssetModel[]) {
 		})
 	})
 
-	await saveModelsToDatabase(ASSETS_TABLE_NAME, assets)
+	await ASSET_HANDLER.saveAssets(assets)
 
 	// import asset prices
 	const importedAssets = _(await queryHistoricalData(-1, false)).map(d => d.assets).flatten().value()
@@ -192,6 +193,5 @@ async function saveHistoricalDataAssets(assets: ExportAssetModel[]) {
 		} as AssetPriceModel
 	}).compact().value()
 
-	await saveModelsToDatabase(ASSETS_PRICE_TABLE_NAME, assetPriceModels)
-
+	await ASSET_PRICE_HANDLER.savePrices(assetPriceModels)
 }

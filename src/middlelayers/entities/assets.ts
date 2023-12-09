@@ -1,6 +1,9 @@
 import _ from 'lodash'
-import { deleteFromDatabase, selectFromDatabase, selectFromDatabaseWithSql } from './database'
-import { AssetModel } from './types'
+import { deleteFromDatabase, saveModelsToDatabase, selectFromDatabase, selectFromDatabaseWithSql } from '../database'
+import { AssetModel, WalletCoinUSD } from '../types'
+import { CoinModel } from '../datafetch/types'
+import { v4 as uuidv4 } from 'uuid'
+import md5 from 'md5'
 
 
 class AssetHandler {
@@ -87,6 +90,51 @@ class AssetHandler {
 		const models = await selectFromDatabaseWithSql<{ createdAt: string }>(sql, [])
 
 		return models[0]?.createdAt
+	}
+
+	async saveAssets(models: AssetModel[]): Promise<AssetModel[]> {
+		return saveModelsToDatabase<AssetModel>(this.assetTableName, _(models).map(m => ({
+			uuid: m.uuid,
+			createdAt: m.createdAt,
+			symbol: m.symbol,
+			amount: m.amount,
+			value: m.value,
+			price: m.price,
+			wallet: m.wallet
+		} as AssetModel)).value())
+	}
+
+	// skip where value is less than 1
+	async saveCoinsToDatabase(coinInUSDs: WalletCoinUSD[]): Promise<AssetModel[]> {
+		const coins = _(coinInUSDs).map(t => ({
+			wallet: t.wallet,
+			symbol: t.symbol,
+			amount: t.amount,
+			value: t.usdValue,
+		})).filter(v => v.value > 1).value()
+
+		const now = new Date().toISOString()
+		// generate uuid v4
+
+		const uid = uuidv4()
+
+		const getDBModel = (models: CoinModel[]) => {
+
+			return _(models).filter(m => m.amount !== 0).map(m => ({
+				createdAt: now,
+				uuid: uid,
+				symbol: m.symbol,
+				amount: m.amount,
+				value: m.value,
+				price: m.value / m.amount,
+				// md5 of wallet
+				wallet: md5(m.wallet),
+			} as AssetModel)).value()
+
+		}
+		const models = getDBModel(coins)
+
+		return saveModelsToDatabase(this.assetTableName, models)
 	}
 
 	// if symbol is not provided, return all assets, else return assets with symbol

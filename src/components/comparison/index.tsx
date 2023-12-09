@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import "./index.css";
 import { CoinData, CurrencyRateDetail } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { LoadingContext } from '@/App'
 
 type ComparisonData = {
   name: string;
@@ -28,6 +29,7 @@ type ComparisonData = {
 type QuickCompareType = "7D" | "1M" | "1Q" | "1Y";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
+  const { setLoading } = useContext(LoadingContext);
   const [baseId, setBaseId] = useState<string>("");
   const [dateOptions, setDateOptions] = useState<
     {
@@ -55,6 +57,16 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const [data, setData] = useState<ComparisonData[]>([]);
 
   const [showDetail, setShowDetail] = useState<boolean>(true);
+
+  useEffect(() => {
+    // it is a hack
+    setLoading(true)
+    // sleep 150ms
+
+    setTimeout(() => {
+      setLoading(false)
+    }, 150)
+  },[])
 
   useEffect(() => {
     loadAllSelectDates().then((data) => {
@@ -87,14 +99,14 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     if (!baseId) {
       return;
     }
-    loadDataByUUID(baseId).then((data) => setBaseData(data));
+    loadDataByUUID(baseId).then((data) => setBaseData(data))
   }, [baseId]);
 
   useEffect(() => {
     if (!headId) {
       return;
     }
-    loadDataByUUID(headId).then((data) => setHeadData(data));
+    loadDataByUUID(headId).then((data) => setHeadData(data))
   }, [headId]);
 
   // update quick compare data ( baseId and headId )
