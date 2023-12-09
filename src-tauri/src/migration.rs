@@ -38,8 +38,6 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         fs::read_to_string(resource_dir.join("migrations/init/configuration_up.sql")).unwrap();
     let assets_v2 =
         fs::read_to_string(resource_dir.join("migrations/init/assets_v2_up.sql")).unwrap();
-    let cloud_sync =
-        fs::read_to_string(resource_dir.join("migrations/init/cloud_sync_up.sql")).unwrap();
     let currency_rates_sync =
         fs::read_to_string(resource_dir.join("migrations/init/currency_rates_up.sql")).unwrap();
     let asset_actions =
@@ -51,7 +49,6 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
         conn.execute(configuration.as_str()).await.unwrap();
         conn.execute(assets_v2.as_str()).await.unwrap();
-        conn.execute(cloud_sync.as_str()).await.unwrap();
         conn.execute(currency_rates_sync.as_str()).await.unwrap();
         conn.execute(asset_actions.as_str()).await.unwrap();
 
@@ -522,6 +519,46 @@ impl Migration for V3TV4 {
             conn.execute(asset_prices.as_str()).await.unwrap();
             conn.close().await.unwrap();
             println!("migrate from v0.3 to v0.4 in tokio spawn done");
+        });
+    }
+}
+
+// todo: enable it when v0.5 is ready
+pub struct V4TV5 {
+    app_dir: String,
+    resource_dir: String,
+}
+
+impl Migration for V4TV5 {
+    fn new(app_dir: String, resource_dir: String) -> Self {
+        V4TV5 {
+            app_dir,
+            resource_dir,
+        }
+    }
+
+    fn need_to_run(&self, previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let res = version::compare(previous_version, "0.5.0").unwrap_or(-1) > 0;
+        println!("check if from v0.4 to v0.5 in rust, {:?}", res);
+        return Ok(res);
+    }
+
+    fn migrate(&self) {
+        let app_dir = Path::new(&self.app_dir);
+        let resource_dir = Path::new(&self.resource_dir);
+        println!("migrate from v0.4 to v0.5");
+        let sqlite_path = get_sqlite_file_path(app_dir);
+        let cloud_sync_down =
+            fs::read_to_string(resource_dir.join("migrations/v04t05/cloud_sync_down.sql"))
+                .unwrap();
+
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move {
+            println!("migrate from v0.4 to v0.5 in tokio spawn");
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            conn.execute(cloud_sync_down.as_str()).await.unwrap();
+            conn.close().await.unwrap();
+            println!("migrate from v0.4 to v0.5 in tokio spawn done");
         });
     }
 }

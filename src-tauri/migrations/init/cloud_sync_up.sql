@@ -1,6 +1,7 @@
-CREATE TABLE IF NOT EXISTS "cloud_sync" (
-	id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-	publicKey TEXT NOT NULL,
-	updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-CREATE UNIQUE INDEX IF NOT EXISTS unique_public_key ON cloud_sync (publicKey);
+-- Deprecated: do not support cloud sync anymore
+-- CREATE TABLE IF NOT EXISTS "cloud_sync" (
+-- 	id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+-- 	publicKey TEXT NOT NULL,
+-- 	updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+-- );
+-- CREATE UNIQUE INDEX IF NOT EXISTS unique_public_key ON cloud_sync (publicKey);

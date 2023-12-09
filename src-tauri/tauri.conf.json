@@ -64,7 +64,7 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": ["migrations/**/*", "configs/**/*"],
+      "resources": ["migrations/**/*"],
       "shortDescription": "",
       "targets": "all",
       "windows": {

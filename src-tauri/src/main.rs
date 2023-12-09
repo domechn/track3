@@ -146,28 +146,6 @@ fn md5(data: String) -> Result<String, String> {
     windows_subsystem = "windows"
 )]
 #[tauri::command]
-async fn get_polybase_namespace(handle: tauri::AppHandle) -> Result<String, String> {
-    let ns = fs::read_to_string(
-        handle
-            .path_resolver()
-            .resource_dir()
-            .unwrap()
-            .as_path()
-            .join("configs/polybase.namespace"),
-    );
-
-    match ns {
-        // remove \n
-        Ok(ns) => Ok(ns.replace("\n", "")),
-        Err(e) => Err(format!("get polybase namespace error: {:?}", e)),
-    }
-}
-
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-#[tauri::command]
 async fn open_debank_window_in_background(handle: tauri::AppHandle, address: String) {
     let debank_window = tauri::WindowBuilder::new(
         &handle,
@@ -248,7 +226,6 @@ fn main() {
             encrypt,
             decrypt,
             md5,
-            get_polybase_namespace,
             download_coins_logos,
             open_debank_window_in_background,
             close_debank_window,

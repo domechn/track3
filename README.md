@@ -30,7 +30,7 @@
 2. Support Binance, OKX and Gate.io. How to create api key: [Binance](https://www.binance.com/en-BH/support/faq/how-to-create-api-360002502072), [OKX](https://use.autoview.com/hc/en-us/articles/360004576632-OKEx-Creating-an-API), [Gate.io](https://www.gate.io/help/guide/common/17521/how-to-utilize-api)
 3. Support BTC, ETH ( ERC20 Tokens ), BNB ( ERC20 Tokens ), SOL and Doge ( Base Users ).
 4. Support dozens of charts to analyze data such as wallet proportion, proportion of each currency asset, changes, etc.
-5. Support Cloud Sync, users can sync their data to cloud and restore it on another device.
+5. Support Data backup and restore. Users can export data to local files and import them to other devices, or share them between multi devices by cloud drive ( e.g. iCloud ).
 
 ## Pro Users
 
@@ -47,15 +47,9 @@
 ![sc3](./images/demo/sc3.jpg)
 ![sc4](./images/demo/sc4.jpg)
 
-## Cloud Sync
-
-Track3 use [Polybase](https://polybase.xyz/) to sync data. Polybase is a decentralized database powered by zero knowledge proofs, with attributes of a blockchain and the speed & privacy of a database.
-
 ### Notice
 
 **All your data is private, only you can access it. And track3 will never sync your configurations into cloud, they are always stored locally with encryption. So your wallet addresses and api keys are totally safe.**
-
-But currently track3 are using polybase testnet, so your data may be lost on cloud, but this will not affect your local data.
 
 ## Known Issues
 
