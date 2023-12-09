@@ -58,7 +58,6 @@ import {
   getCurrentPreferCurrency,
   getQuerySize,
 } from "@/middlelayers/configuration";
-import { autoSyncData } from "@/middlelayers/cloudsync";
 import { getDefaultCurrencyRate } from "@/middlelayers/currency";
 import _ from "lodash";
 import { MainNav } from "@/components/index/main-nav";
@@ -131,8 +130,6 @@ const App = () => {
 
   useEffect(() => {
     loadConfiguration();
-
-    autoSyncData();
   }, []);
 
   useEffect(() => {
@@ -304,8 +301,6 @@ const App = () => {
                       loading={refreshButtonLoading}
                       afterRefresh={() => {
                         loadAllData(querySize);
-                        // auto sync data in background
-                        autoSyncData(true);
                       }}
                     />
                   </RefreshButtonLoadingContext.Provider>
@@ -394,7 +389,6 @@ const App = () => {
               element={
                 <DataManagement
                   onDataImported={() => loadAllData(querySize)}
-                  onDataSynced={() => loadAllData(querySize)}
                 />
               }
             />
