@@ -248,7 +248,7 @@ const App = ({
       act.changedAt
     ).then(() => {
       const newActions = [...actions];
-      newActions[updatePriceIndex].price = updatePriceValue;
+      newActions[updatePriceIndex].price = usdPrice;
       setActions(newActions);
       setUpdatePriceDialogOpen(false);
       setUpdatePriceIndex(-1);
@@ -269,7 +269,7 @@ const App = ({
           <div className="grid gap-4 py-4">
             <Input
               type="number"
-              defaultValue={updatePriceValue}
+              defaultValue={currencyWrapper(currency)(updatePriceValue)}
               onChange={(e) => {
                 if (!e.target.value || e.target.value === "0.") {
                   return;
