@@ -238,11 +238,13 @@ const App = ({
     }
     const act = actions[updatePriceIndex];
 
+    const usdPrice = updatePriceValue / currency.rate;
+
     updateAssetPrice(
       act.uuid,
       act.assetID,
       symbol,
-      updatePriceValue,
+      usdPrice,
       act.changedAt
     ).then(() => {
       const newActions = [...actions];
