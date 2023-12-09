@@ -58,7 +58,7 @@ import {
   getCurrentPreferCurrency,
   getQuerySize,
 } from "@/middlelayers/configuration";
-import { getDefaultCurrencyRate } from "@/middlelayers/currency";
+import { getDefaultCurrencyRate } from "@/middlelayers/configuration";
 import _ from "lodash";
 import { MainNav } from "@/components/index/main-nav";
 import Configuration from "@/components/configuration";

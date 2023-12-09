@@ -3,7 +3,7 @@ import { getDatabase } from './database'
 import { GlobalConfig } from './datafetch/types'
 import { CloudSyncConfiguration, ConfigurationModel, CurrencyRateDetail } from './types'
 import yaml from 'yaml'
-import { getCurrencyRate, getDefaultCurrencyRate } from './currency'
+import { CURRENCY_RATE_HANDLER } from './entities/currency'
 
 const prefix = "!ent:"
 const fixId = "1"
@@ -93,18 +93,30 @@ export async function getQuerySize(): Promise<number> {
 	return cfg.configs.querySize || 10
 }
 
+export async function updateAllCurrencyRates() {
+	return CURRENCY_RATE_HANDLER.updateAllCurrencyRates()
+}
+
+export async function listAllCurrencyRates(){
+	return CURRENCY_RATE_HANDLER.listCurrencyRates()
+}
+
+export function getDefaultCurrencyRate() {
+	return CURRENCY_RATE_HANDLER.getDefaultCurrencyRate()
+}
+
 export async function getCurrentPreferCurrency(): Promise<CurrencyRateDetail> {
 	const cfg = await getConfiguration()
 	if (!cfg) {
-		return getDefaultCurrencyRate()
+		return CURRENCY_RATE_HANDLER.getDefaultCurrencyRate()
 	}
 
 	const pc: string = cfg.configs.preferCurrency
 	if (!pc) {
-		return getDefaultCurrencyRate()
+		return CURRENCY_RATE_HANDLER.getDefaultCurrencyRate()
 	}
 
-	return getCurrencyRate(pc)
+	return CURRENCY_RATE_HANDLER.getCurrencyRateByCurrency(pc)
 }
 
 export async function getClientIDConfiguration(): Promise<string | undefined> {

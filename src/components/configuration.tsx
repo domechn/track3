@@ -19,7 +19,7 @@ import {
   TokenConfig,
 } from "@/middlelayers/datafetch/types";
 import { CurrencyRateDetail } from "@/middlelayers/types";
-import { listAllCurrencyRates } from "@/middlelayers/currency";
+import { listAllCurrencyRates } from "@/middlelayers/configuration";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";

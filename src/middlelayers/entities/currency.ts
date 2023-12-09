@@ -1,9 +1,76 @@
 import _ from 'lodash'
-import { getDatabase } from './database'
-import { ExchangeRate } from './datafetch/currencies'
-import { CurrencyRateDetail, CurrencyRateModel } from './types'
+import { saveModelsToDatabase, selectFromDatabase } from '../database'
+import { ExchangeRate } from '../datafetch/currencies'
+import { CurrencyRateDetail, CurrencyRateModel } from '../types'
 
-const CURRENCY_RATES_TABLE = "currency_rates"
+class CurrencyRateHandler {
+	private readonly tableName = "currency_rates"
+
+	async listCurrencyRates(): Promise<CurrencyRateDetail[]> {
+		let rows = await selectFromDatabase<CurrencyRateModel>(this.tableName, {})
+		if (!rows || rows.length === 0) {
+			console.log("no currency rates found, updating...")
+			rows = await this.updateAllCurrencyRates()
+		}
+
+		return _(rows).sortBy("priority").value()
+	}
+
+	getDefaultCurrencyRate(): CurrencyRateDetail {
+		const [alias, symbol, currency, _priority] = CURRENCY_DETAILS["USD"]
+		return {
+			currency: currency as string,
+			alias: alias as string,
+			symbol: symbol as string,
+			rate: 1,
+		}
+	}
+
+	async getCurrencyRateByCurrency(currency: string): Promise<CurrencyRateDetail> {
+		const rows = await selectFromDatabase<CurrencyRateModel>(this.tableName, { currency })
+		if (!rows || rows.length === 0) {
+			console.error("find currency rate failed, not found:", currency)
+			return this.getDefaultCurrencyRate()
+		}
+
+		return rows[0]
+	}
+
+	async updateAllCurrencyRates() {
+		const q = new ExchangeRate()
+
+		const rates = await q.listAllCurrencyRates()
+
+		const updatedAt = new Date().toISOString()
+
+		const res: CurrencyRateModel[] = []
+
+		
+		// insert into currency_rates if currency not exists else update it
+		for (const r of rates) {
+			const { currency, rate } = r
+			const detail = CURRENCY_DETAILS[currency]
+			if (detail === undefined) {
+				continue
+			}
+			
+			const [alias, symbol, _cur, priority] = detail
+			res.push({
+				currency,
+				alias: alias as string,
+				symbol: symbol as string,
+				priority: priority as number,
+				rate,
+				updatedAt: updatedAt
+			} as CurrencyRateModel)
+		}
+		await saveModelsToDatabase(this.tableName, res)
+
+		return res
+	}
+}
+
+export const CURRENCY_RATE_HANDLER = new CurrencyRateHandler()
 
 // value: 1. alias, 2. symbol, 3. currency 4. priority
 const CURRENCY_DETAILS: { [k: string]: (string | number)[] } = {
@@ -165,90 +232,4 @@ const CURRENCY_DETAILS: { [k: string]: (string | number)[] } = {
 	"YER": ["Yemeni rial", "﷼", "YER", 99],
 	"ZMW": ["Zambian kwacha", "ZK", "ZMW", 99],
 	"ZWL": ["Zimbabwean dollar", "$", "ZWL", 99],
-}
-
-export async function updateAllCurrencyRates() {
-	const q = new ExchangeRate()
-
-	const rates = await q.listAllCurrencyRates()
-
-	const d = await getDatabase()
-
-	const sqls: {
-		sql: string
-		params: any[]
-	}[] = []
-
-	const updatedAt = new Date().toISOString()
-
-	const res: CurrencyRateModel[] = []
-
-	// insert into currency_rates if currency not exists else update it
-	for (const r of rates) {
-		const { currency, rate } = r
-		const detail = CURRENCY_DETAILS[currency]
-		if (detail === undefined) {
-			continue
-		}
-
-		const [alias, symbol, _cur, priority] = detail
-		const sql = `INSERT OR IGNORE INTO ${CURRENCY_RATES_TABLE} (currency, alias, symbol, rate, priority, updatedAt) VALUES (?, ?, ?, ?, ?, ?); UPDATE ${CURRENCY_RATES_TABLE} SET rate = ?, updatedAt = ? WHERE currency = ?`
-		sqls.push({
-			sql,
-			params: [currency, alias, symbol, rate, priority, updatedAt, rate, updatedAt, currency]
-		})
-
-		res.push({
-			// ignore id
-			id: 0,
-			currency,
-			alias: alias as string,
-			symbol: symbol as string,
-			priority: priority as number,
-			rate,
-			updateAt: updatedAt
-		})
-	}
-
-	await d.execute(_(sqls).map(s => s.sql).join(";"), _(sqls).flatMap(s => s.params).value())
-
-	return res
-}
-
-export async function listAllCurrencyRates(): Promise<CurrencyRateDetail[]> {
-	const d = await getDatabase()
-
-	const sql = `SELECT * FROM ${CURRENCY_RATES_TABLE}`
-
-	let rows = await d.select<CurrencyRateModel[]>(sql)
-	if (!rows || rows.length === 0) {
-		console.log("no currency rates found, updating...")
-		rows = await updateAllCurrencyRates()
-	}
-
-	return _(rows).sortBy("priority").value()
-}
-
-export function getDefaultCurrencyRate(): CurrencyRateDetail {
-	const [alias, symbol, currency, _priority] = CURRENCY_DETAILS["USD"]
-	return {
-		currency: currency as string,
-		alias: alias as string,
-		symbol: symbol as string,
-		rate: 1,
-	}
-}
-
-export async function getCurrencyRate(currency: string): Promise<CurrencyRateDetail> {
-	const d = await getDatabase()
-
-	const sql = `SELECT * FROM ${CURRENCY_RATES_TABLE} WHERE currency = ?`
-
-	const rows = await d.select<CurrencyRateModel[]>(sql, [currency])
-	if (!rows || rows.length === 0) {
-		console.error("find currency rate failed, not found:", currency)
-		return getDefaultCurrencyRate()
-	}
-
-	return rows[0]
 }
