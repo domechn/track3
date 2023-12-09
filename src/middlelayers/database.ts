@@ -61,15 +61,17 @@ export async function selectFromDatabaseWithSql<T extends object>(sql: string, v
 export async function deleteFromDatabase<T extends object>(table: string, where: Partial<T>, allowFullDelete = false) {
 	const db = await getDatabase()
 
-	const whereKeys = _(where).filter(v => !_(v).isUndefined()).keys().value()
+	const filteredWhere = _(where).omitBy(v => _(v).isUndefined()).value()
+	const whereKeys = _(filteredWhere).keys().value()
 	if (!allowFullDelete && whereKeys.length === 0) {
 		throw new Error("Delete without where is not allowed")
 	}
 
 	const whereStr = _(whereKeys).map(k => `${k}=?`).join(' AND ')
-	const values = _(whereKeys).map(k => _(where).get(k)).value()
+	const values = _(filteredWhere).map(v => v).value()
 
 
 	const sql = `DELETE FROM ${table} WHERE ${whereStr}`
+	
 	return db.execute(sql, values)
 }
