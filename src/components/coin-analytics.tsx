@@ -16,6 +16,7 @@ import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   currencyWrapper,
+  prettyNumberKeepNDigitsAfterDecimalPoint,
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
@@ -434,9 +435,7 @@ const App = ({
               </div>
               <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
                 max pos:{" "}
-                {Number.isInteger(maxPosition)
-                  ? maxPosition
-                  : maxPosition.toFixed(8).replace(/0+$/, "")}
+                {prettyNumberKeepNDigitsAfterDecimalPoint(maxPosition, 8)}
               </p>
             </CardContent>
           </Card>

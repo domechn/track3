@@ -13,6 +13,16 @@ export function prettyNumberToLocaleString(value: number) {
 	})
 }
 
+// keep n digits after decimal point
+// 1 => 1
+// 1.23456 => 1.234
+// 1.23000 => 1.23
+export function prettyNumberKeepNDigitsAfterDecimalPoint(value: number, keep: number) {
+	return Number.isInteger(value)
+		? "" + value
+		: value.toFixed(keep).replace(/0+$/, "")
+}
+
 // pretty to show price, if price >= 1, keep 3 digits after decimal point
 export function prettyPriceNumberToLocaleString(value: number) {
 	if (value >= 1) {

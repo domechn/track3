@@ -1,14 +1,17 @@
-import { useContext, useEffect, useMemo, useState } from "react";
-import "./index.css";
+import { useEffect, useMemo, useState } from "react";
 import { CoinData, CurrencyRateDetail } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import _ from "lodash";
 import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
-import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { useWindowSize } from "@/utils/hook";
+import {
+  currencyWrapper,
+  prettyNumberKeepNDigitsAfterDecimalPoint,
+  prettyNumberToLocaleString,
+  prettyPriceNumberToLocaleString,
+} from "@/utils/currency";
 import { parseDateToTS } from "@/utils/date";
-import { ButtonGroup, ButtonGroupItem } from "../ui/button-group";
+import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import {
   Select,
   SelectContent,
@@ -17,11 +20,19 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "../ui/select";
-import { LoadingContext } from '@/App'
+} from "./ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 type ComparisonData = {
   name: string;
+  type: "price" | "amount" | "value";
   base: number;
   head: number;
 };
@@ -29,7 +40,6 @@ type ComparisonData = {
 type QuickCompareType = "7D" | "1M" | "1Q" | "1Y";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
-  const { setLoading } = useContext(LoadingContext);
   const [baseId, setBaseId] = useState<string>("");
   const [dateOptions, setDateOptions] = useState<
     {
@@ -40,8 +50,6 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
 
   const [currentQuickCompare, setCurrentQuickCompare] =
     useState<QuickCompareType | null>(null);
-
-  const windowSize = useWindowSize();
 
   const baseDate = useMemo(() => {
     return _.find(dateOptions, { value: "" + baseId })?.label;
@@ -56,17 +64,25 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
 
   const [data, setData] = useState<ComparisonData[]>([]);
 
-  const [showDetail, setShowDetail] = useState<boolean>(true);
+  const [shouldMaskValue, setShowDetail] = useState<boolean>(false);
 
-  useEffect(() => {
-    // it is a hack
-    setLoading(true)
-    // sleep 150ms
-
-    setTimeout(() => {
-      setLoading(false)
-    }, 150)
-  },[])
+  const displayData = useMemo(() => {
+    return _(data)
+      .map((d) => ({
+        name: d.name,
+        type: d.type,
+        base: showColumnVal(d, "base"),
+        head: showColumnVal(d, "head"),
+        cmp: prettyComparisonResult(d.base, d.head),
+        color:
+          prettyComparisonResult(d.base, d.head) === "-"
+            ? "black"
+            : getComparisonResultNumber(d.base, d.head) > 0
+            ? "green"
+            : "red",
+      }))
+      .value();
+  }, [data, shouldMaskValue]);
 
   useEffect(() => {
     loadAllSelectDates().then((data) => {
@@ -99,14 +115,14 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     if (!baseId) {
       return;
     }
-    loadDataByUUID(baseId).then((data) => setBaseData(data))
+    loadDataByUUID(baseId).then((data) => setBaseData(data));
   }, [baseId]);
 
   useEffect(() => {
     if (!headId) {
       return;
     }
-    loadDataByUUID(headId).then((data) => setHeadData(data))
+    loadDataByUUID(headId).then((data) => setHeadData(data));
   }, [headId]);
 
   // update quick compare data ( baseId and headId )
@@ -182,7 +198,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   }
 
   function onViewOrHideClick() {
-    setShowDetail(!showDetail);
+    setShowDetail(!shouldMaskValue);
   }
 
   function loadData(base: CoinData[], head: CoinData[]): ComparisonData[] {
@@ -192,26 +208,13 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       .uniq()
       .value();
 
-    const others = "Others";
-
-    // add others to last
-    symbols.sort((a, b) => {
-      if (a === others) {
-        return 1;
-      }
-      if (b === others) {
-        return -1;
-      }
-      // origin order
-      return 0;
-    });
-
     // make total value and amount as the first two items
     const baseTotal = _(base).sumBy("value");
     const headTotal = _(head).sumBy("value");
     if (!_(symbols).isEmpty()) {
       res.push({
         name: "Total Value",
+        type: "value",
         base: baseTotal,
         head: headTotal,
       });
@@ -222,24 +225,23 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       const headItem = _.find(head, { symbol });
 
       res.push({
-        name: symbol + " Value",
-        base: baseItem?.value || 0,
-        head: headItem?.value || 0,
-      });
-
-      if (symbol === others) {
-        return;
-      }
-
-      res.push({
         name: symbol + " Amount",
+        type: "amount",
         base: baseItem?.amount || 0,
         head: headItem?.amount || 0,
       });
       res.push({
         name: symbol + " Price",
+        type: "price",
         base: baseItem?.price || 0,
         head: headItem?.price || 0,
+      });
+
+      res.push({
+        name: symbol + " Value",
+        type: "value",
+        base: baseItem?.value || 0,
+        head: headItem?.value || 0,
       });
     });
 
@@ -247,7 +249,6 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   }
 
   async function loadDataByUUID(uuid: string): Promise<CoinData[]> {
-    // return queryCoinDataById(id);
     const data = await queryCoinDataByUUID(uuid);
     const reversedData = _(data).sortBy("value").reverse().value();
 
@@ -263,25 +264,26 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
 
   function prettyComparisonResult(base: number, head: number): string {
     const per = getComparisonResultNumber(base, head);
+    const perStr = prettyNumberToLocaleString(per < 0 ? -per : per);
 
-    if (per === 0) {
+    if (perStr === "0.00" || perStr === "-0.00") {
       return "-";
     }
 
     if (per > 0) {
-      return "↑ " + prettyNumber(per, false) + "%";
+      return "↑ " + perStr + "%";
     }
 
-    return "↓ " + -prettyNumber(per, false) + "%";
+    return "↓ " + perStr + "%";
   }
 
   function prettyNumber(
     number: number,
-    keepDecimal: boolean,
-    showRealNumber = true,
+    type: "price" | "amount" | "value",
+    shouldMask = false,
     convertCurrency = false
   ): string {
-    if (!showRealNumber) {
+    if (shouldMask) {
       return "***";
     }
     if (!number) {
@@ -292,7 +294,11 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       convertedNumber = currencyWrapper(currency)(number);
     }
     let res = "" + convertedNumber;
-    if (!keepDecimal) {
+    if (type === "price") {
+      res = prettyPriceNumberToLocaleString(convertedNumber);
+    } else if (type === "amount") {
+      res = prettyNumberKeepNDigitsAfterDecimalPoint(convertedNumber, 8);
+    } else if (type === "value") {
       res = prettyNumberToLocaleString(convertedNumber);
     }
     if (convertCurrency) {
@@ -305,12 +311,14 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     item: ComparisonData,
     valType: "base" | "head"
   ): string {
+    const shouldMask = shouldMaskValue && item.type !== "price";
+    const shouldConvertCurrency =
+      item.type === "price" || item.type === "value";
     return prettyNumber(
       _(item).get(valType),
-      item.name.includes("Amount") || item.name.includes("Price"),
-      // don't hide price
-      showDetail || item.name.includes("Price"),
-      item.name.includes("Price") || item.name.includes("Value")
+      item.type,
+      shouldMask,
+      shouldConvertCurrency
     );
   }
 
@@ -320,14 +328,13 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
 
   return (
     <>
-      <div id="comparison-container" className="comparison-container">
+      <div id="comparison-container">
         <div>
           <div className="flex mb-4 items-center justify-end">
             <div className="mr-5">
               <a onClick={onViewOrHideClick}>
                 <img
-                  className="view-or-hide-icon"
-                  src={showDetail ? ViewIcon : HideIcon}
+                  src={shouldMaskValue ? HideIcon : ViewIcon}
                   alt="view-or-hide"
                   width={25}
                   height={25}
@@ -386,77 +393,33 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
             </Select>
           </div>
         </div>
-        {_(data).isEmpty() ? (
-          "No Data"
-        ) : (
-          <div
-            className="comparison-row"
-            style={{
-              fontWeight: "bold",
-              color: "#ededed",
-              fontSize: Math.min(18, windowSize.width! / 35) + "px",
-              backgroundColor: "#777777",
-            }}
-          >
-            <div
-              className="comparison-column"
-              style={{
-                width: "20%",
-              }}
-            >
-              Name
-            </div>
-            <div className="comparison-column">{baseDate}</div>
-            <div
-              className="comparison-column"
-              style={{
-                maxWidth: "200px",
-              }}
-            >
-              Difference
-            </div>
-            <div className="comparison-column">{headDate}</div>
-          </div>
-        )}
-        {data.map((item, index) => (
-          <div className="comparison-row" key={"comparison" + index}>
-            <div
-              className="comparison-column"
-              style={{
-                width: "20%",
-              }}
-            >
-              {item.name}
-            </div>
-            <div
-              className="comparison-column"
-              title={showColumnVal(item, "base")}
-            >
-              {showColumnVal(item, "base")}
-            </div>
-            <div
-              className="comparison-column"
-              style={{
-                color:
-                  getComparisonResultNumber(item.base, item.head) === 0
-                    ? ""
-                    : getComparisonResultNumber(item.base, item.head) > 0
-                    ? "green"
-                    : "red",
-                maxWidth: "200px",
-              }}
-              title={prettyComparisonResult(item.base, item.head)}
-            >
-              {prettyComparisonResult(item.base, item.head)}
-            </div>
-            <div
-              className="comparison-column"
-              title={showColumnVal(item, "head")}
-            >
-              {showColumnVal(item, "head")}
-            </div>
-          </div>
-        ))}
+        <div className="px-10 mb-5">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>{baseDate}</TableHead>
+                <TableHead className="text-center">Difference</TableHead>
+                <TableHead className="text-right">{headDate}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {displayData.map((item, index) => (
+                <TableRow
+                  key={"comparison" + index}
+                  className={item.type !== "value" ? "border-none" : ""}
+                >
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>{item.base}</TableCell>
+                  <TableCell className={`text-center text-${item.color}-500`}>
+                    {item.cmp}
+                  </TableCell>
+                  <TableCell className="text-right">{item.head}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </>
   );
