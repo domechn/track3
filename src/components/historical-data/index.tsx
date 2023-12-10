@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 type RankData = {
   id: number;
@@ -199,6 +200,58 @@ const App = ({
   function getUpOrDown(val: number) {
     const p = val > 0 ? "+" : val === 0 ? "" : "-";
     return p;
+  }
+
+  function renderHistoricalDataListV2() {
+    return (
+      data
+        .map((d, idx) => {
+          return (
+            <Card className="group" key={"historical-card-" + idx}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-3">
+                <CardTitle className="text-sm font-medium pt-0">
+                  <div className="grid gap-4 grid-cols-12">
+                    <div className="col-span-10">
+                      {timestampToDate(new Date(d.createdAt).getTime(), true)}
+                    </div>
+                    <div className="col-span-1 text-xl text-right">
+                      {currency.symbol +
+                        prettyNumberToLocaleString(
+                          currencyWrapper(currency)(d.total)
+                        )}
+                    </div>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-4">
+                  <div className="col-span-2">todo</div>
+                  <div className="col-span-2">
+                    <div
+                      style={{
+                        color:
+                          d.total - data[idx + 1]?.total > 0 ? "green" : "red",
+                      }}
+                    >
+                      {idx < data.length - 1
+                        ? getUpOrDown(d.total - data[idx + 1].total) +
+                          currency.symbol +
+                          prettyNumberToLocaleString(
+                            currencyWrapper(currency)(
+                              Math.abs(d.total - data[idx + 1].total)
+                            )
+                          )
+                        : ""}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })
+        // TODO: slice first for better performance
+        .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
+    );
   }
 
   function renderHistoricalDataList() {
@@ -460,6 +513,7 @@ const App = ({
           </Button>
         </div>
       </div>
+      {/* <div>{renderHistoricalDataListV2()}</div> */}
       <div className="historical-data">{renderHistoricalDataList()}</div>
     </div>
   );
