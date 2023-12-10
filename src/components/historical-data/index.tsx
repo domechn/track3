@@ -26,6 +26,15 @@ import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import bluebird from "bluebird";
 import { Button } from "../ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 type RankData = {
   id: number;
@@ -410,8 +419,8 @@ const App = ({
           </table>
         </div>
       </Modal>
-      <div className="flex justify-center items-center mb-3 text-gray-500 cursor-pointer">
-        <div className="flex space-x-2 items-center">
+      <div className="flex justify-center items-center mb-3 cursor-pointer">
+        <div className="flex space-x-0 items-center">
           <Button
             variant="outline"
             size="sm"
@@ -420,8 +429,26 @@ const App = ({
           >
             <ChevronLeftIcon />
           </Button>
-          <div className="text-muted-foreground text-sm">
-            {dataPage + 1} {"/"} {maxDataPage + 1}
+          <div className="text-gray-800 text-sm">
+            <Select
+              value={dataPage + ""}
+              onValueChange={(v) => {
+                setDataPage(+v);
+              }}
+            >
+              <SelectTrigger className="border-none shadow-none focus:ring-0">
+                <SelectValue placeholder="Select Page" />
+              </SelectTrigger>
+              <SelectContent className="overflow-y-auto max-h-[20rem]">
+                <SelectGroup>
+                  {_.range(maxDataPage + 1).map((s) => (
+                    <SelectItem key={"historical-idx-" + s} value={s + ""}>
+                      {s + 1} {"/"} {maxDataPage + 1}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
           <Button
             variant="outline"
