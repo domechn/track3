@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
@@ -24,6 +24,8 @@ import ImageStack from "../common/image-stack";
 import { getImageApiPath } from "@/utils/app";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import bluebird from "bluebird";
+import { Button } from "../ui/button";
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 
 type RankData = {
   id: number;
@@ -53,22 +55,23 @@ const App = ({
 
   const wsize = useWindowSize();
 
-  const [pageNum, setPageNum] = useState(1);
+  const [dataPage, setDataPage] = useState<number>(0);
+
   const pageSize = 10;
 
   useEffect(() => {
     const symbols = _(data)
       .map((d) => d.assets)
       .flatten()
-      .sortBy(d=>d.createdAt)
+      .sortBy((d) => d.createdAt)
       .reverse()
-      .uniqBy(d=>d.symbol)
-      .map(d=>({
+      .uniqBy((d) => d.symbol)
+      .map((d) => ({
         symbol: d.symbol,
         price: d.price,
       }))
       .value();
-      
+
     downloadCoinLogos(symbols);
 
     getLogoMap(data).then((m) => setLogoMap(m));
@@ -77,6 +80,12 @@ const App = ({
   useEffect(() => {
     loadAllData();
   }, []);
+
+  const maxDataPage = useMemo(() => {
+    // - 0.000000000001 is for float number precision
+    const mp = Math.floor(data.length / pageSize - 0.000000000001);
+    return mp >= 0 ? mp : 0;
+  }, [data]);
 
   async function getLogoMap(d: HistoricalData[]) {
     const acd = await getAppCacheDir();
@@ -185,102 +194,82 @@ const App = ({
 
   function renderHistoricalDataList() {
     // split data into pages
-    const idx = (pageNum - 1) * pageSize;
-    return _(data)
-      .map((d, idx) => {
-        return (
-          <div
-            key={d.id}
-            className="historical-data-card group"
-            onClick={() => onRowClick(d.id)}
-          >
-            <div>
-              <div className="historical-data-card-created-at">
-                {timestampToDate(new Date(d.createdAt).getTime(), true)}
-              </div>
-              <div className="historical-data-card-total">
-                {currency.symbol +
-                  prettyNumberToLocaleString(
-                    currencyWrapper(currency)(d.total)
-                  )}
-              </div>
-            </div>
-
-            <div className="historical-data-card-bottom">
-              <div className="hidden group-hover:inline-block">
-                <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
-                  <img
-                    src={DeleteIcon}
-                    alt="delete"
-                    style={{
-                      border: 0,
-                      height: 20,
-                      width: 20,
-                    }}
-                  />
-                </a>
-              </div>
-              <div
-                style={{
-                  position: "absolute",
-                  left: "30%",
-                }}
-              >
-                <ImageStack
-                  imageSrcs={_(d.assets)
-                    .sortBy("value")
-                    .reverse()
-                    .take(7)
-                    .map((a) => logoMap[a.symbol] || UnknownLogo)
-                    .value()}
-                  imageWidth={25}
-                  imageHeight={25}
-                />
-              </div>
-              <div
-                className="historical-data-card-bottom-changes"
-                style={{
-                  color: d.total - data[idx + 1]?.total > 0 ? "green" : "red",
-                }}
-              >
-                {idx < data.length - 1
-                  ? getUpOrDown(d.total - data[idx + 1].total) +
-                    currency.symbol +
+    return (
+      _(data)
+        .map((d, idx) => {
+          return (
+            <div
+              key={d.id}
+              className="historical-data-card group"
+              onClick={() => onRowClick(d.id)}
+            >
+              <div>
+                <div className="historical-data-card-created-at">
+                  {timestampToDate(new Date(d.createdAt).getTime(), true)}
+                </div>
+                <div className="historical-data-card-total">
+                  {currency.symbol +
                     prettyNumberToLocaleString(
-                      currencyWrapper(currency)(
-                        Math.abs(d.total - data[idx + 1].total)
+                      currencyWrapper(currency)(d.total)
+                    )}
+                </div>
+              </div>
+
+              <div className="historical-data-card-bottom">
+                <div className="hidden group-hover:inline-block">
+                  <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
+                    <img
+                      src={DeleteIcon}
+                      alt="delete"
+                      style={{
+                        border: 0,
+                        height: 20,
+                        width: 20,
+                      }}
+                    />
+                  </a>
+                </div>
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "30%",
+                  }}
+                >
+                  <ImageStack
+                    imageSrcs={_(d.assets)
+                      .sortBy("value")
+                      .reverse()
+                      .take(7)
+                      .map((a) => logoMap[a.symbol] || UnknownLogo)
+                      .value()}
+                    imageWidth={25}
+                    imageHeight={25}
+                  />
+                </div>
+                <div
+                  className="historical-data-card-bottom-changes"
+                  style={{
+                    color: d.total - data[idx + 1]?.total > 0 ? "green" : "red",
+                  }}
+                >
+                  {idx < data.length - 1
+                    ? getUpOrDown(d.total - data[idx + 1].total) +
+                      currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(
+                          Math.abs(d.total - data[idx + 1].total)
+                        )
                       )
-                    )
-                  : ""}
+                    : ""}
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })
-      .slice(idx, idx + pageSize)
-      .value();
-  }
-
-  function page() {
-    return _(data.length / pageSize)
-      .range()
-      .map((i) => {
-        const curPageNum = i + 1;
-
-        return (
-          <a
-            key={"his-page-" + curPageNum}
-            onClick={() => setPageNum(curPageNum)}
-            style={{
-              color: curPageNum === pageNum ? "black" : "gray",
-              marginRight: 10,
-            }}
-          >
-            {curPageNum}
-          </a>
-        );
-      })
-      .value();
+          );
+        })
+        // TODO: slice first for better performance
+        .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
+        .value()
+    );
   }
 
   function renderDetailPage(data: RankData[]) {
@@ -421,27 +410,28 @@ const App = ({
           </table>
         </div>
       </Modal>
-      <div className="flex justify-center items-center mb-5 text-gray-500 cursor-pointer">
-        <a
-          onClick={() => (pageNum > 1 ? setPageNum(pageNum - 1) : null)}
-          style={{
-            marginRight: 10,
-            color: "gray",
-          }}
-        >
-          {"<"}
-        </a>
-        {page()}
-        <a
-          onClick={() =>
-            pageNum < data.length / pageSize ? setPageNum(pageNum + 1) : null
-          }
-          style={{
-            color: "gray",
-          }}
-        >
-          {">"}
-        </a>
+      <div className="flex justify-center items-center mb-3 text-gray-500 cursor-pointer">
+        <div className="flex space-x-2 items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
+            disabled={dataPage <= 0}
+          >
+            <ChevronLeftIcon />
+          </Button>
+          <div className="text-muted-foreground text-sm">
+            {dataPage + 1} {"/"} {maxDataPage + 1}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
+            disabled={dataPage >= maxDataPage}
+          >
+            <ChevronRightIcon />
+          </Button>
+        </div>
       </div>
       <div className="historical-data">{renderHistoricalDataList()}</div>
     </div>
