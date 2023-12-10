@@ -173,6 +173,11 @@ const App = ({
     [currency, profit]
   );
 
+  const maxPositionStr = useMemo(
+    () => prettyNumberKeepNDigitsAfterDecimalPoint(maxPosition, 8),
+    [maxPosition]
+  );
+
   const profitRate = useMemo(
     () =>
       breakevenPrice === 0
@@ -435,7 +440,7 @@ const App = ({
               </div>
               <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
                 max pos:{" "}
-                {prettyNumberKeepNDigitsAfterDecimalPoint(maxPosition, 8)}
+                {maxPositionStr}
               </p>
             </CardContent>
           </Card>

@@ -328,98 +328,96 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
 
   return (
     <>
-      <div id="comparison-container">
-        <div>
-          <div className="flex mb-4 items-center justify-end">
-            <div className="mr-5">
-              <a onClick={onViewOrHideClick}>
-                <img
-                  src={shouldMaskValue ? HideIcon : ViewIcon}
-                  alt="view-or-hide"
-                  width={25}
-                  height={25}
-                />
-              </a>
-            </div>
-            <div className="mr-2 text-gray-400 text-m flex items-center">
-              Quick Compare
-            </div>
-            <ButtonGroup
-              value={currentQuickCompare || ""}
-              onValueChange={(val: string) =>
-                onQuickCompareButtonClick(val as QuickCompareType)
-              }
-            >
-              <ButtonGroupItem value="7D">7D</ButtonGroupItem>
-              <ButtonGroupItem value="1M">1M</ButtonGroupItem>
-              <ButtonGroupItem value="1Q">1Q</ButtonGroupItem>
-              <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
-            </ButtonGroup>
+      <div>
+        <div className="flex mb-4 items-center justify-end">
+          <div className="mr-5">
+            <a onClick={onViewOrHideClick}>
+              <img
+                src={shouldMaskValue ? HideIcon : ViewIcon}
+                alt="view-or-hide"
+                width={25}
+                height={25}
+              />
+            </a>
           </div>
+          <div className="mr-2 text-gray-400 text-m flex items-center">
+            Quick Compare
+          </div>
+          <ButtonGroup
+            value={currentQuickCompare || ""}
+            onValueChange={(val: string) =>
+              onQuickCompareButtonClick(val as QuickCompareType)
+            }
+          >
+            <ButtonGroupItem value="7D">7D</ButtonGroupItem>
+            <ButtonGroupItem value="1M">1M</ButtonGroupItem>
+            <ButtonGroupItem value="1Q">1Q</ButtonGroupItem>
+            <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
+          </ButtonGroup>
         </div>
-        <div className="grid grid-cols-6 gap-4 mb-5">
-          <div className="col-start-2 col-end-4">
-            <Select onValueChange={onBaseSelectChange} value={baseId}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Select Base Date" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectLabel>Base Dates</SelectLabel>
-                  {dateOptions.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-end-7 col-span-2">
-            <Select onValueChange={onHeadSelectChange} value={headId}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Select Head Date" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectLabel>Head Dates</SelectLabel>
-                  {dateOptions.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+      </div>
+      <div className="grid grid-cols-6 gap-4 mb-5">
+        <div className="col-start-2 col-end-4">
+          <Select onValueChange={onBaseSelectChange} value={baseId}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Select Base Date" />
+            </SelectTrigger>
+            <SelectContent className="overflow-y-auto max-h-[20rem]">
+              <SelectGroup>
+                <SelectLabel>Base Dates</SelectLabel>
+                {dateOptions.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>
+                    {d.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="px-10 mb-5">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>{baseDate}</TableHead>
-                <TableHead className="text-center">Difference</TableHead>
-                <TableHead className="text-right">{headDate}</TableHead>
+        <div className="col-end-7 col-span-2">
+          <Select onValueChange={onHeadSelectChange} value={headId}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Select Head Date" />
+            </SelectTrigger>
+            <SelectContent className="overflow-y-auto max-h-[20rem]">
+              <SelectGroup>
+                <SelectLabel>Head Dates</SelectLabel>
+                {dateOptions.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>
+                    {d.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="px-10 mb-5">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>{baseDate}</TableHead>
+              <TableHead className="text-center">Difference</TableHead>
+              <TableHead className="text-right">{headDate}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayData.map((item, index) => (
+              <TableRow
+                key={"comparison" + index}
+                className={item.type !== "value" ? "border-none" : ""}
+              >
+                <TableCell className="font-medium">{item.name}</TableCell>
+                <TableCell>{item.base}</TableCell>
+                <TableCell className={`text-center text-${item.color}-500`}>
+                  {item.cmp}
+                </TableCell>
+                <TableCell className="text-right">{item.head}</TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayData.map((item, index) => (
-                <TableRow
-                  key={"comparison" + index}
-                  className={item.type !== "value" ? "border-none" : ""}
-                >
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>{item.base}</TableCell>
-                  <TableCell className={`text-center text-${item.color}-500`}>
-                    {item.cmp}
-                  </TableCell>
-                  <TableCell className="text-right">{item.head}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </>
   );
