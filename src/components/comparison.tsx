@@ -393,31 +393,36 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         </div>
       </div>
       <div className="px-10 mb-5">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>{baseDate}</TableHead>
-              <TableHead className="text-center">Difference</TableHead>
-              <TableHead className="text-right">{headDate}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {displayData.map((item, index) => (
-              <TableRow
-                key={"comparison" + index}
-                className={item.type !== "value" ? "border-none" : ""}
-              >
-                <TableCell className="font-medium">{item.name}</TableCell>
-                <TableCell>{item.base}</TableCell>
-                <TableCell className={`text-center text-${item.color}-500`}>
-                  {item.cmp}
-                </TableCell>
-                <TableCell className="text-right">{item.head}</TableCell>
+        {displayData.length === 0 && (
+          <div className="text-center text-gray-600">No Data</div>
+        )}
+        {displayData.length > 0 && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>{baseDate}</TableHead>
+                <TableHead className="text-center">Difference</TableHead>
+                <TableHead className="text-right">{headDate}</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {displayData.map((item, index) => (
+                <TableRow
+                  key={"comparison" + index}
+                  className={item.type !== "value" ? "border-none" : ""}
+                >
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>{item.base}</TableCell>
+                  <TableCell className={`text-center text-${item.color}-500`}>
+                    {item.cmp}
+                  </TableCell>
+                  <TableCell className="text-right">{item.head}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </>
   );
