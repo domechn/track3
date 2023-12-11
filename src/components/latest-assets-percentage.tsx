@@ -5,7 +5,7 @@ import {
 } from "@/middlelayers/types";
 import { Card, CardContent } from "./ui/card";
 import _ from "lodash";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { getImageApiPath } from "@/utils/app";
@@ -31,7 +31,6 @@ const App = ({
   data: LatestAssetsPercentageData;
 }) => {
   const [dataPage, setDataPage] = useState<number>(0);
-  const [maxDataPage, setMaxDataPage] = useState<number>(0);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const pageSize = 5;
   const navigate = useNavigate();
@@ -57,13 +56,14 @@ const App = ({
         .value()
     );
 
-    // - 0.000000000001 is for float number precision
-    const mp = Math.floor(data.length / pageSize - 0.000000000001)
-    // set max data page
-    setMaxDataPage(mp >= 0 ? mp : 0);
-
     // set logo map
     getLogoMap(data).then((m) => setLogoMap(m));
+  }, [data]);
+
+  const maxDataPage = useMemo(() => {
+    // - 0.000000000001 is for float number precision
+    const mp = Math.floor(data.length / pageSize - 0.000000000001);
+    return mp >= 0 ? mp : 0;
   }, [data]);
 
   async function getLogoMap(d: LatestAssetsPercentageData) {

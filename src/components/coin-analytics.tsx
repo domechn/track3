@@ -73,7 +73,6 @@ const App = ({
   const pageSize = 20;
 
   const [dataPage, setDataPage] = useState<number>(0);
-  const [maxDataPage, setMaxDataPage] = useState<number>(0);
 
   const [actions, setActions] = useState<AssetAction[]>([]);
   const [latestAsset, setLatestAsset] = useState<Asset | undefined>();
@@ -116,11 +115,12 @@ const App = ({
       setWalletAliasMap(wam);
     });
 
-    // update max page
+  }, [actions]);
+
+  const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
     const mp = Math.floor(actions.length / pageSize - 0.000000000001);
-    // set max data page
-    setMaxDataPage(mp >= 0 ? mp : 0);
+    return mp >= 0 ? mp : 0;
   }, [actions]);
 
   const breakevenPrice = useMemo(

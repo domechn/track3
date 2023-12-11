@@ -360,7 +360,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         <div className="col-start-2 col-end-4">
           <Select onValueChange={onBaseSelectChange} value={baseId}>
             <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Select Base Date" />
+              <SelectValue placeholder="Base Date" />
             </SelectTrigger>
             <SelectContent className="overflow-y-auto max-h-[20rem]">
               <SelectGroup>
@@ -377,7 +377,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         <div className="col-end-7 col-span-2">
           <Select onValueChange={onHeadSelectChange} value={headId}>
             <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Select Head Date" />
+              <SelectValue placeholder="Head Date" />
             </SelectTrigger>
             <SelectContent className="overflow-y-auto max-h-[20rem]">
               <SelectGroup>
