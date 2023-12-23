@@ -16,12 +16,13 @@ import { AssetPriceModel, ExportAssetModel, HistoricalData } from './types'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
+import md5 from 'md5'
 
 type ExportData = {
 	exportAt: string
 	configuration?: string
 	historicalData: Pick<HistoricalData, "createdAt" | "assets" | "total">[]
-	md5: string
+	md5V2: string
 }
 
 // TODO: query by token address not symbol, because there are multiple coins with same symbol
@@ -102,9 +103,11 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 		configuration: cfg
 	}
 
+	const md5Payload = { data: JSON.stringify(exportData) }
+
 	const content = JSON.stringify({
 		...exportData,
-		md5: await invoke<string>("md5", { data: JSON.stringify(exportData) }),
+		md5V2: md5(JSON.stringify(md5Payload)),
 	} as ExportData)
 
 	// save to filePath
@@ -126,14 +129,15 @@ export async function importHistoricalData(): Promise<boolean> {
 	}
 	const contents = await readTextFile(selected as string)
 
-	const { exportAt, md5, configuration, historicalData } = JSON.parse(contents) as ExportData
+	const { exportAt, md5V2: md5Str, configuration, historicalData } = JSON.parse(contents) as ExportData
 
 	// !compatible with older versions logic ( before 0.3.3 )
-	if (md5) {
+	if (md5Str) {
 		// verify md5
 		// todo: use md5 in typescript
-		const currentMd5 = await invoke<string>("md5", { data: JSON.stringify({ exportAt, historicalData, configuration }) })
-		if (currentMd5 !== md5) {
+		const md5Payload = { data: JSON.stringify({ exportAt, historicalData, configuration }) }
+		const currentMd5 = md5(JSON.stringify(md5Payload))
+		if (currentMd5 !== md5Str) {
 			throw new Error("invalid data, md5 check failed: errorCode 000")
 		}
 	}

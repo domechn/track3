@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
-use std::{collections::HashMap, fs};
+use std::{collections::HashMap};
 
 use tauri::Manager;
 use track3::{
@@ -136,16 +136,6 @@ fn decrypt(data: String) -> Result<String, String> {
     windows_subsystem = "windows"
 )]
 #[tauri::command]
-fn md5(data: String) -> Result<String, String> {
-    let digest = md5::compute(data.as_bytes());
-    Ok(format!("{:x}", digest))
-}
-
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-#[tauri::command]
 async fn open_debank_window_in_background(handle: tauri::AppHandle, address: String) {
     let debank_window = tauri::WindowBuilder::new(
         &handle,
@@ -225,7 +215,6 @@ fn main() {
             query_okex_balance,
             encrypt,
             decrypt,
-            md5,
             download_coins_logos,
             open_debank_window_in_background,
             close_debank_window,
