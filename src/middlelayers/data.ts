@@ -22,7 +22,7 @@ type ExportData = {
 	exportAt: string
 	configuration?: string
 	historicalData: Pick<HistoricalData, "createdAt" | "assets" | "total">[]
-	md5: string
+	md5V2: string
 }
 
 // TODO: query by token address not symbol, because there are multiple coins with same symbol
@@ -107,7 +107,7 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 
 	const content = JSON.stringify({
 		...exportData,
-		md5: md5(JSON.stringify(md5Payload)),
+		md5V2: md5(JSON.stringify(md5Payload)),
 	} as ExportData)
 
 	// save to filePath
@@ -129,7 +129,7 @@ export async function importHistoricalData(): Promise<boolean> {
 	}
 	const contents = await readTextFile(selected as string)
 
-	const { exportAt, md5: md5Str, configuration, historicalData } = JSON.parse(contents) as ExportData
+	const { exportAt, md5V2: md5Str, configuration, historicalData } = JSON.parse(contents) as ExportData
 
 	// !compatible with older versions logic ( before 0.3.3 )
 	if (md5Str) {
