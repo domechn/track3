@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { deleteFromDatabase, saveModelsToDatabase, selectFromDatabase, selectFromDatabaseWithSql } from '../database'
-import { AssetModel, WalletCoinUSD } from '../types'
+import { AssetModel, UniqueIndexConflictResolver, WalletCoinUSD } from '../types'
 import { CoinModel } from '../datafetch/types'
 import { v4 as uuidv4 } from 'uuid'
 import md5 from 'md5'
@@ -92,7 +92,17 @@ class AssetHandler {
 		return models[0]?.createdAt
 	}
 
+	// saveAssets to assets_v2 table, and replace duplicated data if data hits unique constraint
 	async saveAssets(models: AssetModel[]): Promise<AssetModel[]> {
+		return this.saveAssetsInternal(models, 'REPLACE')
+	}
+
+	// importAssets to assets_v2 table, and ignore or replace duplicated data if data hits unique constraint
+	async importAssets(models: AssetModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetModel[]> {
+		return this.saveAssetsInternal(models, conflictResolver)
+	}
+
+	private saveAssetsInternal(models: AssetModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetModel[]> {
 		return saveModelsToDatabase<AssetModel>(this.assetTableName, _(models).map(m => ({
 			uuid: m.uuid,
 			createdAt: m.createdAt,
@@ -101,7 +111,7 @@ class AssetHandler {
 			value: m.value,
 			price: m.price,
 			wallet: m.wallet
-		} as AssetModel)).value())
+		} as AssetModel)).value(), conflictResolver)
 	}
 
 	// skip where value is less than 1
@@ -134,7 +144,7 @@ class AssetHandler {
 		}
 		const models = getDBModel(coins)
 
-		return saveModelsToDatabase(this.assetTableName, models)
+		return this.saveAssets(models)
 	}
 
 	// if symbol is not provided, return all assets, else return assets with symbol

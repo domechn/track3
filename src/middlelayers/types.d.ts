@@ -1,3 +1,5 @@
+export type UniqueIndexConflictResolver = 'IGNORE' | 'REPLACE'
+
 // assets_v2 table
 export type AssetModel = {
 	id: number

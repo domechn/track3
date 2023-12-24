@@ -1,5 +1,6 @@
 import _ from "lodash"
 import Database from "tauri-plugin-sql-api"
+import { UniqueIndexConflictResolver } from './types'
 
 export const databaseName = "track3.db"
 
@@ -13,12 +14,12 @@ export async function getDatabase(): Promise<Database> {
 	return dbInstance
 }
 
-export async function saveModelsToDatabase<T extends object>(table: string, models: T[]) {
+export async function saveModelsToDatabase<T extends object>(table: string, models: T[], conflictResolver: UniqueIndexConflictResolver = 'REPLACE') {
 	const db = await getDatabase()
-	return saveToDatabase(db, table, models)
+	return saveToDatabase(db, table, models, conflictResolver)
 }
 
-async function saveToDatabase<T extends object>(db: Database, table: string, models: T[]) {
+async function saveToDatabase<T extends object>(db: Database, table: string, models: T[], conflictResolver: UniqueIndexConflictResolver) {
 	if (models.length === 0) {
 		return models
 	}
@@ -28,7 +29,7 @@ async function saveToDatabase<T extends object>(db: Database, table: string, mod
 	const first = filteredModes[0]
 	const keys = Object.keys(first)
 	const valuesArrayStr = new Array(filteredModes.length).fill(`(${keys.map(() => '?').join(',')})`).join(',')
-	const insertSql = `INSERT OR REPLACE INTO ${table} (${keys.join(',')}) VALUES ${valuesArrayStr}`
+	const insertSql = `INSERT OR ${conflictResolver} INTO ${table} (${keys.join(',')}) VALUES ${valuesArrayStr}`
 	const values = _(filteredModes).map(m => _(keys).map(k => _(m).get(k)).value()).flatten().value()
 	await db.execute(insertSql, values)
 	return models
@@ -72,6 +73,6 @@ export async function deleteFromDatabase<T extends object>(table: string, where:
 
 
 	const sql = `DELETE FROM ${table} WHERE ${whereStr}`
-	
+
 	return db.execute(sql, values)
 }
