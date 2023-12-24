@@ -551,12 +551,16 @@ impl Migration for V4TV5 {
         let cloud_sync_down =
             fs::read_to_string(resource_dir.join("migrations/v04t05/cloud_sync_down.sql"))
                 .unwrap();
+        let assets_v2_uniq_idx_up =
+            fs::read_to_string(resource_dir.join("migrations/v04t05/assets_v2_uniq_idx_up.sql"))
+                .unwrap();
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
             println!("migrate from v0.4 to v0.5 in tokio spawn");
             let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
             conn.execute(cloud_sync_down.as_str()).await.unwrap();
+            conn.execute(assets_v2_uniq_idx_up.as_str()).await.unwrap();
             conn.close().await.unwrap();
             println!("migrate from v0.4 to v0.5 in tokio spawn done");
         });
