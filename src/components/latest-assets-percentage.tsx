@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { getImageApiPath } from "@/utils/app";
 import {
   currencyWrapper,
+  prettyNumberKeepNDigitsAfterDecimalPoint,
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
@@ -202,7 +203,12 @@ const App = ({
                         className="mr-1 font-bold text-base"
                         title={"" + d.amount}
                       >
-                        {prettyPriceNumberToLocaleString(d.amount)}
+                        {d.amount >= 1
+                          ? prettyNumberKeepNDigitsAfterDecimalPoint(
+                              d.amount,
+                              4
+                            )
+                          : prettyPriceNumberToLocaleString(d.amount)}
                       </div>
                       <div className="text-gray-600">{d.coin}</div>
                       <ArrowTopRightIcon className="ml-2 h-4 w-4 hidden group-hover:inline-block text-gray-600" />

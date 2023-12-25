@@ -12,7 +12,7 @@ import { queryAllAssetPrices, queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
-import { AssetPriceModel, ExportAssetModel, HistoricalData } from './types'
+import { AssetPriceModel, ExportAssetModel, HistoricalData, UniqueIndexConflictResolver } from './types'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
@@ -115,7 +115,7 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 	return true
 }
 
-export async function importHistoricalData(): Promise<boolean> {
+export async function importHistoricalData(conflictResolver: 'REPLACE' | 'IGNORE'): Promise<boolean> {
 	const selected = await open({
 		multiple: false,
 		filters: [{
@@ -153,7 +153,7 @@ export async function importHistoricalData(): Promise<boolean> {
 	}
 
 	// start to import
-	await saveHistoricalDataAssets(assets)
+	await saveHistoricalDataAssets(assets, conflictResolver)
 
 	// import configuration if exported
 	if (configuration) {
@@ -164,7 +164,7 @@ export async function importHistoricalData(): Promise<boolean> {
 }
 
 // import historicalData from file
-async function saveHistoricalDataAssets(assets: ExportAssetModel[]) {
+async function saveHistoricalDataAssets(assets: ExportAssetModel[], conflictResolver: UniqueIndexConflictResolver) {
 	const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
 	_(assets).forEach((asset) => {
 		_(requiredKeys).forEach(k => {
@@ -174,7 +174,7 @@ async function saveHistoricalDataAssets(assets: ExportAssetModel[]) {
 		})
 	})
 
-	await ASSET_HANDLER.saveAssets(assets)
+	await ASSET_HANDLER.importAssets(assets, conflictResolver)
 
 	// import asset prices
 	const importedAssets = _(await queryHistoricalData(-1, false)).map(d => d.assets).flatten().value()

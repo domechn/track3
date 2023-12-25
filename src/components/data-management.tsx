@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { UniqueIndexConflictResolver } from '@/middlelayers/types'
 
 const App = ({
   onDataImported,
@@ -19,6 +20,8 @@ const App = ({
   const { toast } = useToast();
 
   const [exportConfiguration, setExportConfiguration] = useState(false);
+  // todo: let users to choose conflict resolver
+  const [conflictResolver, setConflictResolver] = useState<UniqueIndexConflictResolver>('REPLACE');
 
   async function onExportDataClick() {
     const exported = await exportHistoricalData(exportConfiguration);
@@ -30,7 +33,7 @@ const App = ({
   }
 
   async function onImportDataClick() {
-    return importHistoricalData()
+    return importHistoricalData(conflictResolver)
       .then((imported) => {
         if (!imported) {
           return;
