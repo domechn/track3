@@ -37,7 +37,7 @@ const App = ({
       title: {
         display: false,
         // text is set for resizing
-        text: "Trend of Coins",
+        text: "Trend of Coin",
       },
       datalabels: {
         display: false,
@@ -125,7 +125,7 @@ const App = ({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium font-bold">
-            Trend of Coins
+            Trend of Coin
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">

@@ -179,7 +179,7 @@ const App = () => {
       "Trend of Top Coins Rank",
     ];
     const walletsCharts = ["Percentage And Total Value of Each Wallet"];
-    const coinsCharts = ["Trend of Coins"];
+    const coinsCharts = ["Trend of Coin"];
     let chartsTitles: string[] = [];
     if (activeMenu === "overview") {
       chartsTitles = overviewsCharts;
