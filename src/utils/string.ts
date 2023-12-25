@@ -3,7 +3,7 @@ export const insertEllipsis = (str: string, maxLength: number) => {
 		return str
 	}
 
-	const ellipsisLength = 3 // 省略号的长度
+	const ellipsisLength = 3 // length of ...
 	const charsToShow = maxLength - ellipsisLength
 	const frontChars = Math.ceil(charsToShow / 2)
 	const backChars = Math.floor(charsToShow / 2)

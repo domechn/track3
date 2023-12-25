@@ -13,14 +13,21 @@ export function prettyNumberToLocaleString(value: number) {
 	})
 }
 
-// keep n digits after decimal point
+// keep n digits after decimal point, value needs to > 1
 // 1 => 1
 // 1.23456 => 1.234
 // 1.23000 => 1.23
-export function prettyNumberKeepNDigitsAfterDecimalPoint(value: number, keep: number) {
-	return Number.isInteger(value)
-		? "" + value
-		: value.toFixed(keep).replace(/0+$/, "")
+export function prettyNumberKeepNDigitsAfterDecimalPoint(value: number, keepLen: number) {
+	if (Number.isInteger(value)) {
+		return "" + value
+	}
+	const fixed = value.toFixed(keepLen)
+	const zeroSuffix = "0".repeat(keepLen)
+	if (fixed.endsWith("." + zeroSuffix)) {
+		return Math.floor(value)
+	}
+
+	return fixed.replace(/0+$/, "")
 }
 
 // pretty to show price, if price >= 1, keep 3 digits after decimal point
