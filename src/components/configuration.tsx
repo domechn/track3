@@ -1122,6 +1122,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       </div>
       <Separator />
       <div className="space-y-2">
+        {/* fixme: data misses when updated */}
         <div className="text-l font-bold text-left">Others</div>
         {renderAddOtherForm()}
         {renderOthersForm(others)}
