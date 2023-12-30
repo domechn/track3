@@ -117,10 +117,22 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 
 // return true if there are duplicated data in track3-export-data
 export async function checkIfDuplicatedHistoricalData(ed?: ExportData): Promise<boolean> {
-	return true
+	if (!ed) {
+		return false
+	}
+
+	const allUUIDs = await ASSET_HANDLER.listAllUUIDs()
+
+	const importUUIDs = _(ed.historicalData).map(d=>d.assets).flatten().map(a=>a.uuid).uniq().value()
+
+	// check if there is duplicated uuid
+	const i = _.intersection(allUUIDs, importUUIDs)
+
+	return i && i.length > 0
 }
 
 // readHistoricalDataFromFile from file
+// if return undefined, which means user dose not select any file
 export async function readHistoricalDataFromFile(): Promise<ExportData | undefined> {
 	const selected = await open({
 		multiple: false,
@@ -137,6 +149,7 @@ export async function readHistoricalDataFromFile(): Promise<ExportData | undefin
 	return JSON.parse(contents) as ExportData
 }
 
+// importHistoricalData to db
 export async function importHistoricalData(conflictResolver: 'REPLACE' | 'IGNORE', ed: ExportData): Promise<boolean> {
 	const { exportAt, md5V2: md5Str, configuration, historicalData } = ed
 

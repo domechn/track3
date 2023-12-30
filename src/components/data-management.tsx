@@ -44,9 +44,12 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   }
 
   async function onImportDataClick() {
-    const exportData = await readHistoricalDataFromFile();
-    setExportData(exportData);
-    const hasConflicts = await checkIfDuplicatedHistoricalData(exportData);
+    const ed = await readHistoricalDataFromFile();
+    setExportData(ed);
+    if (!ed) {
+      return;
+    }
+    const hasConflicts = await checkIfDuplicatedHistoricalData(ed);
     if (hasConflicts) {
       setShowConflictResolverDialog(true);
     } else {
@@ -80,6 +83,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         });
       })
       .finally(() => {
+        setExportData(undefined);
         setShowConflictResolverDialog(false);
       });
   }
