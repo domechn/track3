@@ -206,6 +206,22 @@ class AssetHandler {
 			value: _(assets).sumBy("value"),
 		})).value()
 	}
+
+	async listSortedSymbolsByCurrentValue(): Promise<string[]> {
+		const sql = `SELECT A.symbol as symbol, A.createdAt as createdAt, SUM(A.value) as value
+		FROM ${this.assetTableName} AS A
+		INNER JOIN (
+		    SELECT symbol, MAX(createdAt) AS maxCreatedAt, MAX(value) AS maxValue
+		    FROM assets_v2
+		    GROUP BY symbol
+		    HAVING maxValue > 1
+		) AS B ON A.symbol = B.symbol AND A.createdAt = B.maxCreatedAt
+		GROUP BY A.symbol `
+
+		const models = await selectFromDatabaseWithSql<{ symbol: string, createdAt: string, value: number }>(sql, [])
+
+		return _(models).orderBy(['createdAt', 'value'], ["desc", "desc"]).map(m => m.symbol).value()
+	}
 }
 
 export const ASSET_HANDLER = new AssetHandler()

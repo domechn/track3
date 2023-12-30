@@ -23,33 +23,38 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import bluebird from "bluebird";
 import { useNavigate } from "react-router-dom";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
+import { queryLatestAssetsPercentage } from "@/middlelayers/charts";
 
 const App = ({
   currency,
-  data,
+  size,
+  version,
 }: {
   currency: CurrencyRateDetail;
-  data: LatestAssetsPercentageData;
+  size: number;
+  version: number;
 }) => {
   const [dataPage, setDataPage] = useState<number>(0);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+  const [loading, setLoading] = useState(false);
+  const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
+    useState<LatestAssetsPercentageData>([]);
+
   const pageSize = 5;
   const navigate = useNavigate();
 
-  const [percentageData, setPercentageData] = useState<
-    {
-      coin: string;
-      percentage: number;
-      chartColor: string;
-    }[]
-  >(data);
+  const percentageData = useMemo(() => {
+    return splitTopAndOtherData(latestAssetsPercentageData);
+  }, [latestAssetsPercentageData]);
+  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   useEffect(() => {
-    setPercentageData(splitTopAndOtherData(data));
+    loadData();
+  }, [size, version]);
 
+  useEffect(() => {
     // download coin logos
     downloadCoinLogos(
-      _(data)
+      _(latestAssetsPercentageData)
         .map((d) => ({
           symbol: d.coin,
           price: d.value / (d.amount || 1),
@@ -58,14 +63,24 @@ const App = ({
     );
 
     // set logo map
-    getLogoMap(data).then((m) => setLogoMap(m));
-  }, [data]);
+    getLogoMap(latestAssetsPercentageData).then((m) => setLogoMap(m));
+  }, [latestAssetsPercentageData]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const lap = await queryLatestAssetsPercentage();
+      setLatestAssetsPercentageData(lap);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
-    const mp = Math.floor(data.length / pageSize - 0.000000000001);
+    const mp = Math.floor(latestAssetsPercentageData.length / pageSize - 0.000000000001);
     return mp >= 0 ? mp : 0;
-  }, [data]);
+  }, [latestAssetsPercentageData]);
 
   async function getLogoMap(d: LatestAssetsPercentageData) {
     const acd = await getAppCacheDir();
@@ -184,7 +199,7 @@ const App = ({
         <Separator />
         <Table>
           <TableBody>
-            {data
+            {latestAssetsPercentageData
               .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
               .map((d) => (
                 <TableRow

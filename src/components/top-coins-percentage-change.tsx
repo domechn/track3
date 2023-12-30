@@ -2,18 +2,27 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timestampToDate } from "@/utils/date";
 import { TopCoinsPercentageChangeData } from "@/middlelayers/types";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import { legendOnClick } from "@/utils/legend";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { queryTopCoinsPercentageChangeData } from "@/middlelayers/charts";
 
 const prefix = "tcpc";
 
-const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
-  const size = useWindowSize();
+const App = ({ size, version }: { size: number; version: number }) => {
+  const wsize = useWindowSize();
+
+  const [loading, setLoading] = useState(false);
+  const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] =
+    useState<TopCoinsPercentageChangeData>({
+      timestamps: [],
+      coins: [],
+    });
+
   const [currentType, setCurrentType] = useState(getWholeKey("value")); // ['tcpcValue', 'tcpcPrice']
   const chartRef =
     useRef<
@@ -23,6 +32,20 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
         unknown
       >
     >(null);
+
+  useEffect(() => {
+    loadData();
+  }, [size, version]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const tcpcd = await queryTopCoinsPercentageChangeData(size);
+      setTopCoinsPercentageChangeData(tcpcd);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const options = {
     maintainAspectRatio: false,
@@ -44,7 +67,7 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
         display: false,
       },
       legend: {
-        onClick: legendOnClick(_(data.coins).size(), chartRef.current),
+        onClick: legendOnClick(_(topCoinsPercentageChangeData.coins).size(), chartRef.current),
       },
     },
     scales: {
@@ -95,10 +118,10 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
 
   function lineData() {
     return {
-      labels: data.timestamps.map((x) => timestampToDate(x)),
-      datasets: data.coins.map((coin) => ({
+      labels: topCoinsPercentageChangeData.timestamps.map((x) => timestampToDate(x)),
+      datasets: topCoinsPercentageChangeData.coins.map((coin) => ({
         label: coin.coin,
-        data: coinPercentageData(data.timestamps, coin.percentageData),
+        data: coinPercentageData(topCoinsPercentageChangeData.timestamps, coin.percentageData),
         borderColor: coin.lineColor,
         backgroundColor: coin.lineColor,
         borderWidth: 4,
@@ -151,7 +174,7 @@ const App = ({ data }: { data: TopCoinsPercentageChangeData }) => {
           </div>
           <div
             style={{
-              height: Math.max((size.height || 100) / 2, 350),
+              height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
             <Line ref={chartRef} options={options as any} data={lineData()} />

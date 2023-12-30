@@ -7,23 +7,14 @@ import TopCoinsPercentageChange from "@/components/top-coins-percentage-change";
 
 import {
   CurrencyRateDetail,
-  LatestAssetsPercentageData,
-  TopCoinsPercentageChangeData,
-  TopCoinsRankData,
 } from "../middlelayers/types";
 
 const App = ({
   currency,
-  latestAssetsPercentageData,
-  topCoinsRankData,
-  topCoinsPercentageChangeData,
   version,
   size,
 }: {
   currency: CurrencyRateDetail;
-  latestAssetsPercentageData: LatestAssetsPercentageData;
-  topCoinsRankData: TopCoinsRankData;
-  topCoinsPercentageChangeData: TopCoinsPercentageChangeData;
   version: number;
   size: number;
 }) => {
@@ -44,10 +35,11 @@ const App = ({
       </div>
       <LatestAssetsPercentage
         currency={currency}
-        data={latestAssetsPercentageData}
+        size={size}
+        version={version}
       />
-      <TopCoinsRank data={topCoinsRankData} />
-      <TopCoinsPercentageChange data={topCoinsPercentageChangeData} />
+      <TopCoinsRank version={version} size={size} />
+      <TopCoinsPercentageChange version={version} size={size} />
       <div className="mb-2"></div>
     </div>
   );

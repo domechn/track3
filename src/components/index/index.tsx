@@ -33,20 +33,12 @@ import {
 import {
   CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
-  LatestAssetsPercentageData,
-  PNLData,
-  TopCoinsPercentageChangeData,
-  TopCoinsRankData,
 } from "@/middlelayers/types";
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   queryLastRefreshAt,
-  queryPNLValue,
-  queryTopCoinsPercentageChangeData,
 } from "@/middlelayers/charts";
 import { queryCoinsAmountChange } from "@/middlelayers/charts";
-import { queryTopCoinsRank } from "@/middlelayers/charts";
-import { queryLatestAssetsPercentage } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
 import { Chart } from "chart.js";
 import {
@@ -96,31 +88,16 @@ const App = () => {
 
   const [hasData, setHasData] = useState(true);
 
-  const [allSymbols, setAllSymbols] = useState<string[]>([]);
-
   const [activeMenu, setActiveMenu] = useState("overview");
 
-  const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
-    useState<LatestAssetsPercentageData>([]);
   const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
     useState<CoinsAmountAndValueChangeData>([]);
-  const [topCoinsRankData, setTopCoinsRankData] = useState({
-    timestamps: [],
-    coins: [],
-  } as TopCoinsRankData);
-  const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] =
-    useState<TopCoinsPercentageChangeData>({
-      timestamps: [],
-      coins: [],
-    });
+
 
   useEffect(() => {
     loadConfiguration();
   }, []);
 
-  useEffect(() => {
-    setAllSymbols(_(latestAssetsPercentageData).map("coin").uniq().value());
-  }, [latestAssetsPercentageData]);
 
   useEffect(() => {
     if (querySize > 0) {
@@ -206,20 +183,13 @@ const App = () => {
 
   async function loadAllDataAsync(size = 10) {
     console.log("loading all data... size: ", size);
-    const lap = await queryLatestAssetsPercentage();
-    setLatestAssetsPercentageData(lap);
     const cac = await queryCoinsAmountChange(size);
     setCoinsAmountAndValueChangeData(cac);
-    const tcr = await queryTopCoinsRank(size);
-    setTopCoinsRankData(tcr);
-    const tcpcd = await queryTopCoinsPercentageChangeData(size);
-    setTopCoinsPercentageChangeData(tcpcd);
-
 
     const lra = await queryLastRefreshAt();
     setLastRefreshAt(lra);
 
-    if (lap.length > 0) {
+    if (lra) {
       setHasData(true);
     } else {
       setHasData(false);
@@ -320,9 +290,6 @@ const App = () => {
               <PageWrapper hasData={hasData}>
                 <Overview
                   currency={currentCurrency}
-                  latestAssetsPercentageData={latestAssetsPercentageData}
-                  topCoinsRankData={topCoinsRankData}
-                  topCoinsPercentageChangeData={topCoinsPercentageChangeData}
                   size={querySize}
                   version={version}
                 />
@@ -380,7 +347,6 @@ const App = () => {
             element={
               <CoinAnalysis
                 currency={currentCurrency}
-                allowSymbols={allSymbols}
                 coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
               />
             }

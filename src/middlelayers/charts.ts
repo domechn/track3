@@ -10,7 +10,6 @@ import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
-import bluebird from 'bluebird'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -32,6 +31,12 @@ export async function loadAllAssetActionsBySymbol(symbol: string): Promise<Asset
 		return ass
 	})
 	return actions
+}
+
+// listAllowedSymbols return all symbol names
+// returns sort by latest value desc
+export async function listAllowedSymbols():Promise<string[]> {
+	return ASSET_HANDLER.listSortedSymbolsByCurrentValue()
 }
 
 // calculateTotalProfit gets all profit
