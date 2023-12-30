@@ -31,29 +31,24 @@ import {
 } from "react-router-dom";
 
 import {
-  AssetChangeData,
   CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
   LatestAssetsPercentageData,
   PNLData,
   TopCoinsPercentageChangeData,
   TopCoinsRankData,
-  TotalValueData,
 } from "@/middlelayers/types";
 import { useContext, useEffect, useState } from "react";
 import {
-  queryAssetChange,
   queryLastRefreshAt,
   queryPNLValue,
   queryTopCoinsPercentageChangeData,
 } from "@/middlelayers/charts";
 import { queryCoinsAmountChange } from "@/middlelayers/charts";
 import { queryTopCoinsRank } from "@/middlelayers/charts";
-import { queryTotalValue } from "@/middlelayers/charts";
 import { queryLatestAssetsPercentage } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
 import { Chart } from "chart.js";
-import { LoadingContext } from "@/App";
 import {
   getCurrentPreferCurrency,
   getQuerySize,
@@ -87,12 +82,14 @@ export const RefreshButtonLoadingContext = React.createContext<{
 }>(null as any);
 
 const App = () => {
-  const { setLoading } = useContext(LoadingContext);
+  const [version, setVersion] = useState(0);
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const windowSize = useWindowSize();
-  const [querySize, setQuerySize] = useState(0);
+  const [querySize, setQuerySize] = useState(10);
   const [lastSize, setLastSize] = useState(windowSize);
-  const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(undefined);
+  const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(
+    undefined
+  );
   const [currentCurrency, setCurrentCurrency] = useState<CurrencyRateDetail>(
     getDefaultCurrencyRate()
   );
@@ -105,17 +102,6 @@ const App = () => {
 
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
-  const [pnlData, setPnlData] = useState<PNLData>({
-    data: [],
-  });
-  const [assetChangeData, setAssetChangeData] = useState<AssetChangeData>({
-    timestamps: [],
-    data: [],
-  });
-  const [totalValueData, setTotalValueData] = useState<TotalValueData>({
-    totalValue: 0,
-    prevTotalValue: 0,
-  });
   const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
     useState<CoinsAmountAndValueChangeData>([]);
   const [topCoinsRankData, setTopCoinsRankData] = useState({
@@ -164,7 +150,9 @@ const App = () => {
     if (
       lastSize.width === windowSize.width &&
       lastSize.height === windowSize.height &&
-      (activeMenu === "overview" || activeMenu === "wallets" || activeMenu === "coins")
+      (activeMenu === "overview" ||
+        activeMenu === "wallets" ||
+        activeMenu === "coins")
     ) {
       resizeAllCharts();
     }
@@ -185,7 +173,7 @@ const App = () => {
       chartsTitles = overviewsCharts;
     } else if (activeMenu === "wallets") {
       chartsTitles = walletsCharts;
-    }else if (activeMenu === "coins") {
+    } else if (activeMenu === "coins") {
       chartsTitles = coinsCharts;
     }
     console.log("resizing all charts");
@@ -218,20 +206,15 @@ const App = () => {
 
   async function loadAllDataAsync(size = 10) {
     console.log("loading all data... size: ", size);
-    const tv = await queryTotalValue();
-    setTotalValueData(tv);
     const lap = await queryLatestAssetsPercentage();
     setLatestAssetsPercentageData(lap);
-    const ac = await queryAssetChange(size);
-    setAssetChangeData(ac);
     const cac = await queryCoinsAmountChange(size);
     setCoinsAmountAndValueChangeData(cac);
     const tcr = await queryTopCoinsRank(size);
     setTopCoinsRankData(tcr);
     const tcpcd = await queryTopCoinsPercentageChangeData(size);
     setTopCoinsPercentageChangeData(tcpcd);
-    const pd = await queryPNLValue(size);
-    setPnlData(pd);
+
 
     const lra = await queryLastRefreshAt();
     setLastRefreshAt(lra);
@@ -244,9 +227,9 @@ const App = () => {
   }
 
   function loadAllData(size = 10) {
-    setLoading(true);
+    setVersion(version + 1);
     // set a loading delay to show the loading animation
-    loadAllDataAsync(size).finally(() => setLoading(false));
+    loadAllDataAsync(size);
   }
 
   useEffect(() => {
@@ -338,11 +321,10 @@ const App = () => {
                 <Overview
                   currency={currentCurrency}
                   latestAssetsPercentageData={latestAssetsPercentageData}
-                  pnlData={pnlData}
-                  assetChangeData={assetChangeData}
-                  totalValueData={totalValueData}
                   topCoinsRankData={topCoinsRankData}
                   topCoinsPercentageChangeData={topCoinsPercentageChangeData}
+                  size={querySize}
+                  version={version}
                 />
               </PageWrapper>
             }
@@ -387,9 +369,7 @@ const App = () => {
             <Route
               path="data"
               element={
-                <DataManagement
-                  onDataImported={() => loadAllData(querySize)}
-                />
+                <DataManagement onDataImported={() => loadAllData(querySize)} />
               }
             />
             <Route path="systemInfo" element={<SystemInfo />} />

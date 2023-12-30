@@ -10,6 +10,7 @@ import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
+import bluebird from 'bluebird'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -31,6 +32,61 @@ export async function loadAllAssetActionsBySymbol(symbol: string): Promise<Asset
 		return ass
 	})
 	return actions
+}
+
+// calculateTotalProfit gets all profit
+export async function calculateTotalProfit(): Promise<{
+	total: number,
+	coins: {
+		symbol: string,
+		value: number
+	}[]
+}> {
+	const symbols = await ASSET_HANDLER.listAllSymbols()
+	const allAssets = await ASSET_HANDLER.listAssets()
+	const allUpdatedPrices = await ASSET_PRICE_HANDLER.listPrices()
+
+	const symbolData = _(symbols).map(symbol => {
+		const assets = _(allAssets).map(item => {
+			const symbolAss = _(item).filter(i => i.symbol === symbol).value()
+			return symbolAss.length === 0 ? undefined : symbolAss
+		}).compact().value()
+		const updatedPrices = _(allUpdatedPrices).filter(a => a.symbol === symbol).value()
+
+		const revAssets = _(assets).reverse().value()
+
+		const actions = _.flatMap(revAssets, (as, i) => {
+			const a = generateAssetActions(as, updatedPrices, assets[i - 1])
+			return a
+		})
+		const latestAsset = assets[assets.length -1]
+		
+		const latest = convertAssetModelsToAsset(symbol, latestAsset ? [latestAsset] : [])
+
+		return {
+			symbol,
+			actions,
+			latest
+		}
+	}).value()
+
+	const coins = _(symbolData).map(d => {
+		if (!d.latest) {
+			return
+		}
+		const realSpentValue = _(d.actions).sumBy((a) => a.amount * a.price)
+		const value = d.latest.value - realSpentValue
+
+		return {
+			symbol: d.symbol,
+			value,
+		}
+	}).compact().value()
+
+	return {
+		total: _(coins).sumBy(c => c.value),
+		coins
+	}
 }
 
 export async function updateAssetPrice(uuid: string, assetID: number, symbol: string, price: number, createdAt: string) {
@@ -167,6 +223,11 @@ export function queryAssetPricesAfterUpdatedAt(updatedAt?: number): Promise<Asse
 
 export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | undefined> {
 	const models = await ASSET_HANDLER.listAssetsBySymbol(symbol, 1)
+	return convertAssetModelsToAsset(symbol, models)
+}
+
+// models: must only contain same symbol assets
+function convertAssetModelsToAsset(symbol: string, models: AssetModel[][]): Asset | undefined {
 	const model = _(models).flatten().reduce((acc, cur) => ({
 		...acc,
 		amount: acc.amount + cur.amount,

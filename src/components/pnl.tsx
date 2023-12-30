@@ -4,14 +4,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Bar } from "react-chartjs-2";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import { useEffect, useState } from "react";
+import { loadingWrapper } from "@/utils/loading";
+import { queryPNLValue } from "@/middlelayers/charts";
 
 const App = ({
   currency,
-  pnlData,
+  size,
+  version,
 }: {
   currency: CurrencyRateDetail;
-  pnlData: PNLData;
+  size: number;
+  version: number;
 }) => {
+  const [loading, setLoading] = useState(false);
+
+  const [pnlData, setPnlData] = useState<PNLData>({
+    data: [],
+  });
+
+  useEffect(() => {
+    loadData();
+  }, [size, version]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const pd = await queryPNLValue(size);
+      setPnlData(pd);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const options = {
     maintainAspectRatio: false,
     responsive: false,
@@ -190,60 +215,86 @@ const App = ({
               title={formatTimestampData(pnlData.todayPNL?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">Last PNL</div>
-              <div
-                className={`text-l font-bold ${getPNLTextColor(
-                  pnlData.todayPNL?.value
-                )}`}
-              >
-                {formatPNLPercentage(pnlData.todayPNL?.value)}
-              </div>
-              <p
-                className={`text-xs ${getPNLTextColor(
-                  pnlData.todayPNL?.value
-                )}`}
-              >
-                {formatPNLValue(pnlData.todayPNL?.value)}
-              </p>
+              {loadingWrapper(
+                loading,
+                <div
+                  className={`text-l font-bold ${getPNLTextColor(
+                    pnlData.todayPNL?.value
+                  )}`}
+                >
+                  {formatPNLPercentage(pnlData.todayPNL?.value)}
+                </div>,
+                "h-[22px]"
+              )}
+              {loadingWrapper(
+                loading,
+                <p
+                  className={`text-xs ${getPNLTextColor(
+                    pnlData.todayPNL?.value
+                  )}`}
+                >
+                  {formatPNLValue(pnlData.todayPNL?.value)}
+                </p>,
+                "h-[14px] mt-[4px]"
+              )}
             </div>
             <div
               className="flex flex-col items-center justify-center"
               title={formatTimestampData(pnlData.sevenTPnl?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">7T PNL</div>
-              <div
-                className={`text-l font-bold ${getPNLTextColor(
-                  pnlData.sevenTPnl?.value
-                )}`}
-              >
-                {formatPNLPercentage(pnlData.sevenTPnl?.value)}
-              </div>
-              <p
-                className={`text-xs ${getPNLTextColor(
-                  pnlData.sevenTPnl?.value
-                )}`}
-              >
-                {formatPNLValue(pnlData.sevenTPnl?.value)}
-              </p>
+              {loadingWrapper(
+                loading,
+                <div
+                  className={`text-l font-bold ${getPNLTextColor(
+                    pnlData.sevenTPnl?.value
+                  )}`}
+                >
+                  {formatPNLPercentage(pnlData.sevenTPnl?.value)}
+                </div>,
+
+                "h-[22px]"
+              )}
+              {loadingWrapper(
+                loading,
+                <p
+                  className={`text-xs ${getPNLTextColor(
+                    pnlData.sevenTPnl?.value
+                  )}`}
+                >
+                  {formatPNLValue(pnlData.sevenTPnl?.value)}
+                </p>,
+                "h-[14px] mt-[4px]"
+              )}
             </div>
             <div
               className="flex flex-col items-center justify-center"
               title={formatTimestampData(pnlData.thirtyPNL?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">30T PNL</div>
-              <div
-                className={`text-l font-bold ${getPNLTextColor(
-                  pnlData.thirtyPNL?.value
-                )}`}
-              >
-                {formatPNLPercentage(pnlData.thirtyPNL?.value)}
-              </div>
-              <p
-                className={`text-xs ${getPNLTextColor(
-                  pnlData.thirtyPNL?.value
-                )}`}
-              >
-                {formatPNLValue(pnlData.thirtyPNL?.value)}
-              </p>
+              {loadingWrapper(
+                loading,
+                <div
+                  className={`text-l font-bold ${getPNLTextColor(
+                    pnlData.thirtyPNL?.value
+                  )}`}
+                >
+                  {formatPNLPercentage(pnlData.thirtyPNL?.value)}
+                </div>,
+
+                "h-[22px]"
+              )}
+              {loadingWrapper(
+                loading,
+                <p
+                  className={`text-xs ${getPNLTextColor(
+                    pnlData.thirtyPNL?.value
+                  )}`}
+                >
+                  {formatPNLValue(pnlData.thirtyPNL?.value)}
+                </p>,
+                "h-[14px] mt-[4px]"
+              )}
             </div>
           </div>
           <div className="h-30">
