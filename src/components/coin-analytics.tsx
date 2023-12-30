@@ -91,6 +91,9 @@ const App = ({
 
   useEffect(() => {
     loadSymbolData(symbol);
+
+    // reset pagination
+    setDataPage(0)
   }, [symbol]);
 
   async function getLogoPath(symbol: string) {
