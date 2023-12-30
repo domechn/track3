@@ -297,7 +297,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
     if (type === "price") {
       res = prettyPriceNumberToLocaleString(convertedNumber);
     } else if (type === "amount") {
-      res = prettyNumberKeepNDigitsAfterDecimalPoint(convertedNumber, 8);
+      res = "" + prettyNumberKeepNDigitsAfterDecimalPoint(convertedNumber, 8);
     } else if (type === "value") {
       res = prettyNumberToLocaleString(convertedNumber);
     }

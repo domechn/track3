@@ -1,7 +1,10 @@
 import { useToast } from "@/components/ui/use-toast";
 import {
+  ExportData,
+  checkIfDuplicatedHistoricalData,
   exportHistoricalData,
   importHistoricalData,
+  readHistoricalDataFromFile,
 } from "@/middlelayers/data";
 import { useState } from "react";
 
@@ -10,18 +13,26 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { UniqueIndexConflictResolver } from '@/middlelayers/types'
+import { UniqueIndexConflictResolver } from "@/middlelayers/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
-const App = ({
-  onDataImported,
-}: {
-  onDataImported?: () => void;
-}) => {
+const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();
 
   const [exportConfiguration, setExportConfiguration] = useState(false);
-  // todo: let users to choose conflict resolver
-  const [conflictResolver, setConflictResolver] = useState<UniqueIndexConflictResolver>('REPLACE');
+  const [showConflictResolverDialog, setShowConflictResolverDialog] =
+    useState(false);
+
+  const [exportData, setExportData] = useState<ExportData | undefined>(
+    undefined
+  );
 
   async function onExportDataClick() {
     const exported = await exportHistoricalData(exportConfiguration);
@@ -33,7 +44,28 @@ const App = ({
   }
 
   async function onImportDataClick() {
-    return importHistoricalData(conflictResolver)
+    const ed = await readHistoricalDataFromFile();
+    setExportData(ed);
+    if (!ed) {
+      return;
+    }
+    const hasConflicts = await checkIfDuplicatedHistoricalData(ed);
+    if (hasConflicts) {
+      setShowConflictResolverDialog(true);
+    } else {
+      return importData("IGNORE");
+    }
+  }
+
+  async function importData(cr: UniqueIndexConflictResolver) {
+    if (!exportData) {
+      toast({
+        description: "no data to import",
+        variant: "destructive",
+      });
+      return;
+    }
+    return importHistoricalData(cr, exportData)
       .then((imported) => {
         if (!imported) {
           return;
@@ -49,11 +81,41 @@ const App = ({
           description: err.message || err,
           variant: "destructive",
         });
+      })
+      .finally(() => {
+        setExportData(undefined);
+        setShowConflictResolverDialog(false);
       });
+  }
+
+  function conflictResolverDialog() {
+    return (
+      <Dialog
+        open={showConflictResolverDialog}
+        onOpenChange={setShowConflictResolverDialog}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Conflicts Found!</DialogTitle>
+            <DialogDescription>
+              There are conflicts between the data you are importing and
+              existing data, please choose how to resolve them.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => importData("REPLACE")}>Overwrite</Button>
+            <Button onClick={() => importData("IGNORE")} variant="outline">
+              Ignore
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   return (
     <div className="space-y-6">
+      {conflictResolverDialog()}
       <div>
         <h3 className="text-lg font-medium">Data Center</h3>
         <p className="text-sm text-muted-foreground">
@@ -112,7 +174,7 @@ const App = ({
           <div>
             <div className="text-sm font-bold text-left py-2">Auto Backup</div>
 
-            <div className='text-sm'>TODO</div>
+            <div className="text-sm">TODO</div>
           </div>
           {/* <Button>Enable</Button> */}
         </div>

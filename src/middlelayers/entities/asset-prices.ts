@@ -1,5 +1,5 @@
 import { deleteFromDatabase, saveModelsToDatabase, selectFromDatabase } from '../database'
-import { AssetPriceModel } from '../types'
+import { AssetPriceModel, UniqueIndexConflictResolver } from '../types'
 
 class AssetPriceHandler {
 	private readonly assetTableName = "asset_prices"
@@ -36,8 +36,8 @@ class AssetPriceHandler {
 		await deleteFromDatabase(this.assetTableName, { assetID })
 	}
 
-	async savePrices(models: AssetPriceModel[]) {
-		return saveModelsToDatabase(this.assetTableName, models)
+	async savePrices(models: AssetPriceModel[], conflictResolver: UniqueIndexConflictResolver = "REPLACE") {
+		return saveModelsToDatabase(this.assetTableName, models, conflictResolver)
 	}
 }
 

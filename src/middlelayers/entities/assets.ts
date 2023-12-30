@@ -44,6 +44,13 @@ class AssetHandler {
 		return selectFromDatabase<AssetModel>(this.assetTableName, {}, 0, {}, `uuid in (${uuids.map(() => '?').join(',')})`, uuids)
 	}
 
+	async listAllUUIDs(): Promise<string[]> {
+		const sql = `SELECT distinct(uuid) FROM ${this.assetTableName}`
+		const models = await selectFromDatabaseWithSql<{ uuid: string }>(sql, [])
+
+		return _(models).map(m => m.uuid).value()
+	}
+
 	// list assets without grouping
 	async listAssetsByIDs(ids: number[]): Promise<AssetModel[]> {
 		if (ids.length === 0) {
