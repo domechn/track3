@@ -8,8 +8,10 @@ import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
 import { legendOnClick } from "@/utils/legend";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { queryTopCoinsRank } from "@/middlelayers/charts";
+import { queryTopCoinsRank, resizeChartWithDelay } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
+
+const chartName = "Trend of Top Coins Rank";
 
 const App = ({ size, version }: { size: number; version: number }) => {
   const wsize = useWindowSize();
@@ -28,7 +30,7 @@ const App = ({ size, version }: { size: number; version: number }) => {
     >(null);
 
   useEffect(() => {
-    loadData();
+    loadData().then(() => resizeChartWithDelay(chartName));
   }, [size, version]);
 
   async function loadData() {
@@ -55,7 +57,7 @@ const App = ({ size, version }: { size: number; version: number }) => {
     plugins: {
       title: {
         display: false,
-        text: "Trend of Top Coins Rank",
+        text: chartName,
       },
       datalabels: {
         display: false,

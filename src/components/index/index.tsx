@@ -35,12 +35,9 @@ import {
   CurrencyRateDetail,
 } from "@/middlelayers/types";
 import { useEffect, useState } from "react";
-import {
-  queryLastRefreshAt,
-} from "@/middlelayers/charts";
+import { queryLastRefreshAt, resizeChart } from "@/middlelayers/charts";
 import { queryCoinsAmountChange } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
-import { Chart } from "chart.js";
 import {
   getCurrentPreferCurrency,
   getQuerySize,
@@ -93,11 +90,9 @@ const App = () => {
   const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
     useState<CoinsAmountAndValueChangeData>([]);
 
-
   useEffect(() => {
     loadConfiguration();
   }, []);
-
 
   useEffect(() => {
     if (querySize > 0) {
@@ -113,23 +108,21 @@ const App = () => {
 
   useEffect(() => {
     resizeAllChartsInPage();
-  }, [lastSize]);
+  }, [lastSize, activeMenu, hasData]);
 
-  useEffect(() => {
-    if (hasData) {
-      setTimeout(() => {
-        resizeAllChartsInPage();
-      }, resizeDelay / 2);
-    }
-  }, [hasData]);
+  function activeMenuShouldResizeCharts() {
+    return (
+      activeMenu === "overview" ||
+      activeMenu === "wallets" ||
+      activeMenu === "coins"
+    );
+  }
 
   function resizeAllChartsInPage() {
     if (
       lastSize.width === windowSize.width &&
       lastSize.height === windowSize.height &&
-      (activeMenu === "overview" ||
-        activeMenu === "wallets" ||
-        activeMenu === "coins")
+      activeMenuShouldResizeCharts()
     ) {
       resizeAllCharts();
     }
@@ -155,17 +148,7 @@ const App = () => {
     }
     console.log("resizing all charts");
 
-    for (const id in Chart.instances) {
-      const text = Chart.instances[id].options.plugins?.title?.text as
-        | string
-        | undefined;
-      if (
-        !text ||
-        !!_(chartsTitles).find((x) => text === x || text.startsWith(x))
-      ) {
-        Chart.instances[id].resize();
-      }
-    }
+    chartsTitles.forEach((title) => resizeChart(title));
   }
 
   function loadConfiguration() {
@@ -201,16 +184,6 @@ const App = () => {
     // set a loading delay to show the loading animation
     loadAllDataAsync(size);
   }
-
-  useEffect(() => {
-    if (
-      activeMenu === "overview" ||
-      activeMenu === "wallets" ||
-      activeMenu === "coins"
-    ) {
-      resizeAllCharts();
-    }
-  }, [activeMenu]);
 
   function Layout() {
     const lo = useLocation();

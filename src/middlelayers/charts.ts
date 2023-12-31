@@ -10,6 +10,7 @@ import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
+import { Chart } from 'chart.js'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -35,7 +36,7 @@ export async function loadAllAssetActionsBySymbol(symbol: string): Promise<Asset
 
 // listAllowedSymbols return all symbol names
 // returns sort by latest value desc
-export async function listAllowedSymbols():Promise<string[]> {
+export async function listAllowedSymbols(): Promise<string[]> {
 	return ASSET_HANDLER.listSortedSymbolsByCurrentValue()
 }
 
@@ -64,8 +65,8 @@ export async function calculateTotalProfit(): Promise<{
 			const a = generateAssetActions(as, updatedPrices, assets[i - 1])
 			return a
 		})
-		const latestAsset = assets[assets.length -1]
-		
+		const latestAsset = assets[assets.length - 1]
+
 		const latest = convertAssetModelsToAsset(symbol, latestAsset ? [latestAsset] : [])
 
 		return {
@@ -414,7 +415,6 @@ export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopC
 	const coins = getCoins(reservedAssets)
 	const colors = generateRandomColors(coins.length)
 
-
 	return {
 		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
 		coins: _(coins).map((coin, idx) => ({
@@ -581,4 +581,22 @@ export async function queryAllDataDates(): Promise<{
 			date: timestampToDate(new Date(as.createdAt).getTime())
 		}))
 		.value()
+}
+
+// delay: ms
+export async function resizeChartWithDelay(chartNameKey: string, delay = 100) {
+	await new Promise((resolve) => setTimeout(resolve, delay));
+	return resizeChart(chartNameKey)
+}
+
+export function resizeChart(chartNameKey: string) {
+	for (const id in Chart.instances) {
+		const text = Chart.instances[id].options.plugins?.title?.text as
+			| string
+			| undefined
+		if (text?.startsWith(chartNameKey)) {
+			Chart.instances[id].resize()
+			break
+		}
+	}
 }

@@ -9,7 +9,11 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Line } from "react-chartjs-2";
-import { queryAssetChange, queryTotalValue } from "@/middlelayers/charts";
+import {
+  queryAssetChange,
+  queryTotalValue,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
 
 interface TotalValueShower {
@@ -21,6 +25,8 @@ interface TotalValueShower {
 
   formatChangeValue(): string;
 }
+
+const chartName = "Trend of Asset";
 
 class FiatTotalValue implements TotalValueShower {
   private currency: CurrencyRateDetail;
@@ -168,7 +174,7 @@ const App = ({
   const [showValue, setShowValue] = useState(false);
 
   useEffect(() => {
-    loadData(size);
+    loadData(size).then(() => resizeChartWithDelay(chartName));
   }, [size, version]);
 
   useEffect(() => {
@@ -286,7 +292,7 @@ const App = ({
       title: {
         display: false,
         // text is set for resizing
-        text: "Trend of Asset",
+        text: chartName,
       },
       datalabels: {
         display: false,
@@ -393,8 +399,8 @@ const App = ({
         <CardContent>
           {loadingWrapper(
             loading,
-            <div className="text-2xl font-bold">{formatTotalValue()}</div>
-            ,"w-[80%] h-[32px]"
+            <div className="text-2xl font-bold">{formatTotalValue()}</div>,
+            "w-[80%] h-[32px]"
           )}
           {loadingWrapper(
             loading,
@@ -403,11 +409,16 @@ const App = ({
                 {changedValueOrPercentage}
               </span>{" "}
               from last time
-            </p>
-            ,"w-[60%] h-[16px] mt-2"
+            </p>,
+            "w-[60%] h-[16px] mt-2"
           )}
           <div className="h-30">
-            <Line options={options as any} data={lineData()} />
+            {loadingWrapper(
+              loading,
+              <Line options={options as any} data={lineData()} />,
+              "mt-[19.5px] h-[18px]",
+              4
+            )}
           </div>
         </CardContent>
       </Card>

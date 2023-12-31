@@ -9,7 +9,11 @@ import { BubbleDataPoint, Point } from "chart.js";
 import { legendOnClick } from "@/utils/legend";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { queryTopCoinsPercentageChangeData } from "@/middlelayers/charts";
+import {
+  queryTopCoinsPercentageChangeData,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
+import { loadingWrapper } from "@/utils/loading";
 
 const prefix = "tcpc";
 
@@ -34,7 +38,7 @@ const App = ({ size, version }: { size: number; version: number }) => {
     >(null);
 
   useEffect(() => {
-    loadData();
+    loadData().then(() => resizeChartWithDelay("Change of Top Coins"));
   }, [size, version]);
 
   async function loadData() {
@@ -67,7 +71,10 @@ const App = ({ size, version }: { size: number; version: number }) => {
         display: false,
       },
       legend: {
-        onClick: legendOnClick(_(topCoinsPercentageChangeData.coins).size(), chartRef.current),
+        onClick: legendOnClick(
+          _(topCoinsPercentageChangeData.coins).size(),
+          chartRef.current
+        ),
       },
     },
     scales: {
@@ -118,10 +125,15 @@ const App = ({ size, version }: { size: number; version: number }) => {
 
   function lineData() {
     return {
-      labels: topCoinsPercentageChangeData.timestamps.map((x) => timestampToDate(x)),
+      labels: topCoinsPercentageChangeData.timestamps.map((x) =>
+        timestampToDate(x)
+      ),
       datasets: topCoinsPercentageChangeData.coins.map((coin) => ({
         label: coin.coin,
-        data: coinPercentageData(topCoinsPercentageChangeData.timestamps, coin.percentageData),
+        data: coinPercentageData(
+          topCoinsPercentageChangeData.timestamps,
+          coin.percentageData
+        ),
         borderColor: coin.lineColor,
         backgroundColor: coin.lineColor,
         borderWidth: 4,
@@ -177,7 +189,16 @@ const App = ({ size, version }: { size: number; version: number }) => {
               height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
-            <Line ref={chartRef} options={options as any} data={lineData()} />
+            {loadingWrapper(
+              loading,
+              <Line
+                ref={chartRef}
+                options={options as any}
+                data={lineData()}
+              />,
+              "mt-4",
+              10
+            )}
           </div>
         </CardContent>
       </Card>

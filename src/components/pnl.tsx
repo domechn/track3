@@ -6,7 +6,9 @@ import { Bar } from "react-chartjs-2";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { useEffect, useState } from "react";
 import { loadingWrapper } from "@/utils/loading";
-import { queryPNLValue } from "@/middlelayers/charts";
+import { queryPNLValue,  resizeChartWithDelay } from "@/middlelayers/charts";
+
+const chartName = "PNL of Asset";
 
 const App = ({
   currency,
@@ -24,7 +26,7 @@ const App = ({
   });
 
   useEffect(() => {
-    loadData();
+    loadData().then(() => resizeChartWithDelay(chartName));
   }, [size, version]);
 
   async function loadData() {
@@ -44,7 +46,7 @@ const App = ({
       title: {
         display: false,
         // text is set for resizing
-        text: "PNL of Asset",
+        text: chartName,
       },
       datalabels: {
         display: false,
@@ -298,7 +300,12 @@ const App = ({
             </div>
           </div>
           <div className="h-30">
-            <Bar options={options as any} data={lineData()} />
+            {loadingWrapper(
+              loading,
+              <Bar options={options as any} data={lineData()} />,
+              "mt-[19.5px] h-[18px]",
+              4
+            )}
           </div>
         </CardContent>
       </Card>
