@@ -2,15 +2,24 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timestampToDate } from "@/utils/date";
 import { TopCoinsRankData } from "@/middlelayers/types";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
 import { legendOnClick } from "@/utils/legend";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { queryTopCoinsRank, resizeChartWithDelay } from "@/middlelayers/charts";
+import { loadingWrapper } from "@/utils/loading";
 
-const App = ({ data }: { data: TopCoinsRankData }) => {
-  const size = useWindowSize();
+const chartName = "Trend of Top Coins Rank";
+
+const App = ({ size, version }: { size: number; version: number }) => {
+  const wsize = useWindowSize();
+  const [loading, setLoading] = useState(false);
+  const [topCoinsRankData, setTopCoinsRankData] = useState({
+    timestamps: [],
+    coins: [],
+  } as TopCoinsRankData);
   const chartRef =
     useRef<
       ChartJSOrUndefined<
@@ -19,6 +28,20 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
         unknown
       >
     >(null);
+
+  useEffect(() => {
+    loadData().then(() => resizeChartWithDelay(chartName));
+  }, [size, version]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const tcr = await queryTopCoinsRank(size);
+      setTopCoinsRankData(tcr);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const options = {
     maintainAspectRatio: false,
@@ -34,13 +57,16 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
     plugins: {
       title: {
         display: false,
-        text: "Trend of Top Coins Rank",
+        text: chartName,
       },
       datalabels: {
         display: false,
       },
       legend: {
-        onClick: legendOnClick(_(data.coins).size(), chartRef.current),
+        onClick: legendOnClick(
+          _(topCoinsRankData.coins).size(),
+          chartRef.current
+        ),
       },
     },
     scales: {
@@ -86,10 +112,10 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
 
   function lineData() {
     return {
-      labels: data.timestamps.map((x) => timestampToDate(x)),
-      datasets: data.coins.map((coin) => ({
+      labels: topCoinsRankData.timestamps.map((x) => timestampToDate(x)),
+      datasets: topCoinsRankData.coins.map((coin) => ({
         label: coin.coin,
-        data: coinRankData(data.timestamps, coin.rankData),
+        data: coinRankData(topCoinsRankData.timestamps, coin.rankData),
         borderColor: coin.lineColor,
         backgroundColor: coin.lineColor,
         borderWidth: 4,
@@ -111,10 +137,19 @@ const App = ({ data }: { data: TopCoinsRankData }) => {
         <CardContent className="space-y-2">
           <div
             style={{
-              height: Math.max((size.height || 100) / 2, 350),
+              height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
-            <Line ref={chartRef} options={options as any} data={lineData()} />
+            {loadingWrapper(
+              loading,
+              <Line
+                ref={chartRef}
+                options={options as any}
+                data={lineData()}
+              />,
+              "mt-4",
+              10
+            )}
           </div>
         </CardContent>
       </Card>

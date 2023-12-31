@@ -28,6 +28,14 @@ class AssetHandler {
 		return this.queryAssets(size, symbol)
 	}
 
+	// listAllSymbols returns all symbols owned in historical
+	async listAllSymbols(): Promise<string[]> {
+		const sql = `SELECT distinct(symbol) FROM ${this.assetTableName}`
+		const models = await selectFromDatabaseWithSql<{ symbol: string }>(sql, [])
+
+		return _(models).map(m => m.symbol).value()
+	}
+
 	async listSymbolGroupedAssetsByUUID(uuid: string): Promise<AssetModel[]> {
 		const models = await selectFromDatabase<AssetModel>(this.assetTableName, {
 			uuid,
@@ -157,7 +165,11 @@ class AssetHandler {
 	// if symbol is not provided, return all assets, else return assets with symbol
 	private async queryAssets(size?: number, symbol?: string): Promise<AssetModel[][]> {
 		// select top size timestamp
-		let tsSql = `SELECT distinct(createdAt) FROM ${this.assetTableName} ORDER BY createdAt DESC`
+		let tsSql = `SELECT distinct(createdAt) FROM ${this.assetTableName} WHERE 1=1`
+		if (symbol) {
+			tsSql += ` AND symbol = '${symbol}'`
+		}
+		tsSql += " ORDER BY createdAt DESC"
 		if (size && size > 0) {
 			tsSql += ` LIMIT ${size}`
 		}
@@ -193,6 +205,22 @@ class AssetHandler {
 			amount: _(assets).sumBy("amount"),
 			value: _(assets).sumBy("value"),
 		})).value()
+	}
+
+	async listSortedSymbolsByCurrentValue(): Promise<string[]> {
+		const sql = `SELECT A.symbol as symbol, A.createdAt as createdAt, SUM(A.value) as value
+		FROM ${this.assetTableName} AS A
+		INNER JOIN (
+		    SELECT symbol, MAX(createdAt) AS maxCreatedAt, MAX(value) AS maxValue
+		    FROM assets_v2
+		    GROUP BY symbol
+		    HAVING maxValue > 1
+		) AS B ON A.symbol = B.symbol AND A.createdAt = B.maxCreatedAt
+		GROUP BY A.symbol `
+
+		const models = await selectFromDatabaseWithSql<{ symbol: string, createdAt: string, value: number }>(sql, [])
+
+		return _(models).orderBy(['createdAt', 'value'], ["desc", "desc"]).map(m => m.symbol).value()
 	}
 }
 

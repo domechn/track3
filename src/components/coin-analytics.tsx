@@ -1,4 +1,5 @@
 import {
+  listAllowedSymbols,
   loadAllAssetActionsBySymbol,
   queryAssetMaxAmountBySymbol,
   queryLastAssetsBySymbol,
@@ -61,11 +62,9 @@ import CoinsAmountAndValueChange from "./coins-amount-and-value-change";
 
 const App = ({
   currency,
-  allowSymbols,
   coinsAmountAndValueChangeData,
 }: {
   currency: CurrencyRateDetail;
-  allowSymbols: string[];
   coinsAmountAndValueChangeData: CoinsAmountAndValueChangeData;
 }) => {
   const { symbol } = useParams() as { symbol: string };
@@ -88,6 +87,14 @@ const App = ({
   }>({});
 
   const [logo, setLogo] = useState("");
+  
+  const [allowSymbols, setAllowSymbols] = useState<string[]>([]);
+
+  useEffect(() => {
+    listAllowedSymbols()
+    .then(symbols => setAllowSymbols(symbols))
+  }, [])
+  
 
   useEffect(() => {
     loadSymbolData(symbol);

@@ -9,6 +9,12 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Line } from "react-chartjs-2";
+import {
+  queryAssetChange,
+  queryTotalValue,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
+import { loadingWrapper } from "@/utils/loading";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -19,6 +25,8 @@ interface TotalValueShower {
 
   formatChangeValue(): string;
 }
+
+const chartName = "Trend of Asset";
 
 class FiatTotalValue implements TotalValueShower {
   private currency: CurrencyRateDetail;
@@ -139,21 +147,35 @@ class BTCTotalValue implements TotalValueShower {
 }
 
 const App = ({
-  totalValueData,
-  assetChangeData,
   currency,
+  size,
+  version,
 }: {
   currency: CurrencyRateDetail;
-  assetChangeData: AssetChangeData;
-  totalValueData: TotalValueData;
+  size: number;
+  version: number;
 }) => {
   const lineColor = "rgba(255, 99, 71, 1)";
 
+  const [loading, setLoading] = useState(false);
+
   const [changedValueOrPercentage, setChangedValueOrPercentage] = useState("");
+  const [totalValueData, setTotalValueData] = useState<TotalValueData>({
+    totalValue: 0,
+    prevTotalValue: 0,
+  });
+  const [assetChangeData, setAssetChangeData] = useState<AssetChangeData>({
+    timestamps: [],
+    data: [],
+  });
 
   const [btcAsBase, setBtcAsBase] = useState(false);
 
   const [showValue, setShowValue] = useState(false);
+
+  useEffect(() => {
+    loadData(size).then(() => resizeChartWithDelay(chartName));
+  }, [size, version]);
 
   useEffect(() => {
     if (showValue) {
@@ -162,6 +184,18 @@ const App = ({
     }
     setChangedValueOrPercentage(formatChangePercentage());
   }, [totalValueData, btcAsBase, showValue]);
+
+  async function loadData(s: number) {
+    setLoading(true);
+    try {
+      const tv = await queryTotalValue();
+      setTotalValueData(tv);
+      const ac = await queryAssetChange(s);
+      setAssetChangeData(ac);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function getTotalValueShower() {
     if (btcAsBase) {
@@ -258,7 +292,7 @@ const App = ({
       title: {
         display: false,
         // text is set for resizing
-        text: "Trend of Asset",
+        text: chartName,
       },
       datalabels: {
         display: false,
@@ -363,15 +397,28 @@ const App = ({
           </svg>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatTotalValue()}</div>
-          <p className="text-xs text-muted-foreground mb-2">
-            <span className={changePercentageColorClass()}>
-              {changedValueOrPercentage}
-            </span>{" "}
-            from last time
-          </p>
+          {loadingWrapper(
+            loading,
+            <div className="text-2xl font-bold">{formatTotalValue()}</div>,
+            "w-[80%] h-[32px]"
+          )}
+          {loadingWrapper(
+            loading,
+            <p className="text-xs text-muted-foreground mb-2">
+              <span className={changePercentageColorClass()}>
+                {changedValueOrPercentage}
+              </span>{" "}
+              from last time
+            </p>,
+            "w-[60%] h-[16px] mt-2"
+          )}
           <div className="h-30">
-            <Line options={options as any} data={lineData()} />
+            {loadingWrapper(
+              loading,
+              <Line options={options as any} data={lineData()} />,
+              "mt-[19.5px] h-[18px]",
+              4
+            )}
           </div>
         </CardContent>
       </Card>

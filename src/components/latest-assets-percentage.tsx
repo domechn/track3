@@ -23,33 +23,45 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import bluebird from "bluebird";
 import { useNavigate } from "react-router-dom";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
+import {
+  queryLatestAssetsPercentage,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
+import { Skeleton } from "./ui/skeleton";
+import { loadingWrapper } from "@/utils/loading";
+
+const chartName = "Percentage of Assets";
 
 const App = ({
   currency,
-  data,
+  size,
+  version,
 }: {
   currency: CurrencyRateDetail;
-  data: LatestAssetsPercentageData;
+  size: number;
+  version: number;
 }) => {
   const [dataPage, setDataPage] = useState<number>(0);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+  const [loading, setLoading] = useState(true);
+  const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
+    useState<LatestAssetsPercentageData>([]);
+
   const pageSize = 5;
   const navigate = useNavigate();
 
-  const [percentageData, setPercentageData] = useState<
-    {
-      coin: string;
-      percentage: number;
-      chartColor: string;
-    }[]
-  >(data);
+  const percentageData = useMemo(() => {
+    return splitTopAndOtherData(latestAssetsPercentageData);
+  }, [latestAssetsPercentageData]);
+  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   useEffect(() => {
-    setPercentageData(splitTopAndOtherData(data));
+    loadData().then(() => resizeChartWithDelay(chartName));
+  }, [size, version]);
 
+  useEffect(() => {
     // download coin logos
     downloadCoinLogos(
-      _(data)
+      _(latestAssetsPercentageData)
         .map((d) => ({
           symbol: d.coin,
           price: d.value / (d.amount || 1),
@@ -58,14 +70,26 @@ const App = ({
     );
 
     // set logo map
-    getLogoMap(data).then((m) => setLogoMap(m));
-  }, [data]);
+    getLogoMap(latestAssetsPercentageData).then((m) => setLogoMap(m));
+  }, [latestAssetsPercentageData]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const lap = await queryLatestAssetsPercentage();
+      setLatestAssetsPercentageData(lap);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
-    const mp = Math.floor(data.length / pageSize - 0.000000000001);
+    const mp = Math.floor(
+      latestAssetsPercentageData.length / pageSize - 0.000000000001
+    );
     return mp >= 0 ? mp : 0;
-  }, [data]);
+  }, [latestAssetsPercentageData]);
 
   async function getLogoMap(d: LatestAssetsPercentageData) {
     const acd = await getAppCacheDir();
@@ -82,7 +106,7 @@ const App = ({
     responsive: false,
     plugins: {
       // text is set for resizing
-      title: { display: false, text: "Percentage of Assets" },
+      title: { display: false, text: chartName },
       legend: {
         display: true,
         position: "right",
@@ -149,7 +173,12 @@ const App = ({
   }
 
   function renderDoughnut() {
-    return <Doughnut options={options as any} data={lineData()} />;
+    return loadingWrapper(
+      loading,
+      <Doughnut options={options as any} data={lineData()} />,
+      "mt-6 h-[30px]",
+      6
+    );
   }
 
   function renderTokenHoldingList() {
@@ -184,46 +213,57 @@ const App = ({
         <Separator />
         <Table>
           <TableBody>
-            {data
-              .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
-              .map((d) => (
-                <TableRow
-                  key={d.coin}
-                  className="h-[55px] cursor-pointer group"
-                  onClick={() => navigate(`/coins/${d.coin}`)}
-                >
-                  <TableCell>
-                    <div className="flex flex-row items-center">
-                      <img
-                        className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
-                        src={logoMap[d.coin] || UnknownLogo}
-                        alt={d.coin}
-                      />
-                      <div
-                        className="mr-1 font-bold text-base"
-                        title={"" + d.amount}
-                      >
-                        {d.amount >= 1
-                          ? prettyNumberKeepNDigitsAfterDecimalPoint(
-                              d.amount,
-                              4
-                            )
-                          : prettyPriceNumberToLocaleString(d.amount)}
-                      </div>
-                      <div className="text-gray-600">{d.coin}</div>
-                      <ArrowTopRightIcon className="ml-2 h-4 w-4 hidden group-hover:inline-block text-gray-600" />
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="text-gray-400">
-                      {currency.symbol +
-                        prettyNumberToLocaleString(
-                          currencyWrapper(currency)(d.value)
-                        )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+            {loading
+              ? _(5)
+                  .range()
+                  .map((i) => (
+                    <TableRow key={"latest-assets-percentage-row-loading-" + i}>
+                      <TableCell>
+                        <Skeleton className="my-[10px] h-[20px] w-[100%]" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                  .value()
+              : latestAssetsPercentageData
+                  .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
+                  .map((d) => (
+                    <TableRow
+                      key={d.coin}
+                      className="h-[55px] cursor-pointer group"
+                      onClick={() => navigate(`/coins/${d.coin}`)}
+                    >
+                      <TableCell>
+                        <div className="flex flex-row items-center">
+                          <img
+                            className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
+                            src={logoMap[d.coin] || UnknownLogo}
+                            alt={d.coin}
+                          />
+                          <div
+                            className="mr-1 font-bold text-base"
+                            title={"" + d.amount}
+                          >
+                            {d.amount >= 1
+                              ? prettyNumberKeepNDigitsAfterDecimalPoint(
+                                  d.amount,
+                                  4
+                                )
+                              : prettyPriceNumberToLocaleString(d.amount)}
+                          </div>
+                          <div className="text-gray-600">{d.coin}</div>
+                          <ArrowTopRightIcon className="ml-2 h-4 w-4 hidden group-hover:inline-block text-gray-600" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="text-gray-400">
+                          {currency.symbol +
+                            prettyNumberToLocaleString(
+                              currencyWrapper(currency)(d.value)
+                            )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
           </TableBody>
         </Table>
       </>
