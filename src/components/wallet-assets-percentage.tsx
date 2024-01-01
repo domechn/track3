@@ -6,24 +6,42 @@ import {
 } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import _ from "lodash";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { insertEllipsis } from "@/utils/string";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { WALLET_ANALYZER, resizeChartWithDelay } from "@/middlelayers/charts";
+import { loadingWrapper } from "@/utils/loading";
 
-const App = ({
-  data,
-  currency,
-}: {
-  data: WalletAssetsPercentageData;
-  currency: CurrencyRateDetail;
-}) => {
+const chartName = "Percentage And Total Value of Each Wallet";
+
+const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const size = useWindowSize();
 
-  const [totalValue, setTotalValue] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [walletAssetsPercentage, setWalletAssetsPercentage] =
+    useState<WalletAssetsPercentageData>([]);
 
   useEffect(() => {
-    setTotalValue(currencyWrapper(currency)(_(data).sumBy("value")) || 0.0001);
-  }, [data, currency]);
+    loadData().then(() => resizeChartWithDelay(chartName));
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+
+    try {
+      const wap = await WALLET_ANALYZER.queryWalletAssetsPercentage();
+      setWalletAssetsPercentage(wap);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const totalValue = useMemo(
+    () =>
+      currencyWrapper(currency)(_(walletAssetsPercentage).sumBy("value")) ||
+      0.0001,
+    [walletAssetsPercentage, currency]
+  );
 
   const options = {
     maintainAspectRatio: false,
@@ -33,7 +51,7 @@ const App = ({
     plugins: {
       title: {
         display: false,
-        text: `Percentage And Total Value of Each Wallet`,
+        text: chartName,
       },
       legend: {
         display: false,
@@ -41,7 +59,7 @@ const App = ({
       datalabels: {
         display: "auto",
         align: "top",
-        offset: Math.max(0, 15 - _(data).size()),
+        offset: Math.max(0, 15 - _(walletAssetsPercentage).size()),
         formatter: (value: number) => {
           return `${prettyNumberToLocaleString((value / totalValue) * 100)}%`;
         },
@@ -77,7 +95,7 @@ const App = ({
 
   function lineData() {
     return {
-      labels: data.map((d) =>
+      labels: walletAssetsPercentage.map((d) =>
         d.walletAlias
           ? `${d.walletType}-${d.walletAlias}`
           : insertEllipsis(d.wallet, 16)
@@ -86,9 +104,11 @@ const App = ({
         {
           alias: "y",
           fill: false,
-          data: data.map((d) => currencyWrapper(currency)(d.value).toFixed(2)),
-          borderColor: data.map((d) => d.chartColor),
-          backgroundColor: data.map((d) => d.chartColor),
+          data: walletAssetsPercentage.map((d) =>
+            currencyWrapper(currency)(d.value).toFixed(2)
+          ),
+          borderColor: walletAssetsPercentage.map((d) => d.chartColor),
+          backgroundColor: walletAssetsPercentage.map((d) => d.chartColor),
           borderWidth: 1,
         },
       ],
@@ -109,7 +129,12 @@ const App = ({
               height: Math.max((size.height || 100) / 2, 400),
             }}
           >
-            <Bar options={options as any} data={lineData()} />
+            {loadingWrapper(
+              loading,
+              <Bar options={options as any} data={lineData()} />,
+              "h-[25px] my-4",
+              10
+            )}
           </div>
         </CardContent>
       </Card>

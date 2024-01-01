@@ -29,6 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
+import { loadingWrapper } from "@/utils/loading";
+import { Skeleton } from "./ui/skeleton";
 
 type ComparisonData = {
   name: string;
@@ -40,6 +42,9 @@ type ComparisonData = {
 type QuickCompareType = "7D" | "1M" | "1Q" | "1Y";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
+  const [selectDatesLoading, setSelectDatesLoading] = useState<boolean>(false);
+  const [dataLoading, setDataLoading] = useState<boolean>(true);
+
   const [baseId, setBaseId] = useState<string>("");
   const [dateOptions, setDateOptions] = useState<
     {
@@ -62,12 +67,10 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const [baseData, setBaseData] = useState<CoinData[]>([]);
   const [headData, setHeadData] = useState<CoinData[]>([]);
 
-  const [data, setData] = useState<ComparisonData[]>([]);
-
   const [shouldMaskValue, setShowDetail] = useState<boolean>(false);
 
   const displayData = useMemo(() => {
-    return _(data)
+    return _(loadData(baseData, headData))
       .map((d) => ({
         name: d.name,
         type: d.type,
@@ -82,7 +85,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
             : "red",
       }))
       .value();
-  }, [data, shouldMaskValue]);
+  }, [baseData, headData, shouldMaskValue]);
 
   useEffect(() => {
     loadAllSelectDates().then((data) => {
@@ -106,10 +109,6 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       setDateOptions(options);
     });
   }, []);
-
-  useEffect(() => {
-    setData(loadData(baseData, headData));
-  }, [baseData, headData]);
 
   useEffect(() => {
     if (!baseId) {
@@ -177,7 +176,13 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       date: string;
     }[]
   > {
-    return queryAllDataDates();
+    setSelectDatesLoading(true);
+    try {
+      const res = await queryAllDataDates();
+      return res;
+    } finally {
+      setSelectDatesLoading(false);
+    }
   }
 
   function onBaseSelectChange(id: string) {
@@ -249,12 +254,17 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   }
 
   async function loadDataByUUID(uuid: string): Promise<CoinData[]> {
-    const data = await queryCoinDataByUUID(uuid);
-    const reversedData = _(data).sortBy("value").reverse().value();
+    setDataLoading(true);
+    try {
+      const data = await queryCoinDataByUUID(uuid);
+      const reversedData = _(data).sortBy("value").reverse().value();
 
-    const res = _(reversedData).value();
+      const res = _(reversedData).value();
 
-    return res;
+      return res;
+    } finally {
+      setDataLoading(false);
+    }
   }
 
   function getComparisonResultNumber(base: number, head: number): number {
@@ -358,41 +368,50 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
       </div>
       <div className="grid grid-cols-6 gap-4 mb-5">
         <div className="col-start-2 col-end-4">
-          <Select onValueChange={onBaseSelectChange} value={baseId}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Base Date" />
-            </SelectTrigger>
-            <SelectContent className="overflow-y-auto max-h-[20rem]">
-              <SelectGroup>
-                <SelectLabel>Base Dates</SelectLabel>
-                {dateOptions.map((d) => (
-                  <SelectItem key={d.value} value={d.value}>
-                    {d.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          {loadingWrapper(
+            selectDatesLoading,
+            <Select onValueChange={onBaseSelectChange} value={baseId}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Base Date" />
+              </SelectTrigger>
+              <SelectContent className="overflow-y-auto max-h-[20rem]">
+                <SelectGroup>
+                  <SelectLabel>Base Dates</SelectLabel>
+                  {dateOptions.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>,
+            "w-[40%]"
+          )}
         </div>
         <div className="col-end-7 col-span-2">
-          <Select onValueChange={onHeadSelectChange} value={headId}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Head Date" />
-            </SelectTrigger>
-            <SelectContent className="overflow-y-auto max-h-[20rem]">
-              <SelectGroup>
-                <SelectLabel>Head Dates</SelectLabel>
-                {dateOptions.map((d) => (
-                  <SelectItem key={d.value} value={d.value}>
-                    {d.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          {loadingWrapper(
+            selectDatesLoading,
+            <Select onValueChange={onHeadSelectChange} value={headId}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Head Date" />
+              </SelectTrigger>
+              <SelectContent className="overflow-y-auto max-h-[20rem]">
+                <SelectGroup>
+                  <SelectLabel>Head Dates</SelectLabel>
+                  {dateOptions.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>,
+            "w-[40%]"
+          )}
         </div>
       </div>
       <div className="px-10 mb-5">
+        {loadingWrapper(selectDatesLoading, <div></div>, "my-[20px]", 15)}
         {displayData.length === 0 && (
           <div className="text-center text-gray-600">No Data</div>
         )}
@@ -407,19 +426,39 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {displayData.map((item, index) => (
-                <TableRow
-                  key={"comparison" + index}
-                  className={item.type !== "value" ? "border-none" : ""}
-                >
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>{item.base}</TableCell>
-                  <TableCell className={`text-center text-${item.color}-500`}>
-                    {item.cmp}
-                  </TableCell>
-                  <TableCell className="text-right">{item.head}</TableCell>
-                </TableRow>
-              ))}
+              {dataLoading
+                ? _(5)
+                    .range()
+                    .map((i) => (
+                      <TableRow key={"comparison-loading-" + i}>
+                        {_(4)
+                          .range()
+                          .map((j) => (
+                            <TableCell
+                              key={`comparison-cell-loading-${i}-${j}`}
+                            >
+                              <Skeleton className="my-[10px] h-[20px] w-[100%]" />
+                            </TableCell>
+                          ))
+                          .value()}
+                      </TableRow>
+                    ))
+                    .value()
+                : displayData.map((item, index) => (
+                    <TableRow
+                      key={"comparison" + index}
+                      className={item.type !== "value" ? "border-none" : ""}
+                    >
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell>{item.base}</TableCell>
+                      <TableCell
+                        className={`text-center text-${item.color}-500`}
+                      >
+                        {item.cmp}
+                      </TableCell>
+                      <TableCell className="text-right">{item.head}</TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
         )}

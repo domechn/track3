@@ -15,6 +15,7 @@ import {
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
+import bluebird from "bluebird";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -157,7 +158,8 @@ const App = ({
 }) => {
   const lineColor = "rgba(255, 99, 71, 1)";
 
-  const [loading, setLoading] = useState(false);
+  const [totalValueLoading, setTotalValueLoading] = useState(false);
+  const [chartLoading, setChartLoading] = useState(false);
 
   const [changedValueOrPercentage, setChangedValueOrPercentage] = useState("");
   const [totalValueData, setTotalValueData] = useState<TotalValueData>({
@@ -186,14 +188,26 @@ const App = ({
   }, [totalValueData, btcAsBase, showValue]);
 
   async function loadData(s: number) {
-    setLoading(true);
+    return bluebird.all([loadTotalValue(), loadChartData(s)]);
+  }
+
+  async function loadTotalValue() {
+    setTotalValueLoading(true);
     try {
       const tv = await queryTotalValue();
       setTotalValueData(tv);
-      const ac = await queryAssetChange(s);
+    } finally {
+      setTotalValueLoading(false);
+    }
+  }
+
+  async function loadChartData(size: number) {
+    setChartLoading(true);
+    try {
+      const ac = await queryAssetChange(size);
       setAssetChangeData(ac);
     } finally {
-      setLoading(false);
+      setChartLoading(false);
     }
   }
 
@@ -398,12 +412,12 @@ const App = ({
         </CardHeader>
         <CardContent>
           {loadingWrapper(
-            loading,
+            totalValueLoading,
             <div className="text-2xl font-bold">{formatTotalValue()}</div>,
             "w-[80%] h-[32px]"
           )}
           {loadingWrapper(
-            loading,
+            totalValueLoading,
             <p className="text-xs text-muted-foreground mb-2">
               <span className={changePercentageColorClass()}>
                 {changedValueOrPercentage}
@@ -414,7 +428,7 @@ const App = ({
           )}
           <div className="h-30">
             {loadingWrapper(
-              loading,
+              chartLoading,
               <Line options={options as any} data={lineData()} />,
               "mt-[19.5px] h-[18px]",
               4
