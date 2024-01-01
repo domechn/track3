@@ -6,24 +6,34 @@ import {
 } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { insertEllipsis } from "@/utils/string";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { WALLET_ANALYZER, resizeChartWithDelay } from "@/middlelayers/charts";
+import { WALLET_ANALYZER, resizeChart, resizeChartWithDelay } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
+import { ChartResizeContext } from "@/App";
 
 const chartName = "Percentage And Total Value of Each Wallet";
 
-const App = ({ currency }: { currency: CurrencyRateDetail }) => {
+const App = ({
+  currency,
+  version,
+}: {
+  currency: CurrencyRateDetail;
+  version: number;
+}) => {
   const size = useWindowSize();
 
+  const { needResize } = useContext(ChartResizeContext);
   const [loading, setLoading] = useState(false);
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
     useState<WalletAssetsPercentageData>([]);
 
   useEffect(() => {
     loadData().then(() => resizeChartWithDelay(chartName));
-  }, []);
+  }, [version]);
+
+  useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData() {
     setLoading(true);

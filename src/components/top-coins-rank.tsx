@@ -2,20 +2,22 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timestampToDate } from "@/utils/date";
 import { TopCoinsRankData } from "@/middlelayers/types";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
 import { legendOnClick } from "@/utils/legend";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { queryTopCoinsRank, resizeChartWithDelay } from "@/middlelayers/charts";
+import { queryTopCoinsRank, resizeChart, resizeChartWithDelay } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
+import { ChartResizeContext } from '@/App'
 
 const chartName = "Trend of Top Coins Rank";
 
 const App = ({ size, version }: { size: number; version: number }) => {
   const wsize = useWindowSize();
   const [loading, setLoading] = useState(false);
+  const { needResize } = useContext(ChartResizeContext);
   const [topCoinsRankData, setTopCoinsRankData] = useState({
     timestamps: [],
     coins: [],
@@ -32,6 +34,8 @@ const App = ({ size, version }: { size: number; version: number }) => {
   useEffect(() => {
     loadData().then(() => resizeChartWithDelay(chartName));
   }, [size, version]);
+
+  useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData() {
     setLoading(true);

@@ -2,7 +2,7 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timestampToDate } from "@/utils/date";
 import { TopCoinsPercentageChangeData } from "@/middlelayers/types";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
@@ -11,15 +11,19 @@ import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
   queryTopCoinsPercentageChangeData,
+  resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
+import { ChartResizeContext } from "@/App";
 
 const prefix = "tcpc";
+const chartNameKey = "Change of Top Coins";
 
 const App = ({ size, version }: { size: number; version: number }) => {
   const wsize = useWindowSize();
 
+  const { needResize } = useContext(ChartResizeContext);
   const [loading, setLoading] = useState(false);
   const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] =
     useState<TopCoinsPercentageChangeData>({
@@ -38,8 +42,10 @@ const App = ({ size, version }: { size: number; version: number }) => {
     >(null);
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay("Change of Top Coins"));
+    loadData().then(() => resizeChartWithDelay(chartNameKey));
   }, [size, version]);
+
+  useEffect(() => resizeChart(chartNameKey), [needResize]);
 
   async function loadData() {
     setLoading(true);

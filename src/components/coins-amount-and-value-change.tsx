@@ -8,19 +8,53 @@ import {
 } from "@/middlelayers/types";
 import { currencyWrapper } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useContext, useEffect, useState } from "react";
+import {
+  queryCoinsAmountChange,
+  resizeChart,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
+import { loadingWrapper } from "@/utils/loading";
+import { ChartResizeContext } from '@/App'
+
+const chartName = "Trend of Coin";
 
 const App = ({
   currency,
-  data,
-  symbol
+  size,
+  version,
+  symbol,
 }: {
   currency: CurrencyRateDetail;
-  data: CoinsAmountAndValueChangeData;
+  size: number;
+  version: number;
   symbol: string;
 }) => {
-  const size = useWindowSize();
+  const wsize = useWindowSize();
+  const { needResize } = useContext(ChartResizeContext);
   const y1Color = "#4F46E5";
   const y2Color = "#F97316";
+
+  const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
+    useState<CoinsAmountAndValueChangeData>([]);
+
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadData().then(() => resizeChartWithDelay(chartName));
+  }, [size, version]);
+
+  useEffect(() => resizeChart(chartName), [needResize]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const cac = await queryCoinsAmountChange(size);
+      setCoinsAmountAndValueChangeData(cac);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const options = {
     maintainAspectRatio: false,
@@ -37,7 +71,7 @@ const App = ({
       title: {
         display: false,
         // text is set for resizing
-        text: "Trend of Coin",
+        text: chartName,
       },
       datalabels: {
         display: false,
@@ -82,7 +116,7 @@ const App = ({
   };
 
   function chartDataByCoin(coin: string) {
-    const current = data.find((d) => d.coin === coin);
+    const current = coinsAmountAndValueChangeData.find((d) => d.coin === coin);
     if (!current) {
       return {
         labels: [],
@@ -129,35 +163,17 @@ const App = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <div>
-            {/* <Select
-              onValueChange={onCoinSelectChange}
-              value={currentCoinSelected}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Select Coin" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectLabel>Coins</SelectLabel>
-                  {data.map((d) => (
-                    <SelectItem key={d.coin} value={d.coin}>
-                      {d.coin}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select> */}
-          </div>
           <div
             style={{
-              height: Math.max((size.height || 100) / 2, 350),
+              height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
-            <Line
-              options={options as any}
-              data={chartDataByCoin(symbol)}
-            />
+            {loadingWrapper(
+              loading,
+              <Line options={options as any} data={chartDataByCoin(symbol)} />,
+              "my-[10px] h-[26px]",
+              10
+            )}
           </div>
         </CardContent>
       </Card>

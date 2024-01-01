@@ -4,14 +4,15 @@ import {
   CurrencyRateDetail,
 } from "@/middlelayers/types";
 
-const App = ({ currency }: { currency: CurrencyRateDetail }) => {
+const App = ({ currency,version }: { currency: CurrencyRateDetail, version: number }) => {
 
   return (
     <div className="space-y-2">
       <WalletAssetsPercentage
         currency={currency}
+        version={version}
       />
-      <WalletAssetsChange currency={currency} />
+      <WalletAssetsChange currency={currency} version={version}/>
     </div>
   );
 };

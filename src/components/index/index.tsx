@@ -31,12 +31,10 @@ import {
 } from "react-router-dom";
 
 import {
-  CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
 } from "@/middlelayers/types";
-import { useEffect, useState } from "react";
-import { queryLastRefreshAt, resizeChart } from "@/middlelayers/charts";
-import { queryCoinsAmountChange } from "@/middlelayers/charts";
+import { useContext, useEffect, useState } from "react";
+import { queryLastRefreshAt } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
 import {
   getCurrentPreferCurrency,
@@ -49,6 +47,7 @@ import Configuration from "@/components/configuration";
 import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
 import React from "react";
+import { ChartResizeContext } from "@/App";
 
 ChartJS.register(
   ...registerables,
@@ -71,6 +70,8 @@ export const RefreshButtonLoadingContext = React.createContext<{
 }>(null as any);
 
 const App = () => {
+  const { setNeedResize } = useContext(ChartResizeContext);
+
   const [version, setVersion] = useState(0);
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const windowSize = useWindowSize();
@@ -86,9 +87,6 @@ const App = () => {
   const [hasData, setHasData] = useState(true);
 
   const [activeMenu, setActiveMenu] = useState("overview");
-
-  const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
-    useState<CoinsAmountAndValueChangeData>([]);
 
   useEffect(() => {
     loadConfiguration();
@@ -110,45 +108,15 @@ const App = () => {
     resizeAllChartsInPage();
   }, [lastSize, activeMenu, hasData]);
 
-  function activeMenuShouldResizeCharts() {
-    return (
-      activeMenu === "overview" ||
-      activeMenu === "wallets" ||
-      activeMenu === "coins"
-    );
-  }
-
   function resizeAllChartsInPage() {
     if (
       lastSize.width === windowSize.width &&
-      lastSize.height === windowSize.height &&
-      activeMenuShouldResizeCharts()
+      lastSize.height === windowSize.height
     ) {
-      resizeAllCharts();
+      setNeedResize((pre) => {
+        return pre + 1;
+      });
     }
-  }
-
-  function resizeAllCharts() {
-    const overviewsCharts = [
-      "Trend of Asset",
-      "PNL of Asset",
-      "Percentage of Assets",
-      "Change of Top Coins",
-      "Trend of Top Coins Rank",
-    ];
-    const walletsCharts = ["Percentage And Total Value of Each Wallet"];
-    const coinsCharts = ["Trend of Coin"];
-    let chartsTitles: string[] = [];
-    if (activeMenu === "overview") {
-      chartsTitles = overviewsCharts;
-    } else if (activeMenu === "wallets") {
-      chartsTitles = walletsCharts;
-    } else if (activeMenu === "coins") {
-      chartsTitles = coinsCharts;
-    }
-    console.log("resizing all charts");
-
-    chartsTitles.forEach((title) => resizeChart(title));
   }
 
   function loadConfiguration() {
@@ -166,8 +134,6 @@ const App = () => {
 
   async function loadAllDataAsync(size = 10) {
     console.log("loading all data... size: ", size);
-    const cac = await queryCoinsAmountChange(size);
-    setCoinsAmountAndValueChangeData(cac);
 
     const lra = await queryLastRefreshAt();
     setLastRefreshAt(lra);
@@ -274,7 +240,7 @@ const App = () => {
             path="/wallets"
             element={
               <PageWrapper hasData={hasData}>
-                <WalletAnalysis currency={currentCurrency} />
+                <WalletAnalysis currency={currentCurrency} version={version} />
               </PageWrapper>
             }
           />
@@ -319,8 +285,9 @@ const App = () => {
             path="/coins/:symbol"
             element={
               <CoinAnalysis
+                size={querySize}
                 currency={currentCurrency}
-                coinsAmountAndValueChangeData={coinsAmountAndValueChangeData}
+                version={version}
               />
             }
           ></Route>
