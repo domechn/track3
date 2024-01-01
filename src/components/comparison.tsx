@@ -431,18 +431,16 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
                     .range()
                     .map((i) => (
                       <TableRow key={"comparison-loading-" + i}>
-                        <TableCell>
-                          <Skeleton className="my-[10px] h-[20px] w-[100%]" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="my-[10px] h-[20px] w-[100%]" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="my-[10px] h-[20px] w-[100%]" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="my-[10px] h-[20px] w-[100%]" />
-                        </TableCell>
+                        {_(4)
+                          .range()
+                          .map((j) => (
+                            <TableCell
+                              key={`comparison-cell-loading-${i}-${j}`}
+                            >
+                              <Skeleton className="my-[10px] h-[20px] w-[100%]" />
+                            </TableCell>
+                          ))
+                          .value()}
                       </TableRow>
                     ))
                     .value()

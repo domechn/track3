@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useEffect, useState } from "react";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
-import { Skeleton } from './ui/skeleton'
+import { Skeleton } from "./ui/skeleton";
 
 const App = ({ currency }: { currency: CurrencyRateDetail }) => {
   const [loading, setLoading] = useState(false);
@@ -91,21 +91,15 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
                     ? _(5)
                         .range()
                         .map((i) => (
-                          <TableRow
-                            key={"wallet-assets-change-loading-" + i}
-                          >
-                            <TableCell>
-                              <Skeleton className="my-[5px] h-[20px] w-[100%]" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="my-[5px] h-[20px] w-[100%]" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="my-[5px] h-[20px] w-[100%]" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="my-[5px] h-[20px] w-[100%]" />
-                            </TableCell>
+                          <TableRow key={"wallet-assets-change-loading-" + i}>
+                            {_(4)
+                              .range()
+                              .map((j) => (
+                                <TableCell key={`wallet-assets-change-loading-${i}-${j}`}>
+                                  <Skeleton className="my-[5px] h-[20px] w-[100%]" />
+                                </TableCell>
+                              ))
+                              .value()}
                           </TableRow>
                         ))
                         .value()
