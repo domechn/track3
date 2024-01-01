@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { loadingWrapper } from "@/utils/loading";
 
 type RankData = {
   id: number;
@@ -61,6 +62,8 @@ const App = ({
   const [rankData, setRankData] = useState([] as RankData[]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+
+  const [loading, setLoading] = useState(false);
 
   const wsize = useWindowSize();
 
@@ -113,8 +116,14 @@ const App = ({
     return _.assign({}, ...kvs);
   }
 
-  function loadAllData() {
-    queryHistoricalData(-1).then((d) => setData(d));
+  async function loadAllData() {
+    setLoading(true);
+    try {
+      const d = await queryHistoricalData(-1);
+      setData(d);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function onHistoricalDataDeleteClick(uuid: string) {
@@ -513,7 +522,12 @@ const App = ({
         </div>
       </div>
       {/* <div>{renderHistoricalDataListV2()}</div> */}
-      <div className="historical-data">{renderHistoricalDataList()}</div>
+      {loadingWrapper(
+        loading,
+        <div className="historical-data">{renderHistoricalDataList()}</div>,
+        "my-[20px] h-[50px]",
+        10
+      )}
     </div>
   );
 };
