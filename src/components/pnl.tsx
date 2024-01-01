@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Bar } from "react-chartjs-2";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { loadingWrapper } from "@/utils/loading";
-import { queryPNLValue,  resizeChartWithDelay } from "@/middlelayers/charts";
+import { queryPNLValue,  resizeChart,  resizeChartWithDelay } from "@/middlelayers/charts";
+import { ChartResizeContext } from '@/App'
 
 const chartName = "PNL of Asset";
 
@@ -20,7 +21,7 @@ const App = ({
   version: number;
 }) => {
   const [loading, setLoading] = useState(false);
-
+  const { needResize } = useContext(ChartResizeContext);
   const [pnlData, setPnlData] = useState<PNLData>({
     data: [],
   });
@@ -28,6 +29,8 @@ const App = ({
   useEffect(() => {
     loadData().then(() => resizeChartWithDelay(chartName));
   }, [size, version]);
+
+  useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData() {
     setLoading(true);

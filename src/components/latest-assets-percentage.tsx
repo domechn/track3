@@ -5,7 +5,7 @@ import {
 } from "@/middlelayers/types";
 import { Card, CardContent } from "./ui/card";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { getImageApiPath } from "@/utils/app";
@@ -25,10 +25,12 @@ import { useNavigate } from "react-router-dom";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
 import {
   queryLatestAssetsPercentage,
+  resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
 import { loadingWrapper } from "@/utils/loading";
+import { ChartResizeContext } from '@/App'
 
 const chartName = "Percentage of Assets";
 
@@ -41,6 +43,7 @@ const App = ({
   size: number;
   version: number;
 }) => {
+  const { needResize } = useContext(ChartResizeContext);
   const [dataPage, setDataPage] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
@@ -57,6 +60,8 @@ const App = ({
   useEffect(() => {
     loadData().then(() => resizeChartWithDelay(chartName));
   }, [size, version]);
+
+  useEffect(() => resizeChart(chartName), [needResize]);
 
   useEffect(() => {
     // download coin logos

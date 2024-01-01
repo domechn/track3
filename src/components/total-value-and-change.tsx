@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import {
   AssetChangeData,
   CurrencyRateDetail,
@@ -12,10 +12,12 @@ import { Line } from "react-chartjs-2";
 import {
   queryAssetChange,
   queryTotalValue,
+  resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
 import bluebird from "bluebird";
+import { ChartResizeContext } from "@/App";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -157,6 +159,7 @@ const App = ({
   version: number;
 }) => {
   const lineColor = "rgba(255, 99, 71, 1)";
+  const { needResize } = useContext(ChartResizeContext);
 
   const [totalValueLoading, setTotalValueLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
@@ -186,6 +189,8 @@ const App = ({
     }
     setChangedValueOrPercentage(formatChangePercentage());
   }, [totalValueData, btcAsBase, showValue]);
+
+  useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData(s: number) {
     return bluebird.all([loadTotalValue(), loadChartData(s)]);

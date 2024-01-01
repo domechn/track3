@@ -59,17 +59,23 @@ import {
   SelectValue,
 } from "./ui/select";
 import CoinsAmountAndValueChange from "./coins-amount-and-value-change";
+import { Skeleton } from "./ui/skeleton";
+import { loadingWrapper } from "@/utils/loading";
 
 const App = ({
   currency,
-  coinsAmountAndValueChangeData,
+  size,
+  version,
 }: {
   currency: CurrencyRateDetail;
-  coinsAmountAndValueChangeData: CoinsAmountAndValueChangeData;
+  size: number;
+  version: number;
 }) => {
   const { symbol } = useParams() as { symbol: string };
   const navigate = useNavigate();
   const pageSize = 20;
+
+  const [loading, setLoading] = useState<boolean>(false);
 
   const [dataPage, setDataPage] = useState<number>(0);
 
@@ -87,21 +93,19 @@ const App = ({
   }>({});
 
   const [logo, setLogo] = useState("");
-  
+
   const [allowSymbols, setAllowSymbols] = useState<string[]>([]);
 
   useEffect(() => {
-    listAllowedSymbols()
-    .then(symbols => setAllowSymbols(symbols))
-  }, [])
-  
+    listAllowedSymbols().then((symbols) => setAllowSymbols(symbols));
+  }, []);
 
   useEffect(() => {
     loadSymbolData(symbol);
 
     // reset pagination
-    setDataPage(0)
-  }, [symbol]);
+    setDataPage(0);
+  }, [symbol, version]);
 
   async function getLogoPath(symbol: string) {
     const acd = await getAppCacheDir();
@@ -124,7 +128,6 @@ const App = ({
       });
       setWalletAliasMap(wam);
     });
-
   }, [actions]);
 
   const maxDataPage = useMemo(() => {
@@ -135,7 +138,7 @@ const App = ({
 
   const breakevenPrice = useMemo(
     () => Math.max(0, calculateBreakevenPrice(actions)),
-    [actions]
+    [actions, latestAsset]
   );
 
   const breakEvenPriceStr = useMemo(
@@ -196,22 +199,23 @@ const App = ({
     [breakevenPrice, latestPrice]
   );
 
-  function loadSymbolData(s: string) {
-    loadAllAssetActionsBySymbol(s).then((res) => {
-      setActions(_(res).sortBy("changedAt").reverse().value());
-    });
+  async function loadSymbolData(s: string) {
+    setLoading(true);
+    try {
+      const aa = await loadAllAssetActionsBySymbol(s);
+      setActions(_(aa).sortBy("changedAt").reverse().value());
 
-    queryLastAssetsBySymbol(s).then((res) => {
-      setLatestAsset(res);
-    });
+      const la = await queryLastAssetsBySymbol(s);
+      setLatestAsset(la);
 
-    queryAssetMaxAmountBySymbol(s).then((res) => {
-      setMaxPosition(res);
-    });
+      const ama = await queryAssetMaxAmountBySymbol(s);
+      setMaxPosition(ama);
 
-    getLogoPath(s).then((res) => {
-      setLogo(res);
-    });
+      const lp = await getLogoPath(s);
+      setLogo(lp);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function calculateBreakevenPrice(acts: AssetAction[]) {
@@ -270,6 +274,126 @@ const App = ({
       setUpdatePriceIndex(-1);
       setUpdatePriceValue(-1);
     });
+  }
+
+  function renderHistoryTable() {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium font-bold">
+            History
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex space-x-2 py-1 items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
+              disabled={dataPage <= 0}
+            >
+              <ChevronLeftIcon />
+            </Button>
+            <div className="text-muted-foreground text-sm">
+              {dataPage + 1} {"/"} {maxDataPage + 1}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
+              disabled={dataPage >= maxDataPage}
+            >
+              <ChevronRightIcon />
+            </Button>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Amount</TableHead>
+                <TableHead className="w-[300px]">Buy/Sell Price</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead className="text-right">Wallet</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading
+                ? _(10)
+                    .range()
+                    .map((i) => (
+                      <TableRow key={"coin-analytics-history-loading-" + i}>
+                        {_(4)
+                          .range()
+                          .map((j) => (
+                            <TableCell
+                              key={`coin-analytics-history-loading-${i}-${j}`}
+                            >
+                              <Skeleton className="my-[5px] h-[20px] w-[100%]" />
+                            </TableCell>
+                          ))
+                          .value()}
+                      </TableRow>
+                    ))
+                    .value()
+                : actions
+                    .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
+                    .map((act, i) => (
+                      <TableRow key={i} className="h-[55px] group">
+                        <TableCell>
+                          <div className="flex flex-row items-center">
+                            <div
+                              className="mr-1 font-bold text-base"
+                              title={"" + act.amount}
+                            >
+                              {act.amount > 0 ? "+" : "-"}
+                              {/* use pretty price to avoid amount is supper small */}
+                              {prettyPriceNumberToLocaleString(
+                                Math.abs(act.amount)
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <div className="flex">
+                              <div className="text-gray-600">
+                                {currency.symbol}
+                              </div>
+                              <div className="text-gray-600">
+                                {prettyPriceNumberToLocaleString(
+                                  currencyWrapper(currency)(act.price)
+                                )}
+                              </div>
+                            </div>
+                            <Pencil2Icon
+                              className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
+                              onClick={() => {
+                                setUpdatePriceIndex(i);
+                                setUpdatePriceValue(act.price);
+                                setUpdatePriceDialogOpen(true);
+                              }}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-gray-600">
+                            {timestampToDate(
+                              new Date(act.changedAt).getTime(),
+                              true
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div>
+                            {act.wallet ? walletAliasMap[act.wallet] || "" : ""}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -364,9 +488,10 @@ const App = ({
                   </Select>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                rank: {rank}
-              </p>
+              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                <div>rank:</div>
+                {loadingWrapper(loading, <div>{rank}</div>, "h-[16px]")}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -391,11 +516,20 @@ const App = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {breakEvenPriceStr}
+                {loadingWrapper(
+                  loading,
+                  <div>{breakEvenPriceStr}</div>,
+                  "h-[28px] mb-[4px]"
+                )}
               </div>
-              <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                latest price: {latestPriceStr}
-              </p>
+              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex  space-x-1">
+                <div>latest price:</div>
+                {loadingWrapper(
+                  loading,
+                  <div>{latestPriceStr}</div>,
+                  "h-[16px]"
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -419,11 +553,16 @@ const App = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {profitStr}
+                {loadingWrapper(
+                  loading,
+                  <div>{profitStr}</div>,
+                  "h-[28px] mb-[4px]"
+                )}
               </div>
-              <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                profit rate: {profitRate}%
-              </p>
+              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex  space-x-1">
+                <div>profit rate:</div>
+                {loadingWrapper(loading, <div>{profitRate}%</div>, "h-[16px]")}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -446,12 +585,20 @@ const App = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {costPriceStr}
+                {loadingWrapper(
+                  loading,
+                  <div>{costPriceStr}</div>,
+                  "h-[28px] mb-[4px]"
+                )}
               </div>
-              <p className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                max pos:{" "}
-                {maxPositionStr}
-              </p>
+              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex  space-x-1">
+                <div>max pos:</div>
+                {loadingWrapper(
+                  loading,
+                  <div>{maxPositionStr}</div>,
+                  "h-[16px]"
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -460,108 +607,11 @@ const App = ({
         <CoinsAmountAndValueChange
           currency={currency}
           symbol={symbol}
-          data={coinsAmountAndValueChangeData}
+          size={size}
+          version={version}
         />
       </div>
-      <div>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium font-bold">
-              History
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex space-x-2 py-1 items-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
-                disabled={dataPage <= 0}
-              >
-                <ChevronLeftIcon />
-              </Button>
-              <div className="text-muted-foreground text-sm">
-                {dataPage + 1} {"/"} {maxDataPage + 1}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
-                disabled={dataPage >= maxDataPage}
-              >
-                <ChevronRightIcon />
-              </Button>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Amount</TableHead>
-                  <TableHead className="w-[300px]">Buy/Sell Price</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead className="text-right">Wallet</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {actions
-                  .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
-                  .map((act, i) => (
-                    <TableRow key={i} className="h-[55px] group">
-                      <TableCell>
-                        <div className="flex flex-row items-center">
-                          <div
-                            className="mr-1 font-bold text-base"
-                            title={"" + act.amount}
-                          >
-                            {act.amount > 0 ? "+" : "-"}
-                            {/* use pretty price to avoid amount is supper small */}
-                            {prettyPriceNumberToLocaleString(
-                              Math.abs(act.amount)
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <div className="flex">
-                            <div className="text-gray-600">
-                              {currency.symbol}
-                            </div>
-                            <div className="text-gray-600">
-                              {prettyPriceNumberToLocaleString(
-                                currencyWrapper(currency)(act.price)
-                              )}
-                            </div>
-                          </div>
-                          <Pencil2Icon
-                            className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
-                            onClick={() => {
-                              setUpdatePriceIndex(i);
-                              setUpdatePriceValue(act.price);
-                              setUpdatePriceDialogOpen(true);
-                            }}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-gray-600">
-                          {timestampToDate(
-                            new Date(act.changedAt).getTime(),
-                            true
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div>
-                          {act.wallet ? walletAliasMap[act.wallet] || "" : ""}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+      <div>{renderHistoryTable()}</div>
     </div>
   );
 };

@@ -18,14 +18,20 @@ import { useEffect, useState } from "react";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
 
-const App = ({ currency }: { currency: CurrencyRateDetail }) => {
+const App = ({
+  currency,
+  version,
+}: {
+  currency: CurrencyRateDetail;
+  version: number;
+}) => {
   const [loading, setLoading] = useState(false);
   const [walletAssetsChange, setWalletAssetsChange] =
     useState<WalletAssetsChangeData>([]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [version]);
 
   async function loadData() {
     setLoading(true);
@@ -95,7 +101,9 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
                             {_(4)
                               .range()
                               .map((j) => (
-                                <TableCell key={`wallet-assets-change-loading-${i}-${j}`}>
+                                <TableCell
+                                  key={`wallet-assets-change-loading-${i}-${j}`}
+                                >
                                   <Skeleton className="my-[5px] h-[20px] w-[100%]" />
                                 </TableCell>
                               ))

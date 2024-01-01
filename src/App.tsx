@@ -1,26 +1,23 @@
 import IndexApp from "@/components/index";
 import AutoUpdater from "@/components/auto-updater";
 import { Toaster } from "@/components/ui/toaster";
-import Loading from "@/components/common/loading";
-import { useState } from "react";
 import React from "react";
 
-export const LoadingContext = React.createContext<{
-  loading: boolean;
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+export const ChartResizeContext = React.createContext<{
+  needResize: number;
+  setNeedResize: React.Dispatch<React.SetStateAction<number>>;
 }>(null as any);
 
 function App() {
-  const [loading, setLoading] = useState(false);
+  const [needResize, setNeedResize] = React.useState(0);
 
   return (
     <div className="container">
       <Toaster />
-      <Loading loading={loading} />
       <AutoUpdater />
-      <LoadingContext.Provider value={{ loading, setLoading }}>
+      <ChartResizeContext.Provider value={{ needResize, setNeedResize }}>
         <IndexApp />
-      </LoadingContext.Provider>
+      </ChartResizeContext.Provider>
     </div>
   );
 }
