@@ -8,7 +8,6 @@ import {
 import {
   Asset,
   AssetAction,
-  CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
 } from "@/middlelayers/types";
 import _ from "lodash";
