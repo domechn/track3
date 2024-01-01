@@ -133,8 +133,7 @@ const App = () => {
   }
 
   async function loadAllDataAsync(size = 10) {
-    console.log("loading all data... size: ", size);
-
+    console.debug("loading all data... size: ", size);
     const lra = await queryLastRefreshAt();
     setLastRefreshAt(lra);
 
