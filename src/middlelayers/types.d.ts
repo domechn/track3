@@ -165,11 +165,10 @@ export type WalletAssetsChangeData = {
 
 export type CoinsAmountAndValueChangeData = {
 	coin: string
-	lineColor: string
 	amounts: number[]
 	values: number[]
 	timestamps: number[]
-}[]
+}
 
 export type HistoricalData = {
 	id: string

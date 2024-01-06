@@ -15,7 +15,7 @@ import {
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
-import { ChartResizeContext } from '@/App'
+import { ChartResizeContext } from "@/App";
 
 const chartName = "Trend of Coin";
 
@@ -36,20 +36,28 @@ const App = ({
   const y2Color = "#F97316";
 
   const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
-    useState<CoinsAmountAndValueChangeData>([]);
+    useState<CoinsAmountAndValueChangeData>({
+      coin: symbol,
+      timestamps: [],
+      amounts: [],
+      values: [],
+    });
 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadData().then(() => resizeChartWithDelay(chartName));
-  }, [size, version]);
+  }, [size, version, symbol]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData() {
     setLoading(true);
     try {
-      const cac = await queryCoinsAmountChange(size);
+      const cac = await queryCoinsAmountChange(symbol, size);
+      if (!cac) {
+        return;
+      }
       setCoinsAmountAndValueChangeData(cac);
     } finally {
       setLoading(false);
@@ -116,7 +124,7 @@ const App = ({
   };
 
   function chartDataByCoin(coin: string) {
-    const current = coinsAmountAndValueChangeData.find((d) => d.coin === coin);
+    const current = coinsAmountAndValueChangeData;
     if (!current) {
       return {
         labels: [],
