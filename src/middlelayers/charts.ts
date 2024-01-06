@@ -490,10 +490,6 @@ export async function queryCoinsAmountChange(symbol: string, size = 10): Promise
 
 	const reservedAssets = _(assets).reverse().value()
 
-	// // list all coins
-	// const coins = getCoins(reservedAssets, -1)
-
-	// const colors = generateRandomColors(coins.length)
 
 	const getAmountsAndTimestamps = (symbol: string): {
 		amount: number,
@@ -509,18 +505,6 @@ export async function queryCoinsAmountChange(symbol: string, size = 10): Promise
 		}).value()
 	}
 
-
-	// return _(coins).map((coin, idx) => {
-	// 	const aat = getAmountsAndTimestamps(coin)
-
-	// 	return {
-	// 		coin,
-	// 		lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
-	// 		amounts: _(aat).map('amount').reverse().take(size).reverse().value(),
-	// 		values: _(aat).map('value').reverse().take(size).reverse().value(),
-	// 		timestamps: _(aat).map('timestamp').reverse().take(size).reverse().value(),
-	// 	}
-	// }).value()
 
 	const aat = getAmountsAndTimestamps(symbol)
 
