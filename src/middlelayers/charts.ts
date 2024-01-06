@@ -482,18 +482,18 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	})).value()
 }
 
-export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndValueChangeData> {
-	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
+export async function queryCoinsAmountChange(symbol: string, size = 10): Promise<CoinsAmountAndValueChangeData | undefined> {
+	const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol, size)
 	if (!assets) {
-		return []
+		return
 	}
 
 	const reservedAssets = _(assets).reverse().value()
 
-	// list all coins
-	const coins = getCoins(reservedAssets, -1)
+	// // list all coins
+	// const coins = getCoins(reservedAssets, -1)
 
-	const colors = generateRandomColors(coins.length)
+	// const colors = generateRandomColors(coins.length)
 
 	const getAmountsAndTimestamps = (symbol: string): {
 		amount: number,
@@ -510,17 +510,26 @@ export async function queryCoinsAmountChange(size = 10): Promise<CoinsAmountAndV
 	}
 
 
-	return _(coins).map((coin, idx) => {
-		const aat = getAmountsAndTimestamps(coin)
+	// return _(coins).map((coin, idx) => {
+	// 	const aat = getAmountsAndTimestamps(coin)
 
-		return {
-			coin,
-			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
-			amounts: _(aat).map('amount').reverse().take(size).reverse().value(),
-			values: _(aat).map('value').reverse().take(size).reverse().value(),
-			timestamps: _(aat).map('timestamp').reverse().take(size).reverse().value(),
-		}
-	}).value()
+	// 	return {
+	// 		coin,
+	// 		lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
+	// 		amounts: _(aat).map('amount').reverse().take(size).reverse().value(),
+	// 		values: _(aat).map('value').reverse().take(size).reverse().value(),
+	// 		timestamps: _(aat).map('timestamp').reverse().take(size).reverse().value(),
+	// 	}
+	// }).value()
+
+	const aat = getAmountsAndTimestamps(symbol)
+
+	return {
+		coin: symbol,
+		amounts: _(aat).map('amount').reverse().take(size).reverse().value(),
+		values: _(aat).map('value').reverse().take(size).reverse().value(),
+		timestamps: _(aat).map('timestamp').reverse().take(size).reverse().value(),
+	}
 }
 
 // gather: if true, group asset models by same symbol
@@ -585,7 +594,7 @@ export async function queryAllDataDates(): Promise<{
 
 // delay: ms
 export async function resizeChartWithDelay(chartNameKey: string, delay = 100) {
-	await new Promise((resolve) => setTimeout(resolve, delay));
+	await new Promise((resolve) => setTimeout(resolve, delay))
 	return resizeChart(chartNameKey)
 }
 
