@@ -30,9 +30,7 @@ import {
   Navigate,
 } from "react-router-dom";
 
-import {
-  CurrencyRateDetail,
-} from "@/middlelayers/types";
+import { CurrencyRateDetail } from "@/middlelayers/types";
 import { useContext, useEffect, useState } from "react";
 import { queryLastRefreshAt } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
@@ -48,6 +46,7 @@ import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
 import React from "react";
 import { ChartResizeContext } from "@/App";
+import { Progress } from "../ui/progress";
 
 ChartJS.register(
   ...registerables,
@@ -67,6 +66,8 @@ const resizeDelay = 200; // 200 ms
 export const RefreshButtonLoadingContext = React.createContext<{
   buttonLoading: boolean;
   setButtonLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  progress: number,
+  setProgress: React.Dispatch<React.SetStateAction<number>>;
 }>(null as any);
 
 const App = () => {
@@ -74,6 +75,7 @@ const App = () => {
 
   const [version, setVersion] = useState(0);
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState(0);
   const windowSize = useWindowSize();
   const [querySize, setQuerySize] = useState(10);
   const [lastSize, setLastSize] = useState(windowSize);
@@ -186,6 +188,8 @@ const App = () => {
                     value={{
                       buttonLoading: refreshButtonLoading,
                       setButtonLoading: setRefreshButtonLoading,
+                      progress: refreshProgress,
+                      setProgress: setRefreshProgress
                     }}
                   >
                     <RefreshData
@@ -198,6 +202,11 @@ const App = () => {
                 </div>
               </div>
             </div>
+          </div>
+          <div className={`flex items-center justify-center mt-1`} style={{
+            display: refreshProgress > 0 ? "flex" : "none"
+          }}>
+            <Progress value={refreshProgress} className="w-[80%]" />
           </div>
         </div>
         <div className="mt-4">

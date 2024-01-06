@@ -20,7 +20,7 @@ const App = ({
   afterRefresh?: (success: boolean) => unknown;
 }) => {
   const { toast } = useToast();
-  const { setButtonLoading: setRefreshLoading } = useContext(
+  const { setButtonLoading: setRefreshLoading, setProgress: setRefreshProgress } = useContext(
     RefreshButtonLoadingContext
   );
 
