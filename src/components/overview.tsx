@@ -5,9 +5,7 @@ import TopCoinsRank from "@/components/top-coins-rank";
 import Profit from "@/components/profit";
 import TopCoinsPercentageChange from "@/components/top-coins-percentage-change";
 
-import {
-  CurrencyRateDetail,
-} from "../middlelayers/types";
+import { CurrencyRateDetail } from "../middlelayers/types";
 
 const App = ({
   currency,
@@ -20,7 +18,6 @@ const App = ({
 }) => {
   return (
     <div className="space-y-2">
-      <Profit currency={currency} version={version} />
       <div className="grid gap-4 grid-cols-2">
         <div className="col-span-2 md:col-span-1">
           <TotalValue
@@ -38,6 +35,7 @@ const App = ({
         size={size}
         version={version}
       />
+      <Profit currency={currency} version={version} />
       <TopCoinsRank version={version} size={size} />
       <TopCoinsPercentageChange version={version} size={size} />
       <div className="mb-2"></div>
