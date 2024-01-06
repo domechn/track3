@@ -216,8 +216,7 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 	}
 
 	async loadPortfolioPro(license: string): Promise<WalletCoin[]> {
-		const wallets = getAddressList(this.config.erc20)
-		const resp = await sendHttpRequest<{
+		const resp = await asyncMap([getAddressList(this.config.erc20)], async wallets => sendHttpRequest<{
 			data: {
 				wallet: string
 				assets: {
@@ -233,9 +232,9 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 			'x-track3-api-key': license
 		}, {
 			wallets,
-		})
+		}), 1, 1000)
 
-		return _(resp.data).map(d => _(d.assets).map(a => ({
+		return _(resp[0].data).map(d => _(d.assets).map(a => ({
 			symbol: a.symbol,
 			amount: a.amount,
 			price: a.price ? {
