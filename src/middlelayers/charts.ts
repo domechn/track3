@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -16,9 +16,12 @@ const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) => ASSET_HANDLER.listAssets(size))
 
-export async function refreshAllData() {
-	const coins = await queryCoinsData()
+export async function refreshAllData(addProgress: AddProgressFunc) {
+	// will add 90 percent in query coins data
+	const coins = await queryCoinsData(addProgress)
+
 	await ASSET_HANDLER.saveCoinsToDatabase(coins)
+	addProgress(10)
 }
 
 // return all asset actions by analyzing all asset models
@@ -169,14 +172,17 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 	return _(res).filter(r => r.amount !== 0).value()
 }
 
-async function queryCoinsData(): Promise<WalletCoinUSD[]> {
+async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinUSD[]> {
 	const config = await getConfiguration()
 	if (!config) {
 		throw new Error("no configuration found,\n please add configuration first")
 	}
-	const assets = await loadPortfolios(config)
+	addProgress(5)
+	// will add 70 percent in load portfolios
+	const assets = await loadPortfolios(config, addProgress)
 	// always query btc and usdt price
 	const priceMap = await queryCoinPrices(_(assets).filter(a => !a.price).map("symbol").push("USDT").push("BTC").uniq().compact().value())
+	addProgress(15)
 
 	let lastAssets = _.clone(assets)
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false

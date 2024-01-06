@@ -14,6 +14,8 @@ export type AssetModel = {
 
 // type when exporting assets to json or cloud database
 export type ExportAssetModel = AssetModel & { costPrice?: number }
+// AddProgressFunc: progress is a number between 0 and 100, how many percent of the progress is added
+export type AddProgressFunc = (progress: number) => void
 
 // asset_prices table
 // to record the cost price or sell price of each coins, can be updated by users
