@@ -129,29 +129,39 @@ class AssetHandler {
 		} as AssetModel)).value(), conflictResolver)
 	}
 
-	// skip where value is less than 1
+	// skip where value is less than 1, or value is 0
+	// if value is 0, means user sold all of this coin, we need to record this behavior
 	async saveCoinsToDatabase(coinInUSDs: WalletCoinUSD[]): Promise<AssetModel[]> {
 		const coins = _(coinInUSDs).map(t => ({
 			wallet: t.wallet,
 			symbol: t.symbol,
 			amount: t.amount,
 			value: t.usdValue,
-		})).filter(v => v.value > 1).value()
+		})).filter(v => v.value > 1 || v.value === 0).value()
 
 		const now = new Date().toISOString()
 		// generate uuid v4
 
 		const uid = uuidv4()
 
+		const getPrice = (m: CoinModel) => {
+			if (m.amount) {
+				return m.value / m.amount
+			}
+
+			// fixme: it is not very exact if base price is usdt
+			return m.price?.value || 0
+		}
+
 		const getDBModel = (models: CoinModel[]) => {
 
-			return _(models).filter(m => m.amount !== 0).map(m => ({
+			return _(models).map(m => ({
 				createdAt: now,
 				uuid: uid,
 				symbol: m.symbol,
 				amount: m.amount,
 				value: m.value,
-				price: m.value / m.amount,
+				price: getPrice(m),
 				// md5 of wallet
 				wallet: md5(m.wallet),
 			} as AssetModel)).value()

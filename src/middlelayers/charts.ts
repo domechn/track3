@@ -165,10 +165,11 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 		}
 	})
 
-	return res
+	// remove changes whose amount is 0
+	return _(res).filter(r => r.amount !== 0).value()
 }
 
-async function queryCoinsData(): Promise<(WalletCoinUSD)[]> {
+async function queryCoinsData(): Promise<WalletCoinUSD[]> {
 	const config = await getConfiguration()
 	if (!config) {
 		throw new Error("no configuration found,\n please add configuration first")
@@ -496,11 +497,11 @@ export async function queryCoinsAmountChange(symbol: string, size = 10): Promise
 		value: number,
 		timestamp: number
 	}[] => {
-		return _(reservedAssets).map(ass => _(ass).find(a => a.symbol === symbol)).compact().map(asset => {
+		return _(reservedAssets).map(assets => {
 			return {
-				amount: asset.amount,
-				value: asset.value,
-				timestamp: new Date(asset.createdAt).getTime(),
+				amount: _(assets).sumBy("amount"),
+				value: _(assets).sumBy("value"),
+				timestamp: new Date(assets[0].createdAt).getTime(),
 			}
 		}).value()
 	}
