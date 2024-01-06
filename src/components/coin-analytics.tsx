@@ -79,7 +79,7 @@ const App = ({
   const [dataPage, setDataPage] = useState<number>(0);
 
   const [actions, setActions] = useState<AssetAction[]>([]);
-  const [latestAsset, setLatestAsset] = useState<Asset | undefined>();
+  const [lastAsset, setLastAsset] = useState<Asset | undefined>();
 
   const [updatePriceIndex, setUpdatePriceIndex] = useState(-1);
   const [updatePriceValue, setUpdatePriceValue] = useState(-1);
@@ -137,7 +137,7 @@ const App = ({
 
   const breakevenPrice = useMemo(
     () => Math.max(0, calculateBreakevenPrice(actions)),
-    [actions, latestAsset]
+    [actions, lastAsset]
   );
 
   const breakEvenPriceStr = useMemo(
@@ -151,7 +151,7 @@ const App = ({
 
   const profit = useMemo(
     () => calculateProfit(breakevenPrice),
-    [latestAsset, breakevenPrice, symbol]
+    [lastAsset, breakevenPrice, symbol]
   );
 
   const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
@@ -161,12 +161,12 @@ const App = ({
       prettyPriceNumberToLocaleString(currencyWrapper(currency)(costPrice)),
     [currency, costPrice]
   );
-  const latestPrice = useMemo(() => latestAsset?.price || 0, [latestAsset]);
-  const latestPriceStr = useMemo(
+  const lastPrice = useMemo(() => lastAsset?.price || 0, [lastAsset]);
+  const lastPriceStr = useMemo(
     () =>
       currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(latestPrice)),
-    [currency, latestPrice]
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(lastPrice)),
+    [currency, lastPrice]
   );
 
   const rank = useMemo(() => {
@@ -194,8 +194,8 @@ const App = ({
     () =>
       breakevenPrice === 0
         ? "∞"
-        : (((latestPrice - breakevenPrice) / breakevenPrice) * 100).toFixed(2),
-    [breakevenPrice, latestPrice]
+        : (((lastPrice - breakevenPrice) / breakevenPrice) * 100).toFixed(2),
+    [breakevenPrice, lastPrice]
   );
 
   async function loadSymbolData(s: string) {
@@ -205,7 +205,7 @@ const App = ({
       setActions(_(aa).sortBy("changedAt").reverse().value());
 
       const la = await queryLastAssetsBySymbol(s);
-      setLatestAsset(la);
+      setLastAsset(la);
 
       const ama = await queryAssetMaxAmountBySymbol(s);
       setMaxPosition(ama);
@@ -218,8 +218,8 @@ const App = ({
   }
 
   function calculateBreakevenPrice(acts: AssetAction[]) {
-    return latestAsset && latestAsset.amount
-      ? _(acts).sumBy((a) => a.amount * a.price) / latestAsset.amount
+    return lastAsset && lastAsset.amount
+      ? _(acts).sumBy((a) => a.amount * a.price) / lastAsset.amount
       : 0;
   }
 
@@ -235,8 +235,8 @@ const App = ({
   }
 
   function calculateProfit(averagePrice: number) {
-    return latestAsset
-      ? latestAsset.value - averagePrice * latestAsset.amount
+    return lastAsset
+      ? lastAsset.value - averagePrice * lastAsset.amount
       : 0;
   }
 
@@ -522,10 +522,10 @@ const App = ({
                 )}
               </div>
               <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex  space-x-1">
-                <div>latest price:</div>
+                <div>last price:</div>
                 {loadingWrapper(
                   loading,
-                  <div>{latestPriceStr}</div>,
+                  <div>{lastPriceStr}</div>,
                   "h-[16px]"
                 )}
               </div>
