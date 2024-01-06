@@ -49,12 +49,11 @@ const App = ({
   };
 
   function addProgress(p: number) {
-    setRefreshProgress((pp: number) => {
-      if (pp > 100) {
-        return 100;
-      }
-      return pp + p;
-    });
+    setRefreshProgress((preP: number) => Math.min(preP + p, 100));
+  }
+
+  function clearProgress() {
+    setRefreshProgress(0);
   }
 
   const handleButtonClick = () => {
@@ -64,7 +63,7 @@ const App = ({
 
     retry(
       () => {
-        setRefreshProgress(0);
+        clearProgress();
         return refreshAllData(addProgress);
       },
       retries,
@@ -80,7 +79,7 @@ const App = ({
       })
       .finally(() => {
         setRefreshLoading(false);
-        setRefreshProgress(0);
+        clearProgress();
         trackEventWithClientID("data_refreshed");
         if (refreshError) {
           toast({
