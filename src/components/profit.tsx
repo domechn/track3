@@ -51,9 +51,8 @@ const App = ({
     const size = 5;
 
     return topType === "profitTop"
-        ? _(coinsProfit).takeRight(size).reverse().value()
-        : _(coinsProfit).take(5).value();
-
+      ? _(coinsProfit).takeRight(size).reverse().value()
+      : _(coinsProfit).take(5).value();
   }, [coinsProfit, topType]);
 
   async function getLogoMap(d: { symbol: string }[]) {
@@ -90,8 +89,11 @@ const App = ({
           {loadingWrapper(
             loading,
             <div className="text-2xl font-bold">
-              {currency.symbol +
-                prettyNumberToLocaleString(currencyWrapper(currency)(profit))}
+              {(profit < 0 ? "-" : "+") +
+                currency.symbol +
+                prettyNumberToLocaleString(
+                  currencyWrapper(currency)(Math.abs(profit))
+                )}
             </div>,
             "h-[32px]"
           )}
@@ -135,9 +137,10 @@ const App = ({
                             d.value
                           )}-600`}
                         >
-                          {currency.symbol +
+                          {(d.value < 0 ? "-" : "+") +
+                            currency.symbol +
                             prettyNumberToLocaleString(
-                              currencyWrapper(currency)(d.value)
+                              currencyWrapper(currency)(Math.abs(d.value))
                             )}
                         </div>
                       </TableCell>
