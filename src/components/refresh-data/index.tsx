@@ -6,8 +6,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "../ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "../index";
-import { CacheCenter } from '@/middlelayers/datafetch/utils/cache'
-import { updateAllCurrencyRates } from '@/middlelayers/configuration'
+import { CacheCenter } from "@/middlelayers/datafetch/utils/cache";
+import { updateAllCurrencyRates } from "@/middlelayers/configuration";
 
 const retries = 3;
 const retryInterval = 3000; // 3s
@@ -20,9 +20,11 @@ const App = ({
   afterRefresh?: (success: boolean) => unknown;
 }) => {
   const { toast } = useToast();
-  const { setButtonLoading: setRefreshLoading } = useContext(
-    RefreshButtonLoadingContext
-  );
+
+  const {
+    setButtonLoading: setRefreshLoading,
+    setProgress: setRefreshProgress,
+  } = useContext(RefreshButtonLoadingContext);
 
   const retry = async (
     fn: () => Promise<unknown>,
@@ -46,12 +48,27 @@ const App = ({
     }
   };
 
+  function addProgress(p: number) {
+    setRefreshProgress((preP: number) => Math.min(preP + p, 100));
+  }
+
+  function clearProgress() {
+    setRefreshProgress(0);
+  }
+
   const handleButtonClick = () => {
     setRefreshLoading(true);
 
     let refreshError: Error | undefined;
 
-    retry(refreshAllData, retries, retryInterval)
+    retry(
+      () => {
+        clearProgress();
+        return refreshAllData(addProgress);
+      },
+      retries,
+      retryInterval
+    )
       .then(async () => {
         // clean cache after all analyzers finished successfully
         CacheCenter.getInstance().clearCache();
@@ -62,6 +79,7 @@ const App = ({
       })
       .finally(() => {
         setRefreshLoading(false);
+        clearProgress();
         trackEventWithClientID("data_refreshed");
         if (refreshError) {
           toast({

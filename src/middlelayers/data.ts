@@ -12,7 +12,7 @@ import { queryAllAssetPrices, queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
-import { AssetPriceModel, ExportAssetModel, HistoricalData, UniqueIndexConflictResolver } from './types'
+import { AddProgressFunc, AssetPriceModel, ExportAssetModel, HistoricalData, UniqueIndexConflictResolver } from './types'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
@@ -37,10 +37,10 @@ export async function downloadCoinLogos(coins: {
 	return invoke("download_coins_logos", { coins })
 }
 
-export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
+export async function loadPortfolios(config: CexConfig & TokenConfig, addProgress: AddProgressFunc): Promise<WalletCoin[]> {
 
 	// all coins currently owned ( amount > 0 )
-	const currentCoins = await loadPortfoliosByConfig(config)
+	const currentCoins = await loadPortfoliosByConfig(config, addProgress)
 
 	// need to list coins owned before but not now ( amount = 0 )
 	const lastAssets = await ASSET_HANDLER.listAssets(1)
@@ -62,8 +62,11 @@ export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<W
 	return [...currentCoins, ...beforeCoins]
 }
 
-async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
+// progress percent is 70
+async function loadPortfoliosByConfig(config: CexConfig & TokenConfig, addProgress: AddProgressFunc): Promise<WalletCoin[]> {
+	const progressPercent = 70
 	const anas = [ERC20ProAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
+	const perProgressPer = progressPercent / anas.length
 	const coinLists = await bluebird.map(anas, async ana => {
 
 		const a = new ana(config)
@@ -74,6 +77,7 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<
 			const portfolio = await a.loadPortfolio()
 			console.log("loaded portfolio from ", anaName)
 			await a.postLoad()
+			addProgress(perProgressPer)
 			return portfolio
 		} catch (e) {
 			console.error("failed to load portfolio from ", anaName, e)
