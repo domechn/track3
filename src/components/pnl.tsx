@@ -163,11 +163,11 @@ const App = ({
     }
     const valStr =
       currency.symbol +
-      prettyNumberToLocaleString(currencyWrapper(currency)(val));
+      prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(val)));
     if (val > 0) {
       return "+" + valStr;
     }
-    return valStr;
+    return "-" + valStr;
   }
 
   function formatPNLPercentage(val?: number): string {
