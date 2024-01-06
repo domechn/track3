@@ -39,7 +39,27 @@ export async function downloadCoinLogos(coins: {
 
 export async function loadPortfolios(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
 
-	return loadPortfoliosByConfig(config)
+	// all coins currently owned ( amount > 0 )
+	const currentCoins = await loadPortfoliosByConfig(config)
+
+	// need to list coins owned before but not now ( amount = 0 )
+	const lastAssets = await ASSET_HANDLER.listAssets(1)
+	const beforeCoins = _(lastAssets).flatten().map(s => {
+		const found = _(currentCoins).find(c => c.symbol === s.symbol && c.wallet === s.wallet)
+		if (found) {
+			return
+		}
+
+		return {
+			symbol: s.symbol,
+			price: _(currentCoins).find(c => c.symbol === s.symbol)?.price,
+			amount: 0,
+			value: 0,
+			wallet: s.wallet,
+		} as WalletCoin
+	}).compact().value()
+
+	return [...currentCoins, ...beforeCoins]
 }
 
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig): Promise<WalletCoin[]> {
@@ -123,7 +143,7 @@ export async function checkIfDuplicatedHistoricalData(ed?: ExportData): Promise<
 
 	const allUUIDs = await ASSET_HANDLER.listAllUUIDs()
 
-	const importUUIDs = _(ed.historicalData).map(d=>d.assets).flatten().map(a=>a.uuid).uniq().value()
+	const importUUIDs = _(ed.historicalData).map(d => d.assets).flatten().map(a => a.uuid).uniq().value()
 
 	// check if there is duplicated uuid
 	const i = _.intersection(allUUIDs, importUUIDs)
