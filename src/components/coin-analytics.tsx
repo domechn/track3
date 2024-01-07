@@ -5,11 +5,7 @@ import {
   queryLastAssetsBySymbol,
   updateAssetPrice,
 } from "@/middlelayers/charts";
-import {
-  Asset,
-  AssetAction,
-  CurrencyRateDetail,
-} from "@/middlelayers/types";
+import { Asset, AssetAction, CurrencyRateDetail } from "@/middlelayers/types";
 import _ from "lodash";
 import { useEffect, useMemo, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
@@ -136,22 +132,24 @@ const App = ({
   }, [actions]);
 
   const breakevenPrice = useMemo(
-    () => Math.max(0, calculateBreakevenPrice(actions)),
+    () => Math.max(0, calculateBreakevenPrice(actions, lastAsset)),
     [actions, lastAsset]
+  );
+
+  const profit = useMemo(
+    () => calculateProfit(actions, lastAsset),
+    [lastAsset, actions]
   );
 
   const breakEvenPriceStr = useMemo(
     () =>
-      currency.symbol +
-      prettyPriceNumberToLocaleString(
-        currencyWrapper(currency)(breakevenPrice)
-      ),
-    [currency, breakevenPrice]
-  );
-
-  const profit = useMemo(
-    () => calculateProfit(breakevenPrice),
-    [lastAsset, breakevenPrice, symbol]
+      breakevenPrice === 0 && profit < 0
+        ? "∞"
+        : currency.symbol +
+          prettyPriceNumberToLocaleString(
+            currencyWrapper(currency)(breakevenPrice)
+          ),
+    [currency, breakevenPrice, profit]
   );
 
   const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
@@ -190,13 +188,14 @@ const App = ({
     [maxPosition]
   );
 
-  const profitRate = useMemo(
-    () =>
-      breakevenPrice === 0
-        ? "∞"
-        : (((lastPrice - breakevenPrice) / breakevenPrice) * 100).toFixed(2),
-    [breakevenPrice, lastPrice]
-  );
+  const profitRate = useMemo(() =>
+    {
+      const buyValue = calculateBuyValue(actions);
+      if (buyValue <= 0) {
+        return "∞";
+      }
+      return ((profit / buyValue) * 100).toFixed(2);
+    }, [profit, actions]);
 
   async function loadSymbolData(s: string) {
     setLoading(true);
@@ -217,16 +216,16 @@ const App = ({
     }
   }
 
-  function calculateBreakevenPrice(acts: AssetAction[]) {
-    return lastAsset && lastAsset.amount
-      ? _(acts).sumBy((a) => a.amount * a.price) / lastAsset.amount
-      : 0;
+  function calculateBreakevenPrice(acts: AssetAction[], la?: Asset) {
+    return la && la.amount ? calculateBreakevenValue(acts) / la.amount : 0;
+  }
+
+  function calculateBreakevenValue(acts: AssetAction[]) {
+    return _(acts).sumBy((a) => a.amount * a.price);
   }
 
   function calculateCostPrice(acts: AssetAction[]) {
-    const totalBuyValue = _(acts)
-      .filter((a) => a.amount > 0)
-      .sumBy((a) => a.amount * a.price);
+    const totalBuyValue = calculateBuyValue(acts);
     const totalBuyAmount = _(acts)
       .filter((a) => a.amount > 0)
       .sumBy((a) => a.amount);
@@ -234,10 +233,14 @@ const App = ({
     return totalBuyAmount ? totalBuyValue / totalBuyAmount : 0;
   }
 
-  function calculateProfit(averagePrice: number) {
-    return lastAsset
-      ? lastAsset.value - averagePrice * lastAsset.amount
-      : 0;
+  function calculateBuyValue(acts: AssetAction[]) {
+    return _(acts)
+      .filter((a) => a.amount > 0)
+      .sumBy((a) => a.amount * a.price);
+  }
+
+  function calculateProfit(acts: AssetAction[], la?: Asset) {
+    return la ? la.value - calculateBreakevenValue(acts) : 0;
   }
 
   function onUpdatePriceDialogSaveClick() {
@@ -523,11 +526,7 @@ const App = ({
               </div>
               <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex  space-x-1">
                 <div>last price:</div>
-                {loadingWrapper(
-                  loading,
-                  <div>{lastPriceStr}</div>,
-                  "h-[16px]"
-                )}
+                {loadingWrapper(loading, <div>{lastPriceStr}</div>, "h-[16px]")}
               </div>
             </CardContent>
           </Card>
