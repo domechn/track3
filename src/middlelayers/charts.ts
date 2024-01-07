@@ -118,9 +118,9 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 		id: p.assetID
 	})).value()
 
-	// only value changes > 10 or price is 0
+	// only value changes > 1 or price is 0
 	const isAmountChanged = (a: number, b: number, price: number) => {
-		return price === 0 || Math.abs(a - b) * price > 10
+		return price === 0 || Math.abs(a - b) * price > 1
 	}
 
 	const res: AssetAction[] = []
