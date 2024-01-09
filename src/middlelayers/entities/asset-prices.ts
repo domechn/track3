@@ -5,7 +5,10 @@ class AssetPriceHandler {
 	private readonly assetTableName = "asset_prices"
 
 	async createOrUpdate(model: AssetPriceModel): Promise<void> {
-		await saveModelsToDatabase(this.assetTableName, [model])
+		await saveModelsToDatabase(this.assetTableName, [{
+			...model,
+			updatedAt: new Date().toISOString()
+		}])
 	}
 
 	async listPrices(): Promise<AssetPriceModel[]> {
