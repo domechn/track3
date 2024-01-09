@@ -45,7 +45,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, addProgres
 	// need to list coins owned before but not now ( amount = 0 )
 	const lastAssets = await ASSET_HANDLER.listAssets(1)
 	const beforeCoins = _(lastAssets).flatten().map(s => {
-		const found = _(currentCoins).find(c => c.symbol === s.symbol && c.wallet === s.wallet)
+		const found = _(currentCoins).find(c => c.symbol === s.symbol && md5(c.wallet) === s.wallet)
 		if (found) {
 			return
 		}
@@ -55,7 +55,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, addProgres
 			price: _(currentCoins).find(c => c.symbol === s.symbol)?.price,
 			amount: 0,
 			value: 0,
-			wallet: s.wallet,
+			wallet: "md5:" + s.wallet,
 		} as WalletCoin
 	}).compact().value()
 
