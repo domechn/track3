@@ -120,7 +120,7 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 
 	// only value changes > 1 or price is 0
 	const isAmountChanged = (a: number, b: number, price: number) => {
-		return price === 0 || Math.abs(a - b) * price > 1
+		return price === 0 || a !== b // || Math.abs(a - b) * price > 1
 	}
 
 	const res: AssetAction[] = []
@@ -162,7 +162,7 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 				changedAt: p.createdAt,
 				symbol: p.symbol,
 				amount: -p.amount,
-				price: up[getGroupByKey(p)]?.[0]?.price || p.price,
+				price: up[getGroupByKey(p)]?.[0]?.price ?? p.price,
 				wallet: p.wallet
 			})
 		}

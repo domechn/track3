@@ -77,7 +77,7 @@ const App = ({
   const [actions, setActions] = useState<AssetAction[]>([]);
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
 
-  const [updatePriceIndex, setUpdatePriceIndex] = useState(-1);
+  const [updatePriceIndex, setUpdatePriceIndex] = useState("");
   const [updatePriceValue, setUpdatePriceValue] = useState(-1);
   const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
 
@@ -188,14 +188,17 @@ const App = ({
     [maxPosition]
   );
 
-  const profitRate = useMemo(() =>
-    {
-      const buyValue = calculateBuyValue(actions);
-      if (buyValue <= 0) {
-        return "∞";
-      }
-      return ((profit / buyValue) * 100).toFixed(2);
-    }, [profit, actions]);
+  const profitRate = useMemo(() => {
+    const buyValue = calculateBuyValue(actions);
+    if (buyValue <= 0) {
+      return "∞";
+    }
+    return ((profit / buyValue) * 100).toFixed(2);
+  }, [profit, actions]);
+
+  function getAssetActionIndex(act: AssetAction) {
+    return `${act.uuid}-${act.assetID}`;
+  }
 
   async function loadSymbolData(s: string) {
     setLoading(true);
@@ -258,7 +261,15 @@ const App = ({
       });
       return;
     }
-    const act = actions[updatePriceIndex];
+    const actIndex = _(actions).findIndex(act =>getAssetActionIndex(act)=== updatePriceIndex);
+    if (actIndex === -1) {
+      toast({
+        description: "Invalid action",
+        variant: "destructive",
+      });
+      return;
+    }
+    const act = actions[actIndex];
 
     const usdPrice = updatePriceValue / currency.rate;
 
@@ -270,10 +281,10 @@ const App = ({
       act.changedAt
     ).then(() => {
       const newActions = [...actions];
-      newActions[updatePriceIndex].price = usdPrice;
+      newActions[actIndex].price = usdPrice;
       setActions(newActions);
       setUpdatePriceDialogOpen(false);
-      setUpdatePriceIndex(-1);
+      setUpdatePriceIndex("");
       setUpdatePriceValue(-1);
     });
   }
@@ -369,7 +380,7 @@ const App = ({
                             <Pencil2Icon
                               className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
                               onClick={() => {
-                                setUpdatePriceIndex(i);
+                                setUpdatePriceIndex(getAssetActionIndex(act));
                                 setUpdatePriceValue(act.price);
                                 setUpdatePriceDialogOpen(true);
                               }}
