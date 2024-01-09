@@ -154,17 +154,21 @@ class AssetHandler {
 		}
 
 		const getDBModel = (models: CoinModel[]) => {
+			return _(models).map(m => {
+				// !hotfix for wallet is already md5 hashed
 
-			return _(models).map(m => ({
-				createdAt: now,
-				uuid: uid,
-				symbol: m.symbol,
-				amount: m.amount,
-				value: m.value,
-				price: getPrice(m),
-				// md5 of wallet
-				wallet: md5(m.wallet),
-			} as AssetModel)).value()
+				const md5Prefix = "md5:"
+				const md5Wallet = _(m.wallet).startsWith(md5Prefix) ? m.wallet.substring(md5Prefix.length) : md5(m.wallet)
+				return {
+					createdAt: now,
+					uuid: uid,
+					symbol: m.symbol,
+					amount: m.amount,
+					value: m.value,
+					price: getPrice(m),
+					wallet: md5Wallet,
+				} as AssetModel
+			}).value()
 
 		}
 		const models = getDBModel(coins)
