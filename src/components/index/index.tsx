@@ -267,6 +267,7 @@ const App = () => {
                 <HistoricalData
                   currency={currentCurrency}
                   afterDataDeleted={() => loadAllData(querySize)}
+                  version={version}
                 />
               </PageWrapper>
             }
