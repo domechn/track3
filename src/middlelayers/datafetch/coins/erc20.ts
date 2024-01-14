@@ -190,29 +190,15 @@ export class ERC20NormalAnalyzer implements Analyzer {
 
 export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 	private readonly queryUrl = "https://track3-pro-api.domc.me/api/erc20/assetsBalances"
+	private license : string
 
-	constructor(config: Pick<TokenConfig, 'erc20'>) {
+	constructor(config: Pick<TokenConfig, 'erc20'>, license: string) {
 		super(config)
+		this.license = license
 	}
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
-		const license = await getLicenseIfIsPro()
-
-		// if not pro license, use normal analyzer
-		if (!license || await this.validateLicense(license) === false) {
-			// return super.loadPortfolio()
-			console.debug("not pro license, fallback to normal erc20 analyzer")
-			return super.loadPortfolio()
-		}
-
-		console.debug("pro license, use pro erc20 analyzer")
-
-		return this.loadProPortfolioWithRetry(license, 5)
-	}
-
-	async validateLicense(license: string): Promise<boolean> {
-		const { isPro } = await LicenseCenter.getInstance().validateLicense(license)
-		return isPro
+		return this.loadProPortfolioWithRetry(this.license, 5)
 	}
 
 	async loadPortfolioPro(license: string): Promise<WalletCoin[]> {

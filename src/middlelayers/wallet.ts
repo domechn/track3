@@ -72,6 +72,8 @@ export class WalletAnalyzer {
 		handleWeb3Wallet(config.doge, "DOGE")
 		// SOL
 		handleWeb3Wallet(config.sol, "SOL")
+		// Tron
+		handleWeb3Wallet(config.trc20, "TRC20")
 
 		const others = "others"
 		const Others = _(others).upperFirst()
