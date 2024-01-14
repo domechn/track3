@@ -8,10 +8,14 @@ import { asyncMap } from '../utils/async'
 
 export class TRC20ProUserAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'trc20'>
+
 	private readonly queryUrl = "https://track3-pro-api.domc.me/api/trc20/assetsBalances"
 
-	constructor(config: Pick<TokenConfig, 'trc20'>) {
+	private license: string
+
+	constructor(config: Pick<TokenConfig, 'trc20'>, license: string) {
 		this.config = config
+		this.license = license
 	}
 
 	getAnalyzeName(): string {
@@ -33,12 +37,7 @@ export class TRC20ProUserAnalyzer implements Analyzer {
 	}
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
-		const license = await getLicenseIfIsPro()
-		// it should not happened, raise error
-		if (!license) {
-			throw new Error("unexpected error: no pro license")
-		}
-		return this.loadPortfolioWithRetry(license, 5)
+		return this.loadPortfolioWithRetry(this.license, 5)
 	}
 
 	async loadPortfolioWithRetry(license: string, max: number): Promise<WalletCoin[]> {

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api'
 import bluebird from 'bluebird'
-import { Analyzer, CexConfig, TokenConfig, WalletCoin } from './datafetch/types'
+import { CexConfig, TokenConfig, WalletCoin } from './datafetch/types'
 import { BTCAnalyzer } from './datafetch/coins/btc'
 import { combineCoinLists } from './datafetch/utils/coins'
 import { DOGEAnalyzer } from './datafetch/coins/doge'
@@ -49,7 +49,10 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, addProgres
 	}
 
 	// all coins currently owned ( amount > 0 )
-	const currentCoins = await loadPortfoliosByConfig(config, addProgress, isPro)
+	const currentCoins = await loadPortfoliosByConfig(config, addProgress, {
+		isPro,
+		license
+	})
 
 	// need to list coins owned before but not now ( amount = 0 )
 	const lastAssets = await ASSET_HANDLER.listAssets(1)
@@ -72,10 +75,14 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, addProgres
 }
 
 // progress percent is 70
-async function loadPortfoliosByConfig(config: CexConfig & TokenConfig, addProgress: AddProgressFunc, isPro: boolean): Promise<WalletCoin[]> {
+async function loadPortfoliosByConfig(config: CexConfig & TokenConfig, addProgress: AddProgressFunc, userInfo: {
+	isPro: boolean
+	// must exists if isPro === true
+	license?: string
+}): Promise<WalletCoin[]> {
 	const progressPercent = 70
-	let anas: (typeof ERC20NormalAnalyzer | typeof CexAnalyzer | typeof SOLAnalyzer | typeof OthersAnalyzer | typeof BTCAnalyzer | typeof DOGEAnalyzer | typeof TRC20ProUserAnalyzer)[] = [ERC20NormalAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
-	if (isPro) {
+	let anas: (typeof ERC20NormalAnalyzer | typeof ERC20ProAnalyzer | typeof CexAnalyzer | typeof SOLAnalyzer | typeof OthersAnalyzer | typeof BTCAnalyzer | typeof DOGEAnalyzer | typeof TRC20ProUserAnalyzer)[] = [ERC20NormalAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
+	if (userInfo.isPro) {
 		console.debug("pro license, use pro analyzers")
 		anas = [ERC20ProAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer, TRC20ProUserAnalyzer]
 		// anas = [TRC20ProUserAnalyzer]
@@ -85,7 +92,7 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig, addProgre
 	const perProgressPer = progressPercent / anas.length
 	const coinLists = await bluebird.map(anas, async ana => {
 
-		const a = new ana(config)
+		const a = new ana(config, userInfo.license!)
 		const anaName = a.getAnalyzeName()
 		console.log("loading portfolio from ", anaName)
 		try {
