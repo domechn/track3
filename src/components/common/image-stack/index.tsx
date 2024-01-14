@@ -32,7 +32,7 @@ const ImageStack = ({
     >
       {imageSrcs.map((image, index) => (
         <div
-          className="image-stack-child"
+          className="image-stack-child rounded-full"
           style={{ left: expanded ? index * imageWidth * 1.05 : index * imageWidth * 0.7 }}
           key={index}
         >

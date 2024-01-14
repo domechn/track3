@@ -8,7 +8,6 @@ import { CurrencyRateDetail, HistoricalData } from "@/middlelayers/types";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
 
-import "./index.css";
 import { useToast } from "@/components/ui/use-toast";
 import { timestampToDate } from "@/utils/date";
 import {
@@ -16,15 +15,14 @@ import {
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
-import Modal from "../common/modal";
 import { downloadCoinLogos } from "@/middlelayers/data";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useWindowSize } from "@/utils/hook";
-import ImageStack from "../common/image-stack";
+import ImageStack from "./common/image-stack";
 import { getImageApiPath } from "@/utils/app";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import bluebird from "bluebird";
-import { Button } from "../ui/button";
+import { Button } from "./ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import {
   Select,
@@ -33,9 +31,19 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+} from "./ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { loadingWrapper } from "@/utils/loading";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import { ScrollArea } from "./ui/scroll-area";
 
 type RankData = {
   id: number;
@@ -51,11 +59,13 @@ type RankData = {
 const App = ({
   afterDataDeleted,
   currency,
+  version,
 }: {
   // uuid is id for batch data
   // id is for single data
   afterDataDeleted?: (uuid?: string, id?: number) => unknown;
   currency: CurrencyRateDetail;
+  version: number,
 }) => {
   const { toast } = useToast();
   const [data, setData] = useState([] as HistoricalData[]);
@@ -91,7 +101,7 @@ const App = ({
 
   useEffect(() => {
     loadAllData();
-  }, []);
+  }, [version]);
 
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
@@ -201,28 +211,28 @@ const App = ({
     setIsModalOpen(true);
   }
 
-  function onModalClose() {
-    setIsModalOpen(false);
-  }
-
   function getUpOrDown(val: number) {
     const p = val > 0 ? "+" : val === 0 ? "" : "-";
     return p;
   }
 
-  function renderHistoricalDataListV2() {
+  function renderHistoricalDataList() {
     return (
       data
         .map((d, idx) => {
           return (
-            <Card className="group" key={"historical-card-" + idx}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-3">
-                <CardTitle className="text-sm font-medium pt-0">
+            <Card
+              className="group mb-2 cursor-pointer"
+              key={"historical-card-" + idx}
+              onClick={() => onRowClick(d.id)}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-3 pb-4">
+                <CardTitle className="text-sm font-medium pt-0 w-[100%]">
                   <div className="grid gap-4 grid-cols-12">
-                    <div className="col-span-10">
+                    <div className="col-span-9 text-lg text-muted-foreground">
                       {timestampToDate(new Date(d.createdAt).getTime(), true)}
                     </div>
-                    <div className="col-span-1 text-xl text-right">
+                    <div className="col-span-3 text-xl text-right">
                       {currency.symbol +
                         prettyNumberToLocaleString(
                           currencyWrapper(currency)(d.total)
@@ -231,10 +241,36 @@ const App = ({
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-4">
-                  <div className="col-span-2">todo</div>
-                  <div className="col-span-2">
+              <CardContent className="w-[100%] pb-3">
+                <div className="grid grid-cols-12">
+                  <div className="col-span-1">
+                    <div className="hidden group-hover:inline-block">
+                      <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
+                        <img
+                          src={DeleteIcon}
+                          alt="delete"
+                          style={{
+                            border: 0,
+                            height: 18,
+                            width: 18,
+                          }}
+                        />
+                      </a>
+                    </div>
+                  </div>
+                  <div className="col-span-8">
+                    <ImageStack
+                      imageSrcs={_(d.assets)
+                        .sortBy("value")
+                        .reverse()
+                        .take(7)
+                        .map((a) => logoMap[a.symbol] || UnknownLogo)
+                        .value()}
+                      imageWidth={23}
+                      imageHeight={23}
+                    />
+                  </div>
+                  <div className="col-span-3 text-right">
                     <div
                       style={{
                         color:
@@ -262,140 +298,56 @@ const App = ({
     );
   }
 
-  function renderHistoricalDataList() {
-    // split data into pages
-    return (
-      _(data)
-        .map((d, idx) => {
-          return (
-            <div
-              key={d.id}
-              className="historical-data-card group"
-              onClick={() => onRowClick(d.id)}
-            >
-              <div>
-                <div className="historical-data-card-created-at">
-                  {timestampToDate(new Date(d.createdAt).getTime(), true)}
-                </div>
-                <div className="historical-data-card-total">
-                  {currency.symbol +
-                    prettyNumberToLocaleString(
-                      currencyWrapper(currency)(d.total)
-                    )}
-                </div>
-              </div>
-
-              <div className="historical-data-card-bottom">
-                <div className="hidden group-hover:inline-block">
-                  <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
-                    <img
-                      src={DeleteIcon}
-                      alt="delete"
-                      style={{
-                        border: 0,
-                        height: 20,
-                        width: 20,
-                      }}
-                    />
-                  </a>
-                </div>
-                <div
-                  style={{
-                    position: "absolute",
-                    left: "30%",
-                  }}
-                >
-                  <ImageStack
-                    imageSrcs={_(d.assets)
-                      .sortBy("value")
-                      .reverse()
-                      .take(7)
-                      .map((a) => logoMap[a.symbol] || UnknownLogo)
-                      .value()}
-                    imageWidth={25}
-                    imageHeight={25}
-                  />
-                </div>
-                <div
-                  className="historical-data-card-bottom-changes"
-                  style={{
-                    color: d.total - data[idx + 1]?.total > 0 ? "green" : "red",
-                  }}
-                >
-                  {idx < data.length - 1
-                    ? getUpOrDown(d.total - data[idx + 1].total) +
-                      currency.symbol +
-                      prettyNumberToLocaleString(
-                        currencyWrapper(currency)(
-                          Math.abs(d.total - data[idx + 1].total)
-                        )
-                      )
-                    : ""}
-                </div>
-              </div>
-            </div>
-          );
-        })
-        // TODO: slice first for better performance
-        .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
-        .value()
-    );
-  }
-
   function renderDetailPage(data: RankData[]) {
     return _(data)
-      .map((d) => {
+      .map((d, idx) => {
         const apiPath = logoMap[d.symbol];
         return (
-          <tr key={d.id}>
-            <td>
-              <p className="historical-data-detail-row">{d.rank}</p>
-            </td>
-            <td
-              style={{
-                textAlign: "start",
-              }}
-            >
+          <TableRow key={"historical-data-detail-row-" + idx}>
+            <TableCell>
+              <p># {d.rank}</p>
+            </TableCell>
+            <TableCell className="flex space-x-1">
               <img
                 className="inline-block"
                 src={apiPath}
                 alt={d.symbol}
                 style={{ width: 20, height: 20, marginRight: 5 }}
               />
-              <p className="historical-data-detail-row">{d.symbol}</p>
-            </td>
-            <td
+              <p>{d.symbol}</p>
+            </TableCell>
+            <TableCell
               style={{
                 textAlign: "end",
               }}
             >
-              <p className="historical-data-detail-row">
+              <p>
                 {currency.symbol +
                   prettyPriceNumberToLocaleString(
                     currencyWrapper(currency)(d.price)
                   )}
               </p>
-            </td>
-            <td
+            </TableCell>
+            <TableCell
               style={{
                 textAlign: "end",
               }}
             >
-              <p className="historical-data-detail-row">{d.amount}</p>
-            </td>
-            <td
+              <p>{d.amount}</p>
+            </TableCell>
+            <TableCell
               style={{
                 textAlign: "end",
               }}
             >
-              <p className="historical-data-detail-row">
+              <p>
                 {currency.symbol +
                   prettyNumberToLocaleString(
                     currencyWrapper(currency)(d.value)
                   )}
               </p>
-            </td>
-            <td>
+            </TableCell>
+            <TableCell>
               <a onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}>
                 <img
                   src={DeleteIcon}
@@ -407,8 +359,8 @@ const App = ({
                   }}
                 />
               </a>
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         );
       })
       .value();
@@ -416,70 +368,33 @@ const App = ({
 
   return (
     <div>
-      <Modal visible={isModalOpen} onClose={onModalClose}>
-        <div
-          id="detail-view"
-          style={{
-            display: rankData.length > 0 ? "inline-block" : "none",
-            width: (wsize.width ?? 800) * 0.8,
-          }}
-        >
-          <table>
-            <thead>
-              <tr>
-                <th
-                  style={{
-                    width: 50,
-                  }}
-                >
-                  #
-                </th>
-                <th
-                  style={{
-                    width: "30%",
-                    minWidth: 180,
-                    textAlign: "start",
-                  }}
-                >
-                  Name
-                </th>
-                <th
-                  style={{
-                    width: "20%",
-                    textAlign: "end",
-                  }}
-                >
-                  Price
-                </th>
-                <th
-                  style={{
-                    width: "25%",
-                    textAlign: "end",
-                  }}
-                >
-                  Amount
-                </th>
-                <th
-                  style={{
-                    width: "20%",
-                    textAlign: "end",
-                  }}
-                >
-                  Value
-                </th>
-                <th
-                  style={{
-                    width: "3%",
-                    minWidth: 30,
-                    textAlign: "end",
-                  }}
-                ></th>
-              </tr>
-            </thead>
-            <tbody>{renderDetailPage(rankData)}</tbody>
-          </table>
-        </div>
-      </Modal>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="min-w-[80%]">
+          <DialogHeader>
+            <DialogTitle>Historical Data Detail</DialogTitle>
+          </DialogHeader>
+          <ScrollArea
+            className="w-full"
+            style={{
+              maxHeight: (wsize.height ?? 800) * 0.8,
+            }}
+          >
+            <Table>
+              <TableHeader className="sticky top-0 bg-white">
+                <TableRow>
+                  <TableHead>Rank</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
+                  <TableHead >Opt</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>{renderDetailPage(rankData)}</TableBody>
+            </Table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
       <div className="flex justify-center items-center mb-3 cursor-pointer">
         <div className="flex space-x-0 items-center">
           <Button
@@ -521,10 +436,9 @@ const App = ({
           </Button>
         </div>
       </div>
-      {/* <div>{renderHistoricalDataListV2()}</div> */}
       {loadingWrapper(
         loading,
-        <div className="historical-data">{renderHistoricalDataList()}</div>,
+        <div className="w-[80%] ml-[10%]">{renderHistoricalDataList()}</div>,
         "my-[20px] h-[50px]",
         10
       )}
