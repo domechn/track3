@@ -244,7 +244,6 @@ const App = ({
               <CardContent className="w-[100%] pb-3">
                 <div className="grid grid-cols-12">
                   <div className="col-span-1">
-                    {" "}
                     <div className="hidden group-hover:inline-block">
                       <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
                         <img
