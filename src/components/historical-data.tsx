@@ -65,7 +65,7 @@ const App = ({
   // id is for single data
   afterDataDeleted?: (uuid?: string, id?: number) => unknown;
   currency: CurrencyRateDetail;
-  version: number,
+  version: number;
 }) => {
   const { toast } = useToast();
   const [data, setData] = useState([] as HistoricalData[]);
@@ -229,48 +229,21 @@ const App = ({
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-3 pb-4">
                 <CardTitle className="text-sm font-medium pt-0 w-[100%]">
                   <div className="grid gap-4 grid-cols-12">
-                    <div className="col-span-9 text-lg text-muted-foreground">
-                      {timestampToDate(new Date(d.createdAt).getTime(), true)}
-                    </div>
-                    <div className="col-span-3 text-xl text-right">
+                    <div className="col-span-3 text-xl ">
                       {currency.symbol +
                         prettyNumberToLocaleString(
                           currencyWrapper(currency)(d.total)
                         )}
+                    </div>
+                    <div className="col-span-9 text-lg text-muted-foreground text-right">
+                      {timestampToDate(new Date(d.createdAt).getTime(), true)}
                     </div>
                   </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="w-[100%] pb-3">
                 <div className="grid grid-cols-12">
-                  <div className="col-span-1">
-                    <div className="hidden group-hover:inline-block">
-                      <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
-                        <img
-                          src={DeleteIcon}
-                          alt="delete"
-                          style={{
-                            border: 0,
-                            height: 18,
-                            width: 18,
-                          }}
-                        />
-                      </a>
-                    </div>
-                  </div>
-                  <div className="col-span-8">
-                    <ImageStack
-                      imageSrcs={_(d.assets)
-                        .sortBy("value")
-                        .reverse()
-                        .take(7)
-                        .map((a) => logoMap[a.symbol] || UnknownLogo)
-                        .value()}
-                      imageWidth={23}
-                      imageHeight={23}
-                    />
-                  </div>
-                  <div className="col-span-3 text-right">
+                  <div className="col-span-3">
                     <div
                       style={{
                         color:
@@ -286,6 +259,33 @@ const App = ({
                             )
                           )
                         : ""}
+                    </div>
+                  </div>
+                  <div className="col-span-8">
+                    <ImageStack
+                      imageSrcs={_(d.assets)
+                        .sortBy("value")
+                        .reverse()
+                        .take(7)
+                        .map((a) => logoMap[a.symbol] || UnknownLogo)
+                        .value()}
+                      imageWidth={23}
+                      imageHeight={23}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <div className="hidden group-hover:inline-block float-right">
+                      <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
+                        <img
+                          src={DeleteIcon}
+                          alt="delete"
+                          style={{
+                            border: 0,
+                            height: 18,
+                            width: 18,
+                          }}
+                        />
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -380,14 +380,14 @@ const App = ({
             }}
           >
             <Table>
-              <TableHeader className="sticky top-0 bg-white">
+              <TableHeader>
                 <TableRow>
                   <TableHead>Rank</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Value</TableHead>
-                  <TableHead >Opt</TableHead>
+                  <TableHead>Opt</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>{renderDetailPage(rankData)}</TableBody>
