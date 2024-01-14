@@ -687,7 +687,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       case "erc20":
         ana = new ERC20ProAnalyzer({
           erc20: initPayload,
-        });
+        }, "");
         break;
       case "sol":
         ana = new SOLAnalyzer({
@@ -702,7 +702,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       case "trc20":
         ana = new TRC20ProUserAnalyzer({
           trc20: initPayload,
-        });
+        }, "");
         break;
       default:
         ana = null;
