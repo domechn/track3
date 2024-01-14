@@ -13,6 +13,7 @@ import BTCLogo from "@/assets/icons/btc-logo.svg";
 import ETHLogo from "@/assets/icons/eth-logo.svg";
 import SOLLogo from "@/assets/icons/sol-logo.svg";
 import DOGELogo from "@/assets/icons/doge-logo.svg";
+import TRONLogo from "@/assets/icons/tron-logo.svg";
 import {
   Analyzer,
   GlobalConfig,
@@ -50,6 +51,7 @@ import { BTCAnalyzer } from "@/middlelayers/datafetch/coins/btc";
 import { DOGEAnalyzer } from "@/middlelayers/datafetch/coins/doge";
 import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
 import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
+import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -68,6 +70,9 @@ const initialConfiguration: GlobalConfig = {
     addresses: [],
   },
   doge: {
+    addresses: [],
+  },
+  trc20: {
     addresses: [],
   },
   others: [],
@@ -89,7 +94,7 @@ const defaultOtherConfig = {
   amount: 0,
 };
 
-const supportCoins = ["btc", "erc20", "sol", "doge"];
+const supportCoins = ["btc", "erc20", "sol", "doge", "trc20"];
 
 const cexOptions = [
   {
@@ -122,6 +127,10 @@ const walletOptions = [
   {
     value: "doge",
     label: "DOGE",
+  },
+  {
+    value: "trc20",
+    label: "TRC20 ( Pro )",
   },
 ];
 
@@ -243,7 +252,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         return SOLLogo;
       case "doge":
         return DOGELogo;
-
+      case "trc20":
+        return TRONLogo;
       default:
         return "";
     }
@@ -687,6 +697,11 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       case "doge":
         ana = new DOGEAnalyzer({
           doge: initPayload,
+        });
+        break;
+      case "trc20":
+        ana = new TRC20ProUserAnalyzer({
+          trc20: initPayload,
         });
         break;
       default:

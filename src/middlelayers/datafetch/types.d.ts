@@ -46,7 +46,10 @@ export type Addresses = {
 }
 
 export type TokenConfig = {
+	// evm address
 	erc20: Addresses
+	// tron address
+	trc20: Addresses
 	btc: Addresses
 	sol: Addresses
 	doge: Addresses

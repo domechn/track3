@@ -264,6 +264,7 @@ const App = ({
                   <div className="col-span-8">
                     <ImageStack
                       imageSrcs={_(d.assets)
+                        .filter((a) => a.value > 0)
                         .sortBy("value")
                         .reverse()
                         .take(7)
