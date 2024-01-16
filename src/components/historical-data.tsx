@@ -15,6 +15,7 @@ import {
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
+import { useQuery } from "react-query";
 import { downloadCoinLogos } from "@/middlelayers/data";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useWindowSize } from "@/utils/hook";
@@ -44,6 +45,7 @@ import {
   TableRow,
 } from "./ui/table";
 import { ScrollArea } from "./ui/scroll-area";
+import { UICacheCenter } from "@/utils/cache";
 
 type RankData = {
   id: number;
@@ -68,16 +70,26 @@ const App = ({
   version: number;
 }) => {
   const { toast } = useToast();
-  const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
-  const [loading, setLoading] = useState(false);
+  // use to refresh
+  const [innerVersion, setInnerVersion] = useState(0);
 
   const wsize = useWindowSize();
 
   const [dataPage, setDataPage] = useState<number>(0);
+
+  const { data: historicalData, isLoading: loading } = useQuery(
+    "queryHistoricalData",
+    async () => queryHistoricalData(-1),
+    {
+      staleTime: Infinity,
+    }
+  );
+
+  const data = useMemo(() => historicalData ?? [], [historicalData]);
 
   const pageSize = 10;
 
@@ -100,8 +112,12 @@ const App = ({
   }, [data]);
 
   useEffect(() => {
-    loadAllData();
-  }, [version]);
+    UICacheCenter.clearCache("queryHistoricalData");
+  }, [version, innerVersion]);
+
+  function needRefresh() {
+    setInnerVersion(innerVersion + 1);
+  }
 
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
@@ -126,23 +142,13 @@ const App = ({
     return _.assign({}, ...kvs);
   }
 
-  async function loadAllData() {
-    setLoading(true);
-    try {
-      const d = await queryHistoricalData(-1);
-      setData(d);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function onHistoricalDataDeleteClick(uuid: string) {
     deleteHistoricalDataByUUID(uuid)
       .then(() => {
         toast({
           description: "Record deleted",
         });
-        loadAllData();
+        needRefresh();
         if (afterDataDeleted) {
           afterDataDeleted(uuid);
         }
@@ -166,7 +172,7 @@ const App = ({
         toast({
           description: "Record deleted",
         });
-        loadAllData();
+        needRefresh();
         if (afterDataDeleted) {
           afterDataDeleted(undefined, id);
         }

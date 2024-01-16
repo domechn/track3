@@ -1,14 +1,13 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
-  AssetChangeData,
   CurrencyRateDetail,
-  TotalValueData,
 } from "@/middlelayers/types";
 import { timestampToDate } from "@/utils/date";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Line } from "react-chartjs-2";
+import { useQuery } from "react-query";
 import {
   queryAssetChange,
   queryTotalValue,
@@ -16,8 +15,8 @@ import {
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
-import bluebird from "bluebird";
 import { ChartResizeContext } from "@/App";
+import { UICacheCenter } from '@/utils/cache'
 
 interface TotalValueShower {
   currencyName(): string;
@@ -161,26 +160,51 @@ const App = ({
   const lineColor = "rgba(255, 99, 71, 1)";
   const { needResize } = useContext(ChartResizeContext);
 
-  const [totalValueLoading, setTotalValueLoading] = useState(false);
-  const [chartLoading, setChartLoading] = useState(false);
-
   const [changedValueOrPercentage, setChangedValueOrPercentage] = useState("");
-  const [totalValueData, setTotalValueData] = useState<TotalValueData>({
-    totalValue: 0,
-    prevTotalValue: 0,
-  });
-  const [assetChangeData, setAssetChangeData] = useState<AssetChangeData>({
-    timestamps: [],
-    data: [],
-  });
 
   const [btcAsBase, setBtcAsBase] = useState(false);
 
   const [showValue, setShowValue] = useState(false);
 
+  const { data: tv, isLoading: totalValueLoading } = useQuery(
+    "queryTotalValue",
+    queryTotalValue,
+    {
+      staleTime: Infinity,
+    }
+  );
+  const totalValueData = useMemo(
+    () =>
+      tv ?? {
+        totalValue: 0,
+        prevTotalValue: 0,
+      },
+    [tv]
+  );
+
+  const { data: ac, isLoading: chartLoading } = useQuery(
+    "queryAssetChange",
+    async () => queryAssetChange(size),
+    {
+      staleTime: Infinity,
+    }
+  );
+
+  const assetChangeData = useMemo(
+    () =>
+      ac ?? {
+        timestamps: [],
+        data: [],
+      },
+    [ac]
+  );
+
   useEffect(() => {
-    loadData(size).then(() => resizeChartWithDelay(chartName));
-  }, [size, version]);
+    resizeChartWithDelay(chartName);
+
+    UICacheCenter.clearCache("queryTotalValue");
+    UICacheCenter.clearCache("queryAssetChange");
+  }, [version, size]);
 
   useEffect(() => {
     if (showValue) {
@@ -191,30 +215,6 @@ const App = ({
   }, [totalValueData, btcAsBase, showValue]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
-
-  async function loadData(s: number) {
-    return bluebird.all([loadTotalValue(), loadChartData(s)]);
-  }
-
-  async function loadTotalValue() {
-    setTotalValueLoading(true);
-    try {
-      const tv = await queryTotalValue();
-      setTotalValueData(tv);
-    } finally {
-      setTotalValueLoading(false);
-    }
-  }
-
-  async function loadChartData(size: number) {
-    setChartLoading(true);
-    try {
-      const ac = await queryAssetChange(size);
-      setAssetChangeData(ac);
-    } finally {
-      setChartLoading(false);
-    }
-  }
 
   function getTotalValueShower() {
     if (btcAsBase) {

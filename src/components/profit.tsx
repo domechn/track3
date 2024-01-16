@@ -12,6 +12,8 @@ import { Skeleton } from "./ui/skeleton";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import { useQuery } from "react-query";
+import { UICacheCenter } from "@/utils/cache";
 
 type TopType = "profitTop" | "lossTop";
 
@@ -23,29 +25,34 @@ const App = ({
   currency: CurrencyRateDetail;
   version: number;
 }) => {
-  const [profit, setProfit] = useState(0);
-  const [coinsProfit, setCoinsProfit] = useState<
-    {
-      symbol: string;
-      value: number;
-    }[]
-  >([]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [topType, setTopType] = useState<TopType>("profitTop");
-  const [loading, setLoading] = useState(false);
+
+  const { data, isLoading: loading } = useQuery(
+    "loadProfit",
+    calculateTotalProfit,
+    {
+      staleTime: Infinity,
+    }
+  );
 
   useEffect(() => {
-    setLoading(true);
-    calculateTotalProfit()
-      .then((res) => {
-        setProfit(res.total);
-        setCoinsProfit(_(res.coins).sortBy("value").value());
-
-        // set logo map
-        getLogoMap(res.coins).then((m) => setLogoMap(m));
-      })
-      .finally(() => setLoading(false));
+    UICacheCenter.clearCache("loadProfit");
   }, [version]);
+
+  const profit = useMemo(() => data?.total ?? 0, [data]);
+  const coinsProfit = useMemo(
+    () => _(data?.coins).sortBy("value").value(),
+    [data]
+  );
+
+  useEffect(() => {
+    getLogoMap(data?.coins || []).then((m) => setLogoMap(m));
+  }, [data]);
+
+  async function loadData() {
+    return calculateTotalProfit();
+  }
 
   const topTypeData = useMemo(() => {
     const size = 5;

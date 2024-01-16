@@ -1,13 +1,19 @@
-import { CurrencyRateDetail, PNLData } from "@/middlelayers/types";
+import { CurrencyRateDetail } from "@/middlelayers/types";
 import { timestampToDate } from "@/utils/date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Bar } from "react-chartjs-2";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo } from "react";
 import { loadingWrapper } from "@/utils/loading";
-import { queryPNLValue,  resizeChart,  resizeChartWithDelay } from "@/middlelayers/charts";
-import { ChartResizeContext } from '@/App'
+import { useQuery } from "react-query";
+import {
+  queryPNLValue,
+  resizeChart,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
+import { ChartResizeContext } from "@/App";
+import { UICacheCenter } from '@/utils/cache'
 
 const chartName = "PNL of Asset";
 
@@ -20,27 +26,25 @@ const App = ({
   size: number;
   version: number;
 }) => {
-  const [loading, setLoading] = useState(false);
   const { needResize } = useContext(ChartResizeContext);
-  const [pnlData, setPnlData] = useState<PNLData>({
-    data: [],
-  });
+
+  const { data: pd, isLoading: loading } = useQuery(
+    "loadPNL",
+    async () => queryPNLValue(size),
+    {
+      staleTime: Infinity,
+    }
+  );
+
+  const pnlData = useMemo(() => pd ?? { data: [] }, [pd]);
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay(chartName));
+    resizeChartWithDelay(chartName);
+
+    UICacheCenter.clearCache("loadPNL");
   }, [size, version]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
-
-  async function loadData() {
-    setLoading(true);
-    try {
-      const pd = await queryPNLValue(size);
-      setPnlData(pd);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const options = {
     maintainAspectRatio: false,

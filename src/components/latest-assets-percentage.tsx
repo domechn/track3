@@ -9,6 +9,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { getImageApiPath } from "@/utils/app";
+import { useQuery } from "react-query";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -30,7 +31,8 @@ import {
 } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
 import { loadingWrapper } from "@/utils/loading";
-import { ChartResizeContext } from '@/App'
+import { ChartResizeContext } from "@/App";
+import { UICacheCenter } from "@/utils/cache";
 
 const chartName = "Percentage of Assets";
 
@@ -45,12 +47,19 @@ const App = ({
 }) => {
   const { needResize } = useContext(ChartResizeContext);
   const [dataPage, setDataPage] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
-    useState<LatestAssetsPercentageData>([]);
 
   const pageSize = 5;
   const navigate = useNavigate();
+
+  const { data: lap, isLoading: loading } = useQuery(
+    "queryLatestAssetsPercentage",
+    queryLatestAssetsPercentage,
+    {
+      staleTime: Infinity,
+    }
+  );
+
+  const latestAssetsPercentageData = useMemo(() => lap ?? [], [lap]);
 
   const percentageData = useMemo(() => {
     return splitTopAndOtherData(latestAssetsPercentageData);
@@ -58,7 +67,9 @@ const App = ({
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay(chartName));
+    resizeChartWithDelay(chartName);
+
+    UICacheCenter.clearCache("queryLatestAssetsPercentage");
   }, [size, version]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
@@ -77,16 +88,6 @@ const App = ({
     // set logo map
     getLogoMap(latestAssetsPercentageData).then((m) => setLogoMap(m));
   }, [latestAssetsPercentageData]);
-
-  async function loadData() {
-    setLoading(true);
-    try {
-      const lap = await queryLatestAssetsPercentage();
-      setLatestAssetsPercentageData(lap);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision

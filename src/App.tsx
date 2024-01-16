@@ -2,6 +2,8 @@ import IndexApp from "@/components/index";
 import AutoUpdater from "@/components/auto-updater";
 import { Toaster } from "@/components/ui/toaster";
 import React from "react";
+import { QueryClientProvider } from "react-query";
+import { UICacheCenter } from './utils/cache'
 
 export const ChartResizeContext = React.createContext<{
   needResize: number;
@@ -16,7 +18,9 @@ function App() {
       <Toaster />
       <AutoUpdater />
       <ChartResizeContext.Provider value={{ needResize, setNeedResize }}>
-        <IndexApp />
+        <QueryClientProvider client={UICacheCenter.getQueryClient()}>
+          <IndexApp />
+        </QueryClientProvider>
       </ChartResizeContext.Provider>
     </div>
   );
