@@ -6,7 +6,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
-import { legendOnClick } from "@/utils/legend";
+import { hideOtherLinesClickWrapper } from "@/utils/legend";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { queryTopCoinsRank, resizeChart, resizeChartWithDelay } from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
@@ -67,7 +67,7 @@ const App = ({ size, version }: { size: number; version: number }) => {
         display: false,
       },
       legend: {
-        onClick: legendOnClick(
+        onClick: hideOtherLinesClickWrapper(
           _(topCoinsRankData.coins).size(),
           chartRef.current
         ),

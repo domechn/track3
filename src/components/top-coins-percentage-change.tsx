@@ -6,7 +6,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
-import { legendOnClick } from "@/utils/legend";
+import { hideOtherLinesClickWrapper } from "@/utils/legend";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
@@ -77,7 +77,7 @@ const App = ({ size, version }: { size: number; version: number }) => {
         display: false,
       },
       legend: {
-        onClick: legendOnClick(
+        onClick: hideOtherLinesClickWrapper(
           _(topCoinsPercentageChangeData.coins).size(),
           chartRef.current
         ),
