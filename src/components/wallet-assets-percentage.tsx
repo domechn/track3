@@ -1,4 +1,4 @@
-import { Bar } from "react-chartjs-2";
+import { Bar, Doughnut, Pie } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import {
   CurrencyRateDetail,
@@ -6,12 +6,19 @@ import {
 } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import _ from "lodash";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { insertEllipsis } from "@/utils/string";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { WALLET_ANALYZER, resizeChart, resizeChartWithDelay } from "@/middlelayers/charts";
+import {
+  WALLET_ANALYZER,
+  resizeChart,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
 import { ChartResizeContext } from "@/App";
+import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
+import { BubbleDataPoint, Point } from "chart.js";
+import { offsetHoveredItemWrapper } from "@/utils/legend";
 
 const chartName = "Percentage And Total Value of Each Wallet";
 
@@ -23,7 +30,7 @@ const App = ({
   version: number;
 }) => {
   const size = useWindowSize();
-
+  const chartRef = useRef<ChartJSOrUndefined<"pie", string[], unknown>>(null);
   const { needResize } = useContext(ChartResizeContext);
   const [loading, setLoading] = useState(false);
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
@@ -47,79 +54,54 @@ const App = ({
   }
 
   const totalValue = useMemo(
-    () =>
-      currencyWrapper(currency)(_(walletAssetsPercentage).sumBy("value")) ||
-      0.0001,
-    [walletAssetsPercentage, currency]
+    () => _(walletAssetsPercentage).sumBy("value") || 0.0001,
+    [walletAssetsPercentage]
   );
 
   const options = {
     maintainAspectRatio: false,
     responsive: false,
-    indexAxis: "y",
-    barPercentage: 0.9,
+    layout: {
+      padding: 15,
+    },
     plugins: {
-      title: {
-        display: false,
-        text: chartName,
-      },
+      // text is set for resizing
+      title: { display: false, text: chartName },
       legend: {
-        display: false,
+        display: true,
+        position: "right",
+        font: {
+          size: 13,
+        },
+        labels: { font: {} },
+        onHover: offsetHoveredItemWrapper(
+          chartRef.current
+        ),
       },
       datalabels: {
-        display: "auto",
-        align: "top",
-        offset: Math.max(0, 15 - _(walletAssetsPercentage).size()),
-        formatter: (value: number) => {
-          return `${prettyNumberToLocaleString((value / totalValue) * 100)}%`;
-        },
-      },
-    },
-    scales: {
-      x: {
-        title: {
-          display: true,
-          text: `${currency.currency} Value`,
-        },
-        ticks: {
-          precision: 2,
-          callback: function (value: number) {
-            if (value === 0) {
-              return value;
-            }
-            return currency.symbol + value;
-          },
-        },
-      },
-      y: {
-        offset: true,
-        ticks: {
-          precision: 2,
-        },
-        grid: {
-          display: false,
-        },
+        display: false,
       },
     },
   };
 
   function lineData() {
     return {
-      labels: walletAssetsPercentage.map((d) =>
-        d.walletAlias
-          ? `${d.walletType}-${d.walletAlias}`
-          : insertEllipsis(d.wallet, 16)
+      labels: walletAssetsPercentage.map(
+        (d) =>
+          `${((d.value / totalValue) * 100).toFixed(2)}% ` +
+          (d.walletAlias
+            ? `${d.walletType}-${d.walletAlias}`
+            : insertEllipsis(d.wallet, 16))
       ),
       datasets: [
         {
-          alias: "y",
-          fill: false,
           data: walletAssetsPercentage.map((d) =>
             currencyWrapper(currency)(d.value).toFixed(2)
           ),
           borderColor: walletAssetsPercentage.map((d) => d.chartColor),
           backgroundColor: walletAssetsPercentage.map((d) => d.chartColor),
           borderWidth: 1,
+          hoverOffset: 25,
         },
       ],
     };
@@ -141,9 +123,9 @@ const App = ({
           >
             {loadingWrapper(
               loading,
-              <Bar options={options as any} data={lineData()} />,
-              "h-[25px] my-4",
-              10
+              <Pie ref={chartRef} options={options as any} data={lineData()} />,
+              "mt-6 h-[30px]",
+              6
             )}
           </div>
         </CardContent>

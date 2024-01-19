@@ -5,7 +5,7 @@ import {
 } from "@/middlelayers/types";
 import { Card, CardContent } from "./ui/card";
 import _ from "lodash";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { getImageApiPath } from "@/utils/app";
@@ -31,6 +31,8 @@ import {
 import { Skeleton } from "./ui/skeleton";
 import { loadingWrapper } from "@/utils/loading";
 import { ChartResizeContext } from '@/App'
+import { offsetHoveredItemWrapper } from '@/utils/legend'
+import { ChartJSOrUndefined } from 'react-chartjs-2/dist/types'
 
 const chartName = "Percentage of Assets";
 
@@ -48,7 +50,7 @@ const App = ({
   const [loading, setLoading] = useState(true);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
-
+    const chartRef = useRef<ChartJSOrUndefined<"doughnut", number[], unknown>>(null);
   const pageSize = 5;
   const navigate = useNavigate();
 
@@ -109,6 +111,9 @@ const App = ({
   const options = {
     maintainAspectRatio: false,
     responsive: false,
+    layout: {
+      padding: 10,
+    },
     plugins: {
       // text is set for resizing
       title: { display: false, text: chartName },
@@ -119,6 +124,9 @@ const App = ({
           size: 13,
         },
         labels: { font: {} },
+        onHover: offsetHoveredItemWrapper(
+          chartRef.current
+        ),
       },
       datalabels: {
         color: "white",
@@ -172,6 +180,7 @@ const App = ({
           borderColor: d.map((coin) => coin.chartColor),
           backgroundColor: d.map((coin) => coin.chartColor),
           borderWidth: 1,
+          hoverOffset: 15,
         },
       ],
     };
@@ -180,7 +189,7 @@ const App = ({
   function renderDoughnut() {
     return loadingWrapper(
       loading,
-      <Doughnut options={options as any} data={lineData()} />,
+      <Doughnut ref={chartRef} options={options as any} data={lineData()} />,
       "mt-6 h-[30px]",
       6
     );
