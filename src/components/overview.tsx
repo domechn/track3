@@ -16,6 +16,10 @@ const App = ({
   version: number;
   size: number;
 }) => {
+  if (size <= 0) {
+    // do not allow query all size
+    return <div></div>;
+  }
   return (
     <div className="space-y-2">
       <div className="grid gap-4 grid-cols-2">

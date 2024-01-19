@@ -77,7 +77,7 @@ const App = () => {
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const windowSize = useWindowSize();
-  const [querySize, setQuerySize] = useState(10);
+  const [querySize, setQuerySize] = useState(0);
   const [lastSize, setLastSize] = useState(windowSize);
   const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(
     undefined
