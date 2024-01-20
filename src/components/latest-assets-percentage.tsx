@@ -30,9 +30,9 @@ import {
 } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
 import { loadingWrapper } from "@/utils/loading";
-import { ChartResizeContext } from '@/App'
-import { offsetHoveredItemWrapper } from '@/utils/legend'
-import { ChartJSOrUndefined } from 'react-chartjs-2/dist/types'
+import { ChartResizeContext } from "@/App";
+import { offsetHoveredItemWrapper } from "@/utils/legend";
+import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 
 const chartName = "Percentage of Assets";
 
@@ -50,7 +50,8 @@ const App = ({
   const [loading, setLoading] = useState(true);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
-    const chartRef = useRef<ChartJSOrUndefined<"doughnut", number[], unknown>>(null);
+  const chartRef =
+    useRef<ChartJSOrUndefined<"doughnut", number[], unknown>>(null);
   const pageSize = 5;
   const navigate = useNavigate();
 
@@ -124,9 +125,9 @@ const App = ({
           size: 13,
         },
         labels: { font: {} },
-        onHover: offsetHoveredItemWrapper(
-          chartRef.current
-        ),
+        onHover: offsetHoveredItemWrapper(chartRef.current),
+        // disable onclick
+        onClick: () => {},
       },
       datalabels: {
         color: "white",
