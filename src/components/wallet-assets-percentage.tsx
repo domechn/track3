@@ -68,41 +68,39 @@ const App = ({
           size: 13,
         },
         labels: { font: {} },
-        onHover: offsetHoveredItemWrapper(
-          chartRef.current
-        ),
+        onHover: (e: any, legendItem: { index: number }, legend: any) =>
+          offsetHoveredItemWrapper(chartRef.current)(e, legendItem, legend),
         // disable onclick
-        onClick: ()=>{},
+        onClick: () => {},
       },
       datalabels: {
         display: false,
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: { parsed: number }) => {
-            return currency.symbol + context.parsed.toLocaleString();
-          },
-        },
       },
     },
   };
 
   function lineData() {
     return {
-      labels: _(walletAssetsPercentage).map(
-        (d) =>
-          `${d.percentage.toFixed(2)}% ` +
-          (d.walletAlias
-            ? `${d.walletType}-${d.walletAlias}`
-            : insertEllipsis(d.wallet, 16))
-      ).value(),
+      labels: _(walletAssetsPercentage)
+        .map(
+          (d) =>
+            `${d.percentage.toFixed(2)}% ` +
+            (d.walletAlias
+              ? `${d.walletType}-${d.walletAlias}`
+              : insertEllipsis(d.wallet, 16))
+        )
+        .value(),
       datasets: [
         {
-          data: _(walletAssetsPercentage).map((d) =>
-            currencyWrapper(currency)(d.value).toFixed(2)
-          ).value(),
-          borderColor: _(walletAssetsPercentage).map((d) => d.chartColor).value(),
-          backgroundColor: _(walletAssetsPercentage).map((d) => d.chartColor).value(),
+          data: _(walletAssetsPercentage)
+            .map((d) => currencyWrapper(currency)(d.value).toFixed(2))
+            .value(),
+          borderColor: _(walletAssetsPercentage)
+            .map((d) => d.chartColor)
+            .value(),
+          backgroundColor: _(walletAssetsPercentage)
+            .map((d) => d.chartColor)
+            .value(),
           borderWidth: 1,
           hoverOffset: 35,
         },

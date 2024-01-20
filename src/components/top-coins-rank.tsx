@@ -8,9 +8,13 @@ import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
 import { hideOtherLinesClickWrapper } from "@/utils/legend";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { queryTopCoinsRank, resizeChart, resizeChartWithDelay } from "@/middlelayers/charts";
+import {
+  queryTopCoinsRank,
+  resizeChart,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
 import { loadingWrapper } from "@/utils/loading";
-import { ChartResizeContext } from '@/App'
+import { ChartResizeContext } from "@/App";
 
 const chartName = "Trend of Top Coins Rank";
 
@@ -67,10 +71,11 @@ const App = ({ size, version }: { size: number; version: number }) => {
         display: false,
       },
       legend: {
-        onClick: hideOtherLinesClickWrapper(
-          _(topCoinsRankData.coins).size(),
-          chartRef.current
-        ),
+        onClick: (e: any, legendItem: { datasetIndex: number }, legend: any) =>
+          hideOtherLinesClickWrapper(
+            _(topCoinsRankData.coins).size(),
+            chartRef.current
+          )(e, legendItem, legend),
       },
     },
     scales: {
