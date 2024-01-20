@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use tauri::Manager;
 use track3::{
@@ -74,7 +74,22 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
     let res = client.query_coins_prices(symbols).await;
 
     match res {
-        Ok(prices) => Ok(prices),
+        Ok(prices) => {
+            // if all value in prices is 0, raise error
+            // fix issue: https://github.com/domechn/track3/issues/257
+            let mut is_all_zero = true;
+            for (_, v) in prices.iter() {
+                if *v != 0.0 {
+                    is_all_zero = false;
+                    break;
+                }
+            }
+
+            if is_all_zero {
+                return Err("get coin prices failed: all prices are 0".to_string());
+            }
+            return Ok(prices);
+        }
         Err(e) => Err(e.to_string()),
     }
 }
