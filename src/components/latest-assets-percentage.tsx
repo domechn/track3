@@ -125,7 +125,8 @@ const App = ({
           size: 13,
         },
         labels: { font: {} },
-        onHover: offsetHoveredItemWrapper(chartRef.current),
+        onHover: (e: any, legendItem: { index: number }, legend: any) =>
+          offsetHoveredItemWrapper(chartRef.current)(e, legendItem, legend),
         // disable onclick
         onClick: () => {},
       },

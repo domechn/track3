@@ -77,10 +77,11 @@ const App = ({ size, version }: { size: number; version: number }) => {
         display: false,
       },
       legend: {
-        onClick: hideOtherLinesClickWrapper(
-          _(topCoinsPercentageChangeData.coins).size(),
-          chartRef.current
-        ),
+        onClick: (e: any, legendItem: { datasetIndex: number }, legend: any) =>
+          hideOtherLinesClickWrapper(
+            _(topCoinsPercentageChangeData.coins).size(),
+            chartRef.current
+          )(e, legendItem, legend),
       },
     },
     scales: {
