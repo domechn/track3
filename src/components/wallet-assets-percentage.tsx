@@ -71,6 +71,8 @@ const App = ({
         onHover: offsetHoveredItemWrapper(
           chartRef.current
         ),
+        // disable onclick
+        onClick: ()=>{},
       },
       datalabels: {
         display: false,
