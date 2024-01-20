@@ -6,14 +6,6 @@ import {
 } from "@/middlelayers/configuration";
 import { useToast } from "@/components/ui/use-toast";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
-import BinanceLogo from "@/assets/icons/binance-logo.svg";
-import GateLogo from "@/assets/icons/gate-logo.svg";
-import OkexLogo from "@/assets/icons/okex-logo.svg";
-import BTCLogo from "@/assets/icons/btc-logo.svg";
-import ETHLogo from "@/assets/icons/eth-logo.svg";
-import SOLLogo from "@/assets/icons/sol-logo.svg";
-import DOGELogo from "@/assets/icons/doge-logo.svg";
-import TRONLogo from "@/assets/icons/tron-logo.svg";
 import {
   Analyzer,
   GlobalConfig,
@@ -52,6 +44,7 @@ import { DOGEAnalyzer } from "@/middlelayers/datafetch/coins/doge";
 import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
 import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
 import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
+import { getWalletLogo } from '@/lib/utils'
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -236,29 +229,6 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     setCurrencies(currencies);
   }
 
-  function getLogo(type: string) {
-    switch (type) {
-      case "binance":
-        return BinanceLogo;
-      case "okex":
-        return OkexLogo;
-      case "gate":
-        return GateLogo;
-      case "btc":
-        return BTCLogo;
-      case "erc20":
-        return ETHLogo;
-      case "sol":
-        return SOLLogo;
-      case "doge":
-        return DOGELogo;
-      case "trc20":
-        return TRONLogo;
-      default:
-        return "";
-    }
-  }
-
   function loadConfiguration() {
     getConfiguration()
       .then((d) => {
@@ -410,7 +380,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 />
                 <img
                   className="h-4 w-4 text-muted-foreground"
-                  src={getLogo(ex.type)}
+                  src={getWalletLogo(ex.type)}
                 ></img>
               </div>
             </CardHeader>
@@ -455,7 +425,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     onClick={() => handleRemoveWallet(idx)}
                   />
                   <img
-                    src={getLogo(w.type)}
+                    src={getWalletLogo(w.type)}
                     className="h-4 w-4 text-muted-foreground mr-2"
                   />
                 </div>
@@ -756,7 +726,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                       <SelectItem key={o.value} value={o.value}>
                         <img
                           className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                          src={getLogo(o.value)}
+                          src={getWalletLogo(o.value)}
                         ></img>
                         {o.label}
                       </SelectItem>
@@ -925,7 +895,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                       <SelectItem key={o.value} value={o.value}>
                         <img
                           className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                          src={getLogo(o.value)}
+                          src={getWalletLogo(o.value)}
                         ></img>
                         {o.label}
                       </SelectItem>
