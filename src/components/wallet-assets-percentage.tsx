@@ -1,12 +1,12 @@
-import { Bar, Doughnut, Pie } from "react-chartjs-2";
+import { Pie } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import {
   CurrencyRateDetail,
   WalletAssetsPercentageData,
 } from "@/middlelayers/types";
-import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import { currencyWrapper } from "@/utils/currency";
 import _ from "lodash";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { insertEllipsis } from "@/utils/string";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
@@ -17,7 +17,6 @@ import {
 import { loadingWrapper } from "@/utils/loading";
 import { ChartResizeContext } from "@/App";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
-import { BubbleDataPoint, Point } from "chart.js";
 import { offsetHoveredItemWrapper } from "@/utils/legend";
 
 const chartName = "Percentage And Total Value of Each Wallet";
@@ -53,11 +52,6 @@ const App = ({
     }
   }
 
-  const totalValue = useMemo(
-    () => _(walletAssetsPercentage).sumBy("value") || 0.0001,
-    [walletAssetsPercentage]
-  );
-
   const options = {
     maintainAspectRatio: false,
     responsive: false,
@@ -86,20 +80,20 @@ const App = ({
 
   function lineData() {
     return {
-      labels: walletAssetsPercentage.map(
+      labels: _(walletAssetsPercentage).map(
         (d) =>
-          `${((d.value / totalValue) * 100).toFixed(2)}% ` +
+          `${d.percentage.toFixed(2)}% ` +
           (d.walletAlias
             ? `${d.walletType}-${d.walletAlias}`
             : insertEllipsis(d.wallet, 16))
-      ),
+      ).value(),
       datasets: [
         {
-          data: walletAssetsPercentage.map((d) =>
+          data: _(walletAssetsPercentage).map((d) =>
             currencyWrapper(currency)(d.value).toFixed(2)
-          ),
-          borderColor: walletAssetsPercentage.map((d) => d.chartColor),
-          backgroundColor: walletAssetsPercentage.map((d) => d.chartColor),
+          ).value(),
+          borderColor: _(walletAssetsPercentage).map((d) => d.chartColor).value(),
+          backgroundColor: _(walletAssetsPercentage).map((d) => d.chartColor).value(),
           borderWidth: 1,
           hoverOffset: 25,
         },

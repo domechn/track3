@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useEffect, useState } from "react";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
+import { getWalletLogo } from "@/lib/utils";
 
 const App = ({
   currency,
@@ -114,9 +115,17 @@ const App = ({
                     : walletAssetsChange.map((d) => (
                         <TableRow key={d.wallet}>
                           <TableCell className="font-medium">
-                            {!d.walletType || d.walletType === "null"
-                              ? "Unknown"
-                              : tweakWalletType(d.walletType)}
+                            {!d.walletType || d.walletType === "null" ? (
+                              <div>Unknown</div>
+                            ) : (
+                              <div className='flex space-x-1'>
+                                <img
+                                  className="h-5 w-5 text-muted-foreground"
+                                  src={getWalletLogo(d.walletType)}
+                                ></img>
+                                {tweakWalletType(d.walletType)}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
                             {d.walletAlias ??
