@@ -56,7 +56,7 @@ const App = ({
     maintainAspectRatio: false,
     responsive: false,
     layout: {
-      padding: 15,
+      padding: 20,
     },
     plugins: {
       // text is set for resizing
@@ -95,7 +95,7 @@ const App = ({
           borderColor: _(walletAssetsPercentage).map((d) => d.chartColor).value(),
           backgroundColor: _(walletAssetsPercentage).map((d) => d.chartColor).value(),
           borderWidth: 1,
-          hoverOffset: 25,
+          hoverOffset: 35,
         },
       ],
     };
