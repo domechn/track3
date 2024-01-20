@@ -130,20 +130,13 @@ const App = ({
         onClick: () => {},
       },
       datalabels: {
-        color: "white",
-        font: {
-          weight: "bold",
-        },
-        display: "auto",
-        formatter: (
-          value: number,
-          context: {
-            chart: { data: { labels: { [x: string]: any } } };
-            dataIndex: string | number;
-          }
-        ) => {
-          const label = context.chart.data.labels[context.dataIndex];
-          return `${label}: ${value.toLocaleString()}%`;
+        display: false,
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: { parsed: number }) => {
+            return currency.symbol + context.parsed.toLocaleString();
+          },
         },
       },
     },
@@ -163,6 +156,7 @@ const App = ({
         ? {
             coin: "Other",
             percentage: _(other).map("percentage").sum(),
+            value: _(other).map("value").sum(),
             chartColor: other[0]?.chartColor ?? "#4B5563",
           }
         : null,
@@ -174,10 +168,10 @@ const App = ({
   function lineData() {
     const d = percentageData;
     return {
-      labels: d.map((coin) => coin.coin),
+      labels: d.map((coin) => `${coin.percentage.toFixed(2)}% ` + coin.coin),
       datasets: [
         {
-          data: d.map((coin) => coin.percentage),
+          data: d.map((coin) => currencyWrapper(currency)(coin.value)),
           borderColor: d.map((coin) => coin.chartColor),
           backgroundColor: d.map((coin) => coin.chartColor),
           borderWidth: 1,
