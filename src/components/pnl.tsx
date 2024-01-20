@@ -6,8 +6,12 @@ import { Bar } from "react-chartjs-2";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { useContext, useEffect, useState } from "react";
 import { loadingWrapper } from "@/utils/loading";
-import { queryPNLValue,  resizeChart,  resizeChartWithDelay } from "@/middlelayers/charts";
-import { ChartResizeContext } from '@/App'
+import {
+  queryPNLValue,
+  resizeChart,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
+import { ChartResizeContext } from "@/App";
 
 const chartName = "PNL of Asset";
 
@@ -57,6 +61,14 @@ const App = ({
       legend: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          label: (context: { parsed: { y: number } }) => {
+            const v = context.parsed.y.toLocaleString();
+            return currency.symbol + v;
+          },
+        },
+      },
     },
     scales: {
       x: {
@@ -100,6 +112,10 @@ const App = ({
         offset: true,
         ticks: {
           precision: 2,
+          callback: (value: any) => {
+            const v = value.toLocaleString();
+            return currency.symbol + v;
+          },
         },
         grid: {
           display: false,
