@@ -276,7 +276,12 @@ const App = ({
                   </div>
                   <div className="col-span-1">
                     <div className="hidden group-hover:inline-block float-right">
-                      <a onClick={() => onHistoricalDataDeleteClick(d.id)}>
+                      <a
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onHistoricalDataDeleteClick(d.id);
+                        }}
+                      >
                         <img
                           src={DeleteIcon}
                           alt="delete"

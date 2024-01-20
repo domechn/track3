@@ -112,7 +112,7 @@ const App = ({
     maintainAspectRatio: false,
     responsive: false,
     layout: {
-      padding: 10,
+      padding: 20,
     },
     plugins: {
       // text is set for resizing
@@ -180,7 +180,7 @@ const App = ({
           borderColor: d.map((coin) => coin.chartColor),
           backgroundColor: d.map((coin) => coin.chartColor),
           borderWidth: 1,
-          hoverOffset: 15,
+          hoverOffset: 35,
         },
       ],
     };
