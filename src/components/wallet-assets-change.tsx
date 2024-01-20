@@ -118,12 +118,12 @@ const App = ({
                             {!d.walletType || d.walletType === "null" ? (
                               <div>Unknown</div>
                             ) : (
-                              <div className='flex space-x-1'>
+                              <div className="flex space-x-1">
                                 <img
                                   className="h-5 w-5 text-muted-foreground"
                                   src={getWalletLogo(d.walletType)}
                                 ></img>
-                                {tweakWalletType(d.walletType)}
+                                <div>{tweakWalletType(d.walletType)}</div>
                               </div>
                             )}
                           </TableCell>
