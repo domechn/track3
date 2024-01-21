@@ -46,15 +46,13 @@
 ![sc2](./images/demo/sc2.jpg)
 ![sc3](./images/demo/sc3.jpg)
 ![sc4](./images/demo/sc4.jpg)
+![sc5](./images/demo/sc4.jpg)
+![sc6](./images/demo/sc6.jpg)
+![sc7](./images/demo/sc7.jpg)
 
 ### Notice
 
 **All your data is private, only you can access it. And track3 will never sync your configurations into cloud, they are always stored locally with encryption. So your wallet addresses and api keys are totally safe.**
-
-## Known Issues
-
-- [ ] Cannot list assets in earn wallet in OKX
-- [ ] Cannot list assets in Launchpool in Binance
 
 ## Sponsor
 
