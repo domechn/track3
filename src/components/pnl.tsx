@@ -53,6 +53,14 @@ const App = ({
   const options = {
     maintainAspectRatio: false,
     responsive: false,
+    hover: {
+      mode: "index",
+      intersect: false,
+    },
+    interaction: {
+      mode: "index",
+      intersect: false,
+    },
     plugins: {
       title: {
         display: false,
@@ -67,8 +75,11 @@ const App = ({
       },
       tooltip: {
         callbacks: {
-          label: (context: { parsed: { y: number } }) => {
-            const v = context.parsed.y.toLocaleString();
+          label: (context: { parsed: { y?: number } }) => {
+            const v = context.parsed.y?.toLocaleString();
+            if (!v) {
+              return "";
+            }
             return currency.symbol + v;
           },
         },
@@ -132,7 +143,7 @@ const App = ({
     return _(pnlData.data)
       .map((x, idx) => x.totalValue - (pnlData.data[idx - 1]?.totalValue || 0))
       .map(currencyWrapper(currency))
-      .map((x) => Math.max(0, x))
+      .map((x) => (x < 0 ? undefined : x))
       .drop(1)
       .value();
   }
@@ -140,7 +151,7 @@ const App = ({
     return _(pnlData.data)
       .map((x, idx) => x.totalValue - (pnlData.data[idx - 1]?.totalValue || 0))
       .map(currencyWrapper(currency))
-      .map((x) => Math.min(0, x))
+      .map((x) => (x >= 0 ? undefined : x))
       .drop(1)
       .value();
   }
