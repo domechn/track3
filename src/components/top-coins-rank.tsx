@@ -13,7 +13,7 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { loadingWrapper } from "@/utils/loading";
+import { loadingWrapper } from "@/lib/loading";
 import { ChartResizeContext } from "@/App";
 
 const chartName = "Trend of Top Coins Rank";

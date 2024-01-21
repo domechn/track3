@@ -63,3 +63,31 @@ function safeNumberToString(inputNumber: number) {
 	let number = inputNumber.toFixed(Math.max(0, (tmpArray[1] || '').length - parseInt(tmpArray[2])))
 	return number
 }
+
+export function simplifyNumber(num: number) {
+	const absNum = Math.abs(num)
+	const isNegative = num < 0
+	const abbreviations: { [k: string]: number } = {
+		q: 1000000000000000,
+		t: 1000000000000,
+		b: 1000000000,
+		m: 1000000,
+		k: 1000,
+	}
+
+	const negativeWrapper = (str: string) => {
+		return isNegative ? "-" + str : str
+	}
+
+	for (const abbreviation in abbreviations) {
+		if (absNum >= abbreviations[abbreviation]) {
+			const val = (absNum / abbreviations[abbreviation])
+			if (Number.isInteger(val)) {
+				return negativeWrapper(val + abbreviation)
+			}
+			return negativeWrapper(val.toFixed(1) + abbreviation)
+		}
+	}
+
+	return negativeWrapper(absNum.toString())
+}

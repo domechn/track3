@@ -29,7 +29,7 @@ import {
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
-import { loadingWrapper } from "@/utils/loading";
+import { loadingWrapper } from "@/lib/loading";
 import { ChartResizeContext } from "@/App";
 import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
