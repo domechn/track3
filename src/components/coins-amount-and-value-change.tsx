@@ -6,7 +6,7 @@ import {
   CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
 } from "@/middlelayers/types";
-import { currencyWrapper } from "@/utils/currency";
+import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useContext, useEffect, useState } from "react";
 import {
@@ -87,6 +87,19 @@ const App = ({
       legend: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          label: (context: {
+            dataset: { label: string; yAxisID: string };
+            parsed: { y: number };
+          }) => {
+            const v = context.parsed.y.toLocaleString();
+            const vs =
+              context.dataset.yAxisID === "y1" ? currency.symbol + v : v;
+            return " " + context.dataset.label + ": " + vs;
+          },
+        },
+      },
     },
     scales: {
       x: {
@@ -102,6 +115,9 @@ const App = ({
         position: "left",
         ticks: {
           precision: 4,
+          callback: (value: any) => {
+            return simplifyNumber(value);
+          },
         },
         grid: {
           display: false,
@@ -115,6 +131,9 @@ const App = ({
         position: "right",
         ticks: {
           precision: 4,
+          callback: (value: any) => {
+            return simplifyNumber(value);
+          },
         },
         grid: {
           display: false,
@@ -135,7 +154,7 @@ const App = ({
       labels: current.timestamps.map((x) => timestampToDate(x)),
       datasets: [
         {
-          label: `Value(${currency.currency})`,
+          label: `Value`,
           data: _(current.values)
             .map((v) => currencyWrapper(currency)(v))
             .value(),

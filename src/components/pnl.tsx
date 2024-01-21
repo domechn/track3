@@ -116,6 +116,7 @@ const App = ({
         offset: true,
         ticks: {
           precision: 2,
+          maxTicksLimit: 4,
           callback: (value: any) => {
             return simplifyNumber(value);
           },

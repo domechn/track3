@@ -76,6 +76,13 @@ const App = ({
       datalabels: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          label: (context: { parsed: number }) => {
+            return currency.symbol + context.parsed.toLocaleString();
+          },
+        },
+      },
     },
   };
 
