@@ -20,9 +20,6 @@ const App = () => {
   const [licenseChanged, setLicenseChanged] = useState<boolean>(false);
   const [saveLicenseLoading, setSaveLicenseLoading] = useState(false);
 
-  // to show hidden function
-  const [versionClickTimes, setVersionClickTimes] = useState<number>(0);
-
   useEffect(() => {
     loadVersion();
     loadLicense();
@@ -89,7 +86,6 @@ const App = () => {
         <div className="text-l font-bold text-left">Version</div>
         <div
           className="text-sm text-left text-gray-400"
-          onClick={() => setVersionClickTimes(versionClickTimes + 1)}
         >
           {version}
         </div>
@@ -100,7 +96,7 @@ const App = () => {
         <div className="text-sm text-left text-gray-400">
           Enter License Key To Active Pro Version ( <a href="https://track3.notion.site/How-to-get-license-key-by-free-a5e0e39614f54a06ab19ca5aaed58404?pvs=4" target="_blank" className='text-blue-500 underline'>How to get free license key?</a> )
         </div>
-        <div className={versionClickTimes >= 5 ? "flex" : "hidden"}>
+        <div className="flex">
           <Input
             id="license"
             value={license ?? ""}
