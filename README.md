@@ -46,7 +46,7 @@
 ![sc2](./images/demo/sc2.jpg)
 ![sc3](./images/demo/sc3.jpg)
 ![sc4](./images/demo/sc4.jpg)
-![sc5](./images/demo/sc4.jpg)
+![sc5](./images/demo/sc5.jpg)
 ![sc6](./images/demo/sc6.jpg)
 ![sc7](./images/demo/sc7.jpg)
 
