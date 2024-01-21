@@ -98,7 +98,7 @@ const App = () => {
       <div className="space-y-3">
         <div className="text-l font-bold text-left">Pro Version</div>
         <div className="text-sm text-left text-gray-400">
-          Enter License Key To Active Pro Version ( Coming Soon )
+          Enter License Key To Active Pro Version ( <a href="https://track3.notion.site/How-to-get-license-key-by-free-a5e0e39614f54a06ab19ca5aaed58404?pvs=4" target="_blank" className='text-blue-500 underline'>How to get free license key?</a> )
         </div>
         <div className={versionClickTimes >= 5 ? "flex" : "hidden"}>
           <Input
