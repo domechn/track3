@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { loadingWrapper } from "@/utils/loading";
+import { loadingWrapper } from "@/lib/loading";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
   Table,

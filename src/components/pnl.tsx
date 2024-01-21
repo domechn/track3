@@ -3,9 +3,13 @@ import { timestampToDate } from "@/utils/date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Bar } from "react-chartjs-2";
-import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+  simplifyNumber,
+} from "@/utils/currency";
 import { useContext, useEffect, useState } from "react";
-import { loadingWrapper } from "@/utils/loading";
+import { loadingWrapper } from "@/lib/loading";
 import {
   queryPNLValue,
   resizeChart,
@@ -113,8 +117,7 @@ const App = ({
         ticks: {
           precision: 2,
           callback: (value: any) => {
-            const v = value.toLocaleString();
-            return currency.symbol + v;
+            return simplifyNumber(value);
           },
         },
         grid: {

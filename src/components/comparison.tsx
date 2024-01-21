@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { loadingWrapper } from "@/utils/loading";
+import { loadingWrapper } from "@/lib/loading";
 import { Skeleton } from "./ui/skeleton";
 
 type ComparisonData = {

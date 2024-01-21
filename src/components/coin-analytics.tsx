@@ -55,7 +55,7 @@ import {
 } from "./ui/select";
 import CoinsAmountAndValueChange from "./coins-amount-and-value-change";
 import { Skeleton } from "./ui/skeleton";
-import { loadingWrapper } from "@/utils/loading";
+import { loadingWrapper } from "@/lib/loading";
 
 const App = ({
   currency,

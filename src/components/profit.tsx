@@ -4,7 +4,7 @@ import { CurrencyRateDetail } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { calculateTotalProfit } from "@/middlelayers/charts";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { loadingWrapper } from "@/utils/loading";
+import { loadingWrapper } from "@/lib/loading";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import _ from "lodash";

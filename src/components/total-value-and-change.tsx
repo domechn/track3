@@ -5,7 +5,11 @@ import {
   TotalValueData,
 } from "@/middlelayers/types";
 import { timestampToDate } from "@/utils/date";
-import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+  simplifyNumber,
+} from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Line } from "react-chartjs-2";
@@ -15,7 +19,7 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { loadingWrapper } from "@/utils/loading";
+import { loadingWrapper } from "@/lib/loading";
 import bluebird from "bluebird";
 import { ChartResizeContext } from "@/App";
 
@@ -290,7 +294,7 @@ const App = ({
         ? baseData.btcPrice
           ? baseData.usdValue / baseData.btcPrice
           : 0
-        :  currencyWrapper(currency)(baseData.usdValue)) || 0.0000000001;
+        : currencyWrapper(currency)(baseData.usdValue)) || 0.0000000001;
 
     if (btcAsBase) {
       return _(assetChangeData.data)
@@ -338,14 +342,12 @@ const App = ({
       },
       tooltip: {
         callbacks: {
-          label:(context: {
-            parsed: { y: number };
-          }) => {
+          label: (context: { parsed: { y: number } }) => {
             const v = context.parsed.y.toLocaleString();
             return showPercentageInChart ? `${v}%` : currency.symbol + v;
-          }, 
-        }
-      }
+          },
+        },
+      },
     },
     scales: {
       x: {
@@ -389,8 +391,9 @@ const App = ({
         ticks: {
           precision: 2,
           callback: (value: any) => {
-            const v =  value.toLocaleString();
-            return showPercentageInChart ? `${v}%` : currency.symbol + v;
+            return showPercentageInChart
+              ? `${value.toLocaleString()}%`
+              : simplifyNumber(value);
           },
         },
         grid: {
