@@ -1,11 +1,10 @@
-import "./index.css";
 import { useContext } from "react";
-import { refreshAllData } from "../../middlelayers/charts";
-import { trackEventWithClientID } from "../../utils/app";
+import { refreshAllData } from "../middlelayers/charts";
+import { trackEventWithClientID } from "../utils/app";
 import { useToast } from "@/components/ui/use-toast";
-import { Button } from "../ui/button";
+import { Button } from "./ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
-import { RefreshButtonLoadingContext } from "../index";
+import { RefreshButtonLoadingContext } from "./index/index";
 import { CacheCenter } from "@/middlelayers/datafetch/utils/cache";
 import { updateAllCurrencyRates } from "@/middlelayers/configuration";
 
