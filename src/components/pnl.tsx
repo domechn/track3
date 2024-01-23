@@ -76,11 +76,14 @@ const App = ({
       tooltip: {
         callbacks: {
           label: (context: { parsed: { y?: number } }) => {
-            const v = context.parsed.y?.toLocaleString();
-            if (!v) {
+            const yv = context.parsed.y;
+            if (!yv) {
               return "";
             }
-            return currency.symbol + v;
+            const isNegative = yv < 0;
+
+            const v = Math.abs(yv).toLocaleString();
+            return (isNegative ? "-" : "") + currency.symbol + v;
           },
         },
       },
