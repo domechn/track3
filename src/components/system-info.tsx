@@ -43,24 +43,34 @@ const App = () => {
     }
     setSaveLicenseLoading(true);
 
-    LicenseCenter.getInstance()
-      .validateLicense(license)
-      .then((result) => {
-        if (result.isPro) {
-          saveLicense(license);
-          toast({
-            description: "License Key Saved",
-          });
-        } else {
-          toast({
-            description: "Invalid License Key",
-            variant: "destructive"
-          });
-        }
+    activeDevice(license)
+      .then(() => {
+        toast({
+          description: "License Key Saved",
+        });
+      })
+      .catch((err) => {
+        toast({
+          description: err.message,
+          variant: "destructive",
+        });
       })
       .finally(() => {
         setSaveLicenseLoading(false);
       });
+  }
+
+  async function activeDevice(license: string) {
+    const validRes = await LicenseCenter.getInstance().validateLicense(license);
+    if (!validRes.isValid) {
+      throw new Error("Invalid License Key");
+    }
+    const activeRes = await LicenseCenter.getInstance().activeLicense(license);
+    if (!activeRes.success) {
+      throw new Error(activeRes.error ?? "Active License Failed");
+    }
+
+    await saveLicense(license);
   }
 
   function onLicenseInputChange(val: string) {
@@ -84,17 +94,21 @@ const App = () => {
 
       <div className="space-y-3">
         <div className="text-l font-bold text-left">Version</div>
-        <div
-          className="text-sm text-left text-gray-400"
-        >
-          {version}
-        </div>
+        <div className="text-sm text-left text-gray-400">{version}</div>
       </div>
 
       <div className="space-y-3">
         <div className="text-l font-bold text-left">Pro Version</div>
         <div className="text-sm text-left text-gray-400">
-          Enter License Key To Active Pro Version ( <a href="https://track3.notion.site/How-to-get-license-key-by-free-a5e0e39614f54a06ab19ca5aaed58404?pvs=4" target="_blank" className='text-blue-500 underline'>How to get free license key?</a> )
+          Enter License Key To Active Pro Version ({" "}
+          <a
+            href="https://track3.notion.site/How-to-get-license-key-by-free-a5e0e39614f54a06ab19ca5aaed58404?pvs=4"
+            target="_blank"
+            className="text-blue-500 underline"
+          >
+            How to get free license key?
+          </a>{" "}
+          )
         </div>
         <div className="flex space-x-2">
           <Input

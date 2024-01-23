@@ -45,7 +45,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, addProgres
 	const license = await getLicenseIfIsPro()
 	let isPro = false
 	if (license) {
-		isPro = (await LicenseCenter.getInstance().validateLicense(license)).isPro
+		isPro = await LicenseCenter.getInstance().isProUser(license)
 	}
 
 	// all coins currently owned ( amount > 0 )
