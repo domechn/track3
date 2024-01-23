@@ -187,7 +187,6 @@ impl CoinGecko {
                 .iter()
                 .map(|c| c.symbol.clone())
                 .collect::<Vec<String>>();
-            println!("dup_symbol_coins: {:?}", dup_coin_symbols);
             // remove dup_symbol_coins from all_coins
             all_coins = all_coins
                 .into_iter()
