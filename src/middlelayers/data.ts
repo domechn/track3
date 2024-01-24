@@ -17,7 +17,7 @@ import { exportConfigurationString, getLicenseIfIsPro, importRawConfiguration } 
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 import md5 from 'md5'
-import { LicenseCenter } from './license'
+import { LicenseCenter, isProVersion } from './license'
 import { TRC20ProUserAnalyzer } from './datafetch/coins/trc20'
 
 export type ExportData = {
@@ -42,11 +42,7 @@ export async function downloadCoinLogos(coins: {
 export async function loadPortfolios(config: CexConfig & TokenConfig, addProgress: AddProgressFunc): Promise<WalletCoin[]> {
 
 	// check if pro user
-	const license = await getLicenseIfIsPro()
-	let isPro = false
-	if (license) {
-		isPro = await LicenseCenter.getInstance().isProUser(license)
-	}
+	const { license, isPro } = await isProVersion()
 
 	// all coins currently owned ( amount > 0 )
 	const currentCoins = await loadPortfoliosByConfig(config, addProgress, {

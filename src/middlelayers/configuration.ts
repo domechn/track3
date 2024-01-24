@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api'
 import { getDatabase } from './database'
 import { GlobalConfig } from './datafetch/types'
-import { CloudSyncConfiguration, ConfigurationModel, CurrencyRateDetail } from './types'
+import { ConfigurationModel, CurrencyRateDetail } from './types'
 import yaml from 'yaml'
 import { CURRENCY_RATE_HANDLER } from './entities/currency'
 
@@ -31,16 +31,6 @@ export async function saveConfiguration(cfg: GlobalConfig) {
 // used for import data
 export async function importRawConfiguration(data: string) {
 	await saveConfigurationById(fixId, data, false)
-}
-
-export async function getCloudSyncConfiguration(): Promise<ConfigurationModel | undefined> {
-	return getConfigurationById(cloudSyncFixId)
-}
-
-export async function saveCloudSyncConfiguration(cfg: CloudSyncConfiguration) {
-	const data = yaml.stringify(cfg)
-
-	await saveConfigurationById(cloudSyncFixId, data)
 }
 
 async function saveConfigurationById(id: string, cfg: string, encrypt = true) {

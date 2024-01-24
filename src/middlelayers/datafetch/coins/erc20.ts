@@ -5,9 +5,7 @@ import { sendHttpRequest } from '../utils/http'
 import { getAddressList } from '../utils/address'
 import bluebird from 'bluebird'
 import { invoke } from '@tauri-apps/api'
-import { getLicenseIfIsPro } from '@/middlelayers/configuration'
 import { getClientID } from '@/utils/app'
-import { LicenseCenter } from '@/middlelayers/license'
 
 type QueryAssetResp = {
 	data: {

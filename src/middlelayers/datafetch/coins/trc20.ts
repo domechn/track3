@@ -2,7 +2,6 @@ import { Analyzer, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { sendHttpRequest } from '../utils/http'
 import { getAddressList } from '../utils/address'
-import { getLicenseIfIsPro } from '@/middlelayers/configuration'
 import { getClientID } from '@/utils/app'
 import { asyncMap } from '../utils/async'
 
