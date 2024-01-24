@@ -2,7 +2,11 @@ import _ from "lodash";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
 import { getVersion } from "@/utils/app";
-import { getLicenseIfIsPro, saveLicense } from "@/middlelayers/configuration";
+import {
+  cleanLicense,
+  getLicenseIfIsPro,
+  saveLicense,
+} from "@/middlelayers/configuration";
 import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
 import { Input } from "@/components/ui/input";
@@ -10,15 +14,27 @@ import { Button } from "@/components/ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { LicenseCenter } from "@/middlelayers/license";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./ui/alert-dialog";
 
 const App = () => {
   const { toast } = useToast();
   const [version, setVersion] = useState<string>("0.1.0");
 
-  const [license, setLicense] = useState<string | undefined>();
+  const [activeLicense, setActiveLicense] = useState<string | undefined>();
+  const [inputLicense, setInputLicense] = useState<string | undefined>();
   const [showLicense, setShowLicense] = useState(false);
-  const [licenseChanged, setLicenseChanged] = useState<boolean>(false);
   const [saveLicenseLoading, setSaveLicenseLoading] = useState(false);
+  const [inactiveLicenseLoading, setInactiveLicenseLoading] = useState(false);
 
   useEffect(() => {
     loadVersion();
@@ -33,18 +49,20 @@ const App = () => {
 
   function loadLicense() {
     getLicenseIfIsPro().then((license) => {
-      setLicense(license);
+      setActiveLicense(license);
+      setInputLicense(license);
     });
   }
 
   function onSaveLicenseClick() {
-    if (!license) {
+    if (!inputLicense) {
       return;
     }
     setSaveLicenseLoading(true);
 
-    activeDevice(license)
+    activeDevice(inputLicense)
       .then(() => {
+        setActiveLicense(inputLicense);
         toast({
           description: "License Key Saved",
         });
@@ -58,6 +76,43 @@ const App = () => {
       .finally(() => {
         setSaveLicenseLoading(false);
       });
+  }
+
+  function onInactiveLicenseClick() {
+    // sleep 3s
+    if (!activeLicense) {
+      return;
+    }
+    setInactiveLicenseLoading(true);
+    inactiveDevice(activeLicense)
+      .then(() => {
+        setActiveLicense(undefined);
+        setInputLicense(undefined);
+        toast({
+          description: "Device Is Inactived",
+        });
+      })
+      .catch((err) => {
+        toast({
+          description: err.message,
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        setInactiveLicenseLoading(false);
+      });
+  }
+
+  async function inactiveDevice(license: string) {
+    const inactiveRes = await LicenseCenter.getInstance().inactiveLicense(
+      license
+    );
+
+    if (!inactiveRes.success) {
+      throw new Error(inactiveRes.error ?? "Inactive device failed");
+    }
+
+    await cleanLicense();
   }
 
   async function activeDevice(license: string) {
@@ -74,8 +129,7 @@ const App = () => {
   }
 
   function onLicenseInputChange(val: string) {
-    setLicenseChanged(true);
-    setLicense(val);
+    setInputLicense(val);
   }
 
   function onViewOrHideClick() {
@@ -113,13 +167,17 @@ const App = () => {
         <div className="flex space-x-2">
           <Input
             id="license"
-            value={license ?? ""}
+            value={inputLicense ?? ""}
             type={showLicense ? "text" : "password"}
             onChange={(e) => onLicenseInputChange(e.target.value)}
             placeholder="License Key"
             className="w-[400px]"
+            disabled={!!activeLicense}
           />
-          <a onClick={onViewOrHideClick}>
+          <a
+            onClick={onViewOrHideClick}
+            className={activeLicense || inputLicense ? "" : " hidden"}
+          >
             <img
               className="view-or-hide-icon mt-1"
               src={showLicense ? ViewIcon : HideIcon}
@@ -130,13 +188,42 @@ const App = () => {
           </a>
           <Button
             onClick={onSaveLicenseClick}
-            disabled={saveLicenseLoading || !licenseChanged}
+            disabled={saveLicenseLoading}
+            className={activeLicense ? "hidden" : "flex"}
           >
             {saveLicenseLoading && (
               <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
             )}
             Active
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                className={activeLicense ? "flex" : "hidden"}
+                disabled={inactiveLicenseLoading}
+              >
+                {inactiveLicenseLoading && (
+                  <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Inactive
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onInactiveLicenseClick}>
+                  Confirm
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </div>

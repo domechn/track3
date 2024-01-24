@@ -8,6 +8,7 @@ export class LicenseCenter {
 
 	private readonly validateEndpoint = this.endpoint + "/api/license/validate"
 	private readonly activeEndpoint = this.endpoint + "/api/license/active"
+	private readonly inactiveEndpoint = this.endpoint + "/api/license/inactive"
 	private readonly isProEndpoint = this.endpoint + "/api/license/isPro"
 
 	private constructor() { }
@@ -44,6 +45,21 @@ export class LicenseCenter {
 			success: boolean
 			error?: string
 		}>("POST", this.activeEndpoint, 10000, {
+			"x-track3-client-id": await getClientID(),
+			'x-track3-api-key': license
+		})
+
+		return {
+			success: resp.success,
+			error: resp.error
+		}
+	}
+
+	public async inactiveLicense(license: string): Promise<{ success: boolean, error?: string }> {
+		const resp = await sendHttpRequest<{
+			success: boolean
+			error?: string
+		}>("POST", this.inactiveEndpoint, 10000, {
 			"x-track3-client-id": await getClientID(),
 			'x-track3-api-key': license
 		})
