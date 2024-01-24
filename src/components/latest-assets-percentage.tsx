@@ -284,8 +284,10 @@ const App = ({
     <div>
       <Card>
         <CardContent className="p-6">
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-5 h-[330px]">
-            <div className="col-span-2 md:col-span-3">{renderDoughnut()}</div>
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+            <div className="col-span-2 md:col-span-3 h-[330px]">
+              {renderDoughnut()}
+            </div>
             <div className="col-span-2 md:col-span-2 flex flex-col items-start justify-top">
               {renderTokenHoldingList()}
             </div>
