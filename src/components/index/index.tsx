@@ -83,6 +83,7 @@ const App = () => {
   const [version, setVersion] = useState(0);
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
+  // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
 
   const windowSize = useWindowSize();
