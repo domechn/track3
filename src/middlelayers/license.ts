@@ -1,5 +1,23 @@
 import { getClientID } from '@/utils/app'
 import { sendHttpRequest } from './datafetch/utils/http'
+import { getLicenseIfIsPro } from './configuration'
+
+export async function isProVersion(): Promise<{
+	isPro: boolean
+	license?: string
+}> {
+	// check if pro user
+	const license = await getLicenseIfIsPro()
+	let isPro = false
+	if (license) {
+		isPro = await LicenseCenter.getInstance().isProUser(license)
+	}
+
+	return {
+		isPro,
+		license
+	}
+}
 
 export class LicenseCenter {
 	private static instance: LicenseCenter
