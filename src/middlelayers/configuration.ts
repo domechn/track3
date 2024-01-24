@@ -51,6 +51,11 @@ async function saveConfigurationById(id: string, cfg: string, encrypt = true) {
 	await db.execute(`INSERT OR REPLACE INTO configuration (id, data) VALUES (${id}, ?)`, [saveStr])
 }
 
+async function deleteConfigurationById(id: string) {
+	const db = await getDatabase()
+	await db.execute(`DELETE FROM configuration WHERE id = ?`, [id])
+}
+
 export async function exportConfigurationString(): Promise<string | undefined> {
 	const model = await getConfigurationModelById(fixId)
 	return model?.data
@@ -97,7 +102,7 @@ export async function updateAllCurrencyRates() {
 	return CURRENCY_RATE_HANDLER.updateAllCurrencyRates()
 }
 
-export async function listAllCurrencyRates(){
+export async function listAllCurrencyRates() {
 	return CURRENCY_RATE_HANDLER.listCurrencyRates()
 }
 
@@ -136,6 +141,10 @@ async function getConfigurationModelById(id: string): Promise<ConfigurationModel
 
 export async function saveLicense(license: string) {
 	return saveConfigurationById(licenseFixId, license)
+}
+
+export async function cleanLicense() {
+	return deleteConfigurationById(licenseFixId)
 }
 
 // if user has pro license, return license string
