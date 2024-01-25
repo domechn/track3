@@ -332,7 +332,16 @@ const App = () => {
                 <DataManagement onDataImported={() => loadAllData(querySize)} />
               }
             />
-            <Route path="systemInfo" element={<SystemInfo />} />
+            <Route
+              path="systemInfo"
+              element={
+                <SystemInfo
+                  onProStatusChange={(act: boolean) => {
+                    setIsProUser(act);
+                  }}
+                />
+              }
+            />
           </Route>
 
           <Route

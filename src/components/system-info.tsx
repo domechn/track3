@@ -26,7 +26,11 @@ import {
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
 
-const App = () => {
+const App = ({
+  onProStatusChange,
+}: {
+  onProStatusChange: (active: boolean) => void;
+}) => {
   const { toast } = useToast();
   const [version, setVersion] = useState<string>("0.1.0");
 
@@ -113,6 +117,7 @@ const App = () => {
     }
 
     await cleanLicense();
+    onProStatusChange(false);
   }
 
   async function activeDevice(license: string) {
@@ -126,6 +131,7 @@ const App = () => {
     }
 
     await saveLicense(license);
+    onProStatusChange(true);
   }
 
   function onLicenseInputChange(val: string) {
