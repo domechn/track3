@@ -336,7 +336,7 @@ const App = () => {
               path="systemInfo"
               element={
                 <SystemInfo
-                  onLicenseStatusChange={(act: boolean) => {
+                  onProStatusChange={(act: boolean) => {
                     setIsProUser(act);
                   }}
                 />
