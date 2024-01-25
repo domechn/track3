@@ -173,9 +173,11 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <div className="space-y-3">
           <div>
             <div className="text-sm font-bold text-left py-2">Auto Backup</div>
-
-            <div className="text-sm">TODO</div>
+            <div className="text-sm text-left text-gray-400">
+              Data will be automatically backed up to the target folder
+            </div>
           </div>
+          <div className="text-sm">TODO</div>
           {/* <Button>Enable</Button> */}
         </div>
       </div>
