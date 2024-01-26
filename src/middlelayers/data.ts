@@ -13,11 +13,11 @@ import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
 import { AddProgressFunc, AssetPriceModel, ExportAssetModel, HistoricalData, UniqueIndexConflictResolver } from './types'
-import { exportConfigurationString, getLicenseIfIsPro, importRawConfiguration } from './configuration'
+import { exportConfigurationString, importRawConfiguration } from './configuration'
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 import md5 from 'md5'
-import { LicenseCenter, isProVersion } from './license'
+import { isProVersion } from './license'
 import { TRC20ProUserAnalyzer } from './datafetch/coins/trc20'
 
 export type ExportData = {
