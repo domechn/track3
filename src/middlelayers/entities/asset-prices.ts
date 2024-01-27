@@ -1,7 +1,11 @@
 import { deleteFromDatabase, saveModelsToDatabase, selectFromDatabase } from '../database'
 import { AssetPriceModel, UniqueIndexConflictResolver } from '../types'
 
-class AssetPriceHandler {
+export interface AssetPriceHandlerImpl {
+	savePrices(models: AssetPriceModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetPriceModel[]>
+}
+
+class AssetPriceHandler implements AssetPriceHandlerImpl{
 	private readonly assetTableName = "asset_prices"
 
 	async createOrUpdate(model: AssetPriceModel): Promise<void> {

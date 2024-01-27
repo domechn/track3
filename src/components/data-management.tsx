@@ -1,18 +1,19 @@
 import { useToast } from "@/components/ui/use-toast";
 import {
-  ExportData,
   checkIfDuplicatedHistoricalData,
   exportHistoricalData,
   importHistoricalData,
   readHistoricalDataFromFile,
 } from "@/middlelayers/data";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import _ from "lodash";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { open } from "@tauri-apps/api/dialog";
+import "@/components/common/scrollbar/index.css";
 import { UniqueIndexConflictResolver } from "@/middlelayers/types";
 import {
   Dialog,
@@ -22,6 +23,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import {
+  cleanAutoBackupDirectory,
+  getAutoBackupDirectory,
+  saveAutoBackupDirectory,
+} from "@/middlelayers/configuration";
+import { ExportData } from '@/middlelayers/datamanager'
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();
@@ -33,6 +40,14 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [exportData, setExportData] = useState<ExportData | undefined>(
     undefined
   );
+
+  const [autoBackupDirectory, setAutoBackupDirectory] = useState<
+    string | undefined
+  >();
+
+  useEffect(() => {
+    getAutoBackupDirectory().then((d) => setAutoBackupDirectory(d));
+  }, []);
 
   async function onExportDataClick() {
     const exported = await exportHistoricalData(exportConfiguration);
@@ -113,6 +128,24 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     );
   }
 
+  async function onChooseAutoBackupFolderButtonClick() {
+    const selected = await open({
+      multiple: false,
+      directory: true,
+    });
+
+    if (selected) {
+      const ss = selected as string;
+      await saveAutoBackupDirectory(ss);
+      setAutoBackupDirectory(ss);
+    }
+  }
+
+  async function onClearAutoBackupFolderButtonClick() {
+    await cleanAutoBackupDirectory();
+    setAutoBackupDirectory(undefined);
+  }
+
   return (
     <div className="space-y-6">
       {conflictResolverDialog()}
@@ -130,7 +163,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <div className="space-y-3">
           <div className="text-sm font-bold text-left">Import Data</div>
 
-          <Button onClick={onImportDataClick}>Import</Button>
+          <Button onClick={onImportDataClick} size="sm">
+            Import
+          </Button>
         </div>
 
         <div className="space-y-3">
@@ -162,7 +197,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </div>
           </div>
 
-          <Button onClick={onExportDataClick}>Export</Button>
+          <Button onClick={onExportDataClick} size="sm">
+            Export
+          </Button>
         </div>
       </div>
 
@@ -173,10 +210,31 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <div className="space-y-3">
           <div>
             <div className="text-sm font-bold text-left py-2">Auto Backup</div>
-
-            <div className="text-sm">TODO</div>
+            <div className="text-sm text-left text-gray-400">
+              Data will be automatically backed up to the target folder every 24h or after refreshing.
+            </div>
           </div>
-          {/* <Button>Enable</Button> */}
+          <div className="items-center grid gap-4 grid-cols-4">
+            <div
+              className={`text-muted-foreground col-span-4 md:col-span-2 text-sm whitespace-nowrap overflow-x-scroll scrollbar-hide ${
+                autoBackupDirectory ? "block" : "hidden"
+              }`}
+            >
+              {autoBackupDirectory}
+            </div>
+            <div className="space-x-2 col-span-4 md:col-span-2">
+              <Button onClick={onChooseAutoBackupFolderButtonClick} size="sm">
+                Choose Folder
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClearAutoBackupFolderButtonClick}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

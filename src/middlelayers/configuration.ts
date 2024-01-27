@@ -7,7 +7,12 @@ import { CURRENCY_RATE_HANDLER } from './entities/currency'
 
 const prefix = "!ent:"
 const fixId = "1"
+// deprecated: cloud sync function has been removed
 const cloudSyncFixId = "2"
+
+const autoBackupId = "3"
+const lastAutoBackupAtId = "4"
+const lastAutoImportAtId = "5"
 const clientInfoFixId = "998"
 const licenseFixId = "997"
 
@@ -129,16 +134,55 @@ async function getConfigurationModelById(id: string): Promise<ConfigurationModel
 	return configurations[0]
 }
 
+// license
 export async function saveLicense(license: string) {
 	return saveConfigurationById(licenseFixId, license)
 }
 
+// license
 export async function cleanLicense() {
 	return deleteConfigurationById(licenseFixId)
+}
+
+// auto backup
+export async function getAutoBackupDirectory(): Promise<string | undefined> {
+	return getConfigurationModelById(autoBackupId).then(m => m?.data)
+}
+
+// auto backup
+export async function saveAutoBackupDirectory(d: string) {
+	return saveConfigurationById(autoBackupId, d, false)
+}
+
+// auto backup
+export async function cleanAutoBackupDirectory() {
+	return deleteConfigurationById(autoBackupId)
 }
 
 // if user has pro license, return license string
 export async function getLicenseIfIsPro(): Promise<string | undefined> {
 	const model = await getConfigurationById(licenseFixId)
 	return model?.data
+}
+
+// get last auto backup time, if never backup, return 1970-01-01
+export async function getLastAutoBackupAt(): Promise<Date> {
+	const model = await getConfigurationById(lastAutoBackupAtId)
+	return model?.data ? new Date(model.data) : new Date("1970-01-01T00:00:00.000Z")
+}
+
+// if d is undefined, use latest time
+export async function saveLastAutoBackupAt(d?: Date) {
+	return saveConfigurationById(lastAutoBackupAtId, d ? d.toISOString() : new Date().toISOString(), false)
+}
+
+// get last auto import time, if never backup, return 1970-01-01
+export async function getAutoImportAt(): Promise<Date> {
+	const model = await getConfigurationById(lastAutoImportAtId)
+	return model?.data ? new Date(model.data) : new Date("1970-01-01T00:00:00.000Z")
+}
+
+// if d is undefined, use latest time
+export async function saveAutoImportAt(d?: Date) {
+	return saveConfigurationById(lastAutoImportAtId, d ? d.toISOString() : new Date().toISOString(), false)
 }

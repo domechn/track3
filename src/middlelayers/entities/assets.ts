@@ -5,8 +5,11 @@ import { CoinModel } from '../datafetch/types'
 import { v4 as uuidv4 } from 'uuid'
 import md5 from 'md5'
 
+export interface AssetHandlerImpl {
+	importAssets(models: AssetModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetModel[]>
+}
 
-class AssetHandler {
+class AssetHandler implements AssetHandlerImpl{
 
 	private readonly assetTableName = "assets_v2"
 

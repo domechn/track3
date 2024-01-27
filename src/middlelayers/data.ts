@@ -8,24 +8,16 @@ import { OthersAnalyzer } from './datafetch/coins/others'
 import { SOLAnalyzer } from './datafetch/coins/sol'
 import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
-import { queryAllAssetPrices, queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
-import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
-import { AddProgressFunc, AssetPriceModel, ExportAssetModel, HistoricalData, UniqueIndexConflictResolver } from './types'
-import { exportConfigurationString, getLicenseIfIsPro, importRawConfiguration } from './configuration'
+import { AddProgressFunc } from './types'
 import { ASSET_HANDLER } from './entities/assets'
-import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 import md5 from 'md5'
-import { LicenseCenter, isProVersion } from './license'
+import { isProVersion } from './license'
 import { TRC20ProUserAnalyzer } from './datafetch/coins/trc20'
+import { DATA_MANAGER, ExportData } from './datamanager'
+import { getAutoBackupDirectory, getAutoImportAt, getLastAutoBackupAt, saveAutoImportAt, saveLastAutoBackupAt } from './configuration'
 
-export type ExportData = {
-	exportAt: string
-	configuration?: string
-	historicalData: Pick<HistoricalData, "createdAt" | "assets" | "total">[]
-	md5V2: string
-}
 
 // TODO: query by token address not symbol, because there are multiple coins with same symbol
 export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]: number }> {
@@ -124,37 +116,7 @@ export async function exportHistoricalData(exportConfiguration = false): Promise
 	if (!filePath) {
 		return false
 	}
-
-	const historicalData = await queryHistoricalData(-1, false)
-	const priceData = await queryAllAssetPrices()
-	const priceDataByAssetID = _(priceData).mapKeys("assetID").mapValues().value()
-
-	const exportAt = new Date().toISOString()
-
-	const cfg = exportConfiguration ? await exportConfigurationString() : undefined
-
-	const exportData = {
-		exportAt,
-		historicalData: _(historicalData).map(d => ({
-			createdAt: d.createdAt,
-			total: d.total,
-			assets: _(d.assets).map(a => ({
-				...a,
-				costPrice: priceDataByAssetID[a.id]?.price
-			})).value()
-		})).value(),
-		configuration: cfg
-	}
-
-	const md5Payload = { data: JSON.stringify(exportData) }
-
-	const content = JSON.stringify({
-		...exportData,
-		md5V2: md5(JSON.stringify(md5Payload)),
-	} as ExportData)
-
-	// save to filePath
-	await writeTextFile(filePath, content)
+	await DATA_MANAGER.exportHistoricalData(filePath, exportConfiguration)
 	return true
 }
 
@@ -188,79 +150,80 @@ export async function readHistoricalDataFromFile(): Promise<ExportData | undefin
 	if (!selected || !_(selected).isString()) {
 		return
 	}
-	const contents = await readTextFile(selected as string)
-	return JSON.parse(contents) as ExportData
+	return DATA_MANAGER.readHistoricalData(selected as string)
 }
 
 // importHistoricalData to db
 export async function importHistoricalData(conflictResolver: 'REPLACE' | 'IGNORE', ed: ExportData): Promise<boolean> {
-	const { exportAt, md5V2: md5Str, configuration, historicalData } = ed
-
-	// !compatible with older versions logic ( before 0.3.3 )
-	if (md5Str) {
-		// verify md5
-		// todo: use md5 in typescript
-		const md5Payload = { data: JSON.stringify({ exportAt, historicalData, configuration }) }
-		const currentMd5 = md5(JSON.stringify(md5Payload))
-		if (currentMd5 !== md5Str) {
-			throw new Error("invalid data, md5 check failed: errorCode 000")
-		}
-	}
-
-	if (!historicalData || !_(historicalData).isArray() || historicalData.length === 0) {
-		throw new Error("invalid data: errorCode 001")
-	}
-
-	const assets = _(historicalData).map('assets').flatten().value()
-
-	if (assets.length === 0) {
-		throw new Error("no data need to be imported: errorCode 003")
-	}
-
-	// start to import
-	await saveHistoricalDataAssets(assets, conflictResolver)
-
-	// import configuration if exported
-	if (configuration) {
-		await importRawConfiguration(configuration)
-	}
-
+	await DATA_MANAGER.importHistoricalData(conflictResolver, ed)
 	return true
 }
 
-// import historicalData from file
-async function saveHistoricalDataAssets(assets: ExportAssetModel[], conflictResolver: UniqueIndexConflictResolver) {
-	const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
-	_(assets).forEach((asset) => {
-		_(requiredKeys).forEach(k => {
-			if (!_(asset).has(k)) {
-				throw new Error(`invalid data: errorCode 002`)
-			}
-		})
-	})
+const autoBackupHistoricalDataFilename = "track3-auto-backup.json"
 
-	await ASSET_HANDLER.importAssets(assets, conflictResolver)
+// auto backup data to specific path, if user set auto backup directory
+export async function autoBackupHistoricalData(force = false): Promise<boolean> {
+	const abd = await getAutoBackupDirectory()
+	// user did not set auto backup directory
+	if (!abd) {
+		return false
+	}
 
-	// import asset prices
-	const importedAssets = _(await queryHistoricalData(-1, false)).map(d => d.assets).flatten().value()
-	const importAssetsMap = _(importedAssets).mapKeys(a => `${a.uuid}/${a.symbol}/${a.wallet}`).value()
+	// check if need to backup
+	// 1. force is true
+	// 2. check if last export at is over 24 hours		
+	let needBackup = force
+	if (!needBackup) {
+		const laba = await getLastAutoBackupAt()
+		needBackup = new Date().getTime() - laba.getTime() > 24 * 60 * 60 * 1000
+	}
 
-	const assetPriceModels = _(assets).filter(a => a.costPrice !== undefined).map(a => {
-		const key = `${a.uuid}/${a.symbol}/${a.wallet}`
+	if (!needBackup) {
+		console.debug("no need to backup")
+		return false
+	}
 
-		const f = importAssetsMap[key]
-		if (!f) {
-			return
+	const filePath = abd + "/" + autoBackupHistoricalDataFilename
+	console.debug("start to backup to ", filePath)
+	await DATA_MANAGER.exportHistoricalData(filePath, false)
+
+	await saveLastAutoBackupAt()
+	return true
+}
+
+// auto import backup data into app
+export async function autoImportHistoricalData(): Promise<boolean> {
+	const abd = await getAutoBackupDirectory()
+	// user did not set auto backup directory
+	if (!abd) {
+		return false
+	}
+
+	try {
+		const filePath = abd + "/" + autoBackupHistoricalDataFilename
+		const ed = await DATA_MANAGER.readHistoricalData(filePath)
+		if (!ed) {
+			console.debug("no data to auto import")
+			return false
 		}
-		return {
-			uuid: a.uuid,
-			assetID: f.id,
-			symbol: a.symbol,
-			price: a.costPrice,
-			assetCreatedAt: a.createdAt,
-			updatedAt: new Date().toISOString(),
-		} as AssetPriceModel
-	}).compact().value()
 
-	await ASSET_PRICE_HANDLER.savePrices(assetPriceModels, conflictResolver)
+		const aia = await getAutoImportAt()
+		const laba = await getLastAutoBackupAt()
+		const needImport = aia.getTime() < laba.getTime()
+
+		if (!needImport) {
+			console.debug("no need to auto import")
+			return false
+		}
+
+		console.debug("start to import backup data")
+
+		await DATA_MANAGER.importHistoricalData("IGNORE", ed)
+	} catch (e) {
+		console.error("failed to auto import", e)
+		return false
+	}
+
+	await saveAutoImportAt()
+	return true
 }
