@@ -16,7 +16,7 @@
         "readFile": true,
         "writeFile": true,
         "exists": true,
-        "scope": ["$APP/**", "$RESOURCE/**", "$APPCACHE/**"]
+        "scope": ["**"]
       },
       "path": {
         "all": true
