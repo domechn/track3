@@ -17,10 +17,12 @@ type TopType = "profitTop" | "lossTop";
 
 const App = ({
   currency,
+  size,
   // version is used for reloading data
   version,
 }: {
   currency: CurrencyRateDetail;
+  size: number;
   version: number;
 }) => {
   const [profit, setProfit] = useState(0);
@@ -36,7 +38,7 @@ const App = ({
 
   useEffect(() => {
     setLoading(true);
-    calculateTotalProfit()
+    calculateTotalProfit(size)
       .then((res) => {
         setProfit(res.total);
         setCoinsProfit(_(res.coins).sortBy("value").value());
@@ -45,7 +47,7 @@ const App = ({
         getLogoMap(res.coins).then((m) => setLogoMap(m));
       })
       .finally(() => setLoading(false));
-  }, [version]);
+  }, [size, version]);
 
   const topTypeData = useMemo(() => {
     const size = 5;

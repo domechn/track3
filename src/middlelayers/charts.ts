@@ -44,7 +44,7 @@ export async function listAllowedSymbols(): Promise<string[]> {
 }
 
 // calculateTotalProfit gets all profit
-export async function calculateTotalProfit(): Promise<{
+export async function calculateTotalProfit(size: number): Promise<{
 	total: number,
 	coins: {
 		symbol: string,
@@ -52,7 +52,7 @@ export async function calculateTotalProfit(): Promise<{
 	}[]
 }> {
 	const symbols = await ASSET_HANDLER.listAllSymbols()
-	const allAssets = await ASSET_HANDLER.listAssets()
+	const allAssets = await ASSET_HANDLER.listAssets(size)
 	const allUpdatedPrices = await ASSET_PRICE_HANDLER.listPrices()
 
 	const symbolData = _(symbols).map(symbol => {
@@ -60,6 +60,9 @@ export async function calculateTotalProfit(): Promise<{
 			const symbolAss = _(item).filter(i => i.symbol === symbol).value()
 			return symbolAss.length === 0 ? undefined : symbolAss
 		}).compact().value()
+		if (assets.length === 0) {
+			return
+		}
 		const updatedPrices = _(allUpdatedPrices).filter(a => a.symbol === symbol).value()
 
 		const revAssets = _(assets).reverse().value()
@@ -77,7 +80,7 @@ export async function calculateTotalProfit(): Promise<{
 			actions,
 			latest
 		}
-	}).value()
+	}).compact().value()
 
 	const coins = _(symbolData).map(d => {
 		if (!d.latest) {

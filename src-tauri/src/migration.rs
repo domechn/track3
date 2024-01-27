@@ -552,7 +552,7 @@ impl Migration for V4TV5 {
             fs::read_to_string(resource_dir.join("migrations/v04t05/cloud_sync_down.sql"))
                 .unwrap();
         let assets_v2_uniq_idx_up =
-            fs::read_to_string(resource_dir.join("migrations/v04t05/assets_v2_uniq_idx_up.sql"))
+            fs::read_to_string(resource_dir.join("migrations/v04t05/assets_v2_idx_up.sql"))
                 .unwrap();
 
         let rt = Runtime::new().unwrap();
