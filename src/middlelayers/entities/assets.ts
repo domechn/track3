@@ -9,7 +9,7 @@ export interface AssetHandlerImpl {
 	importAssets(models: AssetModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetModel[]>
 }
 
-class AssetHandler implements AssetHandlerImpl{
+class AssetHandler implements AssetHandlerImpl {
 
 	private readonly assetTableName = "assets_v2"
 
@@ -181,28 +181,11 @@ class AssetHandler implements AssetHandlerImpl{
 
 	// if symbol is not provided, return all assets, else return assets with symbol
 	private async queryAssets(size?: number, symbol?: string): Promise<AssetModel[][]> {
-		// select top size timestamp
-		let tsSql = `SELECT distinct(createdAt) FROM ${this.assetTableName} WHERE 1=1`
-		if (symbol) {
-			tsSql += ` AND symbol = '${symbol}'`
-		}
-		tsSql += " ORDER BY createdAt DESC"
-		if (size && size > 0) {
-			tsSql += ` LIMIT ${size}`
-		}
-
-		const tsList = await selectFromDatabaseWithSql<{
-			createdAt: string
-		}>(tsSql, [])
-		const earliestTs = _(tsList).last()?.createdAt || new Date().toISOString()
-
-		// select assets which createdAt >= earliestTs
-
-		const assets = await selectFromDatabase<AssetModel>(this.assetTableName, {
-			symbol,
-		}, 0, {
-			createdAt: 'desc',
-		}, `createdAt >= '${earliestTs}'`)
+		const sql = `SELECT * FROM ${this.assetTableName} WHERE 1 = 1 ${symbol ? ` AND symbol = '${symbol}'` : ""
+			} AND createdAt >= (SELECT distinct(createdAt) as dc FROM ${this.assetTableName} WHERE 1 = 1 ${symbol ? ` AND symbol = '${symbol}'` : ""
+			} ORDER BY dc ${size ? "DESC LIMIT 1 OFFSET " + (size - 1) : "ASC LIMIT 1"
+			} ) ORDER BY createdAt DESC;`
+		const assets = await selectFromDatabaseWithSql<AssetModel>(sql, [])
 		return _(assets).groupBy("uuid").values().value()
 	}
 

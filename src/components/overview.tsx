@@ -39,7 +39,7 @@ const App = ({
         size={size}
         version={version}
       />
-      <Profit currency={currency} version={version} />
+      <Profit currency={currency} version={version} size={size} />
       <TopCoinsRank version={version} size={size} />
       <TopCoinsPercentageChange version={version} size={size} />
       <div className="mb-2"></div>
