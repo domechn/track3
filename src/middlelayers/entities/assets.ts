@@ -183,7 +183,7 @@ class AssetHandler implements AssetHandlerImpl {
 	private async queryAssets(size?: number, symbol?: string): Promise<AssetModel[][]> {
 		const sql = `SELECT * FROM ${this.assetTableName} WHERE 1 = 1 ${symbol ? ` AND symbol = '${symbol}'` : ""
 			} AND createdAt >= (SELECT distinct(createdAt) as dc FROM ${this.assetTableName} WHERE 1 = 1 ${symbol ? ` AND symbol = '${symbol}'` : ""
-			} ORDER BY dc ${size ? "DESC LIMIT 1 OFFSET " + (size - 1) : "ASC LIMIT 1"
+			} ORDER BY dc ${(size && size > 0) ? "DESC LIMIT 1 OFFSET " + (size - 1) : "ASC LIMIT 1"
 			} ) ORDER BY createdAt DESC;`
 		const assets = await selectFromDatabaseWithSql<AssetModel>(sql, [])
 		return _(assets).groupBy("uuid").values().value()
