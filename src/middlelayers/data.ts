@@ -199,25 +199,25 @@ export async function autoImportHistoricalData(): Promise<boolean> {
 		return false
 	}
 
-	const filePath = abd + "/" + autoBackupHistoricalDataFilename
-	const ed = await DATA_MANAGER.readHistoricalData(filePath)
-	if (!ed) {
-		console.debug("no data to auto import")
-		return false
-	}
-
-	const aia = await getAutoImportAt()
-	const laba = await getLastAutoBackupAt()
-	const needImport = aia.getTime() < laba.getTime()
-
-	if (!needImport) {
-		console.debug("no need to auto import")
-		return false
-	}
-
-	console.debug("start to import backup data")
-
 	try {
+		const filePath = abd + "/" + autoBackupHistoricalDataFilename
+		const ed = await DATA_MANAGER.readHistoricalData(filePath)
+		if (!ed) {
+			console.debug("no data to auto import")
+			return false
+		}
+
+		const aia = await getAutoImportAt()
+		const laba = await getLastAutoBackupAt()
+		const needImport = aia.getTime() < laba.getTime()
+
+		if (!needImport) {
+			console.debug("no need to auto import")
+			return false
+		}
+
+		console.debug("start to import backup data")
+
 		await DATA_MANAGER.importHistoricalData("IGNORE", ed)
 	} catch (e) {
 		console.error("failed to auto import", e)

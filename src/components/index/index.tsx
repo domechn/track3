@@ -250,6 +250,7 @@ const App = () => {
                       loading={refreshButtonLoading}
                       afterRefresh={() => {
                         loadAllData(querySize);
+                        autoBackupHistoricalData(true);
                       }}
                     />
                   </RefreshButtonLoadingContext.Provider>

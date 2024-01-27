@@ -211,7 +211,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
           <div>
             <div className="text-sm font-bold text-left py-2">Auto Backup</div>
             <div className="text-sm text-left text-gray-400">
-              Data will be automatically backed up to the target folder
+              Data will be automatically backed up to the target folder every 24h or after refreshing.
             </div>
           </div>
           <div className="items-center grid gap-4 grid-cols-4">
