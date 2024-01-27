@@ -188,6 +188,8 @@ export async function autoBackupHistoricalData(force = false): Promise<boolean> 
 	await DATA_MANAGER.exportHistoricalData(filePath, false)
 
 	await saveLastAutoBackupAt()
+	// also update auto import at
+	await saveAutoImportAt()
 	return true
 }
 
@@ -208,8 +210,8 @@ export async function autoImportHistoricalData(): Promise<boolean> {
 		}
 
 		const aia = await getAutoImportAt()
-		const laba = await getLastAutoBackupAt()
-		const needImport = aia.getTime() < laba.getTime()
+		const exportAt = new Date(ed.exportAt)
+		const needImport = aia.getTime() < exportAt.getTime()
 
 		if (!needImport) {
 			console.debug("no need to auto import")

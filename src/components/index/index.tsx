@@ -324,7 +324,10 @@ const App = () => {
               <PageWrapper hasData={hasData}>
                 <HistoricalData
                   currency={currentCurrency}
-                  afterDataDeleted={() => loadAllData(querySize)}
+                  afterDataDeleted={() => {
+                    loadAllData(querySize);
+                    autoBackupHistoricalData(true);
+                  }}
                   version={version}
                 />
               </PageWrapper>
@@ -342,7 +345,12 @@ const App = () => {
             <Route
               path="data"
               element={
-                <DataManagement onDataImported={() => loadAllData(querySize)} />
+                <DataManagement
+                  onDataImported={() => {
+                    loadAllData(querySize);
+                    autoBackupHistoricalData(true);
+                  }}
+                />
               }
             />
             <Route
