@@ -1,6 +1,5 @@
 import { useToast } from "@/components/ui/use-toast";
 import {
-  ExportData,
   checkIfDuplicatedHistoricalData,
   exportHistoricalData,
   importHistoricalData,
@@ -29,6 +28,7 @@ import {
   getAutoBackupDirectory,
   saveAutoBackupDirectory,
 } from "@/middlelayers/configuration";
+import { ExportData } from '@/middlelayers/datamanager'
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();

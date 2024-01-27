@@ -54,6 +54,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
+import {
+  autoBackupHistoricalData,
+  autoImportHistoricalData,
+} from "@/middlelayers/data";
 
 ChartJS.register(
   ...registerables,
@@ -102,6 +106,8 @@ const App = () => {
 
   useEffect(() => {
     loadConfiguration();
+
+    handleAutoBackup();
   }, []);
 
   useEffect(() => {
@@ -148,6 +154,12 @@ const App = () => {
   function loadIsProUser() {
     // currently only check if there is license in sqlite
     getLicenseIfIsPro().then((l) => setIsProUser(!!l));
+  }
+
+  async function handleAutoBackup() {
+    await autoImportHistoricalData();
+    // todo: reload page if res of autoImportHistoricalData is true ( there is new data imported successfully )
+    await autoBackupHistoricalData();
   }
 
   async function loadAllDataAsync(size = 10) {

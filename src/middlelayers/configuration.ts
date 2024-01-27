@@ -11,6 +11,8 @@ const fixId = "1"
 const cloudSyncFixId = "2"
 
 const autoBackupId = "3"
+const lastAutoBackupAtId = "4"
+const lastAutoImportAtId = "5"
 const clientInfoFixId = "998"
 const licenseFixId = "997"
 
@@ -161,4 +163,26 @@ export async function cleanAutoBackupDirectory() {
 export async function getLicenseIfIsPro(): Promise<string | undefined> {
 	const model = await getConfigurationById(licenseFixId)
 	return model?.data
+}
+
+// get last auto backup time, if never backup, return 1970-01-01
+export async function getLastAutoBackupAt(): Promise<Date> {
+	const model = await getConfigurationById(lastAutoBackupAtId)
+	return model?.data ? new Date(model.data) : new Date("1970-01-01T00:00:00.000Z")
+}
+
+// if d is undefined, use latest time
+export async function saveLastAutoBackupAt(d?: Date) {
+	return saveConfigurationById(lastAutoBackupAtId, d ? d.toISOString() : new Date().toISOString(), false)
+}
+
+// get last auto import time, if never backup, return 1970-01-01
+export async function getAutoImportAt(): Promise<Date> {
+	const model = await getConfigurationById(lastAutoImportAtId)
+	return model?.data ? new Date(model.data) : new Date("1970-01-01T00:00:00.000Z")
+}
+
+// if d is undefined, use latest time
+export async function saveAutoImportAt(d?: Date) {
+	return saveConfigurationById(lastAutoImportAtId, d ? d.toISOString() : new Date().toISOString(), false)
 }
