@@ -224,6 +224,26 @@ const App = () => {
       setSelectTimes(times);
     }
 
+    function handlePredefinedTimesClick(pt: number) {
+      if (availableDays.length === 0) {
+        setDate(undefined);
+        return;
+      }
+
+      const ads =
+        pt < 0
+          ? availableDays
+          : availableDays.slice(
+              availableDays.length - pt,
+              availableDays.length
+            );
+
+      setDate({
+        from: ads[0],
+        to: ads[ads.length - 1],
+      });
+    }
+
     return (
       <Popover>
         <PopoverTrigger asChild>
@@ -249,19 +269,34 @@ const App = () => {
                 Predefined times
               </div>
               <div className="text-xs">
-                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                <div
+                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handlePredefinedTimesClick(10)}
+                >
                   Last 10 Times
                 </div>
-                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                <div
+                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handlePredefinedTimesClick(30)}
+                >
                   Last 30 Times
                 </div>
-                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                <div
+                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handlePredefinedTimesClick(50)}
+                >
                   Last 50 Times
                 </div>
-                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                <div
+                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handlePredefinedTimesClick(100)}
+                >
                   Last 100 Times
                 </div>
-                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                <div
+                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handlePredefinedTimesClick(-1)}
+                >
                   All
                 </div>
               </div>
