@@ -11,6 +11,7 @@ import { OthersAnalyzer } from './datafetch/coins/others'
 import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 import { Chart } from 'chart.js'
+import md5 from 'md5'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -185,18 +186,18 @@ async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinU
 	const assets = await loadPortfolios(config, addProgress)
 	// always query btc and usdt price
 	const priceMap = await queryCoinPrices(_(assets).filter(a => !a.price).map("symbol").push("USDT").push("BTC").uniq().compact().value())
-	addProgress(15)
+	addProgress(10)
 
-	let lastAssets = _.clone(assets)
+	let latestAssets = _.clone(assets)
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
 
 	if (groupUSD) {
 		_(assets).groupBy('wallet').forEach((coins, wallet) => {
 			const usdAmount = _(coins).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
 			const removedUSDCoins = _(coins).filter(c => !STABLE_COIN.includes(c.symbol)).value()
-			lastAssets = _(lastAssets).filter(a => a.wallet !== wallet).concat(removedUSDCoins).value()
+			latestAssets = _(latestAssets).filter(a => a.wallet !== wallet).concat(removedUSDCoins).value()
 			if (usdAmount > 0) {
-				lastAssets.push({
+				latestAssets.push({
 					symbol: "USDT",
 					amount: usdAmount,
 					wallet,
@@ -208,13 +209,32 @@ async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinU
 	// add btc value if not exist
 	const btcData = _(assets).find(c => c.symbol === "BTC")
 	if (!btcData) {
-		lastAssets.push({
+		latestAssets.push({
 			symbol: "BTC",
 			amount: 0,
 			wallet: OthersAnalyzer.wallet,
 		})
 	}
-	const totals = calculateTotalValue(lastAssets, priceMap)
+	const totals = calculateTotalValue(latestAssets, priceMap)
+
+	// if item in totals exists in lastAssets and it's usdValue is less than 1, we think it has been sold out, so we need to update it's amount and value to 0
+	const lastAssets = await ASSET_HANDLER.listAssets(1)
+	for (const total of totals) {
+		if (_(total.wallet).startsWith("md5:")) {
+			// it means this asset has already handled before
+			continue
+		}
+		const totalWallet = md5(total.wallet)
+		// total.usdValue !== 0 && total.usdValue < 1 will also be handled before saving to database
+		const lastAsset = _(lastAssets).flatten().find(a => a.symbol === total.symbol && a.wallet === totalWallet && total.usdValue !== 0 && total.usdValue < 1)
+		if (lastAsset) {
+			console.debug(`asset ${total.symbol} in wallet ${total.wallet} has been sold out, update it's amount and value to 0`)
+			total.amount = 0
+			total.usdValue = 0
+		}
+	}
+
+	addProgress(5)
 	return totals
 }
 
