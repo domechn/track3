@@ -112,6 +112,11 @@ export async function updateAssetPrice(uuid: string, assetID: number, symbol: st
 	} as AssetPriceModel)
 }
 
+// return dates which has data
+export async function getAvailableDays(): Promise<Date[]> {
+	return ASSET_HANDLER.getHasDataCreatedAtDates()
+}
+
 function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[], pre?: AssetModel[]): AssetAction[] {
 	const getGroupByKey = (p: {
 		uuid: string

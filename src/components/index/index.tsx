@@ -32,7 +32,7 @@ import {
 
 import { CurrencyRateDetail } from "@/middlelayers/types";
 import { useContext, useEffect, useState } from "react";
-import { queryLastRefreshAt } from "@/middlelayers/charts";
+import { getAvailableDays, queryLastRefreshAt } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
 import {
   getCurrentPreferCurrency,
@@ -63,7 +63,7 @@ import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { CalendarIcon } from "@radix-ui/react-icons";
 import { Calendar } from "../ui/calendar";
-import { addDays } from "date-fns";
+import { addDays, addYears, endOfDay, isSameDay } from "date-fns";
 import { DateRange } from "react-day-picker";
 
 ChartJS.register(
@@ -192,6 +192,37 @@ const App = () => {
       from: addDays(new Date(), -7),
       to: new Date(),
     });
+    const [availableDays, setAvailableDays] = React.useState<Date[]>([]);
+    const [selectTimes, setSelectTimes] = React.useState<number>(0);
+
+    useEffect(() => {
+      getAvailableDays().then((days) => {
+        setAvailableDays(days);
+      });
+    }, []);
+
+    useEffect(() => {
+      handleDateSelect(availableDays, date);
+    }, [availableDays, date]);
+
+    function isDayDisabled(day: Date) {
+      return !availableDays.find((d) => isSameDay(d, day));
+    }
+
+    function handleDateSelect(availableDays: Date[], dateRange?: DateRange) {
+      if (!dateRange || !dateRange.from || !dateRange.to) {
+        setSelectTimes(0);
+        return;
+      }
+
+      const from = dateRange.from;
+      const to = endOfDay(dateRange.to);
+      const times = _(availableDays)
+        .filter((d) => d >= from && d <= to)
+        .value().length;
+
+      setSelectTimes(times);
+    }
 
     return (
       <Popover>
@@ -211,6 +242,7 @@ const App = () => {
               selected={date}
               onSelect={setDate}
               initialFocus
+              disabled={isDayDisabled}
             />
             <div className="px-3 py-5 space-y-2">
               <div className="text-muted-foreground text-sm">
@@ -241,7 +273,7 @@ const App = () => {
             </Button>
             <div className="flex space-x-1 col-span-2 justify-end items-center text-xs">
               <div className="text-muted-foreground">Selected:</div>
-              <div>{10} times</div>
+              <div>{selectTimes} times</div>
             </div>
             <Button className="col-start-4 col-span-1">Submit</Button>
           </div>
