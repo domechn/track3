@@ -192,6 +192,7 @@ const App = () => {
       from: addDays(new Date(), -7),
       to: new Date(),
     });
+    const [calendarOpen, setCalendarOpen] = React.useState<boolean>(false);
     const [availableDays, setAvailableDays] = React.useState<Date[]>([]);
     const [selectTimes, setSelectTimes] = React.useState<number>(0);
 
@@ -244,8 +245,14 @@ const App = () => {
       });
     }
 
+    function handleSubmitClick() {
+      setCalendarOpen(false)
+      // todo: update query method from querySize to from-to createdAt dates
+      setQuerySize(selectTimes);
+    }
+
     return (
-      <Popover>
+      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
           <CalendarIcon
             className={cn(
@@ -303,14 +310,14 @@ const App = () => {
             </div>
           </div>
           <div className="grid gap-4 grid-cols-4 px-5 py-3">
-            <Button variant="ghost" className="col-span-1">
+            <Button variant="ghost" className="col-span-1" onClick={()=>setCalendarOpen(false)}>
               Cancel
             </Button>
             <div className="flex space-x-1 col-span-2 justify-end items-center text-xs">
               <div className="text-muted-foreground">Selected:</div>
               <div>{selectTimes} times</div>
             </div>
-            <Button className="col-start-4 col-span-1">Submit</Button>
+            <Button className="col-start-4 col-span-1" onClick={handleSubmitClick}>Submit</Button>
           </div>
         </PopoverContent>
       </Popover>
