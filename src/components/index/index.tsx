@@ -316,9 +316,9 @@ const App = () => {
               )}
               <MainNav className="mx-0" />
               <div className="ml-auto flex items-center space-x-4">
-                <div>
+                {/* <div>
                   <DatePicker />
-                </div>
+                </div> */}
                 <div data-tooltip-id="last-refresh-at">
                   <RefreshButtonLoadingContext.Provider
                     value={{
