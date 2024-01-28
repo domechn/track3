@@ -246,7 +246,7 @@ const App = () => {
     }
 
     function handleSubmitClick() {
-      setCalendarOpen(false)
+      setCalendarOpen(false);
       // todo: update query method from querySize to from-to createdAt dates
       setQuerySize(selectTimes);
     }
@@ -254,12 +254,7 @@ const App = () => {
     return (
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
-          <CalendarIcon
-            className={cn(
-              "h-6 w-6 font-normal cursor-pointer",
-              !date && "text-muted-foreground"
-            )}
-          />
+          <CalendarIcon className="h-6 w-6 font-normal cursor-pointer text-muted-foreground" />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="flex">
@@ -310,14 +305,23 @@ const App = () => {
             </div>
           </div>
           <div className="grid gap-4 grid-cols-4 px-5 py-3">
-            <Button variant="ghost" className="col-span-1" onClick={()=>setCalendarOpen(false)}>
+            <Button
+              variant="ghost"
+              className="col-span-1"
+              onClick={() => setCalendarOpen(false)}
+            >
               Cancel
             </Button>
             <div className="flex space-x-1 col-span-2 justify-end items-center text-xs">
               <div className="text-muted-foreground">Selected:</div>
               <div>{selectTimes} times</div>
             </div>
-            <Button className="col-start-4 col-span-1" onClick={handleSubmitClick}>Submit</Button>
+            <Button
+              className="col-start-4 col-span-1"
+              onClick={handleSubmitClick}
+            >
+              Submit
+            </Button>
           </div>
         </PopoverContent>
       </Popover>
