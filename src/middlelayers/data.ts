@@ -73,7 +73,7 @@ async function loadPortfoliosByConfig(config: CexConfig & TokenConfig, addProgre
 	if (userInfo.isPro) {
 		console.debug("pro license, use pro analyzers")
 		anas = [ERC20ProAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer, TRC20ProUserAnalyzer]
-		// anas = [TRC20ProUserAnalyzer]
+		// anas = [CexAnalyzer]
 	} else {
 		console.debug("not pro license, fallback to normal analyzers")
 	}
