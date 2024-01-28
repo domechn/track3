@@ -58,6 +58,13 @@ import {
   autoBackupHistoricalData,
   autoImportHistoricalData,
 } from "@/middlelayers/data";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Button } from "../ui/button";
+import { cn } from "@/lib/utils";
+import { CalendarIcon } from "@radix-ui/react-icons";
+import { Calendar } from "../ui/calendar";
+import { addDays } from "date-fns";
+import { DateRange } from "react-day-picker";
 
 ChartJS.register(
   ...registerables,
@@ -101,19 +108,24 @@ const App = () => {
   );
 
   const [hasData, setHasData] = useState(true);
+  const [autoBackupHandled, setAutoBackupHandled] = useState(false);
 
   const [activeMenu, setActiveMenu] = useState("overview");
 
   useEffect(() => {
     loadConfiguration();
-
-    handleAutoBackup();
   }, []);
 
   useEffect(() => {
-    if (querySize > 0) {
-      loadAllData(querySize);
+    // if first open page, auto backup data and then load data
+    if (!autoBackupHandled) {
+      handleAutoBackup().finally(() => {
+        loadAllData(querySize);
+      });
+      return;
     }
+
+    loadAllData(querySize);
   }, [querySize]);
 
   useEffect(() => {
@@ -157,6 +169,7 @@ const App = () => {
   }
 
   async function handleAutoBackup() {
+    setAutoBackupHandled(true);
     await autoImportHistoricalData();
     // todo: reload page if res of autoImportHistoricalData is true ( there is new data imported successfully )
     await autoBackupHistoricalData();
@@ -174,7 +187,73 @@ const App = () => {
     }
   }
 
+  function DatePicker() {
+    const [date, setDate] = React.useState<DateRange | undefined>({
+      from: addDays(new Date(), -7),
+      to: new Date(),
+    });
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <CalendarIcon
+            className={cn(
+              "h-6 w-6 font-normal cursor-pointer",
+              !date && "text-muted-foreground"
+            )}
+          />
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="flex">
+            <Calendar
+              mode="range"
+              defaultMonth={date?.to}
+              selected={date}
+              onSelect={setDate}
+              initialFocus
+            />
+            <div className="px-3 py-5 space-y-2">
+              <div className="text-muted-foreground text-sm">
+                Predefined times
+              </div>
+              <div className="text-xs">
+                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                  Last 10 Times
+                </div>
+                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                  Last 30 Times
+                </div>
+                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                  Last 50 Times
+                </div>
+                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                  Last 100 Times
+                </div>
+                <div className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer">
+                  All
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-4 grid-cols-4 px-5 py-3">
+            <Button variant="ghost" className="col-span-1">
+              Cancel
+            </Button>
+            <div className="flex space-x-1 col-span-2 justify-end items-center text-xs">
+              <div className="text-muted-foreground">Selected:</div>
+              <div>{10} times</div>
+            </div>
+            <Button className="col-start-4 col-span-1">Submit</Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
   function loadAllData(size = 10) {
+    if (size <= 0) {
+      return;
+    }
     setVersion(version + 1);
     // set a loading delay to show the loading animation
     loadAllDataAsync(size);
@@ -237,6 +316,9 @@ const App = () => {
               )}
               <MainNav className="mx-0" />
               <div className="ml-auto flex items-center space-x-4">
+                <div>
+                  <DatePicker />
+                </div>
                 <div data-tooltip-id="last-refresh-at">
                   <RefreshButtonLoadingContext.Provider
                     value={{
