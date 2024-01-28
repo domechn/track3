@@ -140,6 +140,10 @@ class AssetHandler implements AssetHandlerImpl {
 			symbol: t.symbol,
 			amount: t.amount,
 			value: t.usdValue,
+			price: {
+				base: "usd" as any,
+				value: t.price,
+			},
 		})).filter(v => v.value > 1 || v.value === 0).value()
 
 		const now = new Date().toISOString()
@@ -147,13 +151,16 @@ class AssetHandler implements AssetHandlerImpl {
 
 		const uid = uuidv4()
 
-		const getPrice = (m: CoinModel) => {
+		const getPrice = (m: CoinModel): number => {
+			if ( m.price?.value) {
+				return m.price.value
+			}
+
 			if (m.amount) {
 				return m.value / m.amount
 			}
 
-			// fixme: it is not very exact if base price is usdt
-			return m.price?.value || 0
+			return  0
 		}
 
 		const getDBModel = (models: CoinModel[]) => {
