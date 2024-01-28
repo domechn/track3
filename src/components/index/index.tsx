@@ -108,19 +108,24 @@ const App = () => {
   );
 
   const [hasData, setHasData] = useState(true);
+  const [autoBackupHandled, setAutoBackupHandled] = useState(false);
 
   const [activeMenu, setActiveMenu] = useState("overview");
 
   useEffect(() => {
     loadConfiguration();
-
-    handleAutoBackup();
   }, []);
 
   useEffect(() => {
-    if (querySize > 0) {
-      loadAllData(querySize);
+    // if first open page, auto backup data and then load data
+    if (!autoBackupHandled) {
+      handleAutoBackup().finally(() => {
+        loadAllData(querySize);
+      });
+      return;
     }
+
+    loadAllData(querySize);
   }, [querySize]);
 
   useEffect(() => {
@@ -164,6 +169,7 @@ const App = () => {
   }
 
   async function handleAutoBackup() {
+    setAutoBackupHandled(true);
     await autoImportHistoricalData();
     // todo: reload page if res of autoImportHistoricalData is true ( there is new data imported successfully )
     await autoBackupHistoricalData();
@@ -233,8 +239,8 @@ const App = () => {
             <Button variant="ghost" className="col-span-1">
               Cancel
             </Button>
-            <div className='flex space-x-1 col-span-2 justify-end items-center text-xs'>
-              <div className='text-muted-foreground'>Selected:</div>
+            <div className="flex space-x-1 col-span-2 justify-end items-center text-xs">
+              <div className="text-muted-foreground">Selected:</div>
               <div>{10} times</div>
             </div>
             <Button className="col-start-4 col-span-1">Submit</Button>
@@ -245,6 +251,9 @@ const App = () => {
   }
 
   function loadAllData(size = 10) {
+    if (size <= 0) {
+      return;
+    }
     setVersion(version + 1);
     // set a loading delay to show the loading animation
     loadAllDataAsync(size);
