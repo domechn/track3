@@ -52,6 +52,9 @@ const App = ({
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData() {
+    if (size <= 0) {
+      return
+    }
     setLoading(true);
     try {
       const cac = await queryCoinsAmountChange(symbol, size);
