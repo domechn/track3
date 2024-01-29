@@ -144,7 +144,7 @@ class AssetHandler implements AssetHandlerImpl {
 				base: "usd" as any,
 				value: t.price,
 			},
-		})).filter(v => v.value > 1 || v.value === 0).value()
+		})).filter(v => v.value > 1 || (v.value === 0 && v.amount === 0)).value()
 
 		const now = new Date().toISOString()
 		// generate uuid v4
