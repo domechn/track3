@@ -46,12 +46,12 @@ const App = ({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay(chartName));
+    loadData(symbol, size).then(() => resizeChartWithDelay(chartName));
   }, [size, version, symbol]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData() {
+  async function loadData(symbol: string, size: number) {
     if (size <= 0) {
       return
     }
@@ -145,8 +145,7 @@ const App = ({
     },
   };
 
-  function chartDataByCoin(coin: string) {
-    const current = coinsAmountAndValueChangeData;
+  function chartDataByCoin(current: CoinsAmountAndValueChangeData) {
     if (!current) {
       return {
         labels: [],
@@ -200,7 +199,7 @@ const App = ({
           >
             {loadingWrapper(
               loading,
-              <Line options={options as any} data={chartDataByCoin(symbol)} />,
+              <Line options={options as any} data={chartDataByCoin(coinsAmountAndValueChangeData)} />,
               "my-[10px] h-[26px]",
               10
             )}

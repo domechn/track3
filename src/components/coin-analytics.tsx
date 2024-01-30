@@ -5,7 +5,12 @@ import {
   queryLastAssetsBySymbol,
   updateAssetPrice,
 } from "@/middlelayers/charts";
-import { Asset, AssetAction, CurrencyRateDetail } from "@/middlelayers/types";
+import {
+  Asset,
+  AssetAction,
+  CurrencyRateDetail,
+  TDateRange,
+} from "@/middlelayers/types";
 import _ from "lodash";
 import { useEffect, useMemo, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
@@ -60,10 +65,13 @@ import { loadingWrapper } from "@/lib/loading";
 const App = ({
   currency,
   size,
+  dateRange,
   version,
 }: {
   currency: CurrencyRateDetail;
+  // deprecated: use dateRange
   size: number;
+  dateRange: TDateRange;
   version: number;
 }) => {
   const { symbol } = useParams() as { symbol: string };
@@ -100,7 +108,7 @@ const App = ({
 
     // reset pagination
     setDataPage(0);
-  }, [symbol, version]);
+  }, [symbol, size, version]);
 
   async function getLogoPath(symbol: string) {
     const acd = await getAppCacheDir();
@@ -123,12 +131,6 @@ const App = ({
       });
       setWalletAliasMap(wam);
     });
-  }, [actions]);
-
-  const maxDataPage = useMemo(() => {
-    // - 0.000000000001 is for float number precision
-    const mp = Math.floor(actions.length / pageSize - 0.000000000001);
-    return mp >= 0 ? mp : 0;
   }, [actions]);
 
   const breakevenPrice = useMemo(
@@ -261,7 +263,9 @@ const App = ({
       });
       return;
     }
-    const actIndex = _(actions).findIndex(act =>getAssetActionIndex(act)=== updatePriceIndex);
+    const actIndex = _(actions).findIndex(
+      (act) => getAssetActionIndex(act) === updatePriceIndex
+    );
     if (actIndex === -1) {
       toast({
         description: "Invalid action",
@@ -289,7 +293,23 @@ const App = ({
     });
   }
 
-  function renderHistoryTable() {
+  function HistoryTable() {
+    const historicalData = useMemo(() => {
+      const start = dateRange.start?.toISOString() ?? "";
+      const end = dateRange.end?.toISOString() ?? new Date().toISOString();
+      console.log(start,end);
+      
+      return _(actions)
+        .filter((a) => a.changedAt >= start && a.changedAt <= end)
+        .value();
+    }, [actions, dateRange]);
+
+    const maxDataPage = useMemo(() => {
+      // - 0.000000000001 is for float number precision
+      const mp = Math.floor(historicalData.length / pageSize - 0.000000000001);
+      return mp >= 0 ? mp : 0;
+    }, [historicalData]);
+
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -347,7 +367,7 @@ const App = ({
                       </TableRow>
                     ))
                     .value()
-                : actions
+                : historicalData
                     .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
                     .map((act, i) => (
                       <TableRow key={i} className="h-[55px] group">
@@ -612,15 +632,13 @@ const App = ({
           </Card>
         </div>
       </div>
-      <div>
-        <CoinsAmountAndValueChange
-          currency={currency}
-          symbol={symbol}
-          size={size}
-          version={version}
-        />
-      </div>
-      <div>{renderHistoryTable()}</div>
+      <CoinsAmountAndValueChange
+        currency={currency}
+        symbol={symbol}
+        size={size}
+        version={version}
+      />
+      <HistoryTable />
     </div>
   );
 };
