@@ -1,4 +1,4 @@
-import { CurrencyRateDetail, PNLData } from "@/middlelayers/types";
+import { CurrencyRateDetail, PNLData, TDateRange } from "@/middlelayers/types";
 import { timestampToDate } from "@/utils/date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
@@ -21,10 +21,13 @@ const chartName = "PNL of Asset";
 
 const App = ({
   currency,
+  dateRange,
   size,
   version,
 }: {
   currency: CurrencyRateDetail;
+  dateRange: TDateRange;
+  // deprecated use dateRange instead
   size: number;
   version: number;
 }) => {

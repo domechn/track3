@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import {
   AssetChangeData,
   CurrencyRateDetail,
+  TDateRange,
   TotalValueData,
 } from "@/middlelayers/types";
 import { timestampToDate } from "@/utils/date";
@@ -155,11 +156,11 @@ class BTCTotalValue implements TotalValueShower {
 
 const App = ({
   currency,
-  size,
+  dateRange,
   version,
 }: {
   currency: CurrencyRateDetail;
-  size: number;
+  dateRange: TDateRange;
   version: number;
 }) => {
   const lineColor = "rgba(255, 99, 71, 1)";
@@ -185,8 +186,8 @@ const App = ({
   const [showValue, setShowValue] = useState(false);
 
   useEffect(() => {
-    loadData(size).then(() => resizeChartWithDelay(chartName));
-  }, [size, version]);
+    loadData(dateRange).then(() => resizeChartWithDelay(chartName));
+  }, [dateRange, version]);
 
   useEffect(() => {
     if (showValue) {
@@ -198,8 +199,8 @@ const App = ({
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData(s: number) {
-    return bluebird.all([loadTotalValue(), loadChartData(s)]);
+  async function loadData(dr: TDateRange) {
+    return bluebird.all([loadTotalValue(), loadChartData(dr)]);
   }
 
   async function loadTotalValue() {
@@ -212,10 +213,10 @@ const App = ({
     }
   }
 
-  async function loadChartData(size: number) {
+  async function loadChartData(dr: TDateRange) {
     setChartLoading(true);
     try {
-      const ac = await queryAssetChange(size);
+      const ac = await queryAssetChange(dr);
       setAssetChangeData(ac);
     } finally {
       setChartLoading(false);

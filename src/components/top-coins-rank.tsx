@@ -1,7 +1,7 @@
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timestampToDate } from "@/utils/date";
-import { TopCoinsRankData } from "@/middlelayers/types";
+import { TDateRange, TopCoinsRankData } from "@/middlelayers/types";
 import { useContext, useEffect, useRef, useState } from "react";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
@@ -18,7 +18,13 @@ import { ChartResizeContext } from "@/App";
 
 const chartName = "Trend of Top Coins Rank";
 
-const App = ({ size, version }: { size: number; version: number }) => {
+const App = ({
+  version,
+  dateRange,
+}: {
+  version: number;
+  dateRange: TDateRange;
+}) => {
   const wsize = useWindowSize();
   const [loading, setLoading] = useState(false);
   const { needResize } = useContext(ChartResizeContext);
@@ -36,15 +42,15 @@ const App = ({ size, version }: { size: number; version: number }) => {
     >(null);
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay(chartName));
-  }, [size, version]);
+    loadData(dateRange).then(() => resizeChartWithDelay(chartName));
+  }, [dateRange, version]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData() {
+  async function loadData(dr: TDateRange) {
     setLoading(true);
     try {
-      const tcr = await queryTopCoinsRank(size);
+      const tcr = await queryTopCoinsRank(dr);
       setTopCoinsRankData(tcr);
     } finally {
       setLoading(false);

@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -45,7 +45,7 @@ export async function listAllowedSymbols(): Promise<string[]> {
 }
 
 // calculateTotalProfit gets all profit
-export async function calculateTotalProfit(size: number): Promise<{
+export async function calculateTotalProfit(dateRange: TDateRange): Promise<{
 	total: number,
 	coins: {
 		symbol: string,
@@ -53,7 +53,7 @@ export async function calculateTotalProfit(size: number): Promise<{
 	}[]
 }> {
 	const symbols = await ASSET_HANDLER.listAllSymbols()
-	const allAssets = await ASSET_HANDLER.listAssets(size)
+	const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
 	const allUpdatedPrices = await ASSET_PRICE_HANDLER.listPrices()
 
 	const symbolData = _(symbols).map(symbol => {
@@ -377,9 +377,9 @@ export async function queryPNLValue(size = 10): Promise<PNLData> {
 	}
 }
 
-export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
+export async function queryTopCoinsRank(dateRange: TDateRange): Promise<TopCoinsRankData> {
 
-	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -416,8 +416,8 @@ export async function queryTopCoinsRank(size = 10): Promise<TopCoinsRankData> {
 	}
 }
 
-export async function queryTopCoinsPercentageChangeData(size = 10): Promise<TopCoinsPercentageChangeData> {
-	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
+export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange): Promise<TopCoinsPercentageChangeData> {
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -470,9 +470,9 @@ function getCoins(assets: AssetModel[][], size = 10): string[] {
 	return _(assets).map(as => _(as).sortBy('value').reverse().take(size > 0 ? size : _(as).size()).value()).flatten().map(a => a.symbol).uniq().value()
 }
 
-export async function queryAssetChange(size = 10): Promise<AssetChangeData> {
+export async function queryAssetChange(dateRange: TDateRange): Promise<AssetChangeData> {
 
-	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
 	const reservedAssets = _(assets).reverse().value()
 
@@ -517,8 +517,8 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	})).value()
 }
 
-export async function queryCoinsAmountChange(symbol: string, size = 10): Promise<CoinsAmountAndValueChangeData | undefined> {
-	const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol, size)
+export async function queryCoinsAmountChange(symbol: string, dateRange:TDateRange): Promise<CoinsAmountAndValueChangeData | undefined> {
+	const assets = await ASSET_HANDLER.listAssetsBySymbolByDateRange(symbol, dateRange.start, dateRange.end)
 	if (!assets) {
 		return
 	}
@@ -545,9 +545,9 @@ export async function queryCoinsAmountChange(symbol: string, size = 10): Promise
 
 	return {
 		coin: symbol,
-		amounts: _(aat).map('amount').reverse().take(size).reverse().value(),
-		values: _(aat).map('value').reverse().take(size).reverse().value(),
-		timestamps: _(aat).map('timestamp').reverse().take(size).reverse().value(),
+		amounts: _(aat).map('amount').value(),
+		values: _(aat).map('value').value(),
+		timestamps: _(aat).map('timestamp').value(),
 	}
 }
 

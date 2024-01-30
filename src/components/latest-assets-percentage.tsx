@@ -2,6 +2,7 @@ import { Doughnut } from "react-chartjs-2";
 import {
   CurrencyRateDetail,
   LatestAssetsPercentageData,
+  TDateRange,
 } from "@/middlelayers/types";
 import { Card, CardContent } from "./ui/card";
 import _ from "lodash";
@@ -38,11 +39,11 @@ const chartName = "Percentage of Assets";
 
 const App = ({
   currency,
-  size,
+  dateRange,
   version,
 }: {
   currency: CurrencyRateDetail;
-  size: number;
+  dateRange: TDateRange;
   version: number;
 }) => {
   const { needResize } = useContext(ChartResizeContext);
@@ -61,8 +62,8 @@ const App = ({
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay(chartName));
-  }, [size, version]);
+    loadData(dateRange).then(() => resizeChartWithDelay(chartName));
+  }, [dateRange, version]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
@@ -81,7 +82,7 @@ const App = ({
     getLogoMap(latestAssetsPercentageData).then((m) => setLogoMap(m));
   }, [latestAssetsPercentageData]);
 
-  async function loadData() {
+  async function loadData(dr: TDateRange) {
     setLoading(true);
     try {
       const lap = await queryLatestAssetsPercentage();

@@ -633,7 +633,7 @@ const App = ({
       <CoinsAmountAndValueChange
         currency={currency}
         symbol={symbol}
-        size={size}
+        dateRange={dateRange}
         version={version}
       />
       <HistoryTable />

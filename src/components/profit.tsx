@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { CurrencyRateDetail } from "@/middlelayers/types";
+import { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { calculateTotalProfit } from "@/middlelayers/charts";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
@@ -17,12 +17,12 @@ type TopType = "profitTop" | "lossTop";
 
 const App = ({
   currency,
-  size,
+  dateRange,
   // version is used for reloading data
   version,
 }: {
   currency: CurrencyRateDetail;
-  size: number;
+  dateRange: TDateRange;
   version: number;
 }) => {
   const [profit, setProfit] = useState(0);
@@ -38,7 +38,7 @@ const App = ({
 
   useEffect(() => {
     setLoading(true);
-    calculateTotalProfit(size)
+    calculateTotalProfit(dateRange)
       .then((res) => {
         setProfit(res.total);
         setCoinsProfit(_(res.coins).sortBy("value").value());
@@ -47,7 +47,7 @@ const App = ({
         getLogoMap(res.coins).then((m) => setLogoMap(m));
       })
       .finally(() => setLoading(false));
-  }, [size, version]);
+  }, [dateRange, version]);
 
   const topTypeData = useMemo(() => {
     const size = 5;

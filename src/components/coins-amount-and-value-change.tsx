@@ -5,6 +5,7 @@ import { timestampToDate } from "@/utils/date";
 import {
   CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
+  TDateRange,
 } from "@/middlelayers/types";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,13 +22,13 @@ const chartName = "Trend of Coin";
 
 const App = ({
   currency,
-  size,
+  dateRange,
   version,
   symbol,
 }: {
   currency: CurrencyRateDetail;
-  size: number;
   version: number;
+  dateRange: TDateRange;
   symbol: string;
 }) => {
   const wsize = useWindowSize();
@@ -46,18 +47,15 @@ const App = ({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadData(symbol, size).then(() => resizeChartWithDelay(chartName));
-  }, [size, version, symbol]);
+    loadData(symbol, dateRange).then(() => resizeChartWithDelay(chartName));
+  }, [dateRange, version, symbol]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData(symbol: string, size: number) {
-    if (size <= 0) {
-      return
-    }
+  async function loadData(symbol: string, dateRange: TDateRange) {
     setLoading(true);
     try {
-      const cac = await queryCoinsAmountChange(symbol, size);
+      const cac = await queryCoinsAmountChange(symbol, dateRange);
       if (!cac) {
         return;
       }

@@ -335,6 +335,7 @@ const App = () => {
                   currency={currentCurrency}
                   size={querySize}
                   version={version}
+                  dateRange={tDateRange}
                 />
               </PageWrapper>
             }
