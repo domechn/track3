@@ -94,6 +94,7 @@ const App = () => {
   const [isProUser, setIsProUser] = useState(false);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    // todo: remove hardcode 7 here
     from: addDays(new Date(), -7),
     to: new Date(),
   });
