@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Calendar } from "./ui/calendar";
 import { CalendarIcon } from "@radix-ui/react-icons";
-import { endOfDay, isSameDay } from "date-fns";
+import { endOfDay, isSameDay, startOfDay } from "date-fns";
 import { useEffect, useState } from "react";
 import { getAvailableDays } from "@/middlelayers/charts";
 import _ from "lodash";
@@ -40,7 +40,7 @@ const App = ({
       return;
     }
 
-    const from = dateRange.from;
+    const from = startOfDay(dateRange.from);
     const to = endOfDay(dateRange.to);
     const times = _(availableDays)
       .filter((d) => d >= from && d <= to)
