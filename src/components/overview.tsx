@@ -5,15 +5,18 @@ import TopCoinsRank from "@/components/top-coins-rank";
 import Profit from "@/components/profit";
 import TopCoinsPercentageChange from "@/components/top-coins-percentage-change";
 
-import { CurrencyRateDetail } from "../middlelayers/types";
+import { CurrencyRateDetail, TDateRange } from "../middlelayers/types";
 
 const App = ({
   currency,
   version,
+  dateRange,
   size,
 }: {
   currency: CurrencyRateDetail;
   version: number;
+  dateRange: TDateRange;
+  // deprecated use dateRange instead
   size: number;
 }) => {
   if (size <= 0) {
@@ -26,22 +29,22 @@ const App = ({
         <div className="col-span-2 md:col-span-1">
           <TotalValue
             currency={currency}
-            size={size}
+            dateRange={dateRange}
             version={version}
           ></TotalValue>
         </div>
         <div className="col-span-2 md:col-span-1">
-          <PNL currency={currency} version={version} size={size}></PNL>
+          <PNL currency={currency} version={version} dateRange={dateRange} size={size}></PNL>
         </div>
       </div>
       <LatestAssetsPercentage
         currency={currency}
-        size={size}
+        dateRange={dateRange}
         version={version}
       />
-      <Profit currency={currency} version={version} size={size} />
-      <TopCoinsRank version={version} size={size} />
-      <TopCoinsPercentageChange version={version} size={size} />
+      <Profit currency={currency} version={version} dateRange={dateRange} />
+      <TopCoinsRank version={version} dateRange={dateRange} />
+      <TopCoinsPercentageChange version={version} dateRange={dateRange} />
       <div className="mb-2"></div>
     </div>
   );

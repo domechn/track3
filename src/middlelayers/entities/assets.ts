@@ -21,14 +21,29 @@ class AssetHandler implements AssetHandlerImpl {
 		return this.groupAssetModelsList(assets)
 	}
 
+	async listSymbolGroupedAssetsByDateRange(start?: Date, end?: Date): Promise<AssetModel[][]> {
+		const assets = await this.queryAssetsByDateRange(start, end)
+		return this.groupAssetModelsList(assets)
+	}
+
 	// list assets without grouping
 	async listAssets(size?: number): Promise<AssetModel[][]> {
 		return this.queryAssets(size)
 	}
 
+	// list assets without grouping
+	async listAssetsByDateRange(start?: Date, end?: Date): Promise<AssetModel[][]> {
+		return this.queryAssetsByDateRange(start, end)
+	}
+
 	// list assets by symbol without grouping
 	async listAssetsBySymbol(symbol: string, size?: number): Promise<AssetModel[][]> {
 		return this.queryAssets(size, symbol)
+	}
+
+	// list assets by symbol without grouping
+	async listAssetsBySymbolByDateRange(symbol: string, start?: Date, end?: Date): Promise<AssetModel[][]> {
+		return this.queryAssetsByDateRange(start, end, symbol)
 	}
 
 	// listAllSymbols returns all symbols owned in historical
@@ -152,7 +167,7 @@ class AssetHandler implements AssetHandlerImpl {
 		const uid = uuidv4()
 
 		const getPrice = (m: CoinModel): number => {
-			if ( m.price?.value) {
+			if (m.price?.value) {
 				return m.price.value
 			}
 
@@ -160,7 +175,7 @@ class AssetHandler implements AssetHandlerImpl {
 				return m.value / m.amount
 			}
 
-			return  0
+			return 0
 		}
 
 		const getDBModel = (models: CoinModel[]) => {
@@ -192,6 +207,15 @@ class AssetHandler implements AssetHandlerImpl {
 			} AND createdAt >= ( SELECT min(createdAt) FROM (SELECT distinct(createdAt) FROM ${this.assetTableName} WHERE 1 = 1 ${symbol ? ` AND symbol = '${symbol}'` : ""
 			} ORDER BY createdAt ${(size && size > 0) ? "DESC LIMIT " + size : "ASC LIMIT 1"
 			} ) ) ORDER BY createdAt DESC;`
+		const assets = await selectFromDatabaseWithSql<AssetModel>(sql, [])
+		return _(assets).groupBy("uuid").values().value()
+	}
+
+	private async queryAssetsByDateRange(start?: Date, end?: Date, symbol?: string): Promise<AssetModel[][]> {
+		const symbolSql = symbol ? ` AND symbol = '${symbol}'` : ""
+		const lteCreatedSql = end ? ` AND createdAt <= '${end.toISOString()}'` : ""
+		const gteCreatedSql = start ? ` AND createdAt >= '${start.toISOString()}'` : ""
+		const sql = `SELECT * FROM ${this.assetTableName} WHERE 1 = 1 ${symbolSql} ${gteCreatedSql} ${lteCreatedSql} ORDER BY createdAt DESC;`
 		const assets = await selectFromDatabaseWithSql<AssetModel>(sql, [])
 		return _(assets).groupBy("uuid").values().value()
 	}

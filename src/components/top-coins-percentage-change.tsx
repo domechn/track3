@@ -1,7 +1,7 @@
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timestampToDate } from "@/utils/date";
-import { TopCoinsPercentageChangeData } from "@/middlelayers/types";
+import { TDateRange, TopCoinsPercentageChangeData } from "@/middlelayers/types";
 import { useContext, useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
@@ -20,7 +20,7 @@ import { ChartResizeContext } from "@/App";
 const prefix = "tcpc";
 const chartNameKey = "Change of Top Coins";
 
-const App = ({ size, version }: { size: number; version: number }) => {
+const App = ({ dateRange, version }: { dateRange: TDateRange; version: number }) => {
   const wsize = useWindowSize();
 
   const { needResize } = useContext(ChartResizeContext);
@@ -42,15 +42,15 @@ const App = ({ size, version }: { size: number; version: number }) => {
     >(null);
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay(chartNameKey));
-  }, [size, version]);
+    loadData(dateRange).then(() => resizeChartWithDelay(chartNameKey));
+  }, [dateRange, version]);
 
   useEffect(() => resizeChart(chartNameKey), [needResize]);
 
-  async function loadData() {
+  async function loadData(dr: TDateRange) {
     setLoading(true);
     try {
-      const tcpcd = await queryTopCoinsPercentageChangeData(size);
+      const tcpcd = await queryTopCoinsPercentageChangeData(dr);
       setTopCoinsPercentageChangeData(tcpcd);
     } finally {
       setLoading(false);
