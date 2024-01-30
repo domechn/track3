@@ -343,7 +343,7 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 export async function queryPNLValue(size = 10): Promise<PNLData> {
 	// need to query size + 1 records to calculate first pnl data
 	// take at least 35 records to calculate 30 days pnl
-	const querySize = size < 30 ? 35 : size + 1
+	const querySize = size < 35 ? 35 : size + 1
 	// const querySize = size + 1
 
 	const results = await ASSET_HANDLER.listSymbolGroupedAssets(querySize)
