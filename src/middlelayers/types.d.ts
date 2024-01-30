@@ -206,3 +206,9 @@ export type WalletCoinUSD = Pick<WalletCoin, "amount" | "symbol" | "wallet"> & {
 	price: number,
 	usdValue: number,
 }
+
+// DateRange type for track3
+export type TDateRange = {
+	start: Date
+	end: Date
+}

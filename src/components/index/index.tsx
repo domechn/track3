@@ -20,6 +20,7 @@ import Comparison from "../comparison";
 import PageWrapper from "../page-wrapper";
 import WalletAnalysis from "../wallet-analytics";
 import CoinAnalysis from "../coin-analytics";
+import DatePicker from "../date-picker";
 import "./index.css";
 import {
   Route,
@@ -30,9 +31,9 @@ import {
   Navigate,
 } from "react-router-dom";
 
-import { CurrencyRateDetail } from "@/middlelayers/types";
-import { useContext, useEffect, useState } from "react";
-import { getAvailableDays, queryLastRefreshAt } from "@/middlelayers/charts";
+import { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
+import { useContext, useEffect, useMemo, useState } from "react";
+import { queryLastRefreshAt } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
 import {
   getCurrentPreferCurrency,
@@ -58,13 +59,8 @@ import {
   autoBackupHistoricalData,
   autoImportHistoricalData,
 } from "@/middlelayers/data";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { Button } from "../ui/button";
-import { cn } from "@/lib/utils";
-import { CalendarIcon } from "@radix-ui/react-icons";
-import { Calendar } from "../ui/calendar";
-import { addDays, addYears, endOfDay, isSameDay } from "date-fns";
 import { DateRange } from "react-day-picker";
+import { addDays, endOfDay, parseISO, startOfDay } from "date-fns";
 
 ChartJS.register(
   ...registerables,
@@ -97,6 +93,18 @@ const App = () => {
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
 
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    // todo: remove hardcode 7 here
+    from: addDays(new Date(), -7),
+    to: new Date(),
+  });
+  const tDateRange = useMemo<TDateRange>(
+    () => ({
+      start: dateRange?.from ? startOfDay(dateRange.from) :  parseISO("1970-01-01"),
+      end: dateRange?.to ? endOfDay(dateRange.to) : parseISO("9999-12-31"),
+    }),
+    [dateRange]
+  );
   const windowSize = useWindowSize();
   const [querySize, setQuerySize] = useState(0);
   const [lastSize, setLastSize] = useState(windowSize);
@@ -187,145 +195,12 @@ const App = () => {
     }
   }
 
-  function DatePicker() {
-    const [date, setDate] = React.useState<DateRange | undefined>({
-      from: addDays(new Date(), -7),
-      to: new Date(),
-    });
-    const [calendarOpen, setCalendarOpen] = React.useState<boolean>(false);
-    const [availableDays, setAvailableDays] = React.useState<Date[]>([]);
-    const [selectTimes, setSelectTimes] = React.useState<number>(0);
-
-    useEffect(() => {
-      getAvailableDays().then((days) => {
-        setAvailableDays(days);
-      });
-    }, []);
-
-    useEffect(() => {
-      handleDateSelect(availableDays, date);
-    }, [availableDays, date]);
-
-    function isDayDisabled(day: Date) {
-      return !availableDays.find((d) => isSameDay(d, day));
-    }
-
-    function handleDateSelect(availableDays: Date[], dateRange?: DateRange) {
-      if (!dateRange || !dateRange.from || !dateRange.to) {
-        setSelectTimes(0);
-        return;
-      }
-
-      const from = dateRange.from;
-      const to = endOfDay(dateRange.to);
-      const times = _(availableDays)
-        .filter((d) => d >= from && d <= to)
-        .value().length;
-
-      setSelectTimes(times);
-    }
-
-    function handlePredefinedTimesClick(pt: number) {
-      if (availableDays.length === 0) {
-        setDate(undefined);
-        return;
-      }
-
-      const ads =
-        pt < 0
-          ? availableDays
-          : availableDays.slice(
-              availableDays.length - pt,
-              availableDays.length
-            );
-
-      setDate({
-        from: ads[0],
-        to: ads[ads.length - 1],
-      });
-    }
-
-    function handleSubmitClick() {
-      setCalendarOpen(false);
-      // todo: update query method from querySize to from-to createdAt dates
-      setQuerySize(selectTimes);
-    }
-
-    return (
-      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-        <PopoverTrigger asChild>
-          <CalendarIcon className="h-6 w-6 font-normal cursor-pointer text-muted-foreground" />
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="flex">
-            <Calendar
-              mode="range"
-              defaultMonth={date?.to}
-              selected={date}
-              onSelect={setDate}
-              initialFocus
-              disabled={isDayDisabled}
-            />
-            <div className="px-3 py-5 space-y-2">
-              <div className="text-muted-foreground text-sm">
-                Predefined times
-              </div>
-              <div className="text-xs">
-                <div
-                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
-                  onClick={() => handlePredefinedTimesClick(10)}
-                >
-                  Last 10 Times
-                </div>
-                <div
-                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
-                  onClick={() => handlePredefinedTimesClick(30)}
-                >
-                  Last 30 Times
-                </div>
-                <div
-                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
-                  onClick={() => handlePredefinedTimesClick(50)}
-                >
-                  Last 50 Times
-                </div>
-                <div
-                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
-                  onClick={() => handlePredefinedTimesClick(100)}
-                >
-                  Last 100 Times
-                </div>
-                <div
-                  className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
-                  onClick={() => handlePredefinedTimesClick(-1)}
-                >
-                  All
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-4 grid-cols-4 px-5 py-3">
-            <Button
-              variant="ghost"
-              className="col-span-1"
-              onClick={() => setCalendarOpen(false)}
-            >
-              Cancel
-            </Button>
-            <div className="flex space-x-1 col-span-2 justify-end items-center text-xs">
-              <div className="text-muted-foreground">Selected:</div>
-              <div>{selectTimes} times</div>
-            </div>
-            <Button
-              className="col-start-4 col-span-1"
-              onClick={handleSubmitClick}
-            >
-              Submit
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
-    );
+  function onDatePickerValueChange(
+    selectedTimes: number,
+    dateRange: DateRange | undefined
+  ) {
+    setDateRange(dateRange);
+    setQuerySize(selectedTimes);
   }
 
   function loadAllData(size = 10) {
@@ -395,7 +270,10 @@ const App = () => {
               <MainNav className="mx-0" />
               <div className="ml-auto flex items-center space-x-4">
                 <div>
-                  <DatePicker />
+                  <DatePicker
+                    value={dateRange}
+                    onDateChange={onDatePickerValueChange}
+                  />
                 </div>
                 <div data-tooltip-id="last-refresh-at">
                   <RefreshButtonLoadingContext.Provider
@@ -532,6 +410,7 @@ const App = () => {
                 size={querySize}
                 currency={currentCurrency}
                 version={version}
+                dateRange={tDateRange}
               />
             }
           ></Route>
