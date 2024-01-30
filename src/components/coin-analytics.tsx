@@ -295,10 +295,8 @@ const App = ({
 
   function HistoryTable() {
     const historicalData = useMemo(() => {
-      const start = dateRange.start?.toISOString() ?? "";
-      const end = dateRange.end?.toISOString() ?? new Date().toISOString();
-      console.log(start,end);
-      
+      const start = dateRange.start.toISOString();
+      const end = dateRange.end.toISOString();
       return _(actions)
         .filter((a) => a.changedAt >= start && a.changedAt <= end)
         .value();

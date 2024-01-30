@@ -60,7 +60,7 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
-import { addDays } from "date-fns";
+import { addDays, endOfDay, parseISO, startOfDay } from "date-fns";
 
 ChartJS.register(
   ...registerables,
@@ -99,8 +99,8 @@ const App = () => {
   });
   const tDateRange = useMemo<TDateRange>(
     () => ({
-      start: dateRange?.from,
-      end: dateRange?.to,
+      start: dateRange?.from ? startOfDay(dateRange.from) :  parseISO("1970-01-01"),
+      end: dateRange?.to ? endOfDay(dateRange.to) : parseISO("9999-12-31"),
     }),
     [dateRange]
   );
