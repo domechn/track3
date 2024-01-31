@@ -12,7 +12,8 @@ const App = ({
   value,
   onDateChange,
 }: {
-  availableDates: Date[],
+  // sort asc
+  availableDates: Date[];
   value: DateRange | undefined;
   onDateChange: (selectedTimes: number, date?: DateRange) => void;
 }) => {
@@ -52,7 +53,10 @@ const App = ({
     const ads =
       pt < 0
         ? availableDates
-        : availableDates.slice(availableDates.length - pt, availableDates.length);
+        : availableDates.slice(
+            availableDates.length - pt,
+            availableDates.length
+          );
 
     setDataRange({
       from: ads[0],
