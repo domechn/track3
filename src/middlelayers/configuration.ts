@@ -1,9 +1,12 @@
 import { invoke } from '@tauri-apps/api'
 import { getDatabase } from './database'
 import { GlobalConfig } from './datafetch/types'
-import { ConfigurationModel, CurrencyRateDetail } from './types'
+import { ConfigurationModel, CurrencyRateDetail, TDateRange } from './types'
 import yaml from 'yaml'
 import { CURRENCY_RATE_HANDLER } from './entities/currency'
+import { ASSET_HANDLER } from './entities/assets'
+import _ from 'lodash'
+import { DateRange } from 'react-day-picker'
 
 const prefix = "!ent:"
 const fixId = "1"
@@ -84,13 +87,22 @@ async function getConfigurationById(id: string): Promise<ConfigurationModel | un
 	})
 }
 
-export async function getQuerySize(): Promise<number> {
+export async function getInitialQueryDateRange(): Promise<DateRange> {
 	const cfg = await getConfiguration()
-	if (!cfg) {
-		return 10
+	let size = 10
+	if (cfg?.configs.querySize) {
+		size = cfg.configs.querySize
 	}
 
-	return cfg.configs.querySize || 10
+	const days = await ASSET_HANDLER.getHasDataCreatedAtDates(size)
+	const from = _(days).min()
+	const to = _(days).max()
+
+	return {
+		from,
+		to,
+	}
+
 }
 
 export async function updateAllCurrencyRates() {

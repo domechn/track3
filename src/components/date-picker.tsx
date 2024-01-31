@@ -5,33 +5,27 @@ import { Calendar } from "./ui/calendar";
 import { CalendarIcon } from "@radix-ui/react-icons";
 import { endOfDay, isSameDay, startOfDay } from "date-fns";
 import { useEffect, useState } from "react";
-import { getAvailableDays } from "@/middlelayers/charts";
 import _ from "lodash";
 
 const App = ({
+  availableDates,
   value,
   onDateChange,
 }: {
+  availableDates: Date[],
   value: DateRange | undefined;
   onDateChange: (selectedTimes: number, date?: DateRange) => void;
 }) => {
   const [calendarOpen, setCalendarOpen] = useState<boolean>(false);
-  const [availableDays, setAvailableDays] = useState<Date[]>([]);
   const [selectTimes, setSelectTimes] = useState<number>(0);
   const [date, setDate] = useState<DateRange | undefined>(value);
 
   useEffect(() => {
-    getAvailableDays().then((days) => {
-      setAvailableDays(days);
-    });
-  }, []);
-
-  useEffect(() => {
-    handleDateSelect(availableDays, date);
-  }, [availableDays, date]);
+    handleDateSelect(availableDates, date);
+  }, [date]);
 
   function isDayDisabled(day: Date) {
-    return !availableDays.find((d) => isSameDay(d, day));
+    return !availableDates.find((d) => isSameDay(d, day));
   }
 
   function handleDateSelect(availableDays: Date[], dateRange?: DateRange) {
@@ -50,15 +44,15 @@ const App = ({
   }
 
   function handlePredefinedTimesClick(pt: number) {
-    if (availableDays.length === 0) {
+    if (availableDates.length === 0) {
       setDataRange(undefined);
       return;
     }
 
     const ads =
       pt < 0
-        ? availableDays
-        : availableDays.slice(availableDays.length - pt, availableDays.length);
+        ? availableDates
+        : availableDates.slice(availableDates.length - pt, availableDates.length);
 
     setDataRange({
       from: ads[0],

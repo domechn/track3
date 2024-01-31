@@ -33,12 +33,12 @@ import {
 
 import { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
 import { useContext, useEffect, useMemo, useState } from "react";
-import { queryLastRefreshAt } from "@/middlelayers/charts";
+import { getAvailableDates, queryLastRefreshAt } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
 import {
   getCurrentPreferCurrency,
   getLicenseIfIsPro,
-  getQuerySize,
+  getInitialQueryDateRange,
 } from "@/middlelayers/configuration";
 import { getDefaultCurrencyRate } from "@/middlelayers/configuration";
 import _ from "lodash";
@@ -87,26 +87,21 @@ export const RefreshButtonLoadingContext = React.createContext<{
 const App = () => {
   const { setNeedResize } = useContext(ChartResizeContext);
 
+  // no need version anymore
   const [version, setVersion] = useState(0);
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
 
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    // todo: remove hardcode 7 here
-    from: addDays(new Date(), -7),
-    to: new Date(),
+  const [availableDates, setAvailableDates] = useState<Date[]>([]);
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [tDateRange, setTDateRange] = useState<TDateRange>({
+    start: parseISO("1970-01-01"),
+    end: parseISO("1970-01-01"),
   });
-  const tDateRange = useMemo<TDateRange>(
-    () => ({
-      start: dateRange?.from ? startOfDay(dateRange.from) :  parseISO("1970-01-01"),
-      end: dateRange?.to ? endOfDay(dateRange.to) : parseISO("9999-12-31"),
-    }),
-    [dateRange]
-  );
   const windowSize = useWindowSize();
-  const [querySize, setQuerySize] = useState(0);
   const [lastSize, setLastSize] = useState(windowSize);
   const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(
     undefined
@@ -116,25 +111,15 @@ const App = () => {
   );
 
   const [hasData, setHasData] = useState(true);
-  const [autoBackupHandled, setAutoBackupHandled] = useState(false);
 
   const [activeMenu, setActiveMenu] = useState("overview");
 
   useEffect(() => {
     loadConfiguration();
+    handleAutoBackup().finally(() => {
+      loadAllData();
+    });
   }, []);
-
-  useEffect(() => {
-    // if first open page, auto backup data and then load data
-    if (!autoBackupHandled) {
-      handleAutoBackup().finally(() => {
-        loadAllData(querySize);
-      });
-      return;
-    }
-
-    loadAllData(querySize);
-  }, [querySize]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -158,13 +143,8 @@ const App = () => {
   }
 
   function loadConfiguration() {
-    loadQuerySize();
     loadCurrentCurrency();
     loadIsProUser();
-  }
-
-  function loadQuerySize() {
-    getQuerySize().then((size) => setQuerySize(size));
   }
 
   function loadCurrentCurrency() {
@@ -177,14 +157,12 @@ const App = () => {
   }
 
   async function handleAutoBackup() {
-    setAutoBackupHandled(true);
     await autoImportHistoricalData();
     // todo: reload page if res of autoImportHistoricalData is true ( there is new data imported successfully )
     await autoBackupHistoricalData();
   }
 
-  async function loadAllDataAsync(size = 10) {
-    console.debug("loading all data... size: ", size);
+  async function loadLastRefreshAt() {
     const lra = await queryLastRefreshAt();
     setLastRefreshAt(lra);
 
@@ -195,21 +173,34 @@ const App = () => {
     }
   }
 
+  async function loadDatePickerData() {
+    const dt = await getInitialQueryDateRange();
+    setDateRange(dt);
+    const days = await getAvailableDates();
+    setAvailableDates(days);
+
+    setTDateRange({
+      start: dt.from ? startOfDay(dt.from) : parseISO("1970-01-01"),
+      end: dt.to ? endOfDay(dt.to) : parseISO("1970-01-01"),
+
+      // workaround for refreshing page after date range changed
+      // @ts-ignore
+      current: new Date(),
+    });
+  }
+
   function onDatePickerValueChange(
-    selectedTimes: number,
+    _selectedTimes: number,
     dateRange: DateRange | undefined
   ) {
     setDateRange(dateRange);
-    setQuerySize(selectedTimes);
   }
 
-  function loadAllData(size = 10) {
-    if (size <= 0) {
-      return;
-    }
-    setVersion(version + 1);
+  function loadAllData() {
+    // setVersion(version + 1);
     // set a loading delay to show the loading animation
-    loadAllDataAsync(size);
+    loadLastRefreshAt();
+    loadDatePickerData();
   }
 
   function Layout() {
@@ -271,6 +262,7 @@ const App = () => {
               <div className="ml-auto flex items-center space-x-4">
                 <div>
                   <DatePicker
+                    availableDates={availableDates}
                     value={dateRange}
                     onDateChange={onDatePickerValueChange}
                   />
@@ -287,7 +279,7 @@ const App = () => {
                     <RefreshData
                       loading={refreshButtonLoading}
                       afterRefresh={() => {
-                        loadAllData(querySize);
+                        loadAllData();
                         autoBackupHistoricalData(true);
                       }}
                     />
@@ -333,7 +325,6 @@ const App = () => {
               <PageWrapper hasData={hasData}>
                 <Overview
                   currency={currentCurrency}
-                  size={querySize}
                   version={version}
                   dateRange={tDateRange}
                 />
@@ -364,7 +355,7 @@ const App = () => {
                 <HistoricalData
                   currency={currentCurrency}
                   afterDataDeleted={() => {
-                    loadAllData(querySize);
+                    loadAllData();
                     autoBackupHistoricalData(true);
                   }}
                   version={version}
@@ -386,7 +377,7 @@ const App = () => {
               element={
                 <DataManagement
                   onDataImported={() => {
-                    loadAllData(querySize);
+                    loadAllData();
                     autoBackupHistoricalData(true);
                   }}
                 />
@@ -408,7 +399,6 @@ const App = () => {
             path="/coins/:symbol"
             element={
               <CoinAnalysis
-                size={querySize}
                 currency={currentCurrency}
                 version={version}
                 dateRange={tDateRange}

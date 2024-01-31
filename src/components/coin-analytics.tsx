@@ -64,13 +64,10 @@ import { loadingWrapper } from "@/lib/loading";
 
 const App = ({
   currency,
-  size,
   dateRange,
   version,
 }: {
   currency: CurrencyRateDetail;
-  // deprecated: use dateRange
-  size: number;
   dateRange: TDateRange;
   version: number;
 }) => {
@@ -108,7 +105,7 @@ const App = ({
 
     // reset pagination
     setDataPage(0);
-  }, [symbol, size, version]);
+  }, [symbol, version]);
 
   async function getLogoPath(symbol: string) {
     const acd = await getAppCacheDir();

@@ -1,4 +1,9 @@
-import { CurrencyRateDetail, PNLData, TDateRange } from "@/middlelayers/types";
+import {
+  CurrencyRateDetail,
+  PNLChartData,
+  PNLTableDate,
+  TDateRange,
+} from "@/middlelayers/types";
 import { timestampToDate } from "@/utils/date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
@@ -11,7 +16,8 @@ import {
 import { useContext, useEffect, useState } from "react";
 import { loadingWrapper } from "@/lib/loading";
 import {
-  queryPNLValue,
+  queryPNLChartValue,
+  queryPNLTableValue,
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
@@ -22,34 +28,45 @@ const chartName = "PNL of Asset";
 const App = ({
   currency,
   dateRange,
-  size,
   version,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
-  // deprecated use dateRange instead
-  size: number;
   version: number;
 }) => {
   const [loading, setLoading] = useState(false);
+  const [chartLoading, setChartLoading] = useState(false);
   const { needResize } = useContext(ChartResizeContext);
-  const [pnlData, setPnlData] = useState<PNLData>({
-    data: [],
-  });
+  const [pnlTableData, setPnlTableData] = useState<PNLTableDate>({});
+  const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay(chartName));
-  }, [size, version]);
+    loadChartData(dateRange).then(() => resizeChartWithDelay(chartName));
+  }, [dateRange, version]);
+
+  useEffect(() => {
+    loadTableData();
+  }, []);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData() {
+  async function loadTableData() {
     setLoading(true);
     try {
-      const pd = await queryPNLValue(size);
-      setPnlData(pd);
+      const pd = await queryPNLTableValue();
+      setPnlTableData(pd);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadChartData(dr: TDateRange) {
+    setChartLoading(true);
+    try {
+      const pd = await queryPNLChartValue(dr);
+      setPnlChartData(pd);
+    } finally {
+      setChartLoading(false);
     }
   }
 
@@ -102,7 +119,7 @@ const App = ({
           align: "center",
           autoSkip: false,
           callback: function (val: number, index: number) {
-            const data = pnlData.data;
+            const data = pnlChartData;
 
             // -1, because we remove first element in labels, but not in pnlData.data
             const size = data.length - 1;
@@ -146,16 +163,16 @@ const App = ({
   };
 
   function formatPositiveLineData() {
-    return _(pnlData.data)
-      .map((x, idx) => x.totalValue - (pnlData.data[idx - 1]?.totalValue || 0))
+    return _(pnlChartData)
+      .map((x, idx) => x.totalValue - (pnlChartData[idx - 1]?.totalValue || 0))
       .map(currencyWrapper(currency))
       .map((x) => (x < 0 ? undefined : x))
       .drop(1)
       .value();
   }
   function formatNegativeLineData() {
-    return _(pnlData.data)
-      .map((x, idx) => x.totalValue - (pnlData.data[idx - 1]?.totalValue || 0))
+    return _(pnlChartData)
+      .map((x, idx) => x.totalValue - (pnlChartData[idx - 1]?.totalValue || 0))
       .map(currencyWrapper(currency))
       .map((x) => (x >= 0 ? undefined : x))
       .drop(1)
@@ -163,12 +180,12 @@ const App = ({
   }
 
   function getLatestTotalValue(): number | undefined {
-    return _.last(pnlData.data)?.totalValue;
+    return _.last(pnlChartData)?.totalValue;
   }
 
   function lineData() {
     return {
-      labels: _(pnlData.data)
+      labels: _(pnlChartData)
         // !remove the first element, because it is the comparison of the first and second element
         .tail()
         .map((x) => timestampToDate(x.timestamp))
@@ -254,17 +271,17 @@ const App = ({
           <div className="flex grid grid-cols-3 gap-4">
             <div
               className="flex flex-col items-center justify-center"
-              title={formatTimestampData(pnlData.todayPNL?.timestamp)}
+              title={formatTimestampData(pnlTableData.todayPNL?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">Last PNL</div>
               {loadingWrapper(
                 loading,
                 <div
                   className={`text-l font-bold ${getPNLTextColor(
-                    pnlData.todayPNL?.value
+                    pnlTableData.todayPNL?.value
                   )}`}
                 >
-                  {formatPNLPercentage(pnlData.todayPNL?.value)}
+                  {formatPNLPercentage(pnlTableData.todayPNL?.value)}
                 </div>,
                 "h-[22px]"
               )}
@@ -272,27 +289,27 @@ const App = ({
                 loading,
                 <p
                   className={`text-xs ${getPNLTextColor(
-                    pnlData.todayPNL?.value
+                    pnlTableData.todayPNL?.value
                   )}`}
                 >
-                  {formatPNLValue(pnlData.todayPNL?.value)}
+                  {formatPNLValue(pnlTableData.todayPNL?.value)}
                 </p>,
                 "h-[14px] mt-[4px]"
               )}
             </div>
             <div
               className="flex flex-col items-center justify-center"
-              title={formatTimestampData(pnlData.sevenTPnl?.timestamp)}
+              title={formatTimestampData(pnlTableData.sevenTPnl?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">7T PNL</div>
               {loadingWrapper(
                 loading,
                 <div
                   className={`text-l font-bold ${getPNLTextColor(
-                    pnlData.sevenTPnl?.value
+                    pnlTableData.sevenTPnl?.value
                   )}`}
                 >
-                  {formatPNLPercentage(pnlData.sevenTPnl?.value)}
+                  {formatPNLPercentage(pnlTableData.sevenTPnl?.value)}
                 </div>,
 
                 "h-[22px]"
@@ -301,27 +318,27 @@ const App = ({
                 loading,
                 <p
                   className={`text-xs ${getPNLTextColor(
-                    pnlData.sevenTPnl?.value
+                    pnlTableData.sevenTPnl?.value
                   )}`}
                 >
-                  {formatPNLValue(pnlData.sevenTPnl?.value)}
+                  {formatPNLValue(pnlTableData.sevenTPnl?.value)}
                 </p>,
                 "h-[14px] mt-[4px]"
               )}
             </div>
             <div
               className="flex flex-col items-center justify-center"
-              title={formatTimestampData(pnlData.thirtyPNL?.timestamp)}
+              title={formatTimestampData(pnlTableData.thirtyPNL?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">30T PNL</div>
               {loadingWrapper(
                 loading,
                 <div
                   className={`text-l font-bold ${getPNLTextColor(
-                    pnlData.thirtyPNL?.value
+                    pnlTableData.thirtyPNL?.value
                   )}`}
                 >
-                  {formatPNLPercentage(pnlData.thirtyPNL?.value)}
+                  {formatPNLPercentage(pnlTableData.thirtyPNL?.value)}
                 </div>,
 
                 "h-[22px]"
@@ -330,10 +347,10 @@ const App = ({
                 loading,
                 <p
                   className={`text-xs ${getPNLTextColor(
-                    pnlData.thirtyPNL?.value
+                    pnlTableData.thirtyPNL?.value
                   )}`}
                 >
-                  {formatPNLValue(pnlData.thirtyPNL?.value)}
+                  {formatPNLValue(pnlTableData.thirtyPNL?.value)}
                 </p>,
                 "h-[14px] mt-[4px]"
               )}
@@ -341,7 +358,7 @@ const App = ({
           </div>
           <div className="h-30">
             {loadingWrapper(
-              loading,
+              chartLoading,
               <Bar options={options as any} data={lineData()} />,
               "mt-[19.5px] h-[18px]",
               4
