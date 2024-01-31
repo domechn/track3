@@ -107,12 +107,12 @@ export type TotalValueData = {
 	prevTotalValue: number
 }
 
-export type PNLData = {
-	data: {
-		totalValue: number
-		timestamp: number
-	}[]
+export type PNLChartData = {
+	totalValue: number
+	timestamp: number
+}[]
 
+export type PNLTableDate = {
 	todayPNL?: {
 		value: number
 		timestamp: number

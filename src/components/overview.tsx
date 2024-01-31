@@ -11,15 +11,12 @@ const App = ({
   currency,
   version,
   dateRange,
-  size,
 }: {
   currency: CurrencyRateDetail;
   version: number;
   dateRange: TDateRange;
-  // deprecated use dateRange instead
-  size: number;
 }) => {
-  if (size <= 0) {
+  if (dateRange.start.toISOString() === dateRange.end.toISOString()) {
     // do not allow query all size
     return <div></div>;
   }
@@ -34,7 +31,11 @@ const App = ({
           ></TotalValue>
         </div>
         <div className="col-span-2 md:col-span-1">
-          <PNL currency={currency} version={version} dateRange={dateRange} size={size}></PNL>
+          <PNL
+            currency={currency}
+            version={version}
+            dateRange={dateRange}
+          ></PNL>
         </div>
       </div>
       <LatestAssetsPercentage

@@ -254,8 +254,8 @@ class AssetHandler implements AssetHandlerImpl {
 		return _(models).orderBy(['createdAt', 'value'], ["desc", "desc"]).map(m => m.symbol).value()
 	}
 
-	async getHasDataCreatedAtDates(): Promise<Date[]> {
-		const sql = `SELECT distinct(createdAt) as createdAt FROM ${this.assetTableName} ORDER BY createdAt ASC`
+	async getHasDataCreatedAtDates(size?: number): Promise<Date[]> {
+		const sql = `SELECT distinct(createdAt) as createdAt FROM ${this.assetTableName} ORDER BY createdAt DESC ${size ? "LIMIT " + size : ""}`
 		const models = await selectFromDatabaseWithSql<{ createdAt: string }>(sql, [])
 
 		return _(models).map(m => new Date(m.createdAt)).value()

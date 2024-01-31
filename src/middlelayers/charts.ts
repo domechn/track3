@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLChartData, PNLTableDate, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -113,7 +113,7 @@ export async function updateAssetPrice(uuid: string, assetID: number, symbol: st
 }
 
 // return dates which has data
-export async function getAvailableDays(): Promise<Date[]> {
+export async function getAvailableDates(): Promise<Date[]> {
 	return ASSET_HANDLER.getHasDataCreatedAtDates()
 }
 
@@ -340,37 +340,36 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 	}
 }
 
-export async function queryPNLValue(size = 10): Promise<PNLData> {
-	// need to query size + 1 records to calculate first pnl data
-	// take at least 35 records to calculate 30 days pnl
-	const querySize = size < 35 ? 35 : size + 1
-	// const querySize = size + 1
+export async function queryPNLChartValue(dateRange: TDateRange): Promise<PNLChartData> {
+	
+	const data = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
-	const results = await ASSET_HANDLER.listSymbolGroupedAssets(querySize)
+	return _(data).reverse().map(rs => ({
+		totalValue: _(rs).sumBy("value"),
+		timestamp: new Date(rs[0]?.createdAt).getTime(),
+	})).value()
+}
 
-	const data = _(results).sort((a, b) => a[0].createdAt > b[0].createdAt ? 1 : -1).map(rs => ({
+export async function queryPNLTableValue(): Promise<PNLTableDate> {
+	const pnlData = _(await ASSET_HANDLER.listSymbolGroupedAssets(35)).reverse().map(rs => ({
 		totalValue: _(rs).sumBy("value"),
 		timestamp: new Date(rs[0]?.createdAt).getTime(),
 	})).value()
 
 	const getPNL = (days: number) => {
-		if (data.length < days + 1) {
+		if (pnlData.length < days + 1) {
 			return
 		}
 
-		const pickData = data[data.length - days - 1]
-		const val = data[data.length - 1].totalValue - pickData.totalValue
+		const pickData = pnlData[pnlData.length - days - 1]
+		const val = pnlData[pnlData.length - 1].totalValue - pickData.totalValue
 		return {
 			value: val,
 			timestamp: pickData.timestamp
 		}
 	}
 
-	const realData = size + 1 !== querySize ? _(data).takeRight(size + 1).value() : data
-
 	return {
-		// take last size + 1 from data
-		data: realData,
 		todayPNL: getPNL(1),
 		sevenTPnl: getPNL(8),
 		thirtyPNL: getPNL(31),
@@ -517,7 +516,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	})).value()
 }
 
-export async function queryCoinsAmountChange(symbol: string, dateRange:TDateRange): Promise<CoinsAmountAndValueChangeData | undefined> {
+export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRange): Promise<CoinsAmountAndValueChangeData | undefined> {
 	const assets = await ASSET_HANDLER.listAssetsBySymbolByDateRange(symbol, dateRange.start, dateRange.end)
 	if (!assets) {
 		return
