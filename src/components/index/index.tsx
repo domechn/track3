@@ -97,10 +97,6 @@ const App = () => {
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [tDateRange, setTDateRange] = useState<TDateRange>({
-    start: parseISO("1970-01-01"),
-    end: parseISO("1970-01-01"),
-  });
   const windowSize = useWindowSize();
   const [lastSize, setLastSize] = useState(windowSize);
   const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(
@@ -126,6 +122,13 @@ const App = () => {
       setLastSize(windowSize);
     }, resizeDelay); // to reduce resize count and cpu usage
   }, [windowSize]);
+
+  const tDateRange = useMemo(() => ({
+    start: dateRange?.from
+      ? startOfDay(dateRange.from)
+      : parseISO("1970-01-01"),
+    end: dateRange?.to ? endOfDay(dateRange.to) : parseISO("1970-01-01"),
+  }), [dateRange])
 
   useEffect(() => {
     resizeAllChartsInPage();
@@ -178,15 +181,6 @@ const App = () => {
     setDateRange(dt);
     const days = await getAvailableDates();
     setAvailableDates(days);
-
-    setTDateRange({
-      start: dt.from ? startOfDay(dt.from) : parseISO("1970-01-01"),
-      end: dt.to ? endOfDay(dt.to) : parseISO("1970-01-01"),
-
-      // workaround for refreshing page after date range changed
-      // @ts-ignore
-      current: new Date(),
-    });
   }
 
   function onDatePickerValueChange(
@@ -368,7 +362,10 @@ const App = () => {
               path="configuration"
               element={
                 <Configuration
-                  onConfigurationSave={() => loadConfiguration()}
+                  onConfigurationSave={() => {
+                    loadDatePickerData();
+                    loadConfiguration();
+                  }}
                 />
               }
             />

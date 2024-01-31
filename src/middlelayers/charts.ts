@@ -114,7 +114,9 @@ export async function updateAssetPrice(uuid: string, assetID: number, symbol: st
 
 // return dates which has data
 export async function getAvailableDates(): Promise<Date[]> {
-	return ASSET_HANDLER.getHasDataCreatedAtDates()
+	const dates = await ASSET_HANDLER.getHasDataCreatedAtDates()
+	// return asc sort
+	return _(dates).reverse().value()
 }
 
 function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[], pre?: AssetModel[]): AssetAction[] {

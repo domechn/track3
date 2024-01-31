@@ -12,6 +12,7 @@ const App = ({
   value,
   onDateChange,
 }: {
+  // sort asc
   availableDates: Date[],
   value: DateRange | undefined;
   onDateChange: (selectedTimes: number, date?: DateRange) => void;
@@ -33,7 +34,7 @@ const App = ({
       setSelectTimes(0);
       return;
     }
-
+ 
     const from = startOfDay(dateRange.from);
     const to = endOfDay(dateRange.to);
     const times = _(availableDays)
