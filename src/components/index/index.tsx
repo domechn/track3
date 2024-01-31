@@ -123,12 +123,15 @@ const App = () => {
     }, resizeDelay); // to reduce resize count and cpu usage
   }, [windowSize]);
 
-  const tDateRange = useMemo(() => ({
-    start: dateRange?.from
-      ? startOfDay(dateRange.from)
-      : parseISO("1970-01-01"),
-    end: dateRange?.to ? endOfDay(dateRange.to) : parseISO("1970-01-01"),
-  }), [dateRange])
+  const tDateRange = useMemo(
+    () => ({
+      start: dateRange?.from
+        ? startOfDay(dateRange.from)
+        : parseISO("1970-01-01"),
+      end: dateRange?.to ? endOfDay(dateRange.to) : parseISO("1970-01-01"),
+    }),
+    [dateRange]
+  );
 
   useEffect(() => {
     resizeAllChartsInPage();
@@ -177,10 +180,14 @@ const App = () => {
   }
 
   async function loadDatePickerData() {
-    const dt = await getInitialQueryDateRange();
-    setDateRange(dt);
+    loadInitialQueryDateRange();
     const days = await getAvailableDates();
     setAvailableDates(days);
+  }
+
+  async function loadInitialQueryDateRange() {
+    const dt = await getInitialQueryDateRange();
+    setDateRange(dt);
   }
 
   function onDatePickerValueChange(
@@ -363,7 +370,7 @@ const App = () => {
               element={
                 <Configuration
                   onConfigurationSave={() => {
-                    loadDatePickerData();
+                    loadInitialQueryDateRange();
                     loadConfiguration();
                   }}
                 />
