@@ -321,7 +321,7 @@ const App = () => {
           <Route
             path="/overview"
             element={
-              <PageWrapper hasData={hasData}>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
                 <Overview currency={currentCurrency} dateRange={tDateRange} />
               </PageWrapper>
             }
@@ -330,7 +330,7 @@ const App = () => {
           <Route
             path="/wallets"
             element={
-              <PageWrapper hasData={hasData}>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
                 <WalletAnalysis
                   currency={currentCurrency}
                   dateRange={tDateRange}
@@ -341,7 +341,7 @@ const App = () => {
           <Route
             path="/comparison"
             element={
-              <PageWrapper hasData={hasData}>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
                 <Comparison currency={currentCurrency} />
               </PageWrapper>
             }
@@ -349,7 +349,7 @@ const App = () => {
           <Route
             path="/history"
             element={
-              <PageWrapper hasData={hasData}>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
                 <HistoricalData
                   currency={currentCurrency}
                   dateRange={tDateRange}

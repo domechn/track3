@@ -163,6 +163,7 @@ const App = ({
 }) => {
   const lineColor = "rgba(255, 99, 71, 1)";
   const { needResize } = useContext(ChartResizeContext);
+  const [initialLoaded, setInitialLoaded] = useState(false);
 
   const [totalValueLoading, setTotalValueLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
@@ -184,7 +185,10 @@ const App = ({
   const [showValue, setShowValue] = useState(false);
 
   useEffect(() => {
-    loadData(dateRange).then(() => resizeChartWithDelay(chartName));
+    loadData(dateRange).then(() => {
+      resizeChartWithDelay(chartName);
+      setInitialLoaded(true);
+    });
   }, [dateRange]);
 
   useEffect(() => {
@@ -202,22 +206,34 @@ const App = ({
   }
 
   async function loadTotalValue() {
-    setTotalValueLoading(true);
+    updateLoading(true, "totalValue");
     try {
       const tv = await queryTotalValue();
       setTotalValueData(tv);
     } finally {
-      setTotalValueLoading(false);
+      updateLoading(false, "totalValue");
     }
   }
 
   async function loadChartData(dr: TDateRange) {
-    setChartLoading(true);
+    updateLoading(true, "chart");
     try {
       const ac = await queryAssetChange(dr);
       setAssetChangeData(ac);
     } finally {
-      setChartLoading(false);
+      updateLoading(false, "chart");
+    }
+  }
+
+  function updateLoading(val: boolean, loadingType: "chart" | "totalValue") {
+    // no need to set loading if already loaded ( like refresh data in overview page)
+    if (initialLoaded) {
+      return
+    }
+    if (loadingType === "chart") {
+      setChartLoading(val);
+    } else if (loadingType === "totalValue"){
+      setTotalValueLoading(val);
     }
   }
 

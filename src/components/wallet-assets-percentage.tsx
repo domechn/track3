@@ -32,25 +32,37 @@ const App = ({
   const size = useWindowSize();
   const chartRef = useRef<ChartJSOrUndefined<"pie", string[], unknown>>(null);
   const { needResize } = useContext(ChartResizeContext);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
     useState<WalletAssetsPercentageData>([]);
 
   useEffect(() => {
-    loadData().then(() => resizeChartWithDelay(chartName));
+    loadData().then(() => {
+      resizeChartWithDelay(chartName);
+      setInitialLoaded(true);
+    });
   }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData() {
-    setLoading(true);
+    updateLoading(true);
 
     try {
       const wap = await WALLET_ANALYZER.queryWalletAssetsPercentage();
       setWalletAssetsPercentage(wap);
     } finally {
-      setLoading(false);
+      updateLoading(false);
     }
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return;
+    }
+
+    setLoading(val);
   }
 
   const options = {

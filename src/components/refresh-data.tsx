@@ -3,7 +3,7 @@ import { refreshAllData } from "../middlelayers/charts";
 import { trackEventWithClientID } from "../utils/app";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "./ui/button";
-import { ReloadIcon } from "@radix-ui/react-icons";
+import { UpdateIcon } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { CacheCenter } from "@/middlelayers/datafetch/utils/cache";
 import { updateAllCurrencyRates } from "@/middlelayers/configuration";
@@ -56,6 +56,8 @@ const App = ({
   }
 
   const handleButtonClick = () => {
+    afterRefresh(true)
+    return
     setRefreshLoading(true);
 
     let refreshError: Error | undefined;
@@ -100,8 +102,7 @@ const App = ({
   return (
     <div>
       <Button onClick={handleButtonClick} disabled={refreshLoading}>
-        {/*  animate-spin */}
-        <ReloadIcon
+        <UpdateIcon
           className={`mr-2 h-4 w-4 ${refreshLoading && "animate-spin"}`}
         />
         <p className="hidden sm:inline-block">Refresh</p>

@@ -14,10 +14,6 @@ const App = ({
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
 }) => {
-  if (dateRange.start.toISOString() === dateRange.end.toISOString()) {
-    // do not allow query all size
-    return <div></div>;
-  }
   return (
     <div className="space-y-2">
       <div className="grid gap-4 grid-cols-2">

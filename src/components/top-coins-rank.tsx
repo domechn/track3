@@ -18,12 +18,9 @@ import { ChartResizeContext } from "@/App";
 
 const chartName = "Trend of Top Coins Rank";
 
-const App = ({
-  dateRange,
-}: {
-  dateRange: TDateRange;
-}) => {
+const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const { needResize } = useContext(ChartResizeContext);
   const [topCoinsRankData, setTopCoinsRankData] = useState({
@@ -40,19 +37,30 @@ const App = ({
     >(null);
 
   useEffect(() => {
-    loadData(dateRange).then(() => resizeChartWithDelay(chartName));
+    loadData(dateRange).then(() => {
+      resizeChartWithDelay(chartName);
+      setInitialLoaded(true);
+    });
   }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData(dr: TDateRange) {
-    setLoading(true);
+    updateLoading(true);
     try {
       const tcr = await queryTopCoinsRank(dr);
       setTopCoinsRankData(tcr);
     } finally {
-      setLoading(false);
+      updateLoading(false);
     }
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return;
+    }
+
+    setLoading(val);
   }
 
   const options = {

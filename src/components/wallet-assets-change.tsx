@@ -28,21 +28,31 @@ const App = ({
   dateRange: TDateRange;
 }) => {
   const [loading, setLoading] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [walletAssetsChange, setWalletAssetsChange] =
     useState<WalletAssetsChangeData>([]);
 
   useEffect(() => {
-    loadData();
+    loadData().then(() => {
+      setInitialLoaded(true);
+    });
   }, [dateRange]);
 
   async function loadData() {
-    setLoading(true);
+    updateLoading(true);
     try {
       const wac = await WALLET_ANALYZER.queryWalletAssetsChange();
       setWalletAssetsChange(wac);
     } finally {
-      setLoading(false);
+      updateLoading(false);
     }
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return;
+    }
+    setLoading(val);
   }
 
   function getArrow(value: number) {
