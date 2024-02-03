@@ -25,6 +25,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   const { needResize } = useContext(ChartResizeContext);
   const [loading, setLoading] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] =
     useState<TopCoinsPercentageChangeData>({
       timestamps: [],
@@ -42,19 +43,29 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     >(null);
 
   useEffect(() => {
-    loadData(dateRange).then(() => resizeChartWithDelay(chartNameKey));
+    loadData(dateRange).then(() => {
+      resizeChartWithDelay(chartNameKey);
+      setInitialLoaded(true);
+    });
   }, [dateRange]);
 
   useEffect(() => resizeChart(chartNameKey), [needResize]);
 
   async function loadData(dr: TDateRange) {
-    setLoading(true);
+    updateLoading(true);
     try {
       const tcpcd = await queryTopCoinsPercentageChangeData(dr);
       setTopCoinsPercentageChangeData(tcpcd);
     } finally {
-      setLoading(false);
+      updateLoading(false);
     }
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return;
+    }
+    setLoading(val);
   }
 
   const options = {

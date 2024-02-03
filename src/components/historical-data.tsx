@@ -4,7 +4,11 @@ import {
   deleteHistoricalDataDetailById,
   queryHistoricalData,
 } from "@/middlelayers/charts";
-import { CurrencyRateDetail, HistoricalData, TDateRange } from "@/middlelayers/types";
+import {
+  CurrencyRateDetail,
+  HistoricalData,
+  TDateRange,
+} from "@/middlelayers/types";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
 
@@ -71,6 +75,7 @@ const App = ({
   const [data, setData] = useState([] as HistoricalData[]);
   const [rankData, setRankData] = useState([] as RankData[]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   const [loading, setLoading] = useState(false);
@@ -100,7 +105,9 @@ const App = ({
   }, [data]);
 
   useEffect(() => {
-    loadAllData();
+    loadAllData().then(() => {
+      setInitialLoaded(true);
+    });
   }, [dateRange]);
 
   const maxDataPage = useMemo(() => {
@@ -127,13 +134,21 @@ const App = ({
   }
 
   async function loadAllData() {
-    setLoading(true);
+    updateLoading(true);
     try {
       const d = await queryHistoricalData(-1);
       setData(d);
     } finally {
-      setLoading(false);
+      updateLoading(false);
     }
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return;
+    }
+
+    setLoading(val);
   }
 
   function onHistoricalDataDeleteClick(uuid: string) {

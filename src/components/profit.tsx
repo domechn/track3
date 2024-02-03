@@ -31,19 +31,21 @@ const App = ({
   >([]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [topType, setTopType] = useState<TopType>("profitTop");
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
+    updateLoading(true);
     calculateTotalProfit(dateRange)
       .then((res) => {
         setProfit(res.total);
         setCoinsProfit(_(res.coins).sortBy("value").value());
+        setInitialLoaded(true);
 
         // set logo map
         getLogoMap(res.coins).then((m) => setLogoMap(m));
       })
-      .finally(() => setLoading(false));
+      .finally(() => updateLoading(false));
   }, [dateRange]);
 
   const topTypeData = useMemo(() => {
@@ -62,6 +64,14 @@ const App = ({
     });
 
     return _.assign({}, ...kvs);
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return;
+    }
+
+    setLoading(val);
   }
 
   function onTypeSelectChange(val: TopType) {

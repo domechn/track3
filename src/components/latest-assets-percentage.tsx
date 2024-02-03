@@ -47,6 +47,7 @@ const App = ({
   const { needResize } = useContext(ChartResizeContext);
   const [dataPage, setDataPage] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
   const chartRef =
@@ -60,7 +61,10 @@ const App = ({
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   useEffect(() => {
-    loadData(dateRange).then(() => resizeChartWithDelay(chartName));
+    loadData(dateRange).then(() => {
+      resizeChartWithDelay(chartName);
+      setInitialLoaded(true);
+    });
   }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
@@ -81,13 +85,21 @@ const App = ({
   }, [latestAssetsPercentageData]);
 
   async function loadData(dr: TDateRange) {
-    setLoading(true);
+    updateLoading(true);
     try {
       const lap = await queryLatestAssetsPercentage();
       setLatestAssetsPercentageData(lap);
     } finally {
-      setLoading(false);
+      updateLoading(false);
     }
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return;
+    }
+
+    setLoading(val);
   }
 
   const maxDataPage = useMemo(() => {

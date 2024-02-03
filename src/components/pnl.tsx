@@ -32,36 +32,53 @@ const App = ({
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
 }) => {
-  const [loading, setLoading] = useState(false);
+  const [tableLoading, setTableLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
   const { needResize } = useContext(ChartResizeContext);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+
   const [pnlTableData, setPnlTableData] = useState<PNLTableDate>({});
   const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
 
   useEffect(() => {
-    loadChartData(dateRange).then(() => resizeChartWithDelay(chartName));
+    loadChartData(dateRange).then(() => {
+      resizeChartWithDelay(chartName);
+      setInitialLoaded(true);
+    });
     loadTableData();
   }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadTableData() {
-    setLoading(true);
+    updateLoading(true, "table");
     try {
       const pd = await queryPNLTableValue();
       setPnlTableData(pd);
     } finally {
-      setLoading(false);
+      updateLoading(false, "table");
     }
   }
 
   async function loadChartData(dr: TDateRange) {
-    setChartLoading(true);
+    updateLoading(true, "chart");
     try {
       const pd = await queryPNLChartValue(dr);
       setPnlChartData(pd);
     } finally {
-      setChartLoading(false);
+      updateLoading(false, "chart");
+    }
+  }
+
+  function updateLoading(val: boolean, loadingType: "chart" | "table") {
+    if (initialLoaded) {
+      return;
+    }
+
+    if (loadingType === "chart") {
+      setChartLoading(val);
+    } else if (loadingType === "table") {
+      setTableLoading(val);
     }
   }
 
@@ -270,7 +287,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">Last PNL</div>
               {loadingWrapper(
-                loading,
+                tableLoading,
                 <div
                   className={`text-l font-bold ${getPNLTextColor(
                     pnlTableData.todayPNL?.value
@@ -281,7 +298,7 @@ const App = ({
                 "h-[22px]"
               )}
               {loadingWrapper(
-                loading,
+                tableLoading,
                 <p
                   className={`text-xs ${getPNLTextColor(
                     pnlTableData.todayPNL?.value
@@ -298,7 +315,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">7T PNL</div>
               {loadingWrapper(
-                loading,
+                tableLoading,
                 <div
                   className={`text-l font-bold ${getPNLTextColor(
                     pnlTableData.sevenTPnl?.value
@@ -310,7 +327,7 @@ const App = ({
                 "h-[22px]"
               )}
               {loadingWrapper(
-                loading,
+                tableLoading,
                 <p
                   className={`text-xs ${getPNLTextColor(
                     pnlTableData.sevenTPnl?.value
@@ -327,7 +344,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">30T PNL</div>
               {loadingWrapper(
-                loading,
+                tableLoading,
                 <div
                   className={`text-l font-bold ${getPNLTextColor(
                     pnlTableData.thirtyPNL?.value
@@ -339,7 +356,7 @@ const App = ({
                 "h-[22px]"
               )}
               {loadingWrapper(
-                loading,
+                tableLoading,
                 <p
                   className={`text-xs ${getPNLTextColor(
                     pnlTableData.thirtyPNL?.value
