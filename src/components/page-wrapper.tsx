@@ -53,7 +53,7 @@ const App = ({
   }
 
   const navigate = useNavigate();
-  return PageWrapper();
+  return <>{PageWrapper()}</>;
 };
 
 export default App;
