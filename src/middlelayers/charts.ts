@@ -46,10 +46,16 @@ export async function listAllowedSymbols(): Promise<string[]> {
 
 // calculateTotalProfit gets all profit
 export async function calculateTotalProfit(dateRange: TDateRange): Promise<{
+	// total profit
 	total: number,
+	// total profit percentage
+	percentage: number,
 	coins: {
 		symbol: string,
+		// coin profit
 		value: number
+		// coin profit percentage
+		percentage: number
 	}[]
 }> {
 	const symbols = await ASSET_HANDLER.listAllSymbols()
@@ -92,13 +98,19 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<{
 
 		return {
 			symbol: d.symbol,
+			realSpentValue,
 			value,
+			percentage: realSpentValue === 0 ? 0 : value / realSpentValue * 100
 		}
 	}).compact().value()
 
+	const total = _(coins).sumBy(c => c.value)
+	const totalRealSpent = _(coins).sumBy(c => c.realSpentValue)
+
 	return {
-		total: _(coins).sumBy(c => c.value),
-		coins
+		total,
+		percentage: totalRealSpent === 0 ? 0 : total / totalRealSpent * 100,
+		coins,
 	}
 }
 
