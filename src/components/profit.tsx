@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
-import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberKeepNDigitsAfterDecimalPoint,
+  prettyNumberToLocaleString,
+} from "@/utils/currency";
 import { calculateTotalProfit } from "@/middlelayers/charts";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { loadingWrapper } from "@/lib/loading";
@@ -23,9 +27,11 @@ const App = ({
   dateRange: TDateRange;
 }) => {
   const [profit, setProfit] = useState(0);
+  const [profitPercentage, setProfitPercentage] = useState(0);
   const [coinsProfit, setCoinsProfit] = useState<
     {
       symbol: string;
+      percentage: number;
       value: number;
     }[]
   >([]);
@@ -39,6 +45,7 @@ const App = ({
     calculateTotalProfit(dateRange)
       .then((res) => {
         setProfit(res.total);
+        setProfitPercentage(res.percentage);
         setCoinsProfit(_(res.coins).sortBy("value").value());
         setInitialLoaded(true);
 
@@ -97,12 +104,17 @@ const App = ({
         <CardContent className="space-y-2 placeholder">
           {loadingWrapper(
             loading,
-            <div className="text-2xl font-bold">
-              {(profit < 0 ? "-" : "+") +
-                currency.symbol +
-                prettyNumberToLocaleString(
-                  currencyWrapper(currency)(Math.abs(profit))
-                )}
+            <div className="text-2xl font-bold flex space-x-2 items-end">
+              <div>
+                {(profit < 0 ? "-" : "+") +
+                  currency.symbol +
+                  prettyNumberToLocaleString(
+                    currencyWrapper(currency)(Math.abs(profit))
+                  )}
+              </div>
+              <div className="text-base text-gray-500">
+                {prettyNumberKeepNDigitsAfterDecimalPoint(profitPercentage, 2)}%
+              </div>
             </div>,
             "h-[32px]"
           )}
@@ -151,6 +163,14 @@ const App = ({
                             prettyNumberToLocaleString(
                               currencyWrapper(currency)(Math.abs(d.value))
                             )}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {d.value < 0 ? "-" : "+"}
+                          {prettyNumberKeepNDigitsAfterDecimalPoint(
+                            Math.abs(d.percentage),
+                            2
+                          )}
+                          %
                         </div>
                       </TableCell>
                     </TableRow>
