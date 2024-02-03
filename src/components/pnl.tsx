@@ -28,11 +28,9 @@ const chartName = "PNL of Asset";
 const App = ({
   currency,
   dateRange,
-  version,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
-  version: number;
 }) => {
   const [loading, setLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
@@ -42,11 +40,8 @@ const App = ({
 
   useEffect(() => {
     loadChartData(dateRange).then(() => resizeChartWithDelay(chartName));
-  }, [dateRange, version]);
-
-  useEffect(() => {
     loadTableData();
-  }, []);
+  }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

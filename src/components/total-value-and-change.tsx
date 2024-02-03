@@ -157,11 +157,9 @@ class BTCTotalValue implements TotalValueShower {
 const App = ({
   currency,
   dateRange,
-  version,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
-  version: number;
 }) => {
   const lineColor = "rgba(255, 99, 71, 1)";
   const { needResize } = useContext(ChartResizeContext);
@@ -187,7 +185,7 @@ const App = ({
 
   useEffect(() => {
     loadData(dateRange).then(() => resizeChartWithDelay(chartName));
-  }, [dateRange, version]);
+  }, [dateRange]);
 
   useEffect(() => {
     if (showValue) {

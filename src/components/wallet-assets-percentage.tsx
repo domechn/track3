@@ -2,6 +2,7 @@ import { Pie } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import {
   CurrencyRateDetail,
+  TDateRange,
   WalletAssetsPercentageData,
 } from "@/middlelayers/types";
 import { currencyWrapper } from "@/utils/currency";
@@ -23,10 +24,10 @@ const chartName = "Percentage And Total Value of Each Wallet";
 
 const App = ({
   currency,
-  version,
+  dateRange,
 }: {
   currency: CurrencyRateDetail;
-  version: number;
+  dateRange: TDateRange;
 }) => {
   const size = useWindowSize();
   const chartRef = useRef<ChartJSOrUndefined<"pie", string[], unknown>>(null);
@@ -37,7 +38,7 @@ const App = ({
 
   useEffect(() => {
     loadData().then(() => resizeChartWithDelay(chartName));
-  }, [version]);
+  }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

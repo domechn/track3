@@ -1,6 +1,7 @@
 import _ from "lodash";
 import {
   CurrencyRateDetail,
+  TDateRange,
   WalletAssetsChangeData,
 } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
@@ -21,10 +22,10 @@ import { getWalletLogo } from "@/lib/utils";
 
 const App = ({
   currency,
-  version,
+  dateRange,
 }: {
   currency: CurrencyRateDetail;
-  version: number;
+  dateRange: TDateRange;
 }) => {
   const [loading, setLoading] = useState(false);
   const [walletAssetsChange, setWalletAssetsChange] =
@@ -32,7 +33,7 @@ const App = ({
 
   useEffect(() => {
     loadData();
-  }, [version]);
+  }, [dateRange]);
 
   async function loadData() {
     setLoading(true);

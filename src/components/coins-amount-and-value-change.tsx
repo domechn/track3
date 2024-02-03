@@ -23,11 +23,9 @@ const chartName = "Trend of Coin";
 const App = ({
   currency,
   dateRange,
-  version,
   symbol,
 }: {
   currency: CurrencyRateDetail;
-  version: number;
   dateRange: TDateRange;
   symbol: string;
 }) => {
@@ -48,7 +46,7 @@ const App = ({
 
   useEffect(() => {
     loadData(symbol, dateRange).then(() => resizeChartWithDelay(chartName));
-  }, [dateRange, version, symbol]);
+  }, [dateRange, symbol]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
@@ -197,7 +195,10 @@ const App = ({
           >
             {loadingWrapper(
               loading,
-              <Line options={options as any} data={chartDataByCoin(coinsAmountAndValueChangeData)} />,
+              <Line
+                options={options as any}
+                data={chartDataByCoin(coinsAmountAndValueChangeData)}
+              />,
               "my-[10px] h-[26px]",
               10
             )}

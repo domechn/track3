@@ -9,11 +9,9 @@ import { CurrencyRateDetail, TDateRange } from "../middlelayers/types";
 
 const App = ({
   currency,
-  version,
   dateRange,
 }: {
   currency: CurrencyRateDetail;
-  version: number;
   dateRange: TDateRange;
 }) => {
   if (dateRange.start.toISOString() === dateRange.end.toISOString()) {
@@ -24,28 +22,16 @@ const App = ({
     <div className="space-y-2">
       <div className="grid gap-4 grid-cols-2">
         <div className="col-span-2 md:col-span-1">
-          <TotalValue
-            currency={currency}
-            dateRange={dateRange}
-            version={version}
-          ></TotalValue>
+          <TotalValue currency={currency} dateRange={dateRange}></TotalValue>
         </div>
         <div className="col-span-2 md:col-span-1">
-          <PNL
-            currency={currency}
-            version={version}
-            dateRange={dateRange}
-          ></PNL>
+          <PNL currency={currency} dateRange={dateRange}></PNL>
         </div>
       </div>
-      <LatestAssetsPercentage
-        currency={currency}
-        dateRange={dateRange}
-        version={version}
-      />
-      <Profit currency={currency} version={version} dateRange={dateRange} />
-      <TopCoinsRank version={version} dateRange={dateRange} />
-      <TopCoinsPercentageChange version={version} dateRange={dateRange} />
+      <LatestAssetsPercentage currency={currency} dateRange={dateRange} />
+      <Profit currency={currency} dateRange={dateRange} />
+      <TopCoinsRank dateRange={dateRange} />
+      <TopCoinsPercentageChange dateRange={dateRange} />
       <div className="mb-2"></div>
     </div>
   );
