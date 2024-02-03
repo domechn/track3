@@ -20,7 +20,7 @@ import { ChartResizeContext } from "@/App";
 const prefix = "tcpc";
 const chartNameKey = "Change of Top Coins";
 
-const App = ({ dateRange, version }: { dateRange: TDateRange; version: number }) => {
+const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
 
   const { needResize } = useContext(ChartResizeContext);
@@ -43,7 +43,7 @@ const App = ({ dateRange, version }: { dateRange: TDateRange; version: number })
 
   useEffect(() => {
     loadData(dateRange).then(() => resizeChartWithDelay(chartNameKey));
-  }, [dateRange, version]);
+  }, [dateRange]);
 
   useEffect(() => resizeChart(chartNameKey), [needResize]);
 

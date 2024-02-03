@@ -343,7 +343,7 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 }
 
 export async function queryPNLChartValue(dateRange: TDateRange): Promise<PNLChartData> {
-	
+
 	const data = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
 	return _(data).reverse().map(rs => ({

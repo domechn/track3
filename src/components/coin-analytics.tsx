@@ -65,11 +65,9 @@ import { loadingWrapper } from "@/lib/loading";
 const App = ({
   currency,
   dateRange,
-  version,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
-  version: number;
 }) => {
   const { symbol } = useParams() as { symbol: string };
   const navigate = useNavigate();
@@ -105,7 +103,7 @@ const App = ({
 
     // reset pagination
     setDataPage(0);
-  }, [symbol, version]);
+  }, [symbol]);
 
   async function getLogoPath(symbol: string) {
     const acd = await getAppCacheDir();
@@ -631,7 +629,6 @@ const App = ({
         currency={currency}
         symbol={symbol}
         dateRange={dateRange}
-        version={version}
       />
       <HistoryTable />
     </div>

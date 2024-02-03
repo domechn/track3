@@ -19,10 +19,8 @@ import { ChartResizeContext } from "@/App";
 const chartName = "Trend of Top Coins Rank";
 
 const App = ({
-  version,
   dateRange,
 }: {
-  version: number;
   dateRange: TDateRange;
 }) => {
   const wsize = useWindowSize();
@@ -43,7 +41,7 @@ const App = ({
 
   useEffect(() => {
     loadData(dateRange).then(() => resizeChartWithDelay(chartName));
-  }, [dateRange, version]);
+  }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

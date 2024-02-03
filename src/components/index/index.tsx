@@ -31,7 +31,7 @@ import {
   Navigate,
 } from "react-router-dom";
 
-import { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
+import { CurrencyRateDetail } from "@/middlelayers/types";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { getAvailableDates, queryLastRefreshAt } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
@@ -60,7 +60,7 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
-import { addDays, endOfDay, parseISO, startOfDay } from "date-fns";
+import { endOfDay, parseISO, startOfDay } from "date-fns";
 
 ChartJS.register(
   ...registerables,
@@ -87,8 +87,6 @@ export const RefreshButtonLoadingContext = React.createContext<{
 const App = () => {
   const { setNeedResize } = useContext(ChartResizeContext);
 
-  // no need version anymore
-  const [version, setVersion] = useState(0);
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   // todo: auto update this value, if user active or inactive
@@ -324,11 +322,7 @@ const App = () => {
             path="/overview"
             element={
               <PageWrapper hasData={hasData}>
-                <Overview
-                  currency={currentCurrency}
-                  version={version}
-                  dateRange={tDateRange}
-                />
+                <Overview currency={currentCurrency} dateRange={tDateRange} />
               </PageWrapper>
             }
           ></Route>
@@ -337,7 +331,10 @@ const App = () => {
             path="/wallets"
             element={
               <PageWrapper hasData={hasData}>
-                <WalletAnalysis currency={currentCurrency} version={version} />
+                <WalletAnalysis
+                  currency={currentCurrency}
+                  dateRange={tDateRange}
+                />
               </PageWrapper>
             }
           />
@@ -355,11 +352,11 @@ const App = () => {
               <PageWrapper hasData={hasData}>
                 <HistoricalData
                   currency={currentCurrency}
+                  dateRange={tDateRange}
                   afterDataDeleted={() => {
                     loadAllData();
                     autoBackupHistoricalData(true);
                   }}
-                  version={version}
                 />
               </PageWrapper>
             }
@@ -402,11 +399,7 @@ const App = () => {
           <Route
             path="/coins/:symbol"
             element={
-              <CoinAnalysis
-                currency={currentCurrency}
-                version={version}
-                dateRange={tDateRange}
-              />
+              <CoinAnalysis currency={currentCurrency} dateRange={tDateRange} />
             }
           ></Route>
 

@@ -4,7 +4,7 @@ import {
   deleteHistoricalDataDetailById,
   queryHistoricalData,
 } from "@/middlelayers/charts";
-import { CurrencyRateDetail, HistoricalData } from "@/middlelayers/types";
+import { CurrencyRateDetail, HistoricalData, TDateRange } from "@/middlelayers/types";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
 
@@ -58,14 +58,14 @@ type RankData = {
 
 const App = ({
   afterDataDeleted,
+  dateRange,
   currency,
-  version,
 }: {
   // uuid is id for batch data
   // id is for single data
   afterDataDeleted?: (uuid?: string, id?: number) => unknown;
+  dateRange: TDateRange;
   currency: CurrencyRateDetail;
-  version: number;
 }) => {
   const { toast } = useToast();
   const [data, setData] = useState([] as HistoricalData[]);
@@ -101,7 +101,7 @@ const App = ({
 
   useEffect(() => {
     loadAllData();
-  }, [version]);
+  }, [dateRange]);
 
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision

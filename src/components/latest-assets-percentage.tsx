@@ -40,11 +40,9 @@ const chartName = "Percentage of Assets";
 const App = ({
   currency,
   dateRange,
-  version,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
-  version: number;
 }) => {
   const { needResize } = useContext(ChartResizeContext);
   const [dataPage, setDataPage] = useState<number>(0);
@@ -63,7 +61,7 @@ const App = ({
 
   useEffect(() => {
     loadData(dateRange).then(() => resizeChartWithDelay(chartName));
-  }, [dateRange, version]);
+  }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

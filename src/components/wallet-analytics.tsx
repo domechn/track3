@@ -1,18 +1,18 @@
 import WalletAssetsPercentage from "@/components/wallet-assets-percentage";
 import WalletAssetsChange from "@/components/wallet-assets-change";
-import {
-  CurrencyRateDetail,
-} from "@/middlelayers/types";
+import { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
 
-const App = ({ currency,version }: { currency: CurrencyRateDetail, version: number }) => {
-
+const App = ({
+  currency,
+  dateRange,
+}: {
+  currency: CurrencyRateDetail;
+  dateRange: TDateRange;
+}) => {
   return (
     <div className="space-y-2">
-      <WalletAssetsPercentage
-        currency={currency}
-        version={version}
-      />
-      <WalletAssetsChange currency={currency} version={version}/>
+      <WalletAssetsPercentage currency={currency} dateRange={dateRange} />
+      <WalletAssetsChange currency={currency} dateRange={dateRange} />
     </div>
   );
 };

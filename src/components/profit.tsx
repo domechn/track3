@@ -18,12 +18,9 @@ type TopType = "profitTop" | "lossTop";
 const App = ({
   currency,
   dateRange,
-  // version is used for reloading data
-  version,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
-  version: number;
 }) => {
   const [profit, setProfit] = useState(0);
   const [coinsProfit, setCoinsProfit] = useState<
@@ -47,7 +44,7 @@ const App = ({
         getLogoMap(res.coins).then((m) => setLogoMap(m));
       })
       .finally(() => setLoading(false));
-  }, [dateRange, version]);
+  }, [dateRange]);
 
   const topTypeData = useMemo(() => {
     const size = 5;
