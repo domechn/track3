@@ -56,8 +56,6 @@ const App = ({
   }
 
   const handleButtonClick = () => {
-    afterRefresh(true)
-    return
     setRefreshLoading(true);
 
     let refreshError: Error | undefined;
