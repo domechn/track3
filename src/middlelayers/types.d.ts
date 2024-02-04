@@ -212,3 +212,10 @@ export type TDateRange = {
 	start: Date
 	end: Date
 }
+
+export type UserLicenseInfo = {
+	isPro: boolean
+
+	// must exists if isPro === true
+	license?: string
+}

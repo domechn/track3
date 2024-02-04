@@ -4,11 +4,12 @@ import { sendHttpRequest } from '../utils/http'
 import { getAddressList } from '../utils/address'
 import { getClientID } from '@/utils/app'
 import { asyncMap } from '../utils/async'
+import { PRO_API_ENDPOINT } from '@/middlelayers/configuration'
 
 export class TRC20ProUserAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'trc20'>
 
-	private readonly queryUrl = "https://track3-pro-api.domc.me/api/trc20/assetsBalances"
+	private readonly queryUrl = PRO_API_ENDPOINT + "/api/trc20/assetsBalances"
 
 	private license: string
 

@@ -10,18 +10,24 @@ import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
-import { AddProgressFunc } from './types'
+import { AddProgressFunc, UserLicenseInfo } from './types'
 import { ASSET_HANDLER } from './entities/assets'
 import md5 from 'md5'
-import { isProVersion } from './license'
 import { TRC20ProUserAnalyzer } from './datafetch/coins/trc20'
 import { DATA_MANAGER, ExportData } from './datamanager'
 import { getAutoBackupDirectory, getAutoImportAt, getLastAutoBackupAt, saveAutoImportAt, saveLastAutoBackupAt } from './configuration'
+import { CoinPriceQuerier, CoinPriceQuery, ProCoinPriceQuery } from './datafetch/coins/price'
 
 
-// TODO: query by token address not symbol, because there are multiple coins with same symbol
-export async function queryCoinPrices(symbols: string[]): Promise<{ [k: string]: number }> {
-	return invoke("query_coins_prices", { symbols })
+export async function queryCoinPrices(symbols: string[], userInfo: UserLicenseInfo): Promise<{ [k: string]: number }> {
+	let cpq: CoinPriceQuerier
+	if (userInfo.isPro) {
+		console.debug("pro license, use pro coin price query")
+		cpq = new ProCoinPriceQuery(userInfo.license!)
+	} else {
+		cpq = new CoinPriceQuery()
+	}
+	return cpq.listAllCoinPrices(symbols)
 }
 
 export async function downloadCoinLogos(coins: {
@@ -31,16 +37,9 @@ export async function downloadCoinLogos(coins: {
 	return invoke("download_coins_logos", { coins })
 }
 
-export async function loadPortfolios(config: CexConfig & TokenConfig, addProgress: AddProgressFunc): Promise<WalletCoin[]> {
-
-	// check if pro user
-	const { license, isPro } = await isProVersion()
-
+export async function loadPortfolios(config: CexConfig & TokenConfig, addProgress: AddProgressFunc, userInfo: UserLicenseInfo): Promise<WalletCoin[]> {
 	// all coins currently owned ( amount > 0 )
-	const currentCoins = await loadPortfoliosByConfig(config, addProgress, {
-		isPro,
-		license
-	})
+	const currentCoins = await loadPortfoliosByConfig(config, addProgress, userInfo)
 
 	// need to list coins owned before but not now ( amount = 0 )
 	const lastAssets = await ASSET_HANDLER.listAssets(1)
@@ -63,11 +62,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, addProgres
 }
 
 // progress percent is 70
-async function loadPortfoliosByConfig(config: CexConfig & TokenConfig, addProgress: AddProgressFunc, userInfo: {
-	isPro: boolean
-	// must exists if isPro === true
-	license?: string
-}): Promise<WalletCoin[]> {
+async function loadPortfoliosByConfig(config: CexConfig & TokenConfig, addProgress: AddProgressFunc, userInfo: UserLicenseInfo): Promise<WalletCoin[]> {
 	const progressPercent = 70
 	let anas: (typeof ERC20NormalAnalyzer | typeof ERC20ProAnalyzer | typeof CexAnalyzer | typeof SOLAnalyzer | typeof OthersAnalyzer | typeof BTCAnalyzer | typeof DOGEAnalyzer | typeof TRC20ProUserAnalyzer)[] = [ERC20NormalAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer]
 	if (userInfo.isPro) {

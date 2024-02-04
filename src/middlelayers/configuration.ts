@@ -1,12 +1,15 @@
 import { invoke } from '@tauri-apps/api'
 import { getDatabase } from './database'
 import { GlobalConfig } from './datafetch/types'
-import { ConfigurationModel, CurrencyRateDetail, TDateRange } from './types'
+import { ConfigurationModel, CurrencyRateDetail } from './types'
 import yaml from 'yaml'
 import { CURRENCY_RATE_HANDLER } from './entities/currency'
 import { ASSET_HANDLER } from './entities/assets'
 import _ from 'lodash'
 import { DateRange } from 'react-day-picker'
+
+// todo: update to dedicated domain
+export const PRO_API_ENDPOINT = 'https://track3-pro-api.domc.me'
 
 const prefix = "!ent:"
 const fixId = "1"

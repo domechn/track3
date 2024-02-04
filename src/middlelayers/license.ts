@@ -1,11 +1,9 @@
 import { getClientID } from '@/utils/app'
 import { sendHttpRequest } from './datafetch/utils/http'
-import { getLicenseIfIsPro } from './configuration'
+import { getLicenseIfIsPro, PRO_API_ENDPOINT } from './configuration'
+import { UserLicenseInfo } from '@/middlelayers/types'
 
-export async function isProVersion(): Promise<{
-	isPro: boolean
-	license?: string
-}> {
+export async function isProVersion(): Promise<UserLicenseInfo> {
 	// check if pro user
 	const license = await getLicenseIfIsPro()
 	let isPro = false
@@ -22,7 +20,7 @@ export async function isProVersion(): Promise<{
 export class LicenseCenter {
 	private static instance: LicenseCenter
 
-	private readonly endpoint = "https://track3-pro-api.domc.me"
+	private readonly endpoint = PRO_API_ENDPOINT
 
 	private readonly validateEndpoint = this.endpoint + "/api/license/validate"
 	private readonly activeEndpoint = this.endpoint + "/api/license/active"

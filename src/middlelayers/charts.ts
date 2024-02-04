@@ -12,6 +12,7 @@ import { ASSET_HANDLER } from './entities/assets'
 import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 import { Chart } from 'chart.js'
 import md5 from 'md5'
+import { isProVersion } from './license'
 
 const STABLE_COIN = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "PAX"]
 
@@ -196,15 +197,19 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 }
 
 async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinUSD[]> {
+	addProgress(1)
 	const config = await getConfiguration()
 	if (!config) {
 		throw new Error("no configuration found,\n please add configuration first")
 	}
-	addProgress(5)
+	addProgress(2)
+	// check if pro user
+	const userProInfo = await isProVersion()
+	addProgress(2)
 	// will add 70 percent in load portfolios
-	const assets = await loadPortfolios(config, addProgress)
+	const assets = await loadPortfolios(config, addProgress, userProInfo)
 	// always query btc and usdt price
-	const priceMap = await queryCoinPrices(_(assets).filter(a => !a.price).map("symbol").push("USDT").push("BTC").uniq().compact().value())
+	const priceMap = await queryCoinPrices(_(assets).filter(a => !a.price).map("symbol").push("USDT").push("BTC").uniq().compact().value(), userProInfo)
 	addProgress(10)
 
 	let latestAssets = _.clone(assets)
