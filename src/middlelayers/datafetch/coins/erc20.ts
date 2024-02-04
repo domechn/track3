@@ -6,6 +6,7 @@ import { getAddressList } from '../utils/address'
 import bluebird from 'bluebird'
 import { invoke } from '@tauri-apps/api'
 import { getClientID } from '@/utils/app'
+import { PRO_API_ENDPOINT } from '@/middlelayers/configuration'
 
 type QueryAssetResp = {
 	data: {
@@ -187,8 +188,8 @@ export class ERC20NormalAnalyzer implements Analyzer {
 }
 
 export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
-	private readonly queryUrl = "https://track3-pro-api.domc.me/api/erc20/assetsBalances"
-	private license : string
+	private readonly queryUrl = PRO_API_ENDPOINT + "/api/erc20/assetsBalances"
+	private license: string
 
 	constructor(config: Pick<TokenConfig, 'erc20'>, license: string) {
 		super(config)
