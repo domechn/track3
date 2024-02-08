@@ -12,18 +12,18 @@ import { DateRange } from 'react-day-picker'
 export const PRO_API_ENDPOINT = 'https://track3-pro-api.domc.me'
 
 const prefix = "!ent:"
-const fixId = "1"
-// deprecated: cloud sync function has been removed
-const cloudSyncFixId = "2"
+const generalFixId = "1"
 
 const autoBackupId = "3"
 const lastAutoBackupAtId = "4"
 const lastAutoImportAtId = "5"
+const querySizeId = "6"
+const preferCurrencyId = "7"
 const clientInfoFixId = "998"
 const licenseFixId = "997"
 
 export async function getConfiguration(): Promise<GlobalConfig | undefined> {
-	const model = await getConfigurationById(fixId)
+	const model = await getConfigurationById(generalFixId)
 	if (!model) {
 		return
 	}
@@ -36,12 +36,12 @@ export async function saveConfiguration(cfg: GlobalConfig) {
 	// validate data is yaml
 	const data = yaml.stringify(cfg)
 
-	await saveConfigurationById(fixId, data)
+	await saveConfigurationById(generalFixId, data)
 }
 
 // used for import data
 export async function importRawConfiguration(data: string) {
-	await saveConfigurationById(fixId, data, false)
+	await saveConfigurationById(generalFixId, data, false)
 }
 
 async function saveConfigurationById(id: string, cfg: string, encrypt = true) {
@@ -58,7 +58,7 @@ async function deleteConfigurationById(id: string) {
 }
 
 export async function exportConfigurationString(): Promise<string | undefined> {
-	const model = await getConfigurationModelById(fixId)
+	const model = await getConfigurationModelById(generalFixId)
 	return model?.data
 }
 
@@ -91,11 +91,7 @@ async function getConfigurationById(id: string): Promise<ConfigurationModel | un
 }
 
 export async function getInitialQueryDateRange(): Promise<DateRange> {
-	const cfg = await getConfiguration()
-	let size = 10
-	if (cfg?.configs.querySize) {
-		size = cfg.configs.querySize
-	}
+	const size = await queryQuerySize()
 
 	const days = await ASSET_HANDLER.getHasDataCreatedAtDates(size)
 	const from = _(days).min()
@@ -105,7 +101,15 @@ export async function getInitialQueryDateRange(): Promise<DateRange> {
 		from,
 		to,
 	}
+}
 
+export async function queryQuerySize(): Promise<number> {
+	const model = await getConfigurationById(querySizeId)
+	return model?.data ? parseInt(model.data) : 10
+}
+
+export async function saveQuerySize(size: number) {
+	await saveConfigurationById(querySizeId, size.toString(), false)
 }
 
 export async function updateAllCurrencyRates() {
@@ -120,18 +124,19 @@ export function getDefaultCurrencyRate() {
 	return CURRENCY_RATE_HANDLER.getDefaultCurrencyRate()
 }
 
-export async function getCurrentPreferCurrency(): Promise<CurrencyRateDetail> {
-	const cfg = await getConfiguration()
-	if (!cfg) {
-		return CURRENCY_RATE_HANDLER.getDefaultCurrencyRate()
-	}
+export async function queryPreferCurrency(): Promise<CurrencyRateDetail> {
+	const model = await getConfigurationById(preferCurrencyId)
+	const pc = model?.data
 
-	const pc: string = cfg.configs.preferCurrency
 	if (!pc) {
 		return CURRENCY_RATE_HANDLER.getDefaultCurrencyRate()
 	}
 
 	return CURRENCY_RATE_HANDLER.getCurrencyRateByCurrency(pc)
+}
+
+export async function savePreferCurrency(currency: string) {
+	await saveConfigurationById(preferCurrencyId, currency, false)
 }
 
 export async function getClientIDConfiguration(): Promise<string | undefined> {

@@ -36,7 +36,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { getAvailableDates, queryLastRefreshAt } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
 import {
-  getCurrentPreferCurrency,
+  queryPreferCurrency,
   getLicenseIfIsPro,
   getInitialQueryDateRange,
 } from "@/middlelayers/configuration";
@@ -152,7 +152,7 @@ const App = () => {
   }
 
   function loadCurrentCurrency() {
-    getCurrentPreferCurrency().then((c) => setCurrentCurrency(c));
+    queryPreferCurrency().then((c) => setCurrentCurrency(c));
   }
 
   function loadIsProUser() {

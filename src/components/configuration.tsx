@@ -2,7 +2,11 @@ import _ from "lodash";
 import { useEffect, useMemo, useState } from "react";
 import {
   getConfiguration,
+  queryPreferCurrency,
+  queryQuerySize,
   saveConfiguration,
+  savePreferCurrency,
+  saveQuerySize,
 } from "@/middlelayers/configuration";
 import { useToast } from "@/components/ui/use-toast";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
@@ -44,13 +48,11 @@ import { DOGEAnalyzer } from "@/middlelayers/datafetch/coins/doge";
 import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
 import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
 import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
-import { getWalletLogo } from '@/lib/utils'
+import { getWalletLogo } from "@/lib/utils";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
     groupUSD: true,
-    querySize: 10,
-    preferCurrency: "USD",
   },
   exchanges: [],
   erc20: {
@@ -230,13 +232,16 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   }
 
   function loadConfiguration() {
+    // load query size
+    queryQuerySize().then((s) => setQuerySize(s));
+
+    queryPreferCurrency().then((c) => setPreferCurrency(c.currency));
+
     getConfiguration()
       .then((d) => {
         const globalConfig = d ?? initialConfiguration;
 
         setGroupUSD(globalConfig.configs.groupUSD);
-        setQuerySize(globalConfig.configs.querySize || 10);
-        setPreferCurrency(globalConfig.configs.preferCurrency || "USD");
 
         setExchanges(
           _(globalConfig.exchanges)
@@ -338,8 +343,6 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     return {
       configs: {
         groupUSD,
-        querySize,
-        preferCurrency,
       },
       exchanges: exchangesData,
       // expand wallet
@@ -455,15 +458,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     if (formChanged) {
       submitConfiguration();
     }
-  }, [
-    formChanged,
-    groupUSD,
-    querySize,
-    preferCurrency,
-    exchanges,
-    wallets,
-    others,
-  ]);
+  }, [formChanged, groupUSD, exchanges, wallets, others]);
 
   function handleOthersChange(idx: number, key: string, val: string) {
     const nos = _.set(others, [idx, key], val);
@@ -473,16 +468,32 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   }
 
   function onQuerySizeChanged(val: string) {
-    setQuerySize(parseInt(val, 10));
+    const newVal = parseInt(val, 10);
+    setQuerySize(newVal);
 
-    // mark form is changed
-    markFormChanged();
+    // save to db directly
+    saveQuerySize(newVal)
+      .then(() => onConfigurationSave && onConfigurationSave())
+      .catch((e) => {
+        toast({
+          description: e.message ?? e,
+          variant: "destructive",
+        });
+      });
   }
 
   function onPreferCurrencyChanged(val: string) {
     setPreferCurrency(val);
     // mark form is changed
-    markFormChanged();
+
+    savePreferCurrency(val)
+      .then(() => onConfigurationSave && onConfigurationSave())
+      .catch((e) => {
+        toast({
+          description: e.message ?? e,
+          variant: "destructive",
+        });
+      });
   }
 
   function renderOthersForm(vals: { symbol: string; amount: number }[]) {
@@ -655,9 +666,12 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         });
         break;
       case "erc20":
-        ana = new ERC20ProAnalyzer({
-          erc20: initPayload,
-        }, "");
+        ana = new ERC20ProAnalyzer(
+          {
+            erc20: initPayload,
+          },
+          ""
+        );
         break;
       case "sol":
         ana = new SOLAnalyzer({
@@ -670,9 +684,12 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         });
         break;
       case "trc20":
-        ana = new TRC20ProUserAnalyzer({
-          trc20: initPayload,
-        }, "");
+        ana = new TRC20ProUserAnalyzer(
+          {
+            trc20: initPayload,
+          },
+          ""
+        );
         break;
       default:
         ana = null;
