@@ -303,6 +303,11 @@ const App = ({
       return mp >= 0 ? mp : 0;
     }, [historicalData]);
 
+    const tableHasData = useMemo(
+      () => historicalData.length > 0,
+      [historicalData]
+    );
+
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -417,6 +422,14 @@ const App = ({
                     ))}
             </TableBody>
           </Table>
+
+          {!tableHasData && (
+            <div className="flex items-center justify-center">
+              <div className="text-xl text-gray-300 m-auto">
+                No Historical Data For Selected Dates
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
