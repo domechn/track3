@@ -9,7 +9,7 @@ import {
 } from "@/middlelayers/types";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   queryCoinsAmountChange,
   resizeChart,
@@ -31,6 +31,7 @@ const App = ({
 }) => {
   const wsize = useWindowSize();
   const { needResize } = useContext(ChartResizeContext);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const y1Color = "#4F46E5";
   const y2Color = "#F97316";
 
@@ -44,14 +45,22 @@ const App = ({
 
   const [loading, setLoading] = useState(false);
 
+  const chartHasData = useMemo(
+    () => !_(coinsAmountAndValueChangeData.timestamps).isEmpty(),
+    [coinsAmountAndValueChangeData]
+  );
+
   useEffect(() => {
-    loadData(symbol, dateRange).then(() => resizeChartWithDelay(chartName));
+    loadData(symbol, dateRange).then(() => {
+      resizeChartWithDelay(chartName);
+      setInitialLoaded(true);
+    });
   }, [dateRange, symbol]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData(symbol: string, dateRange: TDateRange) {
-    setLoading(true);
+    updateLoading(true);
     try {
       const cac = await queryCoinsAmountChange(symbol, dateRange);
       if (!cac) {
@@ -59,8 +68,15 @@ const App = ({
       }
       setCoinsAmountAndValueChangeData(cac);
     } finally {
-      setLoading(false);
+      updateLoading(false);
     }
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return;
+    }
+    setLoading(val);
   }
 
   const options = {
@@ -149,7 +165,9 @@ const App = ({
       };
     }
     return {
-      labels: current.timestamps.map((x) => timestampToDate(x)),
+      labels: _(current.timestamps)
+        .map((x) => timestampToDate(x))
+        .value(),
       datasets: [
         {
           label: `Value`,
@@ -189,16 +207,23 @@ const App = ({
         </CardHeader>
         <CardContent className="space-y-2">
           <div
+            className="flex items-center justify-center"
             style={{
               height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
             {loadingWrapper(
               loading,
-              <Line
-                options={options as any}
-                data={chartDataByCoin(coinsAmountAndValueChangeData)}
-              />,
+              chartHasData ? (
+                <Line
+                  options={options as any}
+                  data={chartDataByCoin(coinsAmountAndValueChangeData)}
+                />
+              ) : (
+                <div className="text-3xl text-gray-300 m-auto">
+                  No Available Data For Selected Dates
+                </div>
+              ),
               "my-[10px] h-[26px]",
               10
             )}
