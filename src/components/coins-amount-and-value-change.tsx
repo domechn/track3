@@ -46,7 +46,7 @@ const App = ({
   const [loading, setLoading] = useState(false);
 
   const chartHasData = useMemo(
-    () => coinsAmountAndValueChangeData.timestamps.length > 0,
+    () => !_(coinsAmountAndValueChangeData.timestamps).isEmpty(),
     [coinsAmountAndValueChangeData]
   );
 

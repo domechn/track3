@@ -304,7 +304,7 @@ const App = ({
     }, [historicalData]);
 
     const tableHasData = useMemo(
-      () => historicalData.length > 0,
+      () => !_(historicalData).isEmpty(),
       [historicalData]
     );
 
