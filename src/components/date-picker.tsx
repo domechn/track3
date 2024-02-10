@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Calendar } from "./ui/calendar";
 import { CalendarIcon } from "@radix-ui/react-icons";
 import { endOfDay, isSameDay, startOfDay } from "date-fns";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import _ from "lodash";
 
 const App = ({
@@ -18,35 +18,40 @@ const App = ({
   onDateChange: (selectedTimes: number, date?: DateRange) => void;
 }) => {
   const [calendarOpen, setCalendarOpen] = useState<boolean>(false);
-  const [selectTimes, setSelectTimes] = useState<number>(0);
   const [date, setDate] = useState<DateRange | undefined>(value);
+  // whether need to use start or end of selected dates
+  const [exact, setExact] = useState<boolean>(true);
 
-  useEffect(() => {
-    handleDateSelect(availableDates, date);
-  }, [date]);
+  const selectDates = useMemo(() => {
+    return {
+      from: date?.from
+        ? exact
+          ? date.from
+          : startOfDay(date.from)
+        : undefined,
+      to: date?.to ? (exact ? date.to : endOfDay(date.to)) : undefined,
+    };
+  }, [date, exact]);
+
+  const selectTimes = useMemo(() => {
+    const from = selectDates.from;
+    const to = selectDates.to;
+    if (!from || !to) {
+      return 0;
+    }
+    const times = _(availableDates)
+      .filter((d) => d >= from && d <= to)
+      .value().length;
+    return times;
+  }, [availableDates, selectDates]);
 
   function isDayDisabled(day: Date) {
     return !availableDates.find((d) => isSameDay(d, day));
   }
 
-  function handleDateSelect(availableDays: Date[], dateRange?: DateRange) {
-    if (!dateRange || !dateRange.from || !dateRange.to) {
-      setSelectTimes(0);
-      return;
-    }
-
-    const from = startOfDay(dateRange.from);
-    const to = endOfDay(dateRange.to);
-    const times = _(availableDays)
-      .filter((d) => d >= from && d <= to)
-      .value().length;
-
-    setSelectTimes(times);
-  }
-
   function handlePredefinedTimesClick(pt: number) {
     if (availableDates.length === 0) {
-      setDataRange(undefined);
+      setDataRange(undefined, true);
       return;
     }
 
@@ -58,20 +63,24 @@ const App = ({
             availableDates.length
           );
 
-    setDataRange({
-      from: ads[0],
-      to: ads[ads.length - 1],
-    });
+    setDataRange(
+      {
+        from: ads[0],
+        to: ads[ads.length - 1],
+      },
+      true
+    );
   }
 
-  function setDataRange(v: DateRange | undefined) {
+  function setDataRange(v: DateRange | undefined, exact: boolean) {
     setDate(v);
+    setExact(exact);
   }
 
   function handleSubmitClick() {
     setCalendarOpen(false);
 
-    onDateChange(selectTimes, date);
+    onDateChange(selectTimes, selectDates);
   }
 
   return (
@@ -85,7 +94,7 @@ const App = ({
             mode="range"
             defaultMonth={date?.to}
             selected={date}
-            onSelect={setDate}
+            onSelect={(v) => setDataRange(v, false)}
             initialFocus
             disabled={isDayDisabled}
           />

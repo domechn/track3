@@ -123,10 +123,8 @@ const App = () => {
 
   const tDateRange = useMemo(
     () => ({
-      start: dateRange?.from
-        ? startOfDay(dateRange.from)
-        : parseISO("1970-01-01"),
-      end: dateRange?.to ? endOfDay(dateRange.to) : parseISO("1970-01-01"),
+      start: dateRange?.from ?? parseISO("1970-01-01"),
+      end: dateRange?.to ?? parseISO("1970-01-01"),
     }),
     [dateRange]
   );
