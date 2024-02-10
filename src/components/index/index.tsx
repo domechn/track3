@@ -60,7 +60,7 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
-import { endOfDay, parseISO, startOfDay } from "date-fns";
+import { parseISO } from "date-fns";
 
 ChartJS.register(
   ...registerables,
@@ -104,6 +104,7 @@ const App = () => {
     getDefaultCurrencyRate()
   );
 
+  const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
 
   const [activeMenu, setActiveMenu] = useState("overview");
@@ -182,8 +183,17 @@ const App = () => {
   }
 
   async function loadInitialQueryDateRange() {
-    const dt = await getInitialQueryDateRange();
-    setDateRange(dt);
+    const { dr, size } = await getInitialQueryDateRange();
+    setDateRange(dr);
+    setOriginalQuerySize(size);
+  }
+
+  async function handleQuerySizeWhenConfigurationChange() {
+    const { dr, size } = await getInitialQueryDateRange();
+    if (size !== originalQuerySize) {
+      setDateRange(dr);
+      setOriginalQuerySize(size);
+    }
   }
 
   function onDatePickerValueChange(
@@ -194,7 +204,6 @@ const App = () => {
   }
 
   function loadAllData() {
-    // setVersion(version + 1);
     // set a loading delay to show the loading animation
     loadLastRefreshAt();
     loadDatePickerData();
@@ -365,7 +374,7 @@ const App = () => {
               element={
                 <Configuration
                   onConfigurationSave={() => {
-                    loadInitialQueryDateRange();
+                    handleQuerySizeWhenConfigurationChange();
                     loadConfiguration();
                   }}
                 />
