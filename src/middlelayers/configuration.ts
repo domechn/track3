@@ -90,7 +90,10 @@ async function getConfigurationById(id: string): Promise<ConfigurationModel | un
 	})
 }
 
-export async function getInitialQueryDateRange(): Promise<DateRange> {
+export async function getInitialQueryDateRange(): Promise<{
+	size: number,
+	dr: DateRange
+}> {
 	const size = await queryQuerySize()
 
 	const days = await ASSET_HANDLER.getHasDataCreatedAtDates(size)
@@ -98,8 +101,11 @@ export async function getInitialQueryDateRange(): Promise<DateRange> {
 	const to = _(days).max()
 
 	return {
-		from,
-		to,
+		size,
+		dr: {
+			from,
+			to,
+		}
 	}
 }
 
