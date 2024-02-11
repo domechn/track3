@@ -29,6 +29,7 @@ export function MainNav({
       {...props}
     >
       <CustomLink to="/overview">Overview</CustomLink>
+      <CustomLink to="/summary">Summary</CustomLink>
       <CustomLink to="/wallets">Wallets</CustomLink>
       <CustomLink to="/comparison">Comparison</CustomLink>
       <CustomLink to="/history">History</CustomLink>

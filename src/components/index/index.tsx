@@ -21,6 +21,7 @@ import PageWrapper from "../page-wrapper";
 import WalletAnalysis from "../wallet-analytics";
 import CoinAnalysis from "../coin-analytics";
 import DatePicker from "../date-picker";
+import ProfitSummary from "../profit-summary";
 import "./index.css";
 import {
   Route,
@@ -330,6 +331,19 @@ const App = () => {
             element={
               <PageWrapper dateRange={tDateRange} hasData={hasData}>
                 <Overview currency={currentCurrency} dateRange={tDateRange} />
+              </PageWrapper>
+            }
+          ></Route>
+
+          <Route
+            path="/summary"
+            element={
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                <ProfitSummary
+                  currency={currentCurrency}
+                  startDate={_(availableDates).first()}
+                  endDate={_(availableDates).last()}
+                />
               </PageWrapper>
             }
           ></Route>
