@@ -1,8 +1,14 @@
 import { calculateTotalProfit } from "@/middlelayers/charts";
 import { CurrencyRateDetail } from "@/middlelayers/types";
-import { listAllFirstAndLastDays } from "@/utils/date";
+import {
+  currencyWrapper,
+  prettyNumberKeepNDigitsAfterDecimalPoint,
+  prettyNumberToLocaleString,
+} from "@/utils/currency";
+import { listAllFirstAndLastDays, timestampToDate } from "@/utils/date";
 import bluebird from "bluebird";
-import { useEffect, useState } from "react";
+import _ from "lodash";
+import { useEffect, useMemo, useState } from "react";
 
 const App = ({
   startDate,
@@ -32,6 +38,24 @@ const App = ({
       setInitialLoaded(true);
     });
   }, [startDate, endDate]);
+
+  const availableYears = useMemo(
+    () =>
+      _(profits)
+        .map((p) => p.monthFirstDate.getFullYear())
+        .uniq()
+        .value(),
+    [profits]
+  );
+
+  const profitsMap = useMemo(() => {
+    return _(profits)
+      .mapKeys(
+        (p) =>
+          p.monthFirstDate.getFullYear() + "-" + p.monthFirstDate.getMonth()
+      )
+      .value();
+  }, [profits]);
 
   async function loadAllMonthlyProfits(start: Date, end: Date) {
     updateLoading(true);
@@ -63,11 +87,42 @@ const App = ({
 
   return (
     <div>
-      {profits.map((p) => (
-        <div key={p.monthFirstDate.toISOString()}>
-          <div>{p.monthFirstDate.toISOString()}</div>
-          <div>{p.total}</div>
-          <div>{p.percentage}</div>
+      {availableYears.map((year) => (
+        <div key={"profit-summary-" + year}>
+          <div>{year}</div>
+          <div className="grid gap-4 grid-cols-4">
+            {_.range(0, 12).map((month) => {
+              if (
+                year === new Date().getFullYear() &&
+                month > new Date().getMonth()
+              ) {
+                return null;
+              }
+              const key = year + "-" + month;
+              const p = profitsMap[key];
+              if (!p) {
+                return null;
+              }
+              return (
+                <div
+                  key={"profit-summary-" + p.monthFirstDate.getTime()}
+                  className="bg-gray-300 w-[120px] rounded-lg text-center mb-1 p-2"
+                >
+                  <div>{month + 1}</div>
+                  <div>
+                    {(p.total < 0 ? "-" : "+") +
+                      currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(Math.abs(p.total))
+                      )}
+                  </div>
+                  <div>
+                    {prettyNumberKeepNDigitsAfterDecimalPoint(p.percentage, 2)}%
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ))}
     </div>
