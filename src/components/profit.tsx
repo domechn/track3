@@ -16,6 +16,7 @@ import { Skeleton } from "./ui/skeleton";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import { positiveNegativeColor } from '@/utils/color'
 
 type TopType = "profitTop" | "lossTop";
 
@@ -85,14 +86,6 @@ const App = ({
     setTopType(val);
   }
 
-  function getProfitDisplayColor(val: number) {
-    if (val === 0) {
-      return "gray";
-    }
-
-    return val > 0 ? "green" : "red";
-  }
-
   return (
     <div>
       <Card>
@@ -154,7 +147,7 @@ const App = ({
                       </TableCell>
                       <TableCell className="text-right">
                         <div
-                          className={`text-${getProfitDisplayColor(
+                          className={`text-${positiveNegativeColor(
                             d.value
                           )}-600`}
                         >

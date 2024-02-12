@@ -2,13 +2,23 @@ import { calculateTotalProfit } from "@/middlelayers/charts";
 import { CurrencyRateDetail } from "@/middlelayers/types";
 import {
   currencyWrapper,
-  prettyNumberKeepNDigitsAfterDecimalPoint,
   prettyNumberToLocaleString,
+  simplifyNumber,
 } from "@/utils/currency";
-import { listAllFirstAndLastDays, timestampToDate } from "@/utils/date";
+import { getMonthAbbreviation, listAllFirstAndLastDays } from "@/utils/date";
 import bluebird from "bluebird";
 import _ from "lodash";
 import { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { cn } from "@/lib/utils";
+import { positiveNegativeColor } from "@/utils/color";
+
+// todo: group profit by day, month or year
+enum SummaryType {
+  DAY,
+  MONTH,
+  YEAR,
+}
 
 const App = ({
   startDate,
@@ -32,6 +42,8 @@ const App = ({
   >([]);
   const [loading, setLoading] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
+  // const currentYear = new Date().getFullYear();
+  const currentYear = 2023;
 
   useEffect(() => {
     loadAllMonthlyProfits(startDate, endDate).then(() => {
@@ -86,46 +98,62 @@ const App = ({
   }
 
   return (
-    <div>
-      {availableYears.map((year) => (
-        <div key={"profit-summary-" + year}>
-          <div>{year}</div>
-          <div className="grid gap-4 grid-cols-4">
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium font-bold">
+          Profit Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-10">
+        <div key={"profit-summary-" + currentYear}>
+          <div className="mb-4 text-xl font-medium font-bold">
+            {currentYear}
+          </div>
+          <div className="grid gap-4 md:grid-cols-12 sm:grid-cols-8 grid-cols-4 min-w-[250px]">
             {_.range(0, 12).map((month) => {
               if (
-                year === new Date().getFullYear() &&
+                currentYear === new Date().getFullYear() &&
                 month > new Date().getMonth()
               ) {
                 return null;
               }
-              const key = year + "-" + month;
-              const p = profitsMap[key];
-              if (!p) {
-                return null;
-              }
+              const key = currentYear + "-" + month;
+              const p = profitsMap[key] ?? {
+                total: 0,
+                percentage: 0,
+                monthFirstDate: new Date(currentYear, month, 1),
+              };
               return (
                 <div
                   key={"profit-summary-" + p.monthFirstDate.getTime()}
-                  className="bg-gray-300 w-[120px] rounded-lg text-center mb-1 p-2"
+                  className={cn(
+                    "w-[100px] rounded-lg text-center p-2 col-span-2",
+                    `bg-${positiveNegativeColor(p.total)}-100`
+                  )}
                 >
-                  <div>{month + 1}</div>
-                  <div>
-                    {(p.total < 0 ? "-" : "+") +
-                      currency.symbol +
-                      prettyNumberToLocaleString(
-                        currencyWrapper(currency)(Math.abs(p.total))
-                      )}
+                  <div className="text-md text-gray-800 text-center">
+                    {getMonthAbbreviation(month + 1)}
                   </div>
-                  <div>
-                    {prettyNumberKeepNDigitsAfterDecimalPoint(p.percentage, 2)}%
+                  <div
+                    className={cn(
+                      `text-${positiveNegativeColor(p.total)}-700 font-bold`
+                    )}
+                  >
+                    <div>
+                      {(p.total < 0 ? "-" : "+") +
+                        currency.symbol +
+                        simplifyNumber(
+                          currencyWrapper(currency)(Math.abs(p.total))
+                        )}
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-      ))}
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 

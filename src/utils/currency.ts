@@ -64,6 +64,10 @@ function safeNumberToString(inputNumber: number) {
 	return number
 }
 
+// 1 => 1
+// 1000 => 1k
+// 1000000 => 1m
+// ...
 export function simplifyNumber(num: number) {
 	const absNum = Math.abs(num)
 	const isNegative = num < 0

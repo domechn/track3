@@ -60,7 +60,7 @@ export function generateRandomColors(size: number): { R: number; G: number; B: n
 		}
 	})
 	let lastColor: { R: number; G: number; B: number } | null = colors[colors.length - 1]
-	for (let i = 0; i < size - niceColors.length ; i++) {
+	for (let i = 0; i < size - niceColors.length; i++) {
 		let color
 		do {
 			color = generateRandomColor()
@@ -69,4 +69,14 @@ export function generateRandomColors(size: number): { R: number; G: number; B: n
 		lastColor = color
 	}
 	return colors
+}
+
+export function positiveNegativeColor(val: number) {
+	if (val === 0) {
+		return "gray"
+	} else if (val > 0) {
+		return "green"
+	} else {
+		return "red"
+	}
 }
