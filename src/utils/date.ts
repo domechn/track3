@@ -20,7 +20,7 @@ export const parseDateToTS = (dateStr: string): number => {
 export const listAllFirstAndLastDays = (start: Date, end: Date) => {
 	const dates = []
 
-	let currentMonth = new Date(start)
+	let currentMonth = new Date(start.getFullYear(), start.getMonth(), 1)
 	while (currentMonth <= end) {
 		const year = currentMonth.getFullYear()
 		const month = currentMonth.getMonth()

@@ -323,7 +323,6 @@ const App = ({
                 >
                   {formatPNLPercentage(pnlTableData.sevenTPnl?.value)}
                 </div>,
-
                 "h-[22px]"
               )}
               {loadingWrapper(
@@ -352,7 +351,6 @@ const App = ({
                 >
                   {formatPNLPercentage(pnlTableData.thirtyPNL?.value)}
                 </div>,
-
                 "h-[22px]"
               )}
               {loadingWrapper(

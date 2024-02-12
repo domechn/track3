@@ -12,6 +12,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { cn } from "@/lib/utils";
 import { positiveNegativeColor } from "@/utils/color";
+import { Button } from "./ui/button";
+import { loadingWrapper } from "@/lib/loading";
 
 // todo: group profit by day, month or year
 enum SummaryType {
@@ -42,8 +44,8 @@ const App = ({
   >([]);
   const [loading, setLoading] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
-  // const currentYear = new Date().getFullYear();
-  const currentYear = 2023;
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  // const currentYear = 2023;
 
   useEffect(() => {
     loadAllMonthlyProfits(startDate, endDate).then(() => {
@@ -97,60 +99,90 @@ const App = ({
     setLoading(val);
   }
 
+  function YearsSelect() {
+    return (
+      <div className="mb-4 flex space-x-2">
+        {availableYears.map((year) => (
+          <Button
+            // className="text-xl font-medium font-bold"
+            key={"profit-summary-" + year}
+            variant="outline"
+            onClick={() => {
+              setSelectedYear(year);
+            }}
+          >
+            {year}
+          </Button>
+        ))}
+      </div>
+    );
+  }
+
+  function ProfitSummary() {
+    return (
+      <div className="grid gap-4 md:grid-cols-12 sm:grid-cols-8 grid-cols-4 min-w-[250px]">
+        {_.range(0, 12).map((month) => {
+          if (
+            selectedYear === new Date().getFullYear() &&
+            month > new Date().getMonth()
+          ) {
+            return null;
+          }
+          const key = selectedYear + "-" + month;
+          const p = profitsMap[key] ?? {
+            total: 0,
+            percentage: 0,
+            monthFirstDate: new Date(selectedYear, month, 1),
+          };
+          return (
+            <div
+              key={"profit-summary-" + p.monthFirstDate.getTime()}
+              className={cn(
+                "w-[100px] rounded-lg text-center p-2 col-span-2",
+                `bg-${positiveNegativeColor(p.total)}-100`
+              )}
+            >
+              <div className="text-md text-gray-800 text-center">
+                {getMonthAbbreviation(month + 1)}
+              </div>
+              <div
+                className={cn(
+                  `text-${positiveNegativeColor(p.total)}-700 font-bold`
+                )}
+              >
+                <div>
+                  {(p.total < 0 ? "-" : "+") +
+                    currency.symbol +
+                    simplifyNumber(
+                      currencyWrapper(currency)(Math.abs(p.total))
+                    )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <Card>
+    <Card className='h-[280px]'>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium font-bold">
           Profit Summary
         </CardTitle>
       </CardHeader>
       <CardContent className="px-10">
-        <div key={"profit-summary-" + currentYear}>
-          <div className="mb-4 text-xl font-medium font-bold">
-            {currentYear}
-          </div>
-          <div className="grid gap-4 md:grid-cols-12 sm:grid-cols-8 grid-cols-4 min-w-[250px]">
-            {_.range(0, 12).map((month) => {
-              if (
-                currentYear === new Date().getFullYear() &&
-                month > new Date().getMonth()
-              ) {
-                return null;
-              }
-              const key = currentYear + "-" + month;
-              const p = profitsMap[key] ?? {
-                total: 0,
-                percentage: 0,
-                monthFirstDate: new Date(currentYear, month, 1),
-              };
-              return (
-                <div
-                  key={"profit-summary-" + p.monthFirstDate.getTime()}
-                  className={cn(
-                    "w-[100px] rounded-lg text-center p-2 col-span-2",
-                    `bg-${positiveNegativeColor(p.total)}-100`
-                  )}
-                >
-                  <div className="text-md text-gray-800 text-center">
-                    {getMonthAbbreviation(month + 1)}
-                  </div>
-                  <div
-                    className={cn(
-                      `text-${positiveNegativeColor(p.total)}-700 font-bold`
-                    )}
-                  >
-                    <div>
-                      {(p.total < 0 ? "-" : "+") +
-                        currency.symbol +
-                        simplifyNumber(
-                          currencyWrapper(currency)(Math.abs(p.total))
-                        )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div>
+          {loadingWrapper(
+            loading,
+            <div>
+              <YearsSelect />
+              <ProfitSummary />
+            </div>,
+            "mt-[16px] h-[24px]",
+            5
+          )}
         </div>
       </CardContent>
     </Card>
