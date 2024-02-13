@@ -60,7 +60,8 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
-import { parseISO } from "date-fns";
+import { endOfYear, parseISO, startOfYear } from "date-fns";
+import Summary from "../summary";
 
 ChartJS.register(
   ...registerables,
@@ -330,6 +331,21 @@ const App = () => {
             element={
               <PageWrapper dateRange={tDateRange} hasData={hasData}>
                 <Overview currency={currentCurrency} dateRange={tDateRange} />
+              </PageWrapper>
+            }
+          ></Route>
+
+          <Route
+            path="/summary"
+            element={
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                <Summary
+                  currency={currentCurrency}
+                  dateRange={{
+                    start: _(availableDates).first() ?? startOfYear(1970),
+                    end: _(availableDates).last() ?? endOfYear(9999),
+                  }}
+                />
               </PageWrapper>
             }
           ></Route>

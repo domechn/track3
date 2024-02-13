@@ -16,3 +16,37 @@ export const parseDateToTS = (dateStr: string): number => {
 	const [year, month, day] = dateStr.split('-').map(Number)
 	return new Date(year, month - 1, day).getTime()
 }
+
+export const listAllFirstAndLastDays = (start: Date, end: Date) => {
+	const dates = []
+
+	let currentMonth = new Date(start.getFullYear(), start.getMonth(), 1)
+	while (currentMonth <= end) {
+		const year = currentMonth.getFullYear()
+		const month = currentMonth.getMonth()
+		const firstDay = new Date(year, month, 1)
+		const lastDay = new Date(year, month + 1, 0)
+
+		dates.push({
+			firstDay,
+			lastDay,
+		})
+
+		currentMonth.setMonth(currentMonth.getMonth() + 1)
+	}
+
+	return dates
+}
+
+export function getMonthAbbreviation(monthNumber: number) {
+	const months = [
+		'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+		'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+	]
+
+	if (monthNumber >= 1 && monthNumber <= 12) {
+		return months[monthNumber - 1]
+	}
+
+	return ''
+}
