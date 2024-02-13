@@ -60,7 +60,7 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
-import { endOfYear, parseISO, startOfYear } from "date-fns";
+import { parseISO } from "date-fns";
 import Summary from "../summary";
 
 ChartJS.register(
@@ -342,8 +342,8 @@ const App = () => {
                 <Summary
                   currency={currentCurrency}
                   dateRange={{
-                    start: _(availableDates).first() ?? startOfYear(1970),
-                    end: _(availableDates).last() ?? endOfYear(9999),
+                    start: _(availableDates).first() ?? new Date(1970, 1, 1),
+                    end: _(availableDates).last() ?? new Date(9999, 12, 30, 23, 59, 59),
                   }}
                 />
               </PageWrapper>
