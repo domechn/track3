@@ -342,8 +342,8 @@ const App = () => {
                 <Summary
                   currency={currentCurrency}
                   dateRange={{
-                    start: _(availableDates).first()!,
-                    end: _(availableDates).last()!,
+                    start: _(availableDates).first() ??  parseISO("1970-01-01"),
+                    end: _(availableDates).last() ?? parseISO("9999-12-30"),
                   }}
                 />
               </PageWrapper>
