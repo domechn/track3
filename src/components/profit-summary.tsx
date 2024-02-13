@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from "./ui/select";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
-import { endOfYear, startOfYear } from 'date-fns'
 
 type SummaryType = "day" | "month" | "year";
 
@@ -110,8 +109,8 @@ const App = ({
     try {
       const profits = await bluebird.map(years, async (year) => {
         const { total, percentage } = await calculateTotalProfit({
-          start: startOfYear(year),
-          end: endOfYear(year),
+          start: new Date(year, 0, 1),
+          end: new Date(year, 12, 30),
         });
 
         return { total, percentage, year };
