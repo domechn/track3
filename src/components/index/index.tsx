@@ -21,7 +21,6 @@ import PageWrapper from "../page-wrapper";
 import WalletAnalysis from "../wallet-analytics";
 import CoinAnalysis from "../coin-analytics";
 import DatePicker from "../date-picker";
-import ProfitSummary from "../profit-summary";
 import "./index.css";
 import {
   Route,
@@ -62,6 +61,7 @@ import {
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
 import { parseISO } from "date-fns";
+import Summary from "../summary";
 
 ChartJS.register(
   ...registerables,
@@ -339,10 +339,12 @@ const App = () => {
             path="/summary"
             element={
               <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <ProfitSummary
+                <Summary
                   currency={currentCurrency}
-                  startDate={_(availableDates).first()}
-                  endDate={_(availableDates).last()}
+                  dateRange={{
+                    start: _(availableDates).first()!,
+                    end: _(availableDates).last()!,
+                  }}
                 />
               </PageWrapper>
             }
