@@ -50,14 +50,16 @@ const App = ({
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
 
   useEffect(() => {
-    loadMonthlyProfitsInSelectedYear(dateRange.start,dateRange.end).then(() => {
-      setInitialLoaded(true);
-    });
+    loadMonthlyProfitsInSelectedYear(dateRange.start, dateRange.end).then(
+      () => {
+        setInitialLoaded(true);
+      }
+    );
   }, [dateRange, selectedYear]);
 
   const availableYears = useMemo(
     () =>
-      _(listAllFirstAndLastDays(dateRange.start,dateRange.end))
+      _(listAllFirstAndLastDays(dateRange.start, dateRange.end))
         .map((d) => d.firstDay.getFullYear())
         .uniq()
         .value(),
@@ -110,7 +112,7 @@ const App = ({
       const profits = await bluebird.map(years, async (year) => {
         const { total, percentage } = await calculateTotalProfit({
           start: new Date(year, 0, 1),
-          end: new Date(year, 12, 30),
+          end: new Date(year, 12, 30, 23, 59, 59),
         });
 
         return { total, percentage, year };
