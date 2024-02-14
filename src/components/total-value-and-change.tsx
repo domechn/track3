@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   AssetChangeData,
   CurrencyRateDetail,
@@ -35,6 +35,7 @@ interface TotalValueShower {
 }
 
 const chartName = "Trend of Asset";
+const btcSymbol = "₿";
 
 class FiatTotalValue implements TotalValueShower {
   private currency: CurrencyRateDetail;
@@ -94,7 +95,7 @@ class BTCTotalValue implements TotalValueShower {
   private preBtcPrice: number;
   private latestBtcPrice: number;
 
-  private symbol = "₿";
+  private symbol = btcSymbol;
 
   constructor(
     prevValue: number,
@@ -228,14 +229,19 @@ const App = ({
   function updateLoading(val: boolean, loadingType: "chart" | "totalValue") {
     // no need to set loading if already loaded ( like refresh data in overview page)
     if (initialLoaded) {
-      return
+      return;
     }
     if (loadingType === "chart") {
       setChartLoading(val);
-    } else if (loadingType === "totalValue"){
+    } else if (loadingType === "totalValue") {
       setTotalValueLoading(val);
     }
   }
+
+  const totalValueShower = useMemo(
+    () => getTotalValueShower(),
+    [totalValueData, btcAsBase]
+  );
 
   function getTotalValueShower() {
     if (btcAsBase) {
@@ -254,7 +260,7 @@ const App = ({
   }
 
   function formatTotalValue() {
-    return getTotalValueShower().formatTotalValue();
+    return totalValueShower.formatTotalValue();
   }
 
   function getLatestBTCPrice() {
@@ -271,7 +277,7 @@ const App = ({
   }
 
   function formatCurrencyName() {
-    return getTotalValueShower().currencyName();
+    return totalValueShower.currencyName();
   }
 
   function getPercentageChange() {
@@ -282,7 +288,7 @@ const App = ({
     if (totalValueData.prevTotalValue === 0) {
       return 100;
     }
-    return getTotalValueShower().changePercentage();
+    return totalValueShower.changePercentage();
   }
 
   function formatChangePercentage() {
@@ -295,7 +301,7 @@ const App = ({
   }
 
   function formatChangeValue() {
-    return getTotalValueShower().formatChangeValue();
+    return totalValueShower.formatChangeValue();
   }
 
   function formatLineData() {
@@ -359,7 +365,13 @@ const App = ({
         callbacks: {
           label: (context: { parsed: { y: number } }) => {
             const v = context.parsed.y.toLocaleString();
-            return showPercentageInChart ? `${v}%` : currency.symbol + v;
+            if (showPercentageInChart) {
+              return `${v}%`;
+            }
+            if (btcAsBase) {
+              return `${btcSymbol}${v}`;
+            }
+            return currency.symbol + v;
           },
         },
       },
