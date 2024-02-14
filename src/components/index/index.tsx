@@ -131,6 +131,14 @@ const App = () => {
     [dateRange]
   );
 
+  const maxDateRange = useMemo(
+    () => ({
+      start: _(availableDates).first() ?? new Date(1970, 1, 1),
+      end: _(availableDates).last() ?? new Date(9999, 12, 30, 23, 59, 59),
+    }),
+    [availableDates]
+  );
+
   useEffect(() => {
     resizeAllChartsInPage();
   }, [lastSize, activeMenu, hasData]);
@@ -339,13 +347,7 @@ const App = () => {
             path="/summary"
             element={
               <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <Summary
-                  currency={currentCurrency}
-                  dateRange={{
-                    start: _(availableDates).first() ?? new Date(1970, 1, 1),
-                    end: _(availableDates).last() ?? new Date(9999, 12, 30, 23, 59, 59),
-                  }}
-                />
+                <Summary currency={currentCurrency} dateRange={maxDateRange} />
               </PageWrapper>
             }
           ></Route>

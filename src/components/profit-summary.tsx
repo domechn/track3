@@ -50,12 +50,15 @@ const App = ({
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
 
   useEffect(() => {
+    if (summaryType !== "month") {
+      return;
+    }
     loadMonthlyProfitsInSelectedYear(dateRange.start, dateRange.end).then(
       () => {
         setInitialLoaded(true);
       }
     );
-  }, [dateRange, selectedYear]);
+  }, [dateRange, selectedYear, summaryType]);
 
   const availableYears = useMemo(
     () =>
@@ -65,6 +68,16 @@ const App = ({
         .value(),
     [dateRange]
   );
+
+  useEffect(() => {
+    if (summaryType !== "year") {
+      return;
+    }
+
+    loadYearlyProfits(availableYears).then(() => {
+      setInitialLoaded(true);
+    });
+  }, [availableYears, summaryType]);
 
   const monthlyProfitsMap = useMemo(() => {
     return _(monthlyProfits)
@@ -133,9 +146,6 @@ const App = ({
 
   async function onSummaryTypeChange(val: SummaryType) {
     setSummaryType(val);
-    if (val === "year") {
-      await loadYearlyProfits(availableYears);
-    }
   }
 
   function SummaryTypeSwitch() {
