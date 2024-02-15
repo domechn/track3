@@ -79,6 +79,7 @@ const App = ({
 
   const [actions, setActions] = useState<AssetAction[]>([]);
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
+  const [initialLoaded, setInitialLoaded] = useState(false);
 
   const [updatePriceIndex, setUpdatePriceIndex] = useState("");
   const [updatePriceValue, setUpdatePriceValue] = useState(-1);
@@ -95,15 +96,17 @@ const App = ({
   const [allowSymbols, setAllowSymbols] = useState<string[]>([]);
 
   useEffect(() => {
-    listAllowedSymbols().then((symbols) => setAllowSymbols(symbols));
+    loadAllowedSymbols();
   }, []);
 
   useEffect(() => {
-    loadSymbolData(symbol);
+    loadSymbolData(symbol).then(() => {
+      setInitialLoaded(true);
+    });
 
     // reset pagination
     setDataPage(0);
-  }, [symbol]);
+  }, [symbol, dateRange]);
 
   async function getLogoPath(symbol: string) {
     const acd = await getAppCacheDir();
@@ -198,7 +201,7 @@ const App = ({
   }
 
   async function loadSymbolData(s: string) {
-    setLoading(true);
+    updateLoading(true);
     try {
       const aa = await loadAllAssetActionsBySymbol(s);
       setActions(_(aa).sortBy("changedAt").reverse().value());
@@ -212,8 +215,20 @@ const App = ({
       const lp = await getLogoPath(s);
       setLogo(lp);
     } finally {
-      setLoading(false);
+      updateLoading(false);
     }
+  }
+
+  async function loadAllowedSymbols() {
+    const ss = await listAllowedSymbols();
+    setAllowSymbols(ss);
+  }
+
+  function updateLoading(val: boolean) {
+    if (initialLoaded) {
+      return
+    }
+    setLoading(val);
   }
 
   function calculateBreakevenPrice(acts: AssetAction[], la?: Asset) {
