@@ -4,7 +4,7 @@ import {
   PNLTableDate,
   TDateRange,
 } from "@/middlelayers/types";
-import { timestampToDate } from "@/utils/date";
+import { timeToDateStr } from "@/utils/date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { Bar } from "react-chartjs-2";
@@ -140,11 +140,11 @@ const App = ({
             const end = size - 1;
             // only show start and end date
             if (index === start) {
-              return timestampToDate(data[index + 1].timestamp);
+              return timeToDateStr(data[index + 1].timestamp);
             }
 
             if (index === end) {
-              return timestampToDate(data[index + 1].timestamp);
+              return timeToDateStr(data[index + 1].timestamp);
             }
 
             return "";
@@ -200,7 +200,7 @@ const App = ({
       labels: _(pnlChartData)
         // !remove the first element, because it is the comparison of the first and second element
         .tail()
-        .map((x) => timestampToDate(x.timestamp))
+        .map((x) => timeToDateStr(x.timestamp))
         .value(),
       // two datasets for different colors
       datasets: [
@@ -263,7 +263,7 @@ const App = ({
   }
 
   function formatTimestampData(ts?: number) {
-    return ts ? timestampToDate(ts) : "";
+    return ts ? timeToDateStr(ts) : "";
   }
 
   function getPNLTextColor(val?: number): string {

@@ -1,6 +1,6 @@
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
-import { timestampToDate } from "@/utils/date";
+import { timeToDateStr } from "@/utils/date";
 import { TDateRange, TopCoinsRankData } from "@/middlelayers/types";
 import { useContext, useEffect, useRef, useState } from "react";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
@@ -133,7 +133,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   function lineData() {
     return {
-      labels: topCoinsRankData.timestamps.map((x) => timestampToDate(x)),
+      labels: topCoinsRankData.timestamps.map((x) => timeToDateStr(x)),
       datasets: topCoinsRankData.coins.map((coin) => ({
         label: coin.coin,
         data: coinRankData(topCoinsRankData.timestamps, coin.rankData),

@@ -1,6 +1,6 @@
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
-import { timestampToDate } from "@/utils/date";
+import { timeToDateStr } from "@/utils/date";
 import { TDateRange, TopCoinsPercentageChangeData } from "@/middlelayers/types";
 import { useContext, useEffect, useRef, useState } from "react";
 import _ from "lodash";
@@ -144,7 +144,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   function lineData() {
     return {
       labels: topCoinsPercentageChangeData.timestamps.map((x) =>
-        timestampToDate(x)
+        timeToDateStr(x)
       ),
       datasets: topCoinsPercentageChangeData.coins.map((coin) => ({
         label: coin.coin,

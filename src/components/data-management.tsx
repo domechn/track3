@@ -26,9 +26,20 @@ import {
 import {
   cleanAutoBackupDirectory,
   getAutoBackupDirectory,
+  getLastAutoImportAt,
+  getLastAutoBackupAt,
   saveAutoBackupDirectory,
 } from "@/middlelayers/configuration";
-import { ExportData } from '@/middlelayers/datamanager'
+import { ExportData } from "@/middlelayers/datamanager";
+import { timeToDateStr } from "@/utils/date";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
+import { cn } from "@/lib/utils";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();
@@ -45,10 +56,32 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     string | undefined
   >();
 
+  const [lastBackupAt, setLastBackupAt] = useState<Date | undefined>();
+  const [lastImportAt, setLastImportAt] = useState<Date | undefined>();
+
   useEffect(() => {
-    getAutoBackupDirectory().then((d) => setAutoBackupDirectory(d));
+    loadAutoBackupDirectory().then((isSet) => {
+      if (!isSet) {
+        return;
+      }
+
+      loadAutoBackupTime();
+    });
   }, []);
 
+  async function loadAutoBackupDirectory() {
+    const d = await getAutoBackupDirectory();
+    setAutoBackupDirectory(d);
+    return !!d;
+  }
+
+  async function loadAutoBackupTime() {
+    const laia = await getLastAutoImportAt();
+    setLastImportAt(laia);
+
+    const laba = await getLastAutoBackupAt();
+    setLastBackupAt(laba);
+  }
   async function onExportDataClick() {
     const exported = await exportHistoricalData(exportConfiguration);
     if (exported) {
@@ -210,15 +243,48 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <div className="space-y-3">
           <div>
             <div className="text-sm font-bold text-left py-2">Auto Backup</div>
-            <div className="text-sm text-left text-gray-400">
-              Data will be automatically backed up to the target folder every 24h or after refreshing.
+            <div className="text-sm text-left text-gray-400 flex space-x-2">
+              {autoBackupDirectory && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InfoCircledIcon className="text-muted-foreground w-[20px] h-[20px]" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div>
+                        <div className="flex space-x-2 text-xs">
+                          <div>Last Backup At:</div>
+                          <div className="text-muted-foreground">
+                            {lastBackupAt
+                              ? timeToDateStr(lastBackupAt, true)
+                              : "N/A"}
+                          </div>
+                        </div>
+                        <div className="flex space-x-2 text-xs">
+                          <div>Last Import At:</div>
+                          <div className="text-muted-foreground">
+                            {lastImportAt
+                              ? timeToDateStr(lastImportAt, true)
+                              : "N/A"}
+                          </div>
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <div>
+                Data will be automatically backed up to the target folder every
+                24h or after refreshing.
+              </div>
             </div>
           </div>
-          <div className="items-center grid gap-4 grid-cols-4">
+          <div className="items-center grid grid-cols-4">
             <div
-              className={`text-muted-foreground col-span-4 md:col-span-2 text-sm whitespace-nowrap overflow-x-scroll scrollbar-hide ${
+              className={cn(
+                "text-muted-foreground col-span-4 md:col-span-2 text-sm whitespace-nowrap overflow-x-scroll scrollbar-hide",
                 autoBackupDirectory ? "block" : "hidden"
-              }`}
+              )}
             >
               {autoBackupDirectory}
             </div>

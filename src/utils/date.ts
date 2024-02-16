@@ -1,6 +1,6 @@
 const pad = (n: number) => n < 10 ? `0${n}` : '' + n
 
-export const timestampToDate = (timestamp: number, showTime = false) => {
+export const timeToDateStr = (timestamp: number | Date, showTime = false) => {
 	const date = new Date(timestamp)
 
 	const dateStr = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`

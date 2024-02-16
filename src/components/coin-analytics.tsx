@@ -33,7 +33,7 @@ import {
 } from "./ui/table";
 import { getImageApiPath } from "@/utils/app";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
-import { timestampToDate } from "@/utils/date";
+import { timeToDateStr } from "@/utils/date";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -422,7 +422,7 @@ const App = ({
                         </TableCell>
                         <TableCell>
                           <div className="text-gray-600">
-                            {timestampToDate(
+                            {timeToDateStr(
                               new Date(act.changedAt).getTime(),
                               true
                             )}
