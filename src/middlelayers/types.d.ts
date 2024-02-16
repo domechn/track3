@@ -177,6 +177,11 @@ export type HistoricalData = {
 	total: number
 }
 
+export type RestoreHistoricalData = {
+	assets: AssetModel[]
+	prices: AssetPriceModel[]
+}
+
 export type CoinData = {
 	symbol: string
 	amount: number

@@ -5,7 +5,7 @@ export interface AssetPriceHandlerImpl {
 	savePrices(models: AssetPriceModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetPriceModel[]>
 }
 
-class AssetPriceHandler implements AssetPriceHandlerImpl{
+class AssetPriceHandler implements AssetPriceHandlerImpl {
 	private readonly assetTableName = "asset_prices"
 
 	async createOrUpdate(model: AssetPriceModel): Promise<void> {
@@ -21,6 +21,15 @@ class AssetPriceHandler implements AssetPriceHandlerImpl{
 
 	async listPricesBySymbol(symbol: string): Promise<AssetPriceModel[]> {
 		return selectFromDatabase<AssetPriceModel>(this.assetTableName, { symbol })
+	}
+
+	async getPriceByAssetID(assetID: number): Promise<AssetPriceModel | undefined> {
+		const results = await selectFromDatabase<AssetPriceModel>(this.assetTableName, { assetID })
+		return results[0]
+	}
+
+	async listPricesByAssetUUID(uuid: string): Promise<AssetPriceModel[]> {
+		return selectFromDatabase<AssetPriceModel>(this.assetTableName, { uuid })
 	}
 
 	async listPricesAfterAssetCreatedAt(assetCreatedAt?: string): Promise<AssetPriceModel[]> {
