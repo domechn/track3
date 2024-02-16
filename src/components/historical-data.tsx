@@ -3,10 +3,13 @@ import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
   queryHistoricalData,
+  queryRestoreHistoricalData,
+  restoreHistoricalData,
 } from "@/middlelayers/charts";
 import {
   CurrencyRateDetail,
   HistoricalData,
+  RestoreHistoricalData,
   TDateRange,
 } from "@/middlelayers/types";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
@@ -48,6 +51,7 @@ import {
   TableRow,
 } from "./ui/table";
 import { ScrollArea } from "./ui/scroll-area";
+import { ToastAction } from "./ui/toast";
 
 type RankData = {
   id: number;
@@ -61,13 +65,17 @@ type RankData = {
 };
 
 const App = ({
-  afterDataDeleted,
+  afterDataChanged,
   dateRange,
   currency,
 }: {
   // uuid is id for batch data
   // id is for single data
-  afterDataDeleted?: (uuid?: string, id?: number) => unknown;
+  afterDataChanged?: (
+    action: "delete" | "undoDeletion",
+    uuid?: string,
+    id?: number
+  ) => unknown;
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
 }) => {
@@ -151,15 +159,44 @@ const App = ({
     setLoading(val);
   }
 
+  function onDeletionUndoClick(rhd: {
+    uuid?: string;
+    id?: number;
+    rhd: RestoreHistoricalData;
+  }) {
+    restoreHistoricalData(rhd.rhd).then(() => {
+
+      // hide rank data when undo for data refreshing
+      setIsModalOpen(false)
+
+      if (afterDataChanged) {
+        afterDataChanged("undoDeletion", rhd.uuid, rhd.id);
+      }
+    });
+  }
+
   function onHistoricalDataDeleteClick(uuid: string) {
-    deleteHistoricalDataByUUID(uuid)
-      .then(() => {
+    handleHistoricalDataDelete(uuid)
+      .then((rhd) => {
         toast({
           description: "Record deleted",
+          action: (
+            <ToastAction
+              altText="Restore deleted historical data"
+              onClick={() =>
+                onDeletionUndoClick({
+                  uuid,
+                  rhd,
+                })
+              }
+            >
+              Undo
+            </ToastAction>
+          ),
         });
         loadAllData();
-        if (afterDataDeleted) {
-          afterDataDeleted(uuid);
+        if (afterDataChanged) {
+          afterDataChanged("delete", uuid, undefined);
         }
         // hide rank data when some data is deleted
         setRankData([]);
@@ -175,15 +212,35 @@ const App = ({
       });
   }
 
+  async function handleHistoricalDataDelete(uuid: string) {
+    const rhd = await queryRestoreHistoricalData(uuid);
+
+    await deleteHistoricalDataByUUID(uuid);
+    return rhd;
+  }
+
   function onHistoricalDataDetailDeleteClick(id: number) {
-    deleteHistoricalDataDetailById(id)
-      .then(() => {
+    handleHistoricalDataDetailDelete(id)
+      .then((rhd) => {
         toast({
           description: "Record deleted",
+          action: (
+            <ToastAction
+              altText="Restore deleted historical record"
+              onClick={() =>
+                onDeletionUndoClick({
+                  id,
+                  rhd,
+                })
+              }
+            >
+              Undo
+            </ToastAction>
+          ),
         });
         loadAllData();
-        if (afterDataDeleted) {
-          afterDataDeleted(undefined, id);
+        if (afterDataChanged) {
+          afterDataChanged("delete", undefined, id);
         }
 
         setRankData(
@@ -198,6 +255,12 @@ const App = ({
           variant: "destructive",
         })
       );
+  }
+
+  async function handleHistoricalDataDetailDelete(id: number) {
+    const rhd = await queryRestoreHistoricalData(id);
+    await deleteHistoricalDataDetailById(id);
+    return rhd;
   }
 
   function onRowClick(id: number | string) {

@@ -378,7 +378,7 @@ const App = () => {
                 <HistoricalData
                   currency={currentCurrency}
                   dateRange={tDateRange}
-                  afterDataDeleted={() => {
+                  afterDataChanged={() => {
                     loadAllData();
                     autoBackupHistoricalData(true);
                   }}

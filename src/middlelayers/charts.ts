@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLChartData, PNLTableDate, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -598,6 +598,27 @@ export async function deleteHistoricalDataDetailById(id: number): Promise<void> 
 	await deleteAssetByID(id)
 	// !also delete asset price
 	await deleteAssetPriceByID(id)
+}
+
+export async function restoreHistoricalData(data: RestoreHistoricalData): Promise<void> {
+	const { assets, prices } = data
+
+	await ASSET_HANDLER.saveAssets(assets)
+	await ASSET_PRICE_HANDLER.savePrices(prices)
+}
+
+export async function queryRestoreHistoricalData(id: string | number): Promise<RestoreHistoricalData> {
+	// if id is number => it's asset id
+	// if id is string => it's asset uuid
+	const isUUID = _(id).isString()
+	const assets = isUUID ? await ASSET_HANDLER.listAssetsByUUIDs([id as string]) : await ASSET_HANDLER.listAssetsByIDs([id as number])
+	const prices = isUUID ? await ASSET_PRICE_HANDLER.listPricesByAssetUUID(id as string) : [await ASSET_PRICE_HANDLER.getPriceByAssetID(id as number)]
+
+	return {
+		assets,
+		prices: _(prices).compact().value(),
+	}
+
 }
 
 export async function queryCoinDataByUUID(uuid: string): Promise<CoinData[]> {
