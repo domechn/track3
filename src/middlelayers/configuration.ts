@@ -203,12 +203,12 @@ export async function saveLastAutoBackupAt(d?: Date) {
 }
 
 // get last auto import time, if never backup, return 1970-01-01
-export async function getAutoImportAt(): Promise<Date> {
+export async function getLastAutoImportAt(): Promise<Date> {
 	const model = await getConfigurationById(lastAutoImportAtId)
 	return model?.data ? new Date(model.data) : new Date("1970-01-01T00:00:00.000Z")
 }
 
 // if d is undefined, use latest time
-export async function saveAutoImportAt(d?: Date) {
+export async function saveLastAutoImportAt(d?: Date) {
 	return saveConfigurationById(lastAutoImportAtId, d ? d.toISOString() : new Date().toISOString(), false)
 }

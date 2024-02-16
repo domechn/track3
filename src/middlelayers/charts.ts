@@ -5,7 +5,7 @@ import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, Asset
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
-import { timestampToDate } from '../utils/date'
+import { timeToDateStr } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'
 import { ASSET_HANDLER } from './entities/assets'
@@ -480,7 +480,7 @@ export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange): 
 
 export async function queryLastRefreshAt(): Promise<string | undefined> {
 	const lc = await ASSET_HANDLER.getLatestCreatedAt()
-	return lc ? timestampToDate(new Date(lc).getTime(), true) : undefined
+	return lc ? timeToDateStr(new Date(lc).getTime(), true) : undefined
 }
 
 function getCoins(assets: AssetModel[][], size = 10): string[] {
@@ -624,7 +624,7 @@ export async function queryAllDataDates(): Promise<{
 		.compact()
 		.map(as => ({
 			id: as.uuid,
-			date: timestampToDate(new Date(as.createdAt).getTime())
+			date: timeToDateStr(new Date(as.createdAt).getTime())
 		}))
 		.value()
 }

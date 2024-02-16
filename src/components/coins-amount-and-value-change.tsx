@@ -1,7 +1,7 @@
 import _ from "lodash";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
-import { timestampToDate } from "@/utils/date";
+import { timeToDateStr } from "@/utils/date";
 import {
   CoinsAmountAndValueChangeData,
   CurrencyRateDetail,
@@ -166,7 +166,7 @@ const App = ({
     }
     return {
       labels: _(current.timestamps)
-        .map((x) => timestampToDate(x))
+        .map((x) => timeToDateStr(x))
         .value(),
       datasets: [
         {

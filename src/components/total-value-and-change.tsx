@@ -5,7 +5,7 @@ import {
   TDateRange,
   TotalValueData,
 } from "@/middlelayers/types";
-import { timestampToDate } from "@/utils/date";
+import { timeToDateStr } from "@/utils/date";
 import {
   currencyWrapper,
   prettyNumberToLocaleString,
@@ -395,11 +395,11 @@ const App = ({
 
             // only show start and end date
             if (index === start) {
-              return timestampToDate(data[index]);
+              return timeToDateStr(data[index]);
             }
 
             if (index === end) {
-              return timestampToDate(data[index]);
+              return timeToDateStr(data[index]);
             }
 
             return "";
@@ -433,7 +433,7 @@ const App = ({
 
   function lineData() {
     return {
-      labels: assetChangeData.timestamps.map((x) => timestampToDate(x)),
+      labels: assetChangeData.timestamps.map((x) => timeToDateStr(x)),
       datasets: [
         {
           label: "Value",

@@ -13,7 +13,7 @@ import DeleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
 
 import { useToast } from "@/components/ui/use-toast";
-import { timestampToDate } from "@/utils/date";
+import { timeToDateStr } from "@/utils/date";
 import {
   currencyWrapper,
   prettyNumberToLocaleString,
@@ -251,7 +251,7 @@ const App = ({
                         )}
                     </div>
                     <div className="col-span-9 text-lg text-muted-foreground text-right">
-                      {timestampToDate(new Date(d.createdAt).getTime(), true)}
+                      {timeToDateStr(new Date(d.createdAt).getTime(), true)}
                     </div>
                   </div>
                 </CardTitle>

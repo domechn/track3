@@ -15,7 +15,7 @@ import { ASSET_HANDLER } from './entities/assets'
 import md5 from 'md5'
 import { TRC20ProUserAnalyzer } from './datafetch/coins/trc20'
 import { DATA_MANAGER, ExportData } from './datamanager'
-import { getAutoBackupDirectory, getAutoImportAt, getLastAutoBackupAt, saveAutoImportAt, saveLastAutoBackupAt } from './configuration'
+import { getAutoBackupDirectory, getLastAutoImportAt, getLastAutoBackupAt, saveLastAutoImportAt, saveLastAutoBackupAt } from './configuration'
 import { CoinPriceQuerier, CoinPriceQuery, ProCoinPriceQuery } from './datafetch/coins/price'
 
 
@@ -184,7 +184,7 @@ export async function autoBackupHistoricalData(force = false): Promise<boolean> 
 
 	await saveLastAutoBackupAt()
 	// also update auto import at
-	await saveAutoImportAt()
+	await saveLastAutoImportAt()
 	return true
 }
 
@@ -204,7 +204,7 @@ export async function autoImportHistoricalData(): Promise<boolean> {
 			return false
 		}
 
-		const aia = await getAutoImportAt()
+		const aia = await getLastAutoImportAt()
 		const exportAt = new Date(ed.exportAt)
 		const needImport = aia.getTime() < exportAt.getTime()
 
@@ -221,6 +221,6 @@ export async function autoImportHistoricalData(): Promise<boolean> {
 		return false
 	}
 
-	await saveAutoImportAt()
+	await saveLastAutoImportAt()
 	return true
 }
