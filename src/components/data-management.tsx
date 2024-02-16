@@ -243,7 +243,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <div className="space-y-3">
           <div>
             <div className="text-sm font-bold text-left py-2">Auto Backup</div>
-            <div className="text-sm text-left text-gray-400 flex space-x-2">
+            <div className="text-sm text-left text-gray-400 flex space-x-1">
               {autoBackupDirectory && (
                 <TooltipProvider>
                   <Tooltip>
@@ -279,7 +279,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
               </div>
             </div>
           </div>
-          <div className="items-center grid grid-cols-4">
+          <div className="items-center grid gap-4 grid-cols-4">
             <div
               className={cn(
                 "text-muted-foreground col-span-4 md:col-span-2 text-sm whitespace-nowrap overflow-x-scroll scrollbar-hide",
