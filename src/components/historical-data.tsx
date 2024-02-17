@@ -52,6 +52,7 @@ import {
 } from "./ui/table";
 import { ScrollArea } from "./ui/scroll-area";
 import { ToastAction } from "./ui/toast";
+import { positiveNegativeColor } from "@/utils/color";
 
 type RankData = {
   id: number;
@@ -165,9 +166,8 @@ const App = ({
     rhd: RestoreHistoricalData;
   }) {
     restoreHistoricalData(rhd.rhd).then(() => {
-
       // hide rank data when undo for data refreshing
-      setIsModalOpen(false)
+      setIsModalOpen(false);
 
       if (afterDataChanged) {
         afterDataChanged("undoDeletion", rhd.uuid, rhd.id);
@@ -324,8 +324,9 @@ const App = ({
                   <div className="col-span-3">
                     <div
                       style={{
-                        color:
-                          d.total - data[idx + 1]?.total > 0 ? "green" : "red",
+                        color: positiveNegativeColor(
+                          d.total - data[idx + 1]?.total
+                        ),
                       }}
                     >
                       {idx < data.length - 1

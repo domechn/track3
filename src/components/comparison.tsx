@@ -31,6 +31,7 @@ import {
 } from "./ui/table";
 import { loadingWrapper } from "@/lib/loading";
 import { Skeleton } from "./ui/skeleton";
+import { positiveNegativeColor } from "@/utils/color";
 
 type ComparisonData = {
   name: string;
@@ -80,9 +81,7 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         color:
           prettyComparisonResult(d.base, d.head) === "-"
             ? "black"
-            : getComparisonResultNumber(d.base, d.head) > 0
-            ? "green"
-            : "red",
+            : positiveNegativeColor(getComparisonResultNumber(d.base, d.head)),
       }))
       .value();
   }, [baseData, headData, shouldMaskValue]);

@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
 import { getWalletLogo } from "@/lib/utils";
+import { positiveNegativeColor } from '@/utils/color'
 
 const App = ({
   currency,
@@ -65,12 +66,7 @@ const App = ({
   }
 
   function getChangeClassName(value: number) {
-    if (value < 0) {
-      return "red";
-    } else if (value > 0) {
-      return "green";
-    }
-    return "gray";
+    return positiveNegativeColor(value)
   }
 
   function getPositiveValue(value: number) {

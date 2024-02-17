@@ -62,6 +62,7 @@ import {
 import { DateRange } from "react-day-picker";
 import { parseISO } from "date-fns";
 import Summary from "../summary";
+import GeneralSettings from "../general-settings";
 
 ChartJS.register(
   ...registerables,
@@ -409,6 +410,7 @@ const App = () => {
                 />
               }
             />
+            <Route path="general" element={<GeneralSettings />} />
             <Route
               path="systemInfo"
               element={

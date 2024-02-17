@@ -71,12 +71,12 @@ export function generateRandomColors(size: number): { R: number; G: number; B: n
 	return colors
 }
 
-export function positiveNegativeColor(val: number) {
+export function positiveNegativeColor(val: number, quoteColor: 'green-up-red-down' | 'red-up-green-down' = 'green-up-red-down') {
 	if (val === 0) {
 		return "gray"
 	} else if (val > 0) {
-		return "green"
+		return quoteColor === 'green-up-red-down' ? "green" : "red"
 	} else {
-		return "red"
+		return quoteColor === 'green-up-red-down' ? "red" : "green"
 	}
 }
