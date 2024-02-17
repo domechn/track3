@@ -8,12 +8,12 @@ const sidebarNavItems = [
     href: "/settings/configuration",
   },
   {
-    title: "Data",
-    href: "/settings/data",
-  },
-  {
     title: "General",
     href: "/settings/general",
+  },
+  {
+    title: "Data",
+    href: "/settings/data",
   },
   {
     title: "System",

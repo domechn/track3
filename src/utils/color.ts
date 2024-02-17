@@ -1,5 +1,6 @@
 import _ from 'lodash'
 import ColorDiff from 'color-diff'
+import { QuoteColor } from '@/middlelayers/types'
 
 const niceColors = [
 	"rgba(122, 51, 255, 1)",
@@ -71,7 +72,7 @@ export function generateRandomColors(size: number): { R: number; G: number; B: n
 	return colors
 }
 
-export function positiveNegativeColor(val: number, quoteColor: 'green-up-red-down' | 'red-up-green-down' = 'green-up-red-down') {
+export function positiveNegativeColor(val: number, quoteColor: QuoteColor = 'green-up-red-down') {
 	if (val === 0) {
 		return "gray"
 	} else if (val > 0) {

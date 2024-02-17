@@ -1,6 +1,7 @@
 import _ from "lodash";
 import {
   CurrencyRateDetail,
+  QuoteColor,
   TDateRange,
   WalletAssetsChangeData,
 } from "@/middlelayers/types";
@@ -19,14 +20,16 @@ import { useEffect, useState } from "react";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
 import { getWalletLogo } from "@/lib/utils";
-import { positiveNegativeColor } from '@/utils/color'
+import { positiveNegativeColor } from "@/utils/color";
 
 const App = ({
   currency,
   dateRange,
+  quoteColor,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  quoteColor: QuoteColor;
 }) => {
   const [loading, setLoading] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
@@ -66,7 +69,7 @@ const App = ({
   }
 
   function getChangeClassName(value: number) {
-    return positiveNegativeColor(value)
+    return positiveNegativeColor(value, quoteColor);
   }
 
   function getPositiveValue(value: number) {

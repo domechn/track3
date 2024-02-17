@@ -9,6 +9,7 @@ import {
 import {
   CurrencyRateDetail,
   HistoricalData,
+  QuoteColor,
   RestoreHistoricalData,
   TDateRange,
 } from "@/middlelayers/types";
@@ -69,6 +70,7 @@ const App = ({
   afterDataChanged,
   dateRange,
   currency,
+  quoteColor,
 }: {
   // uuid is id for batch data
   // id is for single data
@@ -79,6 +81,7 @@ const App = ({
   ) => unknown;
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
+  quoteColor: QuoteColor;
 }) => {
   const { toast } = useToast();
   const [data, setData] = useState([] as HistoricalData[]);
@@ -325,7 +328,8 @@ const App = ({
                     <div
                       style={{
                         color: positiveNegativeColor(
-                          d.total - data[idx + 1]?.total
+                          d.total - data[idx + 1]?.total,
+                          quoteColor
                         ),
                       }}
                     >

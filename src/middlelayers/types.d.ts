@@ -224,3 +224,5 @@ export type UserLicenseInfo = {
 	// must exists if isPro === true
 	license?: string
 }
+
+export type QuoteColor = "green-up-red-down" | "red-up-green-down"

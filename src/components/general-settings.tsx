@@ -4,11 +4,14 @@ import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Separator } from "./ui/separator";
 import { useEffect, useState } from "react";
 import { getQuoteColor, saveQuoteColor } from "@/middlelayers/configuration";
+import { QuoteColor } from "@/middlelayers/types";
 
-const App = () => {
-  const [quoteColor, setQuoteColor] = useState<
-    "green-up-red-down" | "red-up-green-down"
-  >("green-up-red-down");
+const App = ({
+  onQuoteColorChange,
+}: {
+  onQuoteColorChange?: (val: QuoteColor) => void;
+}) => {
+  const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
 
   useEffect(() => {
     loadGeneralSettings();
@@ -21,7 +24,16 @@ const App = () => {
 
   function QuoteColor() {
     function onQuoteColorValueChange(val: string) {
-      saveQuoteColor(val as "green-up-red-down" | "red-up-green-down");
+      handleQuoteColorValueChange(val);
+    }
+
+    async function handleQuoteColorValueChange(val: string) {
+      const v = val as QuoteColor;
+      await saveQuoteColor(v);
+      setQuoteColor(v);
+      if (onQuoteColorChange) {
+        onQuoteColorChange(v);
+      }
     }
     return (
       <RadioGroup

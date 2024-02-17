@@ -2,6 +2,7 @@ import {
   CurrencyRateDetail,
   PNLChartData,
   PNLTableDate,
+  QuoteColor,
   TDateRange,
 } from "@/middlelayers/types";
 import { timeToDateStr } from "@/utils/date";
@@ -29,9 +30,11 @@ const chartName = "PNL of Asset";
 const App = ({
   currency,
   dateRange,
+  quoteColor,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  quoteColor: QuoteColor
 }) => {
   const [tableLoading, setTableLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
@@ -197,7 +200,7 @@ const App = ({
   }
 
   function pnlBackgroundColor(val: 'positive' | 'negative'): string {
-    const c = positiveNegativeColor(val === 'positive' ? 1 : -1)
+    const c = positiveNegativeColor(val === 'positive' ? 1 : -1, quoteColor)
     return c === 'green' ? '#4caf50' : '#f44336'
   }
 
@@ -273,7 +276,7 @@ const App = ({
   }
 
   function getPNLTextColor(val?: number): string {
-    const c = positiveNegativeColor(val ?? 0);
+    const c = positiveNegativeColor(val ?? 0, quoteColor);
     return `text-${c}-600`;
   }
 

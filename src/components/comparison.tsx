@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CoinData, CurrencyRateDetail } from "@/middlelayers/types";
+import { CoinData, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import _ from "lodash";
 import ViewIcon from "@/assets/icons/view-icon.png";
@@ -42,7 +42,13 @@ type ComparisonData = {
 
 type QuickCompareType = "7D" | "1M" | "1Q" | "1Y";
 
-const App = ({ currency }: { currency: CurrencyRateDetail }) => {
+const App = ({
+  currency,
+  quoteColor,
+}: {
+  currency: CurrencyRateDetail;
+  quoteColor: QuoteColor;
+}) => {
   const [selectDatesLoading, setSelectDatesLoading] = useState<boolean>(false);
   const [dataLoading, setDataLoading] = useState<boolean>(true);
 
@@ -81,7 +87,10 @@ const App = ({ currency }: { currency: CurrencyRateDetail }) => {
         color:
           prettyComparisonResult(d.base, d.head) === "-"
             ? "black"
-            : positiveNegativeColor(getComparisonResultNumber(d.base, d.head)),
+            : positiveNegativeColor(
+                getComparisonResultNumber(d.base, d.head),
+                quoteColor
+              ),
       }))
       .value();
   }, [baseData, headData, shouldMaskValue]);

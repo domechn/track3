@@ -1,5 +1,5 @@
 import { calculateTotalProfit } from "@/middlelayers/charts";
-import { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
+import { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { getMonthAbbreviation, listAllFirstAndLastDays } from "@/utils/date";
 import bluebird from "bluebird";
@@ -25,9 +25,11 @@ type SummaryType = "day" | "month" | "year";
 const App = ({
   dateRange,
   currency,
+  quoteColor,
 }: {
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
+  quoteColor: QuoteColor
 }) => {
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
@@ -205,7 +207,7 @@ const App = ({
               key={"m-profit-summary-" + p.monthFirstDate.getTime()}
               className={cn(
                 "w-[100px] rounded-lg text-center p-2 col-span-2",
-                `bg-${positiveNegativeColor(p.total)}-100`
+                `bg-${positiveNegativeColor(p.total, quoteColor)}-100`
               )}
             >
               <div className="text-md text-gray-800 text-center">
@@ -213,7 +215,7 @@ const App = ({
               </div>
               <div
                 className={cn(
-                  `text-${positiveNegativeColor(p.total)}-700 font-bold`
+                  `text-${positiveNegativeColor(p.total, quoteColor)}-700 font-bold`
                 )}
               >
                 <div>
@@ -249,13 +251,13 @@ const App = ({
                 key={"y-profit-summary-" + year}
                 className={cn(
                   "w-[100px] rounded-lg text-center p-2 col-span-2",
-                  `bg-${positiveNegativeColor(p.total)}-100`
+                  `bg-${positiveNegativeColor(p.total, quoteColor)}-100`
                 )}
               >
                 <div className="text-md text-gray-800 text-center">{year}</div>
                 <div
                   className={cn(
-                    `text-${positiveNegativeColor(p.total)}-700 font-bold`
+                    `text-${positiveNegativeColor(p.total, quoteColor)}-700 font-bold`
                   )}
                 >
                   <div>
