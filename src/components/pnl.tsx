@@ -2,6 +2,7 @@ import {
   CurrencyRateDetail,
   PNLChartData,
   PNLTableDate,
+  QuoteColor,
   TDateRange,
 } from "@/middlelayers/types";
 import { timeToDateStr } from "@/utils/date";
@@ -22,15 +23,18 @@ import {
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { ChartResizeContext } from "@/App";
+import { positiveNegativeColor } from '@/utils/color'
 
 const chartName = "PNL of Asset";
 
 const App = ({
   currency,
   dateRange,
+  quoteColor,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  quoteColor: QuoteColor
 }) => {
   const [tableLoading, setTableLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
@@ -195,6 +199,11 @@ const App = ({
     return _.last(pnlChartData)?.totalValue;
   }
 
+  function pnlBackgroundColor(val: 'positive' | 'negative'): string {
+    const c = positiveNegativeColor(val === 'positive' ? 1 : -1, quoteColor)
+    return c === 'green' ? '#4caf50' : '#f44336'
+  }
+
   function lineData() {
     return {
       labels: _(pnlChartData)
@@ -209,7 +218,7 @@ const App = ({
           data: formatPositiveLineData(),
           stack: "value",
           // borderColor: lineColor,
-          backgroundColor: "#4caf50",
+          backgroundColor: pnlBackgroundColor('positive'),
         },
         {
           // !add a blank in label to make the difference between positive and negative, if they are the same, it will cause display issue when rendering the chart
@@ -217,7 +226,7 @@ const App = ({
           data: formatNegativeLineData(),
           stack: "value",
           // borderColor: lineColor,
-          backgroundColor: "#f44336",
+          backgroundColor: pnlBackgroundColor('negative')
         },
       ],
     };
@@ -267,10 +276,8 @@ const App = ({
   }
 
   function getPNLTextColor(val?: number): string {
-    if (!val) {
-      return "text-gray-600";
-    }
-    return val > 0 ? "text-green-600" : "text-red-600";
+    const c = positiveNegativeColor(val ?? 0, quoteColor);
+    return `text-${c}-600`;
   }
 
   return (

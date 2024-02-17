@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
+import {
+  CurrencyRateDetail,
+  QuoteColor,
+  TDateRange,
+} from "@/middlelayers/types";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -16,16 +20,18 @@ import { Skeleton } from "./ui/skeleton";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
-import { positiveNegativeColor } from '@/utils/color'
+import { positiveNegativeColor } from "@/utils/color";
 
 type TopType = "profitTop" | "lossTop";
 
 const App = ({
   currency,
   dateRange,
+  quoteColor,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  quoteColor: QuoteColor;
 }) => {
   const [profit, setProfit] = useState(0);
   const [profitPercentage, setProfitPercentage] = useState(0);
@@ -148,7 +154,8 @@ const App = ({
                       <TableCell className="text-right">
                         <div
                           className={`text-${positiveNegativeColor(
-                            d.value
+                            d.value,
+                            quoteColor
                           )}-600`}
                         >
                           {(d.value < 0 ? "-" : "+") +

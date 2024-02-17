@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import {
   AssetChangeData,
   CurrencyRateDetail,
+  QuoteColor,
   TDateRange,
   TotalValueData,
 } from "@/middlelayers/types";
@@ -23,6 +24,7 @@ import {
 import { loadingWrapper } from "@/lib/loading";
 import bluebird from "bluebird";
 import { ChartResizeContext } from "@/App";
+import { positiveNegativeColor } from "@/utils/color";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -158,9 +160,11 @@ class BTCTotalValue implements TotalValueShower {
 const App = ({
   currency,
   dateRange,
+  quoteColor,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  quoteColor: QuoteColor;
 }) => {
   const lineColor = "rgba(255, 99, 71, 1)";
   const { needResize } = useContext(ChartResizeContext);
@@ -332,10 +336,9 @@ const App = ({
   }
 
   function changePercentageColorClass() {
-    if (getPercentageChange() === 0) {
-      return "text-gray-500";
-    }
-    return getPercentageChange() > 0 ? "text-green-500" : "text-red-500";
+    const pc = getPercentageChange();
+    const c = positiveNegativeColor(pc, quoteColor);
+    return `text-${c}-500`;
   }
 
   const options = {

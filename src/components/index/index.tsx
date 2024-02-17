@@ -31,7 +31,7 @@ import {
   Navigate,
 } from "react-router-dom";
 
-import { CurrencyRateDetail } from "@/middlelayers/types";
+import { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { getAvailableDates, queryLastRefreshAt } from "@/middlelayers/charts";
 import { useWindowSize } from "@/utils/hook";
@@ -39,6 +39,7 @@ import {
   queryPreferCurrency,
   getLicenseIfIsPro,
   getInitialQueryDateRange,
+  getQuoteColor,
 } from "@/middlelayers/configuration";
 import { getDefaultCurrencyRate } from "@/middlelayers/configuration";
 import _ from "lodash";
@@ -62,6 +63,7 @@ import {
 import { DateRange } from "react-day-picker";
 import { parseISO } from "date-fns";
 import Summary from "../summary";
+import GeneralSettings from "../general-settings";
 
 ChartJS.register(
   ...registerables,
@@ -92,6 +94,7 @@ const App = () => {
   const [refreshProgress, setRefreshProgress] = useState(0);
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
+  const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
 
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
 
@@ -157,6 +160,7 @@ const App = () => {
   function loadConfiguration() {
     loadCurrentCurrency();
     loadIsProUser();
+    loadQuoteColor();
   }
 
   function loadCurrentCurrency() {
@@ -166,6 +170,10 @@ const App = () => {
   function loadIsProUser() {
     // currently only check if there is license in sqlite
     getLicenseIfIsPro().then((l) => setIsProUser(!!l));
+  }
+
+  function loadQuoteColor() {
+    getQuoteColor().then((c) => setQuoteColor(c));
   }
 
   async function handleAutoBackup() {
@@ -338,7 +346,11 @@ const App = () => {
             path="/overview"
             element={
               <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <Overview currency={currentCurrency} dateRange={tDateRange} />
+                <Overview
+                  currency={currentCurrency}
+                  dateRange={tDateRange}
+                  quoteColor={quoteColor}
+                />
               </PageWrapper>
             }
           ></Route>
@@ -347,7 +359,11 @@ const App = () => {
             path="/summary"
             element={
               <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <Summary currency={currentCurrency} dateRange={maxDateRange} />
+                <Summary
+                  currency={currentCurrency}
+                  dateRange={maxDateRange}
+                  quoteColor={quoteColor}
+                />
               </PageWrapper>
             }
           ></Route>
@@ -359,6 +375,7 @@ const App = () => {
                 <WalletAnalysis
                   currency={currentCurrency}
                   dateRange={tDateRange}
+                  quoteColor={quoteColor}
                 />
               </PageWrapper>
             }
@@ -367,7 +384,10 @@ const App = () => {
             path="/comparison"
             element={
               <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <Comparison currency={currentCurrency} />
+                <Comparison
+                  currency={currentCurrency}
+                  quoteColor={quoteColor}
+                />
               </PageWrapper>
             }
           />
@@ -378,6 +398,7 @@ const App = () => {
                 <HistoricalData
                   currency={currentCurrency}
                   dateRange={tDateRange}
+                  quoteColor={quoteColor}
                   afterDataChanged={() => {
                     loadAllData();
                     autoBackupHistoricalData(true);
@@ -396,6 +417,12 @@ const App = () => {
                     loadConfiguration();
                   }}
                 />
+              }
+            />
+            <Route
+              path="general"
+              element={
+                <GeneralSettings onQuoteColorChange={(v) => setQuoteColor(v)} />
               }
             />
             <Route

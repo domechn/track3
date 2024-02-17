@@ -19,6 +19,7 @@ const lastAutoBackupAtId = "4"
 const lastAutoImportAtId = "5"
 const querySizeId = "6"
 const preferCurrencyId = "7"
+const quoteColorId = "8"
 const clientInfoFixId = "998"
 const licenseFixId = "997"
 
@@ -211,4 +212,17 @@ export async function getLastAutoImportAt(): Promise<Date> {
 // if d is undefined, use latest time
 export async function saveLastAutoImportAt(d?: Date) {
 	return saveConfigurationById(lastAutoImportAtId, d ? d.toISOString() : new Date().toISOString(), false)
+}
+
+export async function saveQuoteColor(qc: 'green-up-red-down' | 'red-up-green-down') {
+	const val = qc === 'green-up-red-down' ? 0 : 1
+
+	return saveConfigurationById(quoteColorId, val.toString(), false)
+}
+
+export async function getQuoteColor(): Promise<'green-up-red-down' | 'red-up-green-down'> {
+	const model = await getConfigurationById(quoteColorId)
+	const val = model?.data ? parseInt(model.data) : 0
+
+	return val === 0 ? 'green-up-red-down' : 'red-up-green-down'
 }

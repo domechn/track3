@@ -9,6 +9,7 @@ import {
 import {
   CurrencyRateDetail,
   HistoricalData,
+  QuoteColor,
   RestoreHistoricalData,
   TDateRange,
 } from "@/middlelayers/types";
@@ -52,6 +53,7 @@ import {
 } from "./ui/table";
 import { ScrollArea } from "./ui/scroll-area";
 import { ToastAction } from "./ui/toast";
+import { positiveNegativeColor } from "@/utils/color";
 
 type RankData = {
   id: number;
@@ -68,6 +70,7 @@ const App = ({
   afterDataChanged,
   dateRange,
   currency,
+  quoteColor,
 }: {
   // uuid is id for batch data
   // id is for single data
@@ -78,6 +81,7 @@ const App = ({
   ) => unknown;
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
+  quoteColor: QuoteColor;
 }) => {
   const { toast } = useToast();
   const [data, setData] = useState([] as HistoricalData[]);
@@ -165,9 +169,8 @@ const App = ({
     rhd: RestoreHistoricalData;
   }) {
     restoreHistoricalData(rhd.rhd).then(() => {
-
       // hide rank data when undo for data refreshing
-      setIsModalOpen(false)
+      setIsModalOpen(false);
 
       if (afterDataChanged) {
         afterDataChanged("undoDeletion", rhd.uuid, rhd.id);
@@ -324,8 +327,10 @@ const App = ({
                   <div className="col-span-3">
                     <div
                       style={{
-                        color:
-                          d.total - data[idx + 1]?.total > 0 ? "green" : "red",
+                        color: positiveNegativeColor(
+                          d.total - data[idx + 1]?.total,
+                          quoteColor
+                        ),
                       }}
                     >
                       {idx < data.length - 1
