@@ -286,10 +286,6 @@ const App = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="px-10">
-        {/* fix color not render issue */}
-        <div className="hidden text-green-700 text-red-700 text-gray-700 bg-green-100 bg-red-100 bg-gray-100">
-          debug
-        </div>
         <div className="flex justify-between">
           <div>
             {loadingWrapper(
