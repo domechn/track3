@@ -110,6 +110,15 @@ const App = ({
     return mp >= 0 ? mp : 0;
   }, [latestAssetsPercentageData]);
 
+  const pagedLatestAssetsPercentageData = useMemo(
+    () =>
+      latestAssetsPercentageData.slice(
+        dataPage * pageSize,
+        (dataPage + 1) * pageSize
+      ),
+    [latestAssetsPercentageData, dataPage]
+  );
+
   async function getLogoMap(d: LatestAssetsPercentageData) {
     const acd = await getAppCacheDir();
     const kvs = await bluebird.map(d, async (coin) => {
@@ -207,7 +216,7 @@ const App = ({
       <>
         <div className="flex w-[100%] h-[50px] justify-between items-center">
           <div className="font-bold text-muted-foreground ml-2">
-            Token holding
+            Token Holding
           </div>
           <div className="flex space-x-2 py-4 items-center">
             <Button
@@ -245,8 +254,7 @@ const App = ({
                     </TableRow>
                   ))
                   .value()
-              : latestAssetsPercentageData
-                  .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
+              : pagedLatestAssetsPercentageData
                   .map((d) => (
                     <TableRow
                       key={d.coin}

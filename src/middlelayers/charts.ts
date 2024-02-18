@@ -511,7 +511,8 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 		return []
 	}
 
-	const latest = assets[0]
+	// ignore coins whose amount is 0
+	const latest = _(assets[0]).filter(a => a.amount !== 0).value()
 	const backgroundColors = generateRandomColors(_(latest).size())
 
 	const total = _(latest).sumBy("value") + 10 ** -21 // avoid total is 0
