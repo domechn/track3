@@ -63,7 +63,7 @@ import {
 import { DateRange } from "react-day-picker";
 import { parseISO } from "date-fns";
 import Summary from "../summary";
-import GeneralSettings from "../general-settings";
+import Appearance from "../appearance";
 
 ChartJS.register(
   ...registerables,
@@ -252,7 +252,7 @@ const App = () => {
 
     return (
       <div className="pb-12">
-        <div className="fixed top-0 left-4 right-0 z-10 bg-white flex-col md:flex">
+        <div className="fixed top-0 left-4 right-0 z-10 flex-col md:flex">
           <div className="border-b">
             <div className="flex h-12 items-center px-4">
               {isProUser && (
@@ -424,9 +424,9 @@ const App = () => {
               }
             />
             <Route
-              path="general"
+              path="appearance"
               element={
-                <GeneralSettings onQuoteColorChange={(v) => setQuoteColor(v)} />
+                <Appearance onQuoteColorChange={(v) => setQuoteColor(v)} />
               }
             />
             <Route

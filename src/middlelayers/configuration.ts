@@ -7,6 +7,7 @@ import { CURRENCY_RATE_HANDLER } from './entities/currency'
 import { ASSET_HANDLER } from './entities/assets'
 import _ from 'lodash'
 import { DateRange } from 'react-day-picker'
+import { Theme } from '@/components/common/theme'
 
 // todo: update to dedicated domain
 export const PRO_API_ENDPOINT = 'https://track3-pro-api.domc.me'
@@ -22,6 +23,8 @@ const preferCurrencyId = "7"
 const quoteColorId = "8"
 const clientInfoFixId = "998"
 const licenseFixId = "997"
+
+export const themeLocalStorageKey = "track3-ui-theme"
 
 export async function getConfiguration(): Promise<GlobalConfig | undefined> {
 	const model = await getConfigurationById(generalFixId)
@@ -225,4 +228,8 @@ export async function getQuoteColor(): Promise<'green-up-red-down' | 'red-up-gre
 	const val = model?.data ? parseInt(model.data) : 0
 
 	return val === 0 ? 'green-up-red-down' : 'red-up-green-down'
+}
+
+export function saveTheme(theme: Theme) {
+	localStorage.setItem(themeLocalStorageKey, theme)
 }
