@@ -3,6 +3,7 @@ import { getClientIDConfiguration } from '../middlelayers/configuration'
 import { trackEvent } from '@aptabase/tauri'
 import { exists } from '@tauri-apps/api/fs'
 import { convertFileSrc } from "@tauri-apps/api/tauri"
+import { relaunch } from "@tauri-apps/api/process"
 
 export async function getVersion() {
 	return api.app.getVersion()
@@ -34,4 +35,8 @@ export async function getImageApiPath(cacheDir: string, symbol: string) {
 		}
 		return convertFileSrc(filePath)
 	})
+}
+
+export function reloadApp() {
+	return relaunch()
 }

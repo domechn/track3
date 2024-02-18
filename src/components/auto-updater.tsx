@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { checkUpdate, installUpdate } from "@tauri-apps/api/updater";
-import { relaunch } from "@tauri-apps/api/process";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+import { reloadApp } from '@/utils/app'
 
 const maxInt = 2147483647;
 
@@ -38,10 +38,6 @@ const App = () => {
           });
         }
       });
-  }
-
-  function reloadApp() {
-    return relaunch();
   }
 
   return <></>;

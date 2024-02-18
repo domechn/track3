@@ -8,8 +8,8 @@ const sidebarNavItems = [
     href: "/settings/configuration",
   },
   {
-    title: "General",
-    href: "/settings/general",
+    title: "Appearance",
+    href: "/settings/appearance",
   },
   {
     title: "Data",
