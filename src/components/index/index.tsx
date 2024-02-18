@@ -252,7 +252,7 @@ const App = () => {
 
     return (
       <div className="pb-12">
-        <div className="fixed top-0 left-4 right-0 z-10 flex-col md:flex">
+        <div className="fixed top-0 left-4 right-0 z-10 bg-background flex-col md:flex">
           <div className="border-b">
             <div className="flex h-12 items-center px-4">
               {isProUser && (
