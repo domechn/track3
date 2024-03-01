@@ -93,5 +93,5 @@ export function simplifyNumber(num: number) {
 		}
 	}
 
-	return negativeWrapper(absNum.toString())
+	return negativeWrapper(absNum.toFixed(1))
 }
