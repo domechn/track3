@@ -15,7 +15,9 @@ export class DOGEAnalyzer implements Analyzer {
 
 	constructor(config: Pick<TokenConfig, 'doge'>) {
 		this.config = config
-		this.dogeQueriers = [new DogeInfo(), new BlockCypher()]
+		this.dogeQueriers = [
+			new BlockCypher(),
+		]
 	}
 
 	getAnalyzeName(): string {
@@ -60,16 +62,6 @@ export class DOGEAnalyzer implements Analyzer {
 			...c,
 			symbol: "DOGE"
 		})).value()
-	}
-}
-
-class DogeInfo implements DogeQuerier {
-	private readonly queryUrl = "https://dogechain.info/api/v1/address/balance/"
-
-	async query(address: string): Promise<number> {
-		const resp = await sendHttpRequest<{ balance: number }>("GET", this.queryUrl + address)
-		const amount = _(resp.balance).toNumber()
-		return amount
 	}
 }
 
