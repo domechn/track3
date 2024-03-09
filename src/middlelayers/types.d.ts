@@ -107,6 +107,12 @@ export type TotalValueData = {
 	prevTotalValue: number
 }
 
+export type MaxTotalValueData = {
+	uuid: string
+	date: Date
+	totalValue: number
+}
+
 export type PNLChartData = {
 	totalValue: number
 	timestamp: number
