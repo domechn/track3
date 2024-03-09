@@ -142,8 +142,8 @@ const App = ({
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-10">
-        <div>
+      <CardContent>
+        <div className='mt-2'>
           {loadingWrapper(
             loading,
             <MaxTotalValueView />,
