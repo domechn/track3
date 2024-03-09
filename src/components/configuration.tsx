@@ -49,6 +49,7 @@ import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
 import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
 import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
 import { getWalletLogo } from "@/lib/utils";
+import { prettyPriceNumberToLocaleString } from "@/utils/currency";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -219,6 +220,11 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         }))
         .value(),
     [currencies]
+  );
+
+  const preferredCurrencyDetail = useMemo(
+    () => _(currencies).find((c) => c.currency === preferCurrency),
+    [currencies, preferCurrency]
   );
 
   useEffect(() => {
@@ -1090,24 +1096,33 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         </div>
         <div className="space-y-2">
           <div className="text-sm font-bold text-left">Base Currency</div>
-          <Select
-            onValueChange={onPreferCurrencyChanged}
-            value={preferCurrency}
-          >
-            <SelectTrigger className="w-[300px]">
-              <SelectValue placeholder="Configure Prefer Currency" />
-            </SelectTrigger>
-            <SelectContent className="overflow-y-auto max-h-[20rem]">
-              <SelectGroup>
-                <SelectLabel>Prefer Currency</SelectLabel>
-                {preferCurrencyOptions.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <div className="flex space-x-2 items-center">
+            <Select
+              onValueChange={onPreferCurrencyChanged}
+              value={preferCurrency}
+            >
+              <SelectTrigger className="w-[300px]">
+                <SelectValue placeholder="Configure Prefer Currency" />
+              </SelectTrigger>
+              <SelectContent className="overflow-y-auto max-h-[20rem]">
+                <SelectGroup>
+                  <SelectLabel>Prefer Currency</SelectLabel>
+                  {preferCurrencyOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {preferredCurrencyDetail && preferCurrency !== 'USD' && (
+              <div className="text-muted-foreground text-sm">
+                1 USD ={" "}
+                {prettyPriceNumberToLocaleString(preferredCurrencyDetail.rate)}{" "}
+                {preferredCurrencyDetail.currency}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <Separator />
