@@ -145,12 +145,14 @@ const querySizeOptions = [
   },
 ];
 
+const defaultBaseCurrency = "USD";
+
 const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const { toast } = useToast();
   const [groupUSD, setGroupUSD] = useState(true);
   const [querySize, setQuerySize] = useState(0);
   const [formChanged, setFormChanged] = useState(false);
-  const [preferCurrency, setPreferCurrency] = useState("USD");
+  const [preferCurrency, setPreferCurrency] = useState(defaultBaseCurrency);
   const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
   const [addWalletDialogOpen, setAddWalletDialogOpen] = useState(false);
   const [addOtherDialogOpen, setAddOtherDialogOpen] = useState(false);
@@ -1115,9 +1117,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {preferredCurrencyDetail && preferCurrency !== 'USD' && (
+            {preferredCurrencyDetail && preferCurrency !== defaultBaseCurrency && (
               <div className="text-muted-foreground text-sm">
-                1 USD ={" "}
+                1 {defaultBaseCurrency} ={" "}
                 {prettyPriceNumberToLocaleString(preferredCurrencyDetail.rate)}{" "}
                 {preferredCurrencyDetail.currency}
               </div>
