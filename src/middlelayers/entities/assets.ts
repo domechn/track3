@@ -36,6 +36,22 @@ class AssetHandler implements AssetHandlerImpl {
 		return this.queryAssetsByDateRange(start, end)
 	}
 
+	async listMaxTotalValueRecord(start?: Date, end?: Date): Promise<{
+		uuid: string
+		createdAt: Date,
+		totalValue: number,
+	} | undefined> {
+		const sql = `SELECT SUM(value) as totalValue, uuid, createdAt FROM ${this.assetTableName} WHERE 1=1 ${start ?
+			" AND createdAt >= ?" : ""} ${end ? " AND createdAt <= ?" : ""} GROUP BY uuid ORDER BY totalValue DESC LIMIT 1`
+		const results = await selectFromDatabaseWithSql<{
+			uuid: string
+			createdAt: Date,
+			totalValue: number,
+		}>(sql, _([start, end]).compact().map(d => d.toISOString()).value())
+
+		return results[0]
+	}
+
 	// list assets by symbol without grouping
 	async listAssetsBySymbol(symbol: string, size?: number): Promise<AssetModel[][]> {
 		return this.queryAssets(size, symbol)

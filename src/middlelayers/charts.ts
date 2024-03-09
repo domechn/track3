@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -356,6 +356,22 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 	return {
 		totalValue: latestTotal,
 		prevTotalValue: previousTotal,
+	}
+}
+
+export async function queryMaxTotalValue(dateRange: TDateRange): Promise<MaxTotalValueData> {
+	const record = await ASSET_HANDLER.listMaxTotalValueRecord(dateRange.start, dateRange.end)
+	if (!record) {
+		return {
+			uuid: "",
+			totalValue: 0,
+			date: new Date()
+		}
+	}
+	return {
+		uuid: record.uuid,
+		totalValue: record.totalValue,
+		date: new Date(record.createdAt)
 	}
 }
 
