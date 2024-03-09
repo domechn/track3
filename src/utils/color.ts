@@ -1,5 +1,5 @@
 import _ from 'lodash'
-import ColorDiff from 'color-diff'
+import { diff, rgb_to_lab } from 'color-diff'
 import { QuoteColor } from '@/middlelayers/types'
 
 const niceColors = [
@@ -65,7 +65,7 @@ export function generateRandomColors(size: number): { R: number; G: number; B: n
 		let color
 		do {
 			color = generateRandomColor()
-		} while (lastColor && ColorDiff.diff(ColorDiff.rgb_to_lab(lastColor), ColorDiff.rgb_to_lab(color)) < 20)
+		} while (lastColor && diff(rgb_to_lab(lastColor), rgb_to_lab(color)) < 20)
 		colors.push(color)
 		lastColor = color
 	}
