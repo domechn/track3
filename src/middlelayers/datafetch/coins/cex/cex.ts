@@ -57,7 +57,7 @@ export class CexAnalyzer implements Analyzer {
 	}
 
 	async fetchTotalBalance(ex: Exchanger, ttl = 600): Promise<{ [k: string]: number }> {
-		const cc = CacheCenter.getInstance()
+		const cc = CacheCenter.getMemoryCacheInstance()
 		const cacheKey = `${ex.getIdentity()}_total_balance`
 
 		const cacheResult = cc.getCache<{ [k: string]: number }>(cacheKey)

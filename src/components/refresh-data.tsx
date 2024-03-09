@@ -70,7 +70,7 @@ const App = ({
     )
       .then(async () => {
         // clean cache after all analyzers finished successfully
-        CacheCenter.getInstance().clearCache();
+        CacheCenter.getMemoryCacheInstance().clearCache();
         return updateAllCurrencyRates();
       })
       .catch((err) => {
