@@ -1119,9 +1119,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             </Select>
             {preferredCurrencyDetail && preferCurrency !== defaultBaseCurrency && (
               <div className="text-muted-foreground text-sm">
-                1 {defaultBaseCurrency} ={" "}
-                {prettyPriceNumberToLocaleString(preferredCurrencyDetail.rate)}{" "}
-                {preferredCurrencyDetail.currency}
+                {`1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(preferredCurrencyDetail.rate)} ${preferredCurrencyDetail.currency}`}
               </div>
             )}
           </div>
