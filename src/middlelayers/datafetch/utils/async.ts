@@ -1,10 +1,10 @@
 import _ from 'lodash'
 import bluebird from 'bluebird'
-import { CacheCenter } from './cache'
+import { getMemoryCacheInstance } from './cache'
 
 // send http request and cache the result for ttl
 export async function asyncMap<K, V>(items: K[], fn: (item: K) => Promise<V>, concurrency = 1, delay = 0, ttl = 600): Promise<V[]> {
-	const cc = CacheCenter.getMemoryCacheInstance()
+	const cc = getMemoryCacheInstance()
 	return bluebird.map(items, async item => {
 		let cacheKey: string
 		if (_(item).isString()) {

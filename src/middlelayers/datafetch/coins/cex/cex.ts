@@ -4,7 +4,7 @@ import bluebird from 'bluebird'
 import { OtherCexExchanges } from './others'
 import { BinanceExchange } from './binance'
 import { OkexExchange } from './okex'
-import { CacheCenter } from '../../utils/cache'
+import { getMemoryCacheInstance } from '../../utils/cache'
 import { GateExchange } from './gate'
 
 export interface Exchanger {
@@ -57,7 +57,7 @@ export class CexAnalyzer implements Analyzer {
 	}
 
 	async fetchTotalBalance(ex: Exchanger, ttl = 600): Promise<{ [k: string]: number }> {
-		const cc = CacheCenter.getMemoryCacheInstance()
+		const cc = getMemoryCacheInstance()
 		const cacheKey = `${ex.getIdentity()}_total_balance`
 
 		const cacheResult = cc.getCache<{ [k: string]: number }>(cacheKey)
