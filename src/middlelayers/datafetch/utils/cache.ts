@@ -32,12 +32,21 @@ class MemoryCacheProvider implements CacheProvider {
 }
 
 class LocalStorageCacheProvider implements CacheProvider {
+	private prefix: string
+	constructor(prefix: string) {
+		this.prefix = prefix + "/"
+	}
+
+	private makeKey(key: string) {
+		return `${this.prefix}${key}`
+	}
+
 	public set(key: string, value: CacheValue) {
-		localStorage.setItem(key, JSON.stringify(value))
+		localStorage.setItem(this.makeKey(key), JSON.stringify(value))
 	}
 
 	public get(key: string): CacheValue | undefined {
-		const cv = localStorage.getItem(key)
+		const cv = localStorage.getItem(this.makeKey(key))
 		if (!cv) {
 			return
 		}
@@ -45,35 +54,38 @@ class LocalStorageCacheProvider implements CacheProvider {
 	}
 
 	public delete(key: string) {
-		localStorage.removeItem(key)
+		localStorage.removeItem(this.makeKey(key))
 	}
 
 	public clear() {
-		localStorage.clear()
+		Object.keys(localStorage).filter(k => k.startsWith(this.prefix)).forEach(k => localStorage.removeItem(k))
 	}
 }
 
-let memoryCacheInstance: CacheCenter
-let localStorageCacheInstance: CacheCenter
+// key is groupKey
+const memoryCacheInstance = new Map<string, CacheCenter>()
+const localStorageCacheInstance = new Map<string, CacheCenter>()
+
+export function getMemoryCacheInstance(groupKey?: string) {
+	const k = groupKey ?? "default"
+	if (!memoryCacheInstance.has(k)) {
+		memoryCacheInstance.set(k, new CacheCenter(new MemoryCacheProvider()))
+	}
+	return memoryCacheInstance.get(k)!
+}
+
+export function getLocalStorageCacheInstance(groupKey?: string) {
+	const k = groupKey ?? "default"
+	if (!localStorageCacheInstance.has(k)) {
+		localStorageCacheInstance.set(k, new CacheCenter(new LocalStorageCacheProvider(k)))
+	}
+	return localStorageCacheInstance.get(k)!
+}
 
 export class CacheCenter {
 	private provider: CacheProvider
-	private constructor(p: CacheProvider) {
+	constructor(p: CacheProvider) {
 		this.provider = p
-	}
-
-	public static getMemoryCacheInstance() {
-		if (!memoryCacheInstance) {
-			memoryCacheInstance = new CacheCenter(new MemoryCacheProvider())
-		}
-		return memoryCacheInstance
-	}
-
-	public static getLocalStorageCacheInstance() {
-		if (!localStorageCacheInstance) {
-			localStorageCacheInstance = new CacheCenter(new LocalStorageCacheProvider())
-		}
-		return localStorageCacheInstance
 	}
 
 	// ttl is second

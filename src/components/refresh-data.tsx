@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "./ui/button";
 import { UpdateIcon } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
-import { CacheCenter } from "@/middlelayers/datafetch/utils/cache";
+import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
 import { updateAllCurrencyRates } from "@/middlelayers/configuration";
 
 const retries = 3;
@@ -70,7 +70,7 @@ const App = ({
     )
       .then(async () => {
         // clean cache after all analyzers finished successfully
-        CacheCenter.getMemoryCacheInstance().clearCache();
+        getMemoryCacheInstance().clearCache();
         return updateAllCurrencyRates();
       })
       .catch((err) => {
