@@ -14,7 +14,7 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { timeToDateStr } from "@/utils/date";
 import { positiveNegativeColor } from "@/utils/color";
 import { cn } from "@/lib/utils";
-import React from 'react'
+import React from "react";
 
 const App = ({
   dateRange,
@@ -56,7 +56,10 @@ const App = ({
     updateLoading(true);
 
     try {
-      const [mtv, tv] = await Promise.all([queryMaxTotalValue(dt), queryTotalValue()]);
+      const [mtv, tv] = await Promise.all([
+        queryMaxTotalValue(dt),
+        queryTotalValue(),
+      ]);
       setMaxTotalValueData(mtv);
       setTotalValueData(tv);
     } finally {
@@ -69,8 +72,9 @@ const App = ({
       return 0;
     }
     return (
-      (totalValueData.totalValue - maxTotalValueData.totalValue) /
-      maxTotalValueData.totalValue
+      ((totalValueData.totalValue - maxTotalValueData.totalValue) /
+        maxTotalValueData.totalValue) *
+      100
     );
   }, [totalValueData, maxTotalValueData]);
 
@@ -81,7 +85,7 @@ const App = ({
     [currency, totalValueData, maxTotalValueData]
   );
 
-  const MaxTotalValueView = React.memo(()=> {
+  const MaxTotalValueView = React.memo(() => {
     return (
       <div
         className={cn(
@@ -131,7 +135,7 @@ const App = ({
         </div>
       </div>
     );
-  })
+  });
 
   return (
     <Card>
@@ -143,7 +147,7 @@ const App = ({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className='mt-2'>
+        <div className="mt-2">
           {loadingWrapper(
             loading,
             <MaxTotalValueView />,
