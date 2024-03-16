@@ -524,8 +524,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             className="w-30"
             onChange={(e) => handleOthersChange(idx, "amount", e.target.value)}
           />
-          <a onClick={() => handleRemoveOther(idx)}>
-            <img src={DeleteIcon} alt="delete" className="w-4 h-4 mt-2" />
+          <a onClick={() => handleRemoveOther(idx)} className="w-4 h-4 mt-2">
+            <img src={DeleteIcon} alt="delete" />
           </a>
         </div>
       ))
@@ -1117,11 +1117,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {preferredCurrencyDetail && preferCurrency !== defaultBaseCurrency && (
-              <div className="text-muted-foreground text-sm">
-                {`1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(preferredCurrencyDetail.rate)} ${preferredCurrencyDetail.currency}`}
-              </div>
-            )}
+            {preferredCurrencyDetail &&
+              preferCurrency !== defaultBaseCurrency && (
+                <div className="text-muted-foreground text-sm">
+                  {`1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
+                    preferredCurrencyDetail.rate
+                  )} ${preferredCurrencyDetail.currency}`}
+                </div>
+              )}
           </div>
         </div>
       </div>
