@@ -524,7 +524,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             className="w-30"
             onChange={(e) => handleOthersChange(idx, "amount", e.target.value)}
           />
-          <a onClick={() => handleRemoveOther(idx)} className="w-4 h-4 mt-2">
+          <a onClick={() => handleRemoveOther(idx)} className="w-4 h-4 mt-2 cursor-pointer">
             <img src={DeleteIcon} alt="delete" />
           </a>
         </div>
