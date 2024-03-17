@@ -64,6 +64,7 @@ import { DateRange } from "react-day-picker";
 import { parseISO } from "date-fns";
 import Summary from "../summary";
 import Appearance from "../appearance";
+import { getLocalStorageCacheInstance } from '@/middlelayers/datafetch/utils/cache'
 
 ChartJS.register(
   ...registerables,
@@ -213,6 +214,14 @@ const App = () => {
     }
   }
 
+  function onDataChanged() {
+    loadAllData();
+    autoBackupHistoricalData(true);
+
+    // clear all cache
+    getLocalStorageCacheInstance("total-profit").clearCache()
+  }
+
   function onDatePickerValueChange(
     _selectedTimes: number,
     dateRange: DateRange | undefined
@@ -301,10 +310,7 @@ const App = () => {
                   >
                     <RefreshData
                       loading={refreshButtonLoading}
-                      afterRefresh={() => {
-                        loadAllData();
-                        autoBackupHistoricalData(true);
-                      }}
+                      afterRefresh={onDataChanged}
                     />
                   </RefreshButtonLoadingContext.Provider>
                 </div>
@@ -403,10 +409,7 @@ const App = () => {
                   currency={currentCurrency}
                   dateRange={tDateRange}
                   quoteColor={quoteColor}
-                  afterDataChanged={() => {
-                    loadAllData();
-                    autoBackupHistoricalData(true);
-                  }}
+                  afterDataChanged={onDataChanged}
                 />
               </PageWrapper>
             }
@@ -433,10 +436,7 @@ const App = () => {
               path="data"
               element={
                 <DataManagement
-                  onDataImported={() => {
-                    loadAllData();
-                    autoBackupHistoricalData(true);
-                  }}
+                  onDataImported={onDataChanged}
                 />
               }
             />

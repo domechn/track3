@@ -13,6 +13,7 @@ import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 import { Chart } from 'chart.js'
 import md5 from 'md5'
 import { isProVersion } from './license'
+import { getLocalStorageCacheInstance } from './datafetch/utils/cache'
 
 const STABLE_COIN = ["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDD", "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "BUSD"]
 
@@ -45,8 +46,7 @@ export async function listAllowedSymbols(): Promise<string[]> {
 	return ASSET_HANDLER.listSortedSymbolsByCurrentValue()
 }
 
-// calculateTotalProfit gets all profit
-export async function calculateTotalProfit(dateRange: TDateRange): Promise<{
+type TotalProfit = {
 	// total profit
 	total: number,
 	// total profit percentage
@@ -58,7 +58,16 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<{
 		// coin profit percentage
 		percentage: number
 	}[]
-}> {
+}
+
+// calculateTotalProfit gets all profit
+export async function calculateTotalProfit(dateRange: TDateRange): Promise<TotalProfit> {
+	const cache = getLocalStorageCacheInstance("total-profit")
+	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
+	const c = cache.getCache<TotalProfit>(key)
+	if (c) {
+		return c
+	}
 	const symbols = await ASSET_HANDLER.listAllSymbols()
 	const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
 	const allUpdatedPrices = await ASSET_PRICE_HANDLER.listPrices()
@@ -108,11 +117,13 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<{
 	const total = _(coins).sumBy(c => c.value)
 	const totalRealSpent = _(coins).sumBy(c => c.realSpentValue)
 
-	return {
+	const resp = {
 		total,
 		percentage: totalRealSpent === 0 ? 0 : total / totalRealSpent * 100,
 		coins,
 	}
+	cache.setCache(key, resp)
+	return resp
 }
 
 export async function updateAssetPrice(uuid: string, assetID: number, symbol: string, price: number, createdAt: string) {

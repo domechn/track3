@@ -61,7 +61,7 @@ const App = ({
     let refreshError: Error | undefined;
 
     retry(
-      () => {
+      async () => {
         clearProgress();
         return refreshAllData(addProgress);
       },
@@ -70,7 +70,7 @@ const App = ({
     )
       .then(async () => {
         // clean cache after all analyzers finished successfully
-        getMemoryCacheInstance().clearCache();
+        getMemoryCacheInstance("data-fetch").clearCache();
         return updateAllCurrencyRates();
       })
       .catch((err) => {
