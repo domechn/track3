@@ -130,7 +130,7 @@ const App = ({
               quoteColor
             )}-700 font-bold`}
           >
-            {percentageFromATH.toFixed(1)}%
+            {percentageFromATH.toFixed(2)}%
           </div>
         </div>
       </div>
