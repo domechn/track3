@@ -401,15 +401,11 @@ const App = ({
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <div className="flex">
-                              <div className="text-gray-600">
-                                {currency.symbol}
-                              </div>
-                              <div className="text-gray-600">
-                                {prettyPriceNumberToLocaleString(
-                                  currencyWrapper(currency)(act.price)
-                                )}
-                              </div>
+                            <div className="text-gray-600">
+                              {currency.symbol}
+                              {prettyPriceNumberToLocaleString(
+                                currencyWrapper(currency)(act.price)
+                              )}
                             </div>
                             <Pencil2Icon
                               className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
@@ -423,21 +419,13 @@ const App = ({
                         </TableCell>
                         <TableCell>
                           <div className="text-gray-600">
-                            <div className="flex">
-                              <div className="text-gray-600">
-                                {act.amount > 0 ? "+" : "-"}
-                              </div>
-                              <div className="text-gray-600">
-                                {currency.symbol}
-                              </div>
-                              <div className="text-gray-600">
-                                {prettyPriceNumberToLocaleString(
-                                  currencyWrapper(currency)(
-                                    Math.abs(act.price * act.amount)
-                                  )
-                                )}
-                              </div>
-                            </div>
+                            {act.amount > 0 ? "+" : "-"}
+                            {currency.symbol}
+                            {prettyPriceNumberToLocaleString(
+                              currencyWrapper(currency)(
+                                Math.abs(act.price * act.amount)
+                              )
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
