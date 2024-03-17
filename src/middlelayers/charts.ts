@@ -252,25 +252,17 @@ async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinU
 	}
 	const totals = calculateTotalValue(latestAssets, priceMap)
 
-	// if item in totals exists in lastAssets and it's usdValue is less than 1, we think it has been sold out, so we need to update it's amount and value to 0
+	// if item in totals exists in lastAssets and it's usdValue is less than 1, we think it has been sold out last time, so we do not need to save its data to database this time
 	const lastAssets = await ASSET_HANDLER.listAssets(1)
-	for (const total of totals) {
-		if (_(total.wallet).startsWith("md5:")) {
-			// it means this asset has already handled before
-			continue
-		}
-		const totalWallet = md5(total.wallet)
+	const filteredTotals = _(totals).filter(t => !_(t.wallet).startsWith("md5:")).filter(t => {
+		const totalWallet = md5(t.wallet)
 		// total.usdValue !== 0 && total.usdValue < 1 will also be handled before saving to database
-		const lastAsset = _(lastAssets).flatten().find(a => a.symbol === total.symbol && a.wallet === totalWallet && a.value !== 0 && total.usdValue !== 0 && total.usdValue < 1)
-		if (lastAsset) {
-			console.debug(`asset ${total.symbol} in wallet ${total.wallet} has been sold out, update it's amount and value to 0`)
-			total.amount = 0
-			total.usdValue = 0
-		}
-	}
+		const lastAsset = _(lastAssets).flatten().find(a => a.symbol === t.symbol && a.wallet === totalWallet && a.value !== 0 && t.usdValue !== 0 && t.usdValue < 1)
+		return !lastAsset
+	}).value()
 
 	addProgress(5)
-	return totals
+	return filteredTotals
 }
 
 export async function queryAssetMaxAmountBySymbol(symbol: string): Promise<number> {
