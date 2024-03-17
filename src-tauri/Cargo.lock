@@ -4508,7 +4508,7 @@ dependencies = [
 
 [[package]]
 name = "track3"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "binance-rs-async",
  "coingecko",
