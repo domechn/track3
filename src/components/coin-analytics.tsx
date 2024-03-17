@@ -226,7 +226,7 @@ const App = ({
 
   function updateLoading(val: boolean) {
     if (initialLoaded) {
-      return
+      return;
     }
     setLoading(val);
   }
@@ -357,6 +357,7 @@ const App = ({
               <TableRow>
                 <TableHead>Amount</TableHead>
                 <TableHead className="w-[300px]">Buy/Sell Price</TableHead>
+                <TableHead>Value</TableHead>
                 <TableHead>Time</TableHead>
                 <TableHead className="text-right">Wallet</TableHead>
               </TableRow>
@@ -418,6 +419,25 @@ const App = ({
                                 setUpdatePriceDialogOpen(true);
                               }}
                             />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-gray-600">
+                            <div className="flex">
+                              <div className="text-gray-600">
+                                {act.amount > 0 ? "+" : "-"}
+                              </div>
+                              <div className="text-gray-600">
+                                {currency.symbol}
+                              </div>
+                              <div className="text-gray-600">
+                                {prettyPriceNumberToLocaleString(
+                                  currencyWrapper(currency)(
+                                    Math.abs(act.price * act.amount)
+                                  )
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
