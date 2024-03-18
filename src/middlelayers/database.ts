@@ -30,6 +30,7 @@ async function saveToDatabase<T extends object>(db: Database, table: string, mod
 	const keys = Object.keys(first)
 	const valuesArrayStr = new Array(filteredModes.length).fill(`(${keys.map(() => '?').join(',')})`).join(',')
 	const insertSql = `INSERT OR ${conflictResolver} INTO ${table} (${keys.join(',')}) VALUES ${valuesArrayStr}`
+	
 	const values = _(filteredModes).map(m => _(keys).map(k => _(m).get(k)).value()).flatten().value()
 	
 	await db.execute(insertSql, values)

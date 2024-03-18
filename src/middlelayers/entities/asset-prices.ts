@@ -1,3 +1,4 @@
+import _ from 'lodash'
 import { deleteFromDatabase, saveModelsToDatabase, selectFromDatabase } from '../database'
 import { AssetPriceModel, UniqueIndexConflictResolver } from '../types'
 
@@ -53,7 +54,15 @@ class AssetPriceHandler implements AssetPriceHandlerImpl {
 	}
 
 	async savePrices(models: AssetPriceModel[], conflictResolver: UniqueIndexConflictResolver = "REPLACE") {
-		return saveModelsToDatabase(this.assetTableName, models, conflictResolver)
+		// split models into chunks
+		const chunkSize = 1000
+		const chunks = _.chunk(models, chunkSize)
+		const res = []
+		for (const chunk of chunks) {
+			const resModels = await saveModelsToDatabase(this.assetTableName, chunk, conflictResolver)
+			res.push(...resModels)
+		}
+		return res
 	}
 }
 

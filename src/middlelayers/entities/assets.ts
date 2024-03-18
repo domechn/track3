@@ -151,16 +151,26 @@ class AssetHandler implements AssetHandlerImpl {
 		return this.saveAssetsInternal(models, conflictResolver)
 	}
 
-	private saveAssetsInternal(models: AssetModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetModel[]> {
-		return saveModelsToDatabase<AssetModel>(this.assetTableName, _(models).map(m => ({
-			uuid: m.uuid,
-			createdAt: m.createdAt,
-			symbol: m.symbol,
-			amount: m.amount,
-			value: m.value,
-			price: m.price,
-			wallet: m.wallet
-		} as AssetModel)).value(), conflictResolver)
+	private async saveAssetsInternal(models: AssetModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetModel[]> {
+		// split models to chunks to avoid too large sql
+		const chunkSize = 1000
+		const chunks = _.chunk(models, chunkSize)
+		const res = []
+		
+		for (const chunk of chunks) {
+			const resModels = await saveModelsToDatabase<AssetModel>(this.assetTableName, _(chunk).map(m => ({
+				uuid: m.uuid,
+				createdAt: m.createdAt,
+				symbol: m.symbol,
+				amount: m.amount,
+				value: m.value,
+				price: m.price,
+				wallet: m.wallet
+			} as AssetModel)).value(), conflictResolver)
+
+			res.push(...resModels)
+		}
+		return res
 	}
 
 	// skip where value is less than 1, or value is 0
