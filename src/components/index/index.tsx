@@ -21,6 +21,7 @@ import PageWrapper from "../page-wrapper";
 import WalletAnalysis from "../wallet-analytics";
 import CoinAnalysis from "../coin-analytics";
 import DatePicker from "../date-picker";
+import RealTimeTotalValue from "../realtime-total-value";
 import "./index.css";
 import {
   Route,
@@ -64,7 +65,11 @@ import { DateRange } from "react-day-picker";
 import { parseISO } from "date-fns";
 import Summary from "../summary";
 import Appearance from "../appearance";
-import { getLocalStorageCacheInstance } from '@/middlelayers/datafetch/utils/cache'
+import {
+  getLocalStorageCacheInstance,
+  getMemoryCacheInstance,
+} from "@/middlelayers/datafetch/utils/cache";
+import { CACHE_GROUP_KEYS } from '@/middlelayers/consts'
 
 ChartJS.register(
   ...registerables,
@@ -219,7 +224,8 @@ const App = () => {
     autoBackupHistoricalData(true);
 
     // clear all cache
-    getLocalStorageCacheInstance("total-profit").clearCache()
+    getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY).clearCache();
+    getMemoryCacheInstance(CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY).clearCache();
   }
 
   function onDatePickerValueChange(
@@ -292,6 +298,7 @@ const App = () => {
               )}
               <MainNav className="mx-0" />
               <div className="ml-auto flex items-center space-x-4">
+                <RealTimeTotalValue quoteColor={quoteColor} currency={currentCurrency} />
                 <div>
                   <DatePicker
                     availableDates={availableDates}
@@ -434,11 +441,7 @@ const App = () => {
             />
             <Route
               path="data"
-              element={
-                <DataManagement
-                  onDataImported={onDataChanged}
-                />
-              }
+              element={<DataManagement onDataImported={onDataChanged} />}
             />
             <Route
               path="systemInfo"
