@@ -32,6 +32,7 @@ export async function refreshAllData(addProgress: AddProgressFunc) {
 // query the real-time price of the last queried asset
 export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 	const cache = getMemoryCacheInstance(CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY)
+	// const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY)
 	const cacheKey = "real-time-assets"
 	const c = cache.getCache<Asset[]>(cacheKey)
 	if (c) {

@@ -4,13 +4,26 @@ import {
 } from "@/middlelayers/charts";
 import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { positiveNegativeColor } from "@/utils/color";
-import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+  prettyPriceNumberToLocaleString,
+} from "@/utils/currency";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Button } from "./ui/button";
 import { loadingWrapper } from "@/lib/loading";
-import { LightningBoltIcon } from '@radix-ui/react-icons'
+import { LightningBoltIcon } from "@radix-ui/react-icons";
+import { Separator } from "./ui/separator";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "./ui/carousel";
+import Autoplay from "embla-carousel-autoplay";
+import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
+import bluebird from "bluebird";
+import { getImageApiPath } from "@/utils/app";
 
 const App = ({
   currency,
@@ -20,6 +33,7 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const [loading, setLoading] = useState(false);
+  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [realtimeAssetValues, setRealtimeAssetValues] = useState<Asset[]>([]);
   const [lastRefreshAssetValues, setLastRefreshAssetValues] = useState<Asset[]>(
     []
@@ -55,7 +69,11 @@ const App = ({
     setLoading(true);
     try {
       const rts = await queryRealTimeAssetsValue();
-      setRealtimeAssetValues(rts);
+      setRealtimeAssetValues(_(rts).sortBy("value").reverse().value());
+
+      // Load logo map
+      const logos = await getLogoMap(rts);
+      setLogoMap(logos);
     } finally {
       setLoading(false);
     }
@@ -65,41 +83,126 @@ const App = ({
     const lra = await queryLatestAssets();
     setLastRefreshAssetValues(lra);
   }
+
+  async function getLogoMap(d: Asset[]) {
+    const acd = await getAppCacheDir();
+    const kvs = await bluebird.map(_(d).map("symbol").value(), async (s) => {
+      const path = await getImageApiPath(acd, s);
+      return { [s]: path };
+    });
+
+    return _.assign({}, ...kvs);
+  }
+
+  function RealtimeView() {
+    const priceChangePercentageMap = useMemo(() => {
+      return _(realtimeAssetValues)
+        .map((a) => [a.symbol, getPriceChangePercentage(a)])
+        .fromPairs()
+        .value();
+    }, [realtimeAssetValues, lastRefreshAssetValues]);
+
+    function getPriceChangePercentage(asset: Asset) {
+      const basePrice = lastRefreshAssetValues.find(
+        (a) => a.symbol === asset.symbol
+      )?.price;
+
+      if (!basePrice) {
+        return 0;
+      }
+
+      return (asset.price / basePrice) * 100 - 100;
+    }
+    return (
+      <div className="space-y-2">
+        <div className="text-sm text-muted-foreground">
+          RealTime Total Value
+        </div>
+        <div className="flex space-x-1 items-center justify-end">
+          <div className="text-xl font-bold">
+            ≈{" "}
+            {currency.symbol +
+              prettyNumberToLocaleString(
+                currencyWrapper(currency)(realtimeTotalValue)
+              )}
+          </div>
+          <div
+            className={`text-sm text-${positiveNegativeColor(
+              changedPercentage,
+              quoteColor
+            )}-700 font-bold`}
+          >
+            {changedPercentage > 0 ? "+" : ""}
+            {changedPercentage.toFixed(2)}%
+          </div>
+        </div>
+        <Separator />
+        <Carousel
+          opts={{
+            align: "start",
+            dragFree: true,
+          }}
+          plugins={[
+            Autoplay({
+              delay: 3000,
+            }),
+          ]}
+          orientation="vertical"
+          className="w-full max-w-xs"
+        >
+          <CarouselContent className="-mt-1 h-[28px]">
+            {realtimeAssetValues.map((asset, index) => (
+              <CarouselItem
+                key={"realtime-asset-values-item" + index}
+                className="pt-1 md:basis-1/2"
+              >
+                <div className="p-1 text-sm flex justify-between">
+                  <div className="flex">
+                    <img
+                      className="inline-block"
+                      src={logoMap[asset.symbol]}
+                      alt={asset.symbol}
+                      style={{ width: 18, height: 18, marginRight: 5 }}
+                    />
+                    <div>{asset.symbol}</div>
+                  </div>
+                  <div>
+                    {currency.symbol +
+                      prettyPriceNumberToLocaleString(
+                        currencyWrapper(currency)(asset.price)
+                      )}
+                  </div>
+                  <div
+                    className={`text-${positiveNegativeColor(
+                      priceChangePercentageMap[asset.symbol],
+                      quoteColor
+                    )}-700`}
+                  >
+                    {priceChangePercentageMap[asset.symbol] > 0 ? "+" : ""}
+                    {priceChangePercentageMap[asset.symbol]?.toFixed(2)}%
+                  </div>
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+        </Carousel>
+      </div>
+    );
+  }
+
   return (
     <div>
       <Popover onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger asChild>
-          <LightningBoltIcon className='cursor-pointer text-gray-500' height={20} width={20} />
+          <LightningBoltIcon
+            className="cursor-pointer text-gray-500"
+            height={20}
+            width={20}
+          />
         </PopoverTrigger>
         <PopoverContent className="w-80">
           <div className="grid gap-4">
-            {loadingWrapper(
-              loading,
-              <div>
-                <div className="text-sm text-muted-foreground mb-2">
-                  RealTime Total Value
-                </div>
-                <div className="flex space-x-1 items-center justify-end">
-                  <div className="text-xl font-bold">
-                    ≈{" "}
-                    {currency.symbol +
-                      prettyNumberToLocaleString(
-                        currencyWrapper(currency)(realtimeTotalValue)
-                      )}
-                  </div>
-                  <div
-                    className={`text-sm text-${positiveNegativeColor(
-                      changedPercentage,
-                      quoteColor
-                    )}-700 font-bold`}
-                  >
-                    {changedPercentage.toFixed(2)}%
-                  </div>
-                </div>
-              </div>,
-              "mt-[2px] h-[12px]",
-              2
-            )}
+            {loadingWrapper(loading, <RealtimeView />, "mt-[2px] h-[12px]", 2)}
           </div>
         </PopoverContent>
       </Popover>
