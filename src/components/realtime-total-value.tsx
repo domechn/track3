@@ -95,6 +95,13 @@ const App = ({
   }
 
   function RealtimeView() {
+    const priceChangePercentageMap = useMemo(() => {
+      return _(realtimeAssetValues)
+        .map((a) => [a.symbol, getPriceChangePercentage(a)])
+        .fromPairs()
+        .value();
+    }, [realtimeAssetValues, lastRefreshAssetValues]);
+
     function getPriceChangePercentage(asset: Asset) {
       const basePrice = lastRefreshAssetValues.find(
         (a) => a.symbol === asset.symbol
@@ -125,6 +132,7 @@ const App = ({
               quoteColor
             )}-700 font-bold`}
           >
+            {changedPercentage > 0 ? "+" : ""}
             {changedPercentage.toFixed(2)}%
           </div>
         </div>
@@ -166,11 +174,12 @@ const App = ({
                   </div>
                   <div
                     className={`text-${positiveNegativeColor(
-                      getPriceChangePercentage(asset),
+                      priceChangePercentageMap[asset.symbol],
                       quoteColor
                     )}-700`}
                   >
-                    {getPriceChangePercentage(asset).toFixed(2)}%
+                    {priceChangePercentageMap[asset.symbol] > 0 ? "+" : ""}
+                    {priceChangePercentageMap[asset.symbol]?.toFixed(2)}%
                   </div>
                 </div>
               </CarouselItem>
