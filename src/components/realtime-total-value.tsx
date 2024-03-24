@@ -6,11 +6,11 @@ import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { positiveNegativeColor } from "@/utils/color";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Button } from "./ui/button";
 import { loadingWrapper } from "@/lib/loading";
-import { LightningBoltIcon } from '@radix-ui/react-icons'
+import { LightningBoltIcon } from "@radix-ui/react-icons";
+import { Separator } from "./ui/separator";
 
 const App = ({
   currency,
@@ -65,41 +65,48 @@ const App = ({
     const lra = await queryLatestAssets();
     setLastRefreshAssetValues(lra);
   }
+
+  function RealtimeView() {
+    return (
+      <div className="space-y-2">
+        <div className="text-sm text-muted-foreground">
+          RealTime Total Value
+        </div>
+        <div className="flex space-x-1 items-center justify-end">
+          <div className="text-xl font-bold">
+            ≈{" "}
+            {currency.symbol +
+              prettyNumberToLocaleString(
+                currencyWrapper(currency)(realtimeTotalValue)
+              )}
+          </div>
+          <div
+            className={`text-sm text-${positiveNegativeColor(
+              changedPercentage,
+              quoteColor
+            )}-700 font-bold`}
+          >
+            {changedPercentage.toFixed(2)}%
+          </div>
+        </div>
+        <Separator />
+      </div>
+    );
+  }
+
   return (
     <div>
       <Popover onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger asChild>
-          <LightningBoltIcon className='cursor-pointer text-gray-500' height={20} width={20} />
+          <LightningBoltIcon
+            className="cursor-pointer text-gray-500"
+            height={20}
+            width={20}
+          />
         </PopoverTrigger>
         <PopoverContent className="w-80">
           <div className="grid gap-4">
-            {loadingWrapper(
-              loading,
-              <div>
-                <div className="text-sm text-muted-foreground mb-2">
-                  RealTime Total Value
-                </div>
-                <div className="flex space-x-1 items-center justify-end">
-                  <div className="text-xl font-bold">
-                    ≈{" "}
-                    {currency.symbol +
-                      prettyNumberToLocaleString(
-                        currencyWrapper(currency)(realtimeTotalValue)
-                      )}
-                  </div>
-                  <div
-                    className={`text-sm text-${positiveNegativeColor(
-                      changedPercentage,
-                      quoteColor
-                    )}-700 font-bold`}
-                  >
-                    {changedPercentage.toFixed(2)}%
-                  </div>
-                </div>
-              </div>,
-              "mt-[2px] h-[12px]",
-              2
-            )}
+            {loadingWrapper(loading, <RealtimeView />, "mt-[2px] h-[12px]", 2)}
           </div>
         </PopoverContent>
       </Popover>
