@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CoinData, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
+import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import _ from "lodash";
 import ViewIcon from "@/assets/icons/view-icon.png";
@@ -71,8 +71,8 @@ const App = ({
     return _.find(dateOptions, { value: "" + headId })?.label;
   }, [dateOptions, headId]);
 
-  const [baseData, setBaseData] = useState<CoinData[]>([]);
-  const [headData, setHeadData] = useState<CoinData[]>([]);
+  const [baseData, setBaseData] = useState<Asset[]>([]);
+  const [headData, setHeadData] = useState<Asset[]>([]);
 
   const [shouldMaskValue, setShowDetail] = useState<boolean>(false);
 
@@ -214,7 +214,7 @@ const App = ({
     setShowDetail(!shouldMaskValue);
   }
 
-  function loadData(base: CoinData[], head: CoinData[]): ComparisonData[] {
+  function loadData(base: Asset[], head: Asset[]): ComparisonData[] {
     const res: ComparisonData[] = [];
     const symbols = _([...base, ...head])
       .map("symbol")
@@ -261,7 +261,7 @@ const App = ({
     return res;
   }
 
-  async function loadDataByUUID(uuid: string): Promise<CoinData[]> {
+  async function loadDataByUUID(uuid: string): Promise<Asset[]> {
     setDataLoading(true);
     try {
       const data = await queryCoinDataByUUID(uuid);

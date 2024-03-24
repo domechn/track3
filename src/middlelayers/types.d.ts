@@ -188,13 +188,6 @@ export type RestoreHistoricalData = {
 	prices: AssetPriceModel[]
 }
 
-export type CoinData = {
-	symbol: string
-	amount: number
-	value: number
-	price: number
-}
-
 export type CurrencyRateModel = {
 	id: number
 	currency: string

@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -13,7 +13,9 @@ import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 import { Chart } from 'chart.js'
 import md5 from 'md5'
 import { isProVersion } from './license'
-import { getLocalStorageCacheInstance } from './datafetch/utils/cache'
+import { getLocalStorageCacheInstance, getMemoryCacheInstance } from './datafetch/utils/cache'
+import { GlobalConfig, WalletCoin } from './datafetch/types'
+import { CACHE_GROUP_KEYS } from './consts'
 
 const STABLE_COIN = ["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDD", "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "BUSD"]
 
@@ -25,6 +27,45 @@ export async function refreshAllData(addProgress: AddProgressFunc) {
 
 	await ASSET_HANDLER.saveCoinsToDatabase(coins)
 	addProgress(10)
+}
+
+// query the real-time price of the last queried asset
+export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
+	const cache = getMemoryCacheInstance(CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY)
+	const cacheKey = "real-time-assets"
+	const c = cache.getCache<Asset[]>(cacheKey)
+	if (c) {
+		return c
+	}
+	const size = 1
+	const result = await ASSET_HANDLER.listSymbolGroupedAssets(size)
+	if (result.length === 0) {
+		return []
+	}
+
+	const assets = result[0]
+	const config = await getConfiguration()
+	if (!config) {
+		throw new Error("no configuration found,\n please add configuration first")
+	}
+	// check if pro user
+	const userProInfo = await isProVersion()
+	const walletCoins = await queryCoinsDataByWalletCoins(_(assets).map(a => ({
+		symbol: a.symbol,
+		amount: a.amount,
+		// wallet here dose not matter
+		wallet: a.wallet ?? OthersAnalyzer.wallet
+	})).value(), config, userProInfo)
+
+	const assetRes = _(walletCoins).map(t => ({
+		symbol: t.symbol,
+		amount: t.amount,
+		value: t.usdValue,
+		price: t.price,
+	})).value()
+
+	cache.setCache(cacheKey, assetRes)
+	return assetRes
 }
 
 // return all asset actions by analyzing all asset models
@@ -62,7 +103,7 @@ type TotalProfit = {
 
 // calculateTotalProfit gets all profit
 export async function calculateTotalProfit(dateRange: TDateRange): Promise<TotalProfit> {
-	const cache = getLocalStorageCacheInstance("total-profit")
+	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
 	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
 	const c = cache.getCache<TotalProfit>(key)
 	if (c) {
@@ -207,21 +248,12 @@ function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[
 	return _(res).filter(r => r.amount !== 0).value()
 }
 
-async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinUSD[]> {
-	addProgress(1)
-	const config = await getConfiguration()
-	if (!config) {
-		throw new Error("no configuration found,\n please add configuration first")
-	}
-	addProgress(2)
-	// check if pro user
-	const userProInfo = await isProVersion()
-	addProgress(2)
-	// will add 70 percent in load portfolios
-	const assets = await loadPortfolios(config, addProgress, userProInfo)
+async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalConfig, userProInfo: UserLicenseInfo, addProgress?: AddProgressFunc): Promise<WalletCoinUSD[]> {
 	// always query btc and usdt price
 	const priceMap = await queryCoinPrices(_(assets).filter(a => !a.price).map("symbol").push("USDT").push("BTC").uniq().compact().value(), userProInfo)
-	addProgress(10)
+	if (addProgress) {
+		addProgress(10)
+	}
 
 	let latestAssets = _.clone(assets)
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
@@ -261,8 +293,27 @@ async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinU
 		return !lastAsset
 	}).value()
 
-	addProgress(5)
+	if (addProgress) {
+		addProgress(5)
+	}
 	return filteredTotals
+}
+
+// query all assets and calculate their value in USD
+async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinUSD[]> {
+	addProgress(1)
+	const config = await getConfiguration()
+	if (!config) {
+		throw new Error("no configuration found,\n please add configuration first")
+	}
+	addProgress(2)
+	// check if pro user
+	const userProInfo = await isProVersion()
+	addProgress(2)
+	// will add 70 percent in load portfolios
+	const assets = await loadPortfolios(config, addProgress, userProInfo)
+
+	return queryCoinsDataByWalletCoins(assets, config, userProInfo, addProgress)
 }
 
 export async function queryAssetMaxAmountBySymbol(symbol: string): Promise<number> {
@@ -522,6 +573,24 @@ export async function queryAssetChange(dateRange: TDateRange): Promise<AssetChan
 	}
 }
 
+export async function queryLatestAssets(): Promise<Asset[]> {
+	const size = 1
+
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
+	if (assets.length === 0) {
+		return []
+	}
+
+	return _(assets[0])
+		.filter(a => a.amount !== 0)
+		.map(a => ({
+			symbol: a.symbol,
+			amount: a.amount,
+			value: a.value,
+			price: a.value / a.amount,
+		})).value()
+}
+
 export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercentageData> {
 	const size = 1
 
@@ -641,10 +710,10 @@ export async function queryRestoreHistoricalData(id: string | number): Promise<R
 
 }
 
-export async function queryCoinDataByUUID(uuid: string): Promise<CoinData[]> {
+export async function queryCoinDataByUUID(uuid: string): Promise<Asset[]> {
 	const models = await ASSET_HANDLER.listSymbolGroupedAssetsByUUID(uuid)
 
-	const res: CoinData[] = _(models)
+	const res: Asset[] = _(models)
 		.map(m => ({
 			symbol: m.symbol,
 			amount: m.amount,
