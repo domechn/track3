@@ -64,7 +64,8 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 		price: t.price,
 	})).value()
 
-	cache.setCache(cacheKey, assetRes)
+	// 15 min ttl
+	cache.setCache(cacheKey, assetRes, 15 * 60)
 	return assetRes
 }
 
