@@ -69,7 +69,7 @@ import {
   getLocalStorageCacheInstance,
   getMemoryCacheInstance,
 } from "@/middlelayers/datafetch/utils/cache";
-import { CACHE_GROUP_KEYS } from '@/middlelayers/consts'
+import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 
 ChartJS.register(
   ...registerables,
@@ -224,8 +224,12 @@ const App = () => {
     autoBackupHistoricalData(true);
 
     // clear all cache
-    getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY).clearCache();
-    getMemoryCacheInstance(CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY).clearCache();
+    getLocalStorageCacheInstance(
+      CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY
+    ).clearCache();
+    getMemoryCacheInstance(
+      CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY
+    ).clearCache();
   }
 
   function onDatePickerValueChange(
@@ -298,7 +302,14 @@ const App = () => {
               )}
               <MainNav className="mx-0" />
               <div className="ml-auto flex items-center space-x-4">
-                <RealTimeTotalValue quoteColor={quoteColor} currency={currentCurrency} />
+                {isProUser && (
+                  <div>
+                    <RealTimeTotalValue
+                      quoteColor={quoteColor}
+                      currency={currentCurrency}
+                    />
+                  </div>
+                )}
                 <div>
                   <DatePicker
                     availableDates={availableDates}
