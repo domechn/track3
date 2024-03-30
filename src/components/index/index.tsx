@@ -121,9 +121,15 @@ const App = () => {
 
   useEffect(() => {
     loadConfiguration();
-    handleAutoBackup().finally(() => {
-      loadAllData();
-    });
+    handleAutoBackup()
+      .then(({ imported }) => {
+        if (imported) {
+          clearAllCache();
+        }
+      })
+      .finally(() => {
+        loadAllData();
+      });
   }, []);
 
   useEffect(() => {
@@ -182,10 +188,18 @@ const App = () => {
     getQuoteColor().then((c) => setQuoteColor(c));
   }
 
-  async function handleAutoBackup() {
-    await autoImportHistoricalData();
+  async function handleAutoBackup(): Promise<{
+    imported: boolean;
+    backuped: boolean;
+  }> {
+    const imported = await autoImportHistoricalData();
     // todo: reload page if res of autoImportHistoricalData is true ( there is new data imported successfully )
-    await autoBackupHistoricalData();
+    const backuped = await autoBackupHistoricalData();
+
+    return {
+      imported,
+      backuped,
+    };
   }
 
   async function loadLastRefreshAt() {
@@ -222,7 +236,11 @@ const App = () => {
   function onDataChanged() {
     loadAllData();
     autoBackupHistoricalData(true);
+    clearAllCache();
+  }
 
+  function clearAllCache() {
+    console.debug("clear all cache");
     // clear all cache
     getLocalStorageCacheInstance(
       CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY
