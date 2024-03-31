@@ -19,6 +19,21 @@ type PortfolioAccountResp = {
 	total: string
 }
 
+type TotalBalanceResp = {
+	details: {
+		[k: string]: {
+			currency: string,
+			amount: string,
+			unrealised_pnl?: string
+		}
+	}
+	total: {
+		amount: string
+		currency: string
+		unrealised_pnl: string
+	}
+}
+
 type SpotAccountResp = {
 	currency: string,
 	available: string,
@@ -68,7 +83,7 @@ export class GateExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const resp = await bluebird.map([this.fetchSpotBalance(), this.fetchFuturesBalance(), this.fetchEarnBalance(), this.fetchPortfolioBalance()], (v) => v)
+		const resp = await bluebird.map([this.fetchSpotBalance(), this.fetchEarnBalance(), this.fetchPortfolioBalance(), this.functionOthersBalance()], (v) => v)
 		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
 	}
 
@@ -81,7 +96,7 @@ export class GateExchange implements Exchanger {
 
 		const suffix = "_USDT"
 
-		const allPricesMap = _(allPrices).filter(p=>p.currency_pair.endsWith(suffix)).map(p =>({
+		const allPricesMap = _(allPrices).filter(p => p.currency_pair.endsWith(suffix)).map(p => ({
 			symbol: p.currency_pair.replace(suffix, ""),
 			price: parseFloat(p.last)
 		})).keyBy("symbol").mapValues("price").value()
@@ -93,25 +108,6 @@ export class GateExchange implements Exchanger {
 		const path = "/spot/accounts"
 		const resp = await this.fetch<SpotAccountResp>("GET", path, "")
 		return _(resp).keyBy("currency").mapValues(v => parseFloat(v.available) + parseFloat(v.locked)).value()
-	}
-
-	// can only return usdt value
-	private async fetchFuturesBalance(): Promise<{ [k: string]: number }> {
-		const path = "/futures/usdt/accounts"
-		try {
-			const resp = await this.fetch<FutureAccountResp>("GET", path, "")
-			return {
-				[resp.currency]: parseFloat(resp.total)
-			}
-
-		} catch (e) {
-			if (e instanceof Error && e.message.includes("please transfer funds first to create futures account")) {
-				console.debug("No futures account", this.apiKey)
-				return {}
-			}
-
-			throw e
-		}
 	}
 
 	private async fetchEarnBalance(): Promise<{ [k: string]: number }> {
@@ -134,6 +130,14 @@ export class GateExchange implements Exchanger {
 			}
 			return {}
 		}
+	}
+
+	// total balance in USDT
+	private async functionOthersBalance(): Promise<{ [k: string]: number }> {
+		const path = "/wallet/total_balance"
+		const resp = await this.fetch<TotalBalanceResp>("GET", path, "")
+
+		return _(resp.details).pickBy((v, k) => ["futures", "options", "payment", "quant", "margin"].includes(k)).mapKeys(v => v.currency).mapValues(v => parseFloat(v.amount)).value()
 	}
 
 	private async fetch<T>(method: HttpVerb, path: string, queryParam: string): Promise<T> {
