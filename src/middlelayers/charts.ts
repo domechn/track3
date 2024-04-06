@@ -287,13 +287,31 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 	const totals = calculateTotalValue(latestAssets, priceMap)
 
 	// if item in totals exists in lastAssets and it's usdValue is less than 1, we think it has been sold out last time, so we do not need to save its data to database this time
-	const lastAssets = await ASSET_HANDLER.listAssets(1)
 	const filteredTotals = _(totals).filter(t => !_(t.wallet).startsWith("md5:")).filter(t => {
+		if (t.usdValue > 1) {
+			return true
+		}
+		// already handled in loadPortfolios
+		if (t.amount === 0) {
+			return true
+		}
 		const totalWallet = md5(t.wallet)
-		// total.usdValue !== 0 && total.usdValue < 1 will also be handled before saving to database
-		const lastAsset = _(lastAssets).flatten().find(a => a.symbol === t.symbol && a.wallet === totalWallet && a.value !== 0 && t.usdValue !== 0 && t.usdValue < 1)
-		return !lastAsset
-	}).value()
+		const lastAsset = _(latestAssets).flatten().find(a => a.symbol === t.symbol && a.wallet === totalWallet)
+		// not found in last asset, which means coin has already been removed before last record
+		if (!lastAsset) {
+			return false
+		}
+		// coin has been sold out in last time
+		if (lastAsset.amount === 0) {
+			return false
+		}
+		return true
+	}).map(t => ({
+		...t,
+		// if usdValue < 1, means it has been sold out this time. update it to 0, because coin whose usdValue < 1 will be ignored before saving to database
+		usdValue: t.usdValue > 1 ? t.usdValue : 0,
+		amount: t.usdValue > 1 ? t.amount : 0,
+	})).value()
 
 	if (addProgress) {
 		addProgress(5)
