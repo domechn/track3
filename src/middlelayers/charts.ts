@@ -285,7 +285,7 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		})
 	}
 	const totals = calculateTotalValue(latestAssets, priceMap)
-
+	const lastAssets = await ASSET_HANDLER.listAssets(1)
 	// if item in totals exists in lastAssets and it's usdValue is less than 1, we think it has been sold out last time, so we do not need to save its data to database this time
 	const filteredTotals = _(totals).filter(t => !_(t.wallet).startsWith("md5:")).filter(t => {
 		if (t.usdValue > 1) {
@@ -296,7 +296,7 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 			return true
 		}
 		const totalWallet = md5(t.wallet)
-		const lastAsset = _(latestAssets).flatten().find(a => a.symbol === t.symbol && a.wallet === totalWallet)
+		const lastAsset = _(lastAssets).flatten().find(a => a.symbol === t.symbol && a.wallet === totalWallet)
 		// not found in last asset, which means coin has already been removed before last record
 		if (!lastAsset) {
 			return false
