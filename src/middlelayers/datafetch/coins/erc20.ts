@@ -11,39 +11,6 @@ type QueryAssetResp = {
 	result: string
 }
 
-interface NodeReal429ErrorResolver {
-	isTried(): boolean
-
-	tryResolve(address?: string): Promise<void>
-
-	resolved(): Promise<void>
-}
-
-class NodeReal429ErrorResolverImpl implements NodeReal429ErrorResolver {
-
-	private tried = false
-
-	constructor() {
-	}
-
-	isTried(): boolean {
-		console.debug("isTried", this.tried)
-
-		return this.tried
-	}
-
-	async tryResolve(address?: string): Promise<void> {
-		this.tried = true
-		// sleep 1s
-		await new Promise(resolve => setTimeout(resolve, 1000))
-	}
-
-	async resolved(): Promise<void> {
-		this.tried = false
-		console.debug("resolved 429")
-	}
-}
-
 interface ERC20Querier {
 	query(addresses: string[]): Promise<WalletCoin[]>
 
@@ -60,9 +27,9 @@ class NodeRealERC20Query implements ERC20Querier {
 	constructor(mainSymbol: 'ETH' | 'BNB') {
 		this.mainSymbol = mainSymbol
 		if (mainSymbol === 'ETH') {
-			this.queryUrl = "https://eth-mainnet.nodereal.io/v1/1659dfb40aa24bbb8153a677b98064d7"
+			this.queryUrl = "https://eth.public-rpc.com"
 		} else {
-			this.queryUrl = "https://bsc-mainnet.nodereal.io/v1/64a9df0874fb4a93b9d0a3849de012d3"
+			this.queryUrl = "https://bscrpc.com"
 		}
 	}
 
@@ -73,8 +40,8 @@ class NodeRealERC20Query implements ERC20Querier {
 			return this.cache[cacheKey]
 		}
 
-		const jsonReq = _(addresses).map(addr => ({
-			id: 1,
+		const jsonReq = _(addresses).map((addr, idx) => ({
+			id: idx,
 			jsonrpc: "2.0",
 			params: [
 				addr,
@@ -119,7 +86,6 @@ class BscERC20Query extends NodeRealERC20Query {
 export class ERC20NormalAnalyzer implements Analyzer {
 	protected readonly config: Pick<TokenConfig, 'erc20'>
 	private readonly queries = [new BscERC20Query(), new EthERC20Query()]
-	private readonly errorResolver: NodeReal429ErrorResolver = new NodeReal429ErrorResolverImpl()
 	constructor(config: Pick<TokenConfig, 'erc20'>) {
 		this.config = config
 
@@ -151,11 +117,6 @@ export class ERC20NormalAnalyzer implements Analyzer {
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		return this.loadPortfolioWithRetry(10)
-			.finally(async () => {
-				if (this.errorResolver.isTried()) {
-					await this.errorResolver.resolved()
-				}
-			})
 	}
 
 	async loadPortfolioWithRetry(max: number): Promise<WalletCoin[]> {
@@ -169,12 +130,8 @@ export class ERC20NormalAnalyzer implements Analyzer {
 		} catch (e) {
 			if (e instanceof Error && e.message.includes("429")) {
 				console.error("failed to query erc20 assets due to 429, retrying...")
-				if (!this.errorResolver.isTried()) {
-					await this.errorResolver.tryResolve(getAddressList(this.config.erc20)[0])
-				}
-				// sleep 500ms
-				await new Promise(resolve => setTimeout(resolve, 500))
-
+				// sleep 3000ms
+				await new Promise(resolve => setTimeout(resolve, 3000))
 				// try again
 				return this.loadPortfolioWithRetry(max - 1)
 			} else {

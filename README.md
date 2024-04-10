@@ -68,6 +68,6 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 
 - https://blockchain.info
 - https://blockcypher.com
-- https://nodereal.io
+- https://ankr.com
 - https://phantom.app
 - https://coingecko.com
