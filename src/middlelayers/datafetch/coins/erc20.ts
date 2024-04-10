@@ -17,7 +17,7 @@ interface ERC20Querier {
 	clean(): void
 }
 
-class NodeRealERC20Query implements ERC20Querier {
+class ERC20RPCQuery implements ERC20Querier {
 	private readonly queryUrl
 	private mainSymbol: 'ETH' | 'BNB'
 
@@ -70,13 +70,13 @@ class NodeRealERC20Query implements ERC20Querier {
 	}
 }
 
-class EthERC20Query extends NodeRealERC20Query {
+class EthERC20Query extends ERC20RPCQuery {
 	constructor() {
 		super('ETH')
 	}
 }
 
-class BscERC20Query extends NodeRealERC20Query {
+class BscERC20Query extends ERC20RPCQuery {
 	constructor() {
 		super('BNB')
 	}
