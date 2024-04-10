@@ -18,8 +18,8 @@ interface ERC20Querier {
 }
 
 class ERC20RPCQuery implements ERC20Querier {
-	private readonly queryUrl
-	private mainSymbol: 'ETH' | 'BNB'
+	private readonly queryUrl: string
+	private readonly mainSymbol: 'ETH' | 'BNB'
 
 	// add cache in one times query to avoid retry error
 	private cache: { [k: string]: WalletCoin[] } = {}
@@ -34,6 +34,9 @@ class ERC20RPCQuery implements ERC20Querier {
 	}
 
 	async query(addresses: string[]): Promise<WalletCoin[]> {
+		if (addresses.length === 0) {
+			return []
+		}
 		const cacheKey = addresses.join(",")
 
 		if (this.cache[cacheKey]) {
