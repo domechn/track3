@@ -2,7 +2,6 @@
 extern crate lazy_static;
 use std::collections::HashMap;
 
-use tauri::Manager;
 use track3::{
     binance::Binance,
     ent::Ent,
