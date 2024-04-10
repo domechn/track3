@@ -29,6 +29,9 @@ impl CoinGecko {
     fn get_usdt_id() -> String {
         "tether".to_string()
     }
+    fn get_btc_id() -> String {
+        "bitcoin".to_string()
+    }
 
     // if multi coins with same symbol, will return all of them in result
     async fn list_all_coin_ids(
@@ -52,9 +55,14 @@ impl CoinGecko {
 
         let mut res = vec![];
         let mut usdt_in = false;
+        let mut btc_in = false;
         for (s, coins) in coins_map {
             if s == "USDT" {
                 usdt_in = true;
+                continue;
+            }
+            if s == "BTC" {
+                btc_in = true;
                 continue;
             }
             if coins.len() > 1 {
@@ -69,11 +77,17 @@ impl CoinGecko {
             }
         }
 
-        // hard fix usdt id
+        // hard fix usdt and btc id
         if usdt_in {
             res.push(CoinGeckoCoin {
                 id: CoinGecko::get_usdt_id(),
                 symbol: "USDT".to_string(),
+            });
+        }
+        if btc_in {
+            res.push(CoinGeckoCoin {
+                id: CoinGecko::get_btc_id(),
+                symbol: "BTC".to_string(),
             });
         }
         return Ok(res);
