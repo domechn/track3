@@ -79,17 +79,22 @@ const App = ({
       .finally(() => {
         setRefreshLoading(false);
         clearProgress();
-        trackEventWithClientID("data_refreshed");
+        let trackProps = {};
         if (refreshError) {
+          const description = refreshError.message
           toast({
-            description: refreshError.message || (refreshError as any),
+            description,
             variant: "destructive",
           });
+          trackProps = {
+            errorMessage: description,
+          };
         } else {
           toast({
             description: "Refresh successfully!",
           });
         }
+        trackEventWithClientID("data_refreshed", trackProps);
 
         if (afterRefresh) {
           afterRefresh(!refreshError);
