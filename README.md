@@ -28,7 +28,7 @@
 
 1. **No backend server, all data is stored locally by default**
 2. Support Binance, OKX and Gate.io. How to create api key: [Binance](https://www.binance.com/en-BH/support/faq/how-to-create-api-360002502072), [OKX](https://use.autoview.com/hc/en-us/articles/360004576632-OKEx-Creating-an-API), [Gate.io](https://www.gate.io/help/guide/common/17521/how-to-utilize-api)
-3. Support BTC, ETH ( ERC20 Tokens ), BNB ( ERC20 Tokens ), SOL and Doge ( Base Users ).
+3. Support BTC, ETH, BNB, SOL and Doge ( Base Users ).
 4. Support dozens of charts to analyze data such as wallet proportion, proportion of each currency asset, changes, etc.
 5. Support Data backup and restore. Users can export data to local files and import them to other devices, or share them between multi devices by cloud drive ( e.g. iCloud ).
 
@@ -36,7 +36,7 @@
 
 [How to become pro user for free?](https://track3.notion.site/How-to-get-license-key-by-free-a5e0e39614f54a06ab19ca5aaed58404?pvs=4)
 
-1. Support 15+ EVM compatible Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base.
+1. Support 15+ EVM compatible Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base. And Most ERC20 Tokens on these chains.
 
 ## Installation
 
@@ -68,6 +68,6 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 
 - https://blockchain.info
 - https://blockcypher.com
-- https://debank.com
+- https://nodereal.io
 - https://phantom.app
 - https://coingecko.com
