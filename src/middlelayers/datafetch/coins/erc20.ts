@@ -57,6 +57,9 @@ class ERC20RPCQuery implements ERC20Querier {
 		if (!results) {
 			throw new Error("failed to query erc20 assets")
 		}
+		if (results.length !== addresses.length) {
+			throw new Error(`Failed to query erc20 balance, expected ${addresses.length} but got ${results.length}`)
+		}
 
 		const res = _(results).map((r, idx) => ({
 			wallet: addresses[idx],

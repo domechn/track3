@@ -1,7 +1,5 @@
 import { Analyzer, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
-import { v4 as uuidv4 } from 'uuid'
-import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
 import { getAddressList } from '../utils/address'
 
@@ -31,29 +29,30 @@ export class SOLAnalyzer implements Analyzer {
 		return valid
 	}
 
-	private async query(address: string): Promise<number> {
-		const resp = await sendHttpRequest<{ result: { value: string } }>("POST", this.queryUrl, 5000, {},
-			{
+	private async query(addresses: string[]): Promise<number[]> {
+		if (addresses.length === 0) {
+			return []
+		}
+		const resp = await sendHttpRequest<{ result: { value: string } }[]>("POST", this.queryUrl, 5000, {},
+			_(addresses).map((address, idx) => ({
 				method: "getBalance",
 				jsonrpc: "2.0",
 				params: [address],
-				id: uuidv4()
-			}
+				id: idx,
+			})).value(),
 		)
-		const amount = parseInt(resp.result.value) / 1e9
-		return amount
+		if (resp.length !== addresses.length) {
+			throw new Error(`Failed to query SOL balance, expected ${addresses.length} but got ${resp.length}`)
+		}
+		return _(resp).map(r => parseInt(r.result.value) / 1e9).value()
 	}
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
-		const coinLists = await asyncMap(getAddressList(this.config.sol) || [], async wallet => {
-			const amount = await this.query(wallet)
-			return {
-				amount,
-				wallet,
-			}
-		}, 1, 1000)
-		return _(coinLists).map(c => ({
-			...c,
+		const addresses = getAddressList(this.config.sol)
+		const coinLists = await this.query(addresses)
+		return _(coinLists).map((amount, idx) => ({
+			amount,
+			wallet: addresses[idx],
 			symbol: "SOL"
 		})).value()
 	}
