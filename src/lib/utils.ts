@@ -8,7 +8,8 @@ import ETHLogo from "@/assets/icons/eth-logo.svg"
 import SOLLogo from "@/assets/icons/sol-logo.svg"
 import DOGELogo from "@/assets/icons/doge-logo.svg"
 import TRONLogo from "@/assets/icons/tron-logo.svg"
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
+import TONLogo from "@/assets/icons/ton-logo.svg"
+import UnknownLogo from "@/assets/icons/unknown-logo.svg"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -32,6 +33,8 @@ export function getWalletLogo(type: string) {
       return DOGELogo
     case "trc20":
       return TRONLogo
+    case "ton":
+      return TONLogo
     default:
       return UnknownLogo
   }
