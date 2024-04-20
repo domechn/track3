@@ -50,7 +50,7 @@ import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
 import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
 import { getWalletLogo } from "@/lib/utils";
 import { prettyPriceNumberToLocaleString } from "@/utils/currency";
-import { TonAnalyzer } from '@/middlelayers/datafetch/coins/ton'
+import { TonAnalyzer } from "@/middlelayers/datafetch/coins/ton";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -135,7 +135,7 @@ const walletOptions = [
   {
     value: "ton",
     label: "TON",
-  }
+  },
 ];
 
 const querySizeOptions = [
@@ -701,7 +701,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         ana = new TonAnalyzer({
           ton: initPayload,
         });
-        break
+        break;
       case "doge":
         ana = new DOGEAnalyzer({
           doge: initPayload,

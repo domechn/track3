@@ -23,12 +23,9 @@ export class TonAnalyzer implements Analyzer {
 	async postLoad(): Promise<void> {
 	}
 
-	// only pro user
 	async verifyConfigs(): Promise<boolean> {
 		const regex = /^(E|U)[1-9A-Za-z-]{47}$/
 
-		console.log(getAddressList(this.config.ton));
-		
 		const valid = _(getAddressList(this.config.ton)).every((address) => regex.test(address))
 		return valid
 	}
