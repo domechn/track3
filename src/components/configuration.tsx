@@ -50,6 +50,7 @@ import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
 import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
 import { getWalletLogo } from "@/lib/utils";
 import { prettyPriceNumberToLocaleString } from "@/utils/currency";
+import { TonAnalyzer } from "@/middlelayers/datafetch/coins/ton";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -71,6 +72,9 @@ const initialConfiguration: GlobalConfig = {
   trc20: {
     addresses: [],
   },
+  ton: {
+    addresses: [],
+  },
   others: [],
 };
 
@@ -90,7 +94,7 @@ const defaultOtherConfig = {
   amount: 0,
 };
 
-const supportCoins = ["btc", "erc20", "sol", "doge", "trc20"];
+const supportCoins = ["btc", "erc20", "sol", "doge", "trc20", "ton"];
 
 const cexOptions = [
   {
@@ -127,6 +131,10 @@ const walletOptions = [
   {
     value: "trc20",
     label: "TRC20 ( Pro )",
+  },
+  {
+    value: "ton",
+    label: "TON",
   },
 ];
 
@@ -524,7 +532,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             className="w-30"
             onChange={(e) => handleOthersChange(idx, "amount", e.target.value)}
           />
-          <a onClick={() => handleRemoveOther(idx)} className="w-4 h-4 mt-2 cursor-pointer">
+          <a
+            onClick={() => handleRemoveOther(idx)}
+            className="w-4 h-4 mt-2 cursor-pointer"
+          >
             <img src={DeleteIcon} alt="delete" />
           </a>
         </div>
@@ -684,6 +695,11 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       case "sol":
         ana = new SOLAnalyzer({
           sol: initPayload,
+        });
+        break;
+      case "ton":
+        ana = new TonAnalyzer({
+          ton: initPayload,
         });
         break;
       case "doge":

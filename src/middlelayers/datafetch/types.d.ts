@@ -51,6 +51,7 @@ export type TokenConfig = {
 	btc: Addresses
 	sol: Addresses
 	doge: Addresses
+	ton: Addresses
 	others: {
 		symbol: string
 		amount: number
