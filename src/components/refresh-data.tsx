@@ -81,7 +81,7 @@ const App = ({
         clearProgress();
         let trackProps = {};
         if (refreshError) {
-          const description = refreshError.message
+          const description = refreshError.message;
           toast({
             description,
             variant: "destructive",
