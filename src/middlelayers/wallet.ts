@@ -54,7 +54,7 @@ export class WalletAnalyzer {
 			_(addrs.addresses).forEach(x => {
 				const alias = _(x).isString() ? undefined : (x as { alias: string, address: string }).alias
 				const address = _(x).isString() ? x as string : (x as { alias: string, address: string }).address
-				
+
 				aliases.push({
 					walletType,
 					walletMd5: md5(address),
@@ -117,8 +117,11 @@ export class WalletAnalyzer {
 			}).value()
 	}
 
-	public async queryWalletAssetsPercentage(): Promise<WalletAssetsPercentageData> {
-		const assets = (await this.queryAssets(1))[0]
+	// if symbol is not provided, return all wallet assets
+	// else only return the wallet assets of the symbol
+	public async queryWalletAssetsPercentage(symbol?: string): Promise<WalletAssetsPercentageData> {
+		const assetModels = (await this.queryAssets(1))[0]
+		const assets = _(assetModels).filter(a => !symbol || a.symbol === symbol).value()
 		// check if there is wallet column
 		const hasWallet = _(assets).find(a => !!a.wallet)
 		if (!assets || !hasWallet) {
