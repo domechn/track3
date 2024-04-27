@@ -61,6 +61,7 @@ import {
 import CoinsAmountAndValueChange from "./coins-amount-and-value-change";
 import { Skeleton } from "./ui/skeleton";
 import { loadingWrapper } from "@/lib/loading";
+import WalletAssetsPercentage from "./wallet-assets-percentage";
 
 const App = ({
   currency,
@@ -665,6 +666,11 @@ const App = ({
         currency={currency}
         symbol={symbol}
         dateRange={dateRange}
+      />
+      <WalletAssetsPercentage
+        currency={currency}
+        dateRange={dateRange}
+        symbol={symbol}
       />
       <HistoryTable />
     </div>

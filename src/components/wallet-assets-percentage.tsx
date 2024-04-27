@@ -25,9 +25,11 @@ const chartName = "Percentage And Total Value of Each Wallet";
 const App = ({
   currency,
   dateRange,
+  symbol,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  symbol?: string;
 }) => {
   const size = useWindowSize();
   const chartRef = useRef<ChartJSOrUndefined<"pie", string[], unknown>>(null);
@@ -38,19 +40,19 @@ const App = ({
     useState<WalletAssetsPercentageData>([]);
 
   useEffect(() => {
-    loadData().then(() => {
+    loadData(symbol).then(() => {
       resizeChartWithDelay(chartName);
       setInitialLoaded(true);
     });
-  }, [dateRange]);
+  }, [symbol, dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData() {
+  async function loadData(s?: string) {
     updateLoading(true);
 
     try {
-      const wap = await WALLET_ANALYZER.queryWalletAssetsPercentage();
+      const wap = await WALLET_ANALYZER.queryWalletAssetsPercentage(s);
       setWalletAssetsPercentage(wap);
     } finally {
       updateLoading(false);
@@ -133,7 +135,7 @@ const App = ({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium font-bold">
-            Percentage And Total Value of Each Wallet
+            {symbol ? symbol + " " : ""}Percentage And Total Value of Each Wallet
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
