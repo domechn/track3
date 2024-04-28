@@ -6,7 +6,7 @@ import { getAddressList } from '../utils/address'
 export class SOLAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'sol'>
 
-	private readonly queryUrl = "https://solana-mainnet.phantom.app/YBPpkkN4g91xDiAnTE9r0RcMkjg0sKUIWvAfoFVJ"
+	private readonly queryUrl = "https://mainnet-beta.solflare.network"
 
 	constructor(config: Pick<TokenConfig, 'sol'>) {
 		this.config = config
