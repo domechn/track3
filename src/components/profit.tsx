@@ -21,6 +21,7 @@ import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { positiveNegativeColor } from "@/utils/color";
+import { useNavigate } from 'react-router-dom'
 
 type TopType = "profitTop" | "lossTop";
 
@@ -46,6 +47,7 @@ const App = ({
   const [topType, setTopType] = useState<TopType>("profitTop");
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     updateLoading(true);
@@ -140,7 +142,9 @@ const App = ({
                     ))
                     .value()
                 : topTypeData.map((d) => (
-                    <TableRow key={d.symbol} className="h-[55px]">
+                    <TableRow key={d.symbol} className="h-[55px]"
+                    onClick={() => navigate(`/coins/${d.symbol}`)}
+                    >
                       <TableCell>
                         <div className="flex flex-row items-center">
                           <img
