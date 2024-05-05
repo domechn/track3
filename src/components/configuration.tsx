@@ -740,6 +740,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     setRefreshCurrencyLoading(true);
     try {
       await updateAllCurrencyRates();
+      await loadSupportedCurrencies()
     } finally {
       setRefreshCurrencyLoading(false);
     }
