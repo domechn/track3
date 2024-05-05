@@ -486,6 +486,11 @@ const App = ({
                 }
                 setUpdatePriceValue(+e.target.value);
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onUpdatePriceDialogSaveClick();
+                }
+              }}
             />
           </div>
           <DialogFooter>
