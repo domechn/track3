@@ -7,6 +7,7 @@ import {
   saveConfiguration,
   savePreferCurrency,
   saveQuerySize,
+  updateAllCurrencyRates,
 } from "@/middlelayers/configuration";
 import { useToast } from "@/components/ui/use-toast";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
@@ -42,7 +43,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CexAnalyzer } from "@/middlelayers/datafetch/coins/cex/cex";
-import { ReloadIcon } from "@radix-ui/react-icons";
+import { ReloadIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { BTCAnalyzer } from "@/middlelayers/datafetch/coins/btc";
 import { DOGEAnalyzer } from "@/middlelayers/datafetch/coins/doge";
 import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
@@ -51,6 +52,12 @@ import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
 import { getWalletLogo } from "@/lib/utils";
 import { prettyPriceNumberToLocaleString } from "@/utils/currency";
 import { TonAnalyzer } from "@/middlelayers/datafetch/coins/ton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -167,6 +174,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   const [saveCexConfigLoading, setSaveCexConfigLoading] = useState(false);
   const [saveWalletConfigLoading, setSaveWalletConfigLoading] = useState(false);
+
+  const [refreshCurrencyLoading, setRefreshCurrencyLoading] = useState(false);
 
   const [addExchangeConfig, setAddExchangeConfig] = useState<
     | {
@@ -727,6 +736,15 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     return ana.verifyConfigs();
   }
 
+  async function updateCurrencyRates() {
+    setRefreshCurrencyLoading(true);
+    try {
+      await updateAllCurrencyRates();
+    } finally {
+      setRefreshCurrencyLoading(false);
+    }
+  }
+
   function renderAddExchangeForm() {
     return (
       <Dialog
@@ -1133,6 +1151,22 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <UpdateIcon
+                    className={`mr-2 h-4 w-4 cursor-pointer ${
+                      refreshCurrencyLoading && "animate-spin"
+                    }`}
+                    onClick={updateCurrencyRates}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Refresh Currency Rates</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {preferredCurrencyDetail &&
               preferCurrency !== defaultBaseCurrency && (
                 <div className="text-muted-foreground text-sm">
