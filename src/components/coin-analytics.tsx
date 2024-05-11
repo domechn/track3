@@ -552,7 +552,7 @@ const App = ({
                         <CaretSortIcon className="h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[200px] p-0">
+                    <PopoverContent className="w-[100%] p-1">
                       <Command>
                         <CommandInput
                           placeholder="Search coin..."
