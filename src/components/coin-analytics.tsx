@@ -35,6 +35,8 @@ import { getImageApiPath } from "@/utils/app";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { timeToDateStr } from "@/utils/date";
 import {
+  CaretSortIcon,
+  CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   Pencil2Icon,
@@ -49,19 +51,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "./ui/button";
 import { toast } from "./ui/use-toast";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 import CoinsAmountAndValueChange from "./coins-amount-and-value-change";
 import { Skeleton } from "./ui/skeleton";
 import { loadingWrapper } from "@/lib/loading";
 import WalletAssetsPercentage from "./wallet-assets-percentage";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "./ui/command";
+import { cn } from "@/lib/utils";
+import bluebird from 'bluebird'
 
 const App = ({
   currency,
@@ -88,6 +92,7 @@ const App = ({
 
   const [maxPosition, setMaxPosition] = useState<number>(0);
 
+  const [coinSelectOpen, setCoinSelectOpen] = useState(false);
   const [walletAliasMap, setWalletAliasMap] = useState<{
     [k: string]: string | undefined;
   }>({});
@@ -532,28 +537,53 @@ const App = ({
                   alt={symbol}
                 />
                 <div className="w-[100%] h-[32px] overflow-hidden">
-                  <Select
-                    defaultValue={symbol}
-                    onValueChange={(v) => {
-                      navigate(`/coins/${v}`);
-                    }}
+                  <Popover
+                    open={coinSelectOpen}
+                    onOpenChange={setCoinSelectOpen}
                   >
-                    <SelectTrigger
-                      className={`text-2xl font-bold border-none shadow-none focus:ring-0`}
-                    >
-                      <SelectValue placeholder="Select Coin" />
-                    </SelectTrigger>
-                    <SelectContent className="overflow-y-auto max-h-[20rem]">
-                      <SelectGroup>
-                        <SelectLabel>Coins</SelectLabel>
-                        {allowSymbols.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={coinSelectOpen}
+                        className="h-[100%] w-[100%] text-2xl font-bold border-none shadow-none focus:ring-0 flex justify-between items-center"
+                      >
+                        <div>{symbol}</div>
+                        <CaretSortIcon className="h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0">
+                      <Command>
+                        <CommandInput
+                          placeholder="Search coin..."
+                          className="h-9"
+                        />
+                        <CommandList>
+                          <CommandEmpty>No coin found.</CommandEmpty>
+                          <CommandGroup>
+                            {allowSymbols.map((s) => (
+                              <CommandItem
+                                key={s}
+                                value={s}
+                                onSelect={(v) => {
+                                  setCoinSelectOpen(false);
+                                  navigate(`/coins/${v}`);
+                                }}
+                              >
+                                <div>{s}</div>
+                                <CheckIcon
+                                  className={cn(
+                                    "ml-auto h-4 w-4",
+                                    s === symbol ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
               <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
