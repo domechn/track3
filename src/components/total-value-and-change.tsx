@@ -189,6 +189,7 @@ const App = ({
 
   const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
   const firstTotalValue = useMemo(() => assetChangeData.data[0]?.usdValue ?? 0, [assetChangeData]);
+  const firstDate = useMemo(() => timeToDateStr(assetChangeData.timestamps[0] ?? 0), [assetChangeData]);
 
   const totalValueShower = useMemo(
     () =>
@@ -512,7 +513,7 @@ const App = ({
               >
                 {changedValueOrPercentage}
               </span>{" "}
-              from first time
+              from {firstDate}
             </p>,
             "w-[60%] h-[16px] mt-2"
           )}
