@@ -36,7 +36,6 @@ const App = ({
   );
   const [totalValueData, setTotalValueData] = useState<TotalValueData>({
     totalValue: 0,
-    prevTotalValue: 0,
   });
 
   function updateLoading(val: boolean) {

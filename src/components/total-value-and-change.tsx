@@ -173,10 +173,8 @@ const App = ({
   const [totalValueLoading, setTotalValueLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
 
-  const [changedValueOrPercentage, setChangedValueOrPercentage] = useState("");
   const [totalValueData, setTotalValueData] = useState<TotalValueData>({
     totalValue: 0,
-    prevTotalValue: 0,
   });
   const [assetChangeData, setAssetChangeData] = useState<AssetChangeData>({
     timestamps: [],
@@ -189,20 +187,39 @@ const App = ({
 
   const [showValue, setShowValue] = useState(false);
 
+  const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
+  const firstTotalValue = useMemo(() => assetChangeData.data[0]?.usdValue ?? 0, [assetChangeData]);
+  const firstDate = useMemo(() => timeToDateStr(assetChangeData.timestamps[0] ?? 0), [assetChangeData]);
+
+  const totalValueShower = useMemo(
+    () =>
+      getTotalValueShower(
+        btcAsBase,
+        firstTotalValue,
+        totalValue,
+        assetChangeData
+      ),
+    [assetChangeData, firstTotalValue, totalValue, btcAsBase]
+  );
+
+  const changedValueOrPercentage = useMemo(() => {
+    if (showValue) {
+      return totalValueShower.formatChangeValue();
+    }
+    let val = getPercentageChange(totalValueShower, totalValue, firstTotalValue);
+    const p = getUpOrDown(val);
+    if (val < 0) {
+      val = -val;
+    }
+    return `${p}${prettyNumberToLocaleString(val)}%`;
+  }, [showValue, firstTotalValue, totalValue, totalValueShower]);
+
   useEffect(() => {
     loadData(dateRange).then(() => {
       resizeChartWithDelay(chartName);
       setInitialLoaded(true);
     });
   }, [dateRange]);
-
-  useEffect(() => {
-    if (showValue) {
-      setChangedValueOrPercentage(formatChangeValue());
-      return;
-    }
-    setChangedValueOrPercentage(formatChangePercentage());
-  }, [totalValueData, btcAsBase, showValue]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
@@ -242,37 +259,26 @@ const App = ({
     }
   }
 
-  const totalValueShower = useMemo(
-    () => getTotalValueShower(),
-    [totalValueData, btcAsBase]
-  );
 
-  function getTotalValueShower() {
+  function getTotalValueShower(
+    btcAsBase: boolean,
+    firstTotalValue: number,
+    totalValue: number,
+    assetChangeData: AssetChangeData
+  ) {
     if (btcAsBase) {
       return new BTCTotalValue(
-        totalValueData.prevTotalValue,
-        totalValueData.totalValue,
-        getPreviousBTCPrice(),
-        getLatestBTCPrice()
+        firstTotalValue,
+        totalValue,
+        assetChangeData.data[0]?.btcPrice ?? 0,
+        assetChangeData.data[assetChangeData.data.length - 1]?.btcPrice ?? 0
       );
     }
     return new FiatTotalValue(
       currency,
-      totalValueData.prevTotalValue,
-      totalValueData.totalValue
+      firstTotalValue,
+      totalValue
     );
-  }
-
-  function formatTotalValue() {
-    return totalValueShower.formatTotalValue();
-  }
-
-  function getLatestBTCPrice() {
-    return assetChangeData.data[assetChangeData.data.length - 1]?.btcPrice ?? 0;
-  }
-
-  function getPreviousBTCPrice() {
-    return assetChangeData.data[assetChangeData.data.length - 2]?.btcPrice ?? 0;
   }
 
   function getUpOrDown(val: number) {
@@ -280,32 +286,19 @@ const App = ({
     return p;
   }
 
-  function formatCurrencyName() {
-    return totalValueShower.currencyName();
-  }
-
-  function getPercentageChange() {
+  function getPercentageChange(
+    ts: TotalValueShower,
+    totalValue: number,
+    firstTotalValue: number
+  ) {
     // to handle empty data
-    if (totalValueData.totalValue === totalValueData.prevTotalValue) {
+    if (totalValue === firstTotalValue) {
       return 0;
     }
-    if (totalValueData.prevTotalValue === 0) {
+    if (firstTotalValue === 0) {
       return 100;
     }
-    return totalValueShower.changePercentage();
-  }
-
-  function formatChangePercentage() {
-    let val = getPercentageChange();
-    const p = getUpOrDown(val);
-    if (val < 0) {
-      val = -val;
-    }
-    return `${p}${prettyNumberToLocaleString(val)}%`;
-  }
-
-  function formatChangeValue() {
-    return totalValueShower.formatChangeValue();
+    return ts.changePercentage();
   }
 
   function formatLineData() {
@@ -335,8 +328,12 @@ const App = ({
       .value();
   }
 
-  function changePercentageColorClass() {
-    const pc = getPercentageChange();
+  function changePercentageColorClass(
+    ts: TotalValueShower,
+    totalValue: number,
+    firstTotalValue: number
+  ) {
+    const pc = getPercentageChange(ts, totalValue, firstTotalValue);
     const c = positiveNegativeColor(pc, quoteColor);
     return `text-${c}-500`;
   }
@@ -460,7 +457,7 @@ const App = ({
       >
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">
-            Total Value In {formatCurrencyName()}
+            Total Value In {totalValueShower.currencyName()}
           </CardTitle>
           <div className="flex space-x-2">
             <svg
@@ -501,16 +498,22 @@ const App = ({
         <CardContent>
           {loadingWrapper(
             totalValueLoading,
-            <div className="text-2xl font-bold">{formatTotalValue()}</div>,
+            <div className="text-2xl font-bold">{totalValueShower.formatTotalValue()}</div>,
             "w-[80%] h-[32px]"
           )}
           {loadingWrapper(
             totalValueLoading,
             <p className="text-xs text-muted-foreground mb-2">
-              <span className={changePercentageColorClass()}>
+              <span
+                className={changePercentageColorClass(
+                  totalValueShower,
+                  totalValue,
+                  firstTotalValue
+                )}
+              >
                 {changedValueOrPercentage}
               </span>{" "}
-              from last time
+              from {firstDate}
             </p>,
             "w-[60%] h-[16px] mt-2"
           )}
