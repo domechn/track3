@@ -104,7 +104,6 @@ export type TopCoinsPercentageChangeData = {
 
 export type TotalValueData = {
 	totalValue: number
-	prevTotalValue: number
 }
 
 export type MaxTotalValueData = {

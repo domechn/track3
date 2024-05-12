@@ -405,12 +405,11 @@ async function deleteAssetPriceByID(id: number): Promise<void> {
 }
 
 export async function queryTotalValue(): Promise<TotalValueData> {
-	const results = await ASSET_HANDLER.listSymbolGroupedAssets(2)
+	const results = await ASSET_HANDLER.listSymbolGroupedAssets(1)
 
 	if (results.length === 0) {
 		return {
 			totalValue: 0,
-			prevTotalValue: 0
 		}
 	}
 
@@ -418,18 +417,8 @@ export async function queryTotalValue(): Promise<TotalValueData> {
 
 	const latestTotal = _(latest).sumBy("value") || 0
 
-	let previousTotal = 0
-
-	if (results.length === 2) {
-		const previous = results[1]
-
-		previousTotal = _(previous).sumBy("value")
-
-	}
-
 	return {
 		totalValue: latestTotal,
-		prevTotalValue: previousTotal,
 	}
 }
 
