@@ -7,7 +7,7 @@ import {
 } from "@/middlelayers/types";
 import { currencyWrapper } from "@/utils/currency";
 import _ from "lodash";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { insertEllipsis } from "@/utils/string";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
@@ -38,6 +38,11 @@ const App = ({
   const [loading, setLoading] = useState(false);
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
     useState<WalletAssetsPercentageData>([]);
+
+  const chartHasData = useMemo(
+    () => !_(walletAssetsPercentage).isEmpty(),
+    [walletAssetsPercentage]
+  );
 
   useEffect(() => {
     loadData(symbol).then(() => {
@@ -135,18 +140,30 @@ const App = ({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium font-bold">
-            {symbol ? symbol + " " : ""}Percentage And Total Value of Each Wallet
+            {symbol ? symbol + " " : ""}Percentage And Total Value of Each
+            Wallet
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <div
+            className="flex items-center justify-center"
             style={{
               height: Math.max((size.height || 100) / 2, 400),
             }}
           >
             {loadingWrapper(
               loading,
-              <Pie ref={chartRef} options={options as any} data={lineData()} />,
+              chartHasData ? (
+                <Pie
+                  ref={chartRef}
+                  options={options as any}
+                  data={lineData()}
+                />
+              ) : (
+                <div className="text-3xl text-gray-300 m-auto">
+                  No Available Data For Selected Dates
+                </div>
+              ),
               "mt-6 h-[30px]",
               6
             )}
