@@ -40,7 +40,7 @@ const App = ({
     useState<WalletAssetsPercentageData>([]);
 
   const chartHasData = useMemo(
-    () => !_(walletAssetsPercentage).isEmpty(),
+    () => !_(walletAssetsPercentage).filter(p => p.value > 0).isEmpty(),
     [walletAssetsPercentage]
   );
 
