@@ -340,6 +340,17 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       });
   }
 
+  function onUpdateCurrencyRatesClick() {
+    updateCurrencyRates()
+      .then(() => onConfigurationSave && onConfigurationSave())
+      .catch((e) => {
+        toast({
+          description: e.message ?? e,
+          variant: "destructive",
+        });
+      });
+  }
+
   function convertFormDataToConfigurationData(): GlobalConfig {
     const exchangesData = _(exchanges)
       .map((ex) => ({
@@ -740,7 +751,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     setRefreshCurrencyLoading(true);
     try {
       await updateAllCurrencyRates();
-      await loadSupportedCurrencies()
+      await loadSupportedCurrencies();
     } finally {
       setRefreshCurrencyLoading(false);
     }
@@ -1159,7 +1170,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     className={`mr-2 h-4 w-4 cursor-pointer ${
                       refreshCurrencyLoading && "animate-spin"
                     }`}
-                    onClick={updateCurrencyRates}
+                    onClick={onUpdateCurrencyRatesClick}
                   />
                 </TooltipTrigger>
                 <TooltipContent>
