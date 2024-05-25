@@ -2,6 +2,9 @@ import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
 import { ArrowTopRightIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { TDateRange } from "@/middlelayers/types";
+import { parseISO } from "date-fns";
+
+const emptyDate = parseISO("1970-01-01");
 
 // if there is no data, show a message and a button to go to settings page
 const App = ({
@@ -40,13 +43,13 @@ const App = ({
   }
 
   function PageWrapper() {
-    // query range is not loaded yet
-    if (dateRange.start.toISOString() === dateRange.end.toISOString()) {
-      return <LoadingPage />;
-    }
-
     if (!hasData) {
       return <NoDataPage />;
+    }
+
+    // query range is not loaded yet
+    if (dateRange.start === emptyDate || dateRange.end === emptyDate) {
+      return <LoadingPage />;
     }
 
     return children;
