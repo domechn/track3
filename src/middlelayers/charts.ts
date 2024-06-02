@@ -510,7 +510,7 @@ export async function queryTopCoinsRank(dateRange: TDateRange, maxSize = DATA_MA
 	const colors = generateRandomColors(coins.length)
 
 	return {
-		timestamps: _(filteredReservedAssets).flatten().uniq().map(t => new Date(t.createdAt).getTime()).value(),
+		timestamps: _(filteredReservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
