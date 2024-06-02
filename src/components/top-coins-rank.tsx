@@ -67,11 +67,11 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     maintainAspectRatio: false,
     responsive: false,
     hover: {
-      mode: "nearest",
+      mode: "index",
       intersect: false,
     },
     interaction: {
-      mode: "nearest",
+      mode: "index",
       intersect: false,
     },
     plugins: {
@@ -81,6 +81,11 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       },
       datalabels: {
         display: false,
+      },
+      tooltip: {
+        itemSort: (a: { raw: number }, b: { raw: number }) => {
+          return a.raw - b.raw;
+        },
       },
       legend: {
         onClick: (e: any, legendItem: { datasetIndex: number }, legend: any) =>

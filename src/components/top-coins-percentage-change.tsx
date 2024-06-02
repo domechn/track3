@@ -72,17 +72,22 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     maintainAspectRatio: false,
     responsive: false,
     hover: {
-      mode: "nearest",
+      mode: "index",
       intersect: false,
     },
     interaction: {
-      mode: "nearest",
+      mode: "index",
       intersect: false,
     },
     plugins: {
       title: {
         display: false,
         text: `Change of Top Coins ${getLabel()} Percentage`,
+      },
+      tooltip: {
+        itemSort: (a: { raw: number }, b: { raw: number }) => {
+          return b.raw - a.raw;
+        },
       },
       datalabels: {
         display: false,
