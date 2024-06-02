@@ -18,6 +18,8 @@ import { GlobalConfig, WalletCoin } from './datafetch/types'
 import { CACHE_GROUP_KEYS } from './consts'
 
 const STABLE_COIN = ["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDD", "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "BUSD"]
+// if data length is greater than 100, only take 100 data points
+const DATA_MAX_POINTS = 100
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) => ASSET_HANDLER.listAssets(size))
 
@@ -442,7 +444,9 @@ export async function queryPNLChartValue(dateRange: TDateRange): Promise<PNLChar
 
 	const data = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
-	return _(data).reverse().map(rs => ({
+	const step = data.length > DATA_MAX_POINTS ? Math.floor(data.length / DATA_MAX_POINTS) : 0
+
+	return _(data).filter((_d, idx) => step === 0 || (idx % step) === 0).reverse().map(rs => ({
 		totalValue: _(rs).sumBy("value"),
 		timestamp: new Date(rs[0]?.createdAt).getTime(),
 	})).value()
@@ -502,9 +506,10 @@ export async function queryTopCoinsRank(dateRange: TDateRange): Promise<TopCoins
 
 	const coins = getCoins(reservedAssets)
 	const colors = generateRandomColors(coins.length)
+	const step = reservedAssets.length > DATA_MAX_POINTS ? Math.floor(reservedAssets.length / DATA_MAX_POINTS) : 0
 
 	return {
-		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
+		timestamps: _(reservedAssets).flatten().filter((_d, idx) => step === 0 || (idx % step) === 0).map(t => new Date(t.createdAt).getTime()).uniq().value(),
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
@@ -546,9 +551,10 @@ export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange): 
 
 	const coins = getCoins(reservedAssets)
 	const colors = generateRandomColors(coins.length)
+	const step = reservedAssets.length > DATA_MAX_POINTS ? Math.floor(reservedAssets.length / DATA_MAX_POINTS) : 0
 
 	return {
-		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
+		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().filter((_d, idx) => step === 0 || (idx % step) === 0).value(),
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
@@ -571,7 +577,8 @@ export async function queryAssetChange(dateRange: TDateRange): Promise<AssetChan
 
 	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
-	const reservedAssets = _(assets).reverse().value()
+	const step = assets.length > DATA_MAX_POINTS ? Math.floor(assets.length / DATA_MAX_POINTS) : 0
+	const reservedAssets = _(assets).reverse().filter((_d, idx) => step === 0 || (idx % step) === 0).value()
 
 	return {
 		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
@@ -658,12 +665,14 @@ export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRan
 
 
 	const aat = getAmountsAndTimestamps(symbol)
+	const step = aat.length > DATA_MAX_POINTS ? Math.floor(aat.length / DATA_MAX_POINTS) : 0
+	const reservedAat = _(aat).filter((_d, idx) => step === 0 || (idx % step) === 0).value()
 
 	return {
 		coin: symbol,
-		amounts: _(aat).map('amount').value(),
-		values: _(aat).map('value').value(),
-		timestamps: _(aat).map('timestamp').value(),
+		amounts: _(reservedAat).map('amount').value(),
+		values: _(reservedAat).map('value').value(),
+		timestamps: _(reservedAat).map('timestamp').value(),
 	}
 }
 
