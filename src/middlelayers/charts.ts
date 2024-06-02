@@ -18,6 +18,8 @@ import { GlobalConfig, WalletCoin } from './datafetch/types'
 import { CACHE_GROUP_KEYS } from './consts'
 
 const STABLE_COIN = ["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDD", "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "BUSD"]
+// if data length is greater than 100, only take 100 data points
+const DATA_MAX_POINTS = 100
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) => ASSET_HANDLER.listAssets(size))
 
@@ -438,11 +440,13 @@ export async function queryMaxTotalValue(dateRange: TDateRange): Promise<MaxTota
 	}
 }
 
-export async function queryPNLChartValue(dateRange: TDateRange): Promise<PNLChartData> {
+export async function queryPNLChartValue(dateRange: TDateRange, maxSize = DATA_MAX_POINTS): Promise<PNLChartData> {
 
 	const data = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
-	return _(data).reverse().map(rs => ({
+	const step = data.length > maxSize ? Math.floor(data.length / maxSize) : 0
+
+	return _(data).reverse().filter((_d, idx) => step === 0 || (idx % step) === 0).map(rs => ({
 		totalValue: _(rs).sumBy("value"),
 		timestamp: new Date(rs[0]?.createdAt).getTime(),
 	})).value()
@@ -474,7 +478,7 @@ export async function queryPNLTableValue(): Promise<PNLTableDate> {
 	}
 }
 
-export async function queryTopCoinsRank(dateRange: TDateRange): Promise<TopCoinsRankData> {
+export async function queryTopCoinsRank(dateRange: TDateRange, maxSize = DATA_MAX_POINTS): Promise<TopCoinsRankData> {
 
 	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
@@ -502,9 +506,10 @@ export async function queryTopCoinsRank(dateRange: TDateRange): Promise<TopCoins
 
 	const coins = getCoins(reservedAssets)
 	const colors = generateRandomColors(coins.length)
+	const step = reservedAssets.length > maxSize ? Math.floor(reservedAssets.length / maxSize) : 0
 
 	return {
-		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
+		timestamps: _(reservedAssets).flatten().filter((_d, idx) => step === 0 || (idx % step) === 0).map(t => new Date(t.createdAt).getTime()).uniq().value(),
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
@@ -513,7 +518,7 @@ export async function queryTopCoinsRank(dateRange: TDateRange): Promise<TopCoins
 	}
 }
 
-export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange): Promise<TopCoinsPercentageChangeData> {
+export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange, maxSize = DATA_MAX_POINTS): Promise<TopCoinsPercentageChangeData> {
 	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
 	const reservedAssets = _(assets).reverse().value()
@@ -546,9 +551,10 @@ export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange): 
 
 	const coins = getCoins(reservedAssets)
 	const colors = generateRandomColors(coins.length)
+	const step = reservedAssets.length > maxSize ? Math.floor(reservedAssets.length / maxSize) : 0
 
 	return {
-		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
+		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().filter((_d, idx) => step === 0 || (idx % step) === 0).value(),
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
@@ -567,11 +573,12 @@ function getCoins(assets: AssetModel[][], size = 10): string[] {
 	return _(assets).map(as => _(as).sortBy('value').reverse().take(size > 0 ? size : _(as).size()).value()).flatten().map(a => a.symbol).uniq().value()
 }
 
-export async function queryAssetChange(dateRange: TDateRange): Promise<AssetChangeData> {
+export async function queryAssetChange(dateRange: TDateRange, maxSize = DATA_MAX_POINTS): Promise<AssetChangeData> {
 
 	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
-	const reservedAssets = _(assets).reverse().value()
+	const step = assets.length > maxSize ? Math.floor(assets.length / maxSize) : 0
+	const reservedAssets = _(assets).reverse().filter((_d, idx) => step === 0 || (idx % step) === 0).value()
 
 	return {
 		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
@@ -633,7 +640,7 @@ export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercent
 	})).value()
 }
 
-export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRange): Promise<CoinsAmountAndValueChangeData | undefined> {
+export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRange, maxSize = DATA_MAX_POINTS): Promise<CoinsAmountAndValueChangeData | undefined> {
 	const assets = await ASSET_HANDLER.listAssetsBySymbolByDateRange(symbol, dateRange.start, dateRange.end)
 	if (!assets) {
 		return
@@ -642,12 +649,12 @@ export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRan
 	const reservedAssets = _(assets).reverse().value()
 
 
-	const getAmountsAndTimestamps = (symbol: string): {
+	const getAmountsAndTimestamps = (models: AssetModel[][]): {
 		amount: number,
 		value: number,
 		timestamp: number
 	}[] => {
-		return _(reservedAssets).map(assets => {
+		return _(models).map(assets => {
 			return {
 				amount: _(assets).sumBy("amount"),
 				value: _(assets).sumBy("value"),
@@ -657,13 +664,15 @@ export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRan
 	}
 
 
-	const aat = getAmountsAndTimestamps(symbol)
+	const aat = getAmountsAndTimestamps(reservedAssets)
+	const step = aat.length > maxSize ? Math.floor(aat.length / maxSize) : 0
+	const reservedAat = _(aat).filter((_d, idx) => step === 0 || (idx % step) === 0).value()
 
 	return {
 		coin: symbol,
-		amounts: _(aat).map('amount').value(),
-		values: _(aat).map('value').value(),
-		timestamps: _(aat).map('timestamp').value(),
+		amounts: _(reservedAat).map('amount').value(),
+		values: _(reservedAat).map('value').value(),
+		timestamps: _(reservedAat).map('timestamp').value(),
 	}
 }
 
