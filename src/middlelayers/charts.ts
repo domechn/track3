@@ -504,12 +504,13 @@ export async function queryTopCoinsRank(dateRange: TDateRange, maxSize = DATA_MA
 	}
 
 
-	const coins = getCoins(reservedAssets)
-	const colors = generateRandomColors(coins.length)
 	const step = reservedAssets.length > maxSize ? Math.floor(reservedAssets.length / maxSize) : 0
+	const filteredReservedAssets = _(reservedAssets).filter((_d, idx) => step === 0 || (idx % step) === 0).value()
+	const coins = getCoins(filteredReservedAssets)
+	const colors = generateRandomColors(coins.length)
 
 	return {
-		timestamps: _(reservedAssets).flatten().filter((_d, idx) => step === 0 || (idx % step) === 0).map(t => new Date(t.createdAt).getTime()).uniq().value(),
+		timestamps: _(filteredReservedAssets).flatten().uniq().map(t => new Date(t.createdAt).getTime()).value(),
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
@@ -549,12 +550,13 @@ export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange, m
 	}
 
 
-	const coins = getCoins(reservedAssets)
-	const colors = generateRandomColors(coins.length)
 	const step = reservedAssets.length > maxSize ? Math.floor(reservedAssets.length / maxSize) : 0
+	const filteredReservedAssets = _(reservedAssets).filter((_d, idx) => step === 0 || (idx % step) === 0).value()
+	const coins = getCoins(filteredReservedAssets)
+	const colors = generateRandomColors(coins.length)
 
 	return {
-		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().filter((_d, idx) => step === 0 || (idx % step) === 0).value(),
+		timestamps: _(filteredReservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
