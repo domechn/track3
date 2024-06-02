@@ -446,7 +446,7 @@ export async function queryPNLChartValue(dateRange: TDateRange, maxSize = DATA_M
 
 	const step = data.length > maxSize ? Math.floor(data.length / maxSize) : 0
 
-	return _(data).filter((_d, idx) => step === 0 || (idx % step) === 0).reverse().map(rs => ({
+	return _(data).reverse().filter((_d, idx) => step === 0 || (idx % step) === 0).map(rs => ({
 		totalValue: _(rs).sumBy("value"),
 		timestamp: new Date(rs[0]?.createdAt).getTime(),
 	})).value()
