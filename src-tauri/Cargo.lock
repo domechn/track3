@@ -2273,7 +2273,7 @@ dependencies = [
 [[package]]
 name = "okex"
 version = "0.1.0"
-source = "git+https://github.com/domechn/okex-rs.git?rev=7126e51#7126e51fdf9c5ff30b4591261c25d3ae11d603c9"
+source = "git+https://github.com/domechn/okex-rs.git?rev=7c101a9#7c101a9963ea32a0063a6b2efe34e7a43db2066e"
 dependencies = [
  "anyhow",
  "base64 0.13.1",
