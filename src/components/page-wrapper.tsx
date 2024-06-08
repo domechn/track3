@@ -48,7 +48,7 @@ const App = ({
     }
 
     // query range is not loaded yet
-    if (dateRange.start === emptyDate || dateRange.end === emptyDate) {
+    if (dateRange.start.getTime() === emptyDate.getTime() || dateRange.end.getTime() === emptyDate.getTime()) {
       return <LoadingPage />;
     }
 

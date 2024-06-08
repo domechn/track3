@@ -6,6 +6,7 @@ import { exportConfigurationString, importRawConfiguration } from './configurati
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
 import { ASSET_HANDLER, AssetHandlerImpl } from './entities/assets'
 import { ASSET_PRICE_HANDLER, AssetPriceHandlerImpl } from './entities/asset-prices'
+import { getClientID } from '@/utils/app'
 
 export interface DataManager {
 	readHistoricalData(filePath: string): Promise<ExportData>
@@ -14,6 +15,8 @@ export interface DataManager {
 }
 
 export type ExportData = {
+	// to record the client who exported the data
+	client?: string
 	exportAt: string
 	configuration?: string
 	historicalData: PartlyHistoricalData
@@ -48,6 +51,7 @@ class DataManagement implements DataManager {
 
 		const exportData = {
 			exportAt,
+			client: await getClientID(),
 			historicalData: _(historicalData).map(d => ({
 				createdAt: d.createdAt,
 				total: d.total,
@@ -119,7 +123,7 @@ class DataManagement implements DataManager {
 		await this.assetPriceHandler.savePrices(assetPriceModels, conflictResolver)
 	}
 
-	async importHistoricalData(conflictResolver: 'REPLACE' | 'IGNORE', data: ExportData): Promise<void> {
+	async importHistoricalData(conflictResolver: 'REPLACE' | 'IGNORE', data: ExportData, dataFilter?: (origin: PartlyHistoricalData) => PartlyHistoricalData): Promise<void> {
 		const { exportAt, md5V2: md5Str, configuration, historicalData } = data
 
 		// !compatible with older versions logic ( before 0.3.3 )
@@ -137,8 +141,10 @@ class DataManagement implements DataManager {
 			throw new Error("invalid data: errorCode 001")
 		}
 
+		const savedData = dataFilter ? dataFilter(historicalData) : historicalData
+
 		// start to import
-		await this.saveHistoricalDataAssets(historicalData, conflictResolver)
+		await this.saveHistoricalDataAssets(savedData, conflictResolver)
 
 		// import configuration if exported
 		if (configuration) {

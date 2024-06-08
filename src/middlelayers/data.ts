@@ -18,6 +18,7 @@ import { DATA_MANAGER, ExportData } from './datamanager'
 import { getAutoBackupDirectory, getLastAutoImportAt, getLastAutoBackupAt, saveLastAutoImportAt, saveLastAutoBackupAt } from './configuration'
 import { CoinPriceQuerier, CoinPriceQuery, ProCoinPriceQuery } from './datafetch/coins/price'
 import { TonAnalyzer } from './datafetch/coins/ton'
+import { getClientID } from '@/utils/app'
 
 
 export async function queryCoinPrices(symbols: string[], userInfo: UserLicenseInfo): Promise<{ [k: string]: number }> {
@@ -205,18 +206,31 @@ export async function autoImportHistoricalData(): Promise<boolean> {
 			return false
 		}
 
+		// check if client is same, if the same, no need to import
+		const client = await getClientID()
+		if (ed.client && ed.client === client) {
+			console.debug("the same client, no need to auto import")
+			return false
+		}
+
 		const aia = await getLastAutoImportAt()
 		const exportAt = new Date(ed.exportAt)
 		const needImport = aia.getTime() < exportAt.getTime()
 
 		if (!needImport) {
-			console.debug("no need to auto import")
+			console.debug("latest data, no need to auto import")
 			return false
 		}
 
 		console.debug("start to import backup data")
 
-		await DATA_MANAGER.importHistoricalData("IGNORE", ed)
+		await DATA_MANAGER.importHistoricalData("IGNORE", ed, (datas) => {
+			// only import data that is after last auto import at
+			return _(datas).filter(d => {
+				const createdAt = new Date(d.createdAt)
+				return createdAt.getTime() > aia.getTime()
+			}).value()
+		})
 	} catch (e) {
 		console.error("failed to auto import", e)
 		return false
