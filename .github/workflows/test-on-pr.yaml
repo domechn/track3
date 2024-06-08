@@ -7,21 +7,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - build: linux
-            os: ubuntu-20.04
-            arch: x86_64
+          - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
-          - build: macos
-            os: macos-latest
-            arch: x86_64
+          - os: macos-latest
             target: x86_64-apple-darwin
-          - build: macos
-            os: macos-latest
-            arch: aarch64
+          - os: macos-latest
             target: aarch64-apple-darwin
-          - build: windows
-            os: windows-latest
-            arch: x86_64
+          - os: windows-latest
             target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.os }}
@@ -61,3 +53,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_PRIVATE_KEY_PASSWORD }}
+        with:
+          args: --target ${{ matrix.target }}
