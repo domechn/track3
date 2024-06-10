@@ -124,13 +124,13 @@ class DataManagement implements DataManager {
 	}
 
 	async importHistoricalData(conflictResolver: 'REPLACE' | 'IGNORE', data: ExportData, dataFilter?: (origin: PartlyHistoricalData) => PartlyHistoricalData): Promise<void> {
-		const { exportAt, md5V2: md5Str, configuration, historicalData } = data
+		const { exportAt, md5V2: md5Str, configuration, historicalData, client } = data
 
 		// !compatible with older versions logic ( before 0.3.3 )
 		if (md5Str) {
 			// verify md5
 			// todo: use md5 in typescript
-			const md5Payload = { data: JSON.stringify({ exportAt, historicalData, configuration }) }
+			const md5Payload = { data: JSON.stringify({ exportAt, historicalData, configuration, client }) }
 			const currentMd5 = md5(JSON.stringify(md5Payload))
 			if (currentMd5 !== md5Str) {
 				throw new Error("invalid data, md5 check failed: errorCode 000")
