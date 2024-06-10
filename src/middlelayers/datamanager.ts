@@ -130,7 +130,7 @@ class DataManagement implements DataManager {
 		if (md5Str) {
 			// verify md5
 			// todo: use md5 in typescript
-			const md5Payload = { data: JSON.stringify({ exportAt, historicalData, configuration, client }) }
+			const md5Payload = { data: JSON.stringify({ exportAt, client, historicalData, configuration }) }
 			const currentMd5 = md5(JSON.stringify(md5Payload))
 			if (currentMd5 !== md5Str) {
 				throw new Error("invalid data, md5 check failed: errorCode 000")
