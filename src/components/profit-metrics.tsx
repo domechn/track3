@@ -127,7 +127,7 @@ const App = ({
       }
     }
 
-    return arr.slice(startIndex, endIndex + 1); // 返回最长连续正数子数组
+    return arr.slice(startIndex, endIndex + 1);
   }
 
   const MaxTotalValueView = React.memo(() => {
