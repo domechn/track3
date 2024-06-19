@@ -1,12 +1,10 @@
 import {
   CurrencyRateDetail,
-  MaxTotalValueData,
   QuoteColor,
   TDateRange,
-  TotalValueData,
 } from "@/middlelayers/types";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { loadingWrapper } from "@/lib/loading";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
@@ -136,7 +134,9 @@ const App = ({
     return (
       <div className="grid gap-2 grid-cols-2">
         <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">Maximum continuous profit time</div>
+          <div className="text-xs text-muted-foreground">
+            Maximum continuous profit time
+          </div>
           <div className="text-l font-bold flex space-x-2 overflow-hidden whitespace-nowrap overflow-ellipsis">
             <div>{timeToDateStr(maxProfileDateRange.start)}</div>
             <div>~</div>
@@ -152,7 +152,9 @@ const App = ({
           </div>
         </div>
         <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">Maximum continuous lost time</div>
+          <div className="text-xs text-muted-foreground">
+            Maximum continuous lost time
+          </div>
           <div className="text-l font-bold flex space-x-2 overflow-hidden whitespace-nowrap overflow-ellipsis">
             <div>{timeToDateStr(maxLostDateRange.start)}</div>
             <div>~</div>
@@ -164,7 +166,9 @@ const App = ({
           </div>
         </div>
         <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">Maximum profit time</div>
+          <div className="text-xs text-muted-foreground">
+            Maximum profit time
+          </div>
           <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
             {maxSingleDayProfitData.value < 0 ? (
               <div>-</div>
@@ -198,7 +202,8 @@ const App = ({
                     quoteColor
                   )}-700`}
                 >
-                  -{currency.symbol +
+                  -
+                  {currency.symbol +
                     prettyNumberToLocaleString(
                       currencyWrapper(currency)(-maxSingleDayLostData.value)
                     )}
