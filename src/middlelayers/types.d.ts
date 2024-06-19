@@ -117,6 +117,8 @@ export type PNLChartData = {
 	timestamp: number
 }[]
 
+export type TotalValuesData = PNLChartData
+
 export type PNLTableDate = {
 	todayPNL?: {
 		value: number

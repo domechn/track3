@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, UserLicenseInfo, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -693,6 +693,16 @@ export async function queryHistoricalData(size = 30, gather = true): Promise<His
 	}
 
 	return _(models).map(m => assetsModelsToHistoricalData(m)).value()
+}
+
+// return all total values order by timestamp asc
+export async function queryTotalValues(dateRange: TDateRange): Promise<TotalValuesData> {
+	const data = await ASSET_HANDLER.listTotalValueRecords(dateRange.start, dateRange.end)
+
+	return _(data).map(rs => ({
+		totalValue: rs.totalValue,
+		timestamp: new Date(rs.createdAt).getTime(),
+	})).value()
 }
 
 // delete batch records by uuid

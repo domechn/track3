@@ -6,6 +6,7 @@ import {
 } from "../middlelayers/types";
 import AthValue from "./ath-value";
 import ProfitSummary from "./profit-summary";
+import ProfitMetrics from "./profit-metrics";
 import Profit from "./profit";
 
 const App = ({
@@ -20,6 +21,11 @@ const App = ({
   return (
     <div className="space-y-2">
       <AthValue
+        currency={currency}
+        dateRange={dateRange}
+        quoteColor={quoteColor}
+      />
+      <ProfitMetrics
         currency={currency}
         dateRange={dateRange}
         quoteColor={quoteColor}
