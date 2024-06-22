@@ -2,6 +2,7 @@ import {
   CurrencyRateDetail,
   QuoteColor,
   TDateRange,
+  TotalValuesData,
 } from "@/middlelayers/types";
 import _ from "lodash";
 import { useEffect, useState } from "react";
@@ -43,6 +44,11 @@ const App = ({
     end: new Date(),
   });
 
+  const [maxDrawdownData, setMaxDrawdownData] = useState({
+    date: new Date(),
+    value: 0,
+  });
+
   function updateLoading(val: boolean) {
     if (initialLoaded) {
       return;
@@ -61,42 +67,75 @@ const App = ({
 
     try {
       const values = await queryTotalValues(dt);
-
-      const diffs = _(values)
-        .map((v, idx) => ({
-          timestamp: v.timestamp,
-          diff: values[idx - 1] ? v.totalValue - values[idx - 1].totalValue : 0,
-        }))
-        .value();
-      // const diffs = [] as { diff: number; timestamp: number }[];
-
-      const maxProfit = _(diffs).maxBy("diff") || { diff: 0, timestamp: 0 };
-      const maxLost = _(diffs).minBy("diff") || { diff: 0, timestamp: 0 };
-
-      const pos = longestContinuousSubarray(diffs);
-      const nag = longestContinuousSubarray(diffs, false);
-
-      setMaxProfileDateRange({
-        start: new Date(pos[0]?.timestamp ?? 0),
-        end: new Date(pos[pos.length - 1]?.timestamp ?? 0),
-      });
-
-      setMaxLostDateRange({
-        start: new Date(nag[0]?.timestamp ?? 0),
-        end: new Date(nag[nag.length - 1]?.timestamp ?? 0),
-      });
-
-      setMaxSingleDayProfitData({
-        timestamp: maxProfit.timestamp,
-        value: maxProfit.diff,
-      });
-      setMaxSingleDayLostData({
-        timestamp: maxLost.timestamp,
-        value: maxLost.diff,
-      });
+      handleTotalValues(values);
     } finally {
       updateLoading(false);
     }
+  }
+
+  function handleTotalValues(values: TotalValuesData) {
+    const diffs = _(values)
+      .map((v, idx) => ({
+        timestamp: v.timestamp,
+        diff: values[idx - 1] ? v.totalValue - values[idx - 1].totalValue : 0,
+      }))
+      .value();
+    // const diffs = [] as { diff: number; timestamp: number }[];
+
+    const maxProfit = _(diffs).maxBy("diff") || { diff: 0, timestamp: 0 };
+    const maxLost = _(diffs).minBy("diff") || { diff: 0, timestamp: 0 };
+
+    const pos = longestContinuousSubarray(diffs);
+    const nag = longestContinuousSubarray(diffs, false);
+
+    setMaxProfileDateRange({
+      start: new Date(pos[0]?.timestamp ?? 0),
+      end: new Date(pos[pos.length - 1]?.timestamp ?? 0),
+    });
+
+    setMaxLostDateRange({
+      start: new Date(nag[0]?.timestamp ?? 0),
+      end: new Date(nag[nag.length - 1]?.timestamp ?? 0),
+    });
+
+    setMaxSingleDayProfitData({
+      timestamp: maxProfit.timestamp,
+      value: maxProfit.diff,
+    });
+    setMaxSingleDayLostData({
+      timestamp: maxLost.timestamp,
+      value: maxLost.diff,
+    });
+
+    handleMaxDrawdownPercentage(values);
+  }
+
+  function handleMaxDrawdownPercentage(values: TotalValuesData) {
+    // find max total value
+    let maxTotalValue = 0;
+    let maxDrawdownPercentage = 0;
+    let maxDrawdownDate = new Date();
+    for (let i = 0; i < values.length; i++) {
+      const cur = values[i].totalValue;
+      if (cur > maxTotalValue) {
+        maxTotalValue = cur;
+      }
+
+      if (maxTotalValue === 0) {
+        continue;
+      }
+      const drawdown = (cur - maxTotalValue) / maxTotalValue;
+
+      if (drawdown < maxDrawdownPercentage) {
+        maxDrawdownPercentage = drawdown;
+        maxDrawdownDate = new Date(values[i].timestamp);
+      }
+    }
+
+    setMaxDrawdownData({
+      value: maxDrawdownPercentage * 100,
+      date: maxDrawdownDate,
+    });
   }
 
   function longestContinuousSubarray(
@@ -211,6 +250,21 @@ const App = ({
                 <div>( {timeToDateStr(maxSingleDayLostData.timestamp)} )</div>
               </div>
             )}
+          </div>
+        </div>
+        <div className="space-y-1">
+          <div className="text-xs text-muted-foreground">
+            <div>Maximum drawdown percentage</div>
+          </div>
+          <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
+            <div className="flex space-x-2">
+              <div
+                className={`text-${positiveNegativeColor(-1, quoteColor)}-700`}
+              >
+                {maxDrawdownData.value.toFixed(2)}%
+              </div>
+              <div>( {timeToDateStr(maxDrawdownData.date)} )</div>
+            </div>
           </div>
         </div>
       </div>
