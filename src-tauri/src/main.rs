@@ -10,7 +10,6 @@ use track3::{
         init_sqlite_file, init_sqlite_tables, is_first_run, load_previous_version,
         prepare_required_data, Migration, V1TV2, V2TV3, V3TV4,
     },
-    okex::Okex,
     types::CoinWithPrice,
 };
 
@@ -29,24 +28,6 @@ async fn query_binance_balance(
 ) -> Result<HashMap<String, f64>, String> {
     let b = Binance::new(api_key, api_secret);
     let res = b.query_balance().await;
-    match res {
-        Ok(balances) => Ok(balances),
-        Err(e) => Err(e.to_string()),
-    }
-}
-
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-#[tauri::command]
-async fn query_okex_balance(
-    api_key: String,
-    api_secret: String,
-    password: String,
-) -> Result<HashMap<String, f64>, String> {
-    let o = Okex::new(api_key, api_secret, password);
-    let res = o.query_balance().await;
     match res {
         Ok(balances) => Ok(balances),
         Err(e) => Err(e.to_string()),
@@ -190,7 +171,6 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             query_coins_prices,
             query_binance_balance,
-            query_okex_balance,
             encrypt,
             decrypt,
             download_coins_logos,
