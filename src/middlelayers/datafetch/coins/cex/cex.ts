@@ -3,7 +3,7 @@ import { Analyzer, CexConfig, WalletCoin } from '../../types'
 import bluebird from 'bluebird'
 import { OtherCexExchanges } from './others'
 import { BinanceExchange } from './binance'
-import { OkexExchange } from './okex'
+import { OkxExchange } from './okx'
 import { getMemoryCacheInstance } from '../../utils/cache'
 import { GateExchange } from './gate'
 
@@ -43,7 +43,7 @@ export class CexAnalyzer implements Analyzer {
 					if (!exCfg.initParams.password) {
 						throw new Error("okex password is required")
 					}
-					return new OkexExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.password, exCfg.alias)
+					return new OkxExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.password, exCfg.alias)
 				case "gate":
 					return new GateExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				default:
