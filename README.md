@@ -69,5 +69,5 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 - https://blockchain.info
 - https://blockcypher.com
 - https://ankr.com
-- https://solflare.network
+- https://helius-rpc.com
 - https://coingecko.com

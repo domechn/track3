@@ -6,7 +6,7 @@ import { getAddressList } from '../utils/address'
 export class SOLAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'sol'>
 
-	private readonly queryUrl = "https://mainnet-beta.solflare.network"
+	private readonly queryUrl = "https://cold-hanni-fast-mainnet.helius-rpc.com"
 
 	constructor(config: Pick<TokenConfig, 'sol'>) {
 		this.config = config
