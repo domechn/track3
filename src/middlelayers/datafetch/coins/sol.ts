@@ -63,7 +63,7 @@ export class SOLAnalyzer implements Analyzer {
 			}
 		}
 
-		throw new Error("Failed to query SOL balance")
+		throw new Error("Failed to query SOL balance, all rpc urls are unavailable")
 	}
 }
 
