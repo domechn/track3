@@ -6,7 +6,7 @@ import { getAddressList } from '../utils/address'
 export class SOLAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'sol'>
 
-	private readonly queryUrl = "https://cold-hanni-fast-mainnet.helius-rpc.com"
+	private readonly rpcUrls = ["https://cold-hanni-fast-mainnet.helius-rpc.com", "https://api.mainnet-beta.solana.com"]
 
 	constructor(config: Pick<TokenConfig, 'sol'>) {
 		this.config = config
@@ -29,11 +29,11 @@ export class SOLAnalyzer implements Analyzer {
 		return valid
 	}
 
-	private async query(addresses: string[]): Promise<number[]> {
+	private async query(rpcUrl: string, addresses: string[]): Promise<number[]> {
 		if (addresses.length === 0) {
 			return []
 		}
-		const resp = await sendHttpRequest<{ result: { value: string } }[]>("POST", this.queryUrl, 5000, {},
+		const resp = await sendHttpRequest<{ result: { value: string } }[]>("POST", rpcUrl, 5000, {},
 			_(addresses).map((address, idx) => ({
 				method: "getBalance",
 				jsonrpc: "2.0",
@@ -49,12 +49,21 @@ export class SOLAnalyzer implements Analyzer {
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		const addresses = getAddressList(this.config.sol)
-		const coinLists = await this.query(addresses)
-		return _(coinLists).map((amount, idx) => ({
-			amount,
-			wallet: addresses[idx],
-			symbol: "SOL"
-		})).value()
+
+		for (const rpcUrl of this.rpcUrls) {
+			try {
+				const coinLists = await this.query(rpcUrl, addresses)
+				return _(coinLists).map((amount, idx) => ({
+					amount,
+					wallet: addresses[idx],
+					symbol: "SOL"
+				})).value()
+			} catch (e) {
+				console.error(e)
+			}
+		}
+
+		throw new Error("Failed to query SOL balance, all rpc urls are unavailable")
 	}
 }
 
