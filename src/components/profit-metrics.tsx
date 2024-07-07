@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "./ui/table";
 import { useWindowSize } from "@/utils/hook";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 const App = ({
   dateRange,
@@ -365,10 +366,12 @@ const App = ({
             <div className="text-xs text-muted-foreground">
               <div>ATH reached times</div>
             </div>
-            <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-              <div className="cursor-pointer" onClick={onATHTimesClick}>
-                {athTimes.times}
-              </div>
+            <div
+              className="text-l font-bold flex space-x-1 items-center overflow-hidden whitespace-nowrap overflow-ellipsis cursor-pointer"
+              onClick={onATHTimesClick}
+            >
+              <div>{athTimes.times}</div>
+              <InfoCircledIcon className="ml-2 h-4 w-4 text-gray-600" />
             </div>
           </div>
         </div>

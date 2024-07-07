@@ -1,6 +1,6 @@
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowTopRightIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { OpenInNewWindowIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { TDateRange } from "@/middlelayers/types";
 import { parseISO } from "date-fns";
 
@@ -34,7 +34,7 @@ const App = ({
             Please add configurations in "settings" and click "Refresh" Button
           </div>
           <Button onClick={() => navigate("/settings")} className="float-right">
-            <ArrowTopRightIcon className="mr-2 h-4 w-4" />
+            <OpenInNewWindowIcon className="mr-2 h-4 w-4" />
             Go to settings
           </Button>
         </div>
