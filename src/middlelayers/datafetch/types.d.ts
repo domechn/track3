@@ -53,6 +53,8 @@ export type TokenConfig = {
 	doge: Addresses
 	ton: Addresses
 	others: {
+		// current this field is only for display
+		alias?: string
 		symbol: string
 		amount: number
 	}[]

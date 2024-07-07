@@ -197,6 +197,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   >(undefined);
   const [addOtherConfig, setAddOtherConfig] = useState<
     | {
+        alias?: string;
         symbol: string;
         amount: number;
       }
@@ -225,6 +226,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   const [others, setOthers] = useState<
     {
+      alias?: string;
       symbol: string;
       amount: number;
     }[]
@@ -532,16 +534,28 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       });
   }
 
-  function renderOthersForm(vals: { symbol: string; amount: number }[]) {
+  function renderOthersForm(
+    vals: { alias?: string; symbol: string; amount: number }[]
+  ) {
     return _(vals)
       .map((o, idx) => (
-        <div key={"other" + idx} className="grid gap-4 grid-cols-3">
+        <div key={"other" + idx} className="grid gap-4 grid-cols-4">
+          <Input
+            type="text"
+            name="alias"
+            placeholder="alias, e.g. main wallet"
+            value={o.alias ?? ""}
+            className="w-15"
+            autoComplete="off"
+            onChange={(e) => handleOthersChange(idx, "alias", e.target.value)}
+          />
           <Input
             type="text"
             name="symbol"
             placeholder="symbol, e.g. BTC"
             value={o.symbol}
             className="w-15"
+            autoComplete="off"
             onChange={(e) => handleOthersChange(idx, "symbol", e.target.value)}
           />
           <Input
@@ -812,6 +826,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               </Label>
               <Input
                 id="alias"
+                autoComplete="off"
                 value={addExchangeConfig?.alias ?? ""}
                 onChange={(e) =>
                   setAddExchangeConfig({
@@ -828,6 +843,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               </Label>
               <Input
                 id="apiKey"
+                autoComplete="off"
                 value={addExchangeConfig?.apiKey ?? ""}
                 onChange={(e) =>
                   setAddExchangeConfig({
@@ -981,6 +997,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               </Label>
               <Input
                 id="alias"
+                autoComplete="off"
                 value={addWalletConfig?.alias ?? ""}
                 onChange={(e) =>
                   setAddWalletConfig({
@@ -997,6 +1014,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               </Label>
               <Input
                 id="address"
+                autoComplete="off"
                 value={addWalletConfig?.address ?? ""}
                 onChange={(e) =>
                   setAddWalletConfig({
@@ -1056,12 +1074,30 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="alias" className="text-right">
+                Alias
+              </Label>
+              <Input
+                id="alias"
+                value={addOtherConfig?.alias ?? ""}
+                autoComplete="off"
+                onChange={(e) =>
+                  setAddOtherConfig({
+                    ...(addOtherConfig || defaultOtherConfig),
+                    alias: e.target.value,
+                  })
+                }
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="symbol" className="text-right">
                 Symbol
               </Label>
               <Input
                 id="symbol"
                 value={addOtherConfig?.symbol ?? ""}
+                autoComplete="off"
                 onChange={(e) =>
                   setAddOtherConfig({
                     ...(addOtherConfig || defaultOtherConfig),
