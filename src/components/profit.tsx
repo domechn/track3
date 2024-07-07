@@ -22,7 +22,7 @@ import { getImageApiPath } from "@/utils/app";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { positiveNegativeColor } from "@/utils/color";
 import { useNavigate } from "react-router-dom";
-import { ArrowTopRightIcon } from '@radix-ui/react-icons'
+import { OpenInNewWindowIcon } from '@radix-ui/react-icons'
 
 type TopType = "profitTop" | "lossTop";
 
@@ -156,7 +156,7 @@ const App = ({
                             alt={d.symbol}
                           />
                           <div className="font-bold text-base">{d.symbol}</div>
-                          <ArrowTopRightIcon className="ml-2 h-4 w-4 hidden group-hover:inline-block text-gray-600" />
+                          <OpenInNewWindowIcon className="ml-2 h-4 w-4 hidden group-hover:inline-block text-gray-600" />
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
