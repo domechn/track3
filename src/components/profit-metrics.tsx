@@ -5,7 +5,7 @@ import {
   TotalValuesData,
 } from "@/middlelayers/types";
 import _ from "lodash";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { loadingWrapper } from "@/lib/loading";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
@@ -13,6 +13,17 @@ import { daysBetweenDates, timeToDateStr } from "@/utils/date";
 import { positiveNegativeColor } from "@/utils/color";
 import React from "react";
 import { queryTotalValues } from "@/middlelayers/charts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { ScrollArea } from "./ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import { useWindowSize } from "@/utils/hook";
 
 const App = ({
   dateRange,
@@ -49,6 +60,12 @@ const App = ({
     value: 0,
   });
 
+  const [athTimes, setAthTimes] = useState({
+    times: 0,
+    dateAndValues: [] as { date: Date; value: number }[],
+  });
+  const [isATHTimesModalOpen, setIsATHTimesModalOpen] = useState(false);
+  const wsize = useWindowSize();
   function updateLoading(val: boolean) {
     if (initialLoaded) {
       return;
@@ -107,17 +124,25 @@ const App = ({
       value: maxLost.diff,
     });
 
-    handleMaxDrawdownPercentage(values);
+    handleATHValues(values);
   }
 
-  function handleMaxDrawdownPercentage(values: TotalValuesData) {
+  function handleATHValues(values: TotalValuesData) {
     // find max total value
     let maxTotalValue = 0;
     let maxDrawdownPercentage = 0;
     let maxDrawdownDate = new Date();
+    let athTimes = 0;
+    const athTimeAndValues = [];
     for (let i = 0; i < values.length; i++) {
       const cur = values[i].totalValue;
       if (cur > maxTotalValue) {
+        athTimes++;
+
+        athTimeAndValues.push({
+          date: new Date(values[i].timestamp),
+          value: values[i].totalValue,
+        });
         maxTotalValue = cur;
       }
 
@@ -135,6 +160,11 @@ const App = ({
     setMaxDrawdownData({
       value: maxDrawdownPercentage * 100,
       date: maxDrawdownDate,
+    });
+
+    setAthTimes({
+      times: athTimes,
+      dateAndValues: _(athTimeAndValues).reverse().value(),
     });
   }
 
@@ -169,71 +199,157 @@ const App = ({
     return arr.slice(startIndex, endIndex + 1);
   }
 
+  function onATHTimesClick() {
+    setIsATHTimesModalOpen(true);
+  }
+
+  const athReachedDetailsDialog = useMemo(
+    () => renderATHReachedDetailsDialog(),
+    [isATHTimesModalOpen]
+  );
+
+  function renderATHReachedDetailsDialog() {
+    console.log(1);
+
+    return (
+      <Dialog open={isATHTimesModalOpen} onOpenChange={setIsATHTimesModalOpen}>
+        <DialogContent className="min-w-[80%]">
+          <DialogHeader>
+            <DialogTitle>ATH Reached Details</DialogTitle>
+          </DialogHeader>
+          <ScrollArea
+            className="w-full"
+            style={{
+              maxHeight: (wsize.height ?? 800) * 0.8,
+            }}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {_(athTimes.dateAndValues)
+                  .map((v, idx) => (
+                    <TableRow key={"ath-reached-details-" + idx}>
+                      <TableCell>{idx + 1}</TableCell>
+                      <TableCell>{timeToDateStr(v.date)}</TableCell>
+                      <TableCell>
+                        {currency.symbol +
+                          prettyNumberToLocaleString(
+                            currencyWrapper(currency)(v.value)
+                          )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                  .value()}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const MaxTotalValueView = React.memo(() => {
     return (
-      <div className="grid gap-2 grid-cols-2">
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            Maximum continuous profit time
-          </div>
-          <div className="text-l font-bold flex space-x-2 overflow-hidden whitespace-nowrap overflow-ellipsis">
-            <div>{timeToDateStr(maxProfileDateRange.start)}</div>
-            <div>~</div>
-            <div>{timeToDateStr(maxProfileDateRange.end)}</div>
-            <div>
-              ({" "}
-              {daysBetweenDates(
-                maxProfileDateRange.start,
-                maxProfileDateRange.end
-              )}{" "}
-              )
+      <div>
+        {athReachedDetailsDialog}
+        <div className="grid gap-2 grid-cols-2">
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              Maximum continuous profit time
             </div>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            Maximum continuous lost time
-          </div>
-          <div className="text-l font-bold flex space-x-2 overflow-hidden whitespace-nowrap overflow-ellipsis">
-            <div>{timeToDateStr(maxLostDateRange.start)}</div>
-            <div>~</div>
-            <div>{timeToDateStr(maxLostDateRange.end)}</div>
-            <div>
-              ( {daysBetweenDates(maxLostDateRange.start, maxLostDateRange.end)}{" "}
-              )
-            </div>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            Maximum profit time
-          </div>
-          <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-            {maxSingleDayProfitData.value < 0 ? (
-              <div>-</div>
-            ) : (
-              <div className="flex space-x-2">
-                <div
-                  className={`text-${positiveNegativeColor(1, quoteColor)}-700`}
-                >
-                  {currency.symbol +
-                    prettyNumberToLocaleString(
-                      currencyWrapper(currency)(maxSingleDayProfitData.value)
-                    )}
-                </div>
-                <div>( {timeToDateStr(maxSingleDayProfitData.timestamp)} )</div>
+            <div className="text-l font-bold flex space-x-2 overflow-hidden whitespace-nowrap overflow-ellipsis">
+              <div>{timeToDateStr(maxProfileDateRange.start)}</div>
+              <div>~</div>
+              <div>{timeToDateStr(maxProfileDateRange.end)}</div>
+              <div>
+                ({" "}
+                {daysBetweenDates(
+                  maxProfileDateRange.start,
+                  maxProfileDateRange.end
+                )}{" "}
+                )
               </div>
-            )}
+            </div>
           </div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            <div>Maximum lost time</div>
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              Maximum continuous lost time
+            </div>
+            <div className="text-l font-bold flex space-x-2 overflow-hidden whitespace-nowrap overflow-ellipsis">
+              <div>{timeToDateStr(maxLostDateRange.start)}</div>
+              <div>~</div>
+              <div>{timeToDateStr(maxLostDateRange.end)}</div>
+              <div>
+                ({" "}
+                {daysBetweenDates(maxLostDateRange.start, maxLostDateRange.end)}{" "}
+                )
+              </div>
+            </div>
           </div>
-          <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-            {maxSingleDayLostData.value > 0 ? (
-              <div>-</div>
-            ) : (
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              Maximum profit time
+            </div>
+            <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
+              {maxSingleDayProfitData.value < 0 ? (
+                <div>-</div>
+              ) : (
+                <div className="flex space-x-2">
+                  <div
+                    className={`text-${positiveNegativeColor(
+                      1,
+                      quoteColor
+                    )}-700`}
+                  >
+                    {currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(maxSingleDayProfitData.value)
+                      )}
+                  </div>
+                  <div>
+                    ( {timeToDateStr(maxSingleDayProfitData.timestamp)} )
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              <div>Maximum lost time</div>
+            </div>
+            <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
+              {maxSingleDayLostData.value > 0 ? (
+                <div>-</div>
+              ) : (
+                <div className="flex space-x-2">
+                  <div
+                    className={`text-${positiveNegativeColor(
+                      -1,
+                      quoteColor
+                    )}-700`}
+                  >
+                    -
+                    {currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(-maxSingleDayLostData.value)
+                      )}
+                  </div>
+                  <div>( {timeToDateStr(maxSingleDayLostData.timestamp)} )</div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              <div>Maximum drawdown percentage</div>
+            </div>
+            <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
               <div className="flex space-x-2">
                 <div
                   className={`text-${positiveNegativeColor(
@@ -241,29 +357,20 @@ const App = ({
                     quoteColor
                   )}-700`}
                 >
-                  -
-                  {currency.symbol +
-                    prettyNumberToLocaleString(
-                      currencyWrapper(currency)(-maxSingleDayLostData.value)
-                    )}
+                  {maxDrawdownData.value.toFixed(2)}%
                 </div>
-                <div>( {timeToDateStr(maxSingleDayLostData.timestamp)} )</div>
+                <div>( {timeToDateStr(maxDrawdownData.date)} )</div>
               </div>
-            )}
+            </div>
           </div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            <div>Maximum drawdown percentage</div>
-          </div>
-          <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-            <div className="flex space-x-2">
-              <div
-                className={`text-${positiveNegativeColor(-1, quoteColor)}-700`}
-              >
-                {maxDrawdownData.value.toFixed(2)}%
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              <div>ATH reached times</div>
+            </div>
+            <div className="text-l font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
+              <div className="cursor-pointer" onClick={onATHTimesClick}>
+                {athTimes.times}
               </div>
-              <div>( {timeToDateStr(maxDrawdownData.date)} )</div>
             </div>
           </div>
         </div>
