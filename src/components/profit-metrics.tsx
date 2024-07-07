@@ -209,8 +209,6 @@ const App = ({
   );
 
   function renderATHReachedDetailsDialog() {
-    console.log(1);
-
     return (
       <Dialog open={isATHTimesModalOpen} onOpenChange={setIsATHTimesModalOpen}>
         <DialogContent className="min-w-[80%]">
