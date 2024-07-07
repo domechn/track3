@@ -71,3 +71,12 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 - https://ankr.com
 - https://helius-rpc.com
 - https://coingecko.com
+- https://solana.com
+
+# Note
+
+1. If the following error occurs when you open the app for the first time on `Mac`, please execute this command `xattr -cr /Applications/track3.app/` to fix it.
+
+```text
+“track3” is damaged and can’t be opened. You should move it to the Trash.
+```
