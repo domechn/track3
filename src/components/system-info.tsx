@@ -173,6 +173,7 @@ const App = ({
         <div className="flex space-x-2">
           <Input
             id="license"
+            autoComplete="off"
             value={inputLicense ?? ""}
             type={showLicense ? "text" : "password"}
             onChange={(e) => onLicenseInputChange(e.target.value)}
