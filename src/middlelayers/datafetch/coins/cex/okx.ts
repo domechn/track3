@@ -28,6 +28,13 @@ type FundingBalanceResp = {
 	}[]
 }
 
+type ETHStakingBalanceResp = {
+	data: {
+		ccy: string
+		amt: string
+	}[]
+}
+
 export class OkxExchange implements Exchanger {
 	private readonly apiKey: string
 	private readonly secret: string
@@ -63,7 +70,7 @@ export class OkxExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const resp = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance()], (v) => v)
+		const resp = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance()], (v) => v)
 		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
 	}
 
@@ -112,6 +119,13 @@ export class OkxExchange implements Exchanger {
 		const allBalances = _(resp.data).flatMap(d => d).keyBy("ccy").mapValues("bal").value()
 
 		return _(allBalances).mapValues(v => parseFloat(v)).value()
+	}
+
+	private async fetchETHStakingBalance(): Promise<{ [k: string]: number }> {
+		const path = "/finance/staking-defi/eth/balance"
+		const resp = await this.fetch<ETHStakingBalanceResp>("GET", path, "")
+
+		return _(resp.data).keyBy("ccy").mapValues("amt").mapValues(v => parseFloat(v)).value()
 	}
 
 	private async fetch<T>(method: HttpVerb, path: string, queryParam: string): Promise<T> {
