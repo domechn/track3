@@ -36,7 +36,7 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const [profit, setProfit] = useState(0);
-  // note: it could be NaN
+  // note: undefined means infinite
   const [profitPercentage, setProfitPercentage] = useState<
     number | undefined
   >();
