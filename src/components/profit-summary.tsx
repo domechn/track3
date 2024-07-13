@@ -1,5 +1,9 @@
 import { calculateTotalProfit } from "@/middlelayers/charts";
-import { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
+import {
+  CurrencyRateDetail,
+  QuoteColor,
+  TDateRange,
+} from "@/middlelayers/types";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { getMonthAbbreviation, listAllFirstAndLastDays } from "@/utils/date";
 import bluebird from "bluebird";
@@ -29,19 +33,17 @@ const App = ({
 }: {
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
-  quoteColor: QuoteColor
+  quoteColor: QuoteColor;
 }) => {
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
       total: number;
-      percentage: number;
       monthFirstDate: Date;
     }[]
   >([]);
   const [yearlyProfits, setYearlyProfits] = useState<
     {
       total: number;
-      percentage: number;
       year: Number;
     }[]
   >([]);
@@ -106,12 +108,12 @@ const App = ({
           .filter((d) => d.firstDay.getFullYear() === selectedYear)
           .value(),
         async (date) => {
-          const { total, percentage } = await calculateTotalProfit({
+          const { total } = await calculateTotalProfit({
             start: date.firstDay,
             end: date.lastDay,
           });
 
-          return { total, percentage, monthFirstDate: date.firstDay };
+          return { total, monthFirstDate: date.firstDay };
         }
       );
 
@@ -125,12 +127,12 @@ const App = ({
     updateLoading(true);
     try {
       const profits = await bluebird.map(years, async (year) => {
-        const { total, percentage } = await calculateTotalProfit({
+        const { total } = await calculateTotalProfit({
           start: new Date(year, 0, 1),
           end: new Date(year, 12, 30, 23, 59, 59),
         });
 
-        return { total, percentage, year };
+        return { total, year };
       });
       setYearlyProfits(profits);
     } finally {
@@ -199,7 +201,6 @@ const App = ({
           const key = selectedYear + "-" + month;
           const p = monthlyProfitsMap[key] ?? {
             total: 0,
-            percentage: 0,
             monthFirstDate: new Date(selectedYear, month, 1),
           };
           return (
@@ -215,7 +216,10 @@ const App = ({
               </div>
               <div
                 className={cn(
-                  `text-${positiveNegativeColor(p.total, quoteColor)}-700 font-bold`
+                  `text-${positiveNegativeColor(
+                    p.total,
+                    quoteColor
+                  )}-700 font-bold`
                 )}
               >
                 <div>
@@ -244,7 +248,6 @@ const App = ({
           .map((year) => {
             const p = yearlyProfitsMap[year] ?? {
               total: 0,
-              percentage: 0,
             };
             return (
               <div
@@ -257,7 +260,10 @@ const App = ({
                 <div className="text-md text-gray-800 text-center">{year}</div>
                 <div
                   className={cn(
-                    `text-${positiveNegativeColor(p.total, quoteColor)}-700 font-bold`
+                    `text-${positiveNegativeColor(
+                      p.total,
+                      quoteColor
+                    )}-700 font-bold`
                   )}
                 >
                   <div>
