@@ -157,8 +157,5 @@ function coinSymbolHandler(name: string): string | undefined {
 	if (name.startsWith(ld) && name.length > ld.length + 1) {
 		return name.substr(ld.length)
 	}
-	if (name == "BETH") {
-		return "ETH"
-	}
 	return name
 }
