@@ -95,13 +95,15 @@ type TotalProfit = {
 	// total profit
 	total: number,
 	// total profit percentage
-	percentage: number,
+	// if it is undefined, means "∞"
+	percentage?: number,
 	coins: {
 		symbol: string,
 		// coin profit
 		value: number
 		// coin profit percentage
-		percentage: number
+		// if it is undefined, means "∞"
+		percentage?: number
 	}[]
 }
 
@@ -148,14 +150,17 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 		if (!d.latest) {
 			return
 		}
-		const realSpentValue = _(d.actions).sumBy((a) => a.amount * a.price)
-		const value = d.latest.value - realSpentValue
+		const latestAvgPrice = d.latest.amount === 0 ? 0 : d.latest.value / d.latest.amount
+		const buyAmount = _(d.actions).filter(a => a.amount > 0).sumBy((a) => a.amount)
+		const costAvgPrice = buyAmount === 0 ? 0 : _(d.actions).filter(a => a.amount > 0).sumBy((a) => a.amount * a.price) / buyAmount
+
+		const value = d.latest.value - _(d.actions).sumBy((a) => a.amount * a.price)
 
 		return {
 			symbol: d.symbol,
-			realSpentValue,
 			value,
-			percentage: realSpentValue === 0 ? 0 : value / realSpentValue * 100
+			realSpentValue: costAvgPrice * d.latest.amount,
+			percentage: costAvgPrice === 0 ? undefined : (latestAvgPrice - costAvgPrice) / costAvgPrice * 100,
 		}
 	}).compact().value()
 
@@ -164,7 +169,7 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 
 	const resp = {
 		total,
-		percentage: totalRealSpent === 0 ? 0 : total / totalRealSpent * 100,
+		percentage: totalRealSpent === 0 ? undefined : total / totalRealSpent * 100,
 		coins,
 	}
 	cache.setCache(key, resp)

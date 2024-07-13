@@ -22,7 +22,7 @@ import { getImageApiPath } from "@/utils/app";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { positiveNegativeColor } from "@/utils/color";
 import { useNavigate } from "react-router-dom";
-import { OpenInNewWindowIcon } from '@radix-ui/react-icons'
+import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 
 type TopType = "profitTop" | "lossTop";
 
@@ -36,11 +36,14 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const [profit, setProfit] = useState(0);
-  const [profitPercentage, setProfitPercentage] = useState(0);
+  // note: it could be NaN
+  const [profitPercentage, setProfitPercentage] = useState<
+    number | undefined
+  >();
   const [coinsProfit, setCoinsProfit] = useState<
     {
       symbol: string;
-      percentage: number;
+      percentage?: number;
       value: number;
     }[]
   >([]);
@@ -115,7 +118,13 @@ const App = ({
                   )}
               </div>
               <div className="text-base text-gray-500">
-                {prettyNumberKeepNDigitsAfterDecimalPoint(profitPercentage, 2)}%
+                {profitPercentage === undefined
+                  ? "∞"
+                  : prettyNumberKeepNDigitsAfterDecimalPoint(
+                      profitPercentage,
+                      2
+                    )}
+                %
               </div>
             </div>,
             "h-[32px]"
@@ -173,11 +182,13 @@ const App = ({
                             )}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {d.value < 0 ? "-" : "+"}
-                          {prettyNumberKeepNDigitsAfterDecimalPoint(
-                            Math.abs(d.percentage),
-                            2
-                          )}
+                          {d.value < 0 ? "" : "+"}
+                          {d.percentage === undefined
+                            ? "∞"
+                            : prettyNumberKeepNDigitsAfterDecimalPoint(
+                                d.percentage,
+                                2
+                              )}
                           %
                         </div>
                       </TableCell>

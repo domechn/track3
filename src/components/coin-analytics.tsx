@@ -65,7 +65,6 @@ import {
   CommandList,
 } from "./ui/command";
 import { cn } from "@/lib/utils";
-import bluebird from 'bluebird'
 
 const App = ({
   currency,
@@ -195,12 +194,16 @@ const App = ({
   );
 
   const profitRate = useMemo(() => {
-    const buyValue = calculateBuyValue(actions);
-    if (buyValue <= 0) {
+    const costPrice = calculateCostPrice(actions);
+    if (costPrice <= 0) {
       return "∞";
     }
-    return ((profit / buyValue) * 100).toFixed(2);
-  }, [profit, actions]);
+    if (!lastAsset?.amount) {
+      return "-";
+    }
+    const latestAvgPrice = lastAsset.value / lastAsset.amount;
+    return ((latestAvgPrice - costPrice) / costPrice * 100).toFixed(2);
+  }, [lastAsset, actions]);
 
   function getAssetActionIndex(act: AssetAction) {
     return `${act.uuid}-${act.assetID}`;
