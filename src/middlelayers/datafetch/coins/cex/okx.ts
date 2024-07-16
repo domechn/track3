@@ -70,8 +70,17 @@ export class OkxExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const resp = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance()], (v) => v)
-		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
+		const [sb, ssb, fb, esb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance()], (v) => v)
+		const merge = (arrs: { [k: string]: number }[]) => _(arrs).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
+		const balance: { [k: string]: number } = merge([sb, ssb, fb])
+		_(esb).forEach((v, k) => {
+			const bv = balance[k] || 0
+			if (bv > v) {
+				balance[k] = bv - v
+			}
+		})
+
+		return merge([balance, esb])
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
