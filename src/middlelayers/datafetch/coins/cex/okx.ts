@@ -75,7 +75,7 @@ export class OkxExchange implements Exchanger {
 		const balance: { [k: string]: number } = merge([sb, ssb, fb])
 		_(esb).forEach((v, k) => {
 			const bv = balance[k] || 0
-			if (bv > v) {
+			if (bv >= v) {
 				balance[k] = bv - v
 			}
 		})
@@ -130,6 +130,8 @@ export class OkxExchange implements Exchanger {
 		return _(allBalances).mapValues(v => parseFloat(v)).value()
 	}
 
+	// this function will return the amount of BETH which get by ETH Staking
+	// but if beth amount will also be calculated in funding or spot balance if these BETH is not redeemed
 	private async fetchETHStakingBalance(): Promise<{ [k: string]: number }> {
 		const path = "/finance/staking-defi/eth/balance"
 		const resp = await this.fetch<ETHStakingBalanceResp>("GET", path, "")
