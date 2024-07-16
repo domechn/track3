@@ -70,8 +70,17 @@ export class OkxExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const resp = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance()], (v) => v)
-		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
+		const [sb, ssb, fb, esb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance()], (v) => v)
+		const merge = (arrs: { [k: string]: number }[]) => _(arrs).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
+		const balance: { [k: string]: number } = merge([sb, ssb, fb])
+		_(esb).forEach((v, k) => {
+			const bv = balance[k] || 0
+			if (bv >= v) {
+				balance[k] = bv - v
+			}
+		})
+
+		return merge([balance, esb])
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
@@ -121,6 +130,8 @@ export class OkxExchange implements Exchanger {
 		return _(allBalances).mapValues(v => parseFloat(v)).value()
 	}
 
+	// this function will return the amount of BETH which get by ETH Staking
+	// but if beth amount will also be calculated in funding or spot balance if these BETH is not redeemed
 	private async fetchETHStakingBalance(): Promise<{ [k: string]: number }> {
 		const path = "/finance/staking-defi/eth/balance"
 		const resp = await this.fetch<ETHStakingBalanceResp>("GET", path, "")
