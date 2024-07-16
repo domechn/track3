@@ -62,6 +62,7 @@ const App = ({
       return;
     }
     loadRealTimeAssetsValue();
+    // get last queried result for comparing
     loadLastRefreshAssetValues();
   }
 
