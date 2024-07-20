@@ -7,7 +7,7 @@ import _ from 'lodash'
 import bluebird from 'bluebird'
 
 type AccountBalanceResp = {
-	errors?: string[]
+	error?: string[]
 
 	result?: {
 		[k: string]: string
@@ -24,11 +24,9 @@ export class KrakenExchange implements Exchanger {
 	private readonly apiPrefix = "/0"
 
 	constructor(apiKey: string, secret: string, alias?: string,) {
-
 		this.apiKey = apiKey
 		this.secret = secret
 		this.alias = alias
-
 	}
 
 	getExchangeName(): string {
@@ -51,8 +49,8 @@ export class KrakenExchange implements Exchanger {
 	private async fetchBalance(): Promise<{ [k: string]: number }> {
 		const path = "/private/BalanceEx"
 		const resp = await this.fetch<AccountBalanceResp>("POST", path)
-		if (resp.errors) {
-			throw new Error(resp.errors.join(","))
+		if (!_(resp.error).isEmpty()) {
+			throw new Error(resp.error!.join(","))
 		}
 
 		return _(resp.result ?? {}).mapValues(v => parseFloat(v)).value()
@@ -60,7 +58,32 @@ export class KrakenExchange implements Exchanger {
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
-		return {}
+		const allPrices = await sendHttpRequest<{
+			error?: string[]
+			result?: {
+				[k: string]: {
+					a: string[]
+					b: string[]
+				}
+			}
+		}>("GET", this.endpoint + this.apiPrefix + "/public/Ticker")
+
+		if (!_(allPrices.error).isEmpty()) {
+			console.error(allPrices.error)
+			return {}
+		}
+
+		const getPrice = (a: string[], b: string[]) => {
+			// 1: price, 2: lot volume, 3: lot volume
+			if (a.length !== 3 || b.length !== 3) {
+				return
+			}
+
+			return (parseFloat(a[0]) + parseFloat(b[0])) / 2
+		}
+		const suffix = "USDT"
+
+		return _(allPrices.result).pickBy((v, k) => k.endsWith(suffix) && v.a.length === 3 && v.b.length === 3).mapKeys((v, k) => k.replace(suffix, "")).mapValues(v => getPrice(v.a, v.b)).pickBy(v => !!v).value() as { [k: string]: number }
 	}
 
 	async verifyConfig(): Promise<boolean> {
