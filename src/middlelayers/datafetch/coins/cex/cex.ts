@@ -6,6 +6,7 @@ import { BinanceExchange } from './binance'
 import { OkxExchange } from './okx'
 import { getMemoryCacheInstance } from '../../utils/cache'
 import { GateExchange } from './gate'
+import { KrakenExchange } from './kraken'
 
 export interface Exchanger {
 	getExchangeName(): string
@@ -46,6 +47,8 @@ export class CexAnalyzer implements Analyzer {
 					return new OkxExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.password, exCfg.alias)
 				case "gate":
 					return new GateExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
+				case "kraken":
+					return new KrakenExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				default:
 					return new OtherCexExchanges(exCfg.name, exCfg.initParams, exCfg.alias)
 			}

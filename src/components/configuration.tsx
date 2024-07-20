@@ -116,6 +116,10 @@ const cexOptions = [
     value: "gate",
     label: "Gate.io",
   },
+  {
+    value: "kraken",
+    label: "Kraken",
+  },
 ];
 
 const walletOptions = [

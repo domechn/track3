@@ -6,7 +6,7 @@ export function getCurrentUA() {
 	return userAgent
 }
 
-export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout = 5000, headers = {}, json = {}): Promise<T> {
+export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout = 5000, headers = {}, json = {}, formData = {}): Promise<T> {
 	const client = await getClient()
 	const hs: { [k: string]: string } = {
 		"user-agent": getCurrentUA(),
@@ -24,8 +24,11 @@ export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout 
 	if (!_(json).isEmpty()) {
 		payload.body = Body.json(json)
 	}
-	const resp = await client.request<T>(payload)
+	if (!_(formData).isEmpty()) {
+		payload.body = Body.form(formData)
+	}
 
+	const resp = await client.request<T>(payload)
 	if (resp.status > 299) {
 		throw new Error(`Request failed with status ${resp.status}, message: ${JSON.stringify(resp.data)}`)
 	}
