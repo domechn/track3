@@ -73,17 +73,10 @@ export class KrakenExchange implements Exchanger {
 			return {}
 		}
 
-		const getPrice = (a: string[], b: string[]) => {
-			// 1: price, 2: lot volume, 3: lot volume
-			if (a.length !== 3 || b.length !== 3) {
-				return
-			}
-
-			return (parseFloat(a[0]) + parseFloat(b[0])) / 2
-		}
+		const getPrice = (a: string[], b: string[]) => (parseFloat(a[0]) + parseFloat(b[0])) / 2
 		const suffix = "USDT"
 
-		return _(allPrices.result).pickBy((v, k) => k.endsWith(suffix) && v.a.length === 3 && v.b.length === 3).mapKeys((v, k) => k.replace(suffix, "")).mapValues(v => getPrice(v.a, v.b)).pickBy(v => !!v).value() as { [k: string]: number }
+		return _(allPrices.result).pickBy((v, k) => k.endsWith(suffix) && v.a.length === 3 && v.b.length === 3).mapKeys((_v, k) => k.replace(suffix, "")).mapValues(v => getPrice(v.a, v.b)).pickBy(v => !!v).value()
 	}
 
 	async verifyConfig(): Promise<boolean> {
