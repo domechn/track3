@@ -120,6 +120,7 @@ export type PNLChartData = {
 export type TotalValuesData = PNLChartData
 
 export type PNLTableDate = {
+	latestTotalValue?: number
 	todayPNL?: {
 		value: number
 		timestamp: number
