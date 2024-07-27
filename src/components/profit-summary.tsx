@@ -8,7 +8,7 @@ import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { getMonthAbbreviation, listAllFirstAndLastDays } from "@/utils/date";
 import bluebird from "bluebird";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { cn } from "@/lib/utils";
 import { positiveNegativeColor } from "@/utils/color";
@@ -141,10 +141,10 @@ const App = ({
   }
 
   function updateLoading(val: boolean) {
-    setSummaryLoading(val);
     if (initialLoaded) {
       return;
     }
+    setSummaryLoading(val);
     setYearSelectLoading(val);
   }
 
@@ -161,7 +161,7 @@ const App = ({
     );
   }
 
-  function YearsSelect() {
+  const YearsSelect = useCallback(() => {
     return (
       <Select
         defaultValue={selectedYear + ""}
@@ -186,9 +186,9 @@ const App = ({
         </SelectContent>
       </Select>
     );
-  }
+  }, [selectedYear, availableYears]);
 
-  function MonthlyProfitSummary() {
+  const MonthlyProfitSummary = useCallback(() => {
     return (
       <div className="grid gap-4 md:grid-cols-12 sm:grid-cols-8 grid-cols-4 min-w-[250px]">
         {_.range(0, 12).map((month) => {
@@ -207,7 +207,7 @@ const App = ({
             <div
               key={"m-profit-summary-" + p.monthFirstDate.getTime()}
               className={cn(
-                "w-[100px] rounded-lg text-center p-2 col-span-2",
+                "w-[100px] rounded-lg text-center p-2 col-span-2 cursor-pointer",
                 `bg-${positiveNegativeColor(p.total, quoteColor)}-100`
               )}
             >
@@ -235,7 +235,7 @@ const App = ({
         })}
       </div>
     );
-  }
+  }, [selectedYear, monthlyProfitsMap, quoteColor, currency]);
 
   function isMonthlyProfitSummary() {
     return summaryType === "month";
