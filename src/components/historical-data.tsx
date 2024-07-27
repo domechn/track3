@@ -386,6 +386,7 @@ const App = ({
         .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
     );
   }, [
+    data,
     dataPage,
     currency,
     logoMap,
