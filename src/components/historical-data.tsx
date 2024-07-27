@@ -388,9 +388,6 @@ const App = ({
   }, [
     dataPage,
     currency,
-    getUpOrDown,
-    onRowClick,
-    onHistoricalDataDeleteClick,
     logoMap,
     quoteColor,
   ]);
