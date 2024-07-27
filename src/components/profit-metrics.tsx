@@ -187,7 +187,8 @@ const App = ({
         if (currentLength === 1) {
           currentStartIndex = i;
         }
-        if (currentLength > maxLength) {
+        // get newest max length
+        if (currentLength >= maxLength) {
           maxLength = currentLength;
           startIndex = currentStartIndex;
           endIndex = i;

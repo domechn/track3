@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import PNLChart from "@/components/pnl-chart";
 
 type SummaryType = "day" | "month" | "year";
 
@@ -52,6 +53,7 @@ const App = ({
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
+  const [clickedMonth, setClickedMonth] = useState<number | null>(null);
 
   useEffect(() => {
     if (summaryType !== "month") {
@@ -60,6 +62,8 @@ const App = ({
     loadMonthlyProfitsInSelectedYear(dateRange.start, dateRange.end).then(
       () => {
         setInitialLoaded(true);
+        // hide pnl chart
+        setClickedMonth(null);
       }
     );
   }, [dateRange, selectedYear, summaryType]);
@@ -80,6 +84,8 @@ const App = ({
 
     loadYearlyProfits(availableYears).then(() => {
       setInitialLoaded(true);
+        // hide pnl chart
+      setClickedMonth(null);
     });
   }, [availableYears, summaryType]);
 
@@ -188,54 +194,92 @@ const App = ({
     );
   }, [selectedYear, availableYears]);
 
+  // month starts from 0
+  function onMonthClick(month: number) {
+    setClickedMonth(month);
+  }
+
+  function onMonthDetailClick() {
+    setClickedMonth(null);
+  }
+
+  const clickedMonthDateRange = useMemo(() => {
+    if (clickedMonth === null) {
+      return null;
+    }
+
+    const month = new Date(selectedYear, clickedMonth, 1);
+    return {
+      start: month,
+      end: new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59),
+    };
+  }, [dateRange, clickedMonth]);
+
   const MonthlyProfitSummary = useCallback(() => {
     return (
-      <div className="grid gap-4 md:grid-cols-12 sm:grid-cols-8 grid-cols-4 min-w-[250px]">
-        {_.range(0, 12).map((month) => {
-          if (
-            selectedYear === new Date().getFullYear() &&
-            month > new Date().getMonth()
-          ) {
-            return null;
-          }
-          const key = selectedYear + "-" + month;
-          const p = monthlyProfitsMap[key] ?? {
-            total: 0,
-            monthFirstDate: new Date(selectedYear, month, 1),
-          };
-          return (
-            <div
-              key={"m-profit-summary-" + p.monthFirstDate.getTime()}
-              className={cn(
-                "w-[100px] rounded-lg text-center p-2 col-span-2 cursor-pointer",
-                `bg-${positiveNegativeColor(p.total, quoteColor)}-100`
-              )}
-            >
-              <div className="text-md text-gray-800 text-center">
-                {getMonthAbbreviation(month + 1)}
-              </div>
-              <div
-                className={cn(
-                  `text-${positiveNegativeColor(
-                    p.total,
-                    quoteColor
-                  )}-700 font-bold`
-                )}
-              >
-                <div>
-                  {(p.total < 0 ? "-" : "+") +
-                    currency.symbol +
-                    simplifyNumber(
-                      currencyWrapper(currency)(Math.abs(p.total))
+      <div>
+        {clickedMonthDateRange !== null ? (
+          <div
+            id="month-detail"
+            onClick={onMonthDetailClick}
+            className="min-w-[250px]"
+          >
+            <PNLChart
+              currency={currency}
+              dateRange={clickedMonthDateRange}
+              quoteColor={quoteColor}
+            />
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-12 sm:grid-cols-8 grid-cols-4 min-w-[250px]">
+            {_.range(0, 12).map((month) => {
+              if (
+                selectedYear === new Date().getFullYear() &&
+                month > new Date().getMonth()
+              ) {
+                return null;
+              }
+              const key = selectedYear + "-" + month;
+              const p = monthlyProfitsMap[key] ?? {
+                total: 0,
+                monthFirstDate: new Date(selectedYear, month, 1),
+              };
+              return (
+                <div
+                  key={"m-profit-summary-" + p.monthFirstDate.getTime()}
+                  className={cn(
+                    "w-[100px] rounded-lg text-center p-2 col-span-2 cursor-pointer",
+                    `bg-${positiveNegativeColor(p.total, quoteColor)}-100`
+                  )}
+                  onClick={() => onMonthClick(month)}
+                >
+                  <div className="text-md text-gray-800 text-center">
+                    {getMonthAbbreviation(month + 1)}
+                  </div>
+                  <div
+                    className={cn(
+                      `text-${positiveNegativeColor(
+                        p.total,
+                        quoteColor
+                      )}-700 font-bold`
                     )}
+                  >
+                    <div>
+                      {(p.total < 0 ? "-" : "+") +
+                        currency.symbol +
+                        simplifyNumber(
+                          currencyWrapper(currency)(Math.abs(p.total))
+                        )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
     );
-  }, [selectedYear, monthlyProfitsMap, quoteColor, currency]);
+  }, [selectedYear, monthlyProfitsMap, quoteColor, currency, clickedMonth]);
 
   function isMonthlyProfitSummary() {
     return summaryType === "month";

@@ -477,6 +477,7 @@ export async function queryPNLTableValue(): Promise<PNLTableDate> {
 	}
 
 	return {
+		latestTotalValue: _(pnlData).last()?.totalValue,
 		todayPNL: getPNL(1),
 		sevenTPnl: getPNL(8),
 		thirtyPNL: getPNL(31),
