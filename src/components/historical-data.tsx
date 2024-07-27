@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
@@ -180,7 +180,8 @@ const App = ({
 
   function onHistoricalDataDeleteClick(uuid: string) {
     handleHistoricalDataDelete(uuid)
-      .then((rhd) => {
+      .then(async (rhd) => {
+        await loadAllData();
         toast({
           description: "Record deleted",
           action: (
@@ -197,7 +198,6 @@ const App = ({
             </ToastAction>
           ),
         });
-        loadAllData();
         if (afterDataChanged) {
           afterDataChanged("delete", uuid, undefined);
         }
@@ -297,99 +297,105 @@ const App = ({
     return p;
   }
 
-  function renderHistoricalDataList() {
-    return (
-      data
-        .map((d, idx) => {
-          return (
-            <Card
-              className="group mb-2 cursor-pointer"
-              key={"historical-card-" + idx}
-              onClick={() => onRowClick(d.id)}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-3 pb-4">
-                <CardTitle className="text-sm font-medium pt-0 w-[100%]">
-                  <div className="grid gap-4 grid-cols-12">
-                    <div className="col-span-3 text-xl ">
-                      {currency.symbol +
-                        prettyNumberToLocaleString(
-                          currencyWrapper(currency)(d.total)
-                        )}
-                    </div>
-                    <div className="col-span-9 text-lg text-muted-foreground text-right">
-                      {timeToDateStr(new Date(d.createdAt).getTime(), true)}
-                    </div>
+  const renderHistoricalDataList = useMemo(() => {
+    return data
+      .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
+      .map((d, idx) => {
+        return (
+          <Card
+            className="group mb-2 cursor-pointer"
+            key={"historical-card-" + idx}
+            onClick={() => onRowClick(d.id)}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-3 pb-4">
+              <CardTitle className="text-sm font-medium pt-0 w-[100%]">
+                <div className="grid gap-4 grid-cols-12">
+                  <div className="col-span-3 text-xl ">
+                    {currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(d.total)
+                      )}
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="w-[100%] pb-3">
-                <div className="grid grid-cols-12">
-                  <div className="col-span-3">
-                    <div
-                      style={{
-                        color: positiveNegativeColor(
-                          d.total - data[idx + 1]?.total,
-                          quoteColor
-                        ),
-                      }}
-                    >
-                      {idx < data.length - 1
-                        ? getUpOrDown(d.total - data[idx + 1].total) +
-                          currency.symbol +
-                          prettyNumberToLocaleString(
-                            currencyWrapper(currency)(
-                              Math.abs(d.total - data[idx + 1].total)
-                            )
-                          )
-                        : ""}
-                    </div>
-                  </div>
-                  <div className="col-span-8">
-                    <ImageStack
-                      imageSrcs={_(d.assets)
-                        .filter((a) => a.value > 0)
-                        .sortBy("value")
-                        .reverse()
-                        .take(7)
-                        .map((a) => logoMap[a.symbol] || UnknownLogo)
-                        .value()}
-                      imageWidth={23}
-                      imageHeight={23}
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <div className="hidden group-hover:inline-block float-right">
-                      <a
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onHistoricalDataDeleteClick(d.id);
-                        }}
-                      >
-                        <img
-                          src={DeleteIcon}
-                          alt="delete"
-                          style={{
-                            border: 0,
-                            height: 18,
-                            width: 18,
-                          }}
-                        />
-                      </a>
-                    </div>
+                  <div className="col-span-9 text-lg text-muted-foreground text-right">
+                    {timeToDateStr(new Date(d.createdAt).getTime(), true)}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })
-        // TODO: slice first for better performance
-        .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
-    );
-  }
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="w-[100%] pb-3">
+              <div className="grid grid-cols-12">
+                <div className="col-span-3">
+                  <div
+                    style={{
+                      color: positiveNegativeColor(
+                        d.total - data[idx + 1]?.total,
+                        quoteColor
+                      ),
+                    }}
+                  >
+                    {idx < data.length - 1
+                      ? getUpOrDown(d.total - data[idx + 1].total) +
+                        currency.symbol +
+                        prettyNumberToLocaleString(
+                          currencyWrapper(currency)(
+                            Math.abs(d.total - data[idx + 1].total)
+                          )
+                        )
+                      : ""}
+                  </div>
+                </div>
+                <div className="col-span-8">
+                  <ImageStack
+                    imageSrcs={_(d.assets)
+                      .filter((a) => a.value > 0)
+                      .sortBy("value")
+                      .reverse()
+                      .take(7)
+                      .map((a) => logoMap[a.symbol] || UnknownLogo)
+                      .value()}
+                    imageWidth={23}
+                    imageHeight={23}
+                  />
+                </div>
+                <div className="col-span-1">
+                  <div className="hidden group-hover:inline-block float-right">
+                    <a
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onHistoricalDataDeleteClick(d.id);
+                      }}
+                    >
+                      <img
+                        src={DeleteIcon}
+                        alt="delete"
+                        style={{
+                          border: 0,
+                          height: 18,
+                          width: 18,
+                        }}
+                      />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      });
+  }, [
+    data,
+    dataPage,
+    currency,
+    getUpOrDown,
+    onRowClick,
+    onHistoricalDataDeleteClick,
+    logoMap,
+    quoteColor,
+  ]);
 
-  function renderDetailPage(data: RankData[]) {
-    return _(data)
-      .map((d, idx) => {
+  const renderDetailPage = useCallback(
+    (data: RankData[]) => {
+      return data.map((d, idx) => {
         const apiPath = logoMap[d.symbol];
         return (
           <TableRow key={"historical-data-detail-row-" + idx}>
@@ -451,9 +457,10 @@ const App = ({
             </TableCell>
           </TableRow>
         );
-      })
-      .value();
-  }
+      });
+    },
+    [currency, logoMap, onHistoricalDataDetailDeleteClick]
+  );
 
   return (
     <div>
@@ -527,7 +534,7 @@ const App = ({
       </div>
       {loadingWrapper(
         loading,
-        <div className="w-[80%] ml-[10%]">{renderHistoricalDataList()}</div>,
+        <div className="w-[80%] ml-[10%]">{renderHistoricalDataList}</div>,
         "my-[20px] h-[50px]",
         10
       )}
