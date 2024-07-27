@@ -180,7 +180,8 @@ const App = ({
 
   function onHistoricalDataDeleteClick(uuid: string) {
     handleHistoricalDataDelete(uuid)
-      .then((rhd) => {
+      .then(async (rhd) => {
+        await loadAllData();
         toast({
           description: "Record deleted",
           action: (
@@ -197,7 +198,6 @@ const App = ({
             </ToastAction>
           ),
         });
-        loadAllData();
         if (afterDataChanged) {
           afterDataChanged("delete", uuid, undefined);
         }
@@ -297,7 +297,7 @@ const App = ({
     return p;
   }
 
-  function renderHistoricalDataList() {
+  const renderHistoricalDataList = useMemo(() => {
     return (
       data
         .map((d, idx) => {
@@ -385,10 +385,18 @@ const App = ({
         // TODO: slice first for better performance
         .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
     );
-  }
+  }, [
+    dataPage,
+    currency,
+    getUpOrDown,
+    onRowClick,
+    onHistoricalDataDeleteClick,
+    logoMap,
+    quoteColor,
+  ]);
 
-  function renderDetailPage(data: RankData[]) {
-    return _(data)
+  const renderDetailPage = useMemo(() => {
+    return _(rankData)
       .map((d, idx) => {
         const apiPath = logoMap[d.symbol];
         return (
@@ -453,7 +461,7 @@ const App = ({
         );
       })
       .value();
-  }
+  }, [rankData, currency, logoMap]);
 
   return (
     <div>
@@ -479,7 +487,7 @@ const App = ({
                   <TableHead>Opt</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>{renderDetailPage(rankData)}</TableBody>
+              <TableBody>{renderDetailPage}</TableBody>
             </Table>
           </ScrollArea>
         </DialogContent>
@@ -527,7 +535,7 @@ const App = ({
       </div>
       {loadingWrapper(
         loading,
-        <div className="w-[80%] ml-[10%]">{renderHistoricalDataList()}</div>,
+        <div className="w-[80%] ml-[10%]">{renderHistoricalDataList}</div>,
         "my-[20px] h-[50px]",
         10
       )}
