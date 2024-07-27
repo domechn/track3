@@ -1,4 +1,12 @@
 import { Doughnut } from "react-chartjs-2";
+import React, {
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import {
   CurrencyRateDetail,
   LatestAssetsPercentageData,
@@ -6,10 +14,8 @@ import {
 } from "@/middlelayers/types";
 import { Card, CardContent } from "./ui/card";
 import _ from "lodash";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { Table, TableBody, TableCell, TableRow } from "./ui/table";
-import { getImageApiPath } from "@/utils/app";
+import { useNavigate } from "react-router-dom";
+import bluebird from "bluebird";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -20,10 +26,11 @@ import { downloadCoinLogos } from "@/middlelayers/data";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
-import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
-import bluebird from "bluebird";
-import { useNavigate } from "react-router-dom";
-import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  OpenInNewWindowIcon,
+} from "@radix-ui/react-icons";
 import {
   queryLatestAssetsPercentage,
   resizeChart,
@@ -34,243 +41,242 @@ import { loadingWrapper } from "@/lib/loading";
 import { ChartResizeContext } from "@/App";
 import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
+import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
+import { getImageApiPath } from "@/utils/app";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 const chartName = "Percentage of Assets";
 
-const App = ({
-  currency,
-  dateRange,
-}: {
-  currency: CurrencyRateDetail;
-  dateRange: TDateRange;
-}) => {
-  const { needResize } = useContext(ChartResizeContext);
-  const [dataPage, setDataPage] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
-    useState<LatestAssetsPercentageData>([]);
-  const chartRef =
-    useRef<ChartJSOrUndefined<"doughnut", number[], unknown>>(null);
-  const pageSize = 5;
-  const navigate = useNavigate();
+const App = React.memo(
+  ({
+    currency,
+    dateRange,
+  }: {
+    currency: CurrencyRateDetail;
+    dateRange: TDateRange;
+  }) => {
+    const { needResize } = useContext(ChartResizeContext);
+    const [dataPage, setDataPage] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [initialLoaded, setInitialLoaded] = useState(false);
+    const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
+      useState<LatestAssetsPercentageData>([]);
+    const chartRef =
+      useRef<ChartJSOrUndefined<"doughnut", number[], unknown>>(null);
+    const pageSize = 5;
+    const navigate = useNavigate();
+    const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
-  const percentageData = useMemo(() => {
-    return splitTopAndOtherData(latestAssetsPercentageData);
-  }, [latestAssetsPercentageData]);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+    const loadData = useCallback(async (dr: TDateRange) => {
+      updateLoading(true);
+      try {
+        const lap = await queryLatestAssetsPercentage();
+        setLatestAssetsPercentageData(lap);
+      } finally {
+        updateLoading(false);
+      }
+    }, []);
 
-  useEffect(() => {
-    loadData(dateRange).then(() => {
-      resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
-    });
-  }, [dateRange]);
+    const getLogoMap = useCallback(async (d: LatestAssetsPercentageData) => {
+      const acd = await getAppCacheDir();
+      const kvs = await bluebird.map(d, async (coin) => {
+        const path = await getImageApiPath(acd, coin.coin);
+        return { [coin.coin]: path };
+      });
 
-  useEffect(() => resizeChart(chartName), [needResize]);
+      return _.assign({}, ...kvs);
+    }, []);
 
-  useEffect(() => {
-    // download coin logos
-    downloadCoinLogos(
-      _(latestAssetsPercentageData)
-        .map((d) => ({
-          symbol: d.coin,
-          price: d.value / (d.amount || 1),
-        }))
-        .value()
+    const updateLoading = (val: boolean) => {
+      if (!initialLoaded) {
+        setLoading(val);
+      }
+    };
+
+    const splitTopAndOtherData = useCallback(
+      (d: LatestAssetsPercentageData) => {
+        const count = 5;
+        if (d.length <= count) {
+          return d;
+        }
+        const top = _(d).sortBy("percentage").reverse().take(count).value();
+        const other = _(d).sortBy("percentage").reverse().drop(count).value();
+
+        return _([
+          ...top,
+          other.length > 0
+            ? {
+                coin: "Other",
+                percentage: _(other).map("percentage").sum(),
+                value: _(other).map("value").sum(),
+                chartColor: other[0]?.chartColor ?? "#4B5563",
+              }
+            : null,
+        ])
+          .filter(Boolean)
+          .compact()
+          .value();
+      },
+      []
     );
 
-    // set logo map
-    getLogoMap(latestAssetsPercentageData).then((m) => setLogoMap(m));
-  }, [latestAssetsPercentageData]);
-
-  async function loadData(dr: TDateRange) {
-    updateLoading(true);
-    try {
-      const lap = await queryLatestAssetsPercentage();
-      setLatestAssetsPercentageData(lap);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setLoading(val);
-  }
-
-  const maxDataPage = useMemo(() => {
-    // - 0.000000000001 is for float number precision
-    const mp = Math.floor(
-      latestAssetsPercentageData.length / pageSize - 0.000000000001
+    const percentageData = useMemo(
+      () => splitTopAndOtherData(latestAssetsPercentageData),
+      [latestAssetsPercentageData, splitTopAndOtherData]
     );
-    return mp >= 0 ? mp : 0;
-  }, [latestAssetsPercentageData]);
 
-  const pagedLatestAssetsPercentageData = useMemo(
-    () =>
-      latestAssetsPercentageData.slice(
-        dataPage * pageSize,
-        (dataPage + 1) * pageSize
-      ),
-    [latestAssetsPercentageData, dataPage]
-  );
+    const maxDataPage = useMemo(
+      () =>
+        Math.floor(
+          latestAssetsPercentageData.length / pageSize - 0.000000000001
+        ),
+      [latestAssetsPercentageData, pageSize]
+    );
 
-  async function getLogoMap(d: LatestAssetsPercentageData) {
-    const acd = await getAppCacheDir();
-    const kvs = await bluebird.map(d, async (coin) => {
-      const path = await getImageApiPath(acd, coin.coin);
-      return { [coin.coin]: path };
-    });
+    const pagedLatestAssetsPercentageData = useMemo(
+      () =>
+        latestAssetsPercentageData.slice(
+          dataPage * pageSize,
+          (dataPage + 1) * pageSize
+        ),
+      [latestAssetsPercentageData, dataPage, pageSize]
+    );
 
-    return _.assign({}, ...kvs);
-  }
+    useEffect(() => {
+      loadData(dateRange).then(() => {
+        resizeChartWithDelay(chartName);
+        setInitialLoaded(true);
+      });
+    }, [dateRange, loadData]);
 
-  const options = {
-    maintainAspectRatio: false,
-    responsive: false,
-    layout: {
-      padding: 20,
-    },
-    plugins: {
-      // text is set for resizing
-      title: { display: false, text: chartName },
-      legend: {
-        display: true,
-        position: "right",
-        font: {
-          size: 13,
+    useEffect(() => resizeChart(chartName), [needResize]);
+
+    useEffect(() => {
+      downloadCoinLogos(
+        _(latestAssetsPercentageData)
+          .map((d) => ({
+            symbol: d.coin,
+            price: d.value / (d.amount || 1),
+          }))
+          .value()
+      );
+
+      getLogoMap(latestAssetsPercentageData).then((m) => setLogoMap(m));
+    }, [latestAssetsPercentageData, getLogoMap]);
+
+    const options = {
+      maintainAspectRatio: false,
+      responsive: false,
+      layout: {
+        padding: 20,
+      },
+      plugins: {
+        title: { display: false, text: chartName },
+        legend: {
+          display: true,
+          position: "right",
+          font: {
+            size: 13,
+          },
+          labels: { font: {} },
+          onHover: (e: any, legendItem: { index: number }, legend: any) =>
+            offsetHoveredItemWrapper(chartRef.current)(e, legendItem, legend),
+          onClick: () => {},
         },
-        labels: { font: {} },
-        onHover: (e: any, legendItem: { index: number }, legend: any) =>
-          offsetHoveredItemWrapper(chartRef.current)(e, legendItem, legend),
-        // disable onclick
-        onClick: () => {},
-      },
-      datalabels: {
-        display: false,
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: { parsed: number }) => {
-            return currency.symbol + context.parsed.toLocaleString();
+        datalabels: {
+          display: false,
+        },
+        tooltip: {
+          callbacks: {
+            label: (context: { parsed: number }) => {
+              return currency.symbol + context.parsed.toLocaleString();
+            },
           },
         },
       },
-    },
-  };
-
-  function splitTopAndOtherData(d: LatestAssetsPercentageData) {
-    const count = 5;
-    if (d.length <= count) {
-      return d;
-    }
-    const top = _(d).sortBy("percentage").reverse().take(count).value();
-    const other = _(d).sortBy("percentage").reverse().drop(count).value();
-
-    return _([
-      ...top,
-      other
-        ? {
-            coin: "Other",
-            percentage: _(other).map("percentage").sum(),
-            value: _(other).map("value").sum(),
-            chartColor: other[0]?.chartColor ?? "#4B5563",
-          }
-        : null,
-    ])
-      .compact()
-      .value();
-  }
-
-  function lineData() {
-    const d = percentageData;
-    return {
-      labels: d.map((coin) => `${coin.percentage.toFixed(2)}% ` + coin.coin),
-      datasets: [
-        {
-          data: d.map((coin) => currencyWrapper(currency)(coin.value)),
-          borderColor: d.map((coin) => coin.chartColor),
-          backgroundColor: d.map((coin) => coin.chartColor),
-          borderWidth: 1,
-          hoverOffset: 35,
-        },
-      ],
     };
-  }
 
-  function renderDoughnut() {
-    return loadingWrapper(
-      loading,
-      <Doughnut ref={chartRef} options={options as any} data={lineData()} />,
-      "mt-6 h-[30px]",
-      6
-    );
-  }
+    const lineData = () => {
+      const d = percentageData;
+      return {
+        labels: d.map((coin) => `${coin.percentage.toFixed(2)}% ` + coin.coin),
+        datasets: [
+          {
+            data: d.map((coin) => currencyWrapper(currency)(coin.value)),
+            borderColor: d.map((coin) => coin.chartColor),
+            backgroundColor: d.map((coin) => coin.chartColor),
+            borderWidth: 1,
+            hoverOffset: 35,
+          },
+        ],
+      };
+    };
 
-  function renderTokenHoldingList() {
-    return (
-      <>
-        <div className="flex w-[100%] h-[50px] justify-between items-center">
-          <div className="font-bold text-muted-foreground ml-2">
-            Token Holding
-          </div>
-          <div className="flex space-x-2 py-4 items-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
-              disabled={dataPage <= 0}
-            >
-              <ChevronLeftIcon />
-            </Button>
-            <div className="text-muted-foreground text-sm">
-              {dataPage + 1} {"/"} {maxDataPage + 1}
+    const renderDoughnut = () => {
+      return loadingWrapper(
+        loading,
+        <Doughnut ref={chartRef} options={options as any} data={lineData()} />,
+        "mt-6 h-[30px]",
+        6
+      );
+    };
+
+    const renderTokenHoldingList = () => {
+      return (
+        <>
+          <div className="flex w-full h-12 justify-between items-center">
+            <div className="font-bold text-muted-foreground ml-2">
+              Token Holding
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
-              disabled={dataPage >= maxDataPage}
-            >
-              <ChevronRightIcon />
-            </Button>
+            <div className="flex space-x-2 py-4 items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
+                disabled={dataPage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <div className="text-muted-foreground text-sm">
+                {dataPage + 1} {"/"} {maxDataPage + 1}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
+                disabled={dataPage >= maxDataPage}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
           </div>
-        </div>
-        <Separator />
-        <Table>
-          <TableBody>
-            {loading
-              ? _(5)
-                  .range()
-                  .map((i) => (
-                    <TableRow key={"latest-assets-percentage-row-loading-" + i}>
+          <Separator />
+          <Table>
+            <TableBody>
+              {loading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={`latest-assets-percentage-row-loading-${i}`}>
                       <TableCell>
-                        <Skeleton className="my-[10px] h-[20px] w-[100%]" />
+                        <Skeleton className="my-2.5 h-5 w-full" />
                       </TableCell>
                     </TableRow>
                   ))
-                  .value()
-              : pagedLatestAssetsPercentageData
-                  .map((d) => (
+                : pagedLatestAssetsPercentageData.map((d) => (
                     <TableRow
                       key={d.coin}
-                      className="h-[55px] cursor-pointer group"
+                      className="h-14 cursor-pointer group"
                       onClick={() => navigate(`/coins/${d.coin}`)}
                     >
                       <TableCell>
-                        <div className="flex flex-row items-center">
+                        <div className="flex items-center">
                           <img
-                            className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
+                            className="inline-block w-5 h-5 mr-2 rounded-full"
                             src={logoMap[d.coin] || UnknownLogo}
                             alt={d.coin}
                           />
                           <div
                             className="mr-1 font-bold text-base"
-                            title={"" + d.amount}
+                            title={String(d.amount)}
                           >
                             {d.amount >= 1
                               ? prettyNumberKeepNDigitsAfterDecimalPoint(
@@ -293,28 +299,29 @@ const App = ({
                       </TableCell>
                     </TableRow>
                   ))}
-          </TableBody>
-        </Table>
-      </>
+            </TableBody>
+          </Table>
+        </>
+      );
+    };
+
+    return (
+      <div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+              <div className="col-span-2 md:col-span-3 h-[330px]">
+                {renderDoughnut()}
+              </div>
+              <div className="col-span-2 md:col-span-2 flex flex-col items-start justify-top">
+                {renderTokenHoldingList()}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
-
-  return (
-    <div>
-      <Card>
-        <CardContent className="p-6">
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
-            <div className="col-span-2 md:col-span-3 h-[330px]">
-              {renderDoughnut()}
-            </div>
-            <div className="col-span-2 md:col-span-2 flex flex-col items-start justify-top">
-              {renderTokenHoldingList()}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+);
 
 export default App;

@@ -2,7 +2,15 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timeToDateStr } from "@/utils/date";
 import { TDateRange, TopCoinsRankData } from "@/middlelayers/types";
-import { useContext, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
@@ -18,15 +26,15 @@ import { ChartResizeContext } from "@/App";
 
 const chartName = "Trend of Top Coins Rank";
 
-const App = ({ dateRange }: { dateRange: TDateRange }) => {
+const App = memo(({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const { needResize } = useContext(ChartResizeContext);
-  const [topCoinsRankData, setTopCoinsRankData] = useState({
+  const [topCoinsRankData, setTopCoinsRankData] = useState<TopCoinsRankData>({
     timestamps: [],
     coins: [],
-  } as TopCoinsRankData);
+  });
   const chartRef =
     useRef<
       ChartJSOrUndefined<
@@ -45,7 +53,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData(dr: TDateRange) {
+  const loadData = useCallback(async (dr: TDateRange) => {
     updateLoading(true);
     try {
       const tcr = await queryTopCoinsRank(dr);
@@ -53,91 +61,106 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     } finally {
       updateLoading(false);
     }
-  }
+  }, []);
 
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setLoading(val);
-  }
-
-  const options = {
-    maintainAspectRatio: false,
-    responsive: false,
-    hover: {
-      mode: "index",
-      intersect: false,
+  const updateLoading = useCallback(
+    (val: boolean) => {
+      if (initialLoaded) {
+        return;
+      }
+      setLoading(val);
     },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: false,
-        text: chartName,
+    [initialLoaded]
+  );
+
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      responsive: true,
+      hover: {
+        mode: "index",
+        intersect: false,
       },
-      datalabels: {
-        display: false,
+      interaction: {
+        mode: "index",
+        intersect: false,
       },
-      tooltip: {
-        itemSort: (a: { raw: number }, b: { raw: number }) => {
-          return a.raw - b.raw;
+      plugins: {
+        decimation: {
+          enabled: true,
+          algorithm: "lttb",
+          samples: 50,
         },
-      },
-      legend: {
-        onClick: (e: any, legendItem: { datasetIndex: number }, legend: any) =>
-          hideOtherLinesClickWrapper(
-            _(topCoinsRankData.coins).size(),
-            chartRef.current
-          )(e, legendItem, legend),
-      },
-    },
-    scales: {
-      x: {
         title: {
           display: false,
-          text: "Date",
+          text: chartName,
         },
-        ticks: {
-          autoSkip: true,
-        },
-      },
-      y: {
-        title: {
+        datalabels: {
           display: false,
-          text: "Rank",
         },
-        offset: true,
-        reverse: true,
-        ticks: {
-          precision: 0,
-          callback: function (value: number) {
-            return "#" + value;
+        tooltip: {
+          itemSort: (a: { raw: number }, b: { raw: number }) => {
+            return a.raw - b.raw;
           },
         },
-        grid: {
-          display: false,
+        legend: {
+          onClick: (
+            e: any,
+            legendItem: { datasetIndex: number },
+            legend: any
+          ) =>
+            hideOtherLinesClickWrapper(
+              _(topCoinsRankData.coins).size(),
+              chartRef.current
+            )(e, legendItem, legend),
         },
       },
+      scales: {
+        x: {
+          title: {
+            display: false,
+            text: "Date",
+          },
+          ticks: {
+            autoSkip: true,
+          },
+        },
+        y: {
+          title: {
+            display: false,
+            text: "Rank",
+          },
+          offset: true,
+          reverse: true,
+          ticks: {
+            precision: 0,
+            callback: (value: number) => `#${value}`,
+          },
+          grid: {
+            display: false,
+          },
+        },
+      },
+    }),
+    [topCoinsRankData.coins]
+  );
+
+  const coinRankData = useCallback(
+    (
+      timestamps: number[],
+      coinRankData: { rank?: number; timestamp: number }[]
+    ) => {
+      const coinRankDataMap = new Map<number, number | undefined>();
+      coinRankData.forEach((rankData) => {
+        coinRankDataMap.set(rankData.timestamp, rankData.rank);
+      });
+      return timestamps.map((date) => coinRankDataMap.get(date) || null);
     },
-  };
+    []
+  );
 
-  function coinRankData(
-    timestamps: number[],
-    coinRankData: { rank?: number; timestamp: number }[]
-  ) {
-    const coinRankDataMap = new Map<number, number | undefined>();
-    coinRankData.forEach((rankData) => {
-      coinRankDataMap.set(rankData.timestamp, rankData.rank);
-    });
-    return timestamps.map((date) => coinRankDataMap.get(date) || null);
-  }
-
-  function lineData() {
-    return {
+  const lineData = useMemo(
+    () => ({
       labels: topCoinsRankData.timestamps.map((x) => timeToDateStr(x)),
       datasets: topCoinsRankData.coins.map((coin) => ({
         label: coin.coin,
@@ -149,8 +172,9 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         pointRadius: 0.2,
         pointStyle: "rotRect",
       })),
-    };
-  }
+    }),
+    [topCoinsRankData, coinRankData]
+  );
 
   return (
     <div>
@@ -168,11 +192,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
           >
             {loadingWrapper(
               loading,
-              <Line
-                ref={chartRef}
-                options={options as any}
-                data={lineData()}
-              />,
+              <Line ref={chartRef} options={options as any} data={lineData} />,
               "mt-4",
               10
             )}
@@ -181,6 +201,6 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       </Card>
     </div>
   );
-};
+});
 
 export default App;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
@@ -15,7 +15,6 @@ import {
 } from "@/middlelayers/types";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
-
 import { useToast } from "@/components/ui/use-toast";
 import { timeToDateStr } from "@/utils/date";
 import {
@@ -57,7 +56,6 @@ import { positiveNegativeColor } from "@/utils/color";
 
 type RankData = {
   id: number;
-  // real id in db
   assetId: number;
   rank: number;
   symbol: string;
@@ -72,8 +70,6 @@ const App = ({
   currency,
   quoteColor,
 }: {
-  // uuid is id for batch data
-  // id is for single data
   afterDataChanged?: (
     action: "delete" | "undoDeletion",
     uuid?: string,
@@ -84,19 +80,59 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const { toast } = useToast();
-  const [data, setData] = useState([] as HistoricalData[]);
-  const [rankData, setRankData] = useState([] as RankData[]);
+  const [data, setData] = useState<HistoricalData[]>([]);
+  const [rankData, setRankData] = useState<RankData[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
-
   const [loading, setLoading] = useState(false);
-
-  const wsize = useWindowSize();
-
   const [dataPage, setDataPage] = useState<number>(0);
 
+  const wsize = useWindowSize();
   const pageSize = 10;
+
+  const updateLoading = useCallback(
+    (val: boolean) => {
+      if (initialLoaded) return;
+      setLoading(val);
+    },
+    [initialLoaded]
+  );
+
+  const loadAllData = useCallback(async () => {
+    updateLoading(true);
+    try {
+      const d = await queryHistoricalData(-1);
+      setData(d);
+    } finally {
+      updateLoading(false);
+    }
+  }, [updateLoading]);
+
+  useEffect(() => {
+    loadAllData().then(() => setInitialLoaded(true));
+  }, [dateRange, loadAllData]);
+
+  const maxDataPage = useMemo(() => {
+    const mp = Math.floor(data.length / pageSize - 0.000000000001);
+    return mp >= 0 ? mp : 0;
+  }, [data]);
+
+  const getLogoMap = useCallback(async (d: HistoricalData[]) => {
+    const acd = await getAppCacheDir();
+    const kvs = await bluebird.map(
+      _(d)
+        .map((dd) => dd.assets)
+        .flatten()
+        .map("symbol")
+        .value(),
+      async (s) => {
+        const path = await getImageApiPath(acd, s);
+        return { [s]: path };
+      }
+    );
+    return _.assign({}, ...kvs);
+  }, []);
 
   useEffect(() => {
     const symbols = _(data)
@@ -112,284 +148,241 @@ const App = ({
       .value();
 
     downloadCoinLogos(symbols);
-
     getLogoMap(data).then((m) => setLogoMap(m));
-  }, [data]);
+  }, [data, getLogoMap]);
 
-  useEffect(() => {
-    loadAllData().then(() => {
-      setInitialLoaded(true);
-    });
-  }, [dateRange]);
-
-  const maxDataPage = useMemo(() => {
-    // - 0.000000000001 is for float number precision
-    const mp = Math.floor(data.length / pageSize - 0.000000000001);
-    return mp >= 0 ? mp : 0;
-  }, [data]);
-
-  async function getLogoMap(d: HistoricalData[]) {
-    const acd = await getAppCacheDir();
-    const kvs = await bluebird.map(
-      _(d)
-        .map((dd) => dd.assets)
-        .flatten()
-        .map("symbol")
-        .value(),
-      async (s) => {
-        const path = await getImageApiPath(acd, s);
-        return { [s]: path };
-      }
-    );
-
-    return _.assign({}, ...kvs);
-  }
-
-  async function loadAllData() {
-    updateLoading(true);
-    try {
-      const d = await queryHistoricalData(-1);
-      setData(d);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setLoading(val);
-  }
-
-  function onDeletionUndoClick(rhd: {
-    uuid?: string;
-    id?: number;
-    rhd: RestoreHistoricalData;
-  }) {
-    restoreHistoricalData(rhd.rhd).then(() => {
-      // hide rank data when undo for data refreshing
-      setIsModalOpen(false);
-
-      if (afterDataChanged) {
-        afterDataChanged("undoDeletion", rhd.uuid, rhd.id);
-      }
-    });
-  }
-
-  function onHistoricalDataDeleteClick(uuid: string) {
-    handleHistoricalDataDelete(uuid)
-      .then((rhd) => {
-        toast({
-          description: "Record deleted",
-          action: (
-            <ToastAction
-              altText="Restore deleted historical data"
-              onClick={() =>
-                onDeletionUndoClick({
-                  uuid,
-                  rhd,
-                })
-              }
-            >
-              Undo
-            </ToastAction>
-          ),
-        });
-        loadAllData();
-        if (afterDataChanged) {
-          afterDataChanged("delete", uuid, undefined);
-        }
-        // hide rank data when some data is deleted
-        setRankData([]);
-      })
-      .catch((e) =>
-        toast({
-          description: e.message,
-          variant: "destructive",
-        })
-      )
-      .finally(() => {
+  const onDeletionUndoClick = useCallback(
+    (rhd: { uuid?: string; id?: number; rhd: RestoreHistoricalData }) => {
+      restoreHistoricalData(rhd.rhd).then(() => {
         setIsModalOpen(false);
+        if (afterDataChanged) {
+          afterDataChanged("undoDeletion", rhd.uuid, rhd.id);
+        }
       });
-  }
+    },
+    [afterDataChanged]
+  );
 
-  async function handleHistoricalDataDelete(uuid: string) {
+  const handleHistoricalDataDelete = useCallback(async (uuid: string) => {
     const rhd = await queryRestoreHistoricalData(uuid);
-
     await deleteHistoricalDataByUUID(uuid);
     return rhd;
-  }
+  }, []);
 
-  function onHistoricalDataDetailDeleteClick(id: number) {
-    handleHistoricalDataDetailDelete(id)
-      .then((rhd) => {
-        toast({
-          description: "Record deleted",
-          action: (
-            <ToastAction
-              altText="Restore deleted historical record"
-              onClick={() =>
-                onDeletionUndoClick({
-                  id,
-                  rhd,
-                })
-              }
-            >
-              Undo
-            </ToastAction>
-          ),
-        });
-        loadAllData();
-        if (afterDataChanged) {
-          afterDataChanged("delete", undefined, id);
-        }
-
-        setRankData(
-          _(rankData)
-            .filter((d) => d.assetId !== id)
-            .value()
-        );
-      })
-      .catch((e) =>
-        toast({
-          description: e.message,
-          variant: "destructive",
+  const onHistoricalDataDeleteClick = useCallback(
+    (uuid: string) => {
+      handleHistoricalDataDelete(uuid)
+        .then(async (rhd) => {
+          await loadAllData();
+          toast({
+            description: "Record deleted",
+            action: (
+              <ToastAction
+                altText="Restore deleted historical data"
+                onClick={() => onDeletionUndoClick({ uuid, rhd })}
+              >
+                Undo
+              </ToastAction>
+            ),
+          });
+          if (afterDataChanged) {
+            afterDataChanged("delete", uuid, undefined);
+          }
+          setRankData([]);
         })
-      );
-  }
+        .catch((e) =>
+          toast({
+            description: e.message,
+            variant: "destructive",
+          })
+        )
+        .finally(() => {
+          setIsModalOpen(false);
+        });
+    },
+    [
+      handleHistoricalDataDelete,
+      loadAllData,
+      onDeletionUndoClick,
+      afterDataChanged,
+      toast,
+    ]
+  );
 
-  async function handleHistoricalDataDetailDelete(id: number) {
+  const handleHistoricalDataDetailDelete = useCallback(async (id: number) => {
     const rhd = await queryRestoreHistoricalData(id);
     await deleteHistoricalDataDetailById(id);
     return rhd;
-  }
+  }, []);
 
-  function onRowClick(id: number | string) {
-    const d = _(data).find((d) => d.id === id);
-    if (!d) {
-      return;
-    }
-
-    const revAssets = _(d.assets).sortBy("value").reverse().value();
-    setRankData(
-      _(d.assets)
-        .map((asset, idx) => ({
-          id: idx,
-          assetId: asset.id,
-          rank: _(revAssets).findIndex((a) => a.symbol === asset.symbol) + 1,
-          amount: asset.amount,
-          symbol: asset.symbol,
-          value: asset.value,
-          price: asset.price,
-        }))
-        .filter((d) => d.value > 1) // ignore value less than 1 dollar
-        .sortBy("rank")
-        .value()
-    );
-
-    setIsModalOpen(true);
-  }
-
-  function getUpOrDown(val: number) {
-    const p = val > 0 ? "+" : val === 0 ? "" : "-";
-    return p;
-  }
-
-  function renderHistoricalDataList() {
-    return (
-      data
-        .map((d, idx) => {
-          return (
-            <Card
-              className="group mb-2 cursor-pointer"
-              key={"historical-card-" + idx}
-              onClick={() => onRowClick(d.id)}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-3 pb-4">
-                <CardTitle className="text-sm font-medium pt-0 w-[100%]">
-                  <div className="grid gap-4 grid-cols-12">
-                    <div className="col-span-3 text-xl ">
-                      {currency.symbol +
-                        prettyNumberToLocaleString(
-                          currencyWrapper(currency)(d.total)
-                        )}
-                    </div>
-                    <div className="col-span-9 text-lg text-muted-foreground text-right">
-                      {timeToDateStr(new Date(d.createdAt).getTime(), true)}
-                    </div>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="w-[100%] pb-3">
-                <div className="grid grid-cols-12">
-                  <div className="col-span-3">
-                    <div
-                      style={{
-                        color: positiveNegativeColor(
-                          d.total - data[idx + 1]?.total,
-                          quoteColor
-                        ),
-                      }}
-                    >
-                      {idx < data.length - 1
-                        ? getUpOrDown(d.total - data[idx + 1].total) +
-                          currency.symbol +
-                          prettyNumberToLocaleString(
-                            currencyWrapper(currency)(
-                              Math.abs(d.total - data[idx + 1].total)
-                            )
-                          )
-                        : ""}
-                    </div>
-                  </div>
-                  <div className="col-span-8">
-                    <ImageStack
-                      imageSrcs={_(d.assets)
-                        .filter((a) => a.value > 0)
-                        .sortBy("value")
-                        .reverse()
-                        .take(7)
-                        .map((a) => logoMap[a.symbol] || UnknownLogo)
-                        .value()}
-                      imageWidth={23}
-                      imageHeight={23}
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <div className="hidden group-hover:inline-block float-right">
-                      <a
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onHistoricalDataDeleteClick(d.id);
-                        }}
-                      >
-                        <img
-                          src={DeleteIcon}
-                          alt="delete"
-                          style={{
-                            border: 0,
-                            height: 18,
-                            width: 18,
-                          }}
-                        />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+  const onHistoricalDataDetailDeleteClick = useCallback(
+    (id: number) => {
+      handleHistoricalDataDetailDelete(id)
+        .then((rhd) => {
+          toast({
+            description: "Record deleted",
+            action: (
+              <ToastAction
+                altText="Restore deleted historical record"
+                onClick={() => onDeletionUndoClick({ id, rhd })}
+              >
+                Undo
+              </ToastAction>
+            ),
+          });
+          loadAllData();
+          if (afterDataChanged) {
+            afterDataChanged("delete", undefined, id);
+          }
+          setRankData((prevRankData) =>
+            prevRankData.filter((d) => d.assetId !== id)
           );
         })
-        // TODO: slice first for better performance
-        .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
-    );
-  }
+        .catch((e) =>
+          toast({
+            description: e.message,
+            variant: "destructive",
+          })
+        );
+    },
+    [
+      handleHistoricalDataDetailDelete,
+      loadAllData,
+      onDeletionUndoClick,
+      afterDataChanged,
+      toast,
+    ]
+  );
 
-  function renderDetailPage(data: RankData[]) {
-    return _(data)
+  const onRowClick = useCallback(
+    (id: number | string) => {
+      const d = data.find((d) => d.id === id);
+      if (!d) return;
+
+      const revAssets = _(d.assets).sortBy("value").reverse().value();
+      setRankData(
+        d.assets
+          .map((asset, idx) => ({
+            id: idx,
+            assetId: asset.id,
+            rank: revAssets.findIndex((a) => a.symbol === asset.symbol) + 1,
+            amount: asset.amount,
+            symbol: asset.symbol,
+            value: asset.value,
+            price: asset.price,
+          }))
+          .filter((d) => d.value > 1) // ignore value less than 1 dollar
+          .sort((a, b) => a.rank - b.rank)
+      );
+
+      setIsModalOpen(true);
+    },
+    [data]
+  );
+
+  const getUpOrDown = useCallback((val: number) => {
+    const p = val > 0 ? "+" : val === 0 ? "" : "-";
+    return p;
+  }, []);
+
+  const renderHistoricalDataList = useCallback(() => {
+    return data
+      .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
       .map((d, idx) => {
+        return (
+          <Card
+            className="group mb-2 cursor-pointer"
+            key={"historical-card-" + idx}
+            onClick={() => onRowClick(d.id)}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-3 pb-4">
+              <CardTitle className="text-sm font-medium pt-0 w-[100%]">
+                <div className="grid gap-4 grid-cols-12">
+                  <div className="col-span-3 text-xl ">
+                    {currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(d.total)
+                      )}
+                  </div>
+                  <div className="col-span-9 text-lg text-muted-foreground text-right">
+                    {timeToDateStr(new Date(d.createdAt).getTime(), true)}
+                  </div>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="w-[100%] pb-3">
+              <div className="grid grid-cols-12">
+                <div className="col-span-3">
+                  <div
+                    style={{
+                      color: positiveNegativeColor(
+                        d.total - data[idx + 1]?.total,
+                        quoteColor
+                      ),
+                    }}
+                  >
+                    {idx < data.length - 1
+                      ? getUpOrDown(d.total - data[idx + 1].total) +
+                        currency.symbol +
+                        prettyNumberToLocaleString(
+                          currencyWrapper(currency)(
+                            Math.abs(d.total - data[idx + 1].total)
+                          )
+                        )
+                      : ""}
+                  </div>
+                </div>
+                <div className="col-span-8">
+                  <ImageStack
+                    imageSrcs={_(d.assets)
+                      .filter((a) => a.value > 0)
+                      .sortBy("value")
+                      .reverse()
+                      .take(7)
+                      .map((a) => logoMap[a.symbol] || UnknownLogo)
+                      .value()}
+                    imageWidth={23}
+                    imageHeight={23}
+                  />
+                </div>
+                <div className="col-span-1">
+                  <div className="hidden group-hover:inline-block float-right">
+                    <a
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onHistoricalDataDeleteClick(d.id);
+                      }}
+                    >
+                      <img
+                        src={DeleteIcon}
+                        alt="delete"
+                        style={{
+                          border: 0,
+                          height: 18,
+                          width: 18,
+                        }}
+                      />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      });
+  }, [
+    data,
+    dataPage,
+    currency,
+    onRowClick,
+    onHistoricalDataDeleteClick,
+    quoteColor,
+    logoMap,
+  ]);
+
+  const renderDetailPage = useCallback(
+    (data: RankData[]) => {
+      return data.map((d, idx) => {
         const apiPath = logoMap[d.symbol];
         return (
           <TableRow key={"historical-data-detail-row-" + idx}>
@@ -451,9 +444,10 @@ const App = ({
             </TableCell>
           </TableRow>
         );
-      })
-      .value();
-  }
+      });
+    },
+    [logoMap, currency, onHistoricalDataDetailDeleteClick]
+  );
 
   return (
     <div>

@@ -14,7 +14,7 @@ import {
   prettyNumberToLocaleString,
   simplifyNumber,
 } from "@/utils/currency";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { loadingWrapper } from "@/lib/loading";
 import {
   queryPNLChartValue,
@@ -23,7 +23,7 @@ import {
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { ChartResizeContext } from "@/App";
-import { positiveNegativeColor } from '@/utils/color'
+import { positiveNegativeColor } from "@/utils/color";
 
 const chartName = "PNL of Asset";
 
@@ -34,7 +34,7 @@ const App = ({
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
-  quoteColor: QuoteColor
+  quoteColor: QuoteColor;
 }) => {
   const [tableLoading, setTableLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
@@ -44,17 +44,20 @@ const App = ({
   const [pnlTableData, setPnlTableData] = useState<PNLTableDate>({});
   const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
 
-  useEffect(() => {
-    loadChartData(dateRange).then(() => {
-      resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
-    });
-    loadTableData();
-  }, [dateRange]);
+  const updateLoading = useCallback(
+    (val: boolean, loadingType: "chart" | "table") => {
+      if (initialLoaded) return;
 
-  useEffect(() => resizeChart(chartName), [needResize]);
+      if (loadingType === "chart") {
+        setChartLoading(val);
+      } else if (loadingType === "table") {
+        setTableLoading(val);
+      }
+    },
+    [initialLoaded]
+  );
 
-  async function loadTableData() {
+  const loadTableData = useCallback(async () => {
     updateLoading(true, "table");
     try {
       const pd = await queryPNLTableValue();
@@ -62,150 +65,158 @@ const App = ({
     } finally {
       updateLoading(false, "table");
     }
-  }
+  }, [updateLoading]);
 
-  async function loadChartData(dr: TDateRange) {
-    updateLoading(true, "chart");
-    try {
-      const pd = await queryPNLChartValue(dr);
-      setPnlChartData(pd);
-    } finally {
-      updateLoading(false, "chart");
-    }
-  }
-
-  function updateLoading(val: boolean, loadingType: "chart" | "table") {
-    if (initialLoaded) {
-      return;
-    }
-
-    if (loadingType === "chart") {
-      setChartLoading(val);
-    } else if (loadingType === "table") {
-      setTableLoading(val);
-    }
-  }
-
-  const options = {
-    maintainAspectRatio: false,
-    responsive: false,
-    hover: {
-      mode: "index",
-      intersect: false,
+  const loadChartData = useCallback(
+    async (dr: TDateRange) => {
+      updateLoading(true, "chart");
+      try {
+        const pd = await queryPNLChartValue(dr);
+        setPnlChartData(pd);
+      } finally {
+        updateLoading(false, "chart");
+      }
     },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: false,
-        // text is set for resizing
-        text: chartName,
+    [updateLoading]
+  );
+
+  useEffect(() => {
+    loadChartData(dateRange).then(() => {
+      resizeChartWithDelay(chartName);
+      setInitialLoaded(true);
+    });
+    loadTableData();
+  }, [dateRange, loadChartData, loadTableData]);
+
+  useEffect(() => resizeChart(chartName), [needResize]);
+
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      responsive: false,
+      hover: {
+        mode: "index",
+        intersect: false,
       },
-      datalabels: {
-        display: false,
+      interaction: {
+        mode: "index",
+        intersect: false,
       },
-      legend: {
-        display: false,
+      plugins: {
+        title: {
+          display: false,
+          // text is set for resizing
+          text: chartName,
+        },
+        datalabels: {
+          display: false,
+        },
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          callbacks: {
+            label: (context: { parsed: { y?: number } }) => {
+              const yv = context.parsed.y;
+              if (!yv) {
+                return "";
+              }
+              const isNegative = yv < 0;
+
+              const v = Math.abs(yv).toLocaleString();
+              return (isNegative ? "-" : "") + currency.symbol + v;
+            },
+          },
+        },
       },
-      tooltip: {
-        callbacks: {
-          label: (context: { parsed: { y?: number } }) => {
-            const yv = context.parsed.y;
-            if (!yv) {
+      scales: {
+        x: {
+          title: {
+            display: false,
+          },
+          ticks: {
+            maxRotation: 0,
+            minRotation: 0,
+            align: "center",
+            autoSkip: false,
+            callback: function (val: number, index: number) {
+              const data = pnlChartData;
+
+              // -1, because we remove first element in labels, but not in pnlData.data
+              const size = data.length - 1;
+              // both add 1, because the first one is the title
+              const start = 0;
+              const end = size - 1;
+              // only show start and end date
+              if (index === start) {
+                return timeToDateStr(data[index + 1].timestamp);
+              }
+
+              if (index === end) {
+                return timeToDateStr(data[index + 1].timestamp);
+              }
+
               return "";
-            }
-            const isNegative = yv < 0;
-
-            const v = Math.abs(yv).toLocaleString();
-            return (isNegative ? "-" : "") + currency.symbol + v;
+            },
+          },
+          grid: {
+            display: false,
+          },
+        },
+        y: {
+          title: {
+            display: false,
+            text: currency.currency,
+          },
+          offset: true,
+          ticks: {
+            precision: 2,
+            maxTicksLimit: 4,
+            callback: (value: any) => {
+              return simplifyNumber(value);
+            },
+          },
+          grid: {
+            display: false,
           },
         },
       },
-    },
-    scales: {
-      x: {
-        title: {
-          display: false,
-        },
-        ticks: {
-          maxRotation: 0,
-          minRotation: 0,
-          align: "center",
-          autoSkip: false,
-          callback: function (val: number, index: number) {
-            const data = pnlChartData;
+    }),
+    [currency.symbol, pnlChartData]
+  );
 
-            // -1, because we remove first element in labels, but not in pnlData.data
-            const size = data.length - 1;
-            // both add 1, because the first one is the title
-            const start = 0;
-            const end = size - 1;
-            // only show start and end date
-            if (index === start) {
-              return timeToDateStr(data[index + 1].timestamp);
-            }
-
-            if (index === end) {
-              return timeToDateStr(data[index + 1].timestamp);
-            }
-
-            return "";
-          },
-        },
-        grid: {
-          display: false,
-        },
-      },
-      y: {
-        title: {
-          display: false,
-          text: currency.currency,
-        },
-        offset: true,
-        ticks: {
-          precision: 2,
-          maxTicksLimit: 4,
-          callback: (value: any) => {
-            return simplifyNumber(value);
-          },
-        },
-        grid: {
-          display: false,
-        },
-      },
-    },
-  };
-
-  function formatPositiveLineData() {
+  const formatPositiveLineData = useCallback(() => {
     return _(pnlChartData)
       .map((x, idx) => x.totalValue - (pnlChartData[idx - 1]?.totalValue || 0))
       .map(currencyWrapper(currency))
       .map((x) => (x < 0 ? undefined : x))
       .drop(1)
       .value();
-  }
-  function formatNegativeLineData() {
+  }, [pnlChartData, currency]);
+
+  const formatNegativeLineData = useCallback(() => {
     return _(pnlChartData)
       .map((x, idx) => x.totalValue - (pnlChartData[idx - 1]?.totalValue || 0))
       .map(currencyWrapper(currency))
       .map((x) => (x >= 0 ? undefined : x))
       .drop(1)
       .value();
-  }
+  }, [pnlChartData, currency]);
 
-  function getLatestTotalValue(): number | undefined {
+  const getLatestTotalValue = useCallback((): number | undefined => {
     return _.last(pnlChartData)?.totalValue;
-  }
+  }, [pnlChartData]);
 
-  function pnlBackgroundColor(val: 'positive' | 'negative'): string {
-    const c = positiveNegativeColor(val === 'positive' ? 1 : -1, quoteColor)
-    return c === 'green' ? '#4caf50' : '#f44336'
-  }
+  const pnlBackgroundColor = useCallback(
+    (val: "positive" | "negative"): string => {
+      const c = positiveNegativeColor(val === "positive" ? 1 : -1, quoteColor);
+      return c === "green" ? "#4caf50" : "#f44336";
+    },
+    [quoteColor]
+  );
 
-  function lineData() {
-    return {
+  const lineData = useCallback(
+    () => ({
       labels: _(pnlChartData)
         // !remove the first element, because it is the comparison of the first and second element
         .tail()
@@ -218,7 +229,7 @@ const App = ({
           data: formatPositiveLineData(),
           stack: "value",
           // borderColor: lineColor,
-          backgroundColor: pnlBackgroundColor('positive'),
+          backgroundColor: pnlBackgroundColor("positive"),
         },
         {
           // !add a blank in label to make the difference between positive and negative, if they are the same, it will cause display issue when rendering the chart
@@ -226,59 +237,74 @@ const App = ({
           data: formatNegativeLineData(),
           stack: "value",
           // borderColor: lineColor,
-          backgroundColor: pnlBackgroundColor('negative')
+          backgroundColor: pnlBackgroundColor("negative"),
         },
       ],
-    };
-  }
+    }),
+    [
+      pnlChartData,
+      formatPositiveLineData,
+      formatNegativeLineData,
+      pnlBackgroundColor,
+    ]
+  );
 
-  function formatPNLValue(val?: number): string {
-    if (!val) {
-      return "-";
-    }
-    const valStr =
-      currency.symbol +
-      prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(val)));
-    if (val > 0) {
-      return "+" + valStr;
-    }
-    return "-" + valStr;
-  }
+  const formatPNLValue = useCallback(
+    (val?: number): string => {
+      if (!val) {
+        return "-";
+      }
+      const valStr =
+        currency.symbol +
+        prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(val)));
+      if (val > 0) {
+        return "+" + valStr;
+      }
+      return "-" + valStr;
+    },
+    [currency]
+  );
 
-  function formatPNLPercentage(val?: number): string {
-    if (val === undefined) {
-      return "-";
-    }
-    const latest = getLatestTotalValue();
-    if (!latest) {
-      return "-";
-    }
+  const formatPNLPercentage = useCallback(
+    (val?: number): string => {
+      if (val === undefined) {
+        return "-";
+      }
+      const latest = getLatestTotalValue();
+      if (!latest) {
+        return "-";
+      }
 
-    let percentage = 0;
+      let percentage = 0;
 
-    if (val === 0) {
-      percentage = 100;
-    } else {
-      percentage = (val / latest) * 100;
-    }
+      if (val === 0) {
+        percentage = 100;
+      } else {
+        percentage = (val / latest) * 100;
+      }
 
-    let percentageStr = percentage.toFixed(2) + "%";
+      let percentageStr = percentage.toFixed(2) + "%";
 
-    if (percentage > 0) {
-      percentageStr = "+" + percentageStr;
-    }
+      if (percentage > 0) {
+        percentageStr = "+" + percentageStr;
+      }
 
-    return percentageStr;
-  }
+      return percentageStr;
+    },
+    [getLatestTotalValue]
+  );
 
-  function formatTimestampData(ts?: number) {
+  const formatTimestampData = useCallback((ts?: number) => {
     return ts ? timeToDateStr(ts) : "";
-  }
+  }, []);
 
-  function getPNLTextColor(val?: number): string {
-    const c = positiveNegativeColor(val ?? 0, quoteColor);
-    return `text-${c}-600`;
-  }
+  const getPNLTextColor = useCallback(
+    (val?: number): string => {
+      const c = positiveNegativeColor(val ?? 0, quoteColor);
+      return `text-${c}-600`;
+    },
+    [quoteColor]
+  );
 
   return (
     <div>

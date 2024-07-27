@@ -8,7 +8,7 @@ import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { getMonthAbbreviation, listAllFirstAndLastDays } from "@/utils/date";
 import bluebird from "bluebird";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { cn } from "@/lib/utils";
 import { positiveNegativeColor } from "@/utils/color";
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 
 type SummaryType = "day" | "month" | "year";
 
@@ -53,6 +54,51 @@ const App = ({
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
 
+  const loadMonthlyProfitsInSelectedYear = useCallback(
+    async (start: Date, end: Date) => {
+      updateLoading(true);
+      try {
+        const dates = listAllFirstAndLastDays(start, end);
+
+        const profits = await bluebird.map(
+          _(dates)
+            .filter((d) => d.firstDay.getFullYear() === selectedYear)
+            .value(),
+          async (date) => {
+            const { total } = await calculateTotalProfit({
+              start: date.firstDay,
+              end: date.lastDay,
+            });
+
+            return { total, monthFirstDate: date.firstDay };
+          }
+        );
+
+        setMonthlyProfits(profits);
+      } finally {
+        updateLoading(false);
+      }
+    },
+    [selectedYear]
+  );
+
+  const loadYearlyProfits = useCallback(async (years: number[]) => {
+    updateLoading(true);
+    try {
+      const profits = await bluebird.map(years, async (year) => {
+        const { total } = await calculateTotalProfit({
+          start: new Date(year, 0, 1),
+          end: new Date(year, 12, 30, 23, 59, 59),
+        });
+
+        return { total, year };
+      });
+      setYearlyProfits(profits);
+    } finally {
+      updateLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (summaryType !== "month") {
       return;
@@ -62,7 +108,7 @@ const App = ({
         setInitialLoaded(true);
       }
     );
-  }, [dateRange, selectedYear, summaryType]);
+  }, [dateRange, selectedYear, summaryType, loadMonthlyProfitsInSelectedYear]);
 
   const availableYears = useMemo(
     () =>
@@ -81,7 +127,7 @@ const App = ({
     loadYearlyProfits(availableYears).then(() => {
       setInitialLoaded(true);
     });
-  }, [availableYears, summaryType]);
+  }, [availableYears, summaryType, loadYearlyProfits]);
 
   const monthlyProfitsMap = useMemo(() => {
     return _(monthlyProfits)
@@ -98,70 +144,31 @@ const App = ({
       .value();
   }, [yearlyProfits]);
 
-  async function loadMonthlyProfitsInSelectedYear(start: Date, end: Date) {
-    updateLoading(true);
-    try {
-      const dates = listAllFirstAndLastDays(start, end);
+  const updateLoading = useCallback(
+    (val: boolean) => {
+      if (initialLoaded) {
+        return;
+      }
+      setSummaryLoading(val);
+      setYearSelectLoading(val);
+    },
+    [initialLoaded]
+  );
 
-      const profits = await bluebird.map(
-        _(dates)
-          .filter((d) => d.firstDay.getFullYear() === selectedYear)
-          .value(),
-        async (date) => {
-          const { total } = await calculateTotalProfit({
-            start: date.firstDay,
-            end: date.lastDay,
-          });
-
-          return { total, monthFirstDate: date.firstDay };
-        }
-      );
-
-      setMonthlyProfits(profits);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  async function loadYearlyProfits(years: number[]) {
-    updateLoading(true);
-    try {
-      const profits = await bluebird.map(years, async (year) => {
-        const { total } = await calculateTotalProfit({
-          start: new Date(year, 0, 1),
-          end: new Date(year, 12, 30, 23, 59, 59),
-        });
-
-        return { total, year };
-      });
-      setYearlyProfits(profits);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    setSummaryLoading(val);
-    if (initialLoaded) {
-      return;
-    }
-    setYearSelectLoading(val);
-  }
-
-  async function onSummaryTypeChange(val: SummaryType) {
+  const onSummaryTypeChange = useCallback(async (val: SummaryType) => {
     setSummaryType(val);
-  }
+  }, []);
 
-  function SummaryTypeSwitch() {
+  const SummaryTypeSwitch = useCallback(() => {
     return (
       <ButtonGroup value={summaryType} onValueChange={onSummaryTypeChange}>
         <ButtonGroupItem value="month">M</ButtonGroupItem>
         <ButtonGroupItem value="year">Y</ButtonGroupItem>
       </ButtonGroup>
     );
-  }
+  }, [summaryType, onSummaryTypeChange]);
 
-  function YearsSelect() {
+  const YearsSelect = useCallback(() => {
     return (
       <Select
         defaultValue={selectedYear + ""}
@@ -186,9 +193,9 @@ const App = ({
         </SelectContent>
       </Select>
     );
-  }
+  }, [selectedYear, availableYears]);
 
-  function MonthlyProfitSummary() {
+  const MonthlyProfitSummary = useCallback(() => {
     return (
       <div className="grid gap-4 md:grid-cols-12 sm:grid-cols-8 grid-cols-4 min-w-[250px]">
         {_.range(0, 12).map((month) => {
@@ -204,44 +211,50 @@ const App = ({
             monthFirstDate: new Date(selectedYear, month, 1),
           };
           return (
-            <div
-              key={"m-profit-summary-" + p.monthFirstDate.getTime()}
-              className={cn(
-                "w-[100px] rounded-lg text-center p-2 col-span-2",
-                `bg-${positiveNegativeColor(p.total, quoteColor)}-100`
-              )}
-            >
-              <div className="text-md text-gray-800 text-center">
-                {getMonthAbbreviation(month + 1)}
-              </div>
-              <div
-                className={cn(
-                  `text-${positiveNegativeColor(
-                    p.total,
-                    quoteColor
-                  )}-700 font-bold`
-                )}
-              >
-                <div>
-                  {(p.total < 0 ? "-" : "+") +
-                    currency.symbol +
-                    simplifyNumber(
-                      currencyWrapper(currency)(Math.abs(p.total))
+            <HoverCard key={"m-profit-summary-" + p.monthFirstDate.getTime()}>
+              <HoverCardTrigger asChild>
+                <div
+                  className={cn(
+                    "w-[100px] rounded-lg text-center p-2 col-span-2 cursor-pointer",
+                    `bg-${positiveNegativeColor(p.total, quoteColor)}-100`
+                  )}
+                >
+                  <div className="text-md text-gray-800 text-center">
+                    {getMonthAbbreviation(month + 1)}
+                  </div>
+                  <div
+                    className={cn(
+                      `text-${positiveNegativeColor(
+                        p.total,
+                        quoteColor
+                      )}-700 font-bold`
                     )}
+                  >
+                    <div>
+                      {(p.total < 0 ? "-" : "+") +
+                        currency.symbol +
+                        simplifyNumber(
+                          currencyWrapper(currency)(Math.abs(p.total))
+                        )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </HoverCardTrigger>
+              <HoverCardContent side="right">
+                <div>TODO</div>
+              </HoverCardContent>
+            </HoverCard>
           );
         })}
       </div>
     );
-  }
+  }, [selectedYear, monthlyProfitsMap, quoteColor, currency]);
 
-  function isMonthlyProfitSummary() {
+  const isMonthlyProfitSummary = useCallback(() => {
     return summaryType === "month";
-  }
+  }, [summaryType]);
 
-  function YearlyProfitSummary() {
+  const YearlyProfitSummary = useCallback(() => {
     return (
       <div className="grid gap-4 md:grid-cols-12 sm:grid-cols-8 grid-cols-4 min-w-[250px]">
         {_(availableYears)
@@ -280,7 +293,7 @@ const App = ({
           .value()}
       </div>
     );
-  }
+  }, [availableYears, yearlyProfitsMap, quoteColor, currency]);
 
   return (
     <Card className="min-h-[280px] min-w-[295px]">

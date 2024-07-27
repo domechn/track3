@@ -1,8 +1,8 @@
+import React, { useContext, useEffect, useRef, useState, useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timeToDateStr } from "@/utils/date";
 import { TDateRange, TopCoinsPercentageChangeData } from "@/middlelayers/types";
-import { useContext, useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
@@ -22,7 +22,6 @@ const chartNameKey = "Change of Top Coins";
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
-
   const { needResize } = useContext(ChartResizeContext);
   const [loading, setLoading] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
@@ -31,6 +30,8 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       timestamps: [],
       coins: [],
     });
+  const getWholeKey = (key: string): string => prefix + _.upperFirst(key);
+  const getLabel = () => _.upperFirst(currentType.replace(prefix, ""));
 
   const [currentType, setCurrentType] = useState(getWholeKey("value")); // ['tcpcValue', 'tcpcPrice']
   const chartRef =
@@ -51,7 +52,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   useEffect(() => resizeChart(chartNameKey), [needResize]);
 
-  async function loadData(dr: TDateRange) {
+  const loadData = async (dr: TDateRange) => {
     updateLoading(true);
     try {
       const tcpcd = await queryTopCoinsPercentageChangeData(dr);
@@ -59,97 +60,95 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     } finally {
       updateLoading(false);
     }
-  }
+  };
 
-  function updateLoading(val: boolean) {
+  const updateLoading = (val: boolean) => {
     if (initialLoaded) {
       return;
     }
     setLoading(val);
-  }
-
-  const options = {
-    maintainAspectRatio: false,
-    responsive: false,
-    hover: {
-      mode: "index",
-      intersect: false,
-    },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: false,
-        text: `Change of Top Coins ${getLabel()} Percentage`,
-      },
-      tooltip: {
-        itemSort: (a: { raw: number }, b: { raw: number }) => {
-          return b.raw - a.raw;
-        },
-      },
-      datalabels: {
-        display: false,
-      },
-      legend: {
-        onClick: (e: any, legendItem: { datasetIndex: number }, legend: any) =>
-          hideOtherLinesClickWrapper(
-            _(topCoinsPercentageChangeData.coins).size(),
-            chartRef.current
-          )(e, legendItem, legend),
-      },
-    },
-    scales: {
-      x: {
-        title: {
-          display: false,
-          text: "Date",
-        },
-      },
-      y: {
-        title: {
-          display: false,
-          text: "Percentage",
-        },
-        offset: true,
-        ticks: {
-          precision: 2,
-          callback: function (value: number) {
-            return value + "%";
-          },
-        },
-        grid: {
-          display: false,
-        },
-      },
-    },
   };
 
-  function getLabel() {
-    return _.upperFirst(currentType.replace(prefix, ""));
-  }
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      responsive: false,
+      hover: {
+        mode: "index",
+        intersect: false,
+      },
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
+      plugins: {
+        title: {
+          display: false,
+          text: `Change of Top Coins ${getLabel()} Percentage`,
+        },
+        tooltip: {
+          itemSort: (a: { raw: number }, b: { raw: number }) => b.raw - a.raw,
+        },
+        datalabels: {
+          display: false,
+        },
+        legend: {
+          onClick: (
+            e: any,
+            legendItem: { datasetIndex: number },
+            legend: any
+          ) =>
+            hideOtherLinesClickWrapper(
+              _(topCoinsPercentageChangeData.coins).size(),
+              chartRef.current
+            )(e, legendItem, legend),
+        },
+      },
+      scales: {
+        x: {
+          title: {
+            display: false,
+            text: "Date",
+          },
+        },
+        y: {
+          title: {
+            display: false,
+            text: "Percentage",
+          },
+          offset: true,
+          ticks: {
+            precision: 2,
+            callback: (value: number) => `${value}%`,
+          },
+          grid: {
+            display: false,
+          },
+        },
+      },
+    }),
+    [topCoinsPercentageChangeData, currentType]
+  );
 
-  function coinPercentageData(
+
+  const coinPercentageData = (
     timestamps: number[],
     coinPercentageData: { value: number; price: number; timestamp: number }[]
-  ) {
+  ) => {
     const coinRankDataMap = new Map<number, number>();
-    coinPercentageData.forEach((percentageData) => {
+    coinPercentageData.forEach(({ timestamp, value, price }) => {
       coinRankDataMap.set(
-        percentageData.timestamp,
-        currentType === getWholeKey("value")
-          ? percentageData.value
-          : percentageData.price
+        timestamp,
+        currentType === getWholeKey("value") ? value : price
       );
     });
     return timestamps.map((date) => coinRankDataMap.get(date) ?? null);
-  }
+  };
 
-  function lineData() {
-    return {
-      labels: topCoinsPercentageChangeData.timestamps.map((x) =>
-        timeToDateStr(x)
+  const lineData = useMemo(
+    () => ({
+      labels: topCoinsPercentageChangeData.timestamps.map((t) =>
+        timeToDateStr(t)
       ),
       datasets: topCoinsPercentageChangeData.coins.map((coin) => ({
         label: coin.coin,
@@ -164,10 +163,11 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         pointRadius: 0.2,
         pointStyle: "rotRect",
       })),
-    };
-  }
+    }),
+    [topCoinsPercentageChangeData, currentType]
+  );
 
-  function onTypeSelectChange(type: string) {
+  const onTypeSelectChange = (type: string) => {
     setCurrentType(type);
 
     const buttons = document.getElementsByClassName("active");
@@ -181,11 +181,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     }
 
     document.getElementById(type)?.classList.add("active");
-  }
-
-  function getWholeKey(key: string): string {
-    return prefix + _(key).upperFirst();
-  }
+  };
 
   return (
     <div>
@@ -214,11 +210,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
           >
             {loadingWrapper(
               loading,
-              <Line
-                ref={chartRef}
-                options={options as any}
-                data={lineData()}
-              />,
+              <Line ref={chartRef} options={options as any} data={lineData} />,
               "mt-4",
               10
             )}

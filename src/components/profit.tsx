@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
   CurrencyRateDetail,
@@ -36,7 +36,6 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const [profit, setProfit] = useState(0);
-  // note: undefined means infinite
   const [profitPercentage, setProfitPercentage] = useState<
     number | undefined
   >();
@@ -53,50 +52,58 @@ const App = ({
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Memoize the callback to prevent unnecessary rerenders
+  const updateLoading = useCallback(
+    (val: boolean) => {
+      if (initialLoaded) {
+        return;
+      }
+      setLoading(val);
+    },
+    [initialLoaded]
+  );
+
+  // Memoize the callback for handling type selection change
+  const onTypeSelectChange = useCallback((val: TopType) => {
+    setTopType(val);
+  }, []);
+
+  // Load data and update state when dateRange changes
   useEffect(() => {
-    updateLoading(true);
-    calculateTotalProfit(dateRange)
-      .then((res) => {
+    const loadData = async () => {
+      updateLoading(true);
+      try {
+        const res = await calculateTotalProfit(dateRange);
         setProfit(res.total);
         setProfitPercentage(res.percentage);
         setCoinsProfit(_(res.coins).sortBy("value").value());
         setInitialLoaded(true);
+        const logoMap = await getLogoMap(res.coins);
+        setLogoMap(logoMap);
+      } finally {
+        updateLoading(false);
+      }
+    };
+    loadData();
+  }, [dateRange, updateLoading]);
 
-        // set logo map
-        getLogoMap(res.coins).then((m) => setLogoMap(m));
-      })
-      .finally(() => updateLoading(false));
-  }, [dateRange]);
-
-  const topTypeData = useMemo(() => {
-    const size = 5;
-
-    return topType === "profitTop"
-      ? _(coinsProfit).takeRight(size).reverse().value()
-      : _(coinsProfit).take(5).value();
-  }, [coinsProfit, topType]);
-
-  async function getLogoMap(d: { symbol: string }[]) {
+  // Memoize the function to get logo map
+  const getLogoMap = useCallback(async (d: { symbol: string }[]) => {
     const acd = await getAppCacheDir();
     const kvs = await bluebird.map(d, async (coin) => {
       const path = await getImageApiPath(acd, coin.symbol);
       return { [coin.symbol]: path };
     });
-
     return _.assign({}, ...kvs);
-  }
+  }, []);
 
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setLoading(val);
-  }
-
-  function onTypeSelectChange(val: TopType) {
-    setTopType(val);
-  }
+  // Memoize the topTypeData to prevent unnecessary calculations
+  const topTypeData = useMemo(() => {
+    const size = 5;
+    return topType === "profitTop"
+      ? _(coinsProfit).takeRight(size).reverse().value()
+      : _(coinsProfit).take(size).value();
+  }, [coinsProfit, topType]);
 
   return (
     <div>
@@ -132,7 +139,7 @@ const App = ({
 
           <ButtonGroup
             defaultValue="profitTop"
-            onValueChange={(val: TopType) => onTypeSelectChange(val)}
+            onValueChange={onTypeSelectChange}
           >
             <ButtonGroupItem value="profitTop">Profit Top</ButtonGroupItem>
             <ButtonGroupItem value="lossTop">Loss Top</ButtonGroupItem>
@@ -141,16 +148,13 @@ const App = ({
           <Table>
             <TableBody>
               {loading
-                ? _(5)
-                    .range()
-                    .map((i) => (
-                      <TableRow key={"coin-profit-row-loading-" + i}>
-                        <TableCell>
-                          <Skeleton className="my-[10px] h-[20px] w-[100%]" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                    .value()
+                ? _.range(5).map((i) => (
+                    <TableRow key={"coin-profit-row-loading-" + i}>
+                      <TableCell>
+                        <Skeleton className="my-[10px] h-[20px] w-[100%]" />
+                      </TableCell>
+                    </TableRow>
+                  ))
                 : topTypeData.map((d) => (
                     <TableRow
                       key={d.symbol}

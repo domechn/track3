@@ -1,4 +1,5 @@
 import _ from "lodash";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   CurrencyRateDetail,
   QuoteColor,
@@ -16,19 +17,100 @@ import {
   Table,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { useEffect, useState } from "react";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
 import { getWalletLogo } from "@/lib/utils";
 import { positiveNegativeColor } from "@/utils/color";
+
+type ArrayElement<ArrayType extends readonly unknown[]> =
+  ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
+
+const WalletRow = memo(
+  ({
+    d,
+    currency,
+    quoteColor,
+  }: {
+    d: ArrayElement<WalletAssetsChangeData>;
+    currency: CurrencyRateDetail;
+    quoteColor: QuoteColor;
+  }) => {
+    const getArrow = useCallback((value: number) => {
+      if (value < 0) {
+        return "↓";
+      } else if (value > 0) {
+        return "↑";
+      }
+      return "";
+    }, []);
+
+    const getChangeClassName = useCallback(
+      (value: number) => positiveNegativeColor(value, quoteColor),
+      [quoteColor]
+    );
+
+    const getPositiveValue = useCallback((value: number) => {
+      if (value < 0) {
+        return -value;
+      }
+      return value;
+    }, []);
+
+    const tweakWalletType = useCallback((walletType: string) => {
+      return <span>{walletType}</span>;
+    }, []);
+
+    return (
+      <TableRow key={d.wallet}>
+        <TableCell className="font-medium">
+          {!d.walletType || d.walletType === "null" ? (
+            <div>Unknown</div>
+          ) : (
+            <div className="flex space-x-1">
+              <img
+                className="h-5 w-5 text-muted-foreground"
+                src={getWalletLogo(d.walletType)}
+              ></img>
+              <div>{tweakWalletType(d.walletType)}</div>
+            </div>
+          )}
+        </TableCell>
+        <TableCell>
+          {d.walletAlias ??
+            insertEllipsis(
+              !d.wallet || d.wallet === "null" ? "Unknown" : d.wallet,
+              32
+            )}
+        </TableCell>
+        <TableCell
+          className={`text-${getChangeClassName(d.changePercentage)}-500`}
+        >
+          {getArrow(d.changePercentage)}
+          {prettyNumberToLocaleString(getPositiveValue(d.changePercentage))}%
+        </TableCell>
+        <TableCell
+          className={`text-right text-${getChangeClassName(
+            d.changePercentage
+          )}-500`}
+        >
+          {getArrow(d.changeValue)}
+          {currency.symbol}
+          {prettyNumberToLocaleString(
+            currencyWrapper(currency)(getPositiveValue(d.changeValue))
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  }
+);
 
 const App = ({
   currency,
   dateRange,
   quoteColor,
 }: {
-  currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
   const [loading, setLoading] = useState(false);
@@ -37,51 +119,30 @@ const App = ({
     useState<WalletAssetsChangeData>([]);
 
   useEffect(() => {
+    const loadData = async () => {
+      updateLoading(true);
+      try {
+        const wac = await WALLET_ANALYZER.queryWalletAssetsChange();
+        setWalletAssetsChange(wac);
+      } finally {
+        updateLoading(false);
+      }
+    };
+
     loadData().then(() => {
       setInitialLoaded(true);
     });
   }, [dateRange]);
 
-  async function loadData() {
-    updateLoading(true);
-    try {
-      const wac = await WALLET_ANALYZER.queryWalletAssetsChange();
-      setWalletAssetsChange(wac);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-    setLoading(val);
-  }
-
-  function getArrow(value: number) {
-    if (value < 0) {
-      return "↓";
-    } else if (value > 0) {
-      return "↑";
-    }
-    return "";
-  }
-
-  function getChangeClassName(value: number) {
-    return positiveNegativeColor(value, quoteColor);
-  }
-
-  function getPositiveValue(value: number) {
-    if (value < 0) {
-      return -value;
-    }
-    return value;
-  }
-
-  function tweakWalletType(walletType: string) {
-    return <span>{walletType}</span>;
-  }
+  const updateLoading = useCallback(
+    (val: boolean) => {
+      if (initialLoaded) {
+        return;
+      }
+      setLoading(val);
+    },
+    [initialLoaded]
+  );
 
   return (
     <div>
@@ -123,54 +184,12 @@ const App = ({
                         ))
                         .value()
                     : walletAssetsChange.map((d) => (
-                        <TableRow key={d.wallet}>
-                          <TableCell className="font-medium">
-                            {!d.walletType || d.walletType === "null" ? (
-                              <div>Unknown</div>
-                            ) : (
-                              <div className="flex space-x-1">
-                                <img
-                                  className="h-5 w-5 text-muted-foreground"
-                                  src={getWalletLogo(d.walletType)}
-                                ></img>
-                                <div>{tweakWalletType(d.walletType)}</div>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {d.walletAlias ??
-                              insertEllipsis(
-                                !d.wallet || d.wallet === "null"
-                                  ? "Unknown"
-                                  : d.wallet,
-                                32
-                              )}
-                          </TableCell>
-                          <TableCell
-                            className={`text-${getChangeClassName(
-                              d.changePercentage
-                            )}-500`}
-                          >
-                            {getArrow(d.changePercentage)}
-                            {prettyNumberToLocaleString(
-                              getPositiveValue(d.changePercentage)
-                            )}
-                            %
-                          </TableCell>
-                          <TableCell
-                            className={`text-right text-${getChangeClassName(
-                              d.changePercentage
-                            )}-500`}
-                          >
-                            {getArrow(d.changeValue)}
-                            {currency.symbol}
-                            {prettyNumberToLocaleString(
-                              currencyWrapper(currency)(
-                                getPositiveValue(d.changeValue)
-                              )
-                            )}
-                          </TableCell>
-                        </TableRow>
+                        <WalletRow
+                          key={d.wallet}
+                          d={d}
+                          currency={currency}
+                          quoteColor={quoteColor}
+                        />
                       ))}
                 </TableBody>
               </Table>

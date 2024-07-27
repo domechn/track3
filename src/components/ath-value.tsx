@@ -6,7 +6,7 @@ import {
   TotalValueData,
 } from "@/middlelayers/types";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { loadingWrapper } from "@/lib/loading";
 import { queryMaxTotalValue, queryTotalValue } from "@/middlelayers/charts";
@@ -14,7 +14,6 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { timeToDateStr } from "@/utils/date";
 import { positiveNegativeColor } from "@/utils/color";
 import { cn } from "@/lib/utils";
-import React from "react";
 
 const App = ({
   dateRange,
@@ -38,33 +37,37 @@ const App = ({
     totalValue: 0,
   });
 
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-    setLoading(val);
-  }
+  const updateLoading = useCallback(
+    (val: boolean) => {
+      if (!initialLoaded) {
+        setLoading(val);
+      }
+    },
+    [initialLoaded]
+  );
+
+  const loadData = useCallback(
+    async (dt: TDateRange) => {
+      updateLoading(true);
+      try {
+        const [mtv, tv] = await Promise.all([
+          queryMaxTotalValue(dt),
+          queryTotalValue(),
+        ]);
+        setMaxTotalValueData(mtv);
+        setTotalValueData(tv);
+      } finally {
+        updateLoading(false);
+      }
+    },
+    [updateLoading]
+  );
 
   useEffect(() => {
     loadData(dateRange).then(() => {
       setInitialLoaded(true);
     });
-  }, [dateRange]);
-
-  async function loadData(dt: TDateRange) {
-    updateLoading(true);
-
-    try {
-      const [mtv, tv] = await Promise.all([
-        queryMaxTotalValue(dt),
-        queryTotalValue(),
-      ]);
-      setMaxTotalValueData(mtv);
-      setTotalValueData(tv);
-    } finally {
-      updateLoading(false);
-    }
-  }
+  }, [dateRange, loadData]);
 
   const percentageFromATH = useMemo(() => {
     if (maxTotalValueData.totalValue === 0) {
@@ -75,17 +78,17 @@ const App = ({
         maxTotalValueData.totalValue) *
       100
     );
-  }, [totalValueData, maxTotalValueData]);
+  }, [totalValueData.totalValue, maxTotalValueData.totalValue]);
 
   const needBreakTotalValueLine = useMemo(
     () =>
       currencyWrapper(currency)(totalValueData.totalValue) >= 10 ** 8 ||
       currencyWrapper(currency)(maxTotalValueData.totalValue) >= 10 ** 8,
-    [currency, totalValueData, maxTotalValueData]
+    [currency, totalValueData.totalValue, maxTotalValueData.totalValue]
   );
 
-  const MaxTotalValueView = React.memo(() => {
-    return (
+  const MaxTotalValueView = useCallback(
+    () => (
       <div
         className={cn(
           "grid gap-2 grid-cols-2",
@@ -133,8 +136,17 @@ const App = ({
           </div>
         </div>
       </div>
-    );
-  });
+    ),
+    [
+      needBreakTotalValueLine,
+      currency,
+      totalValueData.totalValue,
+      maxTotalValueData.totalValue,
+      maxTotalValueData.date,
+      percentageFromATH,
+      quoteColor,
+    ]
+  );
 
   return (
     <Card>

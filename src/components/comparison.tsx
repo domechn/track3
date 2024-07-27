@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import _ from "lodash";
@@ -51,7 +51,6 @@ const App = ({
 }) => {
   const [selectDatesLoading, setSelectDatesLoading] = useState<boolean>(false);
   const [dataLoading, setDataLoading] = useState<boolean>(true);
-
   const [baseId, setBaseId] = useState<string>("");
   const [dateOptions, setDateOptions] = useState<
     {
@@ -59,22 +58,142 @@ const App = ({
       value: string;
     }[]
   >([]);
-
   const [currentQuickCompare, setCurrentQuickCompare] =
     useState<QuickCompareType | null>(null);
-
-  const baseDate = useMemo(() => {
-    return _.find(dateOptions, { value: "" + baseId })?.label;
-  }, [dateOptions, baseId]);
   const [headId, setHeadId] = useState<string>("");
-  const headDate = useMemo(() => {
-    return _.find(dateOptions, { value: "" + headId })?.label;
-  }, [dateOptions, headId]);
-
   const [baseData, setBaseData] = useState<Asset[]>([]);
   const [headData, setHeadData] = useState<Asset[]>([]);
-
   const [shouldMaskValue, setShowDetail] = useState<boolean>(false);
+
+  const baseDate = useMemo(() => {
+    return _.find(dateOptions, { value: baseId })?.label;
+  }, [dateOptions, baseId]);
+  const headDate = useMemo(() => {
+    return _.find(dateOptions, { value: headId })?.label;
+  }, [dateOptions, headId]);
+  const prettyNumber = useCallback(
+    (
+      number: number,
+      type: "price" | "amount" | "value",
+      shouldMask = false,
+      convertCurrency = false
+    ): string => {
+      if (shouldMask) {
+        return "***";
+      }
+      if (!number) {
+        return "-";
+      }
+      let convertedNumber = number;
+      if (convertCurrency) {
+        convertedNumber = currencyWrapper(currency)(number);
+      }
+      let res = "" + convertedNumber;
+      if (type === "price") {
+        res = prettyPriceNumberToLocaleString(convertedNumber);
+      } else if (type === "amount") {
+        res = "" + prettyNumberKeepNDigitsAfterDecimalPoint(convertedNumber, 8);
+      } else if (type === "value") {
+        res = prettyNumberToLocaleString(convertedNumber);
+      }
+      if (convertCurrency) {
+        return `${currency.symbol} ${res}`;
+      }
+      return res;
+    },
+    [currency]
+  );
+
+  const showColumnVal = useCallback(
+    (item: ComparisonData, valType: "base" | "head"): string => {
+      const shouldMask = shouldMaskValue && item.type !== "price";
+      const shouldConvertCurrency =
+        item.type === "price" || item.type === "value";
+      return prettyNumber(
+        _(item).get(valType),
+        item.type,
+        shouldMask,
+        shouldConvertCurrency
+      );
+    },
+    [shouldMaskValue, prettyNumber]
+  );
+
+  const getComparisonResultNumber = useCallback(
+    (base: number, head: number): number => {
+      if (!base || !head) return 0;
+      return ((head - base) / base) * 100;
+    },
+    []
+  );
+
+  const prettyComparisonResult = useCallback(
+    (base: number, head: number): string => {
+      const per = getComparisonResultNumber(base, head);
+      const perStr = prettyNumberToLocaleString(per < 0 ? -per : per);
+
+      if (perStr === "0.00" || perStr === "-0.00") {
+        return "-";
+      }
+
+      if (per > 0) {
+        return "↑ " + perStr + "%";
+      }
+
+      return "↓ " + perStr + "%";
+    },
+    [getComparisonResultNumber]
+  );
+
+  const loadData = useCallback(
+    (base: Asset[], head: Asset[]): ComparisonData[] => {
+      const res: ComparisonData[] = [];
+      const symbols = _([...base, ...head])
+        .map("symbol")
+        .uniq()
+        .value();
+
+      // make total value and amount as the first two items
+      const baseTotal = _(base).sumBy("value");
+      const headTotal = _(head).sumBy("value");
+      if (!_(symbols).isEmpty()) {
+        res.push({
+          name: "Total Value",
+          type: "value",
+          base: baseTotal,
+          head: headTotal,
+        });
+      }
+
+      _(symbols).forEach((symbol) => {
+        const baseItem = _.find(base, { symbol });
+        const headItem = _.find(head, { symbol });
+
+        res.push({
+          name: symbol + " Amount",
+          type: "amount",
+          base: baseItem?.amount || 0,
+          head: headItem?.amount || 0,
+        });
+        res.push({
+          name: symbol + " Price",
+          type: "price",
+          base: baseItem?.price || 0,
+          head: headItem?.price || 0,
+        });
+
+        res.push({
+          name: symbol + " Value",
+          type: "value",
+          base: baseItem?.value || 0,
+          head: headItem?.value || 0,
+        });
+      });
+
+      return res;
+    },
+    []
+  );
 
   const displayData = useMemo(() => {
     return _(loadData(baseData, headData))
@@ -161,29 +280,32 @@ const App = ({
       return;
     }
     setBaseId(closestDate?.value);
-  }, [currentQuickCompare]);
+  }, [currentQuickCompare, dateOptions]);
 
-  function parseDaysQuickCompareType(type: QuickCompareType): number {
-    switch (type) {
-      case "7D":
-        return 7;
-      case "1M":
-        return 30;
-      case "1Q":
-        return 90;
-      case "1Y":
-        return 365;
-      default:
-        return 0;
-    }
-  }
+  const parseDaysQuickCompareType = useCallback(
+    (type: QuickCompareType): number => {
+      switch (type) {
+        case "7D":
+          return 7;
+        case "1M":
+          return 30;
+        case "1Q":
+          return 90;
+        case "1Y":
+          return 365;
+        default:
+          return 0;
+      }
+    },
+    []
+  );
 
-  async function loadAllSelectDates(): Promise<
+  const loadAllSelectDates = useCallback(async (): Promise<
     {
       id: string;
       date: string;
     }[]
-  > {
+  > => {
     setSelectDatesLoading(true);
     try {
       const res = await queryAllDataDates();
@@ -191,77 +313,22 @@ const App = ({
     } finally {
       setSelectDatesLoading(false);
     }
-  }
+  }, []);
 
-  function onBaseSelectChange(id: string) {
-    return onSelectChange(id, "base");
-  }
-
-  function onHeadSelectChange(id: string) {
-    return onSelectChange(id, "head");
-  }
-
-  function onSelectChange(id: string, type: "base" | "head") {
+  const onSelectChange = useCallback((id: string, type: "base" | "head") => {
     setCurrentQuickCompare(null);
     if (type === "base") {
       setBaseId(id);
     } else {
       setHeadId(id);
     }
-  }
+  }, []);
 
-  function onViewOrHideClick() {
-    setShowDetail(!shouldMaskValue);
-  }
+  const onViewOrHideClick = useCallback(() => {
+    setShowDetail((prev) => !prev);
+  }, []);
 
-  function loadData(base: Asset[], head: Asset[]): ComparisonData[] {
-    const res: ComparisonData[] = [];
-    const symbols = _([...base, ...head])
-      .map("symbol")
-      .uniq()
-      .value();
-
-    // make total value and amount as the first two items
-    const baseTotal = _(base).sumBy("value");
-    const headTotal = _(head).sumBy("value");
-    if (!_(symbols).isEmpty()) {
-      res.push({
-        name: "Total Value",
-        type: "value",
-        base: baseTotal,
-        head: headTotal,
-      });
-    }
-
-    _(symbols).forEach((symbol) => {
-      const baseItem = _.find(base, { symbol });
-      const headItem = _.find(head, { symbol });
-
-      res.push({
-        name: symbol + " Amount",
-        type: "amount",
-        base: baseItem?.amount || 0,
-        head: headItem?.amount || 0,
-      });
-      res.push({
-        name: symbol + " Price",
-        type: "price",
-        base: baseItem?.price || 0,
-        head: headItem?.price || 0,
-      });
-
-      res.push({
-        name: symbol + " Value",
-        type: "value",
-        base: baseItem?.value || 0,
-        head: headItem?.value || 0,
-      });
-    });
-
-    return res;
-  }
-
-  async function loadDataByUUID(uuid: string): Promise<Asset[]> {
+  const loadDataByUUID = useCallback(async (uuid: string): Promise<Asset[]> => {
     setDataLoading(true);
     try {
       const data = await queryCoinDataByUUID(uuid);
@@ -273,76 +340,11 @@ const App = ({
     } finally {
       setDataLoading(false);
     }
-  }
+  }, []);
 
-  function getComparisonResultNumber(base: number, head: number): number {
-    if (!base || !head) return 0;
-    return ((head - base) / base) * 100;
-  }
-
-  function prettyComparisonResult(base: number, head: number): string {
-    const per = getComparisonResultNumber(base, head);
-    const perStr = prettyNumberToLocaleString(per < 0 ? -per : per);
-
-    if (perStr === "0.00" || perStr === "-0.00") {
-      return "-";
-    }
-
-    if (per > 0) {
-      return "↑ " + perStr + "%";
-    }
-
-    return "↓ " + perStr + "%";
-  }
-
-  function prettyNumber(
-    number: number,
-    type: "price" | "amount" | "value",
-    shouldMask = false,
-    convertCurrency = false
-  ): string {
-    if (shouldMask) {
-      return "***";
-    }
-    if (!number) {
-      return "-";
-    }
-    let convertedNumber = number;
-    if (convertCurrency) {
-      convertedNumber = currencyWrapper(currency)(number);
-    }
-    let res = "" + convertedNumber;
-    if (type === "price") {
-      res = prettyPriceNumberToLocaleString(convertedNumber);
-    } else if (type === "amount") {
-      res = "" + prettyNumberKeepNDigitsAfterDecimalPoint(convertedNumber, 8);
-    } else if (type === "value") {
-      res = prettyNumberToLocaleString(convertedNumber);
-    }
-    if (convertCurrency) {
-      return `${currency.symbol} ${res}`;
-    }
-    return res;
-  }
-
-  function showColumnVal(
-    item: ComparisonData,
-    valType: "base" | "head"
-  ): string {
-    const shouldMask = shouldMaskValue && item.type !== "price";
-    const shouldConvertCurrency =
-      item.type === "price" || item.type === "value";
-    return prettyNumber(
-      _(item).get(valType),
-      item.type,
-      shouldMask,
-      shouldConvertCurrency
-    );
-  }
-
-  function onQuickCompareButtonClick(type: QuickCompareType) {
+  const onQuickCompareButtonClick = useCallback((type: QuickCompareType) => {
     setCurrentQuickCompare(type);
-  }
+  }, []);
 
   return (
     <>
@@ -378,7 +380,10 @@ const App = ({
         <div className="col-start-2 col-end-4">
           {loadingWrapper(
             selectDatesLoading,
-            <Select onValueChange={onBaseSelectChange} value={baseId}>
+            <Select
+              onValueChange={(val) => onSelectChange(val, "base")}
+              value={baseId}
+            >
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Base Date" />
               </SelectTrigger>
@@ -399,7 +404,10 @@ const App = ({
         <div className="col-end-7 col-span-2">
           {loadingWrapper(
             selectDatesLoading,
-            <Select onValueChange={onHeadSelectChange} value={headId}>
+            <Select
+              onValueChange={(val) => onSelectChange(val, "head")}
+              value={headId}
+            >
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Head Date" />
               </SelectTrigger>
