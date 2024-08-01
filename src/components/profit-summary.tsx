@@ -222,10 +222,10 @@ const App = ({
       return null;
     }
 
-    // find begin from lastRecordDate
     const lrd = _(monthlyProfits).find(
       (p) =>
         p.lastRecordDate !== undefined &&
+        // FIXME: month starts from 0, currently just ignore
         p.monthFirstDate.getMonth() === clickedMonth - 1
     )?.lastRecordDate;
 

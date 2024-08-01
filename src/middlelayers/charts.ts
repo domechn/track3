@@ -168,8 +168,6 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 	const totalRealSpent = _(coins).sumBy(c => c.realSpentValue)
 
 	const lrd = _(allAssets).flatten().maxBy(a => new Date(a.createdAt).getTime())?.createdAt
-	console.log(dateRange,lrd);
-	
 
 	const resp = {
 		total,
