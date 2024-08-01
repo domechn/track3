@@ -108,7 +108,7 @@ type TotalProfit = {
 }
 
 // calculateTotalProfit gets all profit
-export async function calculateTotalProfit(dateRange: TDateRange): Promise<TotalProfit> {
+export async function calculateTotalProfit(dateRange: TDateRange): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
 	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
 	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
 	const c = cache.getCache<TotalProfit>(key)
@@ -167,10 +167,13 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 	const total = _(coins).sumBy(c => c.value)
 	const totalRealSpent = _(coins).sumBy(c => c.realSpentValue)
 
+	const lrd = _(allAssets).flatten().maxBy(a => new Date(a.createdAt).getTime())?.createdAt
+
 	const resp = {
 		total,
 		percentage: totalRealSpent === 0 ? undefined : total / totalRealSpent * 100,
 		coins,
+		lastRecordDate: lrd ? new Date(lrd) : undefined
 	}
 	cache.setCache(key, resp)
 	return resp

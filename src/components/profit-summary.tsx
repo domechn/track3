@@ -40,6 +40,7 @@ const App = ({
     {
       total: number;
       monthFirstDate: Date;
+      lastRecordDate?: Date;
     }[]
   >([]);
   const [yearlyProfits, setYearlyProfits] = useState<
@@ -84,7 +85,7 @@ const App = ({
 
     loadYearlyProfits(availableYears).then(() => {
       setInitialLoaded(true);
-        // hide pnl chart
+      // hide pnl chart
       setClickedMonth(null);
     });
   }, [availableYears, summaryType]);
@@ -114,12 +115,25 @@ const App = ({
           .filter((d) => d.firstDay.getFullYear() === selectedYear)
           .value(),
         async (date) => {
-          const { total } = await calculateTotalProfit({
+          const { total, lastRecordDate } = await calculateTotalProfit({
             start: date.firstDay,
-            end: date.lastDay,
+            end: new Date(
+              date.lastDay.getFullYear(),
+              date.lastDay.getMonth(),
+              date.lastDay.getDate(),
+              23,
+              59,
+              59
+            ),
           });
 
-          return { total, monthFirstDate: date.firstDay };
+          const lrd = lastRecordDate
+            ? _.isString(lastRecordDate)
+              ? new Date(lastRecordDate)
+              : lastRecordDate
+            : undefined;
+
+          return { total, monthFirstDate: date.firstDay, lastRecordDate: lrd };
         }
       );
 
@@ -208,12 +222,21 @@ const App = ({
       return null;
     }
 
+    const lrd = _(monthlyProfits).find(
+      (p) =>
+        p.lastRecordDate !== undefined &&
+        // FIXME: month starts from 0, currently just ignore
+        p.monthFirstDate.getMonth() === clickedMonth - 1
+    )?.lastRecordDate;
+
     const month = new Date(selectedYear, clickedMonth, 1);
+    const start = lrd || month;
+
     return {
-      start: month,
+      start,
       end: new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59),
     };
-  }, [dateRange, clickedMonth]);
+  }, [dateRange, clickedMonth, monthlyProfits]);
 
   const MonthlyProfitSummary = useCallback(() => {
     return (
