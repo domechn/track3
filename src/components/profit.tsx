@@ -182,7 +182,7 @@ const App = ({
                             )}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {d.value < 0 ? "" : "+"}
+                          {(d.percentage || 0) < 0 ? "" : "+"}
                           {d.percentage === undefined
                             ? "∞"
                             : prettyNumberKeepNDigitsAfterDecimalPoint(
