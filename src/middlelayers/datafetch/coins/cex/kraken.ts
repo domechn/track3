@@ -58,7 +58,7 @@ export class KrakenExchange implements Exchanger {
 
 		const res: { [k: string]: number } = {}
 
-		_(resp.result).forEach((v, k) => {
+		_(resp.result ?? {}).forEach((v, k) => {
 			let symbol = k
 			// SOL.F/xxx.F is in earn
 			if (k.endsWith(".F")) {
