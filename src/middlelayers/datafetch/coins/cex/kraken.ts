@@ -10,7 +10,10 @@ type AccountBalanceResp = {
 	error?: string[]
 
 	result?: {
-		[k: string]: string
+		[k: string]: {
+			balance: string
+			hold_trade: string
+		}
 	}
 }
 
@@ -53,8 +56,22 @@ export class KrakenExchange implements Exchanger {
 			throw new Error(resp.error!.join(","))
 		}
 
-		return _(resp.result ?? {}).mapValues(v => parseFloat(v)).value()
+		const res: { [k: string]: number } = {}
 
+		_(resp.result).forEach((v, k) => {
+			let symbol = k
+			// SOL.F/xxx.F is in earn
+			if (k.endsWith(".F")) {
+				symbol = k.replace(".F", "")
+			}
+
+			const amount = (parseFloat(v.balance) || 0) + (parseFloat(v.hold_trade) || 0)
+
+			if (amount > 0) {
+				res[symbol] = amount
+			}
+		})
+		return res
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
