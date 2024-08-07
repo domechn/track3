@@ -58,11 +58,12 @@ export class KrakenExchange implements Exchanger {
 
 		const res: { [k: string]: number } = {}
 
+		const earnSuffix = ".F"
 		_(resp.result ?? {}).forEach((v, k) => {
 			let symbol = k
 			// SOL.F/xxx.F is in earn
-			if (k.endsWith(".F")) {
-				symbol = k.replace(".F", "")
+			if (k.endsWith(earnSuffix)) {
+				symbol = k.substring(0, k.length - earnSuffix.length)
 			}
 
 			const amount = (parseFloat(v.balance) || 0) + (parseFloat(v.hold_trade) || 0)
