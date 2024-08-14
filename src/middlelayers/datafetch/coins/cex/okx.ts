@@ -75,7 +75,9 @@ export class OkxExchange implements Exchanger {
 		const balance: { [k: string]: number } = merge([sb, ssb, fb])
 		_(esb).forEach((v, k) => {
 			const bv = balance[k] || 0
-			if (bv >= v) {
+
+			// if in funding balance, means it is redeemed, no need to cal in eth balance
+			if (bv >= v || fb[k] !== undefined) {
 				balance[k] = bv - v
 			}
 		})
