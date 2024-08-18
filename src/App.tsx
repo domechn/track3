@@ -17,7 +17,7 @@ function App() {
     <div className="container">
       <Toaster />
       <AutoUpdater />
-      <ThemeProvider defaultTheme="dark" storageKey={themeLocalStorageKey}>
+      <ThemeProvider defaultTheme="light" storageKey={themeLocalStorageKey}>
         <ChartResizeContext.Provider value={{ needResize, setNeedResize }}>
           <IndexApp />
         </ChartResizeContext.Provider>
