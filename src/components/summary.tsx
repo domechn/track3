@@ -39,6 +39,7 @@ const App = ({
         currency={currency}
         dateRange={dateRange}
         quoteColor={quoteColor}
+        showCoinsProfitPercentage={true}
       />
       <div className="mb-2"></div>
     </div>
