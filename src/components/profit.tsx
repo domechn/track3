@@ -29,9 +29,11 @@ type TopType = "profitTop" | "lossTop";
 const App = ({
   currency,
   dateRange,
+  showCoinsProfitPercentage,
   quoteColor,
 }: {
   currency: CurrencyRateDetail;
+  showCoinsProfitPercentage?: boolean;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
@@ -181,16 +183,18 @@ const App = ({
                               currencyWrapper(currency)(Math.abs(d.value))
                             )}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {(d.percentage || 0) < 0 ? "" : "+"}
-                          {d.percentage === undefined
-                            ? "∞"
-                            : prettyNumberKeepNDigitsAfterDecimalPoint(
-                                d.percentage,
-                                2
-                              )}
-                          %
-                        </div>
+                        {showCoinsProfitPercentage && (
+                          <div className="text-xs text-gray-500">
+                            {(d.percentage || 0) < 0 ? "" : "+"}
+                            {d.percentage === undefined
+                              ? "∞"
+                              : prettyNumberKeepNDigitsAfterDecimalPoint(
+                                  d.percentage,
+                                  2
+                                )}
+                            %
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

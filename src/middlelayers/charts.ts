@@ -108,7 +108,8 @@ type TotalProfit = {
 }
 
 // calculateTotalProfit gets all profit
-export async function calculateTotalProfit(dateRange: TDateRange): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
+// showCoinPercentage only true when full load ( dataRange from 0 -> latest ), if not, the coin percentage will not be very accurate
+export async function calculateTotalProfit(dateRange: TDateRange, showCoinPercentage = false): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
 	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
 	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
 	const c = cache.getCache<TotalProfit>(key)
