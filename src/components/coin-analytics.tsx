@@ -157,12 +157,28 @@ const App = ({
     [currency, breakevenPrice, profit]
   );
 
+  const sellPrice = useMemo(() => calculateSellPrice(actions), [actions]);
+  const sellPriceStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellPrice)),
+    [currency, sellPrice]
+  );
+  const sellAmountStr = useMemo(
+    () => prettyAmount(calculateSellAmount(actions)),
+    [actions]
+  );
+
   const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
   const costPriceStr = useMemo(
     () =>
       currency.symbol +
       prettyPriceNumberToLocaleString(currencyWrapper(currency)(costPrice)),
     [currency, costPrice]
+  );
+  const buyAmountStr = useMemo(
+    () => prettyAmount(calculateBuyAmount(actions)),
+    [actions]
   );
   const lastPrice = useMemo(() => lastAsset?.price || 0, [lastAsset]);
   const lastPriceStr = useMemo(
@@ -188,8 +204,12 @@ const App = ({
     [currency, profit]
   );
 
-  const maxPositionStr = useMemo(
-    () => prettyNumberKeepNDigitsAfterDecimalPoint(maxPosition, 8),
+  const positionsStr = useMemo(
+    () => prettyAmount(lastAsset?.amount || 0),
+    [lastAsset]
+  );
+  const maxPositionsStr = useMemo(
+    () => prettyAmount(maxPosition),
     [maxPosition]
   );
 
@@ -202,8 +222,14 @@ const App = ({
       return "-";
     }
     const latestAvgPrice = lastAsset.value / lastAsset.amount;
-    return ((latestAvgPrice - costPrice) / costPrice * 100).toFixed(2);
+    return (((latestAvgPrice - costPrice) / costPrice) * 100).toFixed(2);
   }, [lastAsset, actions]);
+
+  function prettyAmount(amount: number) {
+    return amount >= 1
+      ? prettyNumberKeepNDigitsAfterDecimalPoint(amount, 4)
+      : prettyPriceNumberToLocaleString(amount);
+  }
 
   function getAssetActionIndex(act: AssetAction) {
     return `${act.uuid}-${act.assetID}`;
@@ -245,21 +271,52 @@ const App = ({
   }
 
   function calculateBreakevenValue(acts: AssetAction[]) {
-    return _(acts).sumBy((a) => a.amount * a.price);
+    return _(acts)
+      .filter((a) => a.price > 0)
+      .sumBy((a) => a.amount * a.price);
   }
 
   function calculateCostPrice(acts: AssetAction[]) {
     const totalBuyValue = calculateBuyValue(acts);
-    const totalBuyAmount = _(acts)
-      .filter((a) => a.amount > 0)
-      .sumBy((a) => a.amount);
+    const totalBuyAmount = calculateBuyAmount(acts);
 
     return totalBuyAmount ? totalBuyValue / totalBuyAmount : 0;
+  }
+
+  function calculateBuyAmount(acts: AssetAction[]) {
+    return _(acts)
+      .filter((a) => a.amount > 0)
+      .filter((a) => a.price > 0)
+      .sumBy((a) => a.amount);
+  }
+
+  function calculateSellPrice(acts: AssetAction[]) {
+    const totalSellValue = calculateSellValue(acts);
+    const totalSellAmount = calculateSellAmount(acts);
+
+    return totalSellAmount ? Math.abs(totalSellValue / totalSellAmount) : 0;
+  }
+
+  function calculateSellAmount(acts: AssetAction[]) {
+    return Math.abs(
+      _(acts)
+        .filter((a) => a.amount < 0)
+        .filter((a) => a.price > 0)
+        .sumBy((a) => a.amount)
+    );
   }
 
   function calculateBuyValue(acts: AssetAction[]) {
     return _(acts)
       .filter((a) => a.amount > 0)
+      .filter((a) => a.price > 0)
+      .sumBy((a) => a.amount * a.price);
+  }
+
+  function calculateSellValue(acts: AssetAction[]) {
+    return _(acts)
+      .filter((a) => a.amount < 0)
+      .filter((a) => a.price > 0)
       .sumBy((a) => a.amount * a.price);
   }
 
@@ -508,8 +565,8 @@ const App = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <div className="grid gap-4 grid-cols-4">
-        <div className="col-span-4 md:col-span-1 sm:col-span-2">
+      <div className="grid gap-4 grid-cols-6">
+        <div className="col-span-6 md:col-span-2 sm:col-span-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Symbol</CardTitle>
@@ -596,7 +653,7 @@ const App = ({
             </CardContent>
           </Card>
         </div>
-        <div className="col-span-4 md:col-span-1 sm:col-span-2">
+        <div className="col-span-6 md:col-span-2 sm:col-span-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium overflow-hidden whitespace-nowrap overflow-ellipsis">
@@ -630,7 +687,46 @@ const App = ({
             </CardContent>
           </Card>
         </div>
-        <div className="col-span-4 md:col-span-1 sm:col-span-2">
+        <div className="col-span-6 md:col-span-2 sm:col-span-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Positions</CardTitle>
+              <svg
+              className="h-4 w-4 text-muted-foreground"
+                viewBox="0 0 1024 1024"
+                version="1.1"
+                xmlns="http://www.w3.org/2000/svg"
+                p-id="3273"
+                width="16"
+                height="16"
+              >
+                <path
+                  d="M205.971 159.72c23.856-65.521 103.802-93.332 177.05-66.675L804.79 246.58H836.8c68.04 0 123.2 55.162 123.2 123.204v123.204a33.602 33.602 0 0 1-33.6 33.6c-37.114 0-67.2 30.088-67.2 67.203 0 37.114 30.086 67.202 67.2 67.202 18.557 0 33.6 15.043 33.6 33.6v123.204C960 885.838 904.84 941 836.8 941H187.2C119.16 941 64 885.838 64 817.796V694.593c0-18.558 15.043-33.601 33.6-33.601 37.114 0 67.2-30.088 67.2-67.202 0-37.115-30.086-67.202-67.2-67.202-18.557 0-33.6-15.044-33.6-33.601V369.783c0-63.618 48.216-115.98 110.096-122.52l31.875-87.542z m630 153.291H792.66l-0.067 0.168-0.493-0.179-606.07 0.011c-14.86 0-29.112 5.9-39.62 16.402A55.983 55.983 0 0 0 130 369.01v93.832c58.002 14.918 100.853 67.534 100.853 130.164 0 62.629-42.851 115.245-100.853 130.163v93.832a55.983 55.983 0 0 0 16.41 39.597A56.045 56.045 0 0 0 186.03 873h649.94c14.86 0 29.112-5.9 39.62-16.402A55.983 55.983 0 0 0 892 817.001V723.17c-58.002-14.918-100.853-67.534-100.853-130.163 0-62.63 42.851-115.246 100.853-130.164V369.01a55.983 55.983 0 0 0-16.41-39.597 56.045 56.045 0 0 0-39.62-16.402zM645.4 634c18.557 0 33.6 15.222 33.6 34s-15.043 34-33.6 34H376.6c-18.557 0-33.6-15.222-33.6-34s15.043-34 33.6-34h268.8z m0-157c18.557 0 33.6 15.222 33.6 34s-15.043 34-33.6 34H376.6c-18.557 0-33.6-15.222-33.6-34s15.043-34 33.6-34h268.8zM359.018 156.031c-40.828-14.807-80.807-0.959-90.796 26.392L245 246h362l-247.982-89.969z"
+                  fill="#515151"
+                  p-id="3274"
+                ></path>
+              </svg>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                {loadingWrapper(
+                  loading,
+                  <div>{positionsStr}</div>,
+                  "h-[28px] mb-[4px]"
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex  space-x-1">
+                <div>max positions:</div>
+                {loadingWrapper(
+                  loading,
+                  <div>{maxPositionsStr}</div>,
+                  "h-[16px]"
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="col-span-6 md:col-span-2 sm:col-span-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Profit</CardTitle>
@@ -663,7 +759,7 @@ const App = ({
             </CardContent>
           </Card>
         </div>
-        <div className="col-span-4 md:col-span-1 sm:col-span-2">
+        <div className="col-span-6 md:col-span-2 sm:col-span-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Cost Price</CardTitle>
@@ -689,10 +785,43 @@ const App = ({
                 )}
               </div>
               <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex  space-x-1">
-                <div>max pos:</div>
+                <div>buy amount:</div>
+                {loadingWrapper(loading, <div>{buyAmountStr}</div>, "h-[16px]")}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="col-span-6 md:col-span-2 sm:col-span-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Sell Price</CardTitle>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                className="h-4 w-4 text-muted-foreground"
+              >
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
                 {loadingWrapper(
                   loading,
-                  <div>{maxPositionStr}</div>,
+                  <div>{sellPriceStr}</div>,
+                  "h-[28px] mb-[4px]"
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex  space-x-1">
+                <div>sell amount:</div>
+                {loadingWrapper(
+                  loading,
+                  <div>{sellAmountStr}</div>,
                   "h-[16px]"
                 )}
               </div>
