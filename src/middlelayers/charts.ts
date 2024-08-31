@@ -108,8 +108,7 @@ type TotalProfit = {
 }
 
 // calculateTotalProfit gets all profit
-// showCoinPercentage only true when full load ( dataRange from 0 -> latest ), if not, the coin percentage will not be very accurate
-export async function calculateTotalProfit(dateRange: TDateRange, showCoinPercentage = false): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
+export async function calculateTotalProfit(dateRange: TDateRange): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
 	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
 	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
 	const c = cache.getCache<TotalProfit>(key)
@@ -151,17 +150,25 @@ export async function calculateTotalProfit(dateRange: TDateRange, showCoinPercen
 		if (!d.latest) {
 			return
 		}
-		const latestAvgPrice = d.latest.amount === 0 ? 0 : d.latest.value / d.latest.amount
-		const buyAmount = _(d.actions).filter(a => a.amount > 0).sumBy((a) => a.amount)
-		const costAvgPrice = buyAmount === 0 ? 0 : _(d.actions).filter(a => a.amount > 0).sumBy((a) => a.amount * a.price) / buyAmount
+		const buyAmount = _(d.actions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount)
+		const sellAmount = _(d.actions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount)
+		const cost = _(d.actions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount * a.price)
+		const costAvgPrice = buyAmount === 0 ? 0 : cost / buyAmount
+		const sellAvgPrice = sellAmount === 0 ? 0 : _(d.actions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount * a.price) / sellAmount
 
-		const value = d.latest.value - _(d.actions).sumBy((a) => a.amount * a.price)
+		const lastPrice = d.latest.price
+		const lastAmount = d.latest.amount
+
+		const realizedProfit = sellAmount * (sellAvgPrice - costAvgPrice)
+		const unrealizedProfit = lastAmount * (lastPrice - costAvgPrice)
+
+		const percentage = cost === 0 ? undefined : (realizedProfit + unrealizedProfit) / cost * 100
 
 		return {
 			symbol: d.symbol,
-			value,
-			realSpentValue: costAvgPrice * d.latest.amount,
-			percentage: costAvgPrice === 0 ? undefined : (latestAvgPrice - costAvgPrice) / costAvgPrice * 100,
+			value: realizedProfit + unrealizedProfit,
+			realSpentValue: cost,
+			percentage,
 		}
 	}).compact().value()
 

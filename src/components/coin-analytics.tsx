@@ -214,16 +214,30 @@ const App = ({
   );
 
   const profitRate = useMemo(() => {
-    const costPrice = calculateCostPrice(actions);
-    if (costPrice <= 0) {
-      return "∞";
-    }
-    if (!lastAsset?.amount) {
-      return "-";
-    }
-    const latestAvgPrice = lastAsset.value / lastAsset.amount;
-    return (((latestAvgPrice - costPrice) / costPrice) * 100).toFixed(2);
+    const buyPrice = calculateCostPrice(actions);
+    const buyAmount = calculateBuyAmount(actions);
+
+    const cost = buyPrice * buyAmount;
+
+    return cost
+      ? ((calculateProfit(actions, lastAsset) / cost) * 100).toFixed(2)
+      : 0;
   }, [lastAsset, actions]);
+
+  function calculateProfit(acts: AssetAction[], la?: Asset) {
+    const sellPrice = calculateSellPrice(acts);
+    const sellAmount = calculateSellAmount(acts);
+
+    const buyPrice = calculateCostPrice(acts);
+
+    const lastPrice = la?.price || 0;
+    const lastAmount = la?.amount || 0;
+
+    const realizedProfit = (sellPrice - buyPrice) * sellAmount;
+    const unrealizedProfit = lastAmount * (lastPrice - buyPrice);
+
+    return realizedProfit + unrealizedProfit;
+  }
 
   function prettyAmount(amount: number) {
     return amount >= 1
@@ -294,7 +308,7 @@ const App = ({
     const totalSellValue = calculateSellValue(acts);
     const totalSellAmount = calculateSellAmount(acts);
 
-    return totalSellAmount ? Math.abs(totalSellValue / totalSellAmount) : 0;
+    return totalSellAmount ? totalSellValue / totalSellAmount : 0;
   }
 
   function calculateSellAmount(acts: AssetAction[]) {
@@ -314,14 +328,12 @@ const App = ({
   }
 
   function calculateSellValue(acts: AssetAction[]) {
-    return _(acts)
-      .filter((a) => a.amount < 0)
-      .filter((a) => a.price > 0)
-      .sumBy((a) => a.amount * a.price);
-  }
-
-  function calculateProfit(acts: AssetAction[], la?: Asset) {
-    return la ? la.value - calculateBreakevenValue(acts) : 0;
+    return Math.abs(
+      _(acts)
+        .filter((a) => a.amount < 0)
+        .filter((a) => a.price > 0)
+        .sumBy((a) => a.amount * a.price)
+    );
   }
 
   function onUpdatePriceDialogSaveClick() {
@@ -692,7 +704,7 @@ const App = ({
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Positions</CardTitle>
               <svg
-              className="h-4 w-4 text-muted-foreground"
+                className="h-4 w-4 text-muted-foreground"
                 viewBox="0 0 1024 1024"
                 version="1.1"
                 xmlns="http://www.w3.org/2000/svg"
