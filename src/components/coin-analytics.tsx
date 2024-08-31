@@ -157,6 +157,14 @@ const App = ({
     [currency, breakevenPrice, profit]
   );
 
+  const sellPrice = useMemo(() => calculateSellPrice(actions), [actions]);
+  const sellPriceStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellPrice)),
+    [currency, sellPrice]
+  );
+
   const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
   const costPriceStr = useMemo(
     () =>
@@ -202,7 +210,7 @@ const App = ({
       return "-";
     }
     const latestAvgPrice = lastAsset.value / lastAsset.amount;
-    return ((latestAvgPrice - costPrice) / costPrice * 100).toFixed(2);
+    return (((latestAvgPrice - costPrice) / costPrice) * 100).toFixed(2);
   }, [lastAsset, actions]);
 
   function getAssetActionIndex(act: AssetAction) {
@@ -245,21 +253,42 @@ const App = ({
   }
 
   function calculateBreakevenValue(acts: AssetAction[]) {
-    return _(acts).sumBy((a) => a.amount * a.price);
+    return _(acts)
+      .filter((a) => a.price > 0)
+      .sumBy((a) => a.amount * a.price);
   }
 
   function calculateCostPrice(acts: AssetAction[]) {
     const totalBuyValue = calculateBuyValue(acts);
     const totalBuyAmount = _(acts)
       .filter((a) => a.amount > 0)
+      .filter((a) => a.price > 0)
       .sumBy((a) => a.amount);
 
     return totalBuyAmount ? totalBuyValue / totalBuyAmount : 0;
   }
 
+  function calculateSellPrice(acts: AssetAction[]) {
+    const totalSellValue = calculateSellValue(acts);
+    const totalSellAmount = _(acts)
+      .filter((a) => a.amount < 0)
+      .filter((a) => a.price > 0)
+      .sumBy((a) => a.amount);
+
+    return totalSellAmount ? totalSellValue / totalSellAmount : 0;
+  }
+
   function calculateBuyValue(acts: AssetAction[]) {
     return _(acts)
       .filter((a) => a.amount > 0)
+      .filter((a) => a.price > 0)
+      .sumBy((a) => a.amount * a.price);
+  }
+
+  function calculateSellValue(acts: AssetAction[]) {
+    return _(acts)
+      .filter((a) => a.amount < 0)
+      .filter((a) => a.price > 0)
       .sumBy((a) => a.amount * a.price);
   }
 
@@ -666,7 +695,9 @@ const App = ({
         <div className="col-span-4 md:col-span-1 sm:col-span-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cost Price</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Cost/Sell Price
+              </CardTitle>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -684,7 +715,9 @@ const App = ({
               <div className="text-2xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
                 {loadingWrapper(
                   loading,
-                  <div>{costPriceStr}</div>,
+                  <div>
+                    {costPriceStr} / {sellPriceStr}
+                  </div>,
                   "h-[28px] mb-[4px]"
                 )}
               </div>
