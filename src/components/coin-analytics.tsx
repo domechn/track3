@@ -214,22 +214,13 @@ const App = ({
   );
 
   const profitRate = useMemo(() => {
-    const sellPrice = calculateSellPrice(actions);
-    const sellAmount = calculateSellAmount(actions);
-
     const buyPrice = calculateCostPrice(actions);
     const buyAmount = calculateBuyAmount(actions);
 
-    const lastPrice = lastAsset?.price || 0;
-    const lastAmount = lastAsset?.amount || 0;
-
     const cost = buyPrice * buyAmount;
 
-    const realizedProfit = (sellPrice - buyPrice) * sellAmount;
-    const unrealizedProfit = lastAmount * (lastPrice - buyPrice);
-
     return cost
-      ? (((realizedProfit + unrealizedProfit) / cost) * 100).toFixed(2)
+      ? ((calculateProfit(actions, lastAsset) / cost) * 100).toFixed(2)
       : 0;
   }, [lastAsset, actions]);
 
@@ -337,10 +328,12 @@ const App = ({
   }
 
   function calculateSellValue(acts: AssetAction[]) {
-    return Math.abs(_(acts)
-      .filter((a) => a.amount < 0)
-      .filter((a) => a.price > 0)
-      .sumBy((a) => a.amount * a.price));
+    return Math.abs(
+      _(acts)
+        .filter((a) => a.amount < 0)
+        .filter((a) => a.price > 0)
+        .sumBy((a) => a.amount * a.price)
+    );
   }
 
   function onUpdatePriceDialogSaveClick() {
