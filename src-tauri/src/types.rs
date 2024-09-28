@@ -1,5 +1,3 @@
-use core::str;
-
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
