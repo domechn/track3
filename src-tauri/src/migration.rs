@@ -9,7 +9,7 @@ use tauri::api::version;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 
-use crate::types::{AssetsV1, AssetsV2, Configuration};
+use crate::types::{AssetPrice, AssetsV1, AssetsV2, Configuration, Transaction};
 
 static CLIENT_ID_CONFIGURATION_ID: i32 = 998;
 static VERSION_CONFIGURATION_ID: i32 = 999;
@@ -509,8 +509,7 @@ impl Migration for V3TV4 {
         println!("migrate from v0.3 to v0.4");
         let sqlite_path = get_sqlite_file_path(app_dir);
         let asset_prices =
-            fs::read_to_string(resource_dir.join("migrations/v03t04/asset_prices_up.sql"))
-                .unwrap();
+            fs::read_to_string(resource_dir.join("migrations/v03t04/asset_prices_up.sql")).unwrap();
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
@@ -549,11 +548,14 @@ impl Migration for V4TV5 {
         println!("migrate from v0.4 to v0.5");
         let sqlite_path = get_sqlite_file_path(app_dir);
         let cloud_sync_down =
-            fs::read_to_string(resource_dir.join("migrations/v04t05/cloud_sync_down.sql"))
-                .unwrap();
+            fs::read_to_string(resource_dir.join("migrations/v04t05/cloud_sync_down.sql")).unwrap();
         let assets_v2_uniq_idx_up =
             fs::read_to_string(resource_dir.join("migrations/v04t05/assets_v2_idx_up.sql"))
                 .unwrap();
+        let transactions_up =
+            fs::read_to_string(resource_dir.join("migrations/v04t05/transactions_up.sql")).unwrap();
+
+        // todo: down asset_prices table in the future
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
@@ -561,8 +563,21 @@ impl Migration for V4TV5 {
             let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
             conn.execute(cloud_sync_down.as_str()).await.unwrap();
             conn.execute(assets_v2_uniq_idx_up.as_str()).await.unwrap();
+            conn.execute(transactions_up.as_str()).await.unwrap();
+            
+            // todo: move data from assets and asset_prices to transactions
             conn.close().await.unwrap();
             println!("migrate from v0.4 to v0.5 in tokio spawn done");
         });
+    }
+}
+
+impl V4TV5 {
+    fn move_data_from_assets_and_assets_price_to_transactions(
+        &self,
+        assets: Vec<AssetsV2>,
+        asset_prices: Vec<AssetPrice>,
+    ) -> Vec<Transaction> {
+        return Vec::new();
     }
 }

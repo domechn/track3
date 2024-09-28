@@ -1,3 +1,5 @@
+use core::str;
+
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -82,4 +84,27 @@ pub struct AssetsV2 {
 pub struct Configuration {
     pub id: i32,
     pub data: String,
+}
+
+pub struct AssetPrice {
+    pub id: i32,
+    pub uuid : String,
+    pub assetID : i32,
+    pub symbol : String,
+    pub price : f64,
+    pub assetCreatedAt : String,
+    pub updatedAt : String,
+}
+
+pub struct Transaction {
+    pub id: i32,
+    // "unknown" if not set
+    pub wallet: String,
+    pub symbol: String,
+    pub amount: f64,
+    pub price: f64,
+    // txnType = "buy" or "sell" or "withdraw" or "deposit"
+    pub txnType: String,
+    pub txnCreatedAt: String,
+    pub createdAt: String,
 }
