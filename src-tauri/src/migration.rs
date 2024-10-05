@@ -17,6 +17,7 @@ static VERSION_CONFIGURATION_ID: i32 = 999;
 static CONFIGURATION_TABLE_NAME: &str = "configuration";
 static ASSETS_V2_TABLE_NAME: &str = "assets_v2";
 static ASSET_ACTIONS_TABLE_NAME: &str = "asset_actions";
+static TRANSACTION_TABLE_NAME: &str = "transactions";
 
 pub fn is_first_run(path: &Path) -> bool {
     // check sqlite file exists

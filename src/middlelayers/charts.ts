@@ -16,6 +16,7 @@ import { isProVersion } from './license'
 import { getLocalStorageCacheInstance, getMemoryCacheInstance } from './datafetch/utils/cache'
 import { GlobalConfig, WalletCoin } from './datafetch/types'
 import { CACHE_GROUP_KEYS } from './consts'
+import { TRANSACTION_HANDLER } from './entities/transactions'
 
 const STABLE_COIN = ["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDD", "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "BUSD"]
 // if data length is greater than 100, only take 100 data points
@@ -184,6 +185,78 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 		lastRecordDate: lrd ? new Date(lrd) : undefined
 	}
 	cache.setCache(key, resp)
+	return resp
+}
+
+// calculate total profit from transactions
+export async function calculateTotalProfitV2(dateRange: TDateRange): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
+	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
+	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
+	const c = cache.getCache<TotalProfit>(key)
+	if (c) {
+		// return c
+	}
+
+	const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
+	const allTransactions = await TRANSACTION_HANDLER.listTransactionsByDateRange(dateRange.start, dateRange.end)
+	const groupedTransactions = _(allTransactions).flatten().groupBy("symbol").map((txns, symbol) => {
+		const symbolTxns = _(txns).sortBy('txnCreatedAt').map(txn => {
+			if (txn.txnType !== "buy" && txn.txnType !== "sell") {
+				return
+			}
+
+			return {
+				// assetID: number
+				symbol: txn.symbol,
+				wallet: txn.wallet,
+				amount: txn.txnType === 'sell' ? -txn.amount : txn.amount,
+				price: txn.price,
+			}
+		}).compact().value()
+		return {
+			symbol,
+			latest: _(allAssets).flatten().filter(a => a.symbol === txns[0].symbol).maxBy(a => new Date(a.createdAt).getTime()),
+			actions: symbolTxns
+		}
+	}).value()
+	const coins = _(groupedTransactions).map(d => {
+		if (!d.latest) {
+			return
+		}
+		const buyAmount = _(d.actions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount)
+		const sellAmount = _(d.actions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount)
+		const cost = _(d.actions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount * a.price)
+		const costAvgPrice = buyAmount === 0 ? 0 : cost / buyAmount
+		const sellAvgPrice = sellAmount === 0 ? 0 : _(d.actions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount * a.price) / sellAmount
+
+		const lastPrice = d.latest.price
+		const lastAmount = d.latest.amount
+
+		const realizedProfit = sellAmount * (sellAvgPrice - costAvgPrice)
+		const unrealizedProfit = lastAmount * (lastPrice - costAvgPrice)
+
+		const percentage = cost === 0 ? undefined : (realizedProfit + unrealizedProfit) / cost * 100
+
+		return {
+			symbol: d.symbol,
+			value: realizedProfit + unrealizedProfit,
+			realSpentValue: cost,
+			percentage,
+		}
+	}).compact().value()
+
+	const total = _(coins).sumBy(c => c.value)
+	const totalRealSpent = _(coins).sumBy(c => c.realSpentValue)
+
+	const lrd = _(allAssets).flatten().maxBy(a => new Date(a.createdAt).getTime())?.createdAt
+
+	const resp = {
+		total,
+		percentage: totalRealSpent === 0 ? undefined : total / totalRealSpent * 100,
+		coins,
+		lastRecordDate: lrd ? new Date(lrd) : undefined
+	}
+	// cache.setCache(key, resp)
 	return resp
 }
 
@@ -363,16 +436,6 @@ export function queryAllAssetPrices(): Promise<AssetPriceModel[]> {
 	return ASSET_PRICE_HANDLER.listPrices()
 }
 
-export function queryAssetPricesAfterAssetCreatedAt(createdAt?: number): Promise<AssetPriceModel[]> {
-	const ts = createdAt ? new Date(createdAt).toISOString() : undefined
-	return ASSET_PRICE_HANDLER.listPricesAfterAssetCreatedAt(ts)
-}
-
-export function queryAssetPricesAfterUpdatedAt(updatedAt?: number): Promise<AssetPriceModel[]> {
-	const ts = updatedAt ? new Date(updatedAt).toISOString() : undefined
-	return ASSET_PRICE_HANDLER.listPricesAfterUpdatedAt(ts)
-}
-
 export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | undefined> {
 	const models = await ASSET_HANDLER.listAssetsBySymbol(symbol, 1)
 	return convertAssetModelsToAsset(symbol, models)
@@ -414,12 +477,12 @@ async function deleteAssetByID(id: number): Promise<void> {
 	return ASSET_HANDLER.deleteAssetByID(id)
 }
 
-async function deleteAssetPriceByUUID(uuid: string): Promise<void> {
-	return ASSET_PRICE_HANDLER.deletePricesByUUID(uuid)
+async function deleteTransactionsByUUID(uuid: string): Promise<void> {
+	return TRANSACTION_HANDLER.deleteTransactionsByUUID(uuid)
 }
 
-async function deleteAssetPriceByID(id: number): Promise<void> {
-	return ASSET_PRICE_HANDLER.deletePricesByAssetID(id)
+async function deleteTransactionsByAssetID(id: number): Promise<void> {
+	return TRANSACTION_HANDLER.deleteTransactionsByAssetID(id)
 }
 
 export async function queryTotalValue(): Promise<TotalValueData> {
@@ -725,15 +788,15 @@ export async function queryTotalValues(dateRange: TDateRange): Promise<TotalValu
 // delete batch records by uuid
 export async function deleteHistoricalDataByUUID(uuid: string): Promise<void> {
 	await deleteAssetByUUID(uuid)
-	// !also delete asset price
-	await deleteAssetPriceByUUID(uuid)
+	// !also delete assets related transactions
+	await deleteTransactionsByUUID(uuid)
 }
 
 // delete single record by id
 export async function deleteHistoricalDataDetailById(id: number): Promise<void> {
 	await deleteAssetByID(id)
-	// !also delete asset price
-	await deleteAssetPriceByID(id)
+	// !also delete assets related transactions
+	await deleteTransactionsByAssetID(id)
 }
 
 export async function restoreHistoricalData(data: RestoreHistoricalData): Promise<void> {

@@ -96,7 +96,8 @@ pub struct AssetPrice {
 
 pub struct Transaction {
     pub id: i32,
-    // "unknown" if not set
+    pub uuid: String,
+    pub assetID: i32,
     pub wallet: String,
     pub symbol: String,
     pub amount: f64,
