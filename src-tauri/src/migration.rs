@@ -4,6 +4,7 @@ use std::{
     path::Path,
 };
 
+use indexmap::IndexSet;
 use sqlx::{Connection, Executor, SqliteConnection};
 use tauri::api::version;
 use tokio::runtime::Runtime;
@@ -565,8 +566,37 @@ impl Migration for V4TV5 {
             conn.execute(cloud_sync_down.as_str()).await.unwrap();
             conn.execute(assets_v2_uniq_idx_up.as_str()).await.unwrap();
             conn.execute(transactions_up.as_str()).await.unwrap();
-            
-            // todo: move data from assets and asset_prices to transactions
+
+            let mut tx = conn.begin().await.unwrap();
+            // read all data from assets table and migrate to assets
+            let assets =
+                sqlx::query_as::<_, AssetsV2>("select * from assets_v2 order by createdAt ASC")
+                    .fetch_all(&mut tx)
+                    .await
+                    .unwrap();
+            let asset_prices = sqlx::query_as::<_, AssetPrice>("select * from asset_prices")
+                .fetch_all(&mut tx)
+                .await
+                .unwrap();
+            let transaction_data =
+                self.move_data_from_assets_and_assets_price_to_transactions(assets, asset_prices);
+            // insert transaction data to transaction table
+            for row in transaction_data {
+            sqlx::query(format!("insert into {} (uuid, assetID, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", TRANSACTION_TABLE_NAME).as_str())
+            .bind(row.uuid)
+                .bind(row.assetID)
+                .bind(row.wallet)
+                .bind(row.symbol)
+                .bind(row.amount)
+                .bind(row.price)
+                .bind(row.txnType)
+                .bind(row.txnCreatedAt)
+                .bind(row.createdAt)
+                .execute(&mut tx)
+                .await
+                .unwrap();
+            }
+            tx.commit().await.unwrap();
             conn.close().await.unwrap();
             println!("migrate from v0.4 to v0.5 in tokio spawn done");
         });
@@ -579,6 +609,123 @@ impl V4TV5 {
         assets: Vec<AssetsV2>,
         asset_prices: Vec<AssetPrice>,
     ) -> Vec<Transaction> {
-        return Vec::new();
+        if assets.len() == 0 {
+            return Vec::new();
+        }
+        let mut asset_prices_map = HashMap::<i32, f64>::new();
+        for asset_price in asset_prices {
+            asset_prices_map.insert(asset_price.assetID, asset_price.price);
+        }
+
+        // get all uuids of assets
+        let mut uuids = IndexSet::<String>::new();
+        // sort assets by createdAt asc
+        for asset in &assets {
+            uuids.insert(asset.uuid.clone());
+        }
+
+        let mut last_grouped_assets = Vec::<AssetsV2>::new();
+        let mut transactions = Vec::<Transaction>::new();
+
+        for uuid in uuids {
+            let grouped_assets = assets
+                .iter()
+                .filter(|asset| asset.uuid == uuid)
+                .cloned()
+                .collect::<Vec<AssetsV2>>();
+            println!("uuid: {}", uuid);
+
+            // calculate transaction by grouped_assets and last_grouped_assets
+            for asset in &grouped_assets {
+                let mut last_asset: Option<&AssetsV2> = None;
+                // find last asset by wallet and symbol
+                for last_grouped_asset in &last_grouped_assets {
+                    if last_grouped_asset.wallet == asset.wallet
+                        && last_grouped_asset.symbol == asset.symbol
+                    {
+                        last_asset = Some(last_grouped_asset);
+                        break;
+                    }
+                }
+
+                let amount: f64;
+                if let Some(last_asset) = last_asset {
+                    amount = asset.amount - last_asset.amount;
+                } else {
+                    amount = asset.amount;
+                }
+                let price = asset_prices_map.get(&asset.id).unwrap_or(&asset.price);
+                if amount == 0.0 && price != &0.0 {
+                    // if asset.symbol == "BTC" {
+                    //     println!("uuid: {}, asset: {:?}", uuid, asset);
+                    // }
+                    continue;
+                }
+                let mut txn_type = "buy";
+                if amount > 0.0 {
+                    if *price == 0.0 {
+                        txn_type = "deposit";
+                    }
+                } else {
+                    if *price != 0.0 {
+                        txn_type = "sell";
+                    } else {
+                        txn_type = "withdraw";
+                    }
+                }
+                let transaction = Transaction {
+                    id: 0,
+                    uuid: uuid.clone(),
+                    assetID: asset.id,
+                    wallet: asset.wallet.clone().unwrap_or("".to_string()),
+                    symbol: asset.symbol.clone(),
+                    amount: amount.abs(),
+                    price: *price,
+                    txnType: txn_type.to_string(),
+                    txnCreatedAt: asset.createdAt.clone(),
+                    createdAt: asset.createdAt.clone(),
+                };
+                transactions.push(transaction);
+            }
+
+            for last_grouped_asset in &last_grouped_assets {
+                let mut found = false;
+                for asset in &grouped_assets {
+                    if last_grouped_asset.wallet == asset.wallet
+                        && last_grouped_asset.symbol == asset.symbol
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if !found {
+                    let price = asset_prices_map
+                        .get(&last_grouped_asset.id)
+                        .unwrap_or(&last_grouped_asset.price);
+                    let mut txn_type = "sell";
+                    if price == &0.0 {
+                        txn_type = "withdraw";
+                    }
+                    let transaction = Transaction {
+                        id: 0,
+                        uuid: uuid.clone(),
+                        assetID: last_grouped_asset.id,
+                        wallet: last_grouped_asset.wallet.clone().unwrap_or("".to_string()),
+                        symbol: last_grouped_asset.symbol.clone(),
+                        amount: last_grouped_asset.amount,
+                        price: *price,
+                        txnType: txn_type.to_string(),
+                        txnCreatedAt: last_grouped_asset.createdAt.clone(),
+                        createdAt: last_grouped_asset.createdAt.clone(),
+                    };
+                    transactions.push(transaction);
+                }
+            }
+
+            last_grouped_assets = grouped_assets.clone();
+        }
+
+        return transactions;
     }
 }

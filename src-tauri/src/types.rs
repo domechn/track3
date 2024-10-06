@@ -64,7 +64,7 @@ pub struct AssetsV1 {
     pub total: Option<f64>,
 }
 
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Clone)]
 pub struct AssetsV2 {
     pub id: i32,
     pub uuid: String,
@@ -84,6 +84,7 @@ pub struct Configuration {
     pub data: String,
 }
 
+#[derive(FromRow, Debug)]
 pub struct AssetPrice {
     pub id: i32,
     pub uuid : String,
@@ -94,6 +95,7 @@ pub struct AssetPrice {
     pub updatedAt : String,
 }
 
+#[derive(FromRow, Debug)]
 pub struct Transaction {
     pub id: i32,
     pub uuid: String,
