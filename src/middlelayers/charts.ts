@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetPriceModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, UserLicenseInfo, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, TransactionModel, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -9,13 +9,13 @@ import { timeToDateStr } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
 import { OthersAnalyzer } from './datafetch/coins/others'
 import { ASSET_HANDLER } from './entities/assets'
-import { ASSET_PRICE_HANDLER } from './entities/asset-prices'
 import { Chart } from 'chart.js'
 import md5 from 'md5'
 import { isProVersion } from './license'
 import { getLocalStorageCacheInstance, getMemoryCacheInstance } from './datafetch/utils/cache'
 import { GlobalConfig, WalletCoin } from './datafetch/types'
 import { CACHE_GROUP_KEYS } from './consts'
+import { TRANSACTION_HANDLER } from './entities/transactions'
 
 const STABLE_COIN = ["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDD", "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "BUSD"]
 // if data length is greater than 100, only take 100 data points
@@ -74,15 +74,16 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 
 // return all asset actions by analyzing all asset models
 export async function loadAllAssetActionsBySymbol(symbol: string): Promise<AssetAction[]> {
-	const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol)
-	const updatedPrices = await ASSET_PRICE_HANDLER.listPricesBySymbol(symbol)
-	const revAssets = _(assets).reverse().value()
+	const transactions = await TRANSACTION_HANDLER.listTransactions(symbol)
+	// const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol)
+	// const updatedPrices = await ASSET_PRICE_HANDLER.listPricesBySymbol(symbol)
+	// const revAssets = _(assets).reverse().value()
 
-	const actions = _.flatMap(revAssets, (as, i) => {
-		const ass = generateAssetActions(as, updatedPrices, assets[i - 1])
-		return ass
-	})
-	return actions
+	// const actions = _.flatMap(revAssets, (as, i) => {
+	// 	const ass = generateAssetActions(as, updatedPrices, assets[i - 1])
+	// 	return ass
+	// })
+	return _(transactions).map(t => transformTransactionModelToAssetAction(t)).value()
 }
 
 // listAllowedSymbols return all symbol names
@@ -107,46 +108,32 @@ type TotalProfit = {
 	}[]
 }
 
-// calculateTotalProfit gets all profit
+// calculate total profit from transactions
 export async function calculateTotalProfit(dateRange: TDateRange): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
 	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
 	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
 	const c = cache.getCache<TotalProfit>(key)
 	if (c) {
-		return c
+		// return c
 	}
-	const symbols = await ASSET_HANDLER.listAllSymbols()
+
 	const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
-	const allUpdatedPrices = await ASSET_PRICE_HANDLER.listPrices()
+	const allTransactions = await TRANSACTION_HANDLER.listTransactionsByDateRange(dateRange.start, dateRange.end)
+	const groupedTransactions = _(allTransactions).flatten().groupBy("symbol").map((txns, symbol) => {
+		const symbolTxns = _(txns).sortBy('txnCreatedAt').map(txn => {
+			if (txn.txnType !== "buy" && txn.txnType !== "sell") {
+				return
+			}
 
-	const symbolData = _(symbols).map(symbol => {
-		const assets = _(allAssets).map(item => {
-			const symbolAss = _(item).filter(i => i.symbol === symbol).value()
-			return symbolAss.length === 0 ? undefined : symbolAss
+			return transformTransactionModelToAssetAction(txn)
 		}).compact().value()
-		if (assets.length === 0) {
-			return
-		}
-		const updatedPrices = _(allUpdatedPrices).filter(a => a.symbol === symbol).value()
-
-		const revAssets = _(assets).reverse().value()
-
-		const actions = _.flatMap(revAssets, (as, i) => {
-			const a = generateAssetActions(as, updatedPrices, assets[i - 1])
-			return a
-		})
-		const latestAsset = assets[assets.length - 1]
-
-		const latest = convertAssetModelsToAsset(symbol, latestAsset ? [latestAsset] : [])
-
 		return {
 			symbol,
-			actions,
-			latest
+			latest: _(allAssets).flatten().filter(a => a.symbol === txns[0].symbol).maxBy(a => new Date(a.createdAt).getTime()),
+			actions: symbolTxns
 		}
-	}).compact().value()
-
-	const coins = _(symbolData).map(d => {
+	}).value()
+	const coins = _(groupedTransactions).map(d => {
 		if (!d.latest) {
 			return
 		}
@@ -183,18 +170,16 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 		coins,
 		lastRecordDate: lrd ? new Date(lrd) : undefined
 	}
-	cache.setCache(key, resp)
+	// cache.setCache(key, resp)
 	return resp
 }
 
-export async function updateAssetPrice(uuid: string, assetID: number, symbol: string, price: number, createdAt: string) {
-	await ASSET_PRICE_HANDLER.createOrUpdate({
-		uuid,
-		assetID,
-		symbol,
-		price,
-		assetCreatedAt: createdAt
-	} as AssetPriceModel)
+export async function updateTransactionPrice(id: number, price: number) {
+	const txnModel = await TRANSACTION_HANDLER.getTransactionByID(id)
+	await TRANSACTION_HANDLER.createOrUpdate({
+		...txnModel,
+		price
+	})
 }
 
 // return dates which has data
@@ -202,70 +187,6 @@ export async function getAvailableDates(): Promise<Date[]> {
 	const dates = await ASSET_HANDLER.getHasDataCreatedAtDates()
 	// return asc sort
 	return _(dates).reverse().value()
-}
-
-function generateAssetActions(cur: AssetModel[], updatedPrices: AssetPriceModel[], pre?: AssetModel[]): AssetAction[] {
-	const getGroupByKey = (p: {
-		uuid: string
-		id: number
-	}) => `${p.uuid}-${p.id}`
-	const up = _(updatedPrices).groupBy(p => getGroupByKey({
-		uuid: p.uuid,
-		id: p.assetID
-	})).value()
-
-	// only value changes > 1 or price is 0
-	const isAmountChanged = (a: number, b: number, price: number) => {
-		return price === 0 || a !== b // || Math.abs(a - b) * price > 1
-	}
-
-	const res: AssetAction[] = []
-
-	_(cur).forEach(c => {
-
-		const p = _(pre).find(p => p.symbol === c.symbol && p.wallet === c.wallet)
-		const price = up[getGroupByKey(c)]?.[0]?.price ?? c.price
-
-		if (!p) {
-			res.push({
-				assetID: c.id,
-				uuid: c.uuid,
-				changedAt: c.createdAt,
-				symbol: c.symbol,
-				amount: c.amount,
-				price,
-				wallet: c.wallet
-			})
-		} else if (isAmountChanged(p.amount, c.amount, price)) {
-			res.push({
-				assetID: c.id,
-				uuid: c.uuid,
-				changedAt: c.createdAt,
-				symbol: c.symbol,
-				amount: c.amount - p.amount,
-				price,
-				wallet: c.wallet
-			})
-		}
-	})
-
-	_(pre).forEach(p => {
-		const c = _(cur).find(c => c.symbol === p.symbol && c.wallet === p.wallet)
-		if (!c) {
-			res.push({
-				assetID: p.id,
-				uuid: p.uuid,
-				changedAt: p.createdAt,
-				symbol: p.symbol,
-				amount: -p.amount,
-				price: up[getGroupByKey(p)]?.[0]?.price ?? p.price,
-				wallet: p.wallet
-			})
-		}
-	})
-
-	// remove changes whose amount is 0
-	return _(res).filter(r => r.amount !== 0).value()
 }
 
 async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalConfig, userProInfo: UserLicenseInfo, addProgress?: AddProgressFunc): Promise<WalletCoinUSD[]> {
@@ -358,19 +279,9 @@ export async function queryAssetMaxAmountBySymbol(symbol: string): Promise<numbe
 	return ASSET_HANDLER.getMaxAmountBySymbol(symbol)
 }
 
-// return all asset prices for all symbols
-export function queryAllAssetPrices(): Promise<AssetPriceModel[]> {
-	return ASSET_PRICE_HANDLER.listPrices()
-}
-
-export function queryAssetPricesAfterAssetCreatedAt(createdAt?: number): Promise<AssetPriceModel[]> {
-	const ts = createdAt ? new Date(createdAt).toISOString() : undefined
-	return ASSET_PRICE_HANDLER.listPricesAfterAssetCreatedAt(ts)
-}
-
-export function queryAssetPricesAfterUpdatedAt(updatedAt?: number): Promise<AssetPriceModel[]> {
-	const ts = updatedAt ? new Date(updatedAt).toISOString() : undefined
-	return ASSET_PRICE_HANDLER.listPricesAfterUpdatedAt(ts)
+// return all transactions for exporting data
+export function queryAllTransactions(): Promise<TransactionModel[]> {
+	return TRANSACTION_HANDLER.listTransactions()
 }
 
 export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | undefined> {
@@ -414,12 +325,12 @@ async function deleteAssetByID(id: number): Promise<void> {
 	return ASSET_HANDLER.deleteAssetByID(id)
 }
 
-async function deleteAssetPriceByUUID(uuid: string): Promise<void> {
-	return ASSET_PRICE_HANDLER.deletePricesByUUID(uuid)
+async function deleteTransactionsByUUID(uuid: string): Promise<void> {
+	return TRANSACTION_HANDLER.deleteTransactionsByUUID(uuid)
 }
 
-async function deleteAssetPriceByID(id: number): Promise<void> {
-	return ASSET_PRICE_HANDLER.deletePricesByAssetID(id)
+async function deleteTransactionsByAssetID(id: number): Promise<void> {
+	return TRANSACTION_HANDLER.deleteTransactionsByAssetID(id)
 }
 
 export async function queryTotalValue(): Promise<TotalValueData> {
@@ -697,19 +608,22 @@ export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRan
 
 // gather: if true, group asset models by same symbol
 export async function queryHistoricalData(size = 30, gather = true): Promise<HistoricalData[]> {
-	const models = gather ? await ASSET_HANDLER.listSymbolGroupedAssets(size) : await ASSET_HANDLER.listAssets(size)
-
+	const assetModels = gather ? await ASSET_HANDLER.listSymbolGroupedAssets(size) : await ASSET_HANDLER.listAssets(size)
+	const uuids = _(assetModels).flatMap(m => _(m).map('uuid').value()).compact().uniq().value()
+	const transactionModels = await TRANSACTION_HANDLER.listTransactionsByUUIDs(uuids)
 
 	const assetsModelsToHistoricalData = (ams: AssetModel[]): HistoricalData => {
+		const uuid = _(ams).first()!.uuid
 		return {
-			id: _(ams).first()!.uuid,
+			id: uuid,
 			createdAt: _(ams).first()!.createdAt,
 			assets: ams,
+			transactions: _(transactionModels).filter(t => t.uuid === uuid).value(),
 			total: _(ams).sumBy('value'),
 		}
 	}
 
-	return _(models).map(m => assetsModelsToHistoricalData(m)).value()
+	return _(assetModels).map(m => assetsModelsToHistoricalData(m)).value()
 }
 
 // return all total values order by timestamp asc
@@ -725,22 +639,23 @@ export async function queryTotalValues(dateRange: TDateRange): Promise<TotalValu
 // delete batch records by uuid
 export async function deleteHistoricalDataByUUID(uuid: string): Promise<void> {
 	await deleteAssetByUUID(uuid)
-	// !also delete asset price
-	await deleteAssetPriceByUUID(uuid)
+	// !also delete assets related transactions
+	await deleteTransactionsByUUID(uuid)
 }
 
 // delete single record by id
 export async function deleteHistoricalDataDetailById(id: number): Promise<void> {
 	await deleteAssetByID(id)
-	// !also delete asset price
-	await deleteAssetPriceByID(id)
+	// !also delete assets related transactions
+	await deleteTransactionsByAssetID(id)
 }
 
 export async function restoreHistoricalData(data: RestoreHistoricalData): Promise<void> {
-	const { assets, prices } = data
+	const { assets, transactions } = data
 
 	await ASSET_HANDLER.saveAssets(assets)
-	await ASSET_PRICE_HANDLER.savePrices(prices)
+	// await ASSET_PRICE_HANDLER.savePrices(prices)
+	await TRANSACTION_HANDLER.saveTransactions(transactions)
 }
 
 export async function queryRestoreHistoricalData(id: string | number): Promise<RestoreHistoricalData> {
@@ -748,11 +663,11 @@ export async function queryRestoreHistoricalData(id: string | number): Promise<R
 	// if id is string => it's asset uuid
 	const isUUID = _(id).isString()
 	const assets = isUUID ? await ASSET_HANDLER.listAssetsByUUIDs([id as string]) : await ASSET_HANDLER.listAssetsByIDs([id as number])
-	const prices = isUUID ? await ASSET_PRICE_HANDLER.listPricesByAssetUUID(id as string) : [await ASSET_PRICE_HANDLER.getPriceByAssetID(id as number)]
+	const transactions = isUUID ? await TRANSACTION_HANDLER.listTransactionsByUUIDs([id as string]) : await TRANSACTION_HANDLER.listTransactionsByAssetID(id as number)
 
 	return {
 		assets,
-		prices: _(prices).compact().value(),
+		transactions,
 	}
 
 }
@@ -801,5 +716,17 @@ export function resizeChart(chartNameKey: string) {
 			Chart.instances[id].resize()
 			break
 		}
+	}
+}
+
+function transformTransactionModelToAssetAction(txn: TransactionModel): AssetAction {
+	return {
+		assetID: txn.assetID,
+		uuid: txn.uuid,
+		symbol: txn.symbol,
+		wallet: txn.wallet,
+		amount: txn.txnType === 'sell' ? -txn.amount : txn.amount,
+		price: txn.price,
+		changedAt: txn.txnCreatedAt
 	}
 }
