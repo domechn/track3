@@ -20,6 +20,18 @@ struct LockedSavingRowItem {
     amount: String,
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct FlexibleSavingResponse {
+    rows: Vec<FlexibleSavingRowItem>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct FlexibleSavingRowItem {
+    asset: String,
+    #[serde(rename = "totalAmount")]
+    total_amount: String,
+}
+
 impl Binance {
     pub fn new(api_key: String, secret_key: String) -> Self {
         Self {
@@ -69,11 +81,30 @@ impl Binance {
                 locked_savings_req.as_str(),
             )
             .await?;
-        print!("{:?}", locked_savings);
-        
+
         locked_savings.rows.iter().for_each(|row| {
             let asset = row.asset.clone();
             let amount = row.amount.parse::<f64>().unwrap_or(0.0);
+            if res.contains_key(&asset) {
+                let val = res.get(&asset).unwrap();
+                res.insert(asset.to_owned(), val + amount);
+            } else {
+                res.insert(asset.to_owned(), amount);
+            }
+        });
+
+        let flexible_savings_req = build_signed_request([("size", "100")], funding.recv_window)?;
+        let flexible_savings: FlexibleSavingResponse = funding
+            .client
+            .get_signed(
+                "/sapi/v1/simple-earn/flexible/position",
+                flexible_savings_req.as_str(),
+            )
+            .await?;
+
+        flexible_savings.rows.iter().for_each(|row| {
+            let asset = row.asset.clone();
+            let amount = row.total_amount.parse::<f64>().unwrap_or(0.0);
             if res.contains_key(&asset) {
                 let val = res.get(&asset).unwrap();
                 res.insert(asset.to_owned(), val + amount);
