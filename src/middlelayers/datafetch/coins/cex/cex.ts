@@ -156,9 +156,9 @@ export function filterCoinsInPortfolio(wallet: string, portfolio: { [k: string]:
 
 function coinSymbolHandler(name: string): string | undefined {
 	const ld = "LD"
-	// LD in binance is for ean
+	// LD in binance is for earn in spot, we can skip it
 	if (name.startsWith(ld) && name.length > ld.length + 1) {
-		return name.substr(ld.length)
+		return
 	}
 	if (name == "BETH" || name == "ETH2") {
 		return "ETH"
