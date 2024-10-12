@@ -70,9 +70,9 @@ export class OkxExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const [sb, ssb, fb, esb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance()], (v) => v)
+		const [sb, ssb, fb, esb, sdb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance(), this.fetchStakingDefiBalance()], (v) => v)
 		const merge = (arrs: { [k: string]: number }[]) => _(arrs).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
-		const balance: { [k: string]: number } = merge([sb, ssb, fb])
+		const balance: { [k: string]: number } = merge([sb, ssb, fb, sdb])
 		_(esb).forEach((v, k) => {
 			const bv = balance[k] || 0
 
@@ -139,6 +139,13 @@ export class OkxExchange implements Exchanger {
 		const resp = await this.fetch<ETHStakingBalanceResp>("GET", path, "")
 
 		return _(resp.data).keyBy("ccy").mapValues("amt").mapValues(v => parseFloat(v)).value()
+	}
+
+	// onchain staking
+	private async fetchStakingDefiBalance(): Promise<{ [k: string]: number }> {
+		const path = "/finance/staking-defi/orders-active"
+		const resp = await this.fetch<{ data: { ccy: string, investData: { amt: string }[] } }>("GET", path, "")
+		return _(resp.data).keyBy("ccy").mapValues("investData").mapValues(v => _(v).map("amt").map(parseFloat).sum()).value()
 	}
 
 	private async fetch<T>(method: HttpVerb, path: string, queryParam: string): Promise<T> {
