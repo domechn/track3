@@ -58,12 +58,16 @@ export class KrakenExchange implements Exchanger {
 
 		const res: { [k: string]: number } = {}
 
-		const earnSuffix = ".F"
+		// .F is flexible earn, .B is locked earn
+		const earnSuffixes = [".F", ".B"]
 		_(resp.result ?? {}).forEach((v, k) => {
 			let symbol = k
 			// SOL.F/xxx.F is in earn
-			if (k.endsWith(earnSuffix)) {
-				symbol = k.substring(0, k.length - earnSuffix.length)
+			for (const earnSuffix of earnSuffixes) {
+				if (k.endsWith(earnSuffix)) {
+					symbol = k.substring(0, k.length - earnSuffix.length)
+					break
+				}
 			}
 
 			const amount = (parseFloat(v.balance) || 0) + (parseFloat(v.hold_trade) || 0)
