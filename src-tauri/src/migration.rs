@@ -604,6 +604,10 @@ impl Migration for V4TV5 {
 }
 
 impl V4TV5 {
+    fn are_floats_equal(a: f64, b: f64, epsilon: f64) -> bool {
+        (a - b).abs() < epsilon
+    }
+
     fn move_data_from_assets_and_assets_price_to_transactions(
         &self,
         assets: Vec<AssetsV2>,
@@ -633,7 +637,6 @@ impl V4TV5 {
                 .filter(|asset| asset.uuid == uuid)
                 .cloned()
                 .collect::<Vec<AssetsV2>>();
-            println!("uuid: {}", uuid);
 
             // calculate transaction by grouped_assets and last_grouped_assets
             for asset in &grouped_assets {
@@ -655,7 +658,7 @@ impl V4TV5 {
                     amount = asset.amount;
                 }
                 let price = asset_prices_map.get(&asset.id).unwrap_or(&asset.price);
-                if amount == 0.0 && price != &0.0 {
+                if amount == 0.0 {
                     // if asset.symbol == "BTC" {
                     //     println!("uuid: {}, asset: {:?}", uuid, asset);
                     // }

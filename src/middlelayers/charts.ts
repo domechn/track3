@@ -117,7 +117,18 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 		// return c
 	}
 
-	const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
+	// const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
+	const latestAssets = await ASSET_HANDLER.listAssetsMaxCreatedAt(dateRange.start, dateRange.end)
+	// group latestAssets by symbol, can sum amount and value
+	const dateRangeAssets = _(latestAssets).groupBy("symbol").map((assets, symbol) => {
+		return {
+			symbol,
+			price: _(assets).first()!.price,
+			amount: _(assets).sumBy("amount"),
+			value: _(assets).sumBy("value"),
+		}
+	}).value()
+
 	const allTransactions = await TRANSACTION_HANDLER.listTransactionsByDateRange(dateRange.start, dateRange.end)
 	const groupedTransactions = _(allTransactions).flatten().groupBy("symbol").map((txns, symbol) => {
 		const symbolTxns = _(txns).sortBy('txnCreatedAt').map(txn => {
@@ -129,7 +140,7 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 		}).compact().value()
 		return {
 			symbol,
-			latest: _(allAssets).flatten().filter(a => a.symbol === txns[0].symbol).maxBy(a => new Date(a.createdAt).getTime()),
+			latest: _(dateRangeAssets).find(a => a.symbol === txns[0].symbol),
 			actions: symbolTxns
 		}
 	}).value()
@@ -144,12 +155,17 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 		const sellAvgPrice = sellAmount === 0 ? 0 : _(d.actions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount * a.price) / sellAmount
 
 		const lastPrice = d.latest.price
+
 		const lastAmount = d.latest.amount
 
 		const realizedProfit = sellAmount * (sellAvgPrice - costAvgPrice)
 		const unrealizedProfit = lastAmount * (lastPrice - costAvgPrice)
 
 		const percentage = cost === 0 ? undefined : (realizedProfit + unrealizedProfit) / cost * 100
+		// if (d.symbol === "BTC") {
+		// 	console.log(`buyAmount: ${buyAmount}, sellAmount: ${sellAmount}, cost: ${cost}, costAvgPrice: ${costAvgPrice}, sellAvgPrice: ${sellAvgPrice}, lastPrice: ${lastPrice}, lastAmount: ${lastAmount}, realizedProfit: ${realizedProfit}, unrealizedProfit: ${unrealizedProfit}, percentage: ${percentage}`)
+
+		// }
 
 		return {
 			symbol: d.symbol,
@@ -162,7 +178,7 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 	const total = _(coins).sumBy(c => c.value)
 	const totalRealSpent = _(coins).sumBy(c => c.realSpentValue)
 
-	const lrd = _(allAssets).flatten().maxBy(a => new Date(a.createdAt).getTime())?.createdAt
+	const lrd = _(latestAssets).maxBy(a => new Date(a.createdAt).getTime())?.createdAt
 
 	const resp = {
 		total,
@@ -725,7 +741,7 @@ function transformTransactionModelToAssetAction(txn: TransactionModel): AssetAct
 		uuid: txn.uuid,
 		symbol: txn.symbol,
 		wallet: txn.wallet,
-		amount: txn.txnType === 'sell' ? -txn.amount : txn.amount,
+		amount: ["sell", "withdraw"].includes(txn.txnType) ? -txn.amount : txn.amount,
 		price: txn.price,
 		changedAt: txn.txnCreatedAt
 	}
