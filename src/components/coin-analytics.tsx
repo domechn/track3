@@ -3,7 +3,7 @@ import {
   loadAllAssetActionsBySymbol,
   queryAssetMaxAmountBySymbol,
   queryLastAssetsBySymbol,
-  updateAssetPrice,
+  updateTransactionPrice,
 } from "@/middlelayers/charts";
 import {
   Asset,
@@ -365,13 +365,23 @@ const App = ({
 
     const usdPrice = updatePriceValue / currency.rate;
 
-    updateAssetPrice(
-      act.uuid,
-      act.assetID,
-      symbol,
-      usdPrice,
-      act.changedAt
-    ).then(() => {
+    // updateAssetPrice(
+    //   act.uuid,
+    //   act.assetID,
+    //   symbol,
+    //   usdPrice,
+    //   act.changedAt
+    // ).then(() => {
+    //   const newActions = [...actions];
+    //   newActions[actIndex].price = usdPrice;
+    //   setActions(newActions);
+    //   setUpdatePriceDialogOpen(false);
+    //   setUpdatePriceIndex("");
+    //   setUpdatePriceValue(-1);
+    // });
+
+    // todo: update to txn
+    updateTransactionPrice(0, usdPrice).then(() => {
       const newActions = [...actions];
       newActions[actIndex].price = usdPrice;
       setActions(newActions);
