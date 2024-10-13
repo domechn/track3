@@ -581,21 +581,21 @@ impl Migration for V4TV5 {
             let transaction_data =
                 self.move_data_from_assets_and_assets_price_to_transactions(assets, asset_prices);
             // insert transaction data to transaction table
-            for row in transaction_data {
-            sqlx::query(format!("insert into {} (uuid, assetID, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", TRANSACTION_TABLE_NAME).as_str())
-            .bind(row.uuid)
-                .bind(row.assetID)
-                .bind(row.wallet)
-                .bind(row.symbol)
-                .bind(row.amount)
-                .bind(row.price)
-                .bind(row.txnType)
-                .bind(row.txnCreatedAt)
-                .bind(row.createdAt)
-                .execute(&mut tx)
-                .await
-                .unwrap();
-            }
+            // for row in transaction_data {
+            // sqlx::query(format!("insert into {} (uuid, assetID, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", TRANSACTION_TABLE_NAME).as_str())
+            // .bind(row.uuid)
+            //     .bind(row.assetID)
+            //     .bind(row.wallet)
+            //     .bind(row.symbol)
+            //     .bind(row.amount)
+            //     .bind(row.price)
+            //     .bind(row.txnType)
+            //     .bind(row.txnCreatedAt)
+            //     .bind(row.createdAt)
+            //     .execute(&mut tx)
+            //     .await
+            //     .unwrap();
+            // }
             tx.commit().await.unwrap();
             conn.close().await.unwrap();
             println!("migrate from v0.4 to v0.5 in tokio spawn done");
@@ -604,10 +604,6 @@ impl Migration for V4TV5 {
 }
 
 impl V4TV5 {
-    fn are_floats_equal(a: f64, b: f64, epsilon: f64) -> bool {
-        (a - b).abs() < epsilon
-    }
-
     fn move_data_from_assets_and_assets_price_to_transactions(
         &self,
         assets: Vec<AssetsV2>,

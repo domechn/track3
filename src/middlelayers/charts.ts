@@ -121,11 +121,28 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 	const latestAssets = await ASSET_HANDLER.listAssetsMaxCreatedAt(dateRange.start, dateRange.end)
 	// group latestAssets by symbol, can sum amount and value
 	const dateRangeAssets = _(latestAssets).groupBy("symbol").map((assets, symbol) => {
+		const allAmount = _(assets).sumBy("amount")
+		const allValue = _(assets).sumBy("value")
 		return {
 			symbol,
-			price: _(assets).first()!.price,
-			amount: _(assets).sumBy("amount"),
-			value: _(assets).sumBy("value"),
+			price: allAmount === 0 ? 0 : allValue / allAmount,
+			amount: allAmount,
+			value: allValue,
+			// all createdAt are same, so just get the first one
+			createdAt: _(assets).first()?.createdAt
+		}
+	}).value()
+	const earliestAssets = await ASSET_HANDLER.listAssetsMinCreatedAt(dateRange.start, dateRange.end)
+	const dateRangeEarliestAssets = _(earliestAssets).groupBy("symbol").map((assets, symbol) => {
+		const allAmount = _(assets).sumBy("amount")
+		const allValue = _(assets).sumBy("value")
+		return {
+			symbol,
+			price: allAmount === 0 ? 0 : allValue / allAmount,
+			amount: allAmount,
+			value: allValue,
+			// all createdAt are same, so just get the first one
+			createdAt: _(assets).first()?.createdAt
 		}
 	}).value()
 
@@ -148,11 +165,20 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 		if (!d.latest) {
 			return
 		}
-		const buyAmount = _(d.actions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount)
-		const sellAmount = _(d.actions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount)
-		const cost = _(d.actions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount * a.price)
+		const beforeBuyAmount = _(dateRangeEarliestAssets).find(a => a.symbol === d.symbol)?.amount ?? 0
+		const beforeCost = _(dateRangeEarliestAssets).find(a => a.symbol === d.symbol)?.value ?? 0
+		const beforeCreatedAt = _(dateRangeEarliestAssets).find(a => a.symbol === d.symbol)?.createdAt
+		const beforeSellAmount = 0
+		const beforeSell = 0
+		// filter out transactions before the first buy
+		const afterActions = _(d.actions).filter(a => beforeCreatedAt === undefined || a.changedAt > beforeCreatedAt).value()
+
+		const buyAmount = _(afterActions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount) + beforeBuyAmount
+		const sellAmount = _(afterActions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount) + beforeSellAmount
+		const cost = _(afterActions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount * a.price) + beforeCost
+		const sell = _(afterActions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount * a.price) + beforeSell
 		const costAvgPrice = buyAmount === 0 ? 0 : cost / buyAmount
-		const sellAvgPrice = sellAmount === 0 ? 0 : _(d.actions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount * a.price) / sellAmount
+		const sellAvgPrice = sellAmount === 0 ? 0 : sell / sellAmount
 
 		const lastPrice = d.latest.price
 
@@ -162,11 +188,6 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 		const unrealizedProfit = lastAmount * (lastPrice - costAvgPrice)
 
 		const percentage = cost === 0 ? undefined : (realizedProfit + unrealizedProfit) / cost * 100
-		// if (d.symbol === "BTC") {
-		// 	console.log(`buyAmount: ${buyAmount}, sellAmount: ${sellAmount}, cost: ${cost}, costAvgPrice: ${costAvgPrice}, sellAvgPrice: ${sellAvgPrice}, lastPrice: ${lastPrice}, lastAmount: ${lastAmount}, realizedProfit: ${realizedProfit}, unrealizedProfit: ${unrealizedProfit}, percentage: ${percentage}`)
-
-		// }
-
 		return {
 			symbol: d.symbol,
 			value: realizedProfit + unrealizedProfit,
