@@ -36,14 +36,16 @@ class AssetHandler implements AssetHandlerImpl {
 		return this.queryAssetsByDateRange(start, end)
 	}
 
-	async listAssetsMaxCreatedAt(start?: Date, end?: Date): Promise<AssetModel[]> {
-		const sql = `SELECT t1.* FROM ${this.assetTableName} t1 JOIN (SELECT uuid, symbol, MAX(createdAt) as maxCreatedAt FROM ${this.assetTableName} WHERE 1=1 ${start ? " AND createdAt >= ?" : ""} ${end ? " AND createdAt <= ?" : ""} GROUP BY symbol) t2 ON t1.symbol = t2.symbol and t1.uuid = t2.uuid`
+	async listAssetsMaxCreatedAt(start?: Date, end?: Date, symbol?: string): Promise<AssetModel[]> {
+		const conditions = `1=1 ${start ? " AND createdAt >= ?" : ""} ${end ? " AND createdAt <= ?" : ""} ${symbol ? ` AND symbol = '${symbol}'` : ""}`
+		const sql = `SELECT t1.* FROM ${this.assetTableName} t1 JOIN (SELECT uuid, symbol, MAX(createdAt) as maxCreatedAt FROM ${this.assetTableName} WHERE ${conditions} GROUP BY symbol) t2 ON t1.symbol = t2.symbol and t1.uuid = t2.uuid`
 		const results = await selectFromDatabaseWithSql<AssetModel>(sql, _([start, end]).compact().map(d => d.toISOString()).value())
 		return results
 	}
 
-	async listAssetsMinCreatedAt(start?: Date, end?: Date): Promise<AssetModel[]> {
-		const sql = `SELECT t1.* FROM ${this.assetTableName} t1 JOIN (SELECT uuid, symbol, MIN(createdAt) as maxCreatedAt FROM ${this.assetTableName} WHERE 1=1 ${start ? " AND createdAt >= ?" : ""} ${end ? " AND createdAt <= ?" : ""} GROUP BY symbol) t2 ON t1.symbol = t2.symbol and t1.uuid = t2.uuid`
+	async listAssetsMinCreatedAt(start?: Date, end?: Date, symbol?: string): Promise<AssetModel[]> {
+		const conditions = `1=1 ${start ? " AND createdAt >= ?" : ""} ${end ? " AND createdAt <= ?" : ""} ${symbol ? ` AND symbol = '${symbol}'` : ""}`
+		const sql = `SELECT t1.* FROM ${this.assetTableName} t1 JOIN (SELECT uuid, symbol, MIN(createdAt) as maxCreatedAt FROM ${this.assetTableName} WHERE ${conditions} GROUP BY symbol) t2 ON t1.symbol = t2.symbol and t1.uuid = t2.uuid`
 		const results = await selectFromDatabaseWithSql<AssetModel>(sql, _([start, end]).compact().map(d => d.toISOString()).value())
 		return results
 	}

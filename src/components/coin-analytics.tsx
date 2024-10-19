@@ -1,4 +1,5 @@
 import {
+  calculateTotalProfit,
   listAllowedSymbols,
   loadAllAssetActionsBySymbol,
   queryAssetMaxAmountBySymbol,
@@ -85,6 +86,16 @@ const App = ({
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
   const [initialLoaded, setInitialLoaded] = useState(false);
 
+  const [buyAmount, setBuyAmount] = useState<number>(0);
+  const [sellAmount, setSellAmount] = useState<number>(0);
+  const [costAvgPrice, setCostAvgPrice] = useState<number>(0);
+  const [sellAvgPrice, setSellAvgPrice] = useState<number>(0);
+
+  const [profit, setProfit] = useState<number>(0);
+  const [profitPercentage, setProfitPercentage] = useState<
+    number | undefined
+  >();
+
   const [updatePriceIndex, setUpdatePriceIndex] = useState("");
   const [updatePriceValue, setUpdatePriceValue] = useState(-1);
   const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
@@ -136,50 +147,42 @@ const App = ({
     });
   }, [actions]);
 
-  const breakevenPrice = useMemo(
-    () => Math.max(0, calculateBreakevenPrice(actions, lastAsset)),
-    [actions, lastAsset]
-  );
-
-  const profit = useMemo(
-    () => calculateProfit(actions, lastAsset),
-    [lastAsset, actions]
-  );
+  const breakevenPrice = useMemo(() => {
+    if (!lastAsset) {
+      return -1;
+    }
+    if (lastAsset.amount === 0) {
+      return profit > 0 ? 0 : -1;
+    }
+    return (lastAsset.price * lastAsset.amount - profit) / lastAsset.amount;
+  }, [profit, lastAsset]);
 
   const breakEvenPriceStr = useMemo(
     () =>
-      breakevenPrice === 0 && profit < 0
+      breakevenPrice < 0
         ? "∞"
         : currency.symbol +
           prettyPriceNumberToLocaleString(
             currencyWrapper(currency)(breakevenPrice)
           ),
-    [currency, breakevenPrice, profit]
+    [currency, breakevenPrice]
   );
 
-  const sellPrice = useMemo(() => calculateSellPrice(actions), [actions]);
   const sellPriceStr = useMemo(
     () =>
       currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellPrice)),
-    [currency, sellPrice]
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellAvgPrice)),
+    [currency, sellAvgPrice]
   );
-  const sellAmountStr = useMemo(
-    () => prettyAmount(calculateSellAmount(actions)),
-    [actions]
-  );
+  const sellAmountStr = useMemo(() => prettyAmount(sellAmount), [sellAmount]);
 
-  const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
   const costPriceStr = useMemo(
     () =>
       currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(costPrice)),
-    [currency, costPrice]
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(costAvgPrice)),
+    [currency, costAvgPrice]
   );
-  const buyAmountStr = useMemo(
-    () => prettyAmount(calculateBuyAmount(actions)),
-    [actions]
-  );
+  const buyAmountStr = useMemo(() => prettyAmount(buyAmount), [buyAmount]);
   const lastPrice = useMemo(() => lastAsset?.price || 0, [lastAsset]);
   const lastPriceStr = useMemo(
     () =>
@@ -213,31 +216,10 @@ const App = ({
     [maxPosition]
   );
 
-  const profitRate = useMemo(() => {
-    const buyPrice = calculateCostPrice(actions);
-    const buyAmount = calculateBuyAmount(actions);
-
-    const cost = buyPrice * buyAmount;
-
-    return cost
-      ? ((calculateProfit(actions, lastAsset) / cost) * 100).toFixed(2)
-      : 0;
-  }, [lastAsset, actions]);
-
-  function calculateProfit(acts: AssetAction[], la?: Asset) {
-    const sellPrice = calculateSellPrice(acts);
-    const sellAmount = calculateSellAmount(acts);
-
-    const buyPrice = calculateCostPrice(acts);
-
-    const lastPrice = la?.price || 0;
-    const lastAmount = la?.amount || 0;
-
-    const realizedProfit = (sellPrice - buyPrice) * sellAmount;
-    const unrealizedProfit = lastAmount * (lastPrice - buyPrice);
-
-    return realizedProfit + unrealizedProfit;
-  }
+  const profitRate = useMemo(
+    () => (profitPercentage ? profitPercentage.toFixed(2) : 0),
+    [profitPercentage]
+  );
 
   function prettyAmount(amount: number) {
     return amount >= 1
@@ -252,9 +234,13 @@ const App = ({
   async function loadSymbolData(s: string) {
     updateLoading(true);
     try {
-      const aa = await loadAllAssetActionsBySymbol(s);
-      setActions(_(aa).sortBy("changedAt").reverse().value());
-
+      const tp = await calculateTotalProfit(
+        {
+          start: new Date(1970, 0, 1),
+          end: new Date(2999, 12, 30, 23, 59, 59),
+        },
+        s
+      );
       const la = await queryLastAssetsBySymbol(s);
       setLastAsset(la);
 
@@ -263,6 +249,19 @@ const App = ({
 
       const lp = await getLogoPath(s);
       setLogo(lp);
+
+      const detail = _(tp.coins).find((c) => c.symbol === s);
+      if (!detail) {
+        return;
+      }
+
+      setBuyAmount(detail.buyAmount);
+      setSellAmount(detail.sellAmount);
+      setCostAvgPrice(detail.costAvgPrice);
+      setSellAvgPrice(detail.sellAvgPrice);
+
+      setProfit(tp.total);
+      setProfitPercentage(tp.percentage);
     } finally {
       updateLoading(false);
     }
@@ -278,62 +277,6 @@ const App = ({
       return;
     }
     setLoading(val);
-  }
-
-  function calculateBreakevenPrice(acts: AssetAction[], la?: Asset) {
-    return la && la.amount ? calculateBreakevenValue(acts) / la.amount : 0;
-  }
-
-  function calculateBreakevenValue(acts: AssetAction[]) {
-    return _(acts)
-      .filter((a) => a.price > 0)
-      .sumBy((a) => a.amount * a.price);
-  }
-
-  function calculateCostPrice(acts: AssetAction[]) {
-    const totalBuyValue = calculateBuyValue(acts);
-    const totalBuyAmount = calculateBuyAmount(acts);
-
-    return totalBuyAmount ? totalBuyValue / totalBuyAmount : 0;
-  }
-
-  function calculateBuyAmount(acts: AssetAction[]) {
-    return _(acts)
-      .filter((a) => a.amount > 0)
-      .filter((a) => a.price > 0)
-      .sumBy((a) => a.amount);
-  }
-
-  function calculateSellPrice(acts: AssetAction[]) {
-    const totalSellValue = calculateSellValue(acts);
-    const totalSellAmount = calculateSellAmount(acts);
-
-    return totalSellAmount ? totalSellValue / totalSellAmount : 0;
-  }
-
-  function calculateSellAmount(acts: AssetAction[]) {
-    return Math.abs(
-      _(acts)
-        .filter((a) => a.amount < 0)
-        .filter((a) => a.price > 0)
-        .sumBy((a) => a.amount)
-    );
-  }
-
-  function calculateBuyValue(acts: AssetAction[]) {
-    return _(acts)
-      .filter((a) => a.amount > 0)
-      .filter((a) => a.price > 0)
-      .sumBy((a) => a.amount * a.price);
-  }
-
-  function calculateSellValue(acts: AssetAction[]) {
-    return Math.abs(
-      _(acts)
-        .filter((a) => a.amount < 0)
-        .filter((a) => a.price > 0)
-        .sumBy((a) => a.amount * a.price)
-    );
   }
 
   function onUpdatePriceDialogSaveClick() {

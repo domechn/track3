@@ -40,8 +40,8 @@ class TransactionHandler implements TransactionHandlerImpl {
 		return selectFromDatabase<TransactionModel>(this.transactionTableName, { assetID })
 	}
 
-	async listTransactionsByDateRange(start: Date, end: Date): Promise<TransactionModel[][]> {
-		return this.queryTransactionsByDateRange(start, end)
+	async listTransactionsByDateRange(start: Date, end: Date, symbol?: string): Promise<TransactionModel[][]> {
+		return this.queryTransactionsByDateRange(start, end, symbol)
 	}
 
 	async deleteTransactionsByUUID(uuid: string) {

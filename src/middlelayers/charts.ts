@@ -105,11 +105,16 @@ type TotalProfit = {
 		// coin profit percentage
 		// if it is undefined, means "∞"
 		percentage?: number
+
+		buyAmount: number,
+		sellAmount: number,
+		costAvgPrice: number,
+		sellAvgPrice: number,
 	}[]
 }
 
 // calculate total profit from transactions
-export async function calculateTotalProfit(dateRange: TDateRange): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
+export async function calculateTotalProfit(dateRange: TDateRange, symbol?: string): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
 	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
 	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
 	const c = cache.getCache<TotalProfit>(key)
@@ -118,7 +123,7 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 	}
 
 	// const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
-	const latestAssets = await ASSET_HANDLER.listAssetsMaxCreatedAt(dateRange.start, dateRange.end)
+	const latestAssets = await ASSET_HANDLER.listAssetsMaxCreatedAt(dateRange.start, dateRange.end, symbol)
 	// group latestAssets by symbol, can sum amount and value
 	const dateRangeAssets = _(latestAssets).groupBy("symbol").map((assets, symbol) => {
 		const allAmount = _(assets).sumBy("amount")
@@ -132,7 +137,7 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 			createdAt: _(assets).first()?.createdAt
 		}
 	}).value()
-	const earliestAssets = await ASSET_HANDLER.listAssetsMinCreatedAt(dateRange.start, dateRange.end)
+	const earliestAssets = await ASSET_HANDLER.listAssetsMinCreatedAt(dateRange.start, dateRange.end, symbol)
 	const dateRangeEarliestAssets = _(earliestAssets).groupBy("symbol").map((assets, symbol) => {
 		const allAmount = _(assets).sumBy("amount")
 		const allValue = _(assets).sumBy("value")
@@ -166,6 +171,7 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 			return
 		}
 		const beforeBuyAmount = _(dateRangeEarliestAssets).find(a => a.symbol === d.symbol)?.amount ?? 0
+
 		const beforeCost = _(dateRangeEarliestAssets).find(a => a.symbol === d.symbol)?.value ?? 0
 		const beforeCreatedAt = _(dateRangeEarliestAssets).find(a => a.symbol === d.symbol)?.createdAt
 		const beforeSellAmount = 0
@@ -192,6 +198,10 @@ export async function calculateTotalProfit(dateRange: TDateRange): Promise<Total
 			symbol: d.symbol,
 			value: realizedProfit + unrealizedProfit,
 			realSpentValue: cost,
+			buyAmount,
+			sellAmount,
+			costAvgPrice,
+			sellAvgPrice,
 			percentage,
 		}
 	}).compact().value()

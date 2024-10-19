@@ -17,7 +17,6 @@ static VERSION_CONFIGURATION_ID: i32 = 999;
 
 static CONFIGURATION_TABLE_NAME: &str = "configuration";
 static ASSETS_V2_TABLE_NAME: &str = "assets_v2";
-static ASSET_ACTIONS_TABLE_NAME: &str = "asset_actions";
 static TRANSACTION_TABLE_NAME: &str = "transactions";
 
 pub fn is_first_run(path: &Path) -> bool {
@@ -581,21 +580,21 @@ impl Migration for V4TV5 {
             let transaction_data =
                 self.move_data_from_assets_and_assets_price_to_transactions(assets, asset_prices);
             // insert transaction data to transaction table
-            // for row in transaction_data {
-            // sqlx::query(format!("insert into {} (uuid, assetID, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", TRANSACTION_TABLE_NAME).as_str())
-            // .bind(row.uuid)
-            //     .bind(row.assetID)
-            //     .bind(row.wallet)
-            //     .bind(row.symbol)
-            //     .bind(row.amount)
-            //     .bind(row.price)
-            //     .bind(row.txnType)
-            //     .bind(row.txnCreatedAt)
-            //     .bind(row.createdAt)
-            //     .execute(&mut tx)
-            //     .await
-            //     .unwrap();
-            // }
+            for row in transaction_data {
+            sqlx::query(format!("insert into {} (uuid, assetID, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", TRANSACTION_TABLE_NAME).as_str())
+            .bind(row.uuid)
+                .bind(row.assetID)
+                .bind(row.wallet)
+                .bind(row.symbol)
+                .bind(row.amount)
+                .bind(row.price)
+                .bind(row.txnType)
+                .bind(row.txnCreatedAt)
+                .bind(row.createdAt)
+                .execute(&mut tx)
+                .await
+                .unwrap();
+            }
             tx.commit().await.unwrap();
             conn.close().await.unwrap();
             println!("migrate from v0.4 to v0.5 in tokio spawn done");
