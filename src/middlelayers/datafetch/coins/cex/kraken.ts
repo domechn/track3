@@ -72,8 +72,9 @@ export class KrakenExchange implements Exchanger {
 
 			const amount = (parseFloat(v.balance) || 0) + (parseFloat(v.hold_trade) || 0)
 
+			let lastValue = res[symbol] || 0
 			if (amount > 0) {
-				res[symbol] = amount
+				res[symbol] = lastValue + amount
 			}
 		})
 		return res
