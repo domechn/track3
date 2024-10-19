@@ -150,6 +150,7 @@ const App = ({
           </div>
           <Button
             className="col-start-4 col-span-1"
+            disabled={selectTimes === 0}
             onClick={handleSubmitClick}
           >
             Submit
