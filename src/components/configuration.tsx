@@ -380,6 +380,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           secret: ex.secret,
           password: ex.type !== "okex" ? undefined : ex.password,
         },
+        active: ex.active,
       }))
       .value();
 
@@ -390,6 +391,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           .map((w) => ({
             alias: w.alias,
             address: w.address,
+            active: w.active,
           }))
           .value(),
       }))
@@ -452,7 +454,11 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               </p>
 
               <div className="flex items-center justify-end mt-2">
-                <Switch id="airplane-mode" checked={ex.active} />
+                <Switch
+                  id="airplane-mode"
+                  checked={ex.active}
+                  onCheckedChange={() => handleActiveExchange(idx)}
+                />
               </div>
             </CardContent>
           </Card>
@@ -501,7 +507,11 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   <span>{w.address}</span>
                 </p>
                 <div className="flex items-center justify-end">
-                  <Switch id="airplane-mode" checked={w.active} />
+                  <Switch
+                    id="airplane-mode"
+                    checked={w.active}
+                    onCheckedChange={() => handleActiveWallet(idx)}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -609,6 +619,21 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     markFormChanged();
   }
 
+  function handleActiveExchange(idx: number) {
+    setExchanges(
+      _.map(exchanges, (ex, i) => {
+        if (i === idx) {
+          return {
+            ...ex,
+            active: !ex.active,
+          };
+        }
+        return ex;
+      })
+    );
+    markFormChanged();
+  }
+
   function handleAddWallet(val: {
     type: string;
     address: string;
@@ -638,6 +663,21 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     setWallets(_.filter(wallets, (_, i) => i !== idx));
 
     // mark form is changed
+    markFormChanged();
+  }
+
+  function handleActiveWallet(idx: number) {
+    setWallets(
+      _.map(wallets, (w, i) => {
+        if (i === idx) {
+          return {
+            ...w,
+            active: !w.active,
+          };
+        }
+        return w;
+      })
+    );
     markFormChanged();
   }
 
