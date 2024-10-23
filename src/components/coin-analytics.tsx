@@ -79,6 +79,112 @@ import {
   SelectValue,
 } from "./ui/select";
 
+interface UpdatePriceDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  updatePriceValue: number;
+  setUpdatePriceValue: (value: number) => void;
+  onSave: () => void;
+  currency: CurrencyRateDetail;
+}
+
+export const UpdatePriceDialog = ({
+  open,
+  onOpenChange,
+  updatePriceValue,
+  setUpdatePriceValue,
+  onSave,
+  currency,
+}: UpdatePriceDialogProps) => {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Update Buy/Sell Price</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <Input
+            type="number"
+            defaultValue={currencyWrapper(currency)(updatePriceValue)}
+            onChange={(e) => {
+              if (!e.target.value || e.target.value === "0.") {
+                return;
+              }
+              if (+e.target.value < 0) {
+                toast({
+                  description: "Invalid price",
+                  variant: "destructive",
+                });
+                return;
+              }
+              setUpdatePriceValue(+e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onSave();
+              }
+            }}
+          />
+        </div>
+        <DialogFooter>
+          <Button type="submit" onClick={onSave}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+interface UpdateTransactionTypeDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  updateTxnTypeValue?: TransactionType;
+  setUpdateTxnTypeValue: (value: TransactionType) => void;
+  onSave: () => void;
+}
+
+export const UpdateTransactionTypeDialog = ({
+  open,
+  onOpenChange,
+  updateTxnTypeValue,
+  setUpdateTxnTypeValue,
+  onSave,
+}: UpdateTransactionTypeDialogProps) => {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[250px]">
+        <DialogHeader>
+          <DialogTitle>Update Txn Type</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <Select
+            onValueChange={(e) => setUpdateTxnTypeValue(e as TransactionType)}
+            value={updateTxnTypeValue}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Transaction Type" />
+            </SelectTrigger>
+            <SelectContent className="overflow-y-auto max-h-[20rem]">
+              <SelectGroup>
+                <SelectItem value="sell">sell</SelectItem>
+                <SelectItem value="buy">buy</SelectItem>
+                <SelectItem value="withdraw">withdraw</SelectItem>
+                <SelectItem value="deposit">deposit</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button type="submit" onClick={onSave}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const App = ({
   currency,
   dateRange,
@@ -546,78 +652,22 @@ const App = ({
 
   return (
     <div className="space-y-4">
-      <Dialog
+      <UpdatePriceDialog
         open={updatePriceDialogOpen}
         onOpenChange={setUpdatePriceDialogOpen}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Update Buy/Sell Price</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <Input
-              type="number"
-              defaultValue={currencyWrapper(currency)(updatePriceValue)}
-              onChange={(e) => {
-                if (!e.target.value || e.target.value === "0.") {
-                  return;
-                }
-                if (+e.target.value < 0) {
-                  toast({
-                    description: "Invalid price",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                setUpdatePriceValue(+e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onUpdatePriceDialogSaveClick();
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button type="submit" onClick={onUpdatePriceDialogSaveClick}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog
+        updatePriceValue={updatePriceValue}
+        setUpdatePriceValue={setUpdatePriceValue}
+        onSave={onUpdatePriceDialogSaveClick}
+        currency={currency}
+      />
+
+      <UpdateTransactionTypeDialog
         open={updateTxnDialogOpen}
         onOpenChange={setUpdateTxnTypeDialogOpen}
-      >
-        <DialogContent className="sm:max-w-[250px]">
-          <DialogHeader>
-            <DialogTitle>Update Txn Type</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <Select
-              onValueChange={(e) => setUpdateTxnTypeValue(e as TransactionType)}
-              value={updateTxnTypeValue}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Transaction Type" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectItem value="sell">sell</SelectItem>
-                  <SelectItem value="buy">buy</SelectItem>
-                  <SelectItem value="withdraw">withdraw</SelectItem>
-                  <SelectItem value="deposit">deposit</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button type="submit" onClick={onUpdateTxnTypeDialogSaveClick}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        updateTxnTypeValue={updateTxnTypeValue}
+        setUpdateTxnTypeValue={setUpdateTxnTypeValue}
+        onSave={onUpdateTxnTypeDialogSaveClick}
+      />
       <div className="grid gap-4 grid-cols-6">
         <div className="col-span-6 md:col-span-2 sm:col-span-3">
           <Card>
