@@ -10,7 +10,7 @@ import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
-import { AddProgressFunc, AssetModel, UserLicenseInfo } from './types'
+import { AddProgressFunc, UserLicenseInfo } from './types'
 import { ASSET_HANDLER } from './entities/assets'
 import md5 from 'md5'
 import { TRC20ProUserAnalyzer } from './datafetch/coins/trc20'

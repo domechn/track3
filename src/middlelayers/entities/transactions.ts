@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { TransactionModel, UniqueIndexConflictResolver } from '../types'
-import { saveModelsToDatabase, selectFromDatabase, selectFromDatabaseWithSql } from '../database'
+import { deleteFromDatabase, saveModelsToDatabase, selectFromDatabase, selectFromDatabaseWithSql } from '../database'
 
 
 export interface TransactionHandlerImpl {
@@ -45,11 +45,11 @@ class TransactionHandler implements TransactionHandlerImpl {
 	}
 
 	async deleteTransactionsByUUID(uuid: string) {
-		await selectFromDatabase(this.transactionTableName, { uuid })
+		await deleteFromDatabase(this.transactionTableName, { uuid })
 	}
 
 	async deleteTransactionsByAssetID(assetID: number) {
-		await selectFromDatabase(this.transactionTableName, { assetID })
+		await deleteFromDatabase(this.transactionTableName, { assetID })
 	}
 
 	private async queryTransactionsByDateRange(start?: Date, end?: Date, symbol?: string): Promise<TransactionModel[][]> {

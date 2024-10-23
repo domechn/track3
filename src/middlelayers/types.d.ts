@@ -32,6 +32,8 @@ export type AssetPriceModel = {
 	updatedAt: string
 }
 
+export type TransactionType = 'buy' | 'sell' | 'deposit' | 'withdraw'
+
 export type TransactionModel = {
 	id: number
 	// uuid is the same as uuid in assets_v2 table
@@ -42,7 +44,7 @@ export type TransactionModel = {
 	// amount always >= 0
 	amount: number
 	price: number
-	txnType: 'buy' | 'sell' | 'deposit' | 'withdraw'
+	txnType: TransactionType
 	txnCreatedAt: string
 	createdAt: string
 	updatedAt: string
@@ -80,7 +82,7 @@ export type Transaction = {
 	wallet?: string
 	amount: number
 	price: number
-	txnType: 'buy' | 'sell' | 'deposit' | 'withdraw'
+	txnType: TransactionType
 	txnCreatedAt: string
 }
 

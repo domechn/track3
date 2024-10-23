@@ -5,6 +5,7 @@ import {
   queryLastAssetsBySymbol,
   queryTransactionsBySymbolAndDateRange,
   updateTransactionPrice,
+  updateTransactionTxnType,
 } from "@/middlelayers/charts";
 import {
   Asset,
@@ -12,6 +13,7 @@ import {
   CurrencyRateDetail,
   TDateRange,
   Transaction,
+  TransactionType,
 } from "@/middlelayers/types";
 import _ from "lodash";
 import { useEffect, useMemo, useState } from "react";
@@ -67,6 +69,15 @@ import {
   CommandList,
 } from "./ui/command";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 const App = ({
   currency,
@@ -100,6 +111,11 @@ const App = ({
   const [updateTxnId, setUpdateTxnId] = useState<number>(0);
   const [updatePriceValue, setUpdatePriceValue] = useState(-1);
   const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
+
+  const [updateTxnTypeValue, setUpdateTxnTypeValue] = useState<
+    TransactionType | undefined
+  >();
+  const [updateTxnDialogOpen, setUpdateTxnTypeDialogOpen] = useState(false);
 
   const [maxPosition, setMaxPosition] = useState<number>(0);
 
@@ -294,9 +310,7 @@ const App = ({
       });
       return;
     }
-    const txnIndex = _(transactions).findIndex(
-      (act) => act.id === updateTxnId
-    );
+    const txnIndex = _(transactions).findIndex((act) => act.id === updateTxnId);
     if (txnIndex === -1) {
       toast({
         description: "Invalid action",
@@ -315,6 +329,41 @@ const App = ({
       setUpdatePriceDialogOpen(false);
       setUpdateTxnId(0);
       setUpdatePriceValue(-1);
+    });
+  }
+
+  function onUpdateTxnTypeDialogSaveClick() {
+    if (!symbol) {
+      toast({
+        description: "Invalid symbol",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!updateTxnTypeValue) {
+      toast({
+        description: "Invalid txnType",
+        variant: "destructive",
+      });
+      return;
+    }
+    const txnIndex = _(transactions).findIndex((act) => act.id === updateTxnId);
+    if (txnIndex === -1) {
+      toast({
+        description: "Invalid action",
+        variant: "destructive",
+      });
+      return;
+    }
+    const act = transactions[txnIndex];
+
+    updateTransactionTxnType(act.id, updateTxnTypeValue).then(() => {
+      const newTxns = [...transactions];
+      newTxns[txnIndex].txnType = updateTxnTypeValue;
+      setTransactions(newTxns);
+      setUpdateTxnTypeDialogOpen(false);
+      setUpdateTxnId(0);
+      setUpdateTxnTypeValue(undefined);
     });
   }
 
@@ -389,7 +438,7 @@ const App = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Amount</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead className="w-[120px]">Type</TableHead>
                 <TableHead className="w-[300px]">Buy/Sell Price</TableHead>
                 <TableHead>Value</TableHead>
                 <TableHead>Time</TableHead>
@@ -430,7 +479,17 @@ const App = ({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-gray-600">{act.txnType}</div>
+                          <div className="flex space-x-2">
+                            <div className="text-gray-600">{act.txnType}</div>
+                            <Pencil2Icon
+                              className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
+                              onClick={() => {
+                                setUpdateTxnId(act.id);
+                                setUpdateTxnTypeValue(act.txnType);
+                                setUpdateTxnTypeDialogOpen(true);
+                              }}
+                            />
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
@@ -521,6 +580,39 @@ const App = ({
           </div>
           <DialogFooter>
             <Button type="submit" onClick={onUpdatePriceDialogSaveClick}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={updateTxnDialogOpen}
+        onOpenChange={setUpdateTxnTypeDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[250px]">
+          <DialogHeader>
+            <DialogTitle>Update Txn Type</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Select
+              onValueChange={(e) => setUpdateTxnTypeValue(e as TransactionType)}
+              value={updateTxnTypeValue}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Transaction Type" />
+              </SelectTrigger>
+              <SelectContent className="overflow-y-auto max-h-[20rem]">
+                <SelectGroup>
+                  <SelectItem value="sell">sell</SelectItem>
+                  <SelectItem value="buy">buy</SelectItem>
+                  <SelectItem value="withdraw">withdraw</SelectItem>
+                  <SelectItem value="deposit">deposit</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={onUpdateTxnTypeDialogSaveClick}>
               Save
             </Button>
           </DialogFooter>

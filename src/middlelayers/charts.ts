@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, UserLicenseInfo, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, TransactionType, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -85,7 +85,6 @@ function generateTransactions(before: AssetModel[], after: AssetModel[]): Transa
 			txnCreatedAt: la.createdAt,
 		} as TransactionModel
 	}).compact().value()
-	console.log("updated txns", updatedTxns, "removed txns", removedTxns)
 
 	return [...updatedTxns, ...removedTxns]
 }
@@ -193,7 +192,7 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
 	const c = cache.getCache<TotalProfit>(key)
 	if (c) {
-		// return c
+		return c
 	}
 
 	// const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
@@ -291,7 +290,7 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 		coins,
 		lastRecordDate: lrd ? new Date(lrd) : undefined
 	}
-	// cache.setCache(key, resp)
+	cache.setCache(key, resp)
 	return resp
 }
 
@@ -300,6 +299,14 @@ export async function updateTransactionPrice(id: number, price: number) {
 	await TRANSACTION_HANDLER.createOrUpdate({
 		...txnModel,
 		price
+	})
+}
+
+export async function updateTransactionTxnType(id: number, txnType: TransactionType) {
+	const txnModel = await TRANSACTION_HANDLER.getTransactionByID(id)
+	await TRANSACTION_HANDLER.createOrUpdate({
+		...txnModel,
+		txnType
 	})
 }
 
