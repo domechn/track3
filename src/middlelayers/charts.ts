@@ -24,11 +24,70 @@ const DATA_MAX_POINTS = 100
 export const WALLET_ANALYZER = new WalletAnalyzer((size) => ASSET_HANDLER.listAssets(size))
 
 export async function refreshAllData(addProgress: AddProgressFunc) {
+	const lastAssets = _(await ASSET_HANDLER.listAssets(1)).flatten().value()
 	// will add 90 percent in query coins data
 	const coins = await queryCoinsData(addProgress)
 
+	// todo: add db transaction
 	await ASSET_HANDLER.saveCoinsToDatabase(coins)
-	addProgress(10)
+	addProgress(5)
+
+	// calculate transactions and save
+	const newAssets = _(await ASSET_HANDLER.listAssets(1)).flatten().value()
+	await TRANSACTION_HANDLER.saveTransactions(generateTransactions(lastAssets, newAssets))
+	addProgress(5)
+}
+
+function generateTransactions(before: AssetModel[], after: AssetModel[]): TransactionModel[] {
+	const updatedTxns = _(after).map(a => {
+		const l = _(before).find(la => la.symbol === a.symbol && la.wallet === a.wallet)
+		if (!l) {
+			if (a.amount !== 0) {
+				return {
+					uuid: a.uuid,
+					assetID: a.id,
+					wallet: a.wallet,
+					symbol: a.symbol,
+					amount: a.amount,
+					price: a.price,
+					txnType: 'buy',
+					txnCreatedAt: a.createdAt,
+				} as TransactionModel
+			}
+			return
+		}
+		if (a.amount === l.amount) {
+			return
+		}
+		return {
+			uuid: a.uuid,
+			assetID: a.id,
+			wallet: a.wallet,
+			symbol: a.symbol,
+			amount: Math.abs(a.amount - l.amount),
+			price: a.price,
+			txnType: a.amount > l.amount ? 'buy' : 'sell',
+			txnCreatedAt: a.createdAt,
+		} as TransactionModel
+	}).compact().value()
+	const removedTxns = _(before).filter(la => !_(after).find(a => a.symbol === la.symbol && a.wallet === la.wallet)).map(la => {
+		if (la.amount === 0) {
+			return
+		}
+		return {
+			uuid: la.uuid,
+			assetID: la.id,
+			wallet: la.wallet,
+			symbol: la.symbol,
+			amount: la.amount,
+			price: la.price,
+			txnType: 'sell',
+			txnCreatedAt: la.createdAt,
+		} as TransactionModel
+	}).compact().value()
+	console.log("updated txns", updatedTxns, "removed txns", removedTxns)
+
+	return [...updatedTxns, ...removedTxns]
 }
 
 // query the real-time price of the last queried asset
@@ -316,7 +375,7 @@ async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinU
 	// check if pro user
 	const userProInfo = await isProVersion()
 	addProgress(2)
-	// will add 70 percent in load portfolios
+	// will add 70 percent progress in load portfolios
 	const assets = await loadPortfolios(config, addProgress, userProInfo)
 
 	return queryCoinsDataByWalletCoins(assets, config, userProInfo, addProgress)
