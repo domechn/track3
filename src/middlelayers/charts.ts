@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, TransactionModel, UserLicenseInfo, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -132,18 +132,18 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 }
 
 // return all asset actions by analyzing all asset models
-export async function loadAllAssetActionsBySymbol(symbol: string): Promise<AssetAction[]> {
-	const transactions = await TRANSACTION_HANDLER.listTransactions(symbol)
-	// const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol)
-	// const updatedPrices = await ASSET_PRICE_HANDLER.listPricesBySymbol(symbol)
-	// const revAssets = _(assets).reverse().value()
+// export async function loadAllAssetActionsBySymbol(symbol: string): Promise<AssetAction[]> {
+// 	const transactions = await TRANSACTION_HANDLER.listTransactions(symbol)
+// 	// const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol)
+// 	// const updatedPrices = await ASSET_PRICE_HANDLER.listPricesBySymbol(symbol)
+// 	// const revAssets = _(assets).reverse().value()
 
-	// const actions = _.flatMap(revAssets, (as, i) => {
-	// 	const ass = generateAssetActions(as, updatedPrices, assets[i - 1])
-	// 	return ass
-	// })
-	return _(transactions).map(t => transformTransactionModelToAssetAction(t)).value()
-}
+// 	// const actions = _.flatMap(revAssets, (as, i) => {
+// 	// 	const ass = generateAssetActions(as, updatedPrices, assets[i - 1])
+// 	// 	return ass
+// 	// })
+// 	return _(transactions).map(t => transformTransactionModelToAssetAction(t)).value()
+// }
 
 // listAllowedSymbols return all symbol names
 // returns sort by latest value desc
@@ -170,6 +170,21 @@ type TotalProfit = {
 		costAvgPrice: number,
 		sellAvgPrice: number,
 	}[]
+}
+
+export async function queryTransactionsBySymbolAndDateRange(symbol: string, dateRange: TDateRange): Promise<Transaction[]> {
+	const models = await TRANSACTION_HANDLER.listTransactionsByDateRange(dateRange.start, dateRange.end, symbol)
+	return _(models).flatten().map(m => ({
+		id: m.id,
+		assetID: m.assetID,
+		uuid: m.uuid,
+		symbol: m.symbol,
+		wallet: m.wallet,
+		amount: m.amount,
+		price: m.price,
+		txnType: m.txnType,
+		txnCreatedAt: m.txnCreatedAt,
+	})).value()
 }
 
 // calculate total profit from transactions

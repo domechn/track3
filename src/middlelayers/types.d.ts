@@ -72,6 +72,18 @@ export type AssetAction = {
 	changedAt: string
 }
 
+export type Transaction = {
+	id: number
+	assetID: number
+	uuid: string
+	symbol: string
+	wallet?: string
+	amount: number
+	price: number
+	txnType: 'buy' | 'sell' | 'deposit' | 'withdraw'
+	txnCreatedAt: string
+}
+
 export type Asset = {
 	symbol: string
 	amount: number
