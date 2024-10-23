@@ -58,6 +58,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import { Switch } from "./ui/switch";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -89,11 +90,13 @@ const defaultExChangeConfig = {
   type: "binance",
   apiKey: "",
   secret: "",
+  active: true,
 };
 
 const defaultWalletConfig = {
   type: "btc",
   address: "",
+  active: true,
 };
 
 const defaultOtherConfig = {
@@ -188,6 +191,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         secret: string;
         password?: string;
         alias?: string;
+        active: boolean;
       }
     | undefined
   >(undefined);
@@ -196,6 +200,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         type: string;
         address: string;
         alias?: string;
+        active: boolean;
       }
     | undefined
   >(undefined);
@@ -215,6 +220,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       type: string;
       alias?: string;
       address: string;
+      active: boolean;
     }[]
   >([]);
 
@@ -225,6 +231,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       apiKey: string;
       secret: string;
       password?: string;
+      active: boolean;
     }[]
   >([]);
 
@@ -282,6 +289,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               apiKey: ex.initParams.apiKey,
               secret: ex.initParams.secret,
               password: ex.initParams.password,
+              active: ex.active ?? true,
             }))
             .value()
         );
@@ -293,13 +301,18 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               _(v.addresses)
                 .map((a) => {
                   if (_(a).isString()) {
-                    return { type: k, address: a };
+                    return { type: k, address: a, active: true };
                   }
-                  const na = a as { address: string; alias?: string };
+                  const na = a as {
+                    address: string;
+                    alias?: string;
+                    active?: boolean;
+                  };
                   return {
                     type: k,
                     address: na.address,
                     alias: na.alias,
+                    active: na.active ?? true,
                   };
                 })
                 .value()
@@ -367,6 +380,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           secret: ex.secret,
           password: ex.type !== "okex" ? undefined : ex.password,
         },
+        active: ex.active,
       }))
       .value();
 
@@ -377,6 +391,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           .map((w) => ({
             alias: w.alias,
             address: w.address,
+            active: w.active,
           }))
           .value(),
       }))
@@ -404,6 +419,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       apiKey: string;
       secret: string;
       password?: string;
+      active: boolean;
     }[]
   ) {
     const renderExchangeItems = () => {
@@ -436,6 +452,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               <p className="text-xs text-muted-foreground overflow-ellipsis overflow-hidden">
                 <span>{ex.apiKey}</span>
               </p>
+
+              <div className="flex items-center justify-end mt-2">
+                <Switch
+                  id="airplane-mode"
+                  checked={ex.active}
+                  onCheckedChange={() => handleActiveExchange(idx)}
+                />
+              </div>
             </CardContent>
           </Card>
         ))
@@ -449,7 +473,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   }
 
   function renderWalletForm(
-    ws: { type: string; alias?: string; address: string }[]
+    ws: { type: string; alias?: string; address: string; active: boolean }[]
   ) {
     const renderWalletItems = () => {
       return _(ws)
@@ -482,6 +506,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 <p className="text-xs text-muted-foreground overflow-ellipsis overflow-hidden">
                   <span>{w.address}</span>
                 </p>
+                <div className="flex items-center justify-end">
+                  <Switch
+                    id="airplane-mode"
+                    checked={w.active}
+                    onCheckedChange={() => handleActiveWallet(idx)}
+                  />
+                </div>
               </CardContent>
             </Card>
           );
@@ -588,7 +619,26 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     markFormChanged();
   }
 
-  function handleAddWallet(val: { type: string; address: string }) {
+  function handleActiveExchange(idx: number) {
+    setExchanges(
+      _.map(exchanges, (ex, i) => {
+        if (i === idx) {
+          return {
+            ...ex,
+            active: !ex.active,
+          };
+        }
+        return ex;
+      })
+    );
+    markFormChanged();
+  }
+
+  function handleAddWallet(val: {
+    type: string;
+    address: string;
+    active: boolean;
+  }) {
     setWallets([...wallets, val]);
 
     // mark form is changed
@@ -616,12 +666,28 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     markFormChanged();
   }
 
+  function handleActiveWallet(idx: number) {
+    setWallets(
+      _.map(wallets, (w, i) => {
+        if (i === idx) {
+          return {
+            ...w,
+            active: !w.active,
+          };
+        }
+        return w;
+      })
+    );
+    markFormChanged();
+  }
+
   function handleExchangeChange(val: {
     type: string;
     apiKey: string;
     secret: string;
     password?: string;
     alias?: string;
+    active: boolean;
   }) {
     setExchanges([...exchanges, val]);
 

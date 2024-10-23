@@ -101,6 +101,9 @@ export class ERC20NormalAnalyzer implements Analyzer {
 	}
 
 	private async query(addresses: string[]): Promise<WalletCoin[]> {
+		if (addresses.length === 0) {
+			return []
+		}
 		const coins = await bluebird.map(this.queries, async q => q.query(addresses))
 		return _(coins).flatten().value()
 	}
@@ -161,7 +164,11 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 	}
 
 	async loadPortfolioPro(license: string): Promise<WalletCoin[]> {
-		const resp = await asyncMap([getAddressList(this.config.erc20)], async wallets => sendHttpRequest<{
+		const addrs = getAddressList(this.config.erc20)
+		if (addrs.length === 0) {
+			return []
+		}
+		const resp = await asyncMap([addrs], async wallets => sendHttpRequest<{
 			data: {
 				wallet: string
 				assets: {

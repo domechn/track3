@@ -8,7 +8,11 @@ export function getAddressList(addr: Addresses): string[] {
 			if (_(as).isString()) {
 				return as as string
 			}
+			const asp = (as as { address: string, alias?: string, active?: boolean })
+			if (asp.active === false) {
+				return
+			}
 
-			return (as as { address: string, alias?: string }).address
-		}).value()
+			return asp.address
+		}).compact().value()
 }

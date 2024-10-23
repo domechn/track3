@@ -61,7 +61,11 @@ export class TRC20ProUserAnalyzer implements Analyzer {
 	}
 
 	async loadPortfolioInternal(license: string): Promise<WalletCoin[]> {
-		const resp = await asyncMap([getAddressList(this.config.trc20)], async wallets => sendHttpRequest<{
+		const addrs = getAddressList(this.config.trc20)
+		if (addrs.length === 0) {
+			return []
+		}
+		const resp = await asyncMap([addrs], async wallets => sendHttpRequest<{
 			data: {
 				wallet: string
 				assets: {
