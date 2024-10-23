@@ -33,6 +33,7 @@ export type CexConfig = {
 			password?: string
 		},
 		alias?: string
+		active?: boolean
 	}[]
 }
 
@@ -40,6 +41,7 @@ export type Addresses = {
 	addresses?: (string | {
 		address: string
 		alias?: string
+		active?: boolean
 	})[]
 }
 

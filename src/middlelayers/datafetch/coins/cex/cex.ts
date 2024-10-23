@@ -36,6 +36,10 @@ export class CexAnalyzer implements Analyzer {
 
 		this.exchanges = _(_(config).get("exchanges", [])).map(exCfg => {
 			console.log("loading exchange", exCfg.name)
+			if (exCfg.active === false) {
+				console.log("exchange is not active, skip")
+				return
+			}
 			switch (exCfg.name) {
 				case "binance":
 					return new BinanceExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
