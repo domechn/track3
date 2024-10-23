@@ -91,6 +91,7 @@ const App = ({
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const wsize = useWindowSize();
 
@@ -179,6 +180,7 @@ const App = ({
   }
 
   function onHistoricalDataDeleteClick(uuid: string) {
+    setDeleting(true);
     handleHistoricalDataDelete(uuid)
       .then(async (rhd) => {
         await loadAllData();
@@ -211,6 +213,7 @@ const App = ({
         })
       )
       .finally(() => {
+        setDeleting(false);
         setIsModalOpen(false);
       });
   }
@@ -223,6 +226,7 @@ const App = ({
   }
 
   function onHistoricalDataDetailDeleteClick(id: number) {
+    setDeleting(true);
     handleHistoricalDataDetailDelete(id)
       .then((rhd) => {
         toast({
@@ -257,7 +261,10 @@ const App = ({
           description: e.message,
           variant: "destructive",
         })
-      );
+      )
+      .finally(() => {
+        setDeleting(false);
+      });
   }
 
   async function handleHistoricalDataDetailDelete(id: number) {
@@ -357,11 +364,12 @@ const App = ({
               </div>
               <div className="col-span-1">
                 <div className="hidden group-hover:inline-block float-right">
-                  <a
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onHistoricalDataDeleteClick(d.id);
                     }}
+                    disabled={deleting}
                   >
                     <img
                       src={DeleteIcon}
@@ -372,7 +380,7 @@ const App = ({
                         width: 18,
                       }}
                     />
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>
@@ -432,7 +440,10 @@ const App = ({
               </p>
             </TableCell>
             <TableCell>
-              <a onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}>
+              <button
+                onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}
+                disabled={deleting}
+              >
                 <img
                   src={DeleteIcon}
                   alt="delete"
@@ -442,7 +453,7 @@ const App = ({
                     width: 20,
                   }}
                 />
-              </a>
+              </button>
             </TableCell>
           </TableRow>
         );

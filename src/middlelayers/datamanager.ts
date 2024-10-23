@@ -1,12 +1,12 @@
 import md5 from 'md5'
-import { AssetPriceModel, ExportAssetModel, HistoricalData, UniqueIndexConflictResolver } from './types'
-import { queryAllAssetPrices, queryHistoricalData } from './charts'
+import { AssetModel, HistoricalData, TransactionModel, UniqueIndexConflictResolver } from './types'
+import { queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
 import { ASSET_HANDLER, AssetHandlerImpl } from './entities/assets'
-import { ASSET_PRICE_HANDLER, AssetPriceHandlerImpl } from './entities/asset-prices'
-import { getClientID } from '@/utils/app'
+import { getClientID, getVersion } from '@/utils/app'
+import { TRANSACTION_HANDLER, TransactionHandlerImpl } from './entities/transactions'
 
 export interface DataManager {
 	readHistoricalData(filePath: string): Promise<ExportData>
@@ -15,6 +15,9 @@ export interface DataManager {
 }
 
 export type ExportData = {
+	// after 0.5.x this field is required
+	// we need to use this filed to check if the data is compatible with the current version
+	clientVersion?: string
 	// to record the client who exported the data
 	client?: string
 	exportAt: string
@@ -23,16 +26,16 @@ export type ExportData = {
 	md5V2: string
 }
 
-type PartlyHistoricalData = Pick<HistoricalData, "createdAt" | "assets" | "total">[]
+type PartlyHistoricalData = Pick<HistoricalData, "createdAt" | "assets" | "transactions" | "total">[]
 
 class DataManagement implements DataManager {
 
 	private assetHandler: AssetHandlerImpl
-	private assetPriceHandler: AssetPriceHandlerImpl
+	private transactionHandler: TransactionHandlerImpl
 
 	constructor() {
 		this.assetHandler = ASSET_HANDLER
-		this.assetPriceHandler = ASSET_PRICE_HANDLER
+		this.transactionHandler = TRANSACTION_HANDLER
 	}
 
 	async readHistoricalData(filePath: string): Promise<ExportData> {
@@ -42,8 +45,6 @@ class DataManagement implements DataManager {
 
 	async exportHistoricalData(filePath: string, exportConfiguration = false): Promise<void> {
 		const historicalData = await queryHistoricalData(-1, false)
-		const priceData = await queryAllAssetPrices()
-		const priceDataByAssetID = _(priceData).mapKeys("assetID").mapValues().value()
 
 		const exportAt = new Date().toISOString()
 
@@ -52,14 +53,8 @@ class DataManagement implements DataManager {
 		const exportData = {
 			exportAt,
 			client: await getClientID(),
-			historicalData: _(historicalData).map(d => ({
-				createdAt: d.createdAt,
-				total: d.total,
-				assets: _(d.assets).map(a => ({
-					...a,
-					costPrice: priceDataByAssetID[a.id]?.price
-				})).value()
-			})).value(),
+			clientVersion: await getVersion(),
+			historicalData,
 			configuration: cfg
 		}
 
@@ -74,9 +69,21 @@ class DataManagement implements DataManager {
 		await writeTextFile(filePath, content)
 	}
 
-	private validateHistoricalDataAssets(assets: ExportAssetModel[]): boolean {
+	private validateHistoricalDataAssets(assets: AssetModel[]): boolean {
 		const requiredKeys = ["uuid", "createdAt", "symbol", "amount", "value", "price"]
 		_(assets).forEach((asset) => {
+			_(requiredKeys).forEach(k => {
+				if (!_(asset).has(k)) {
+					return false
+				}
+			})
+		})
+		return true
+	}
+
+	private validateHistoricalDataTransactions(transactions: TransactionModel[]): boolean {
+		const requiredKeys = ["uuid", "assetID", "wallet", "symbol", "amount", "price", "txnType", "txnCreatedAt", "createdAt", "updatedAt"]
+		_(transactions).forEach((asset) => {
 			_(requiredKeys).forEach(k => {
 				if (!_(asset).has(k)) {
 					return false
@@ -90,6 +97,7 @@ class DataManagement implements DataManager {
 	private async saveHistoricalDataAssets(historicalData: PartlyHistoricalData, conflictResolver: UniqueIndexConflictResolver) {
 
 		const assets = _(historicalData).map('assets').flatten().value()
+		const transactions = _(historicalData).map('transactions').flatten().value()
 
 		if (assets.length === 0) {
 			throw new Error("no data need to be imported: errorCode 003")
@@ -97,40 +105,23 @@ class DataManagement implements DataManager {
 		if (!this.validateHistoricalDataAssets(assets)) {
 			throw new Error(`invalid data: errorCode 002`)
 		}
+		if (!this.validateHistoricalDataTransactions(transactions)) {
+			throw new Error(`invalid data: errorCode 004`)
+		}
 		await this.assetHandler.importAssets(assets, conflictResolver)
-
-		// import asset prices
-		const importedAssets = _(await queryHistoricalData(-1, false)).map(d => d.assets).flatten().value()
-		const importAssetsMap = _(importedAssets).mapKeys(a => `${a.uuid}/${a.symbol}/${a.wallet}`).value()
-
-		const assetPriceModels = _(assets).filter(a => a.costPrice !== undefined).map(a => {
-			const key = `${a.uuid}/${a.symbol}/${a.wallet}`
-
-			const f = importAssetsMap[key]
-			if (!f) {
-				return
-			}
-			return {
-				uuid: a.uuid,
-				assetID: f.id,
-				symbol: a.symbol,
-				price: a.costPrice,
-				assetCreatedAt: a.createdAt,
-				updatedAt: new Date().toISOString(),
-			} as AssetPriceModel
-		}).compact().value()
-
-		await this.assetPriceHandler.savePrices(assetPriceModels, conflictResolver)
+		await this.transactionHandler.importTransactions(transactions, conflictResolver)
 	}
 
 	async importHistoricalData(conflictResolver: 'REPLACE' | 'IGNORE', data: ExportData, dataFilter?: (origin: PartlyHistoricalData) => PartlyHistoricalData): Promise<void> {
-		const { exportAt, md5V2: md5Str, configuration, historicalData, client } = data
+		const { exportAt, md5V2: md5Str, configuration, historicalData, client, clientVersion } = data
+
+		if (clientVersion === undefined) {
+			throw new Error("exported data is not compatible with current version")
+		}
 
 		// !compatible with older versions logic ( before 0.3.3 )
 		if (md5Str) {
-			// verify md5
-			// todo: use md5 in typescript
-			const md5Payload = { data: JSON.stringify({ exportAt, client, historicalData, configuration }) }
+			const md5Payload = { data: JSON.stringify({ exportAt, client, clientVersion, historicalData, configuration }) }
 			const currentMd5 = md5(JSON.stringify(md5Payload))
 			if (currentMd5 !== md5Str) {
 				throw new Error("invalid data, md5 check failed: errorCode 000")

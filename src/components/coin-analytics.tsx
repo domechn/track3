@@ -1,15 +1,19 @@
 import {
+  calculateTotalProfit,
   listAllowedSymbols,
-  loadAllAssetActionsBySymbol,
   queryAssetMaxAmountBySymbol,
   queryLastAssetsBySymbol,
-  updateAssetPrice,
+  queryTransactionsBySymbolAndDateRange,
+  updateTransactionPrice,
+  updateTransactionTxnType,
 } from "@/middlelayers/charts";
 import {
   Asset,
   AssetAction,
   CurrencyRateDetail,
   TDateRange,
+  Transaction,
+  TransactionType,
 } from "@/middlelayers/types";
 import _ from "lodash";
 import { useEffect, useMemo, useState } from "react";
@@ -65,6 +69,121 @@ import {
   CommandList,
 } from "./ui/command";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+
+interface UpdatePriceDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  updatePriceValue: number;
+  setUpdatePriceValue: (value: number) => void;
+  onSave: () => void;
+  currency: CurrencyRateDetail;
+}
+
+export const UpdatePriceDialog = ({
+  open,
+  onOpenChange,
+  updatePriceValue,
+  setUpdatePriceValue,
+  onSave,
+  currency,
+}: UpdatePriceDialogProps) => {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Update Buy/Sell Price</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <Input
+            type="number"
+            defaultValue={currencyWrapper(currency)(updatePriceValue)}
+            onChange={(e) => {
+              if (!e.target.value || e.target.value === "0.") {
+                return;
+              }
+              if (+e.target.value < 0) {
+                toast({
+                  description: "Invalid price",
+                  variant: "destructive",
+                });
+                return;
+              }
+              setUpdatePriceValue(+e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onSave();
+              }
+            }}
+          />
+        </div>
+        <DialogFooter>
+          <Button type="submit" onClick={onSave}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+interface UpdateTransactionTypeDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  updateTxnTypeValue?: TransactionType;
+  setUpdateTxnTypeValue: (value: TransactionType) => void;
+  onSave: () => void;
+}
+
+export const UpdateTransactionTypeDialog = ({
+  open,
+  onOpenChange,
+  updateTxnTypeValue,
+  setUpdateTxnTypeValue,
+  onSave,
+}: UpdateTransactionTypeDialogProps) => {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[250px]">
+        <DialogHeader>
+          <DialogTitle>Update Txn Type</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <Select
+            onValueChange={(e) => setUpdateTxnTypeValue(e as TransactionType)}
+            value={updateTxnTypeValue}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Transaction Type" />
+            </SelectTrigger>
+            <SelectContent className="overflow-y-auto max-h-[20rem]">
+              <SelectGroup>
+                <SelectItem value="sell">sell</SelectItem>
+                <SelectItem value="buy">buy</SelectItem>
+                <SelectItem value="withdraw">withdraw</SelectItem>
+                <SelectItem value="deposit">deposit</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button type="submit" onClick={onSave}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const App = ({
   currency,
@@ -81,13 +200,28 @@ const App = ({
 
   const [dataPage, setDataPage] = useState<number>(0);
 
-  const [actions, setActions] = useState<AssetAction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
   const [initialLoaded, setInitialLoaded] = useState(false);
 
-  const [updatePriceIndex, setUpdatePriceIndex] = useState("");
+  const [buyAmount, setBuyAmount] = useState<number>(0);
+  const [sellAmount, setSellAmount] = useState<number>(0);
+  const [costAvgPrice, setCostAvgPrice] = useState<number>(0);
+  const [sellAvgPrice, setSellAvgPrice] = useState<number>(0);
+
+  const [profit, setProfit] = useState<number>(0);
+  const [profitPercentage, setProfitPercentage] = useState<
+    number | undefined
+  >();
+
+  const [updateTxnId, setUpdateTxnId] = useState<number>(0);
   const [updatePriceValue, setUpdatePriceValue] = useState(-1);
   const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
+
+  const [updateTxnTypeValue, setUpdateTxnTypeValue] = useState<
+    TransactionType | undefined
+  >();
+  const [updateTxnDialogOpen, setUpdateTxnTypeDialogOpen] = useState(false);
 
   const [maxPosition, setMaxPosition] = useState<number>(0);
 
@@ -119,14 +253,14 @@ const App = ({
   }
 
   useEffect(() => {
-    if (actions.length === 0) {
+    if (transactions.length === 0) {
       return;
     }
 
     // init wallet alias map
     const wa = new WalletAnalyzer(async () => []);
     wa.listWalletAliases(
-      _(actions).map("wallet").compact().uniq().value()
+      _(transactions).map("wallet").compact().uniq().value()
     ).then((res) => {
       const wam: { [k: string]: string | undefined } = {};
       _(res).forEach((k, v) => {
@@ -134,52 +268,44 @@ const App = ({
       });
       setWalletAliasMap(wam);
     });
-  }, [actions]);
+  }, [transactions]);
 
-  const breakevenPrice = useMemo(
-    () => Math.max(0, calculateBreakevenPrice(actions, lastAsset)),
-    [actions, lastAsset]
-  );
-
-  const profit = useMemo(
-    () => calculateProfit(actions, lastAsset),
-    [lastAsset, actions]
-  );
+  const breakevenPrice = useMemo(() => {
+    if (!lastAsset) {
+      return -1;
+    }
+    if (lastAsset.amount === 0) {
+      return profit > 0 ? 0 : -1;
+    }
+    return (lastAsset.price * lastAsset.amount - profit) / lastAsset.amount;
+  }, [profit, lastAsset]);
 
   const breakEvenPriceStr = useMemo(
     () =>
-      breakevenPrice === 0 && profit < 0
+      breakevenPrice < 0
         ? "∞"
         : currency.symbol +
           prettyPriceNumberToLocaleString(
             currencyWrapper(currency)(breakevenPrice)
           ),
-    [currency, breakevenPrice, profit]
+    [currency, breakevenPrice]
   );
 
-  const sellPrice = useMemo(() => calculateSellPrice(actions), [actions]);
   const sellPriceStr = useMemo(
     () =>
       currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellPrice)),
-    [currency, sellPrice]
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellAvgPrice)),
+    [currency, sellAvgPrice]
   );
-  const sellAmountStr = useMemo(
-    () => prettyAmount(calculateSellAmount(actions)),
-    [actions]
-  );
+  const sellAmountStr = useMemo(() => prettyAmount(sellAmount), [sellAmount]);
 
-  const costPrice = useMemo(() => calculateCostPrice(actions), [actions]);
   const costPriceStr = useMemo(
     () =>
       currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(costPrice)),
-    [currency, costPrice]
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(costAvgPrice)),
+    [currency, costAvgPrice]
   );
-  const buyAmountStr = useMemo(
-    () => prettyAmount(calculateBuyAmount(actions)),
-    [actions]
-  );
+  const buyAmountStr = useMemo(() => prettyAmount(buyAmount), [buyAmount]);
   const lastPrice = useMemo(() => lastAsset?.price || 0, [lastAsset]);
   const lastPriceStr = useMemo(
     () =>
@@ -213,31 +339,10 @@ const App = ({
     [maxPosition]
   );
 
-  const profitRate = useMemo(() => {
-    const buyPrice = calculateCostPrice(actions);
-    const buyAmount = calculateBuyAmount(actions);
-
-    const cost = buyPrice * buyAmount;
-
-    return cost
-      ? ((calculateProfit(actions, lastAsset) / cost) * 100).toFixed(2)
-      : 0;
-  }, [lastAsset, actions]);
-
-  function calculateProfit(acts: AssetAction[], la?: Asset) {
-    const sellPrice = calculateSellPrice(acts);
-    const sellAmount = calculateSellAmount(acts);
-
-    const buyPrice = calculateCostPrice(acts);
-
-    const lastPrice = la?.price || 0;
-    const lastAmount = la?.amount || 0;
-
-    const realizedProfit = (sellPrice - buyPrice) * sellAmount;
-    const unrealizedProfit = lastAmount * (lastPrice - buyPrice);
-
-    return realizedProfit + unrealizedProfit;
-  }
+  const profitRate = useMemo(
+    () => (profitPercentage ? profitPercentage.toFixed(2) : 0),
+    [profitPercentage]
+  );
 
   function prettyAmount(amount: number) {
     return amount >= 1
@@ -245,16 +350,19 @@ const App = ({
       : prettyPriceNumberToLocaleString(amount);
   }
 
-  function getAssetActionIndex(act: AssetAction) {
-    return `${act.uuid}-${act.assetID}`;
-  }
-
   async function loadSymbolData(s: string) {
     updateLoading(true);
     try {
-      const aa = await loadAllAssetActionsBySymbol(s);
-      setActions(_(aa).sortBy("changedAt").reverse().value());
+      const txns = await queryTransactionsBySymbolAndDateRange(s, dateRange);
+      setTransactions(txns);
 
+      const tp = await calculateTotalProfit(
+        {
+          start: new Date(1970, 0, 1),
+          end: new Date(2999, 12, 30, 23, 59, 59),
+        },
+        s
+      );
       const la = await queryLastAssetsBySymbol(s);
       setLastAsset(la);
 
@@ -263,6 +371,19 @@ const App = ({
 
       const lp = await getLogoPath(s);
       setLogo(lp);
+
+      const detail = _(tp.coins).find((c) => c.symbol === s);
+      if (!detail) {
+        return;
+      }
+
+      setBuyAmount(detail.buyAmount);
+      setSellAmount(detail.sellAmount);
+      setCostAvgPrice(detail.costAvgPrice);
+      setSellAvgPrice(detail.sellAvgPrice);
+
+      setProfit(tp.total);
+      setProfitPercentage(tp.percentage);
     } finally {
       updateLoading(false);
     }
@@ -280,62 +401,6 @@ const App = ({
     setLoading(val);
   }
 
-  function calculateBreakevenPrice(acts: AssetAction[], la?: Asset) {
-    return la && la.amount ? calculateBreakevenValue(acts) / la.amount : 0;
-  }
-
-  function calculateBreakevenValue(acts: AssetAction[]) {
-    return _(acts)
-      .filter((a) => a.price > 0)
-      .sumBy((a) => a.amount * a.price);
-  }
-
-  function calculateCostPrice(acts: AssetAction[]) {
-    const totalBuyValue = calculateBuyValue(acts);
-    const totalBuyAmount = calculateBuyAmount(acts);
-
-    return totalBuyAmount ? totalBuyValue / totalBuyAmount : 0;
-  }
-
-  function calculateBuyAmount(acts: AssetAction[]) {
-    return _(acts)
-      .filter((a) => a.amount > 0)
-      .filter((a) => a.price > 0)
-      .sumBy((a) => a.amount);
-  }
-
-  function calculateSellPrice(acts: AssetAction[]) {
-    const totalSellValue = calculateSellValue(acts);
-    const totalSellAmount = calculateSellAmount(acts);
-
-    return totalSellAmount ? totalSellValue / totalSellAmount : 0;
-  }
-
-  function calculateSellAmount(acts: AssetAction[]) {
-    return Math.abs(
-      _(acts)
-        .filter((a) => a.amount < 0)
-        .filter((a) => a.price > 0)
-        .sumBy((a) => a.amount)
-    );
-  }
-
-  function calculateBuyValue(acts: AssetAction[]) {
-    return _(acts)
-      .filter((a) => a.amount > 0)
-      .filter((a) => a.price > 0)
-      .sumBy((a) => a.amount * a.price);
-  }
-
-  function calculateSellValue(acts: AssetAction[]) {
-    return Math.abs(
-      _(acts)
-        .filter((a) => a.amount < 0)
-        .filter((a) => a.price > 0)
-        .sumBy((a) => a.amount * a.price)
-    );
-  }
-
   function onUpdatePriceDialogSaveClick() {
     if (!symbol) {
       toast({
@@ -351,44 +416,65 @@ const App = ({
       });
       return;
     }
-    const actIndex = _(actions).findIndex(
-      (act) => getAssetActionIndex(act) === updatePriceIndex
-    );
-    if (actIndex === -1) {
+    const txnIndex = _(transactions).findIndex((act) => act.id === updateTxnId);
+    if (txnIndex === -1) {
       toast({
         description: "Invalid action",
         variant: "destructive",
       });
       return;
     }
-    const act = actions[actIndex];
+    const act = transactions[txnIndex];
 
     const usdPrice = updatePriceValue / currency.rate;
 
-    updateAssetPrice(
-      act.uuid,
-      act.assetID,
-      symbol,
-      usdPrice,
-      act.changedAt
-    ).then(() => {
-      const newActions = [...actions];
-      newActions[actIndex].price = usdPrice;
-      setActions(newActions);
+    updateTransactionPrice(act.id, usdPrice).then(() => {
+      const newTxns = [...transactions];
+      newTxns[txnIndex].price = usdPrice;
+      setTransactions(newTxns);
       setUpdatePriceDialogOpen(false);
-      setUpdatePriceIndex("");
+      setUpdateTxnId(0);
       setUpdatePriceValue(-1);
     });
   }
 
+  function onUpdateTxnTypeDialogSaveClick() {
+    if (!symbol) {
+      toast({
+        description: "Invalid symbol",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!updateTxnTypeValue) {
+      toast({
+        description: "Invalid txnType",
+        variant: "destructive",
+      });
+      return;
+    }
+    const txnIndex = _(transactions).findIndex((act) => act.id === updateTxnId);
+    if (txnIndex === -1) {
+      toast({
+        description: "Invalid action",
+        variant: "destructive",
+      });
+      return;
+    }
+    const act = transactions[txnIndex];
+
+    updateTransactionTxnType(act.id, updateTxnTypeValue).then(() => {
+      const newTxns = [...transactions];
+      newTxns[txnIndex].txnType = updateTxnTypeValue;
+      setTransactions(newTxns);
+      setUpdateTxnTypeDialogOpen(false);
+      setUpdateTxnId(0);
+      setUpdateTxnTypeValue(undefined);
+    });
+  }
+
   function HistoryTable() {
-    const historicalData = useMemo(() => {
-      const start = dateRange.start.toISOString();
-      const end = dateRange.end.toISOString();
-      return _(actions)
-        .filter((a) => a.changedAt >= start && a.changedAt <= end)
-        .value();
-    }, [actions, dateRange]);
+    const historicalData = useMemo(() => transactions, [transactions]);
 
     const maxDataPage = useMemo(() => {
       // - 0.000000000001 is for float number precision
@@ -400,6 +486,30 @@ const App = ({
       () => !_(historicalData).isEmpty(),
       [historicalData]
     );
+
+    const getAmountStr = (act: Transaction) => {
+      const raw = prettyPriceNumberToLocaleString(act.amount);
+      if (act.txnType === "sell" || act.txnType === "withdraw") {
+        return `-${raw}`;
+      }
+      if (act.txnType === "buy" || act.txnType === "deposit") {
+        return `+${raw}`;
+      }
+      return raw;
+    };
+
+    const getValueStr = (act: Transaction) => {
+      const raw = `${currency.symbol}${prettyPriceNumberToLocaleString(
+        currencyWrapper(currency)(act.price * act.amount)
+      )}`;
+      if (act.txnType === "sell") {
+        return `-${raw}`;
+      }
+      if (act.txnType === "buy") {
+        return `+${raw}`;
+      }
+      return "0";
+    };
 
     return (
       <Card>
@@ -434,6 +544,7 @@ const App = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Amount</TableHead>
+                <TableHead className="w-[120px]">Type</TableHead>
                 <TableHead className="w-[300px]">Buy/Sell Price</TableHead>
                 <TableHead>Value</TableHead>
                 <TableHead>Time</TableHead>
@@ -469,12 +580,21 @@ const App = ({
                               className="mr-1 font-bold text-base"
                               title={"" + act.amount}
                             >
-                              {act.amount > 0 ? "+" : "-"}
-                              {/* use pretty price to avoid amount is supper small */}
-                              {prettyPriceNumberToLocaleString(
-                                Math.abs(act.amount)
-                              )}
+                              {getAmountStr(act)}
                             </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <div className="text-gray-600">{act.txnType}</div>
+                            <Pencil2Icon
+                              className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
+                              onClick={() => {
+                                setUpdateTxnId(act.id);
+                                setUpdateTxnTypeValue(act.txnType);
+                                setUpdateTxnTypeDialogOpen(true);
+                              }}
+                            />
                           </div>
                         </TableCell>
                         <TableCell>
@@ -488,7 +608,7 @@ const App = ({
                             <Pencil2Icon
                               className="h-[20px] w-[20px] cursor-pointer hidden group-hover:inline-block text-gray-600"
                               onClick={() => {
-                                setUpdatePriceIndex(getAssetActionIndex(act));
+                                setUpdateTxnId(act.id);
                                 setUpdatePriceValue(act.price);
                                 setUpdatePriceDialogOpen(true);
                               }}
@@ -497,19 +617,13 @@ const App = ({
                         </TableCell>
                         <TableCell>
                           <div className="text-gray-600">
-                            {act.amount > 0 ? "+" : "-"}
-                            {currency.symbol}
-                            {prettyPriceNumberToLocaleString(
-                              currencyWrapper(currency)(
-                                Math.abs(act.price * act.amount)
-                              )
-                            )}
+                            {getValueStr(act)}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="text-gray-600">
                             {timeToDateStr(
-                              new Date(act.changedAt).getTime(),
+                              new Date(act.txnCreatedAt).getTime(),
                               true
                             )}
                           </div>
@@ -538,45 +652,22 @@ const App = ({
 
   return (
     <div className="space-y-4">
-      <Dialog
+      <UpdatePriceDialog
         open={updatePriceDialogOpen}
         onOpenChange={setUpdatePriceDialogOpen}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Update Buy/Sell Price</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <Input
-              type="number"
-              defaultValue={currencyWrapper(currency)(updatePriceValue)}
-              onChange={(e) => {
-                if (!e.target.value || e.target.value === "0.") {
-                  return;
-                }
-                if (+e.target.value < 0) {
-                  toast({
-                    description: "Invalid price",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                setUpdatePriceValue(+e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onUpdatePriceDialogSaveClick();
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button type="submit" onClick={onUpdatePriceDialogSaveClick}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        updatePriceValue={updatePriceValue}
+        setUpdatePriceValue={setUpdatePriceValue}
+        onSave={onUpdatePriceDialogSaveClick}
+        currency={currency}
+      />
+
+      <UpdateTransactionTypeDialog
+        open={updateTxnDialogOpen}
+        onOpenChange={setUpdateTxnTypeDialogOpen}
+        updateTxnTypeValue={updateTxnTypeValue}
+        setUpdateTxnTypeValue={setUpdateTxnTypeValue}
+        onSave={onUpdateTxnTypeDialogSaveClick}
+      />
       <div className="grid gap-4 grid-cols-6">
         <div className="col-span-6 md:col-span-2 sm:col-span-3">
           <Card>

@@ -12,8 +12,6 @@ export type AssetModel = {
 	wallet?: string
 }
 
-// type when exporting assets to json or cloud database
-export type ExportAssetModel = AssetModel & { costPrice?: number }
 // AddProgressFunc: progress is a number between 0 and 100, how many percent of the progress is added
 export type AddProgressFunc = (progress: number) => void
 
@@ -31,6 +29,24 @@ export type AssetPriceModel = {
 
 	// createdAt in assets_v2 table
 	assetCreatedAt: string
+	updatedAt: string
+}
+
+export type TransactionType = 'buy' | 'sell' | 'deposit' | 'withdraw'
+
+export type TransactionModel = {
+	id: number
+	// uuid is the same as uuid in assets_v2 table
+	uuid: string
+	assetID: number
+	wallet: string
+	symbol: string
+	// amount always >= 0
+	amount: number
+	price: number
+	txnType: TransactionType
+	txnCreatedAt: string
+	createdAt: string
 	updatedAt: string
 }
 
@@ -56,6 +72,18 @@ export type AssetAction = {
 	amount: number
 	price: number
 	changedAt: string
+}
+
+export type Transaction = {
+	id: number
+	assetID: number
+	uuid: string
+	symbol: string
+	wallet?: string
+	amount: number
+	price: number
+	txnType: TransactionType
+	txnCreatedAt: string
 }
 
 export type Asset = {
@@ -179,15 +207,15 @@ export type CoinsAmountAndValueChangeData = {
 export type HistoricalData = {
 	id: string
 	createdAt: string
-	// costPrice only exists when exporting historical data
-	assets: ExportAssetModel[]
+	assets: AssetModel[]
+	transactions: TransactionModel[]
 
 	total: number
 }
 
 export type RestoreHistoricalData = {
 	assets: AssetModel[]
-	prices: AssetPriceModel[]
+	transactions: TransactionModel[]
 }
 
 export type CurrencyRateModel = {
