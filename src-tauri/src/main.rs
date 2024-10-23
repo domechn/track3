@@ -167,7 +167,7 @@ fn main() {
             }
 
             if v4tv5.need_to_run(&pv).unwrap() {
-                v4tv5.migrate();
+                // v4tv5.migrate();
             }
 
             prepare_required_data(app_version.clone(), app_dir.as_path());
