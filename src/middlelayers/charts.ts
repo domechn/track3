@@ -190,7 +190,7 @@ export async function queryTransactionsBySymbolAndDateRange(symbol: string, date
 // calculate total profit from transactions
 export async function calculateTotalProfit(dateRange: TDateRange, symbol?: string): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
 	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
-	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`
+	const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}-${symbol ?? "all"}`
 	const c = cache.getCache<TotalProfit>(key)
 	if (c) {
 		return c
@@ -212,9 +212,14 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 		}
 	}).value()
 	const earliestAssets = await ASSET_HANDLER.listAssetsMinCreatedAt(dateRange.start, dateRange.end, symbol)
+
+	const allTransactions = await TRANSACTION_HANDLER.listTransactionsByDateRange(dateRange.start, dateRange.end, symbol)
+	// todo: handle if one asset has multiple transactions
+	const allTransactionsAssetIdMap = _(allTransactions).flatten().groupBy("assetID").mapValues(t => t[0]).value()
+
 	const dateRangeEarliestAssets = _(earliestAssets).groupBy("symbol").map((assets, symbol) => {
 		const allAmount = _(assets).sumBy("amount")
-		const allValue = _(assets).sumBy("value")
+		const allValue = _(assets).map(a => (allTransactionsAssetIdMap[a.id]?.price ?? a.price) * a.amount).sum()
 		return {
 			symbol,
 			price: allAmount === 0 ? 0 : allValue / allAmount,
@@ -225,7 +230,6 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 		}
 	}).value()
 
-	const allTransactions = await TRANSACTION_HANDLER.listTransactionsByDateRange(dateRange.start, dateRange.end)
 	const groupedTransactions = _(allTransactions).flatten().groupBy("symbol").map((txns, symbol) => {
 		const symbolTxns = _(txns).sortBy('txnCreatedAt').map(txn => {
 			if (txn.txnType !== "buy" && txn.txnType !== "sell") {
@@ -253,10 +257,11 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 		// filter out transactions before the first buy
 		const afterActions = _(d.actions).filter(a => beforeCreatedAt === undefined || a.changedAt > beforeCreatedAt).value()
 
-		const buyAmount = _(afterActions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount) + beforeBuyAmount
-		const sellAmount = _(afterActions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount) + beforeSellAmount
-		const cost = _(afterActions).filter(a => a.amount > 0).filter(a => a.price > 0).sumBy((a) => a.amount * a.price) + beforeCost
-		const sell = _(afterActions).filter(a => a.amount < 0).filter(a => a.price > 0).sumBy((a) => -a.amount * a.price) + beforeSell
+		const buyAmount = _(afterActions).filter(a => a.amount > 0).sumBy((a) => a.amount) + beforeBuyAmount
+
+		const sellAmount = _(afterActions).filter(a => a.amount < 0).sumBy((a) => -a.amount) + beforeSellAmount
+		const cost = _(afterActions).filter(a => a.amount > 0).sumBy((a) => a.amount * a.price) + beforeCost
+		const sell = _(afterActions).filter(a => a.amount < 0).sumBy((a) => -a.amount * a.price) + beforeSell
 		const costAvgPrice = buyAmount === 0 ? 0 : cost / buyAmount
 		const sellAvgPrice = sellAmount === 0 ? 0 : sell / sellAmount
 
@@ -291,7 +296,7 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 		coins,
 		lastRecordDate: lrd ? new Date(lrd) : undefined
 	}
-	cache.setCache(key, resp)
+	cache.setCache<TotalProfit>(key, resp)
 	return resp
 }
 
