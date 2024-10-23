@@ -5,7 +5,7 @@ import _ from 'lodash'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
 import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
 import { ASSET_HANDLER, AssetHandlerImpl } from './entities/assets'
-import { getClientID } from '@/utils/app'
+import { getClientID, getVersion } from '@/utils/app'
 import { TRANSACTION_HANDLER, TransactionHandlerImpl } from './entities/transactions'
 
 export interface DataManager {
@@ -15,6 +15,9 @@ export interface DataManager {
 }
 
 export type ExportData = {
+	// after 0.5.x this field is required
+	// we need to use this filed to check if the data is compatible with the current version
+	clientVersion?: string
 	// to record the client who exported the data
 	client?: string
 	exportAt: string
@@ -50,33 +53,7 @@ class DataManagement implements DataManager {
 		const exportData = {
 			exportAt,
 			client: await getClientID(),
-			historicalData,
-			configuration: cfg
-		}
-
-		const md5Payload = { data: JSON.stringify(exportData) }
-
-		const content = JSON.stringify({
-			...exportData,
-			md5V2: md5(JSON.stringify(md5Payload)),
-		} as ExportData)
-
-		// save to filePath
-		await writeTextFile(filePath, content)
-	}
-
-	// todo: update to txn
-	async exportHistoricalDataV2(filePath: string, exportConfiguration = false): Promise<void> {
-		const historicalData = await queryHistoricalData(-1, false)
-
-		const exportAt = new Date().toISOString()
-
-		const cfg = exportConfiguration ? await exportConfigurationString() : undefined
-
-		const exportData = {
-			exportAt,
-			client: await getClientID(),
-			version: 'v0.5',
+			clientVersion: await getVersion(),
 			historicalData,
 			configuration: cfg
 		}
@@ -133,42 +110,18 @@ class DataManagement implements DataManager {
 		}
 		await this.assetHandler.importAssets(assets, conflictResolver)
 		await this.transactionHandler.importTransactions(transactions, conflictResolver)
-
-		// import asset prices
-		// const importedAssets = _(await queryHistoricalData(-1, false)).map(d => d.assets).flatten().value()
-		// const importAssetsMap = _(importedAssets).mapKeys(a => `${a.uuid}/${a.symbol}/${a.wallet}`).value()
-
-		// const assetPriceModels = _(assets).filter(a => a.costPrice !== undefined).map(a => {
-		// 	const key = `${a.uuid}/${a.symbol}/${a.wallet}`
-
-		// 	const f = importAssetsMap[key]
-		// 	if (!f) {
-		// 		return
-		// 	}
-		// 	return {
-		// 		uuid: a.uuid,
-		// 		assetID: f.id,
-		// 		symbol: a.symbol,
-		// 		price: a.costPrice,
-		// 		assetCreatedAt: a.createdAt,
-		// 		updatedAt: new Date().toISOString(),
-		// 	} as AssetPriceModel
-		// }).compact().value()
-
-		// await this.assetPriceHandler.savePrices(assetPriceModels, conflictResolver)
-
-		// todo: if there is cost price in assets model, mean's they were exported from old version
-		// we need to transform them to transaction model
 	}
 
 	async importHistoricalData(conflictResolver: 'REPLACE' | 'IGNORE', data: ExportData, dataFilter?: (origin: PartlyHistoricalData) => PartlyHistoricalData): Promise<void> {
-		const { exportAt, md5V2: md5Str, configuration, historicalData, client } = data
+		const { exportAt, md5V2: md5Str, configuration, historicalData, client, clientVersion } = data
+
+		if (clientVersion === undefined) {
+			throw new Error("exported data is not compatible with current version")
+		}
 
 		// !compatible with older versions logic ( before 0.3.3 )
 		if (md5Str) {
-			// verify md5
-			// todo: use md5 in typescript
-			const md5Payload = { data: JSON.stringify({ exportAt, client, historicalData, configuration }) }
+			const md5Payload = { data: JSON.stringify({ exportAt, client, clientVersion, historicalData, configuration }) }
 			const currentMd5 = md5(JSON.stringify(md5Payload))
 			if (currentMd5 !== md5Str) {
 				throw new Error("invalid data, md5 check failed: errorCode 000")
