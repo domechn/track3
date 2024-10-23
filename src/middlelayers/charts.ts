@@ -52,6 +52,7 @@ function generateTransactions(before: AssetModel[], after: AssetModel[]): Transa
 					price: a.price,
 					txnType: 'buy',
 					txnCreatedAt: a.createdAt,
+					createdAt: a.createdAt,
 				} as TransactionModel
 			}
 			return
