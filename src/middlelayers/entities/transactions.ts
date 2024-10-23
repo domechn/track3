@@ -54,9 +54,10 @@ class TransactionHandler implements TransactionHandlerImpl {
 
 	private async queryTransactionsByDateRange(start?: Date, end?: Date, symbol?: string): Promise<TransactionModel[][]> {
 		const symbolSql = symbol ? ` AND symbol = '${symbol}'` : ""
-		const lteCreatedSql = end ? ` AND createdAt <= '${end.toISOString()}'` : ""
-		const gteCreatedSql = start ? ` AND createdAt >= '${start.toISOString()}'` : ""
-		const sql = `SELECT * FROM ${this.transactionTableName} WHERE 1 = 1 ${symbolSql} ${gteCreatedSql} ${lteCreatedSql} ORDER BY createdAt DESC;`
+		const lteCreatedSql = end ? ` AND txnCreatedAt <= '${end.toISOString()}'` : ""
+		const gteCreatedSql = start ? ` AND txnCreatedAt >= '${start.toISOString()}'` : ""
+		const sql = `SELECT * FROM ${this.transactionTableName} WHERE 1 = 1 ${symbolSql} ${gteCreatedSql} ${lteCreatedSql} ORDER BY txnCreatedAt DESC;`
+
 		const assets = await selectFromDatabaseWithSql<TransactionModel>(sql, [])
 		return _(assets).groupBy("uuid").values().value()
 	}
