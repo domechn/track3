@@ -54,6 +54,23 @@ import {
 import { ScrollArea } from "./ui/scroll-area";
 import { ToastAction } from "./ui/toast";
 import { positiveNegativeColor } from "@/utils/color";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./ui/alert-dialog";
 
 type RankData = {
   id: number;
@@ -183,7 +200,9 @@ const App = ({
     setDeleting(true);
     handleHistoricalDataDelete(uuid)
       .then(async (rhd) => {
-        await loadAllData();
+        loadAllData();
+        // wait 500ms for data refreshing
+        await new Promise((r) => setTimeout(r, 500));
         toast({
           description: "Record deleted",
           action: (
@@ -369,17 +388,39 @@ const App = ({
                       e.stopPropagation();
                       onHistoricalDataDeleteClick(d.id);
                     }}
-                    disabled={deleting}
+                    disabled={deleting || idx !== 0}
                   >
-                    <img
-                      src={DeleteIcon}
-                      alt="delete"
-                      style={{
-                        border: 0,
-                        height: 18,
-                        width: 18,
-                      }}
-                    />
+                    {idx === 0 ? (
+                      <img
+                        src={DeleteIcon}
+                        alt="delete"
+                        style={{
+                          border: 0,
+                          height: 18,
+                          width: 18,
+                        }}
+                      />
+                    ) : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <img
+                              src={DeleteIcon}
+                              alt="delete"
+                              style={{
+                                border: 0,
+                                height: 18,
+                                width: 18,
+                                filter: "grayscale(10)",
+                              }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            <p>You can only delete first record</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </button>
                 </div>
               </div>
@@ -440,20 +481,45 @@ const App = ({
               </p>
             </TableCell>
             <TableCell>
-              <button
-                onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}
-                disabled={deleting}
-              >
-                <img
-                  src={DeleteIcon}
-                  alt="delete"
-                  style={{
-                    border: 0,
-                    height: 20,
-                    width: 20,
-                  }}
-                />
-              </button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    disabled={deleting}
+                  >
+                    <img
+                      src={DeleteIcon}
+                      alt="delete"
+                      style={{
+                        border: 0,
+                        height: 20,
+                        width: 20,
+                      }}
+                    />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Are you absolutely sure?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Deleting the currency information may result in incorrect
+                      calculation of the currency's income and other
+                      information. Are you sure you need to do this?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() =>
+                        onHistoricalDataDetailDeleteClick(d.assetId)
+                      }
+                    >
+                      Confirm
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </TableCell>
           </TableRow>
         );
