@@ -411,7 +411,7 @@ const App = ({
                                 border: 0,
                                 height: 18,
                                 width: 18,
-                                filter: idx === 0 ? undefined : "grayscale(10)",
+                                filter: "grayscale(10)",
                               }}
                             />
                           </TooltipTrigger>
@@ -484,7 +484,6 @@ const App = ({
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <button
-                    // onClick={() => onHistoricalDataDetailDeleteClick(d.assetId)}
                     disabled={deleting}
                   >
                     <img
