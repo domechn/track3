@@ -131,20 +131,6 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 	return assetRes
 }
 
-// return all asset actions by analyzing all asset models
-// export async function loadAllAssetActionsBySymbol(symbol: string): Promise<AssetAction[]> {
-// 	const transactions = await TRANSACTION_HANDLER.listTransactions(symbol)
-// 	// const assets = await ASSET_HANDLER.listAssetsBySymbol(symbol)
-// 	// const updatedPrices = await ASSET_PRICE_HANDLER.listPricesBySymbol(symbol)
-// 	// const revAssets = _(assets).reverse().value()
-
-// 	// const actions = _.flatMap(revAssets, (as, i) => {
-// 	// 	const ass = generateAssetActions(as, updatedPrices, assets[i - 1])
-// 	// 	return ass
-// 	// })
-// 	return _(transactions).map(t => transformTransactionModelToAssetAction(t)).value()
-// }
-
 // listAllowedSymbols return all symbol names
 // returns sort by latest value desc
 export async function listAllowedSymbols(): Promise<string[]> {
