@@ -26,7 +26,7 @@ export const WALLET_ANALYZER = new WalletAnalyzer((size) => ASSET_HANDLER.listAs
 export async function refreshAllData(addProgress: AddProgressFunc) {
 	const lastAssets = _(await ASSET_HANDLER.listAssets(1)).flatten().value()
 	// will add 90 percent in query coins data
-	const coins = await queryCoinsData(addProgress)
+	const coins = await queryCoinsData(lastAssets, addProgress)
 
 	// todo: add db transaction
 	await ASSET_HANDLER.saveCoinsToDatabase(coins)
@@ -379,7 +379,7 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 }
 
 // query all assets and calculate their value in USD
-async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinUSD[]> {
+async function queryCoinsData(lastAssets: AssetModel[], addProgress: AddProgressFunc): Promise<WalletCoinUSD[]> {
 	addProgress(1)
 	const config = await getConfiguration()
 	if (!config) {
@@ -390,7 +390,7 @@ async function queryCoinsData(addProgress: AddProgressFunc): Promise<WalletCoinU
 	const userProInfo = await isProVersion()
 	addProgress(2)
 	// will add 70 percent progress in load portfolios
-	const assets = await loadPortfolios(config, addProgress, userProInfo)
+	const assets = await loadPortfolios(config, lastAssets, addProgress, userProInfo)
 
 	return queryCoinsDataByWalletCoins(assets, config, userProInfo, addProgress)
 }

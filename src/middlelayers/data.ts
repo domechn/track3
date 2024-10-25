@@ -10,7 +10,7 @@ import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
 import _ from 'lodash'
 import { save, open } from "@tauri-apps/api/dialog"
-import { AddProgressFunc, UserLicenseInfo } from './types'
+import { AddProgressFunc, AssetModel, UserLicenseInfo } from './types'
 import { ASSET_HANDLER } from './entities/assets'
 import md5 from 'md5'
 import { TRC20ProUserAnalyzer } from './datafetch/coins/trc20'
@@ -39,11 +39,25 @@ export async function downloadCoinLogos(coins: {
 	return invoke("download_coins_logos", { coins })
 }
 
-export async function loadPortfolios(config: CexConfig & TokenConfig, addProgress: AddProgressFunc, userInfo: UserLicenseInfo): Promise<WalletCoin[]> {
+export async function loadPortfolios(config: CexConfig & TokenConfig, lastAssets: AssetModel[], addProgress: AddProgressFunc, userInfo: UserLicenseInfo): Promise<WalletCoin[]> {
 	// all coins currently owned ( amount > 0 )
 	const currentCoins = await loadPortfoliosByConfig(config, addProgress, userInfo)
 
-	return currentCoins
+	// need to list coins owned before but not now ( amount = 0 )
+	const beforeCoins = _(lastAssets).flatten().map(s => {
+		const found = _(currentCoins).find(c => c.symbol === s.symbol && md5(c.wallet) === s.wallet)
+		if (found) {
+			return
+		}
+		return {
+			symbol: s.symbol,
+			price: _(currentCoins).find(c => c.symbol === s.symbol)?.price,
+			amount: 0,
+			value: 0,
+			wallet: "md5:" + s.wallet,
+		} as WalletCoin
+	}).compact().value()
+	return [...currentCoins, ...beforeCoins]
 }
 
 // progress percent is 70
