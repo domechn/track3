@@ -47,11 +47,12 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, lastAssets
 	const beforeCoins = _(lastAssets).flatten().map(s => {
 		const found = _(currentCoins).find(c => c.symbol === s.symbol && md5(c.wallet) === s.wallet)
 		if (found) {
+			// todo check price
 			return
 		}
 		return {
 			symbol: s.symbol,
-			price: _(currentCoins).find(c => c.symbol === s.symbol)?.price,
+			price: _(currentCoins).find(c => c.symbol === s.symbol)?.price ?? s.price,
 			amount: 0,
 			value: 0,
 			wallet: "md5:" + s.wallet,

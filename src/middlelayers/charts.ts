@@ -112,12 +112,14 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 	}
 	// check if pro user
 	const userProInfo = await isProVersion()
+	const lastAssets = _(await ASSET_HANDLER.listAssets(1)).flatten().value()
+
 	const walletCoins = await queryCoinsDataByWalletCoins(_(assets).map(a => ({
 		symbol: a.symbol,
 		amount: a.amount,
 		// wallet here dose not matter
 		wallet: a.wallet ?? OthersAnalyzer.wallet
-	})).value(), config, userProInfo)
+	})).value(), config, lastAssets, userProInfo)
 
 	const assetRes = _(walletCoins).map(t => ({
 		symbol: t.symbol,
@@ -309,7 +311,7 @@ export async function getAvailableDates(): Promise<Date[]> {
 	return _(dates).reverse().value()
 }
 
-async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalConfig, userProInfo: UserLicenseInfo, addProgress?: AddProgressFunc): Promise<WalletCoinUSD[]> {
+async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalConfig, lastAssets: AssetModel[], userProInfo: UserLicenseInfo, addProgress?: AddProgressFunc): Promise<WalletCoinUSD[]> {
 	// always query btc and usdt price
 	const priceMap = await queryCoinPrices(_(assets).filter(a => !a.price).map("symbol").push("USDT").push("BTC").uniq().compact().value(), userProInfo)
 	if (addProgress) {
@@ -344,9 +346,8 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		})
 	}
 	const totals = calculateTotalValue(latestAssets, priceMap)
-	const lastAssets = await ASSET_HANDLER.listAssets(1)
 	// if item in totals exists in lastAssets and it's usdValue is less than 1, we think it has been sold out last time, so we do not need to save its data to database this time
-	const filteredTotals = _(totals).filter(t => !_(t.wallet).startsWith("md5:")).filter(t => {
+	const filteredTotals = _(totals).filter(t => {
 		if (t.usdValue > 1) {
 			return true
 		}
@@ -355,7 +356,8 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 			return true
 		}
 		const totalWallet = md5(t.wallet)
-		const lastAsset = _(lastAssets).flatten().find(a => a.symbol === t.symbol && a.wallet === totalWallet)
+		const lastAsset = _(lastAssets).find(a => a.symbol === t.symbol && (a.wallet === totalWallet || a.wallet === t.wallet))
+
 		// not found in last asset, which means coin has already been removed before last record
 		if (!lastAsset) {
 			return false
@@ -371,6 +373,7 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		usdValue: t.usdValue > 1 ? t.usdValue : 0,
 		amount: t.usdValue > 1 ? t.amount : 0,
 	})).value()
+
 
 	if (addProgress) {
 		addProgress(5)
@@ -392,7 +395,7 @@ async function queryCoinsData(lastAssets: AssetModel[], addProgress: AddProgress
 	// will add 70 percent progress in load portfolios
 	const assets = await loadPortfolios(config, lastAssets, addProgress, userProInfo)
 
-	return queryCoinsDataByWalletCoins(assets, config, userProInfo, addProgress)
+	return queryCoinsDataByWalletCoins(assets, config, lastAssets, userProInfo, addProgress)
 }
 
 export async function queryAssetMaxAmountBySymbol(symbol: string): Promise<number> {
