@@ -29,22 +29,22 @@ export async function refreshAllData(addProgress: AddProgressFunc) {
 	const coins = await queryCoinsData(lastAssets, addProgress)
 
 	// todo: add db transaction
-	await ASSET_HANDLER.saveCoinsToDatabase(coins)
+	const uid = await ASSET_HANDLER.saveCoinsToDatabase(coins)
 	addProgress(5)
 
 	// calculate transactions and save
 	const newAssets = _(await ASSET_HANDLER.listAssets(1)).flatten().value()
-	await TRANSACTION_HANDLER.saveTransactions(generateTransactions(lastAssets, newAssets))
+	await TRANSACTION_HANDLER.saveTransactions(generateTransactions(uid, lastAssets, newAssets))
 	addProgress(5)
 }
 
-function generateTransactions(before: AssetModel[], after: AssetModel[]): TransactionModel[] {
+function generateTransactions(uid: string, before: AssetModel[], after: AssetModel[]): TransactionModel[] {
 	const updatedTxns = _(after).map(a => {
 		const l = _(before).find(la => la.symbol === a.symbol && la.wallet === a.wallet)
 		if (!l) {
 			if (a.amount !== 0) {
 				return {
-					uuid: a.uuid,
+					uuid: uid,
 					assetID: a.id,
 					wallet: a.wallet,
 					symbol: a.symbol,
@@ -61,7 +61,7 @@ function generateTransactions(before: AssetModel[], after: AssetModel[]): Transa
 			return
 		}
 		return {
-			uuid: a.uuid,
+			uuid: uid,
 			assetID: a.id,
 			wallet: a.wallet,
 			symbol: a.symbol,
@@ -76,7 +76,7 @@ function generateTransactions(before: AssetModel[], after: AssetModel[]): Transa
 			return
 		}
 		return {
-			uuid: la.uuid,
+			uuid: uid,
 			assetID: la.id,
 			wallet: la.wallet,
 			symbol: la.symbol,
