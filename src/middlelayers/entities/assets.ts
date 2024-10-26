@@ -206,7 +206,7 @@ class AssetHandler implements AssetHandlerImpl {
 
 	// skip where value is less than 1, or value is 0
 	// if value is 0, means user sold all of this coin, we need to record this behavior
-	async saveCoinsToDatabase(coinInUSDs: WalletCoinUSD[]): Promise<AssetModel[]> {
+	async saveCoinsToDatabase(coinInUSDs: WalletCoinUSD[]): Promise<string> {
 		const coins = _(coinInUSDs).map(t => ({
 			wallet: t.wallet,
 			symbol: t.symbol,
@@ -255,7 +255,8 @@ class AssetHandler implements AssetHandlerImpl {
 		}
 		const models = getDBModel(coins)
 
-		return this.saveAssets(models)
+		await this.saveAssets(models)
+		return uid
 	}
 
 	// if symbol is not provided, return all assets, else return assets with symbol
