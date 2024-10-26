@@ -351,10 +351,6 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		if (t.usdValue > 1) {
 			return true
 		}
-		// already handled in loadPortfolios
-		if (t.amount === 0) {
-			return true
-		}
 		const totalWallet = md5(t.wallet)
 		const lastAsset = _(lastAssets).find(a => a.symbol === t.symbol && (a.wallet === totalWallet || a.wallet === t.wallet))
 
@@ -365,6 +361,10 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		// coin has been sold out in last time
 		if (lastAsset.amount === 0) {
 			return false
+		}
+		// already handled in loadPortfolios
+		if (t.amount === 0) {
+			return true
 		}
 		return true
 	}).map(t => ({
