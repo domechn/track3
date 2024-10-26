@@ -705,6 +705,9 @@ impl V4TV5 {
                     if price == &0.0 {
                         txn_type = "withdraw";
                     }
+                    if last_grouped_asset.amount == 0.0 {
+                        continue;
+                    }
                     let transaction = Transaction {
                         id: 0,
                         uuid: uuid.clone(),
