@@ -361,7 +361,8 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		// coin has been sold out in last time
 		if (lastAsset.amount === 0) {
 			return false
-		}		// already handled in loadPortfolios
+		}
+		// already handled in loadPortfolios
 		if (t.amount === 0) {
 			return true
 		}
