@@ -200,9 +200,6 @@ const App = ({
     setDeleting(true);
     handleHistoricalDataDelete(uuid)
       .then(async (rhd) => {
-        loadAllData();
-        // wait 500ms for data refreshing
-        await new Promise((r) => setTimeout(r, 500));
         toast({
           description: "Record deleted",
           action: (
@@ -264,7 +261,6 @@ const App = ({
             </ToastAction>
           ),
         });
-        loadAllData();
         if (afterDataChanged) {
           afterDataChanged("delete", undefined, id);
         }
