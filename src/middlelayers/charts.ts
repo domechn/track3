@@ -288,6 +288,11 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 	return resp
 }
 
+export function cleanTotalProfitCache() {
+	const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY)
+	cache.clearCache()
+}
+
 export async function updateTransactionPrice(id: number, price: number) {
 	const txnModel = await TRANSACTION_HANDLER.getTransactionByID(id)
 	await TRANSACTION_HANDLER.createOrUpdate({

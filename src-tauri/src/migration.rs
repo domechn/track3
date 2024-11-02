@@ -225,7 +225,7 @@ impl Migration for V1TV2 {
             // read all data from assets table and migrate to assets
             // let data : Vec<AssetsV1>= tx.fetch_all::<_, AssetsV1>("select * from assets").await.unwrap();
             let data = sqlx::query_as::<_, AssetsV1>("select * from assets")
-            .fetch_all(&mut tx)
+            .fetch_all(&mut *tx)
             .await
             .unwrap();
             let data_v2 = self.move_data_from_assets_to_v2(data);
@@ -238,7 +238,7 @@ impl Migration for V1TV2 {
                 .bind(row.value)
                 .bind(row.price)
                 .bind(row.createdAt)
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await
                 .unwrap();
             }
@@ -570,11 +570,11 @@ impl Migration for V4TV5 {
             // read all data from assets table and migrate to assets
             let assets =
                 sqlx::query_as::<_, AssetsV2>("select * from assets_v2 order by createdAt ASC")
-                    .fetch_all(&mut tx)
+                    .fetch_all(&mut *tx)
                     .await
                     .unwrap();
             let asset_prices = sqlx::query_as::<_, AssetPrice>("select * from asset_prices")
-                .fetch_all(&mut tx)
+                .fetch_all(&mut *tx)
                 .await
                 .unwrap();
             let transaction_data =
@@ -591,7 +591,7 @@ impl Migration for V4TV5 {
                 .bind(row.txnType)
                 .bind(row.txnCreatedAt)
                 .bind(row.createdAt)
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await
                 .unwrap();
             }

@@ -130,6 +130,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_aptabase::Builder::new("A-EU-6972874637").build())
+        .plugin(tauri_plugin_context_menu::init())
         .setup(|app| {
             let app_version = app.package_info().version.to_string();
             let resource_path = app.path_resolver();
