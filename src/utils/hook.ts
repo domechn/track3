@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { invoke } from "@tauri-apps/api"
+import { listen } from "@tauri-apps/api/event"
+import { cleanTotalProfitCache } from '@/middlelayers/charts'
 
 export const useBeforeRender = (callback: () => unknown, deps: any) => {
 	const [isRun, setIsRun] = useState(false)
@@ -46,4 +49,24 @@ export const useWindowSize = () => {
 		return () => window.removeEventListener("resize", handleResize)
 	}, []) // Empty array ensures that effect is only run on mount
 	return windowSize
+}
+
+export function registerRightClickListens() {
+	listen("reloadclicked", () => {
+		cleanTotalProfitCache()
+		location.reload()
+	})
+}
+
+export async function renderRightClickMenu(e: MouseEvent) {
+	e.preventDefault()
+	await invoke("plugin:context_menu|show_context_menu", {
+		items: [
+			{
+				label: "Reload",
+				disabled: false,
+				event: "reloadclicked",
+			}
+		],
+	})
 }

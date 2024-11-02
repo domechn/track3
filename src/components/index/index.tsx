@@ -360,7 +360,8 @@ const App = () => {
           <div
             className={`flex items-center justify-center mt-1`}
             style={{
-              display: refreshProgress > 0 && refreshButtonLoading ? "flex" : "none",
+              display:
+                refreshProgress > 0 && refreshButtonLoading ? "flex" : "none",
             }}
           >
             <Progress value={refreshProgress} className="w-[80%]" />
