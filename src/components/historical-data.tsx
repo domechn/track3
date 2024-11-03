@@ -153,6 +153,7 @@ const App = ({
         .map((dd) => dd.assets)
         .flatten()
         .map("symbol")
+        .uniq()
         .value(),
       async (s) => {
         const path = await getImageApiPath(acd, s);

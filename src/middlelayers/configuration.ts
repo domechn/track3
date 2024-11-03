@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api'
+import { invoke } from "@tauri-apps/api/core"
 import { getDatabase } from './database'
 import { GlobalConfig } from './datafetch/types'
 import { ConfigurationModel, CurrencyRateDetail } from './types'

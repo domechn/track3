@@ -1,12 +1,12 @@
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{HashMap},
     fs::{self, File},
     path::Path,
 };
 
 use indexmap::IndexSet;
 use sqlx::{Connection, Executor, SqliteConnection};
-use tauri::api::version;
+use version_compare::{compare_to, Cmp};
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 
@@ -458,7 +458,7 @@ impl Migration for V2TV3 {
     }
 
     fn need_to_run(&self, previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
-        let res = version::compare(previous_version, "0.3.0").unwrap_or(-1) > 0;
+        let res = compare_to(previous_version, "0.3.0", Cmp::Lt).unwrap();
         println!("check if from v0.2 to v0.3 in rust, {:?}", res);
         return Ok(res);
     }
@@ -499,7 +499,7 @@ impl Migration for V3TV4 {
     }
 
     fn need_to_run(&self, previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
-        let res = version::compare(previous_version, "0.4.0").unwrap_or(-1) > 0;
+        let res = compare_to(previous_version, "0.4.0", Cmp::Lt).unwrap();
         println!("check if from v0.3 to v0.4 in rust, {:?}", res);
         return Ok(res);
     }
@@ -538,7 +538,7 @@ impl Migration for V4TV5 {
     }
 
     fn need_to_run(&self, previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
-        let res = version::compare(previous_version, "0.5.0").unwrap_or(-1) > 0;
+        let res = compare_to(previous_version, "0.5.0", Cmp::Lt).unwrap();
         println!("check if from v0.4 to v0.5 in rust, {:?}", res);
         return Ok(res);
     }

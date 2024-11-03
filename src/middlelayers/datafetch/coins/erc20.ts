@@ -179,7 +179,7 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 					price?: number
 				}[]
 			}[]
-		}>("POST", this.queryUrl, 20000, {
+		}>("POST", this.queryUrl, 30000, {
 			"x-track3-client-id": await getClientID(),
 			'x-track3-api-key': license
 		}, {

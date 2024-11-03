@@ -1,4 +1,4 @@
-import { HttpVerb, getClient, Body, HttpOptions } from '@tauri-apps/api/http'
+import { fetch } from '@tauri-apps/plugin-http'
 import _ from 'lodash'
 
 export function getCurrentUA() {
@@ -6,8 +6,8 @@ export function getCurrentUA() {
 	return userAgent
 }
 
-export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout = 5000, headers = {}, json = {}, formData = {}): Promise<T> {
-	const client = await getClient()
+export async function sendHttpRequest<T>(method: string, url: string, timeout = 5000, headers = {}, json = {}, formData = {}): Promise<T> {
+	// const client = await getClient()
 	const hs: { [k: string]: string } = {
 		"user-agent": getCurrentUA(),
 		...headers,
@@ -15,22 +15,25 @@ export async function sendHttpRequest<T>(method: HttpVerb, url: string, timeout 
 	if (!_(json).isEmpty()) {
 		hs["content-type"] = "application/json"
 	}
-	const payload = {
+	const payload: RequestInit = {
 		method,
-		url,
-		timeout,
 		headers: hs,
-	} as HttpOptions
+		connectTimeout: timeout,
+	} as any
 	if (!_(json).isEmpty()) {
-		payload.body = Body.json(json)
+		payload.body = JSON.stringify(json)
 	}
 	if (!_(formData).isEmpty()) {
-		payload.body = Body.form(formData)
+		const fd = new URLSearchParams()
+		_(formData).forEach((v, k) => {
+			fd.append(k, v)
+		})
+		payload.body = fd
 	}
 
-	const resp = await client.request<T>(payload)
+	const resp = await fetch(url, payload)
 	if (resp.status > 299) {
-		throw new Error(`Request failed with status ${resp.status}, message: ${JSON.stringify(resp.data)}`)
+		throw new Error(`Request failed with status ${resp.status}, message: ${await resp.text()}`)
 	}
-	return resp.data
+	return resp.json()
 }

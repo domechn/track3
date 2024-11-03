@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { invoke } from "@tauri-apps/api"
+import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { cleanTotalProfitCache } from '@/middlelayers/charts'
 
@@ -59,14 +59,14 @@ export function registerRightClickListens() {
 }
 
 export async function renderRightClickMenu(e: MouseEvent) {
-	e.preventDefault()
-	await invoke("plugin:context_menu|show_context_menu", {
-		items: [
-			{
-				label: "Reload",
-				disabled: false,
-				event: "reloadclicked",
-			}
-		],
-	})
+	// e.preventDefault()
+	// await invoke("plugin:context_menu|show_context_menu", {
+	// 	items: [
+	// 		{
+	// 			label: "Reload",
+	// 			disabled: false,
+	// 			event: "reloadclicked",
+	// 		}
+	// 	],
+	// })
 }

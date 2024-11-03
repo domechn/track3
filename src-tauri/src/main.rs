@@ -2,6 +2,7 @@
 extern crate lazy_static;
 use std::collections::HashMap;
 
+use tauri::Manager;
 use track3::{
     binance::Binance,
     ent::Ent,
@@ -84,7 +85,7 @@ async fn download_coins_logos(
     coins: Vec<CoinWithPrice>,
 ) -> Result<(), String> {
     let resource_dir = handle
-        .path_resolver()
+        .path()
         .app_cache_dir()
         .unwrap()
         .to_str()
@@ -128,12 +129,19 @@ fn decrypt(data: String) -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_sql::Builder::new().build())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
-        .plugin(tauri_plugin_aptabase::Builder::new("A-EU-6972874637").build())
-        .plugin(tauri_plugin_context_menu::init())
+        // .plugin(tauri_plugin_aptabase::Builder::new("A-EU-6972874637").build())
+        // .plugin(tauri_plugin_context_menu::init())
         .setup(|app| {
             let app_version = app.package_info().version.to_string();
-            let resource_path = app.path_resolver();
+            let resource_path = app.path();
             let resource_dir = resource_path.resource_dir().unwrap();
             let app_dir = resource_path.app_data_dir().unwrap();
             println!("app_dir: {:?}, resource_dir: {:?}", app_dir, resource_dir);

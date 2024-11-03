@@ -1,6 +1,6 @@
 import { Exchanger } from './cex'
 import _ from 'lodash'
-import { invoke } from '@tauri-apps/api'
+import { invoke } from "@tauri-apps/api/core"
 import { sendHttpRequest } from '../../utils/http'
 
 export class BinanceExchange implements Exchanger {

@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api'
+import { invoke } from "@tauri-apps/api/core"
 import bluebird from 'bluebird'
 import { CexConfig, TokenConfig, WalletCoin } from './datafetch/types'
 import { BTCAnalyzer } from './datafetch/coins/btc'
@@ -9,7 +9,7 @@ import { SOLAnalyzer } from './datafetch/coins/sol'
 import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from './datafetch/coins/erc20'
 import { CexAnalyzer } from './datafetch/coins/cex/cex'
 import _ from 'lodash'
-import { save, open } from "@tauri-apps/api/dialog"
+import { save, open } from "@tauri-apps/plugin-dialog"
 import { AddProgressFunc, AssetModel, UserLicenseInfo } from './types'
 import { ASSET_HANDLER } from './entities/assets'
 import md5 from 'md5'

@@ -1,6 +1,5 @@
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
-import { HttpVerb } from '@tauri-apps/api/http'
 import { sendHttpRequest } from '../../utils/http'
 import _ from 'lodash'
 import bluebird from 'bluebird'
@@ -140,7 +139,7 @@ export class GateExchange implements Exchanger {
 		return _(resp.details).pickBy((v, k) => ["futures", "options", "payment", "quant", "margin"].includes(k)).mapKeys(v => v.currency).mapValues(v => parseFloat(v.amount)).value()
 	}
 
-	private async fetch<T>(method: HttpVerb, path: string, queryParam: string): Promise<T> {
+	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {
 		const url = `${this.endpoint}${this.apiPrefix}${path}`
 
 		const sigHeader = this.generateSignature(method, this.apiPrefix + path, queryParam)

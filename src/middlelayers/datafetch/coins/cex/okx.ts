@@ -1,7 +1,6 @@
 import CryptoJS from 'crypto-js'
 import { Exchanger } from './cex'
 import { sendHttpRequest } from '../../utils/http'
-import { HttpVerb } from '@tauri-apps/api/http'
 import _ from 'lodash'
 import bluebird from 'bluebird'
 
@@ -148,7 +147,7 @@ export class OkxExchange implements Exchanger {
 		return _(resp.data).keyBy("ccy").mapValues("investData").mapValues(v => _(v).map("amt").map(parseFloat).sum()).value()
 	}
 
-	private async fetch<T>(method: HttpVerb, path: string, queryParam: string): Promise<T> {
+	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {
 		const url = `${this.endpoint}${this.apiPrefix}${path}`
 
 		const sigHeader = this.generateSignature(method, this.apiPrefix + path, queryParam)

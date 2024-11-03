@@ -1,0 +1,42 @@
+{
+  "identifier": "migrated",
+  "description": "permissions that were migrated from v1",
+  "local": true,
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-exists",
+    "fs:allow-app-write",
+    "fs:allow-app-write-recursive",
+    "fs:allow-appcache-write",
+    "fs:allow-appcache-write-recursive",
+    "fs:allow-appconfig-write",
+    "fs:allow-appconfig-write-recursive",
+    {
+      "identifier": "fs:scope",
+      "allow": ["**"]
+    },
+    "shell:allow-open",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://**/"
+        }
+      ]
+    },
+    "process:allow-restart",
+    "core:app:allow-app-show",
+    "core:app:allow-app-hide",
+    "dialog:default",
+    "shell:default",
+    "fs:default",
+    "sql:default",
+    "sql:allow-execute",
+    "updater:allow-check"
+  ]
+}
