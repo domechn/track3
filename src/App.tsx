@@ -2,8 +2,9 @@ import IndexApp from "@/components/index";
 import AutoUpdater from "@/components/auto-updater";
 import { Toaster } from "@/components/ui/toaster";
 import React from "react";
-import { ThemeProvider } from '@/components/common/theme'
-import { themeLocalStorageKey } from './middlelayers/configuration'
+import { ThemeProvider } from "@/components/common/theme";
+import { themeLocalStorageKey } from "./middlelayers/configuration";
+import { renderRightClickMenu } from './utils/hook'
 
 export const ChartResizeContext = React.createContext<{
   needResize: number;
@@ -14,7 +15,7 @@ function App() {
   const [needResize, setNeedResize] = React.useState(0);
 
   return (
-    <div className="container">
+    <div className="container" onContextMenu={renderRightClickMenu}>
       <Toaster />
       <AutoUpdater />
       <ThemeProvider defaultTheme="light" storageKey={themeLocalStorageKey}>
