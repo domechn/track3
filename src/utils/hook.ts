@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { cleanTotalProfitCache } from '@/middlelayers/charts'
+import { Menu, MenuItem } from '@tauri-apps/api/menu'
 
 export const useBeforeRender = (callback: () => unknown, deps: any) => {
 	const [isRun, setIsRun] = useState(false)
@@ -51,22 +51,19 @@ export const useWindowSize = () => {
 	return windowSize
 }
 
-export function registerRightClickListens() {
-	listen("reloadclicked", () => {
-		cleanTotalProfitCache()
-		location.reload()
-	})
+export function handleReloadClick() {
+	cleanTotalProfitCache()
+	location.reload()
 }
 
-export async function renderRightClickMenu(e: MouseEvent) {
-	// e.preventDefault()
-	// await invoke("plugin:context_menu|show_context_menu", {
-	// 	items: [
-	// 		{
-	// 			label: "Reload",
-	// 			disabled: false,
-	// 			event: "reloadclicked",
-	// 		}
-	// 	],
-	// })
+export async function renderRightClickMenu(event: React.MouseEvent) {
+	event.preventDefault()
+	const reload = await MenuItem.new({
+		text: "Reload",
+		action: handleReloadClick
+	})
+	const menu = await Menu.new({
+		items: [reload],
+	})
+	menu.popup()
 }
