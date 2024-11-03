@@ -87,12 +87,12 @@ pub struct Configuration {
 #[derive(FromRow, Debug)]
 pub struct AssetPrice {
     pub id: i32,
-    pub uuid : String,
-    pub assetID : i32,
-    pub symbol : String,
-    pub price : f64,
-    pub assetCreatedAt : String,
-    pub updatedAt : String,
+    pub uuid: String,
+    pub assetID: i32,
+    pub symbol: String,
+    pub price: f64,
+    pub assetCreatedAt: String,
+    pub updatedAt: String,
 }
 
 #[derive(FromRow, Debug)]

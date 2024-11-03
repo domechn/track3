@@ -3,7 +3,7 @@ import { AssetModel, HistoricalData, TransactionModel, UniqueIndexConflictResolv
 import { queryHistoricalData } from './charts'
 import _ from 'lodash'
 import { exportConfigurationString, importRawConfiguration } from './configuration'
-import { writeTextFile, readTextFile } from "@tauri-apps/api/fs"
+import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs"
 import { ASSET_HANDLER, AssetHandlerImpl } from './entities/assets'
 import { getClientID, getVersion } from '@/utils/app'
 import { TRANSACTION_HANDLER, TransactionHandlerImpl } from './entities/transactions'

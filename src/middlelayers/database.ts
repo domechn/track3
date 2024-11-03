@@ -1,5 +1,5 @@
 import _ from "lodash"
-import Database from "tauri-plugin-sql-api"
+import Database from "@tauri-apps/plugin-sql"
 import { UniqueIndexConflictResolver } from './types'
 
 export const databaseName = "track3.db"

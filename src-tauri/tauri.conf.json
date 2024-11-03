@@ -2,90 +2,58 @@
   "build": {
     "beforeDevCommand": "yarn dev",
     "beforeBuildCommand": "yarn build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist"
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
   },
-  "package": {
-    "productName": "track3",
-    "version": "0.5.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "fs": {
-        "readFile": true,
-        "writeFile": true,
-        "exists": true,
-        "scope": ["**"]
-      },
-      "path": {
-        "all": true
-      },
-      "protocol": {
-        "asset": true,
-        "assetScope": ["$RESOURCE/**", "$APPCACHE/**"]
-      },
-      "process": {
-        "relaunch": true
-      },
-      "http": {
-        "all": true,
-        "request": true,
-        "scope": ["https://**"]
-      },
-      "app": {
-        "all": true
-      },
-      "dialog": {
-        "open": true,
-        "save": true
-      },
-      "shell": {
-        "all": false,
-        "open": true
-      }
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "copyright": "",
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
     },
-    "bundle": {
-      "active": true,
-      "category": "DeveloperTool",
-      "copyright": "",
+    "longDescription": "",
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null
+    },
+    "resources": [
+      "migrations/**/*"
+    ],
+    "shortDescription": "",
+    "linux": {
       "deb": {
         "depends": []
-      },
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "identifier": "dev.track3.track3",
-      "longDescription": "",
-      "macOS": {
-        "entitlements": null,
-        "exceptionDomain": "",
-        "frameworks": [],
-        "providerShortName": null,
-        "signingIdentity": null
-      },
-      "resources": ["migrations/**/*"],
-      "shortDescription": "",
-      "targets": "all",
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
       }
     },
-    "security": {},
+    "createUpdaterArtifacts": "v1Compatible"
+  },
+  "productName": "track3",
+  "mainBinaryName": "track3",
+  "version": "0.5.0",
+  "identifier": "dev.track3.track3",
+  "plugins": {
     "updater": {
-      "active": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVBMzU0MjMxMDZEQjFERDIKUldUU0hkc0dNVUkxNnFUc21rSnVZVnd2c0JRa2t2dHA0ZEJ5M0hWZTJ3U3NFR2NsZWZha1JFTTEK",
       "endpoints": [
         "https://github.com/domechn/track3/releases/download/updater/update.json"
-      ],
-      "dialog": false,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVBMzU0MjMxMDZEQjFERDIKUldUU0hkc0dNVUkxNnFUc21rSnVZVnd2c0JRa2t2dHA0ZEJ5M0hWZTJ3U3NFR2NsZWZha1JFTTEK"
-    },
+      ]
+    }
+  },
+  "app": {
     "windows": [
       {
         "fullscreen": false,
@@ -94,6 +62,15 @@
         "title": "Track3 - Unlock the insights of your crypto assets.",
         "width": 1100
       }
-    ]
+    ],
+    "security": {
+      "assetProtocol": {
+        "scope": [
+          "$RESOURCE/**",
+          "$APPCACHE/**"
+        ],
+        "enable": true
+      }
+    }
   }
 }

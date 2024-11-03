@@ -1,7 +1,6 @@
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import qs from 'qs'
-import { HttpVerb } from '@tauri-apps/api/http'
 import { sendHttpRequest } from '../../utils/http'
 import _ from 'lodash'
 import bluebird from 'bluebird'
@@ -106,7 +105,7 @@ export class KrakenExchange implements Exchanger {
 		return this.fetchTotalBalance().then(() => true).catch(() => false)
 	}
 
-	private async fetch<T>(method: HttpVerb, path: string, postData: {} = {}): Promise<T> {
+	private async fetch<T>(method: "GET" | "POST", path: string, postData: {} = {}): Promise<T> {
 		const nonce = "" + Date.now()
 		const param = {
 			nonce,

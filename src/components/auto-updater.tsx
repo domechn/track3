@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { checkUpdate, installUpdate } from "@tauri-apps/api/updater";
+import { check } from "@tauri-apps/plugin-updater";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { reloadApp } from '@/utils/app'
@@ -13,10 +13,10 @@ const App = () => {
   }, []);
 
   function autoInstallLatestVersion() {
-    checkUpdate()
-      .then(async (res) => {
-        if (res.shouldUpdate && res.manifest?.version) {
-          await installUpdate();
+    check()
+      .then(async (update) => {
+        if (update?.available) {
+          await update.downloadAndInstall();
           return true;
         }
         return false;
