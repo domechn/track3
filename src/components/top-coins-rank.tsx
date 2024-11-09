@@ -2,7 +2,7 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timeToDateStr } from "@/utils/date";
 import { TDateRange, TopCoinsRankData } from "@/middlelayers/types";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
 import _ from "lodash";
@@ -152,6 +152,8 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     };
   }
 
+  const lineDataMemo = useMemo(() => lineData(), [topCoinsRankData]);
+
   return (
     <div>
       <Card>
@@ -171,7 +173,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
               <Line
                 ref={chartRef}
                 options={options as any}
-                data={lineData()}
+                data={lineDataMemo}
               />,
               "mt-4",
               10

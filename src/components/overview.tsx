@@ -18,6 +18,7 @@ import {
 } from "./ui/collapsible";
 import { Button } from "./ui/button";
 import { CaretSortIcon } from "@radix-ui/react-icons";
+import AssetsPercentageChange from './assets-percentage-change'
 
 const App = ({
   currency,
@@ -50,6 +51,7 @@ const App = ({
               ></PNL>
             </div>
           </div>
+          <AssetsPercentageChange dateRange={dateRange} />
           <LatestAssetsPercentage currency={currency} dateRange={dateRange} />
           <Profit
             currency={currency}

@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
-import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, TransactionType, UserLicenseInfo, WalletCoinUSD } from './types'
+import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetsPercentageChangeData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, TransactionType, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices } from './data'
 import { getConfiguration } from './configuration'
@@ -532,6 +532,45 @@ export async function queryPNLTableValue(): Promise<PNLTableDate> {
 		sevenTPnl: getPNL(8),
 		thirtyPNL: getPNL(31),
 	}
+}
+
+// return top 10 and other coins' percentage change during the date range
+export async function queryAssetsPercentageChange(dataRange: TDateRange): Promise<AssetsPercentageChangeData> {
+	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dataRange.start, dataRange.end)
+	const reservedAssets = _(assets).reverse().value()
+	const getPercentages = (asts: AssetModel[]): {
+		timestamp: number,
+		data: {
+			symbol: string,
+			percentage: number
+		}[]
+	} => {
+		const total = _(asts).sumBy("value")
+		// get top 10 coins and their percentage change
+		if (total === 0) {
+			return {
+				timestamp: new Date(asts[0]?.createdAt).getTime(),
+				data: _(asts).map(a => ({
+					symbol: a.symbol,
+					percentage: 0
+				})).value()
+			}
+		}
+
+		return {
+			timestamp: new Date(asts[0]?.createdAt).getTime(),
+			data: _(asts).map(a => ({
+				symbol: a.symbol,
+				percentage: a.value / total * 100
+			})).value()
+		}
+	}
+
+	const data = _(reservedAssets).map((asts) => getPercentages(asts)).value()
+	return _(data).map(d => ({
+		timestamp: d.timestamp,
+		percentages: d.data,
+	})).value()
 }
 
 export async function queryTopCoinsRank(dateRange: TDateRange, maxSize = DATA_MAX_POINTS): Promise<TopCoinsRankData> {
