@@ -7,6 +7,7 @@ import { Line } from "react-chartjs-2";
 import { ChartResizeContext } from "@/App";
 import {
   queryAssetsPercentageChange,
+  queryTopNAssets,
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
@@ -14,12 +15,11 @@ import { timeToDateStr } from "@/utils/date";
 import _ from "lodash";
 import { generateRandomColors } from "@/utils/color";
 
-const chartName = "Top Coins";
-
-const topN = ["BTC", "ETH", "USDT", "BNB", "SOL", "DOGE"];
+const chartName = "Coins Percentage Overview";
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
+  const [topN, setTopN] = useState<string[]>([]);
   const { needResize } = useContext(ChartResizeContext);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,15 +35,16 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   }, [dateRange]);
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  const colors = useMemo(() => generateRandomColors(topN.length + 1), []);
+  const colors = useMemo(() => generateRandomColors(topN.length + 1), [topN]);
 
   async function loadData(dr: TDateRange) {
     updateLoading(true);
 
     try {
+      const topN = await queryTopNAssets(dr, 6);
       const data = await queryAssetsPercentageChange(dr);
-      console.log(data);
 
+      setTopN(topN);
       setAssetsPercentageChangeData(data);
     } finally {
       updateLoading(false);
@@ -82,6 +83,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         display: true,
       },
       tooltip: {
+        itemSort: (a: any, b: any) => b.parsed.y - a.parsed.y,
         // mode: "index",
         callbacks: {
           label: (context: {
@@ -110,15 +112,16 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       y: {
         stacked: true,
         beginAtZero: true,
-	max: 100,
+        reverse: true,
+        max: 100,
         title: {
           display: false,
         },
         ticks: {
           precision: 0,
-	  stepSize: 25,
+          stepSize: 25,
           callback: function (value: number) {
-            return value + "%";
+            return 100 - value + "%";
           },
         },
         grid: {
@@ -131,6 +134,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   function lineData() {
     const topNDatasets = _(topN)
       .map((s, idx) => {
+        const colorIdx = idx;
         return {
           label: s,
           data: _(assetsPercentageChangeData)
@@ -139,7 +143,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                 _(d.percentages).find((p) => p.symbol === s)?.percentage ?? 0
             )
             .value(),
-          backgroundColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 0.5)`,
+          backgroundColor: `rgba(${colors[colorIdx].R}, ${colors[colorIdx].G}, ${colors[colorIdx].B}, 1)`,
           fill: true,
           borderWidth: 0,
           pointStyle: false as any,
@@ -169,7 +173,10 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     };
   }
 
-  const lineDataMemo = useMemo(() => lineData(), [assetsPercentageChangeData]);
+  const lineDataMemo = useMemo(
+    () => lineData(),
+    [assetsPercentageChangeData, topN, colors]
+  );
 
   return (
     <div>

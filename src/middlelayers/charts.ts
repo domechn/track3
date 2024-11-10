@@ -534,6 +534,13 @@ export async function queryPNLTableValue(): Promise<PNLTableDate> {
 	}
 }
 
+// returns top n coin symbols which have most value during the date range
+export async function queryTopNAssets(dateRange: TDateRange, n: number): Promise<string[]> {
+	const assets = await ASSET_HANDLER.listTopNAssetsByDateRange(n, dateRange.start, dateRange.end)
+
+	return _(assets).map(a => a.symbol).value()
+}
+
 // return top 10 and other coins' percentage change during the date range
 export async function queryAssetsPercentageChange(dataRange: TDateRange): Promise<AssetsPercentageChangeData> {
 	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dataRange.start, dataRange.end)
