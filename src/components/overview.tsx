@@ -18,6 +18,7 @@ import {
 } from "./ui/collapsible";
 import { Button } from "./ui/button";
 import { CaretSortIcon } from "@radix-ui/react-icons";
+import AssetsPercentageChange from "./assets-percentage-change";
 
 const App = ({
   currency,
@@ -64,6 +65,7 @@ const App = ({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2">
+          <AssetsPercentageChange dateRange={dateRange} />
           <TopCoinsRank dateRange={dateRange} />
           <TopCoinsPercentageChange dateRange={dateRange} />
         </CollapsibleContent>

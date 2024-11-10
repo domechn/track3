@@ -83,6 +83,19 @@ class AssetHandler implements AssetHandlerImpl {
 		return results || []
 	}
 
+	// return total value of each query and order by createdAt asc
+	async listTopNAssetsByDateRange(n: number, start?: Date, end?: Date): Promise<{
+		symbol: string,
+		totalValue: number,
+	}[]> {
+		const sql = `SELECT symbol, sum(value) as totalValue FROM ${this.assetTableName} WHERE 1=1 ${start ? " AND createdAt >= ?" : ""} ${end ? " AND createdAt <= ?" : ""} GROUP BY symbol ORDER BY totalValue DESC LIMIT ${n}`
+		const results = await selectFromDatabaseWithSql<{
+			symbol: string,
+			totalValue: number,
+		}>(sql, _([start, end]).compact().map(d => d.toISOString()).value())
+		return results || []
+	}
+
 	// list assets by symbol without grouping
 	async listAssetsBySymbol(symbol: string, size?: number): Promise<AssetModel[][]> {
 		return this.queryAssets(size, symbol)
