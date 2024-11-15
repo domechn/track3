@@ -143,8 +143,14 @@ export class OkxExchange implements Exchanger {
 	// onchain staking
 	private async fetchStakingDefiBalance(): Promise<{ [k: string]: number }> {
 		const path = "/finance/staking-defi/orders-active"
-		const resp = await this.fetch<{ data: { ccy: string, investData: { amt: string }[] } }>("GET", path, "")
-		return _(resp.data).keyBy("ccy").mapValues("investData").mapValues(v => _(v).map("amt").map(parseFloat).sum()).value()
+		const resp = await this.fetch<{ data: { ccy: string, investData: { amt: string }[] }[] }>("GET", path, "")
+		const res: { [k: string]: number } = {}
+		_(resp.data).forEach(d => {
+			const sum = _(d.investData).map("amt").map(parseFloat).sum()
+			res[d.ccy] = (res[d.ccy] || 0) + sum
+		})
+
+		return res
 	}
 
 	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {
