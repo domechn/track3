@@ -40,7 +40,7 @@ type ComparisonData = {
   head: number;
 };
 
-type QuickCompareType = "7D" | "1M" | "1Q" | "1Y";
+type QuickCompareType = "7D" | "1M" | "1Y" | "YTD" | "ALL";
 
 const App = ({
   currency,
@@ -144,9 +144,10 @@ const App = ({
 
     // get days from QuickCompareType
     const days = parseDaysQuickCompareType(currentQuickCompare);
-    const baseDate = new Date(
-      parseDateToTS(latestDate.label) - days * 24 * 60 * 60 * 1000
-    );
+    const baseDate =
+      days >= 0
+        ? new Date(parseDateToTS(latestDate.label) - days * 24 * 60 * 60 * 1000)
+        : new Date(0);
 
     // find the closest date
     const closestDate = _(dateOptions)
@@ -169,10 +170,17 @@ const App = ({
         return 7;
       case "1M":
         return 30;
-      case "1Q":
-        return 90;
       case "1Y":
         return 365;
+      case "YTD":
+        const today = new Date();
+        const year = today.getFullYear();
+        const firstDayOfYear = new Date(year, 0, 1);
+        return Math.floor(
+          (today.getTime() - firstDayOfYear.getTime()) / (24 * 60 * 60 * 1000)
+        );
+      case "ALL":
+        return -1;
       default:
         return 0;
     }
@@ -369,8 +377,9 @@ const App = ({
           >
             <ButtonGroupItem value="7D">7D</ButtonGroupItem>
             <ButtonGroupItem value="1M">1M</ButtonGroupItem>
-            <ButtonGroupItem value="1Q">1Q</ButtonGroupItem>
             <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
+            <ButtonGroupItem value="YTD">YTD</ButtonGroupItem>
+            <ButtonGroupItem value="ALL">ALL</ButtonGroupItem>
           </ButtonGroup>
         </div>
       </div>
