@@ -1,7 +1,7 @@
 [package]
 authors = ["domechn"]
 description = "Analyze all your crypto assets in cex and web3 wallet."
-edition = "2024"
+edition = "2021"
 license = "CC-BY-NC-ND-4.0"
 name = "track3"
 repository = "https://gituhb.com/domechn/track3"
