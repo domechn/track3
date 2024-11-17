@@ -1,11 +1,11 @@
 [package]
 authors = ["domechn"]
-description = "A Tauri App"
+description = "Analyze all your crypto assets in cex and web3 wallet."
 edition = "2021"
-license = ""
+license = "CC-BY-NC-ND-4.0"
 name = "track3"
-repository = ""
-rust-version = "1.57"
+repository = "https://gituhb.com/domechn/track3"
+rust-version = "1.80"
 version = "0.5.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
