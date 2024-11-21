@@ -206,8 +206,12 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 	const allTransactionsAssetIdMap = _(allTransactions).flatten().groupBy("assetID").mapValues(t => t[0]).value()
 
 	const dateRangeEarliestAssets = _(earliestAssets).groupBy("symbol").map((assets, symbol) => {
-		const allAmount = _(assets).sumBy("amount")
-		const allValue = _(assets).map(a => (allTransactionsAssetIdMap[a.id]?.price ?? a.price) * a.amount).sum()
+		const bsAssets = _(assets).filter(a => {
+			const txn = allTransactionsAssetIdMap[a.id]
+			return !txn || isTransactionBuyOrSell(txn)
+		}).value()
+		const allAmount = _(bsAssets).sumBy("amount")
+		const allValue = _(bsAssets).map(a => (allTransactionsAssetIdMap[a.id]?.price ?? a.price) * a.amount).sum()
 		return {
 			symbol,
 			price: allAmount === 0 ? 0 : allValue / allAmount,
@@ -220,7 +224,7 @@ export async function calculateTotalProfit(dateRange: TDateRange, symbol?: strin
 
 	const groupedTransactions = _(allTransactions).flatten().groupBy("symbol").map((txns, symbol) => {
 		const symbolTxns = _(txns).sortBy('txnCreatedAt').map(txn => {
-			if (txn.txnType !== "buy" && txn.txnType !== "sell") {
+			if (!isTransactionBuyOrSell(txn)) {
 				return
 			}
 
@@ -903,4 +907,8 @@ function transformTransactionModelToAssetAction(txn: TransactionModel): AssetAct
 		price: txn.price,
 		changedAt: txn.txnCreatedAt
 	}
+}
+
+function isTransactionBuyOrSell(txn: Transaction) {
+	return txn.txnType === "buy" || txn.txnType === "sell"
 }
