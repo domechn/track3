@@ -272,21 +272,21 @@ const App = ({
 
   const breakevenPrice = useMemo(() => {
     if (!lastAsset) {
-      return -1;
+      return;
     }
     if (lastAsset.amount === 0) {
-      return profit > 0 ? 0 : -1;
+      return profit > 0 ? 0 : undefined;
     }
     return (lastAsset.price * lastAsset.amount - profit) / lastAsset.amount;
   }, [profit, lastAsset]);
 
   const breakEvenPriceStr = useMemo(
     () =>
-      breakevenPrice < 0
+      breakevenPrice === undefined
         ? "∞"
         : currency.symbol +
           prettyPriceNumberToLocaleString(
-            currencyWrapper(currency)(breakevenPrice)
+            currencyWrapper(currency)(_.max([breakevenPrice, 0]) || 0)
           ),
     [currency, breakevenPrice]
   );
