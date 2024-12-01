@@ -49,6 +49,11 @@ export function prettyPriceNumberToLocaleString(value: number) {
 			break
 		}
 	}
+	// if there are over 3 0 between 0. and first non zero number, simplify 0.00000001 => 0.0(7)1
+	if (last0 >= 5) {
+		return str.substring(0, 3) + "(" + (last0 - 2) + ")" + str.substring(last0 + 1, last0 + 4)
+	}
+
 	return str.substring(0, last0 + 4)
 }
 
