@@ -42,6 +42,7 @@ jobs:
             rustup target add x86_64-apple-darwin
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
+        shell: bash
         run: |
           yarn config set cacheFolder ~/.yarn/cache
           echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
