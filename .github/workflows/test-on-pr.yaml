@@ -42,7 +42,9 @@ jobs:
             rustup target add x86_64-apple-darwin
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: |
+          yarn config set cacheFolder ~/.yarn/cache
+          echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
       - name: Yarn cache
         uses: actions/cache@v4
         id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
