@@ -39,7 +39,7 @@
         "depends": []
       }
     },
-    "createUpdaterArtifacts": "v1Compatible"
+    "createUpdaterArtifacts": true
   },
   "productName": "track3",
   "mainBinaryName": "track3",
