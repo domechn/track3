@@ -37,6 +37,7 @@
     "fs:default",
     "sql:default",
     "sql:allow-execute",
-    "updater:allow-check"
+    "updater:allow-check",
+    "updater:allow-download-and-install"
   ]
 }
