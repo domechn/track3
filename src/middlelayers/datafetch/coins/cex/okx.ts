@@ -143,10 +143,22 @@ export class OkxExchange implements Exchanger {
 	// onchain staking
 	private async fetchStakingDefiBalance(): Promise<{ [k: string]: number }> {
 		const path = "/finance/staking-defi/orders-active"
-		const resp = await this.fetch<{ data: { ccy: string, investData: { amt: string }[] }[] }>("GET", path, "")
+		const resp = await this.fetch<{ data: { state: string, ccy: string, investData: { amt: string }[] }[] }>("GET", path, "")
 		const res: { [k: string]: number } = {}
+		// todo: improve logic here
+		const maxInstantRedeem: { [k: string]: number } = {
+			'USDT': 20000,
+			'USDC': 10000,
+		}
+
 		_(resp.data).forEach(d => {
-			const sum = _(d.investData).map("amt").map(parseFloat).sum()
+			// 2 is redeeming, the instant redeem amount will be in funding wallet instantly
+			let sum = _(d.investData).map("amt").map(parseFloat).sum()
+			if (d.state === '2') {
+				if (maxInstantRedeem[d.ccy] !== undefined) {
+					sum = Math.max(0, sum - maxInstantRedeem[d.ccy])
+				}
+			}
 			res[d.ccy] = (res[d.ccy] || 0) + sum
 		})
 
