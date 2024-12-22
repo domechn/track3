@@ -152,12 +152,7 @@ export class OkxExchange implements Exchanger {
 		const path = "/finance/staking-defi/offers"
 		const resp = await this.fetch<{ data: { ccy: string, productId: string, fastRedemptionDailyLimit: string }[] }>("GET", path, "")
 
-		const limits = _(resp.data).keyBy("productId").mapValues("fastRedemptionDailyLimit").mapValues(limit => {
-			if (!limit) {
-				return 0
-			}
-			return parseFloat(limit)
-		}).value()
+		const limits = _(resp.data).keyBy("productId").mapValues("fastRedemptionDailyLimit").mapValues(limit => parseFloat(limit) || 0).value()
 
 		cache.setCache(cacheKey, limits)
 		return limits
