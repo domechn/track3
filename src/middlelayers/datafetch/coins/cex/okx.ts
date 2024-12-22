@@ -3,6 +3,7 @@ import { Exchanger } from './cex'
 import { sendHttpRequest } from '../../utils/http'
 import _ from 'lodash'
 import bluebird from 'bluebird'
+import { getMemoryCacheInstance } from '../../utils/cache'
 
 type AccountBalanceResp = {
 	data: {
@@ -140,23 +141,37 @@ export class OkxExchange implements Exchanger {
 		return _(resp.data).keyBy("ccy").mapValues("amt").mapValues(v => parseFloat(v)).value()
 	}
 
+	// key is productId
+	private async fetchStakingDefiFastRedemptionDailyLimits(): Promise<{ [k: string]: number }> {
+		const cache = getMemoryCacheInstance()
+		const cacheKey = "okx-staking-defi-fast-redemption-daily-limit"
+		const cacheValue = cache.getCache<{ [k: string]: number }>(cacheKey)
+		if (cacheValue) {
+			return cacheValue
+		}
+		const path = "/finance/staking-defi/offers"
+		const resp = await this.fetch<{ data: { ccy: string, productId: string, fastRedemptionDailyLimit: string }[] }>("GET", path, "")
+
+		const limits = _(resp.data).keyBy("productId").mapValues("fastRedemptionDailyLimit").mapValues(limit => parseFloat(limit) || 0).value()
+
+		cache.setCache(cacheKey, limits)
+		return limits
+	}
+
 	// onchain staking
 	private async fetchStakingDefiBalance(): Promise<{ [k: string]: number }> {
 		const path = "/finance/staking-defi/orders-active"
-		const resp = await this.fetch<{ data: { state: string, ccy: string, investData: { amt: string }[] }[] }>("GET", path, "")
+		const resp = await this.fetch<{ data: { productId: string, state: string, ccy: string, investData: { amt: string }[] }[] }>("GET", path, "")
 		const res: { [k: string]: number } = {}
-		// todo: improve logic here
-		const maxInstantRedeem: { [k: string]: number } = {
-			'USDT': 20000,
-			'USDC': 10000,
-		}
+		const maxInstantRedeem = await this.fetchStakingDefiFastRedemptionDailyLimits()
 
 		_(resp.data).forEach(d => {
 			// 2 is redeeming, the instant redeem amount will be in funding wallet instantly
 			let sum = _(d.investData).map("amt").map(parseFloat).sum()
 			if (d.state === '2') {
-				if (maxInstantRedeem[d.ccy] !== undefined) {
-					sum = Math.max(0, sum - maxInstantRedeem[d.ccy])
+				const limit = maxInstantRedeem[d.productId]
+				if (limit !== undefined) {
+					sum = Math.max(0, sum - limit)
 				}
 			}
 			res[d.ccy] = (res[d.ccy] || 0) + sum
