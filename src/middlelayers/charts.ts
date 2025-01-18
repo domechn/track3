@@ -128,6 +128,19 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 		price: t.price,
 	})).value()
 
+	// check if there are assets without price, if exits, use the last price
+	// sometimes coin price is provided by erc20 provider or cex, so it may not be existed in coin price query service ( coingecko )
+	_(assets).forEach(a => {
+		if (_(assetRes).findIndex(ar => ar.symbol === a.symbol) === -1) {
+			assetRes.push({
+				symbol: a.symbol,
+				amount: a.amount,
+				value: a.value,
+				price: a.price,
+			})
+		}
+	})
+
 	// 15 min ttl
 	cache.setCache(cacheKey, assetRes, 15 * 60)
 	return assetRes
