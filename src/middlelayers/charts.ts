@@ -121,12 +121,23 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 		wallet: a.wallet ?? OthersAnalyzer.wallet
 	})).value(), config, lastAssets, userProInfo)
 
-	const assetRes = _(walletCoins).map(t => ({
-		symbol: t.symbol,
-		amount: t.amount,
-		value: t.usdValue,
-		price: t.price,
-	})).value()
+	const assetRes = _(walletCoins).map(t => {
+		const ast = {
+			symbol: t.symbol,
+			amount: t.amount,
+			value: t.usdValue,
+			price: t.price,
+		}
+		// check if there are assets without price, if exits, use the last price
+		// sometimes coin price is provided by erc20 provider or cex, so it may not be existed in coin price query service ( coingecko )
+		const lastAst = _(assets).find(a => a.symbol === t.symbol)
+		if (lastAst && ast.amount !== lastAst.amount) {
+			ast.amount = lastAst.amount
+			ast.value = lastAst.value
+			ast.price = lastAst.price
+		}
+		return ast
+	}).value()
 
 	// 15 min ttl
 	cache.setCache(cacheKey, assetRes, 15 * 60)
