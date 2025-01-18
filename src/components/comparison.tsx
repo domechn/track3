@@ -466,7 +466,7 @@ const App = ({
                       key={"comparison" + index}
                       className={item.type !== "value" ? "border-none" : ""}
                     >
-                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell className="font-medium max-w-[100px] truncate">{item.name}</TableCell>
                       <TableCell>{item.base}</TableCell>
                       <TableCell
                         className={`text-center text-${item.color}-500`}

@@ -480,9 +480,7 @@ const App = ({
             <TableCell>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <button
-                    disabled={deleting}
-                  >
+                  <button disabled={deleting}>
                     <img
                       src={DeleteIcon}
                       alt="delete"
