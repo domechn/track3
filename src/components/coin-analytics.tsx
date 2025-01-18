@@ -711,7 +711,7 @@ const App = ({
                         aria-expanded={coinSelectOpen}
                         className="h-[100%] w-[100%] text-2xl font-bold border-none shadow-none focus:ring-0 flex justify-between items-center"
                       >
-                        <div>{symbol}</div>
+                        <div className='truncate'>{symbol}</div>
                         <CaretSortIcon className="h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>

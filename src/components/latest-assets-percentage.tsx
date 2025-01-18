@@ -279,7 +279,7 @@ const App = ({
                                 )
                               : prettyPriceNumberToLocaleString(d.amount)}
                           </div>
-                          <div className="text-gray-600">{d.coin}</div>
+                          <div className="text-gray-600 truncate">{d.coin}</div>
                           <OpenInNewWindowIcon className="ml-2 h-4 w-4 hidden group-hover:inline-block text-gray-600" />
                         </div>
                       </TableCell>
