@@ -8,7 +8,6 @@ import {
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
-  prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
 import _ from "lodash";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
