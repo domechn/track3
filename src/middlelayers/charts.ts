@@ -2,7 +2,7 @@ import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
 import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetsPercentageChangeData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, TransactionType, UserLicenseInfo, WalletCoinUSD } from './types'
 
-import { loadPortfolios, queryCoinPrices } from './data'
+import { loadPortfolios, queryCoinPrices, queryStableCoins } from './data'
 import { getConfiguration } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
 import { timeToDateStr } from '../utils/date'
@@ -17,7 +17,6 @@ import { GlobalConfig, WalletCoin } from './datafetch/types'
 import { CACHE_GROUP_KEYS } from './consts'
 import { TRANSACTION_HANDLER } from './entities/transactions'
 
-const STABLE_COIN = ["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDD", "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "BUSD"]
 // if data length is greater than 100, only take 100 data points
 const DATA_MAX_POINTS = 100
 
@@ -338,13 +337,18 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		addProgress(10)
 	}
 
+	const stableCoins = await queryStableCoins()
+
+	const upperCaseStableCoins = _(stableCoins).map(c => c.toUpperCase()).value()
+
 	let latestAssets = _.clone(assets)
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
 
 	if (groupUSD) {
 		_(assets).groupBy('wallet').forEach((coins, wallet) => {
-			const usdAmount = _(coins).filter(c => STABLE_COIN.includes(c.symbol)).map(c => c.amount).sum()
-			const removedUSDCoins = _(coins).filter(c => !STABLE_COIN.includes(c.symbol)).value()
+			// not case sensitive
+			const usdAmount = _(coins).filter(c => upperCaseStableCoins.includes(c.symbol.toUpperCase())).map(c => c.amount).sum()
+			const removedUSDCoins = _(coins).filter(c => !upperCaseStableCoins.includes(c.symbol.toUpperCase())).value()
 			latestAssets = _(latestAssets).filter(a => a.wallet !== wallet).concat(removedUSDCoins).value()
 			if (usdAmount > 0) {
 				latestAssets.push({
