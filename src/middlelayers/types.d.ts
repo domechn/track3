@@ -194,6 +194,7 @@ export type WalletAssetsPercentageData = {
 	walletAlias?: string
 	percentage: number
 	value: number
+	amount: number
 	chartColor: string
 }[]
 
