@@ -19,7 +19,16 @@ import { getAutoBackupDirectory, getLastAutoImportAt, getLastAutoBackupAt, saveL
 import { CoinPriceQuerier, CoinPriceQuery, ProCoinPriceQuery } from './datafetch/coins/price'
 import { TonAnalyzer } from './datafetch/coins/ton'
 import { getClientID } from '@/utils/app'
+import { RemoteStableCoinsQuery, StableCoinsQuery } from './datafetch/coins/stable'
 
+export function queryStableCoins(): Promise<string[]> {
+	try {
+		return new RemoteStableCoinsQuery().listAllStableCoins()
+	} catch (e) {
+		console.error("failed to query stable coins", e)
+		return new StableCoinsQuery().listAllStableCoins()
+	}
+}
 
 export async function queryCoinPrices(symbols: string[], userInfo: UserLicenseInfo): Promise<{ [k: string]: number }> {
 	let cpq: CoinPriceQuerier
