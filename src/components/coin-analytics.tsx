@@ -941,6 +941,7 @@ const App = ({
         currency={currency}
         dateRange={dateRange}
         symbol={symbol}
+        displayAmount={true}
       />
       <HistoryTable />
     </div>

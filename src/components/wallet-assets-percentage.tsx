@@ -29,10 +29,12 @@ const App = ({
   currency,
   dateRange,
   symbol,
+  displayAmount,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   symbol?: string;
+  displayAmount?: boolean;
 }) => {
   const size = useWindowSize();
   const chartRef = useRef<ChartJSOrUndefined<"pie", string[], unknown>>(null);
@@ -106,7 +108,7 @@ const App = ({
         callbacks: {
           label: (context: { dataIndex: number; parsed: number }) => {
             const p = walletAssetsPercentage[context.dataIndex];
-            if (p) {
+            if (p && displayAmount) {
               return `${prettyNumberKeepNDigitsAfterDecimalPoint(
                 p.amount,
                 4
