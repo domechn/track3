@@ -106,13 +106,15 @@ export class WalletAnalyzer {
 		return this.walletAliases
 	}
 
-	loadWalletTotalAssetsValue(models: AssetModel[]): { wallet: string, total: number }[] {
+	loadWalletTotalAssetsValue(models: AssetModel[]): { wallet: string, total: number, amount: number }[] {
 		return _(models).groupBy('wallet')
 			.map((walletAssets, wallet) => {
 				const total = _(walletAssets).sumBy("value")
+				const amount = _(walletAssets).sumBy("amount")
 				return {
 					wallet,
 					total,
+					amount,
 				}
 			}).value()
 	}
@@ -140,6 +142,7 @@ export class WalletAnalyzer {
 			chartColor: `rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`,
 			percentage: wa.total / total * 100,
 			value: wa.total,
+			amount: wa.amount,
 		})).sortBy("percentage").reverse().value()
 	}
 

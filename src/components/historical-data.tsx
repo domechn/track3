@@ -20,6 +20,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { timeToDateStr } from "@/utils/date";
 import {
   currencyWrapper,
+  prettyNumberKeepNDigitsAfterDecimalPoint,
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
@@ -463,7 +464,7 @@ const App = ({
                 textAlign: "end",
               }}
             >
-              <p>{d.amount}</p>
+              <p>{prettyNumberKeepNDigitsAfterDecimalPoint(d.amount, 4)}</p>
             </TableCell>
             <TableCell
               style={{

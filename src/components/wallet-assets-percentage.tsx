@@ -5,7 +5,11 @@ import {
   TDateRange,
   WalletAssetsPercentageData,
 } from "@/middlelayers/types";
-import { currencyWrapper } from "@/utils/currency";
+import {
+  currencyWrapper,
+  prettyNumberKeepNDigitsAfterDecimalPoint,
+  prettyPriceNumberToLocaleString,
+} from "@/utils/currency";
 import _ from "lodash";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { insertEllipsis } from "@/utils/string";
@@ -40,7 +44,10 @@ const App = ({
     useState<WalletAssetsPercentageData>([]);
 
   const chartHasData = useMemo(
-    () => !_(walletAssetsPercentage).filter(p => p.value > 0).isEmpty(),
+    () =>
+      !_(walletAssetsPercentage)
+        .filter((p) => p.value > 0)
+        .isEmpty(),
     [walletAssetsPercentage]
   );
 
@@ -98,8 +105,16 @@ const App = ({
       },
       tooltip: {
         callbacks: {
-          label: (context: { parsed: number }) => {
-            return currency.symbol + context.parsed.toLocaleString();
+          label: (context: { dataIndex: number; parsed: number }) => {
+            const p = walletAssetsPercentage[context.dataIndex];
+            if (p) {
+              return `${prettyNumberKeepNDigitsAfterDecimalPoint(
+                p.amount,
+                4
+              )} / ${currency.symbol}${context.parsed.toLocaleString()}`;
+            }
+
+            return `${currency.symbol}${context.parsed.toLocaleString()}`;
           },
         },
       },
