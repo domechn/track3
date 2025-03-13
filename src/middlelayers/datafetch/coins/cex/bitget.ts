@@ -40,7 +40,6 @@ export class BitgetExchange implements Exchanger {
 	private readonly alias?: string
 
 	private readonly endpoint = "https://api.bitget.com"
-	private readonly apiPrefix = "/api"
 
 	constructor(
 		apiKey: string,
