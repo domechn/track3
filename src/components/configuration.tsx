@@ -238,6 +238,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       apiKey: string;
       secret: string;
       password?: string;
+      passphrase?: string;
       active: boolean;
     }[]
   >([]);
@@ -386,6 +387,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           apiKey: ex.apiKey,
           secret: ex.secret,
           password: ex.type !== "okex" ? undefined : ex.password,
+          passphrase: ex.type !== "bitget" ? undefined : ex.passphrase,
         },
         active: ex.active,
       }))
@@ -693,6 +695,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     apiKey: string;
     secret: string;
     password?: string;
+    passphrase?: string;
     alias?: string;
     active: boolean;
   }) {
