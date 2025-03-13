@@ -116,6 +116,10 @@ const cexOptions = [
     label: "OKX",
   },
   {
+    value: "bitget",
+    label: "Bitget",
+  },
+  {
     value: "gate",
     label: "Gate.io",
   },
@@ -189,7 +193,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         type: string;
         apiKey: string;
         secret: string;
+        // for okx
         password?: string;
+        // for bitget
+        passphrase?: string;
         alias?: string;
         active: boolean;
       }
@@ -700,6 +707,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     apiKey: string;
     secret: string;
     password?: string;
+    passphrase?: string;
     alias?: string;
   }) {
     const ana = new CexAnalyzer({
@@ -710,6 +718,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             apiKey: cfg.apiKey,
             secret: cfg.secret,
             password: cfg.password,
+            passphrase: cfg.passphrase,
           },
         },
       ],
@@ -736,6 +745,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     if (addExchangeConfig.type === "okex" && !addExchangeConfig.password) {
       toast({
         description: "Password is required for okex",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (addExchangeConfig.type === "bitget" && !addExchangeConfig.passphrase) {
+      toast({
+        description: "Passphrase is required for bitget",
         variant: "destructive",
       });
       return;
@@ -954,6 +971,25 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     setAddExchangeConfig({
                       ...(addExchangeConfig || defaultExChangeConfig),
                       password: e.target.value,
+                    })
+                  }
+                  className="col-span-3"
+                />
+              </div>
+            )}
+            {addExchangeConfig?.type === "bitget" && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="passphrase" className="text-right">
+                  Passphrase
+                </Label>
+                <Input
+                  id="passphrase"
+                  value={addExchangeConfig?.passphrase ?? ""}
+                  type="password"
+                  onChange={(e) =>
+                    setAddExchangeConfig({
+                      ...(addExchangeConfig || defaultExChangeConfig),
+                      passphrase: e.target.value,
                     })
                   }
                   className="col-span-3"
