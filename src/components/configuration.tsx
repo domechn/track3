@@ -297,6 +297,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               apiKey: ex.initParams.apiKey,
               secret: ex.initParams.secret,
               password: ex.initParams.password,
+              passphrase: ex.initParams.passphrase,
               active: ex.active ?? true,
             }))
             .value()
@@ -428,6 +429,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       apiKey: string;
       secret: string;
       password?: string;
+      passphrase?: string;
       active: boolean;
     }[]
   ) {
