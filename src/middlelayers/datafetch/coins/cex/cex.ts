@@ -7,6 +7,7 @@ import { OkxExchange } from './okx'
 import { getMemoryCacheInstance } from '../../utils/cache'
 import { GateExchange } from './gate'
 import { KrakenExchange } from './kraken'
+import { BitgetExchange } from './bitget'
 
 export interface Exchanger {
 	getExchangeName(): string
@@ -49,6 +50,11 @@ export class CexAnalyzer implements Analyzer {
 						throw new Error("okex password is required")
 					}
 					return new OkxExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.password, exCfg.alias)
+				case "bitget":
+					if (!exCfg.initParams.passphrase) {
+						throw new Error("bitget passphrase is required")
+					}
+					return new BitgetExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.initParams.passphrase, exCfg.alias)
 				case "gate":
 					return new GateExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				case "kraken":

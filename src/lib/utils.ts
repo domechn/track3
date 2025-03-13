@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge"
 import BinanceLogo from "@/assets/icons/binance-logo.svg"
 import GateLogo from "@/assets/icons/gate-logo.svg"
 import OkexLogo from "@/assets/icons/okex-logo.svg"
+import BitgetLogo from "@/assets/icons/bitget-logo.svg"
 import KrakenLogo from "@/assets/icons/kraken-logo.svg"
 import BTCLogo from "@/assets/icons/btc-logo.svg"
 import ETHLogo from "@/assets/icons/eth-logo.svg"
@@ -22,6 +23,8 @@ export function getWalletLogo(type: string) {
       return BinanceLogo
     case "okex":
       return OkexLogo
+    case "bitget":
+      return BitgetLogo
     case "gate":
       return GateLogo
     case "kraken":

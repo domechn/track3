@@ -30,7 +30,10 @@ export type CexConfig = {
 		initParams: {
 			apiKey: string
 			secret: string
+			// for okx
 			password?: string
+			// for bitget
+			passphrase?: string
 		},
 		alias?: string
 		active?: boolean
