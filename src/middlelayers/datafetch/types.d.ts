@@ -21,6 +21,8 @@ export interface Analyzer {
 export type GlobalConfig = CexConfig & TokenConfig & {
 	configs: {
 		groupUSD: boolean
+		// hide inactive exchanges and wallets
+		hideInactive?: boolean
 	}
 }
 
