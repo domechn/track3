@@ -59,11 +59,12 @@ import {
   TooltipTrigger,
 } from "./ui/tooltip";
 import { Switch } from "./ui/switch";
-import { SUIAnalyzer } from '@/middlelayers/datafetch/coins/sui'
+import { SUIAnalyzer } from "@/middlelayers/datafetch/coins/sui";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
     groupUSD: true,
+    hideInactive: false,
   },
   exchanges: [],
   erc20: {
@@ -184,6 +185,7 @@ const defaultBaseCurrency = "USD";
 const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const { toast } = useToast();
   const [groupUSD, setGroupUSD] = useState(true);
+  const [hideInactive, setHideInactive] = useState(false);
   const [querySize, setQuerySize] = useState(0);
   const [formChanged, setFormChanged] = useState(false);
   const [preferCurrency, setPreferCurrency] = useState(defaultBaseCurrency);
@@ -295,7 +297,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       .then((d) => {
         const globalConfig = d ?? initialConfiguration;
 
-        setGroupUSD(globalConfig.configs.groupUSD);
+        setGroupUSD(!!globalConfig.configs.groupUSD);
+        setHideInactive(!!globalConfig.configs.hideInactive);
 
         setExchanges(
           _(globalConfig.exchanges)
@@ -350,6 +353,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function onGroupUSDSelectChange(v: boolean) {
     setGroupUSD(!!v);
+
+    // mark form is changed
+    markFormChanged();
+  }
+
+  function onHideInactiveSelectChange(v: boolean) {
+    setHideInactive(!!v);
 
     // mark form is changed
     markFormChanged();
@@ -418,6 +428,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     return {
       configs: {
         groupUSD,
+        hideInactive,
       },
       exchanges: exchangesData,
       // expand wallet
@@ -550,7 +561,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     if (formChanged) {
       submitConfiguration();
     }
-  }, [formChanged, groupUSD, exchanges, wallets, others]);
+  }, [formChanged, hideInactive, groupUSD, exchanges, wallets, others]);
 
   function handleOthersChange(idx: number, key: string, val: string) {
     const nos = _.set(others, [idx, key], val);
@@ -1284,6 +1295,19 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             Group Stable Coins into USDT ( e.g. USDC, TUSD, DAI etc.)
           </Label>
         </div>
+        <div className="flex items-center space-x-2 mb-2">
+          <Checkbox
+            id="hideInactive"
+            checked={hideInactive}
+            onCheckedChange={(v) => onHideInactiveSelectChange(!!v)}
+          />
+          <Label
+            htmlFor="hideInactive"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Hide Inactive Wallets and Exchanges
+          </Label>
+        </div>
         <div className="space-y-2">
           <div className="text-sm font-bold text-left">Count of Results</div>
           <Select onValueChange={onQuerySizeChanged} value={querySize + ""}>
@@ -1354,13 +1378,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       <div className="space-y-2">
         <div className="text-l font-bold text-left">Exchanges</div>
         {renderAddExchangeForm()}
-        {renderExchangeForm(exchanges)}
+        {renderExchangeForm(exchanges.filter((e) => e.active || !hideInactive))}
       </div>
       <Separator />
       <div className="space-y-2">
         <div className="text-l font-bold text-left">Wallets</div>
         {renderAddWalletForm()}
-        {renderWalletForm(wallets)}
+        {renderWalletForm(wallets.filter((w) => w.active || !hideInactive))}
       </div>
       <Separator />
       <div className="space-y-2">
