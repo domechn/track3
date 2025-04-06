@@ -59,6 +59,7 @@ import {
   TooltipTrigger,
 } from "./ui/tooltip";
 import { Switch } from "./ui/switch";
+import { SUIAnalyzer } from '@/middlelayers/datafetch/coins/sui'
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -83,6 +84,9 @@ const initialConfiguration: GlobalConfig = {
   ton: {
     addresses: [],
   },
+  sui: {
+    addresses: [],
+  },
   others: [],
 };
 
@@ -104,7 +108,7 @@ const defaultOtherConfig = {
   amount: 0,
 };
 
-const supportCoins = ["btc", "erc20", "sol", "doge", "trc20", "ton"];
+const supportCoins = ["btc", "erc20", "sol", "doge", "trc20", "ton", "sui"];
 
 const cexOptions = [
   {
@@ -153,6 +157,10 @@ const walletOptions = [
   {
     value: "ton",
     label: "TON",
+  },
+  {
+    value: "sui",
+    label: "SUI",
   },
 ];
 
@@ -826,6 +834,11 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       case "ton":
         ana = new TonAnalyzer({
           ton: initPayload,
+        });
+        break;
+      case "sui":
+        ana = new SUIAnalyzer({
+          sui: initPayload,
         });
         break;
       case "doge":

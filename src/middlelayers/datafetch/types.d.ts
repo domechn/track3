@@ -57,6 +57,7 @@ export type TokenConfig = {
 	sol: Addresses
 	doge: Addresses
 	ton: Addresses
+	sui: Addresses
 	others: {
 		// current this field is only for display
 		alias?: string

@@ -20,6 +20,7 @@ import { CoinPriceQuerier, CoinPriceQuery, ProCoinPriceQuery } from './datafetch
 import { TonAnalyzer } from './datafetch/coins/ton'
 import { getClientID } from '@/utils/app'
 import { RemoteStableCoinsQuery, StableCoinsQuery } from './datafetch/coins/stable'
+import { SUIAnalyzer } from './datafetch/coins/sui'
 
 export function queryStableCoins(): Promise<string[]> {
 	try {
@@ -73,10 +74,10 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, lastAssets
 // progress percent is 70
 async function loadPortfoliosByConfig(config: CexConfig & TokenConfig, addProgress: AddProgressFunc, userInfo: UserLicenseInfo): Promise<WalletCoin[]> {
 	const progressPercent = 70
-	let anas: (typeof ERC20NormalAnalyzer | typeof ERC20ProAnalyzer | typeof CexAnalyzer | typeof SOLAnalyzer | typeof OthersAnalyzer | typeof BTCAnalyzer | typeof DOGEAnalyzer | typeof TRC20ProUserAnalyzer | typeof TonAnalyzer)[] = [ERC20NormalAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer, TonAnalyzer]
+	let anas: (typeof ERC20NormalAnalyzer | typeof ERC20ProAnalyzer | typeof CexAnalyzer | typeof SOLAnalyzer | typeof OthersAnalyzer | typeof BTCAnalyzer | typeof DOGEAnalyzer | typeof TRC20ProUserAnalyzer | typeof TonAnalyzer | typeof SUIAnalyzer)[] = [ERC20NormalAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer, TonAnalyzer, SUIAnalyzer]
 	if (userInfo.isPro) {
 		console.debug("pro license, use pro analyzers")
-		anas = [ERC20ProAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer, TRC20ProUserAnalyzer, TonAnalyzer]
+		anas = [ERC20ProAnalyzer, CexAnalyzer, SOLAnalyzer, OthersAnalyzer, BTCAnalyzer, DOGEAnalyzer, TRC20ProUserAnalyzer, TonAnalyzer, SUIAnalyzer]
 		// anas = [SOLAnalyzer]
 	} else {
 		console.debug("not pro license, fallback to normal analyzers")

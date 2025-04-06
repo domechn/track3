@@ -74,6 +74,10 @@ export class WalletAnalyzer {
 		handleWeb3Wallet(config.sol, "SOL")
 		// Tron
 		handleWeb3Wallet(config.trc20, "TRC20")
+		// Ton
+		handleWeb3Wallet(config.ton, "TON")
+		// Sui
+		handleWeb3Wallet(config.sui, "SUI")
 
 		const others = "others"
 		const Others = _(others).upperFirst()
