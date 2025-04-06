@@ -11,6 +11,7 @@ import SOLLogo from "@/assets/icons/sol-logo.svg"
 import DOGELogo from "@/assets/icons/doge-logo.svg"
 import TRONLogo from "@/assets/icons/tron-logo.svg"
 import TONLogo from "@/assets/icons/ton-logo.svg"
+import SUILogo from "@/assets/icons/sui-logo.svg"
 import UnknownLogo from "@/assets/icons/unknown-logo.svg"
 
 export function cn(...inputs: ClassValue[]) {
@@ -41,6 +42,8 @@ export function getWalletLogo(type: string) {
       return TRONLogo
     case "ton":
       return TONLogo
+    case "sui":
+      return SUILogo
     default:
       return UnknownLogo
   }
