@@ -12,6 +12,7 @@
 [![license][license-image]][license-url]
 [![release][release-image]][release-url]
 [![last commit][last-commit-image]][last-commit-url]
+[![wiki][wiki-image]][wiki-url]
 
 [author-image]: https://img.shields.io/badge/author-domechn-blue.svg
 [author-url]: https://github.com/domechn
@@ -21,6 +22,8 @@
 [release-url]: https://github.com/domechn/track3/releases/latest
 [last-commit-image]: https://img.shields.io/github/last-commit/domechn/track3?label=last%20commit
 [last-commit-url]: https://github.com/domechn/track3/commits
+[wiki-image]: https://img.shields.io/badge/wiki-by%20deepwiki-green?style=flat
+[wiki-url]: https://deepwiki.com/domechn/track3
 
 </div>
 
