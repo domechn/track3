@@ -456,7 +456,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       return _(exs)
         .map((ex, idx) => (
           <Card
-            key={ex.apiKey + idx}
+            key={ex.type + ex.apiKey + idx}
             className="cursor-pointer hover:shadow-lg group"
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
@@ -467,7 +467,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 <img
                   src={DeleteIcon}
                   className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
-                  onClick={() => handleRemoveExchange(idx)}
+                  onClick={() => handleRemoveExchange(ex.type, ex.apiKey)}
                 />
                 <img
                   className="h-4 w-4 text-muted-foreground"
@@ -487,7 +487,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 <Switch
                   id="airplane-mode"
                   checked={ex.active}
-                  onCheckedChange={() => handleActiveExchange(idx)}
+                  onCheckedChange={() =>
+                    handleActiveExchange(ex.type, ex.apiKey)
+                  }
                 />
               </div>
             </CardContent>
@@ -510,7 +512,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         .map((w, idx) => {
           return (
             <Card
-              key={w.address + idx}
+              key={w.type + w.address + idx}
               className="cursor-pointer hover:shadow-lg group"
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
@@ -521,7 +523,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   <img
                     src={DeleteIcon}
                     className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
-                    onClick={() => handleRemoveWallet(idx)}
+                    onClick={() => handleRemoveWallet(w.type, w.address)}
                   />
                   <img
                     src={getWalletLogo(w.type)}
@@ -540,7 +542,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   <Switch
                     id="airplane-mode"
                     checked={w.active}
-                    onCheckedChange={() => handleActiveWallet(idx)}
+                    onCheckedChange={() =>
+                      handleActiveWallet(w.type, w.address)
+                    }
                   />
                 </div>
               </CardContent>
@@ -642,14 +646,26 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       .value();
   }
 
-  function handleRemoveExchange(idx: number) {
+  function handleRemoveExchange(exchangeType: string, exchangeApiKey: string) {
+    const idx = _(exchanges).findIndex(
+      (ex) => ex.type === exchangeType && ex.apiKey === exchangeApiKey
+    );
+    if (idx < 0) {
+      throw new Error(`cannot find exchange ${exchangeType}/${exchangeApiKey}`);
+    }
     setExchanges(_.filter(exchanges, (_, i) => i !== idx));
 
     // mark form is changed
     markFormChanged();
   }
 
-  function handleActiveExchange(idx: number) {
+  function handleActiveExchange(exchangeType: string, exchangeApiKey: string) {
+    const idx = _(exchanges).findIndex(
+      (ex) => ex.type === exchangeType && ex.apiKey === exchangeApiKey
+    );
+    if (idx < 0) {
+      throw new Error(`cannot find exchange ${exchangeType}/${exchangeApiKey}`);
+    }
     setExchanges(
       _.map(exchanges, (ex, i) => {
         if (i === idx) {
@@ -689,14 +705,26 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     markFormChanged();
   }
 
-  function handleRemoveWallet(idx: number) {
+  function handleRemoveWallet(walletType: string, walletAddress: string) {
+    const idx = _(wallets).findIndex(
+      (w) => w.type === walletType && w.address === walletAddress
+    );
+    if (idx < 0) {
+      throw new Error(`cannot find wallet ${walletType}/${walletAddress}`);
+    }
     setWallets(_.filter(wallets, (_, i) => i !== idx));
 
     // mark form is changed
     markFormChanged();
   }
 
-  function handleActiveWallet(idx: number) {
+  function handleActiveWallet(walletType: string, walletAddress: string) {
+    const idx = _(wallets).findIndex(
+      (w) => w.type === walletType && w.address === walletAddress
+    );
+    if (idx < 0) {
+      throw new Error(`cannot find wallet ${walletType}/${walletAddress}`);
+    }
     setWallets(
       _.map(wallets, (w, i) => {
         if (i === idx) {
