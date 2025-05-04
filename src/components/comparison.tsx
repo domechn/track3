@@ -76,22 +76,28 @@ const App = ({
 
   const [shouldMaskValue, setShowDetail] = useState<boolean>(false);
 
+  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
+
   const displayData = useMemo(() => {
     return _(loadData(baseData, headData))
-      .map((d) => ({
-        name: d.name,
-        type: d.type,
-        base: showColumnVal(d, "base"),
-        head: showColumnVal(d, "head"),
-        cmp: prettyComparisonResult(d.base, d.head),
-        color:
-          prettyComparisonResult(d.base, d.head) === "-"
-            ? "black"
-            : positiveNegativeColor(
-                getComparisonResultNumber(d.base, d.head),
-                quoteColor
-              ),
-      }))
+      .map((d) => {
+        const cmp = prettyComparisonResult(d.type, d.base, d.head);
+        return {
+          name: d.name,
+          type: d.type,
+          base: showColumnVal(d, "base"),
+          head: showColumnVal(d, "head"),
+          cmpPercentage: cmp.cmpPercentage,
+          cmpValue: cmp.cmpValue,
+          color:
+            cmp.cmpPercentage === "-"
+              ? "black"
+              : positiveNegativeColor(
+                  getComparisonResultNumber(d.base, d.head),
+                  quoteColor
+                ),
+        };
+      })
       .value();
   }, [baseData, headData, shouldMaskValue]);
 
@@ -288,19 +294,40 @@ const App = ({
     return ((head - base) / base) * 100;
   }
 
-  function prettyComparisonResult(base: number, head: number): string {
+  function prettyComparisonResult(
+    type: "price" | "amount" | "value",
+    base: number,
+    head: number
+  ): {
+    cmpPercentage: string;
+    cmpValue: string;
+  } {
     const per = getComparisonResultNumber(base, head);
     const perStr = prettyNumberToLocaleString(per < 0 ? -per : per);
 
+    const diff = head - base;
+    const cmpValue = showColumnValByType(type, Math.abs(diff));
+
     if (perStr === "0.00" || perStr === "-0.00") {
-      return "-";
+      return {
+        cmpPercentage: "-",
+        cmpValue: "-",
+      };
     }
 
     if (per > 0) {
-      return "↑ " + perStr + "%";
+      const prefix = "↑ ";
+      return {
+        cmpPercentage: prefix + perStr + "%",
+        cmpValue: prefix + cmpValue,
+      };
     }
 
-    return "↓ " + perStr + "%";
+    const prefix = "↓ ";
+    return {
+      cmpPercentage: prefix + perStr + "%",
+      cmpValue: prefix + cmpValue,
+    };
   }
 
   function prettyNumber(
@@ -337,15 +364,16 @@ const App = ({
     item: ComparisonData,
     valType: "base" | "head"
   ): string {
-    const shouldMask = shouldMaskValue && item.type !== "price";
-    const shouldConvertCurrency =
-      item.type === "price" || item.type === "value";
-    return prettyNumber(
-      _(item).get(valType),
-      item.type,
-      shouldMask,
-      shouldConvertCurrency
-    );
+    return showColumnValByType(item.type, _(item).get(valType));
+  }
+
+  function showColumnValByType(
+    valType: "price" | "amount" | "value",
+    val: number
+  ) {
+    const shouldMask = shouldMaskValue && valType !== "price";
+    const shouldConvertCurrency = valType === "price" || valType === "value";
+    return prettyNumber(val, valType, shouldMask, shouldConvertCurrency);
   }
 
   function onQuickCompareButtonClick(type: QuickCompareType) {
@@ -465,13 +493,30 @@ const App = ({
                     <TableRow
                       key={"comparison" + index}
                       className={item.type !== "value" ? "border-none" : ""}
+                      onMouseEnter={() => setHoveredRowIndex(index)}
+                      onMouseLeave={() => setHoveredRowIndex(null)}
                     >
-                      <TableCell className="font-medium max-w-[100px] truncate">{item.name}</TableCell>
+                      <TableCell className="font-medium max-w-[100px] truncate">
+                        {item.name}
+                      </TableCell>
                       <TableCell>{item.base}</TableCell>
-                      <TableCell
-                        className={`text-center text-${item.color}-500`}
-                      >
-                        {item.cmp}
+                      <TableCell className={`text-${item.color}-500`}>
+                        <div className="h-6 overflow-hidden">
+                          <div
+                            className={`transform transition-all duration-300 ease-in-out ${
+                              hoveredRowIndex === index
+                                ? "-translate-y-6"
+                                : "translate-y-0"
+                            }`}
+                          >
+                            <div className="h-6 flex items-center justify-center">
+                              {item.cmpPercentage}
+                            </div>
+                            <div className="h-6 flex items-center justify-center">
+                              {item.cmpValue}
+                            </div>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">{item.head}</TableCell>
                     </TableRow>
