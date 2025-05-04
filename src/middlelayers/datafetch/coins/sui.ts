@@ -77,7 +77,7 @@ export class SUIAnalyzer implements Analyzer {
 				symbol: string
 				amount: string
 				rate: number
-				last_24h_price: {
+				last_24h_price?: {
 					// if price is 0, it means the token is not tradable, ignore it
 					price?: number
 				}
@@ -85,7 +85,7 @@ export class SUIAnalyzer implements Analyzer {
 			}[]
 		}>("GET", `${ep}/address/${address}/holding`, 20000)
 
-		return _(resp.data).filter(d => !d.is_spam && !!d.last_24h_price.price).map((v) => ({
+		return _(resp.data).filter(d => !d.is_spam && !!d.last_24h_price?.price).map((v) => ({
 			symbol: v.symbol,
 			amount: parseInt(v.amount) || 0,
 			price: v.rate,
