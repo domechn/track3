@@ -375,6 +375,9 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		if (t.usdValue > 1) {
 			return true
 		}
+		if (t.symbol === "BTC") {
+			return true
+		}
 		const totalWallet = md5(t.wallet)
 		const lastAsset = _(lastAssets).find(a => a.symbol === t.symbol && (a.wallet === totalWallet || a.wallet === t.wallet))
 
