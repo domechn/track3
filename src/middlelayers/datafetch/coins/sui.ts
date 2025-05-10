@@ -87,7 +87,7 @@ export class SUIAnalyzer implements Analyzer {
 
 		return _(resp.data).filter(d => !d.is_spam && !!d.last_24h_price?.price).map((v) => ({
 			symbol: v.symbol,
-			amount: parseInt(v.amount) || 0,
+			amount: parseFloat(v.amount) || 0,
 			price: v.rate,
 		})).filter(v => v.amount > 0 && v.price > 0).value()
 
