@@ -66,7 +66,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tauri-plugin-context-menu": "^0.8.0",
     "uuid": "^9.0.0",
-    "yaml": "^2.2.2"
+    "yaml": "^2.7.1"
   },
   "devDependencies": {
     "@actions/github": "^5.1.1",
