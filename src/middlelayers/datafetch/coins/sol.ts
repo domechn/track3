@@ -55,6 +55,7 @@ export class SOLAnalyzer implements Analyzer {
 				const coinLists = await this.query(rpcUrl, addresses)
 				return _(coinLists).map((amount, idx) => ({
 					amount,
+					chain: "solana",
 					wallet: addresses[idx],
 					symbol: "SOL"
 				})).value()

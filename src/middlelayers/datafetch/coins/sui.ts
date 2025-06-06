@@ -38,10 +38,11 @@ export class SUIAnalyzer implements Analyzer {
 			amount: p.amount,
 			price: {
 				value: p.price,
-				base: 'usd',
+				base: 'usd' as 'usd',
 			},
 			wallet: address,
-		} as WalletCoin)).value()
+			chain: 'sui',
+		})).value()
 	}
 
 	// price is in usd

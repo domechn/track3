@@ -1,4 +1,4 @@
-import { Analyzer, Coin, TokenConfig, WalletCoin } from '../types'
+import { Analyzer, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { asyncMap } from '../utils/async'
 import { sendHttpRequest } from '../utils/http'
@@ -33,6 +33,15 @@ class ERC20RPCQuery implements ERC20Querier {
 		}
 	}
 
+	private getChain(): string {
+		if (this.mainSymbol === 'ETH') {
+			return "ethereum"
+		} else if (this.mainSymbol === 'BNB') {
+			return "bsc"
+		}
+		return "unknown"
+	}
+
 	async query(addresses: string[]): Promise<WalletCoin[]> {
 		if (addresses.length === 0) {
 			return []
@@ -65,6 +74,7 @@ class ERC20RPCQuery implements ERC20Querier {
 			wallet: addresses[idx],
 			symbol: this.mainSymbol,
 			amount: parseInt(r.result) / 1e18,
+			chain: this.getChain(),
 		})).value()
 
 		this.cache[cacheKey] = res
@@ -174,6 +184,7 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 				assets: {
 					symbol: string
 					amount: number
+					chain: string
 					tokenAddress: string
 					// based on usd
 					price?: number
@@ -191,10 +202,11 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
 			amount: a.amount,
 			price: a.price ? {
 				value: a.price,
-				base: "usd"
+				base: "usd" as "usd"
 			} : undefined,
-			wallet: d.wallet
-		} as WalletCoin)).value()).flatten().value()
+			wallet: d.wallet,
+			chain: a.chain,
+		})).value()).flatten().value()
 	}
 
 	async loadProPortfolioWithRetry(license: string, max: number): Promise<WalletCoin[]> {

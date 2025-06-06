@@ -54,7 +54,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, lastAssets
 	const currentCoins = await loadPortfoliosByConfig(config, addProgress, userInfo)
 
 	// need to list coins owned before but not now ( amount = 0 )
-	const beforeCoins = _(lastAssets).flatten().map(s => {
+	const beforeCoins: WalletCoin[] = _(lastAssets).flatten().map(s => {
 		const found = _(currentCoins).find(c => c.symbol === s.symbol && md5(c.wallet) === s.wallet)
 		if (found) {
 			// todo check price
@@ -62,11 +62,11 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, lastAssets
 		}
 		return {
 			symbol: s.symbol,
-			price: _(currentCoins).find(c => c.symbol === s.symbol)?.price ?? s.price,
+			price: _(currentCoins).find(c => c.symbol === s.symbol)?.price ?? { base: "usd", value: s.price },
 			amount: 0,
 			value: 0,
 			wallet: "md5:" + s.wallet,
-		} as WalletCoin
+		}
 	}).compact().value()
 	return [...currentCoins, ...beforeCoins]
 }
