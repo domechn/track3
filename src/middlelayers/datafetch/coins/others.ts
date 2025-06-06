@@ -29,6 +29,7 @@ export class OthersAnalyzer implements Analyzer {
 			symbol: c.symbol,
 			amount: +c.amount,
 			wallet: OthersAnalyzer.wallet,
+			chain: "unknown",
 		})).value()
 	}
 }

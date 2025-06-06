@@ -88,9 +88,10 @@ export class TRC20ProUserAnalyzer implements Analyzer {
 			amount: a.amount,
 			price: a.price ? {
 				value: a.price,
-				base: "usd"
+				base: "usd" as "usd"
 			} : undefined,
-			wallet: d.wallet
-		} as WalletCoin)).value()).flatten().value()
+			wallet: d.wallet,
+			chain: "tron",
+		})).value()).flatten().value()
 	}
 }

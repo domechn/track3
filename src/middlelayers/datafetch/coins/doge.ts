@@ -60,6 +60,7 @@ export class DOGEAnalyzer implements Analyzer {
 		}, 1, 1000)
 		return _(coinLists).map(c => ({
 			...c,
+			chain: "dogecoin",
 			symbol: "DOGE"
 		})).value()
 	}

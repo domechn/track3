@@ -58,6 +58,7 @@ export class BTCAnalyzer implements Analyzer {
 		}, 1, 1000)
 		return _(coinLists).map(c => ({
 			...c,
+			chain: "bitcoin",
 			symbol: "BTC"
 		})).value()
 	}

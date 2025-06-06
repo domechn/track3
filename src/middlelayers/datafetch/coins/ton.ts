@@ -46,7 +46,8 @@ export class TonAnalyzer implements Analyzer {
 		}, 1, 1000)
 		return _(coinLists).map(c => ({
 			...c,
-			symbol: "TON"
+			symbol: "TON",
+			chain: "ton",
 		})).value()
 	}
 }

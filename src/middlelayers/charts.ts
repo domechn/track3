@@ -345,7 +345,7 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
 
 	if (groupUSD) {
-		_(assets).groupBy('wallet').forEach((coins, wallet) => {
+		_(assets).groupBy("wallet").forEach((coins, wallet) => {
 			// not case sensitive
 			const usdAmount = _(coins).filter(c => upperCaseStableCoins.includes(c.symbol.toUpperCase())).map(c => c.amount).sum()
 			const removedUSDCoins = _(coins).filter(c => !upperCaseStableCoins.includes(c.symbol.toUpperCase())).value()
