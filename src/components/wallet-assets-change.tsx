@@ -93,7 +93,10 @@ const App = ({
         break;
       case "BTC":
         url = `https://www.blockchain.com/explorer/addresses/btc/${wallet}`;
-        break
+        break;
+      case "SOL":
+        url = `https://portfolio.jup.ag/portfolio/${wallet}`;
+        break;
     }
 
     if (url) {
