@@ -85,12 +85,20 @@ const App = ({
   }
 
   function onWalletClick(wallet: string, walletType?: string) {
-    if (walletType !== "ERC20") {
-      return;
+    let url = "";
+    switch (walletType) {
+      case "ERC20":
+        // jump to debank in browser
+        url = `https://debank.com/profile/${wallet}`;
+        break;
+      case "BTC":
+        url = `https://www.blockchain.com/explorer/addresses/btc/${wallet}`;
+        break
     }
-    // jump to debank in browser
-    const url = `https://debank.com/profile/${wallet}`;
-    openUrl(url);
+
+    if (url) {
+      openUrl(url);
+    }
   }
 
   return (
