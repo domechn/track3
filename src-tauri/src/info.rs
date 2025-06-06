@@ -147,8 +147,7 @@ impl CoinGecko {
             .iter()
             .map(|c| c.symbol.clone())
             .filter(|s| {
-                let path = download_dir.clone();
-                let asset_path = path.join(format!("{}.png", s.to_lowercase()));
+                let asset_path = download_dir.join(format!("{}.png", s.to_lowercase()));
                 !asset_path.exists()
             })
             .collect::<Vec<String>>();
@@ -274,7 +273,7 @@ impl CoinGecko {
 
         for m in markets {
             let _ = self
-                .download_coin_logo(download_dir.clone(), m.clone())
+                .download_coin_logo(download_dir, m.clone())
                 .await;
         }
 
@@ -285,8 +284,7 @@ impl CoinGecko {
             // if not exists, make an empty file
 
             for symbol in non_exists_symbols {
-                let path = download_dir.clone();
-                let asset_path = path.join(format!("{}.png", symbol.to_lowercase()));
+                let asset_path = download_dir.join(format!("{}.png", symbol.to_lowercase()));
                 if !asset_path.exists() {
                     let mut file = OpenOptions::new()
                         .create(true)

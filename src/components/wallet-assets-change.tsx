@@ -21,6 +21,7 @@ import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { Skeleton } from "./ui/skeleton";
 import { getWalletLogo } from "@/lib/utils";
 import { positiveNegativeColor } from "@/utils/color";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 const App = ({
   currency,
@@ -83,6 +84,15 @@ const App = ({
     return <span>{walletType}</span>;
   }
 
+  function onWalletClick(wallet: string, walletType?: string) {
+    if (walletType !== "ERC20") {
+      return;
+    }
+    // jump to debank in browser
+    const url = `https://debank.com/profile/${wallet}`;
+    openUrl(url);
+  }
+
   return (
     <div>
       <Card>
@@ -123,7 +133,11 @@ const App = ({
                         ))
                         .value()
                     : walletAssetsChange.map((d) => (
-                        <TableRow key={d.wallet}>
+                        <TableRow
+                          key={d.wallet}
+                          className="cursor-pointer hover:bg-muted"
+                          onClick={() => onWalletClick(d.wallet, d.walletType)}
+                        >
                           <TableCell className="font-medium">
                             {!d.walletType || d.walletType === "null" ? (
                               <div>Unknown</div>
