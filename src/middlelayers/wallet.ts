@@ -5,6 +5,7 @@ import md5 from 'md5'
 import { Addresses } from './datafetch/types'
 import { AssetModel, WalletAssetsChangeData, WalletAssetsPercentageData } from './types'
 import { generateRandomColors } from '../utils/color'
+import { SUPPORT_CONS } from './constants'
 
 export class WalletAnalyzer {
 
@@ -64,20 +65,9 @@ export class WalletAnalyzer {
 			})
 		}
 
-		// BTC
-		handleWeb3Wallet(config.btc, "BTC")
-		// ETH
-		handleWeb3Wallet(config.erc20, "ERC20")
-		// Doge
-		handleWeb3Wallet(config.doge, "DOGE")
-		// SOL
-		handleWeb3Wallet(config.sol, "SOL")
-		// Tron
-		handleWeb3Wallet(config.trc20, "TRC20")
-		// Ton
-		handleWeb3Wallet(config.ton, "TON")
-		// Sui
-		handleWeb3Wallet(config.sui, "SUI")
+		_(SUPPORT_CONS).forEach(c => {
+			handleWeb3Wallet(_(config).get(c), c.toUpperCase())
+		})
 
 		const others = "others"
 		const Others = _(others).upperFirst()

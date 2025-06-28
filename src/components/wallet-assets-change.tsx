@@ -24,6 +24,10 @@ import { Skeleton } from "./ui/skeleton";
 import { getWalletLogo } from "@/lib/utils";
 import { positiveNegativeColor } from "@/utils/color";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import {
+  WALLET_AIRDROP_URLS,
+  WALLET_DETAIL_URLS,
+} from "@/middlelayers/constants";
 
 const App = ({
   currency,
@@ -87,15 +91,7 @@ const App = ({
   }
 
   function getWalletDetailUrl(wallet: string, walletType?: string) {
-    switch (walletType) {
-      case "ERC20":
-        // jump to debank in browser
-        return `https://debank.com/profile/${wallet}`;
-      case "BTC":
-        return `https://www.blockchain.com/explorer/addresses/btc/${wallet}`;
-      case "SOL":
-        return `https://portfolio.jup.ag/portfolio/${wallet}`;
-    }
+    return WALLET_DETAIL_URLS[walletType ?? ""]?.(wallet);
   }
 
   function onWalletDetailClick(wallet: string, walletType?: string) {
@@ -106,9 +102,7 @@ const App = ({
   }
 
   function getWalletAirdropUrl(wallet: string, walletType?: string) {
-    if (["ERC20", "BTC", "SOL", "SUI", "TON"].includes(walletType ?? "")) {
-      return `https://drops.bot/address/${wallet}`;
-    }
+    return WALLET_AIRDROP_URLS[walletType ?? ""]?.(wallet);
   }
 
   function onWalletAirdropClick(wallet: string, walletType?: string) {
