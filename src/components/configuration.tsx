@@ -463,7 +463,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               <CardTitle className="text-sm font-medium">
                 {cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type}
               </CardTitle>
-              <div className="flex ">
+              <div className="flex">
                 <img
                   src={DeleteIcon}
                   className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"

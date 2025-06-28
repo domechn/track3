@@ -7,6 +7,8 @@ import {
 } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { insertEllipsis } from "@/utils/string";
+import MoneyBankIcon from "@/assets/icons/money-bank-icon.png";
+import AirdropIcon from "@/assets/icons/airdrop-icon.png";
 import {
   TableHead,
   TableRow,
@@ -84,20 +86,34 @@ const App = ({
     return <span>{walletType}</span>;
   }
 
-  function onWalletClick(wallet: string, walletType?: string) {
-    let url = "";
+  function getWalletDetailUrl(wallet: string, walletType?: string) {
     switch (walletType) {
       case "ERC20":
         // jump to debank in browser
-        url = `https://debank.com/profile/${wallet}`;
-        break;
+        return `https://debank.com/profile/${wallet}`;
       case "BTC":
-        url = `https://www.blockchain.com/explorer/addresses/btc/${wallet}`;
-        break;
+        return `https://www.blockchain.com/explorer/addresses/btc/${wallet}`;
       case "SOL":
-        url = `https://portfolio.jup.ag/portfolio/${wallet}`;
-        break;
+        return `https://portfolio.jup.ag/portfolio/${wallet}`;
     }
+  }
+
+  function onWalletDetailClick(wallet: string, walletType?: string) {
+    const url = getWalletDetailUrl(wallet, walletType);
+    if (url) {
+      openUrl(url);
+    }
+  }
+
+  function getWalletAirdropUrl(wallet: string, walletType?: string) {
+    if (["ERC20", "BTC", "SOL", "SUI", "TON"].includes(walletType ?? "")) {
+      return `https://drops.bot/address/${wallet}`;
+    }
+  }
+
+  function onWalletAirdropClick(wallet: string, walletType?: string) {
+    const url = getWalletAirdropUrl(wallet, walletType);
+    console.log(url);
 
     if (url) {
       openUrl(url);
@@ -118,7 +134,7 @@ const App = ({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Wallet Type</TableHead>
+                    <TableHead className="w-[180px]">Wallet Type</TableHead>
                     <TableHead>Wallet Alias</TableHead>
                     <TableHead>Percentage</TableHead>
                     <TableHead className="text-right">Value</TableHead>
@@ -144,11 +160,7 @@ const App = ({
                         ))
                         .value()
                     : walletAssetsChange.map((d) => (
-                        <TableRow
-                          key={d.wallet}
-                          className="cursor-pointer hover:bg-muted"
-                          onClick={() => onWalletClick(d.wallet, d.walletType)}
-                        >
+                        <TableRow key={d.wallet} className="group">
                           <TableCell className="font-medium">
                             {!d.walletType || d.walletType === "null" ? (
                               <div>Unknown</div>
@@ -159,6 +171,34 @@ const App = ({
                                   src={getWalletLogo(d.walletType)}
                                 ></img>
                                 <div>{tweakWalletType(d.walletType)}</div>
+                                {getWalletDetailUrl(d.wallet, d.walletType) && (
+                                  <img
+                                    src={MoneyBankIcon}
+                                    className="h-5 w-5 text-muted-foreground hidden group-hover:inline-block cursor-pointer"
+                                    onClick={() =>
+                                      onWalletDetailClick(
+                                        d.wallet,
+                                        d.walletType
+                                      )
+                                    }
+                                  ></img>
+                                )}
+
+                                {getWalletAirdropUrl(
+                                  d.wallet,
+                                  d.walletType
+                                ) && (
+                                  <img
+                                    src={AirdropIcon}
+                                    className="h-4 w-4 mt-0.5 text-muted-foreground hidden group-hover:inline-block cursor-pointer"
+                                    onClick={() =>
+                                      onWalletAirdropClick(
+                                        d.wallet,
+                                        d.walletType
+                                      )
+                                    }
+                                  ></img>
+                                )}
                               </div>
                             )}
                           </TableCell>
