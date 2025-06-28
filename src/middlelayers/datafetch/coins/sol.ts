@@ -2,11 +2,12 @@ import { Analyzer, TokenConfig, WalletCoin } from '../types'
 import _ from 'lodash'
 import { sendHttpRequest } from '../utils/http'
 import { getAddressList } from '../utils/address'
+import bluebird from 'bluebird'
 
 export class SOLAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'sol'>
 
-	private readonly rpcUrls = ["https://cold-hanni-fast-mainnet.helius-rpc.com", "https://api.mainnet-beta.solana.com"]
+	private readonly endpoint = "https://lite-api.jup.ag/ultra/v1"
 
 	constructor(config: Pick<TokenConfig, 'sol'>) {
 		this.config = config
@@ -29,42 +30,94 @@ export class SOLAnalyzer implements Analyzer {
 		return valid
 	}
 
-	private async query(rpcUrl: string, addresses: string[]): Promise<number[]> {
+	private async query(addresses: string[]): Promise<WalletCoin[]> {
 		if (addresses.length === 0) {
 			return []
 		}
-		const resp = await sendHttpRequest<{ result: { value: string } }[]>("POST", rpcUrl, 5000, {},
-			_(addresses).map((address, idx) => ({
-				method: "getBalance",
-				jsonrpc: "2.0",
-				params: [address],
-				id: idx,
-			})).value(),
-		)
-		if (resp.length !== addresses.length) {
-			throw new Error(`Failed to query SOL balance, expected ${addresses.length} but got ${resp.length}`)
+		const balances = await bluebird.map(addresses, async (address) => this.queryBalances(address), {
+			concurrency: 2,
+		})
+		const cas = _(balances).flatten().map('ca').uniq().filter(s => s !== 'SOL').value()
+
+		const tokens = await this.queryTokens(cas)
+
+		return _(balances).flatten().map(b => {
+			if (b.ca === 'SOL') {
+				return {
+					symbol: 'SOL',
+					amount: b.amount,
+					wallet: b.address,
+					chain: 'sol',
+				}
+			}
+			const token = tokens[b.ca]
+			if (!token) {
+				return
+			}
+			return {
+				symbol: token.symbol,
+				amount: b.amount,
+				price: {
+					value: token.price,
+					base: 'usd' as 'usd',
+				},
+				wallet: b.address,
+				chain: 'sol',
+			} as WalletCoin
+		}).compact().value()
+	}
+
+	private async queryTokens(cas: string[]): Promise<{
+		[ca: string]: {
+			symbol: string
+			price: number
 		}
-		return _(resp).map(r => parseInt(r.result.value) / 1e9).value()
+	}> {
+		if (cas.length === 0) {
+			return {}
+		}
+		// split to chunks of 100
+		const chunks = _(cas).chunk(100).value()
+		const tokens = await bluebird.map(chunks, async (chunk) => {
+			const url = `${this.endpoint}/search?query=${chunk.join(',')}`
+			const resp = await sendHttpRequest<{
+				id: string
+				name: string
+				symbol: string
+				usdPrice: number
+			}[]>("GET", url, 5000)
+			return _(resp).map((v, k) => ({
+				ca: v.id,
+				symbol: v.symbol,
+				price: v.usdPrice || 0,
+			})).value()
+		}, {
+			concurrency: 2,
+		})
+		return _(tokens).flatten().mapKeys('ca').mapValues(v => ({
+			symbol: v.symbol,
+			price: v.price,
+		})).value()
+	}
+
+	private async queryBalances(address: string): Promise<{ address: string, ca: string, amount: number }[]> {
+		const url = `${this.endpoint}/balances/${address}`
+		const resp = await sendHttpRequest<{
+			[k: string]: {
+				uiAmount: number
+			}
+		}>("GET", url, 5000)
+		return _(resp).map((v, k) => ({
+			address,
+			ca: k,
+			amount: v.uiAmount || 0,
+		})).filter(c => c.amount > 0).value()
 	}
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
 		const addresses = getAddressList(this.config.sol)
 
-		for (const rpcUrl of this.rpcUrls) {
-			try {
-				const coinLists = await this.query(rpcUrl, addresses)
-				return _(coinLists).map((amount, idx) => ({
-					amount,
-					chain: "solana",
-					wallet: addresses[idx],
-					symbol: "SOL"
-				})).value()
-			} catch (e) {
-				console.error(e)
-			}
-		}
-
-		throw new Error("Failed to query SOL balance, all rpc urls are unavailable")
+		return this.query(addresses)
 	}
 }
 
