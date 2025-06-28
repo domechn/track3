@@ -60,6 +60,11 @@ import {
 } from "./ui/tooltip";
 import { Switch } from "./ui/switch";
 import { SUIAnalyzer } from "@/middlelayers/datafetch/coins/sui";
+import {
+  CEX_OPTIONS,
+  SUPPORT_CONS,
+  WALLET_OPTIONS,
+} from "@/middlelayers/constants";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -109,61 +114,11 @@ const defaultOtherConfig = {
   amount: 0,
 };
 
-const supportCoins = ["btc", "erc20", "sol", "doge", "trc20", "ton", "sui"];
+const supportCoins = SUPPORT_CONS;
 
-const cexOptions = [
-  {
-    value: "binance",
-    label: "Binance",
-  },
-  {
-    value: "okex",
-    label: "OKX",
-  },
-  {
-    value: "bitget",
-    label: "Bitget",
-  },
-  {
-    value: "gate",
-    label: "Gate.io",
-  },
-  {
-    value: "kraken",
-    label: "Kraken",
-  },
-];
+const cexOptions = CEX_OPTIONS;
 
-const walletOptions = [
-  {
-    value: "btc",
-    label: "BTC",
-  },
-  {
-    value: "erc20",
-    label: "ERC20",
-  },
-  {
-    value: "sol",
-    label: "SOL",
-  },
-  {
-    value: "doge",
-    label: "DOGE",
-  },
-  {
-    value: "trc20",
-    label: "TRC20 ( Pro )",
-  },
-  {
-    value: "ton",
-    label: "TON",
-  },
-  {
-    value: "sui",
-    label: "SUI",
-  },
-];
+const walletOptions = WALLET_OPTIONS;
 
 const querySizeOptions = [
   {
