@@ -59,14 +59,9 @@ export class CoinbaseExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const [portfolios] = await Promise.all([
-			this.fetchPortfolios()
-		])
-
+		const portfolios = await this.fetchPortfolios()
 
 		const portfolioBalances = await this.calculatePortfolioBalances(portfolios)
-
-
 		return portfolioBalances
 	}
 
