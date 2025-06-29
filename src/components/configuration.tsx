@@ -434,7 +434,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               <div className="text-xl font-bold">
                 {ex.alias ?? ex.type + idx}
               </div>
-              <p className="text-xs text-muted-foreground overflow-ellipsis overflow-hidden">
+              <p className="text-xs text-muted-foreground overflow-ellipsis overflow-hidden text-nowrap">
                 <span>{ex.apiKey}</span>
               </p>
 

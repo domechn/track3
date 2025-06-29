@@ -9,6 +9,7 @@ import SOLLogo from "@/assets/icons/sol-logo.svg"
 import DOGELogo from "@/assets/icons/doge-logo.svg"
 import TRONLogo from "@/assets/icons/tron-logo.svg"
 import TONLogo from "@/assets/icons/ton-logo.svg"
+import CoinbaseLogo from "@/assets/icons/coinbase-logo.jpg"
 import SUILogo from "@/assets/icons/sui-logo.svg"
 
 const dropsBotUrl = "https://drops.bot/address/"
@@ -24,6 +25,7 @@ export const WALLET_LOGS: { [k: string]: string } = {
 	"bitget": BitgetLogo,
 	"gate": GateLogo,
 	"kraken": KrakenLogo,
+	"coinbase": CoinbaseLogo,
 	"btc": BTCLogo,
 	"erc20": ETHLogo,
 	"sol": SOLLogo,
@@ -54,6 +56,10 @@ export const CEX_OPTIONS = [
 	{
 		value: "kraken",
 		label: "Kraken",
+	},
+	{
+		value: "coinbase",
+		label: "Coinbase",
 	},
 ]
 
