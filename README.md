@@ -75,6 +75,7 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 - https://helius-rpc.com
 - https://coingecko.com
 - https://solana.com
+- https://jup.ag
 
 # Note
 
