@@ -23,6 +23,9 @@ export class ProCoinPriceQuery implements CoinPriceQuerier {
 	async listAllCoinPrices(coins: string[]): Promise<{
 		[key: string]: number
 	}> {
+		if (coins.length === 0) {
+			return {}
+		}
 		const resp = await sendHttpRequest<{
 			data: {
 				[key: string]: number
@@ -33,6 +36,10 @@ export class ProCoinPriceQuery implements CoinPriceQuerier {
 		}, {
 			coins
 		})
+
+		if (_.size(resp.data) === 0) {
+			throw new Error("failed to fetch coin prices")
+		}
 
 		return resp.data ?? {}
 	}
