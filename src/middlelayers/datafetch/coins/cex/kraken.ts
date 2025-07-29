@@ -57,8 +57,8 @@ export class KrakenExchange implements Exchanger {
 
 		const res: { [k: string]: number } = {}
 
-		// .F is flexible earn, .B is locked earn
-		const earnSuffixes = [".F", ".B"]
+		// .F/.M is flexible earn, .B is locked earn
+		const earnSuffixes = [".F", ".B", ".M"]
 		_(resp.result ?? {}).forEach((v, k) => {
 			let symbol = k
 			// SOL.F/xxx.F is in earn
