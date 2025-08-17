@@ -114,18 +114,23 @@ impl Binance {
         });
 
         // futures
-        let futures_balances = futures.account_balance().await?;
-        futures_balances
-            .into_iter()
-            .map(|b| (b.asset.clone(), b.balance))
-            .for_each(|(k, v)| {
-                if res.contains_key(&k) {
-                    let val = res.get(&k).unwrap();
-                    res.insert(k.to_owned(), val + v);
-                } else {
-                    res.insert(k.to_owned(), v);
-                }
-            });
+        // some accounts may not have futures enabled, so we handle the error gracefully
+        let futures_balances = futures.account_balance().await;
+        if let Ok(futures_balances) = futures_balances {
+            futures_balances
+                .into_iter()
+                .map(|b| (b.asset.clone(), b.balance))
+                .for_each(|(k, v)| {
+                    if res.contains_key(&k) {
+                        let val = res.get(&k).unwrap();
+                        res.insert(k.to_owned(), val + v);
+                    } else {
+                        res.insert(k.to_owned(), v);
+                    }
+                });
+        } else {
+            println!("Failed to fetch futures account balances, error: {:?}", futures_balances.err());
+        }
 
         Ok(res)
     }
