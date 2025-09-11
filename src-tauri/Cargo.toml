@@ -6,7 +6,7 @@ license = "CC-BY-NC-ND-4.0"
 name = "track3"
 repository = "https://gituhb.com/domechn/track3"
 rust-version = "1.81"
-version = "0.5.3"
+version = "0.5.4"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
