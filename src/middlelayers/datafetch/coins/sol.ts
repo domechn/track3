@@ -37,13 +37,11 @@ export class SOLAnalyzer implements Analyzer {
 		const balances = await bluebird.map(addresses, async (address) => this.queryBalances(address), {
 			concurrency: 2,
 		})
-		console.log("balance", balances);
 		
 		const earnings = await bluebird.map(addresses, async (address) => this.queryEarnings(address), {
 			concurrency: 2,
 		})
 		const flatEarnings = _(earnings).flatten().value()
-		console.log("flatEarnings", flatEarnings)
 
 		// loop balances, and find if there is a earning with the same ca and address, if there is, remove the balance and add the earning value to it
 		const newBalances = _(balances).flatten().map(b=> {
