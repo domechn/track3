@@ -25,3 +25,6 @@ dist-ssr
 .vscode/
 
 .local/
+
+track3-ios/
+docs/

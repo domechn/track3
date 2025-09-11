@@ -7,7 +7,7 @@ import bluebird from 'bluebird'
 export class SOLAnalyzer implements Analyzer {
 	private readonly config: Pick<TokenConfig, 'sol'>
 
-	private readonly endpoint = "https://lite-api.jup.ag/ultra/v1"
+	private readonly endpoint = "https://lite-api.jup.ag"
 
 	constructor(config: Pick<TokenConfig, 'sol'>) {
 		this.config = config
@@ -37,11 +37,30 @@ export class SOLAnalyzer implements Analyzer {
 		const balances = await bluebird.map(addresses, async (address) => this.queryBalances(address), {
 			concurrency: 2,
 		})
-		const cas = _(balances).flatten().map('ca').uniq().filter(s => s !== 'SOL').value()
+		
+		const earnings = await bluebird.map(addresses, async (address) => this.queryEarnings(address), {
+			concurrency: 2,
+		})
+		const flatEarnings = _(earnings).flatten().value()
+
+		// loop balances, and find if there is a earning with the same ca and address, if there is, remove the balance and add the earning value to it
+		const newBalances = _(balances).flatten().map(b=> {
+			const earning = _(flatEarnings).find(e => e.ca === b.ca && e.address === b.address)
+			if (earning) {
+				return {
+					address: b.address,
+					ca: earning.underlyingCa,
+					amount: earning.underlyingAmount,
+				}
+			}
+			return b
+		}).value()
+
+		const cas = _(newBalances).map('ca').uniq().filter(s => s !== 'SOL').value()
 
 		const tokens = await this.queryTokens(cas)
 
-		return _(balances).flatten().map(b => {
+		return _(newBalances).map(b => {
 			if (b.ca === 'SOL') {
 				return {
 					symbol: 'SOL',
@@ -79,7 +98,7 @@ export class SOLAnalyzer implements Analyzer {
 		// split to chunks of 100
 		const chunks = _(cas).chunk(100).value()
 		const tokens = await bluebird.map(chunks, async (chunk) => {
-			const url = `${this.endpoint}/search?query=${chunk.join(',')}`
+			const url = `${this.endpoint}/ultra/v1/search?query=${chunk.join(',')}`
 			const resp = await sendHttpRequest<{
 				id: string
 				name: string
@@ -100,18 +119,50 @@ export class SOLAnalyzer implements Analyzer {
 		})).value()
 	}
 
-	private async queryBalances(address: string): Promise<{ address: string, ca: string, amount: number }[]> {
-		const url = `${this.endpoint}/balances/${address}`
+	private async queryEarnings(address: string): Promise<{ address: string, ca: string, underlyingCa: string, underlyingAmount: number }[]> {
+		const url = `${this.endpoint}/lend/v1/earn/positions?users=${address}`
 		const resp = await sendHttpRequest<{
-			[k: string]: {
-				uiAmount: number
+			token: {
+				address: string
+				asset: {
+					address: string
+					symbol: string
+					decimals: number
+				}
+			}
+			underlyingAssets: string
+		}[]>("GET", url, 5000)
+		return _(resp).map(v => ({
+			address,
+			ca: v.token.address,
+			underlyingCa: v.token.asset.address,
+			underlyingAmount: +(v.underlyingAssets) / 10 ** v.token.asset.decimals,
+		})).filter(c => c.underlyingAmount > 0).value()
+	}
+
+	private async queryBalances(address: string): Promise<{ address: string, ca: string, amount: number }[]> {
+		const url = `${this.endpoint}/ultra/v1/holdings/${address}`
+		const resp = await sendHttpRequest<{
+			// this is amount of SOL
+			uiAmount: number
+			tokens: {
+				// key is ca
+				[k: string]: {
+					uiAmount: number
+				}[]
 			}
 		}>("GET", url, 5000)
-		return _(resp).map((v, k) => ({
+		const tokens = _(resp.tokens).map((vs, k) => ({
 			address,
 			ca: k,
-			amount: v.uiAmount || 0,
+			amount: vs[0].uiAmount || 0,
 		})).filter(c => c.amount > 0).value()
+
+		return [...tokens, {
+			address,
+			ca: 'SOL',
+			amount: resp.uiAmount || 0,
+		}]
 	}
 
 	async loadPortfolio(): Promise<WalletCoin[]> {
