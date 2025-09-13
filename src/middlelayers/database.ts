@@ -29,12 +29,12 @@ async function saveToDatabase<T extends object>(db: Database, table: string, mod
 	const first = filteredModes[0]
 	const keys = Object.keys(first)
 	const valuesArrayStr = new Array(filteredModes.length).fill(`(${keys.map(() => '?').join(',')})`).join(',')
-	const insertSql = `INSERT OR ${conflictResolver} INTO ${table} (${keys.join(',')}) VALUES ${valuesArrayStr}`
+	const insertSql = `INSERT OR ${conflictResolver} INTO ${table} (${keys.join(',')}) VALUES ${valuesArrayStr} RETURNING *`
 	
 	const values = _(filteredModes).map(m => _(keys).map(k => _(m).get(k)).value()).flatten().value()
 	
-	await db.execute(insertSql, values)
-	return models
+	const result = await db.select<T[]>(insertSql, values)
+	return result
 }
 
 export async function selectFromDatabase<T extends object>(table: string, where: Partial<T>, limit = 0, orderBy?: {
@@ -51,7 +51,7 @@ export async function selectFromDatabase<T extends object>(table: string, where:
 
 	const limitStr = limit > 0 ? `LIMIT ${limit}` : ''
 	const orderByStr = !_(orderBy).isEmpty() ? `ORDER BY ${_(orderBy).map((v, k) => `${k} ${v}`).join(',')}` : ''
-	const sql = `SELECT * FROM ${table} WHERE 1=1 ${whereStr ? "AND " + whereStr : ''} ${plainWhere ? "AND " + plainWhere : ''} ${limitStr} ${orderByStr}`
+	const sql = `SELECT * FROM ${table} WHERE 1=1 ${whereStr ? "AND " + whereStr : ''} ${plainWhere ? "AND " + plainWhere : ''} ${orderByStr} ${limitStr}`
 
 	return db.select<T[]>(sql, [...values, ...(plainWhereValues ?? [])])
 }

@@ -1,5 +1,6 @@
 import {
   calculateTotalProfit,
+  fixSymbolDataIfNeeded,
   listAllowedSymbols,
   queryAssetMaxAmountBySymbol,
   queryLastAssetsBySymbol,
@@ -353,6 +354,8 @@ const App = ({
   async function loadSymbolData(s: string) {
     updateLoading(true);
     try {
+      // !this is a tricky function to fix the legacy data, should not be used anymore
+      // await fixSymbolDataIfNeeded(s);
       const txns = await queryTransactionsBySymbolAndDateRange(s, dateRange);
       setTransactions(txns);
 
