@@ -170,6 +170,70 @@ type TotalProfit = {
 	}[]
 }
 
+export async function fixSymbolDataIfNeeded(symbol: string) {
+	// get max createdAt from assets_v2
+	const maxCreatedAt = await ASSET_HANDLER.getLatestCreatedAt()
+	if (!maxCreatedAt) {
+		console.debug("there is no assets_v2 data")
+		return
+	}
+	// get max createdAt from assets_v2 for this symbol
+	const symbolMaxCreatedAt = await ASSET_HANDLER.getLatestCreatedAt(symbol)
+	if (!symbolMaxCreatedAt) {
+		console.debug("there is no assets_v2 data for symbol", symbol)
+		return
+	}
+
+	// if they are the same, return
+	if (maxCreatedAt === symbolMaxCreatedAt) {
+		console.debug("maxCreatedAt and symbolMaxCreatedAt are the same, no need to fix")
+		return
+	}
+
+	// if symbol amount is 0, return
+	const symbolModels = await ASSET_HANDLER.listAssetsMaxCreatedAt(undefined, undefined, symbol)
+	const symbolAmount = _(symbolModels).sumBy("amount")
+	if (symbolAmount === 0) {
+		console.debug("symbol amount is 0, no need to fix")
+		return
+	}
+
+	const symbolCreatedAt = _(symbolModels).first()?.createdAt
+	if (!symbolCreatedAt) {
+		console.debug("symbol createdAt is not found, no need to fix")
+		return
+	}
+
+	const nextOtherSymbolModels = await ASSET_HANDLER.listAssetsAfterCreatedAt(new Date(symbolCreatedAt).getTime() + 1000, 1, "asc")
+
+	const nextCreatedAt = _(nextOtherSymbolModels).first()?.createdAt
+	const nextUUID = _(nextOtherSymbolModels).first()?.uuid
+	if (!nextCreatedAt || !nextUUID) {
+		console.debug("next createdAt or uuid is not found, no need to fix")
+		return
+	}
+	console.info(`there is some issue with ${symbol} data, need to fix`)
+
+	// if they are different, find the next createdAt for this symbol
+	// insert the createdAt and amount, value, price for this symbol into assets_v2
+	// then insert a transaction, type is sell all of this coin
+	console.debug("next createdAt is", nextCreatedAt)
+	const needAddedModels = _(symbolModels).map(m => ({
+		...m,
+		id: 0,
+		uuid: nextUUID,
+		createdAt: nextCreatedAt,
+		amount: 0,
+		value: 0,
+	})).value()
+
+	const savedModels = await ASSET_HANDLER.saveAssets(needAddedModels)
+
+	// no need to save transactions for now since all transactions are already saved
+	const needAddedTransactions = generateTransactions(nextUUID, symbolModels, savedModels)
+	await TRANSACTION_HANDLER.saveTransactions(needAddedTransactions)
+}
+
 export async function queryTransactionsBySymbolAndDateRange(symbol: string, dateRange: TDateRange): Promise<Transaction[]> {
 	const models = await TRANSACTION_HANDLER.listTransactionsByDateRange(dateRange.start, dateRange.end, symbol)
 	return _(models).flatten().map(m => ({
@@ -771,7 +835,6 @@ export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRan
 	if (!assets) {
 		return
 	}
-
 	const reservedAssets = _(assets).reverse().value()
 
 
@@ -792,7 +855,10 @@ export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRan
 
 	const aat = getAmountsAndTimestamps(reservedAssets)
 	const step = aat.length > maxSize ? Math.floor(aat.length / maxSize) : 0
-	const reservedAat = _(aat).filter((_d, idx) => step === 0 || (idx % step) === 0).value()
+	const reservedAat = _(aat).filter((_d, idx, arr) => {
+		if (step === 0) return true
+		return idx === 0 || idx === arr.length - 1 || (idx % step) === 0
+	}).value()
 
 	return {
 		coin: symbol,

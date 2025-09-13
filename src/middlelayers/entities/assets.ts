@@ -145,7 +145,7 @@ class AssetHandler implements AssetHandlerImpl {
 		return selectFromDatabase<AssetModel>(this.assetTableName, {}, 0, {}, `id in (${ids.map(() => '?').join(',')})`, ids)
 	}
 
-	async listAssetsAfterCreatedAt(createdAt?: number | string): Promise<AssetModel[]> {
+	async listAssetsAfterCreatedAt(createdAt?: number | string, limit = 0, order = 'desc'): Promise<AssetModel[]> {
 		let createdAtStr = new Date(0).toISOString()
 		if (_(createdAt).isNumber()) {
 			createdAtStr = new Date(createdAt as number).toISOString()
@@ -153,8 +153,8 @@ class AssetHandler implements AssetHandlerImpl {
 			createdAtStr = createdAt as string
 		}
 
-		return selectFromDatabase<AssetModel>(this.assetTableName, {}, 0, {
-			createdAt: 'desc',
+		return selectFromDatabase<AssetModel>(this.assetTableName, {}, limit, {
+			createdAt: order as 'asc' | 'desc',
 		}, `createdAt >= ?`, [createdAtStr])
 	}
 
@@ -178,8 +178,8 @@ class AssetHandler implements AssetHandlerImpl {
 		return models[0]?.amount || 0
 	}
 
-	async getLatestCreatedAt(): Promise<string | undefined> {
-		const sql = `SELECT createdAt FROM ${this.assetTableName} ORDER BY createdAt DESC LIMIT 1`
+	async getLatestCreatedAt(symbol?: string): Promise<string | undefined> {
+		const sql = `SELECT createdAt FROM ${this.assetTableName} WHERE 1=1 ${symbol ? ` AND symbol = '${symbol}'` : ""} ORDER BY createdAt DESC LIMIT 1`
 		const models = await selectFromDatabaseWithSql<{ createdAt: string }>(sql, [])
 
 		return models[0]?.createdAt
