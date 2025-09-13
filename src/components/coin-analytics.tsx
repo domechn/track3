@@ -1,6 +1,5 @@
 import {
   calculateTotalProfit,
-  fixSymbolDataIfNeeded,
   listAllowedSymbols,
   queryAssetMaxAmountBySymbol,
   queryLastAssetsBySymbol,
@@ -10,7 +9,6 @@ import {
 } from "@/middlelayers/charts";
 import {
   Asset,
-  AssetAction,
   CurrencyRateDetail,
   TDateRange,
   Transaction,
@@ -75,7 +73,6 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
