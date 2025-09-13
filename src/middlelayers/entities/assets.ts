@@ -179,8 +179,9 @@ class AssetHandler implements AssetHandlerImpl {
 	}
 
 	async getLatestCreatedAt(symbol?: string): Promise<string | undefined> {
-		const sql = `SELECT createdAt FROM ${this.assetTableName} WHERE 1=1 ${symbol ? ` AND symbol = '${symbol}'` : ""} ORDER BY createdAt DESC LIMIT 1`
-		const models = await selectFromDatabaseWithSql<{ createdAt: string }>(sql, [])
+		const sql = `SELECT createdAt FROM ${this.assetTableName} WHERE 1=1 ${symbol ? ` AND symbol = ?` : ""} ORDER BY createdAt DESC LIMIT 1`
+		const params = symbol ? [symbol] : []
+		const models = await selectFromDatabaseWithSql<{ createdAt: string }>(sql, params)
 
 		return models[0]?.createdAt
 	}
