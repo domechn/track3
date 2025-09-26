@@ -23,6 +23,7 @@ const preferCurrencyId = "7"
 const quoteColorId = "8"
 const clientInfoFixId = "998"
 const licenseFixId = "997"
+const stableCoinsId = "996"
 
 export const themeLocalStorageKey = "track3-ui-theme"
 
@@ -162,6 +163,15 @@ async function getConfigurationModelById(id: string): Promise<ConfigurationModel
 	}
 
 	return configurations[0]
+}
+
+export async function getStableCoins(): Promise<string[]> {
+	const model = await getConfigurationById(stableCoinsId)
+	return model?.data ? model.data.split(',') : []
+}
+
+export async function saveStableCoins(stableCoins: string[]) {
+	return saveConfigurationById(stableCoinsId, stableCoins.join(','), false)
 }
 
 // license

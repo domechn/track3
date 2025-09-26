@@ -3,7 +3,7 @@ import { generateRandomColors } from '../utils/color'
 import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetsPercentageChangeData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, TransactionType, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices, queryStableCoins } from './data'
-import { getConfiguration } from './configuration'
+import { getConfiguration, saveStableCoins } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
 import { timeToDateStr } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
@@ -401,13 +401,16 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		addProgress(10)
 	}
 
+	let latestAssets = _.clone(assets)
+
 	const stableCoins = await queryStableCoins()
 
 	const upperCaseStableCoins = _(stableCoins).map(c => c.toUpperCase()).value()
 
-	let latestAssets = _.clone(assets)
-	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
+	// save stable coins to configuration
+	await saveStableCoins(upperCaseStableCoins)
 
+	const groupUSD: boolean = _(config).get(['configs', 'groupUSD']) || false
 	if (groupUSD) {
 		_(assets).groupBy("wallet").forEach((coins, wallet) => {
 			// not case sensitive
