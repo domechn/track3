@@ -3,7 +3,7 @@ import { deleteFromDatabase, saveModelsToDatabase, selectFromDatabase, selectFro
 import { AssetModel, UniqueIndexConflictResolver, WalletCoinUSD } from '../types'
 import { CoinModel } from '../datafetch/types'
 import { v4 as uuidv4 } from 'uuid'
-import md5 from 'md5'
+import { normalizeWalletToMD5 } from '../../lib/utils'
 
 export interface AssetHandlerImpl {
 	importAssets(models: AssetModel[], conflictResolver: UniqueIndexConflictResolver): Promise<AssetModel[]>
@@ -252,9 +252,7 @@ class AssetHandler implements AssetHandlerImpl {
 		const getDBModel = (models: CoinModel[]) => {
 			return _(models).map(m => {
 				// !hotfix for wallet is already md5 hashed
-
-				const md5Prefix = "md5:"
-				const md5Wallet = _(m.wallet).startsWith(md5Prefix) ? m.wallet.substring(md5Prefix.length) : md5(m.wallet)
+				const md5Wallet = normalizeWalletToMD5(m.wallet)
 				return {
 					createdAt: now,
 					uuid: uid,

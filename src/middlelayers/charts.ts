@@ -1,5 +1,6 @@
 import _ from 'lodash'
 import { generateRandomColors } from '../utils/color'
+import { isSameWallet } from '../lib/utils'
 import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetsPercentageChangeData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, TransactionType, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices, queryStableCoins } from './data'
@@ -437,35 +438,61 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		})
 	}
 	const totals = calculateTotalValue(latestAssets, priceMap)
-	// if item in totals exists in lastAssets and it's usdValue is less than 1, we think it has been sold out last time, so we do not need to save its data to database this time
+	// 1. If USD value < 1, consider it sold out, set amount and value to 0
+	// 2. If this asset is found both this time and last time (same symbol and wallet)
+	// 2.1 If last time was 0, this time is also 0 or < 1, then drop this time
+	// 2.2 Last time was 0, this time >= 1, save it
+	// 2.3 If last time was not 0, this time is 0 or < 1, then save it
+	// 2.4 If last time was not 0, this time > 1, then save it
+	// 3. BTC always save regardless
 	const filteredTotals = _(totals).filter(t => {
-		if (t.usdValue > 1) {
-			return true
-		}
+		// 3. BTC always save regardless
 		if (t.symbol === "BTC") {
 			return true
 		}
-		const totalWallet = md5(t.wallet)
-		const lastAsset = _(lastAssets).find(a => a.symbol === t.symbol && (a.wallet === totalWallet || a.wallet === t.wallet))
 
-		// not found in last asset, which means coin has already been removed before last record
+		// 1. If USD value < 1, consider it sold out, set amount and value to 0
+		const isCurrentSoldOut = t.usdValue < 1
+
+		// Handle wallet comparison: lastAssets contains MD5 hashed wallet (no prefix)
+		// Current wallet might have "md5:" prefix, so we need to normalize it
+		const lastAsset = _(lastAssets).find(a => a.symbol === t.symbol && isSameWallet(a.wallet ?? "", t.wallet))
+
+		// If last asset not found, it's a new asset
 		if (!lastAsset) {
+			// New asset and < 1 USD, drop it directly
+			return !isCurrentSoldOut
+		}
+
+		// Last time amount was 0, means it was sold out
+		const wasLastSoldOut = lastAsset.amount === 0
+
+		// 2.1 If last time was 0, this time is also 0 or < 1, then drop this time
+		if (wasLastSoldOut && isCurrentSoldOut) {
 			return false
 		}
-		// coin has been sold out in last time
-		if (lastAsset.amount === 0) {
-			return false
-		}
-		// already handled in loadPortfolios
-		if (t.amount === 0) {
+
+		// 2.2 Last time was 0, this time >= 1, save it
+		if (wasLastSoldOut && !isCurrentSoldOut) {
 			return true
 		}
+
+		// 2.3 If last time was not 0, this time is 0 or < 1, then save it
+		if (!wasLastSoldOut && isCurrentSoldOut) {
+			return true
+		}
+
+		// 2.4 If last time was not 0, this time > 1, then save it
+		if (!wasLastSoldOut && !isCurrentSoldOut) {
+			return true
+		}
+
 		return true
 	}).map(t => ({
 		...t,
-		// if usdValue < 1, means it has been sold out this time. update it to 0, because coin whose usdValue < 1 will be ignored before saving to database
-		usdValue: t.usdValue > 1 ? t.usdValue : 0,
-		amount: t.usdValue > 1 ? t.amount : 0,
+		// 1. If USD value < 1, consider it sold out, set amount and value to 0
+		usdValue: t.usdValue >= 1 ? t.usdValue : 0,
+		amount: t.usdValue >= 1 ? t.amount : 0,
 	})).value()
 
 
