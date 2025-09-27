@@ -12,7 +12,7 @@ import _ from 'lodash'
 import { save, open } from "@tauri-apps/plugin-dialog"
 import { AddProgressFunc, AssetModel, UserLicenseInfo } from './types'
 import { ASSET_HANDLER } from './entities/assets'
-import md5 from 'md5'
+import { addMD5PrefixToWallet, isSameWallet } from '../lib/utils'
 import { TRC20ProUserAnalyzer } from './datafetch/coins/trc20'
 import { DATA_MANAGER, ExportData } from './datamanager'
 import { getAutoBackupDirectory, getLastAutoImportAt, getLastAutoBackupAt, saveLastAutoImportAt, saveLastAutoBackupAt } from './configuration'
@@ -55,7 +55,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, lastAssets
 
 	// need to list coins owned before but not now ( amount = 0 )
 	const beforeCoins: WalletCoin[] = _(lastAssets).flatten().map(s => {
-		const found = _(currentCoins).find(c => c.symbol === s.symbol && md5(c.wallet) === s.wallet)
+		const found = _(currentCoins).find(c => c.symbol === s.symbol && isSameWallet(c.wallet, s.wallet ?? ""))
 		if (found) {
 			// todo check price
 			return
@@ -65,7 +65,7 @@ export async function loadPortfolios(config: CexConfig & TokenConfig, lastAssets
 			price: _(currentCoins).find(c => c.symbol === s.symbol)?.price ?? { base: "usd", value: s.price },
 			amount: 0,
 			value: 0,
-			wallet: "md5:" + s.wallet,
+			wallet: addMD5PrefixToWallet(s.wallet || ''),
 		}
 	}).compact().value()
 	return [...currentCoins, ...beforeCoins]
