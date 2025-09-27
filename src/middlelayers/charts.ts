@@ -490,9 +490,9 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 		return true
 	}).map(t => ({
 		...t,
-		// 1. If USD value < 1, consider it sold out, set amount and value to 0
-		usdValue: t.usdValue > 1 ? t.usdValue : 0,
-		amount: t.usdValue > 1 ? t.amount : 0,
+		// If USD value < 1, consider it sold out, set amount and value to 0
+		usdValue: t.usdValue >= 1 ? t.usdValue : 0,
+		amount: t.usdValue >= 1 ? t.amount : 0,
 	})).value()
 
 

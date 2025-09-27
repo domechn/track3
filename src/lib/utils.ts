@@ -25,7 +25,7 @@ export function normalizeWalletToMD5(wallet: string): string {
 
 /**
  * Add "md5:" prefix to wallet address
- * @param wallet - Wallet address (MD5 hashed)
+ * @param wallet - Wallet address (any format)
  * @returns Wallet address with "md5:" prefix
  */
 export function addMD5PrefixToWallet(wallet: string): string {
@@ -34,11 +34,15 @@ export function addMD5PrefixToWallet(wallet: string): string {
 }
 
 /**
- * Check if two wallet addresses are the same (handles MD5 normalization)
- * @param wallet1 - First wallet address
- * @param wallet2 - Second wallet address
+ * Check if two wallet addresses are the same (handles all three wallet formats)
+ * @param wallet1 - First wallet address (any format), md5:xxxx or xxxxx ( no prefix md5 hash ) or xxx ( not md5 hash )
+ * @param wallet2 - Second wallet address (any format), md5:xxxx or xxxxx ( no prefix md5 hash ) or xxx ( not md5 hash )
  * @returns True if wallets are the same after normalization
  */
 export function isSameWallet(wallet1: string, wallet2: string): boolean {
-  return normalizeWalletToMD5(wallet1) === normalizeWalletToMD5(wallet2)
+  const md5Prefix = "md5:"
+  const wallet1WithoutPrefix = wallet1.startsWith(md5Prefix) ? wallet1.substring(md5Prefix.length) : wallet1
+  const wallet2WithoutPrefix = wallet2.startsWith(md5Prefix) ? wallet2.substring(md5Prefix.length) : wallet2
+
+  return wallet1WithoutPrefix === wallet2WithoutPrefix || md5(wallet2WithoutPrefix) === wallet1WithoutPrefix || md5(wallet1WithoutPrefix) === wallet2WithoutPrefix
 }
