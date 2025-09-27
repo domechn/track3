@@ -44,5 +44,11 @@ export function isSameWallet(wallet1: string, wallet2: string): boolean {
   const wallet1WithoutPrefix = wallet1.startsWith(md5Prefix) ? wallet1.substring(md5Prefix.length) : wallet1
   const wallet2WithoutPrefix = wallet2.startsWith(md5Prefix) ? wallet2.substring(md5Prefix.length) : wallet2
 
-  return wallet1WithoutPrefix === wallet2WithoutPrefix || md5(wallet2WithoutPrefix) === wallet1WithoutPrefix || md5(wallet1WithoutPrefix) === wallet2WithoutPrefix
+  const wallet1MD5 = md5(wallet1WithoutPrefix)
+  const wallet2MD5 = md5(wallet2WithoutPrefix)
+  return (
+    wallet1WithoutPrefix === wallet2WithoutPrefix ||
+    wallet2MD5 === wallet1WithoutPrefix ||
+    wallet1MD5 === wallet2WithoutPrefix
+  )
 }

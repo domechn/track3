@@ -231,8 +231,6 @@ class AssetHandler implements AssetHandlerImpl {
 				value: t.price,
 			},
 		})).value() // Remove the filter to save all records
-		
-		console.log(`Saving ${coins.length} coins to database:`, coins.map(c => `${c.symbol}:${c.amount}:${c.value}`))
 
 		const now = new Date().toISOString()
 		// generate uuid v4
