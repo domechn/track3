@@ -218,8 +218,8 @@ class AssetHandler implements AssetHandlerImpl {
 		return res
 	}
 
-	// skip where value is less than 1, or value is 0
-	// if value is 0, means user sold all of this coin, we need to record this behavior
+	// Save all coins to database, including those with value < 1 or amount = 0
+	// This ensures we record the sell-out behavior properly
 	async saveCoinsToDatabase(coinInUSDs: WalletCoinUSD[]): Promise<string> {
 		const coins = _(coinInUSDs).map(t => ({
 			wallet: t.wallet,
@@ -230,7 +230,7 @@ class AssetHandler implements AssetHandlerImpl {
 				base: "usd" as any,
 				value: t.price,
 			},
-		})).filter(v => v.value > 1 || (v.value === 0 && v.amount === 0)).value()
+		})).value() // Remove the filter to save all records
 
 		const now = new Date().toISOString()
 		// generate uuid v4
