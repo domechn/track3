@@ -615,9 +615,13 @@ export async function queryPNLChartValue(dateRange: TDateRange, maxSize = DATA_M
 
 	const data = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
-	const step = data.length > maxSize ? Math.floor(data.length / maxSize) : 0
+	const reversedData = _(data).reverse().value()
+	const step = reversedData.length > maxSize ? Math.floor(reversedData.length / maxSize) : 0
 
-	return _(data).reverse().filter((_d, idx) => step === 0 || (idx % step) === 0).map(rs => ({
+	return _(reversedData).filter((_d, idx, arr) => {
+		if (step === 0) return true
+		return idx === 0 || idx === arr.length - 1 || (idx % step) === 0
+	}).map(rs => ({
 		totalValue: _(rs).sumBy("value"),
 		timestamp: new Date(rs[0]?.createdAt).getTime(),
 	})).value()
@@ -723,7 +727,10 @@ export async function queryTopCoinsRank(dateRange: TDateRange, maxSize = DATA_MA
 
 
 	const step = reservedAssets.length > maxSize ? Math.floor(reservedAssets.length / maxSize) : 0
-	const filteredReservedAssets = _(reservedAssets).filter((_d, idx) => step === 0 || (idx % step) === 0).value()
+	const filteredReservedAssets = _(reservedAssets).filter((_d, idx, arr) => {
+		if (step === 0) return true
+		return idx === 0 || idx === arr.length - 1 || (idx % step) === 0
+	}).value()
 	const coins = getCoins(filteredReservedAssets)
 	const colors = generateRandomColors(coins.length)
 
@@ -769,7 +776,10 @@ export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange, m
 
 
 	const step = reservedAssets.length > maxSize ? Math.floor(reservedAssets.length / maxSize) : 0
-	const filteredReservedAssets = _(reservedAssets).filter((_d, idx) => step === 0 || (idx % step) === 0).value()
+	const filteredReservedAssets = _(reservedAssets).filter((_d, idx, arr) => {
+		if (step === 0) return true
+		return idx === 0 || idx === arr.length - 1 || (idx % step) === 0
+	}).value()
 	const coins = getCoins(filteredReservedAssets)
 	const colors = generateRandomColors(coins.length)
 
@@ -797,8 +807,12 @@ export async function queryAssetChange(dateRange: TDateRange, maxSize = DATA_MAX
 
 	const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
 
-	const step = assets.length > maxSize ? Math.floor(assets.length / maxSize) : 0
-	const reservedAssets = _(assets).reverse().filter((_d, idx) => step === 0 || (idx % step) === 0).value()
+	const reversedAssets = _(assets).reverse().value()
+	const step = reversedAssets.length > maxSize ? Math.floor(reversedAssets.length / maxSize) : 0
+	const reservedAssets = _(reversedAssets).filter((_d, idx, arr) => {
+		if (step === 0) return true
+		return idx === 0 || idx === arr.length - 1 || (idx % step) === 0
+	}).value()
 
 	return {
 		timestamps: _(reservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
