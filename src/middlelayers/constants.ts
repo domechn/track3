@@ -11,6 +11,7 @@ import TRONLogo from "@/assets/icons/tron-logo.svg"
 import TONLogo from "@/assets/icons/ton-logo.svg"
 import CoinbaseLogo from "@/assets/icons/coinbase-logo.jpg"
 import SUILogo from "@/assets/icons/sui-logo.svg"
+import BybitLogo from "@/assets/icons/bybit-logo.svg"
 
 const dropsBotUrl = "https://drops.bot/address/"
 const debankUrl = "https://debank.com/profile/"
@@ -26,6 +27,7 @@ export const WALLET_LOGS: { [k: string]: string } = {
 	"gate": GateLogo,
 	"kraken": KrakenLogo,
 	"coinbase": CoinbaseLogo,
+	"bybit": BybitLogo,
 	"btc": BTCLogo,
 	"erc20": ETHLogo,
 	"sol": SOLLogo,
@@ -60,6 +62,10 @@ export const CEX_OPTIONS = [
 	{
 		value: "coinbase",
 		label: "Coinbase",
+	},
+	{
+		value: "bybit",
+		label: "Bybit",
 	},
 ]
 
