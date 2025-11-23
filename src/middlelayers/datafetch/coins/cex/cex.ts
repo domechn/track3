@@ -9,6 +9,7 @@ import { GateExchange } from './gate'
 import { KrakenExchange } from './kraken'
 import { BitgetExchange } from './bitget'
 import { CoinbaseExchange } from './coinbase'
+import { BybitExchange } from './bybit'
 
 export interface Exchanger {
 	getExchangeName(): string
@@ -62,6 +63,8 @@ export class CexAnalyzer implements Analyzer {
 					return new KrakenExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				case "coinbase":
 					return new CoinbaseExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
+				case "bybit":
+					return new BybitExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				default:
 					return new OtherCexExchanges(exCfg.name, exCfg.initParams, exCfg.alias)
 			}
