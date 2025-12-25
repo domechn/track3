@@ -68,7 +68,7 @@ export class BitgetExchange implements Exchanger {
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
 		const resp = await bluebird.map([
 			this.fetchSpotBalance(),
-			this.fetchSavingBalance(),
+			// this.fetchSavingBalance(),
 			this.fetchFutureBalance(),
 			this.fetchEarnBalance()
 		], (v) => v)
@@ -126,6 +126,7 @@ export class BitgetExchange implements Exchanger {
 		}
 	}
 
+	// this may contain /api/v2/earn/account/assets
 	private async fetchSavingBalance(): Promise<{ [k: string]: number }> {
 		const path = "/api/v2/earn/savings/account"
 		const resp = await this.fetch<{ data: SavingAccountResp }>("GET", path)
