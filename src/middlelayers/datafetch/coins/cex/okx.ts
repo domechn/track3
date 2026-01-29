@@ -77,9 +77,9 @@ export class OkxExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const [sb, ssb, fb, esb, sdb, feb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance(), this.fetchStakingDefiBalance(), this.fetchFlashEarnBalance()], (v) => v)
+		const [sb, ssb, fb, esb, sdb, aeb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance(), this.fetchStakingDefiBalance(), this.fetchFlashEarnBalance()], (v) => v)
 		const merge = (arrs: { [k: string]: number }[]) => _(arrs).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
-		const balance: { [k: string]: number } = merge([sb, ssb, fb, sdb, feb])
+		const balance: { [k: string]: number } = merge([sb, ssb, fb, sdb, aeb])
 		_(esb).forEach((v, k) => {
 			const bv = balance[k] || 0
 
@@ -197,7 +197,6 @@ export class OkxExchange implements Exchanger {
 		const potentialPaths = [
 			"/finance/flash-earn/balance",
 			"/finance/airdrop-earn/balance",
-			"/finance/savings/lending-rate",
 		]
 
 		// Try each potential endpoint
@@ -208,12 +207,13 @@ export class OkxExchange implements Exchanger {
 				return _(resp.data).keyBy("ccy").mapValues("amt").mapValues(v => parseFloat(v)).value()
 			} catch (error) {
 				// Silently continue to next endpoint if this one fails
-				console.debug(`Flash Earn endpoint ${path} not available or returned error`)
+				// Detailed error logging is handled by the fetch method
 			}
 		}
 
 		// If all endpoints fail, return empty balance
 		// This is expected behavior as Flash Earn API is not officially documented yet
+		console.debug("Flash Earn balance endpoints not available, returning empty balance")
 		return {}
 	}
 
