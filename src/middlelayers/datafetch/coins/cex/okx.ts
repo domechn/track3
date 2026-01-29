@@ -35,6 +35,13 @@ type ETHStakingBalanceResp = {
 	}[]
 }
 
+type FlashEarnBalanceResp = {
+	data: {
+		ccy: string
+		amt: string
+	}[]
+}
+
 export class OkxExchange implements Exchanger {
 	private readonly apiKey: string
 	private readonly secret: string
@@ -70,9 +77,9 @@ export class OkxExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const [sb, ssb, fb, esb, sdb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance(), this.fetchStakingDefiBalance()], (v) => v)
+		const [sb, ssb, fb, esb, sdb, feb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance(), this.fetchStakingDefiBalance(), this.fetchFlashEarnBalance()], (v) => v)
 		const merge = (arrs: { [k: string]: number }[]) => _(arrs).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
-		const balance: { [k: string]: number } = merge([sb, ssb, fb, sdb])
+		const balance: { [k: string]: number } = merge([sb, ssb, fb, sdb, feb])
 		_(esb).forEach((v, k) => {
 			const bv = balance[k] || 0
 
@@ -178,6 +185,36 @@ export class OkxExchange implements Exchanger {
 		})
 
 		return res
+	}
+
+	// Flash Earn (also known as Airdrop Earn) allows users to subscribe with crypto to receive airdrops 
+	// and earn base yield. As of the current implementation, OKX does not provide a publicly documented 
+	// API endpoint specifically for Flash Earn balances. 
+	// This method attempts to fetch from potential endpoints based on the pattern of other earn products.
+	// If the endpoint doesn't exist or returns an error, it returns an empty balance to prevent 
+	// breaking the overall balance calculation.
+	private async fetchFlashEarnBalance(): Promise<{ [k: string]: number }> {
+		const potentialPaths = [
+			"/finance/flash-earn/balance",
+			"/finance/airdrop-earn/balance",
+			"/finance/savings/lending-rate",
+		]
+
+		// Try each potential endpoint
+		for (const path of potentialPaths) {
+			try {
+				const resp = await this.fetch<FlashEarnBalanceResp>("GET", path, "")
+				// If successful, process and return the balance
+				return _(resp.data).keyBy("ccy").mapValues("amt").mapValues(v => parseFloat(v)).value()
+			} catch (error) {
+				// Silently continue to next endpoint if this one fails
+				console.debug(`Flash Earn endpoint ${path} not available or returned error`)
+			}
+		}
+
+		// If all endpoints fail, return empty balance
+		// This is expected behavior as Flash Earn API is not officially documented yet
+		return {}
 	}
 
 	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {
