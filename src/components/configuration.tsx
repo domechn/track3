@@ -43,7 +43,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CexAnalyzer } from "@/middlelayers/datafetch/coins/cex/cex";
-import { ReloadIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { MagnifyingGlassIcon, ReloadIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { BTCAnalyzer } from "@/middlelayers/datafetch/coins/btc";
 import { DOGEAnalyzer } from "@/middlelayers/datafetch/coins/doge";
 import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
@@ -52,6 +52,11 @@ import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
 import { getWalletLogo } from "@/lib/utils";
 import { prettyPriceNumberToLocaleString } from "@/utils/currency";
 import { TonAnalyzer } from "@/middlelayers/datafetch/coins/ton";
+import { isProVersion } from "@/middlelayers/license";
+import { getImageApiPath } from "@/utils/app";
+import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
+import UnknownLogo from "@/assets/icons/unknown-logo.svg";
+import bluebird from "bluebird";
 import {
   Tooltip,
   TooltipContent,
@@ -153,6 +158,18 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   const [refreshCurrencyLoading, setRefreshCurrencyLoading] = useState(false);
 
+  const [isPro, setIsPro] = useState(false);
+  const [proLicense, setProLicense] = useState("");
+  const [quickLookOpen, setQuickLookOpen] = useState(false);
+  const [quickLookLoading, setQuickLookLoading] = useState(false);
+  const [quickLookData, setQuickLookData] = useState<
+    { symbol: string; amount: number }[]
+  >([]);
+  const [quickLookLogoMap, setQuickLookLogoMap] = useState<{
+    [x: string]: string;
+  }>({});
+  const [quickLookTitle, setQuickLookTitle] = useState("");
+
   const [addExchangeConfig, setAddExchangeConfig] = useState<
     | {
         type: string;
@@ -235,6 +252,12 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   useEffect(() => {
     loadConfiguration();
     loadSupportedCurrencies();
+    isProVersion()
+      .then((info) => {
+        setIsPro(info.isPro);
+        if (info.license) setProLicense(info.license);
+      })
+      .catch(() => {});
   }, []);
 
   async function loadSupportedCurrencies() {
@@ -396,6 +419,189 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     };
   }
 
+  async function buildLogoMap(
+    coins: { symbol: string }[]
+  ): Promise<{ [x: string]: string }> {
+    const acd = await getAppCacheDir();
+    const kvs = await bluebird.map(coins, async (coin) => {
+      const path = await getImageApiPath(acd, coin.symbol);
+      return { [coin.symbol]: path };
+    });
+    return _.assign({}, ...kvs);
+  }
+
+  async function handleQuickLookExchange(ex: {
+    type: string;
+    alias?: string;
+    apiKey: string;
+    secret: string;
+    password?: string;
+    passphrase?: string;
+  }) {
+    setQuickLookTitle(ex.alias ?? ex.type);
+    setQuickLookData([]);
+    setQuickLookLogoMap({});
+    setQuickLookLoading(true);
+    setQuickLookOpen(true);
+
+    try {
+      const ana = new CexAnalyzer({
+        exchanges: [
+          {
+            name: ex.type,
+            initParams: {
+              apiKey: ex.apiKey,
+              secret: ex.secret,
+              password: ex.password,
+              passphrase: ex.passphrase,
+            },
+          },
+        ],
+      });
+
+      const coins = await ana.loadPortfolio();
+      const filtered = coins
+        .filter((c) => c.amount > 0)
+        .sort((a, b) => b.amount - a.amount)
+        .map((c) => ({ symbol: c.symbol, amount: c.amount }));
+      setQuickLookData(filtered);
+      buildLogoMap(filtered).then(setQuickLookLogoMap);
+    } catch (e: any) {
+      toast({
+        description: "Failed to fetch balances: " + (e.message || e),
+        variant: "destructive",
+      });
+      setQuickLookOpen(false);
+    } finally {
+      setQuickLookLoading(false);
+    }
+  }
+
+  async function handleQuickLookWallet(wallet: {
+    type: string;
+    alias?: string;
+    address: string;
+  }) {
+    setQuickLookTitle(wallet.alias ?? `${wallet.type.toUpperCase()} Wallet`);
+    setQuickLookData([]);
+    setQuickLookLogoMap({});
+    setQuickLookLoading(true);
+    setQuickLookOpen(true);
+
+    try {
+      const initPayload = { addresses: [wallet.address] };
+      let ana: Analyzer | null;
+
+      switch (wallet.type) {
+        case "btc":
+          ana = new BTCAnalyzer({ btc: initPayload });
+          break;
+        case "erc20":
+          ana = new ERC20ProAnalyzer({ erc20: initPayload }, proLicense);
+          break;
+        case "sol":
+          ana = new SOLAnalyzer({ sol: initPayload });
+          break;
+        case "ton":
+          ana = new TonAnalyzer({ ton: initPayload });
+          break;
+        case "sui":
+          ana = new SUIAnalyzer({ sui: initPayload });
+          break;
+        case "doge":
+          ana = new DOGEAnalyzer({ doge: initPayload });
+          break;
+        case "trc20":
+          ana = new TRC20ProUserAnalyzer({ trc20: initPayload }, proLicense);
+          break;
+        default:
+          ana = null;
+          break;
+      }
+
+      if (!ana) {
+        throw new Error("Unsupported wallet type");
+      }
+
+      const coins = await ana.loadPortfolio();
+      const filtered = coins
+        .filter((c) => c.amount > 0)
+        .sort((a, b) => b.amount - a.amount)
+        .map((c) => ({ symbol: c.symbol, amount: c.amount }));
+      setQuickLookData(filtered);
+      buildLogoMap(filtered).then(setQuickLookLogoMap);
+    } catch (e: any) {
+      toast({
+        description: "Failed to fetch balances: " + (e.message || e),
+        variant: "destructive",
+      });
+      setQuickLookOpen(false);
+    } finally {
+      setQuickLookLoading(false);
+    }
+  }
+
+  function renderQuickLookDialog() {
+    return (
+      <Dialog
+        open={quickLookOpen}
+        onOpenChange={(open) => {
+          setQuickLookOpen(open);
+          if (!open) {
+            setQuickLookData([]);
+            setQuickLookLogoMap({});
+            setQuickLookTitle("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Quick Look - {quickLookTitle}</DialogTitle>
+            <DialogDescription>
+              Current asset balances
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto">
+            {quickLookLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <ReloadIcon className="h-6 w-6 animate-spin" />
+              </div>
+            ) : quickLookData.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                No assets found
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 text-sm font-medium text-muted-foreground px-2">
+                  <span>Symbol</span>
+                  <span className="text-right">Amount</span>
+                </div>
+                {quickLookData.map((item, idx) => (
+                  <div
+                    key={item.symbol + idx}
+                    className="grid grid-cols-2 text-sm px-2 py-1.5 rounded hover:bg-muted items-center"
+                  >
+                    <div className="flex items-center">
+                      <img
+                        className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
+                        src={quickLookLogoMap[item.symbol] || UnknownLogo}
+                        alt={item.symbol}
+                      />
+                      <span className="font-medium">{item.symbol}</span>
+                    </div>
+                    <span className="text-right">
+                      {prettyPriceNumberToLocaleString(item.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   function renderExchangeForm(
     exs: {
       type: string;
@@ -418,7 +624,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               <CardTitle className="text-sm font-medium">
                 {cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type}
               </CardTitle>
-              <div className="flex">
+              <div className="flex items-center">
+                {isPro && (
+                  <MagnifyingGlassIcon
+                    className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2 cursor-pointer"
+                    onClick={() => handleQuickLookExchange(ex)}
+                  />
+                )}
                 <img
                   src={DeleteIcon}
                   className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
@@ -474,7 +686,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 <CardTitle className="text-sm font-medium">
                   {w.type.toUpperCase()}
                 </CardTitle>
-                <div className="flex ">
+                <div className="flex items-center">
+                  {isPro && (
+                    <MagnifyingGlassIcon
+                      className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2 cursor-pointer"
+                      onClick={() => handleQuickLookWallet(w)}
+                    />
+                  )}
                   <img
                     src={DeleteIcon}
                     className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
@@ -1255,6 +1473,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   return (
     <div className="space-y-6">
+      {renderQuickLookDialog()}
       <div>
         <h3 className="text-lg font-medium">Configuration</h3>
         <p className="text-sm text-muted-foreground">
