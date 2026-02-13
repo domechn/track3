@@ -15,6 +15,12 @@ export const PRO_API_ENDPOINT = 'https://track3-pro-api.domc.me'
 const prefix = "!ent:"
 const generalFixId = "1"
 
+const exchangesConfigId = "10"
+const walletsConfigId = "11"
+const generalConfigId = "12"
+
+const walletKeys = ['btc', 'erc20', 'sol', 'doge', 'trc20', 'ton', 'sui'] as const
+
 const autoBackupId = "3"
 const lastAutoBackupAtId = "4"
 const lastAutoImportAtId = "5"
@@ -28,25 +34,62 @@ const stableCoinsId = "996"
 export const themeLocalStorageKey = "track3-ui-theme"
 
 export async function getConfiguration(): Promise<GlobalConfig | undefined> {
-	const model = await getConfigurationById(generalFixId)
-	if (!model) {
+	const [exchangesModel, walletsModel, generalModel] = await Promise.all([
+		getConfigurationById(exchangesConfigId),
+		getConfigurationById(walletsConfigId),
+		getConfigurationModelById(generalConfigId),
+	])
+
+	// new-format exists: merge and return
+	if (exchangesModel || walletsModel || generalModel) {
+		const exchanges = exchangesModel ? yaml.parse(exchangesModel.data) : { exchanges: [] }
+		const wallets = walletsModel ? yaml.parse(walletsModel.data) : {}
+		const general = generalModel ? yaml.parse(generalModel.data) : { configs: { groupUSD: false }, others: [] }
+
+		return {
+			...exchanges,
+			...wallets,
+			...general,
+		} as GlobalConfig
+	}
+
+	// fallback: legacy id=1
+	const legacyModel = await getConfigurationById(generalFixId)
+	if (!legacyModel) {
 		return
 	}
 
-	const data = yaml.parse(model.data)
-	return data
+	const cfg = yaml.parse(legacyModel.data) as GlobalConfig
+	await migrateConfigurationToSplit(cfg)
+	return cfg
 }
 
 export async function saveConfiguration(cfg: GlobalConfig) {
-	// validate data is yaml
-	const data = yaml.stringify(cfg)
+	const exchangesData = yaml.stringify({ exchanges: cfg.exchanges })
+	const walletsData = yaml.stringify(_.pick(cfg, walletKeys))
+	const generalData = yaml.stringify({ configs: cfg.configs, others: cfg.others })
 
-	await saveConfigurationById(generalFixId, data)
+	await Promise.all([
+		saveConfigurationById(exchangesConfigId, exchangesData),
+		saveConfigurationById(walletsConfigId, walletsData),
+		saveConfigurationById(generalConfigId, generalData, false),
+	])
 }
 
 // used for import data
 export async function importRawConfiguration(data: string) {
-	await saveConfigurationById(generalFixId, data, false)
+	let raw = data
+	if (raw.startsWith(prefix)) {
+		raw = await invoke<string>("decrypt", { data: raw })
+	}
+	const cfg = yaml.parse(raw) as GlobalConfig
+	await saveConfiguration(cfg)
+	await deleteConfigurationById(generalFixId)
+}
+
+async function migrateConfigurationToSplit(cfg: GlobalConfig) {
+	await saveConfiguration(cfg)
+	await deleteConfigurationById(generalFixId)
 }
 
 async function saveConfigurationById(id: string, cfg: string, encrypt = true) {
@@ -63,8 +106,12 @@ async function deleteConfigurationById(id: string) {
 }
 
 export async function exportConfigurationString(): Promise<string | undefined> {
-	const model = await getConfigurationModelById(generalFixId)
-	return model?.data
+	const cfg = await getConfiguration()
+	if (!cfg) {
+		return
+	}
+	const data = yaml.stringify(cfg)
+	return invoke<string>("encrypt", { data })
 }
 
 async function getConfigurationById(id: string): Promise<ConfigurationModel | undefined> {
