@@ -57,10 +57,10 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 800,
+        "height": 900,
         "resizable": true,
         "title": "Track3 - Unlock the insights of your crypto assets.",
-        "width": 1100
+        "width": 1400
       }
     ],
     "security": {

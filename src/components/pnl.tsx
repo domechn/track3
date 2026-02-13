@@ -9,11 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { useContext, useEffect, useState } from "react";
-import { loadingWrapper } from "@/lib/loading";
 import { queryPNLTableValue, resizeChart } from "@/middlelayers/charts";
 import PNLChart from "@/components/pnl-chart";
 import { ChartResizeContext } from "@/App";
 import { positiveNegativeColor } from "@/utils/color";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const chartName = "PNL of Asset";
 
@@ -26,36 +26,22 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
-  const [tableLoading, setTableLoading] = useState(false);
   const { needResize } = useContext(ChartResizeContext);
-  const [initialLoaded, setInitialLoaded] = useState(false);
+  const { reportLoaded } = useContext(OverviewLoadingContext);
 
   const [pnlTableData, setPnlTableData] = useState<PNLTableDate>({});
 
   useEffect(() => {
     loadTableData().then(() => {
-      setInitialLoaded(true);
+      reportLoaded();
     });
   }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadTableData() {
-    updateLoading(true);
-    try {
-      const pd = await queryPNLTableValue();
-      setPnlTableData(pd);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setTableLoading(val);
+    const pd = await queryPNLTableValue();
+    setPnlTableData(pd);
   }
 
   function getLatestTotalValue(): number | undefined {
@@ -114,93 +100,69 @@ const App = ({
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">PNL Analysis</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">PNL Analysis</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex grid grid-cols-3 gap-4">
             <div
-              className="flex flex-col items-center justify-center"
+              className="flex flex-col items-center justify-center border-r border-border/50"
               title={formatTimestampData(pnlTableData.todayPNL?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">Last PNL</div>
-              {loadingWrapper(
-                tableLoading,
-                <div
-                  className={`text-l font-bold ${getPNLTextColor(
-                    pnlTableData.todayPNL?.value
-                  )}`}
-                >
-                  {formatPNLPercentage(pnlTableData.todayPNL?.value)}
-                </div>,
-                "h-[22px]"
-              )}
-              {loadingWrapper(
-                tableLoading,
-                <p
-                  className={`text-xs ${getPNLTextColor(
-                    pnlTableData.todayPNL?.value
-                  )}`}
-                >
-                  {formatPNLValue(pnlTableData.todayPNL?.value)}
-                </p>,
-                "h-[14px] mt-[4px]"
-              )}
+              <div
+                className={`text-l font-bold ${getPNLTextColor(
+                  pnlTableData.todayPNL?.value
+                )}`}
+              >
+                {formatPNLPercentage(pnlTableData.todayPNL?.value)}
+              </div>
+              <p
+                className={`text-xs ${getPNLTextColor(
+                  pnlTableData.todayPNL?.value
+                )}`}
+              >
+                {formatPNLValue(pnlTableData.todayPNL?.value)}
+              </p>
             </div>
             <div
-              className="flex flex-col items-center justify-center"
+              className="flex flex-col items-center justify-center border-r border-border/50"
               title={formatTimestampData(pnlTableData.sevenTPnl?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">7T PNL</div>
-              {loadingWrapper(
-                tableLoading,
-                <div
-                  className={`text-l font-bold ${getPNLTextColor(
-                    pnlTableData.sevenTPnl?.value
-                  )}`}
-                >
-                  {formatPNLPercentage(pnlTableData.sevenTPnl?.value)}
-                </div>,
-                "h-[22px]"
-              )}
-              {loadingWrapper(
-                tableLoading,
-                <p
-                  className={`text-xs ${getPNLTextColor(
-                    pnlTableData.sevenTPnl?.value
-                  )}`}
-                >
-                  {formatPNLValue(pnlTableData.sevenTPnl?.value)}
-                </p>,
-                "h-[14px] mt-[4px]"
-              )}
+              <div
+                className={`text-l font-bold ${getPNLTextColor(
+                  pnlTableData.sevenTPnl?.value
+                )}`}
+              >
+                {formatPNLPercentage(pnlTableData.sevenTPnl?.value)}
+              </div>
+              <p
+                className={`text-xs ${getPNLTextColor(
+                  pnlTableData.sevenTPnl?.value
+                )}`}
+              >
+                {formatPNLValue(pnlTableData.sevenTPnl?.value)}
+              </p>
             </div>
             <div
               className="flex flex-col items-center justify-center"
               title={formatTimestampData(pnlTableData.thirtyPNL?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">30T PNL</div>
-              {loadingWrapper(
-                tableLoading,
-                <div
-                  className={`text-l font-bold ${getPNLTextColor(
-                    pnlTableData.thirtyPNL?.value
-                  )}`}
-                >
-                  {formatPNLPercentage(pnlTableData.thirtyPNL?.value)}
-                </div>,
-                "h-[22px]"
-              )}
-              {loadingWrapper(
-                tableLoading,
-                <p
-                  className={`text-xs ${getPNLTextColor(
-                    pnlTableData.thirtyPNL?.value
-                  )}`}
-                >
-                  {formatPNLValue(pnlTableData.thirtyPNL?.value)}
-                </p>,
-                "h-[14px] mt-[4px]"
-              )}
+              <div
+                className={`text-l font-bold ${getPNLTextColor(
+                  pnlTableData.thirtyPNL?.value
+                )}`}
+              >
+                {formatPNLPercentage(pnlTableData.thirtyPNL?.value)}
+              </div>
+              <p
+                className={`text-xs ${getPNLTextColor(
+                  pnlTableData.thirtyPNL?.value
+                )}`}
+              >
+                {formatPNLValue(pnlTableData.thirtyPNL?.value)}
+              </p>
             </div>
           </div>
           <PNLChart

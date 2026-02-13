@@ -1,7 +1,6 @@
 import { AssetsPercentageChangeData, TDateRange } from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useWindowSize } from "@/utils/hook";
-import { loadingWrapper } from "@/lib/loading";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { ChartResizeContext } from "@/App";
@@ -13,7 +12,12 @@ import {
 } from "@/middlelayers/charts";
 import { timeToDateStr } from "@/utils/date";
 import _ from "lodash";
-import { generateRandomColors } from "@/utils/color";
+import {
+  chartColors,
+  createGradientFill,
+  glassScaleOptions,
+  glassTooltip,
+} from "@/utils/chart-theme";
 
 const chartName = "Coins Percentage Overview";
 
@@ -21,8 +25,6 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
   const [topN, setTopN] = useState<string[]>([]);
   const { needResize } = useContext(ChartResizeContext);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [assetsPercentageChangeData, setAssetsPercentageChangeData] = useState(
     [] as AssetsPercentageChangeData
   );
@@ -30,38 +32,21 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   useEffect(() => {
     loadData(dateRange).then(() => {
       resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
     });
   }, [dateRange]);
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  const colors = useMemo(() => generateRandomColors(topN.length + 1), [topN]);
-
   async function loadData(dr: TDateRange) {
-    updateLoading(true);
+    const topN = await queryTopNAssets(dr, 6);
+    const data = await queryAssetsPercentageChange(dr);
 
-    try {
-      const topN = await queryTopNAssets(dr, 6);
-      const data = await queryAssetsPercentageChange(dr);
-
-      setTopN(topN);
-      setAssetsPercentageChangeData(data);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setLoading(val);
+    setTopN(topN);
+    setAssetsPercentageChangeData(data);
   }
 
   const options = {
     maintainAspectRatio: false,
-    responsive: false,
+    responsive: true,
     hover: {
       mode: "index",
       intersect: false,
@@ -83,8 +68,8 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         display: true,
       },
       tooltip: {
+        ...glassTooltip,
         itemSort: (a: any, b: any) => b.parsed.y - a.parsed.y,
-        // mode: "index",
         callbacks: {
           label: (context: {
             dataset: { label: string; yAxisID: string };
@@ -103,6 +88,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
           display: false,
         },
         ticks: {
+          ...glassScaleOptions.ticks,
           autoSkip: true,
         },
         grid: {
@@ -118,6 +104,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
           display: false,
         },
         ticks: {
+          ...glassScaleOptions.ticks,
           precision: 0,
           stepSize: 25,
           callback: function (value: number) {
@@ -125,7 +112,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
           },
         },
         grid: {
-          display: false,
+          ...glassScaleOptions.grid,
         },
       },
     },
@@ -134,7 +121,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   function lineData() {
     const topNDatasets = _(topN)
       .map((s, idx) => {
-        const colorIdx = idx;
+        const color = chartColors[idx % chartColors.length];
         return {
           label: s,
           data: _(assetsPercentageChangeData)
@@ -143,15 +130,16 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                 _(d.percentages).find((p) => p.symbol === s)?.percentage ?? 0
             )
             .value(),
-          backgroundColor: `rgba(${colors[colorIdx].R}, ${colors[colorIdx].G}, ${colors[colorIdx].B}, 1)`,
+          borderColor: color.main,
+          backgroundColor: color.bg,
           fill: true,
-          borderWidth: 0,
-          pointStyle: false as any,
+          borderWidth: 1.5,
+          tension: 0.4,
+          pointRadius: 0,
         };
       })
       .compact()
       .value();
-    const othersIdx = topN.length;
     const othersDatasets = {
       label: "Others",
       data: _(assetsPercentageChangeData)
@@ -162,10 +150,12 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
               .sumBy("percentage") ?? 0
         )
         .value(),
-      backgroundColor: `rgba(${colors[othersIdx].R}, ${colors[othersIdx].G}, ${colors[othersIdx].B})`,
+      borderColor: "rgba(148,163,184,0.5)",
+      backgroundColor: "rgba(148,163,184,0.15)",
       fill: true,
-      borderWidth: 0,
-      pointStyle: false as any,
+      borderWidth: 1.5,
+      tension: 0.4,
+      pointRadius: 0,
     };
     return {
       labels: assetsPercentageChangeData.map((x) => timeToDateStr(x.timestamp)),
@@ -175,30 +165,52 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   const lineDataMemo = useMemo(
     () => lineData(),
-    [assetsPercentageChangeData, topN, colors]
+    [assetsPercentageChangeData, topN]
   );
 
   return (
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium font-bold">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             {chartName}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 placeholder">
+        <CardContent className="space-y-2">
           <div
             className="flex items-center justify-center"
             style={{
               height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
-            {loadingWrapper(
-              loading,
-              <Line options={options as any} data={lineDataMemo} />,
-              "my-[10px] h-[26px]",
-              10
-            )}
+            <Line
+              options={options as any}
+              data={lineDataMemo}
+              plugins={[
+                {
+                  id: "stackedGradientFill",
+                  beforeDraw(chart: any) {
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) return;
+                    chart.data.datasets.forEach((ds: any, idx: number) => {
+                      if (ds.fill) {
+                        const color =
+                          idx < topN.length
+                            ? chartColors[idx % chartColors.length].main
+                            : "rgba(148,163,184,1)";
+                        ds.backgroundColor = createGradientFill(
+                          ctx,
+                          chartArea,
+                          color,
+                          0.35,
+                          0.08
+                        );
+                      }
+                    });
+                  },
+                },
+              ]}
+            />
           </div>
         </CardContent>
       </Card>

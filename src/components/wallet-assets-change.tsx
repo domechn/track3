@@ -20,7 +20,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useEffect, useState } from "react";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
-import { Skeleton } from "./ui/skeleton";
 import { getWalletLogo } from "@/lib/utils";
 import { positiveNegativeColor } from "@/utils/color";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -38,32 +37,16 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
-  const [loading, setLoading] = useState(false);
-  const [initialLoaded, setInitialLoaded] = useState(false);
   const [walletAssetsChange, setWalletAssetsChange] =
     useState<WalletAssetsChangeData>([]);
 
   useEffect(() => {
-    loadData().then(() => {
-      setInitialLoaded(true);
-    });
+    loadData();
   }, [dateRange]);
 
   async function loadData() {
-    updateLoading(true);
-    try {
-      const wac = await WALLET_ANALYZER.queryWalletAssetsChange();
-      setWalletAssetsChange(wac);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-    setLoading(val);
+    const wac = await WALLET_ANALYZER.queryWalletAssetsChange();
+    setWalletAssetsChange(wac);
   }
 
   function getArrow(value: number) {
@@ -118,7 +101,7 @@ const App = ({
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium font-bold">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Value Changes
           </CardTitle>
         </CardHeader>
@@ -135,26 +118,8 @@ const App = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading
-                    ? _(5)
-                        .range()
-                        .map((i) => (
-                          <TableRow key={"wallet-assets-change-loading-" + i}>
-                            {_(4)
-                              .range()
-                              .map((j) => (
-                                <TableCell
-                                  key={`wallet-assets-change-loading-${i}-${j}`}
-                                >
-                                  <Skeleton className="my-[5px] h-[20px] w-[100%]" />
-                                </TableCell>
-                              ))
-                              .value()}
-                          </TableRow>
-                        ))
-                        .value()
-                    : walletAssetsChange.map((d) => (
-                        <TableRow key={d.wallet} className="group">
+                  {walletAssetsChange.map((d) => (
+                        <TableRow key={d.wallet} className="h-[42px] group">
                           <TableCell className="font-medium">
                             {!d.walletType || d.walletType === "null" ? (
                               <div>Unknown</div>

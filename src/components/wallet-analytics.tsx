@@ -5,6 +5,7 @@ import {
   QuoteColor,
   TDateRange,
 } from "@/middlelayers/types";
+import { StaggerContainer, FadeUp } from "./motion";
 
 const App = ({
   currency,
@@ -16,14 +17,18 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   return (
-    <div className="space-y-2">
-      <WalletAssetsPercentage currency={currency} dateRange={dateRange} />
-      <WalletAssetsChange
-        currency={currency}
-        dateRange={dateRange}
-        quoteColor={quoteColor}
-      />
-    </div>
+    <StaggerContainer className="space-y-3">
+      <FadeUp>
+        <WalletAssetsPercentage currency={currency} dateRange={dateRange} />
+      </FadeUp>
+      <FadeUp>
+        <WalletAssetsChange
+          currency={currency}
+          dateRange={dateRange}
+          quoteColor={quoteColor}
+        />
+      </FadeUp>
+    </StaggerContainer>
   );
 };
 

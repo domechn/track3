@@ -15,8 +15,14 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { loadingWrapper } from "@/lib/loading";
 import { ChartResizeContext } from "@/App";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import {
+  chartColors,
+  createGradientFill,
+  glassScaleOptions,
+  glassTooltip,
+} from "@/utils/chart-theme";
 
 const chartName = "Trend of Coin";
 
@@ -31,9 +37,7 @@ const App = ({
 }) => {
   const wsize = useWindowSize();
   const { needResize } = useContext(ChartResizeContext);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  const y1Color = "#4F46E5";
-  const y2Color = "#F97316";
+  const { reportLoaded } = useContext(OverviewLoadingContext);
 
   const [coinsAmountAndValueChangeData, setCoinsAmountAndValueChangeData] =
     useState<CoinsAmountAndValueChangeData>({
@@ -43,8 +47,6 @@ const App = ({
       values: [],
     });
 
-  const [loading, setLoading] = useState(false);
-
   const chartHasData = useMemo(
     () => !_(coinsAmountAndValueChangeData.timestamps).isEmpty(),
     [coinsAmountAndValueChangeData]
@@ -53,35 +55,23 @@ const App = ({
   useEffect(() => {
     loadData(symbol, dateRange).then(() => {
       resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
+      reportLoaded();
     });
   }, [dateRange, symbol]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData(symbol: string, dateRange: TDateRange) {
-    updateLoading(true);
-    try {
-      const cac = await queryCoinsAmountChange(symbol, dateRange);
-      if (!cac) {
-        return;
-      }
-      setCoinsAmountAndValueChangeData(cac);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
+    const cac = await queryCoinsAmountChange(symbol, dateRange);
+    if (!cac) {
       return;
     }
-    setLoading(val);
+    setCoinsAmountAndValueChangeData(cac);
   }
 
   const options = {
     maintainAspectRatio: false,
-    responsive: false,
+    responsive: true,
     hover: {
       mode: "index",
       intersect: false,
@@ -103,6 +93,7 @@ const App = ({
         display: false,
       },
       tooltip: {
+        ...glassTooltip,
         callbacks: {
           label: (context: {
             dataset: { label: string; yAxisID: string };
@@ -121,6 +112,12 @@ const App = ({
         title: {
           display: false,
         },
+        ticks: {
+          ...glassScaleOptions.ticks,
+        },
+        grid: {
+          display: false,
+        },
       },
       y1: {
         title: {
@@ -129,13 +126,14 @@ const App = ({
         offset: true,
         position: "left",
         ticks: {
+          ...glassScaleOptions.ticks,
           precision: 4,
           callback: (value: any) => {
             return simplifyNumber(value);
           },
         },
         grid: {
-          display: false,
+          ...glassScaleOptions.grid,
         },
       },
       y2: {
@@ -145,6 +143,7 @@ const App = ({
         offset: true,
         position: "right",
         ticks: {
+          ...glassScaleOptions.ticks,
           precision: 4,
           callback: (value: any) => {
             return simplifyNumber(value);
@@ -174,23 +173,23 @@ const App = ({
           data: _(current.values)
             .map((v) => currencyWrapper(currency)(v))
             .value(),
-          borderColor: y1Color,
-          backgroundColor: y1Color,
-          borderWidth: 4,
-          tension: 0.1,
-          pointRadius: 0.2,
-          pointStyle: "rotRect",
+          borderColor: chartColors[0].main,
+          backgroundColor: chartColors[0].bg,
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 0,
+          fill: true,
           yAxisID: "y1",
         },
         {
           label: "Amount",
           data: current.amounts,
-          borderColor: y2Color,
-          backgroundColor: y2Color,
-          borderWidth: 4,
-          tension: 0.1,
-          pointRadius: 0.2,
-          pointStyle: "rotRect",
+          borderColor: chartColors[5].main,
+          backgroundColor: chartColors[5].bg,
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 0,
+          fill: true,
           yAxisID: "y2",
         },
       ],
@@ -201,7 +200,7 @@ const App = ({
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium font-bold">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Trend of {symbol}
           </CardTitle>
         </CardHeader>
@@ -212,20 +211,38 @@ const App = ({
               height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
-            {loadingWrapper(
-              loading,
-              chartHasData ? (
-                <Line
-                  options={options as any}
-                  data={chartDataByCoin(coinsAmountAndValueChangeData)}
-                />
-              ) : (
-                <div className="text-3xl text-gray-300 m-auto">
-                  No Available Data For Selected Dates
-                </div>
-              ),
-              "my-[10px] h-[26px]",
-              10
+            {chartHasData ? (
+              <Line
+                options={options as any}
+                data={chartDataByCoin(coinsAmountAndValueChangeData)}
+                plugins={[
+                  {
+                    id: "gradientFill",
+                    beforeDraw(chart: any) {
+                      const { ctx, chartArea } = chart;
+                      if (!chartArea) return;
+                      chart.data.datasets.forEach(
+                        (ds: any, idx: number) => {
+                          if (ds.fill) {
+                            const colorIdx = idx === 0 ? 0 : 5;
+                            ds.backgroundColor = createGradientFill(
+                              ctx,
+                              chartArea,
+                              chartColors[colorIdx].main,
+                              0.2,
+                              0.0
+                            );
+                          }
+                        }
+                      );
+                    },
+                  },
+                ]}
+              />
+            ) : (
+              <div className="text-lg text-muted-foreground m-auto">
+                No Available Data For Selected Dates
+              </div>
             )}
           </div>
         </CardContent>

@@ -18,10 +18,11 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { loadingWrapper } from "@/lib/loading";
 import { ChartResizeContext } from "@/App";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { offsetHoveredItemWrapper } from "@/utils/legend";
+import { chartColors, glassTooltip } from "@/utils/chart-theme";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const chartName = "Percentage And Total Value of Each Wallet";
 
@@ -39,8 +40,7 @@ const App = ({
   const size = useWindowSize();
   const chartRef = useRef<ChartJSOrUndefined<"pie", string[], unknown>>(null);
   const { needResize } = useContext(ChartResizeContext);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { reportLoaded } = useContext(OverviewLoadingContext);
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
     useState<WalletAssetsPercentageData>([]);
 
@@ -55,34 +55,20 @@ const App = ({
   useEffect(() => {
     loadData(symbol).then(() => {
       resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
+      reportLoaded();
     });
   }, [symbol, dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData(s?: string) {
-    updateLoading(true);
-
-    try {
-      const wap = await WALLET_ANALYZER.queryWalletAssetsPercentage(s);
-      setWalletAssetsPercentage(wap);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setLoading(val);
+    const wap = await WALLET_ANALYZER.queryWalletAssetsPercentage(s);
+    setWalletAssetsPercentage(wap);
   }
 
   const options = {
     maintainAspectRatio: false,
-    responsive: false,
+    responsive: true,
     layout: {
       padding: 20,
     },
@@ -105,6 +91,7 @@ const App = ({
         display: false,
       },
       tooltip: {
+        ...glassTooltip,
         callbacks: {
           label: (context: { dataIndex: number; parsed: number }) => {
             const p = walletAssetsPercentage[context.dataIndex];
@@ -138,14 +125,12 @@ const App = ({
           data: _(walletAssetsPercentage)
             .map((d) => currencyWrapper(currency)(d.value).toFixed(2))
             .value(),
-          borderColor: _(walletAssetsPercentage)
-            .map((d) => d.chartColor)
-            .value(),
-          backgroundColor: _(walletAssetsPercentage)
-            .map((d) => d.chartColor)
-            .value(),
-          borderWidth: 1,
-          hoverOffset: 35,
+          borderColor: "rgba(255,255,255,0.15)",
+          backgroundColor: walletAssetsPercentage.map(
+            (_d, i) => chartColors[i % chartColors.length].main
+          ),
+          borderWidth: 2,
+          hoverOffset: 12,
         },
       ],
     };
@@ -155,7 +140,7 @@ const App = ({
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium font-bold">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             {symbol ? symbol + " " : ""}Percentage And Total Value of Each
             Wallet
           </CardTitle>
@@ -167,21 +152,16 @@ const App = ({
               height: Math.max((size.height || 100) / 2, 400),
             }}
           >
-            {loadingWrapper(
-              loading,
-              chartHasData ? (
-                <Pie
-                  ref={chartRef}
-                  options={options as any}
-                  data={lineData()}
-                />
-              ) : (
-                <div className="text-3xl text-gray-300 m-auto">
-                  No Available Data For Selected Dates
-                </div>
-              ),
-              "mt-6 h-[30px]",
-              6
+            {chartHasData ? (
+              <Pie
+                ref={chartRef}
+                options={options as any}
+                data={lineData()}
+              />
+            ) : (
+              <div className="text-lg text-muted-foreground m-auto">
+                No Available Data For Selected Dates
+              </div>
             )}
           </div>
         </CardContent>

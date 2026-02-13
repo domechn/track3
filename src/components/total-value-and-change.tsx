@@ -21,10 +21,16 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { loadingWrapper } from "@/lib/loading";
 import bluebird from "bluebird";
 import { ChartResizeContext } from "@/App";
 import { positiveNegativeColor } from "@/utils/color";
+import {
+  chartColors,
+  createGradientFill,
+  glassScaleOptions,
+  glassTooltip,
+} from "@/utils/chart-theme";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -166,12 +172,9 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
-  const lineColor = "rgba(255, 99, 71, 1)";
+  const lineColor = chartColors[0].main;
   const { needResize } = useContext(ChartResizeContext);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-
-  const [totalValueLoading, setTotalValueLoading] = useState(false);
-  const [chartLoading, setChartLoading] = useState(false);
+  const { reportLoaded } = useContext(OverviewLoadingContext);
 
   const [totalValueData, setTotalValueData] = useState<TotalValueData>({
     totalValue: 0,
@@ -217,7 +220,7 @@ const App = ({
   useEffect(() => {
     loadData(dateRange).then(() => {
       resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
+      reportLoaded();
     });
   }, [dateRange]);
 
@@ -228,37 +231,14 @@ const App = ({
   }
 
   async function loadTotalValue() {
-    updateLoading(true, "totalValue");
-    try {
-      const tv = await queryTotalValue();
-      setTotalValueData(tv);
-    } finally {
-      updateLoading(false, "totalValue");
-    }
+    const tv = await queryTotalValue();
+    setTotalValueData(tv);
   }
 
   async function loadChartData(dr: TDateRange) {
-    updateLoading(true, "chart");
-    try {
-      const ac = await queryAssetChange(dr);
-      setAssetChangeData(ac);
-    } finally {
-      updateLoading(false, "chart");
-    }
+    const ac = await queryAssetChange(dr);
+    setAssetChangeData(ac);
   }
-
-  function updateLoading(val: boolean, loadingType: "chart" | "totalValue") {
-    // no need to set loading if already loaded ( like refresh data in overview page)
-    if (initialLoaded) {
-      return;
-    }
-    if (loadingType === "chart") {
-      setChartLoading(val);
-    } else if (loadingType === "totalValue") {
-      setTotalValueLoading(val);
-    }
-  }
-
 
   function getTotalValueShower(
     btcAsBase: boolean,
@@ -340,7 +320,7 @@ const App = ({
 
   const options = {
     maintainAspectRatio: false,
-    responsive: false,
+    responsive: true,
     hover: {
       mode: "index",
       intersect: false,
@@ -362,6 +342,7 @@ const App = ({
         display: false,
       },
       tooltip: {
+        ...glassTooltip,
         callbacks: {
           label: (context: { parsed: { y: number } }) => {
             const v = context.parsed.y.toLocaleString();
@@ -382,6 +363,7 @@ const App = ({
           display: false,
         },
         ticks: {
+          ...glassScaleOptions.ticks,
           maxRotation: 0,
           minRotation: 0,
           align: "center",
@@ -416,6 +398,7 @@ const App = ({
         },
         offset: true,
         ticks: {
+          ...glassScaleOptions.ticks,
           precision: 2,
           maxTicksLimit: 4,
           callback: (value: any) => {
@@ -425,7 +408,7 @@ const App = ({
           },
         },
         grid: {
-          display: false,
+          ...glassScaleOptions.grid,
         },
       },
     },
@@ -440,10 +423,11 @@ const App = ({
           data: formatLineData(),
           borderColor: lineColor,
           backgroundColor: lineColor,
-          borderWidth: assetChangeData.data.length > 20 ? 2 : 4,
-          tension: 0.1,
-          pointRadius: assetChangeData.data.length > 20 ? 0 : 0.3,
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 0,
           pointStyle: "rotRect",
+          fill: true,
         },
       ],
     };
@@ -456,7 +440,7 @@ const App = ({
         onMouseLeave={() => setShowValue(false)}
       >
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Total Value In {totalValueShower.currencyName()}
           </CardTitle>
           <div className="flex space-x-2">
@@ -496,34 +480,42 @@ const App = ({
           </div>
         </CardHeader>
         <CardContent>
-          {loadingWrapper(
-            totalValueLoading,
-            <div className="text-2xl font-bold">{totalValueShower.formatTotalValue()}</div>,
-            "w-[80%] h-[32px]"
-          )}
-          {loadingWrapper(
-            totalValueLoading,
-            <p className="text-xs text-muted-foreground mb-2">
-              <span
-                className={changePercentageColorClass(
-                  totalValueShower,
-                  totalValue,
-                  firstTotalValue
-                )}
-              >
-                {changedValueOrPercentage}
-              </span>{" "}
-              from {firstDate}
-            </p>,
-            "w-[60%] h-[16px] mt-2"
-          )}
+          <div className="text-2xl font-bold">{totalValueShower.formatTotalValue()}</div>
+          <p className="text-xs text-muted-foreground mb-2">
+            <span
+              className={changePercentageColorClass(
+                totalValueShower,
+                totalValue,
+                firstTotalValue
+              )}
+            >
+              {changedValueOrPercentage}
+            </span>{" "}
+            from {firstDate}
+          </p>
           <div className="h-30">
-            {loadingWrapper(
-              chartLoading,
-              <Line options={options as any} data={lineData()} />,
-              "mt-[19.5px] h-[18px]",
-              4
-            )}
+            <Line
+              options={options as any}
+              data={lineData()}
+              plugins={[
+                {
+                  id: "gradientFill",
+                  beforeDraw(chart: any) {
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) return;
+                    chart.data.datasets.forEach((ds: any) => {
+                      if (ds.fill) {
+                        ds.backgroundColor = createGradientFill(
+                          ctx,
+                          chartArea,
+                          lineColor
+                        );
+                      }
+                    });
+                  },
+                },
+              ]}
+            />
           </div>
         </CardContent>
       </Card>

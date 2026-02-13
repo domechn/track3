@@ -29,9 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { loadingWrapper } from "@/lib/loading";
-import { Skeleton } from "./ui/skeleton";
 import { positiveNegativeColor } from "@/utils/color";
+import { StaggerContainer, FadeUp } from "./motion";
+import { Card, CardContent } from "./ui/card";
 
 type ComparisonData = {
   name: string;
@@ -381,151 +381,129 @@ const App = ({
   }
 
   return (
-    <>
-      <div>
-        <div className="flex mb-4 items-center justify-end">
-          <div className="mr-5">
-            <a onClick={onViewOrHideClick}>
-              <img
-                src={shouldMaskValue ? HideIcon : ViewIcon}
-                alt="view-or-hide"
-                width={25}
-                height={25}
-              />
-            </a>
-          </div>
-          <div className="mr-2 text-gray-400 text-m flex items-center">
-            Quick Compare
-          </div>
-          <ButtonGroup
-            value={currentQuickCompare || ""}
-            onValueChange={(val: string) =>
-              onQuickCompareButtonClick(val as QuickCompareType)
-            }
-          >
-            <ButtonGroupItem value="7D">7D</ButtonGroupItem>
-            <ButtonGroupItem value="1M">1M</ButtonGroupItem>
-            <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
-            <ButtonGroupItem value="YTD">YTD</ButtonGroupItem>
-            <ButtonGroupItem value="ALL">ALL</ButtonGroupItem>
-          </ButtonGroup>
-        </div>
-      </div>
-      <div className="grid grid-cols-6 gap-4 mb-5">
-        <div className="col-start-2 col-end-4">
-          {loadingWrapper(
-            selectDatesLoading,
-            <Select onValueChange={onBaseSelectChange} value={baseId}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Base Date" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectLabel>Base Dates</SelectLabel>
-                  {dateOptions.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>,
-            "w-[40%]"
-          )}
-        </div>
-        <div className="col-end-7 col-span-2">
-          {loadingWrapper(
-            selectDatesLoading,
-            <Select onValueChange={onHeadSelectChange} value={headId}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Head Date" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectLabel>Head Dates</SelectLabel>
-                  {dateOptions.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>,
-            "w-[40%]"
-          )}
-        </div>
-      </div>
-      <div className="px-10 mb-5">
-        {loadingWrapper(selectDatesLoading, <div></div>, "my-[20px]", 15)}
-        {displayData.length === 0 && (
-          <div className="text-center text-gray-600">No Data</div>
-        )}
-        {displayData.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>{baseDate}</TableHead>
-                <TableHead className="text-center">Difference</TableHead>
-                <TableHead className="text-right">{headDate}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dataLoading
-                ? _(5)
-                    .range()
-                    .map((i) => (
-                      <TableRow key={"comparison-loading-" + i}>
-                        {_(4)
-                          .range()
-                          .map((j) => (
-                            <TableCell
-                              key={`comparison-cell-loading-${i}-${j}`}
-                            >
-                              <Skeleton className="my-[10px] h-[20px] w-[100%]" />
-                            </TableCell>
-                          ))
-                          .value()}
-                      </TableRow>
-                    ))
-                    .value()
-                : displayData.map((item, index) => (
-                    <TableRow
-                      key={"comparison" + index}
-                      className={item.type !== "value" ? "border-none" : ""}
-                      onMouseEnter={() => setHoveredRowIndex(index)}
-                      onMouseLeave={() => setHoveredRowIndex(null)}
-                    >
-                      <TableCell className="font-medium max-w-[100px] truncate">
-                        {item.name}
-                      </TableCell>
-                      <TableCell>{item.base}</TableCell>
-                      <TableCell className={`text-${item.color}-500`}>
-                        <div className="h-6 overflow-hidden">
-                          <div
-                            className={`transform transition-all duration-300 ease-in-out ${
-                              hoveredRowIndex === index
-                                ? "-translate-y-6"
-                                : "translate-y-0"
-                            }`}
-                          >
-                            <div className="h-6 flex items-center justify-center">
-                              {item.cmpPercentage}
+    <StaggerContainer className="space-y-4">
+      <FadeUp>
+        <Card>
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <a onClick={onViewOrHideClick} className="cursor-pointer">
+                  <img
+                    src={shouldMaskValue ? HideIcon : ViewIcon}
+                    alt="view-or-hide"
+                    width={22}
+                    height={22}
+                  />
+                </a>
+                <div className="flex items-center gap-2">
+                  <Select onValueChange={onBaseSelectChange} value={baseId}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Base Date" />
+                    </SelectTrigger>
+                    <SelectContent className="overflow-y-auto max-h-[20rem]">
+                      <SelectGroup>
+                        <SelectLabel>Base Dates</SelectLabel>
+                        {dateOptions.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-muted-foreground text-sm">vs</span>
+                  <Select onValueChange={onHeadSelectChange} value={headId}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Head Date" />
+                    </SelectTrigger>
+                    <SelectContent className="overflow-y-auto max-h-[20rem]">
+                      <SelectGroup>
+                        <SelectLabel>Head Dates</SelectLabel>
+                        {dateOptions.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-sm">Quick</span>
+                <ButtonGroup
+                  value={currentQuickCompare || ""}
+                  onValueChange={(val: string) =>
+                    onQuickCompareButtonClick(val as QuickCompareType)
+                  }
+                >
+                  <ButtonGroupItem value="7D">7D</ButtonGroupItem>
+                  <ButtonGroupItem value="1M">1M</ButtonGroupItem>
+                  <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
+                  <ButtonGroupItem value="YTD">YTD</ButtonGroupItem>
+                  <ButtonGroupItem value="ALL">ALL</ButtonGroupItem>
+                </ButtonGroup>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </FadeUp>
+      <FadeUp>
+        <Card>
+          <CardContent className="pt-5">
+            {displayData.length === 0 && !selectDatesLoading && (
+              <div className="text-center text-muted-foreground py-8">No Data</div>
+            )}
+            {displayData.length > 0 && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>{baseDate}</TableHead>
+                    <TableHead className="text-center">Difference</TableHead>
+                    <TableHead className="text-right">{headDate}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {displayData.map((item, index) => (
+                        <TableRow
+                          key={"comparison" + index}
+                          className={item.type !== "value" ? "border-none" : ""}
+                          onMouseEnter={() => setHoveredRowIndex(index)}
+                          onMouseLeave={() => setHoveredRowIndex(null)}
+                        >
+                          <TableCell className="font-medium max-w-[120px] truncate">
+                            {item.name}
+                          </TableCell>
+                          <TableCell>{item.base}</TableCell>
+                          <TableCell className={`text-${item.color}-500`}>
+                            <div className="h-6 overflow-hidden">
+                              <div
+                                className={`transform transition-all duration-300 ease-in-out ${
+                                  hoveredRowIndex === index
+                                    ? "-translate-y-6"
+                                    : "translate-y-0"
+                                }`}
+                              >
+                                <div className="h-6 flex items-center justify-center">
+                                  {item.cmpPercentage}
+                                </div>
+                                <div className="h-6 flex items-center justify-center">
+                                  {item.cmpValue}
+                                </div>
+                              </div>
                             </div>
-                            <div className="h-6 flex items-center justify-center">
-                              {item.cmpValue}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{item.head}</TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
-    </>
+                          </TableCell>
+                          <TableCell className="text-right">{item.head}</TableCell>
+                        </TableRow>
+                      ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </FadeUp>
+    </StaggerContainer>
   );
 };
 

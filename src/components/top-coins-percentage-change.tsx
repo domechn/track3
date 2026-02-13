@@ -14,8 +14,13 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { loadingWrapper } from "@/lib/loading";
 import { ChartResizeContext } from "@/App";
+import {
+  chartColors,
+  createGradientFill,
+  glassScaleOptions,
+  glassTooltip,
+} from "@/utils/chart-theme";
 
 const prefix = "tcpc";
 const chartNameKey = "Change of Top Coins";
@@ -24,8 +29,6 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
 
   const { needResize } = useContext(ChartResizeContext);
-  const [loading, setLoading] = useState(false);
-  const [initialLoaded, setInitialLoaded] = useState(false);
   const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] =
     useState<TopCoinsPercentageChangeData>({
       timestamps: [],
@@ -45,32 +48,19 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   useEffect(() => {
     loadData(dateRange).then(() => {
       resizeChartWithDelay(chartNameKey);
-      setInitialLoaded(true);
     });
   }, [dateRange]);
 
   useEffect(() => resizeChart(chartNameKey), [needResize]);
 
   async function loadData(dr: TDateRange) {
-    updateLoading(true);
-    try {
-      const tcpcd = await queryTopCoinsPercentageChangeData(dr);
-      setTopCoinsPercentageChangeData(tcpcd);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-    setLoading(val);
+    const tcpcd = await queryTopCoinsPercentageChangeData(dr);
+    setTopCoinsPercentageChangeData(tcpcd);
   }
 
   const options = {
     maintainAspectRatio: false,
-    responsive: false,
+    responsive: true,
     hover: {
       mode: "index",
       intersect: false,
@@ -85,6 +75,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         text: `Change of Top Coins ${getLabel()} Percentage`,
       },
       tooltip: {
+        ...glassTooltip,
         itemSort: (a: { raw: number }, b: { raw: number }) => {
           return b.raw - a.raw;
         },
@@ -114,13 +105,14 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         },
         offset: true,
         ticks: {
+          ...glassScaleOptions.ticks,
           precision: 2,
           callback: function (value: number) {
             return value + "%";
           },
         },
         grid: {
-          display: false,
+          ...glassScaleOptions.grid,
         },
       },
     },
@@ -151,18 +143,18 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       labels: topCoinsPercentageChangeData.timestamps.map((x) =>
         timeToDateStr(x)
       ),
-      datasets: topCoinsPercentageChangeData.coins.map((coin) => ({
+      datasets: topCoinsPercentageChangeData.coins.map((coin, idx) => ({
         label: coin.coin,
         data: coinPercentageData(
           topCoinsPercentageChangeData.timestamps,
           coin.percentageData
         ),
-        borderColor: coin.lineColor,
-        backgroundColor: coin.lineColor,
-        borderWidth: 4,
-        tension: 0.1,
-        pointRadius: 0.2,
-        pointStyle: "rotRect",
+        borderColor: chartColors[idx % chartColors.length].main,
+        backgroundColor: chartColors[idx % chartColors.length].bg,
+        borderWidth: 2,
+        tension: 0.4,
+        pointRadius: 0,
+        fill: true,
       })),
     };
   }
@@ -191,7 +183,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium font-bold">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Change of Top Coins {getLabel()} Percentage
           </CardTitle>
         </CardHeader>
@@ -212,16 +204,33 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
               height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
-            {loadingWrapper(
-              loading,
-              <Line
-                ref={chartRef}
-                options={options as any}
-                data={lineData()}
-              />,
-              "mt-4",
-              10
-            )}
+            <Line
+              ref={chartRef}
+              options={options as any}
+              data={lineData()}
+              plugins={[
+                {
+                  id: "gradientFill",
+                  beforeDraw(chart: any) {
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) return;
+                    chart.data.datasets.forEach(
+                      (ds: any, idx: number) => {
+                        if (ds.fill) {
+                          ds.backgroundColor = createGradientFill(
+                            ctx,
+                            chartArea,
+                            chartColors[idx % chartColors.length].main,
+                            0.2,
+                            0.0
+                          );
+                        }
+                      }
+                    );
+                  },
+                },
+              ]}
+            />
           </div>
         </CardContent>
       </Card>

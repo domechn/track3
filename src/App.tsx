@@ -15,7 +15,7 @@ function App() {
   const [needResize, setNeedResize] = React.useState(0);
 
   return (
-    <div className="container" onContextMenu={renderRightClickMenu}>
+    <div className="bg-gradient-to-br from-background via-background to-accent/20 min-h-screen" onContextMenu={renderRightClickMenu}>
       <Toaster />
       <AutoUpdater />
       <ThemeProvider defaultTheme="light" storageKey={themeLocalStorageKey}>

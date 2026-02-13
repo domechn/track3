@@ -72,6 +72,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
+import { StaggerContainer, FadeUp } from "./motion";
 
 type RankData = {
   id: number;
@@ -524,7 +525,7 @@ const App = ({
   }, [rankData, currency, logoMap]);
 
   return (
-    <div>
+    <StaggerContainer className="space-y-3">
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="min-w-[80%]">
           <DialogHeader>
@@ -552,24 +553,24 @@ const App = ({
           </ScrollArea>
         </DialogContent>
       </Dialog>
-      <div className="flex justify-center items-center mb-3 cursor-pointer">
-        <div className="flex space-x-0 items-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
-            disabled={dataPage <= 0}
-          >
-            <ChevronLeftIcon />
-          </Button>
-          <div className="text-gray-800 text-sm">
+      <FadeUp>
+        <div className="flex justify-center items-center">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
+              disabled={dataPage <= 0}
+            >
+              <ChevronLeftIcon />
+            </Button>
             <Select
               value={dataPage + ""}
               onValueChange={(v) => {
                 setDataPage(+v);
               }}
             >
-              <SelectTrigger className="border-none shadow-none focus:ring-0">
+              <SelectTrigger className="border-none shadow-none focus:ring-0 text-sm text-muted-foreground">
                 <SelectValue placeholder="Select Page" />
               </SelectTrigger>
               <SelectContent className="overflow-y-auto max-h-[20rem]">
@@ -582,29 +583,31 @@ const App = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
+              disabled={dataPage >= maxDataPage}
+            >
+              <ChevronRightIcon />
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
-            disabled={dataPage >= maxDataPage}
-          >
-            <ChevronRightIcon />
-          </Button>
         </div>
-      </div>
-      {loadingWrapper(
-        loading,
-        <div className="w-[80%] ml-[10%]">
-          {renderHistoricalDataList.slice(
-            dataPage * pageSize,
-            (dataPage + 1) * pageSize
-          )}
-        </div>,
-        "my-[20px] h-[50px]",
-        10
-      )}
-    </div>
+      </FadeUp>
+      <FadeUp>
+        {loadingWrapper(
+          loading,
+          <div className="space-y-2">
+            {renderHistoricalDataList.slice(
+              dataPage * pageSize,
+              (dataPage + 1) * pageSize
+            )}
+          </div>,
+          "my-[20px] h-[50px]",
+          10
+        )}
+      </FadeUp>
+    </StaggerContainer>
   );
 };
 

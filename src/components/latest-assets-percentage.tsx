@@ -29,11 +29,11 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { Skeleton } from "./ui/skeleton";
-import { loadingWrapper } from "@/lib/loading";
 import { ChartResizeContext } from "@/App";
 import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
+import { chartColors, glassTooltip } from "@/utils/chart-theme";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const chartName = "Percentage of Assets";
 
@@ -45,9 +45,8 @@ const App = ({
   dateRange: TDateRange;
 }) => {
   const { needResize } = useContext(ChartResizeContext);
+  const { reportLoaded } = useContext(OverviewLoadingContext);
   const [dataPage, setDataPage] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [initialLoaded, setInitialLoaded] = useState(false);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
   const chartRef =
@@ -63,7 +62,7 @@ const App = ({
   useEffect(() => {
     loadData(dateRange).then(() => {
       resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
+      reportLoaded();
     });
   }, [dateRange]);
 
@@ -85,21 +84,8 @@ const App = ({
   }, [latestAssetsPercentageData]);
 
   async function loadData(dr: TDateRange) {
-    updateLoading(true);
-    try {
-      const lap = await queryLatestAssetsPercentage();
-      setLatestAssetsPercentageData(lap);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setLoading(val);
+    const lap = await queryLatestAssetsPercentage();
+    setLatestAssetsPercentageData(lap);
   }
 
   const maxDataPage = useMemo(() => {
@@ -131,7 +117,7 @@ const App = ({
 
   const options = {
     maintainAspectRatio: false,
-    responsive: false,
+    responsive: true,
     layout: {
       padding: 20,
     },
@@ -154,6 +140,7 @@ const App = ({
         display: false,
       },
       tooltip: {
+        ...glassTooltip,
         callbacks: {
           label: (context: { parsed: number }) => {
             return currency.symbol + context.parsed.toLocaleString();
@@ -193,32 +180,32 @@ const App = ({
       datasets: [
         {
           data: d.map((coin) => currencyWrapper(currency)(coin.value)),
-          borderColor: d.map((coin) => coin.chartColor),
-          backgroundColor: d.map((coin) => coin.chartColor),
-          borderWidth: 1,
-          hoverOffset: 35,
+          borderColor: "rgba(255,255,255,0.15)",
+          backgroundColor: d.map(
+            (_coin, i) => chartColors[i % chartColors.length].main
+          ),
+          borderWidth: 2,
+          hoverOffset: 12,
+          cutout: "72%",
         },
       ],
     };
   }
 
   function renderDoughnut() {
-    return loadingWrapper(
-      loading,
-      <Doughnut ref={chartRef} options={options as any} data={lineData()} />,
-      "mt-6 h-[30px]",
-      6
+    return (
+      <Doughnut ref={chartRef} options={options as any} data={lineData()} />
     );
   }
 
   function renderTokenHoldingList() {
     return (
       <>
-        <div className="flex w-[100%] h-[50px] justify-between items-center">
-          <div className="font-bold text-muted-foreground ml-2">
+        <div className="flex w-[100%] h-[40px] justify-between items-center">
+          <div className="text-sm font-medium text-muted-foreground ml-2">
             Token Holding
           </div>
-          <div className="flex space-x-2 py-4 items-center">
+          <div className="flex space-x-2 py-3 items-center">
             <Button
               variant="outline"
               size="sm"
@@ -227,7 +214,7 @@ const App = ({
             >
               <ChevronLeftIcon />
             </Button>
-            <div className="text-muted-foreground text-sm">
+            <div className="text-muted-foreground text-xs">
               {dataPage + 1} {"/"} {maxDataPage + 1}
             </div>
             <Button
@@ -243,56 +230,46 @@ const App = ({
         <Separator />
         <Table>
           <TableBody>
-            {loading
-              ? _(5)
-                  .range()
-                  .map((i) => (
-                    <TableRow key={"latest-assets-percentage-row-loading-" + i}>
-                      <TableCell>
-                        <Skeleton className="my-[10px] h-[20px] w-[100%]" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                  .value()
-              : pagedLatestAssetsPercentageData
-                  .map((d) => (
-                    <TableRow
-                      key={d.coin}
-                      className="h-[55px] cursor-pointer group"
-                      onClick={() => navigate(`/coins/${d.coin}`)}
+            {pagedLatestAssetsPercentageData.map((d) => (
+              <TableRow
+                key={d.coin}
+                className="h-[46px] cursor-pointer group"
+                onClick={() => navigate(`/coins/${d.coin}`)}
+              >
+                <TableCell className="py-2">
+                  <div className="flex flex-row items-center">
+                    <img
+                      className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
+                      src={logoMap[d.coin] || UnknownLogo}
+                      alt={d.coin}
+                    />
+                    <div
+                      className="mr-1 font-medium text-sm"
+                      title={"" + d.amount}
                     >
-                      <TableCell>
-                        <div className="flex flex-row items-center">
-                          <img
-                            className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
-                            src={logoMap[d.coin] || UnknownLogo}
-                            alt={d.coin}
-                          />
-                          <div
-                            className="mr-1 font-bold text-base"
-                            title={"" + d.amount}
-                          >
-                            {d.amount >= 1
-                              ? prettyNumberKeepNDigitsAfterDecimalPoint(
-                                  d.amount,
-                                  4
-                                )
-                              : prettyPriceNumberToLocaleString(d.amount)}
-                          </div>
-                          <div className="text-gray-600 truncate">{d.coin}</div>
-                          <OpenInNewWindowIcon className="ml-2 h-4 w-4 hidden group-hover:inline-block text-gray-600" />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="text-gray-400">
-                          {currency.symbol +
-                            prettyNumberToLocaleString(
-                              currencyWrapper(currency)(d.value)
-                            )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                      {d.amount >= 1
+                        ? prettyNumberKeepNDigitsAfterDecimalPoint(
+                            d.amount,
+                            4
+                          )
+                        : prettyPriceNumberToLocaleString(d.amount)}
+                    </div>
+                    <div className="text-muted-foreground text-xs truncate">
+                      {d.coin}
+                    </div>
+                    <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
+                  </div>
+                </TableCell>
+                <TableCell className="text-right py-2">
+                  <div className="text-muted-foreground text-xs">
+                    {currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(d.value)
+                      )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </>
@@ -307,7 +284,7 @@ const App = ({
             <div className="col-span-2 md:col-span-3 h-[330px]">
               {renderDoughnut()}
             </div>
-            <div className="col-span-2 md:col-span-2 flex flex-col items-start justify-top">
+            <div className="col-span-2 md:col-span-2 flex flex-col items-start justify-center">
               {renderTokenHoldingList()}
             </div>
           </div>

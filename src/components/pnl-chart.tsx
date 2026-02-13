@@ -1,5 +1,4 @@
 import { ChartResizeContext } from "@/App";
-import { loadingWrapper } from "@/lib/loading";
 import {
   queryPNLChartValue,
   resizeChart,
@@ -13,10 +12,12 @@ import {
 } from "@/middlelayers/types";
 import { positiveNegativeColor } from "@/utils/color";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
+import { glassScaleOptions, glassTooltip } from "@/utils/chart-theme";
 import { timeToDateStr } from "@/utils/date";
 import _ from "lodash";
 import { useContext, useEffect, useState } from "react";
 import { Bar } from "react-chartjs-2";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const chartName = "PNL of Asset";
 
@@ -32,40 +33,26 @@ const App = ({
   className?: string;
 }) => {
   const { needResize } = useContext(ChartResizeContext);
+  const { reportLoaded } = useContext(OverviewLoadingContext);
   const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
-  const [chartLoading, setChartLoading] = useState(false);
-  const [initialLoaded, setInitialLoaded] = useState(false);
 
   useEffect(() => {
     loadChartData(dateRange).then(() => {
       resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
+      reportLoaded();
     });
   }, [dateRange]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadChartData(dr: TDateRange) {
-    updateLoading(true);
-    try {
-      const pd = await queryPNLChartValue(dr);
-      setPnlChartData(pd);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-
-    setChartLoading(val);
+    const pd = await queryPNLChartValue(dr);
+    setPnlChartData(pd);
   }
 
   const options = {
     maintainAspectRatio: false,
-    responsive: false,
+    responsive: true,
     hover: {
       mode: "index",
       intersect: false,
@@ -87,6 +74,7 @@ const App = ({
         display: false,
       },
       tooltip: {
+        ...glassTooltip,
         callbacks: {
           label: (context: { parsed: { y?: number } }) => {
             const yv = context.parsed.y;
@@ -107,6 +95,7 @@ const App = ({
           display: false,
         },
         ticks: {
+          ...glassScaleOptions.ticks,
           maxRotation: 0,
           minRotation: 0,
           align: "center",
@@ -142,6 +131,7 @@ const App = ({
         },
         offset: true,
         ticks: {
+          ...glassScaleOptions.ticks,
           precision: 2,
           maxTicksLimit: 4,
           callback: (value: any) => {
@@ -149,7 +139,7 @@ const App = ({
           },
         },
         grid: {
-          display: false,
+          ...glassScaleOptions.grid,
         },
       },
     },
@@ -175,7 +165,7 @@ const App = ({
 
   function pnlBackgroundColor(val: "positive" | "negative"): string {
     const c = positiveNegativeColor(val === "positive" ? 1 : -1, quoteColor);
-    return c === "green" ? "#4caf50" : "#f44336";
+    return c === "green" ? "rgba(16,185,129,0.8)" : "rgba(244,63,94,0.8)";
   }
 
   function lineData() {
@@ -191,16 +181,18 @@ const App = ({
           label: "Value",
           data: formatPositiveLineData(),
           stack: "value",
-          // borderColor: lineColor,
           backgroundColor: pnlBackgroundColor("positive"),
+          borderRadius: 4,
+          maxBarThickness: 16,
         },
         {
           // !add a blank in label to make the difference between positive and negative, if they are the same, it will cause display issue when rendering the chart
           label: " Value",
           data: formatNegativeLineData(),
           stack: "value",
-          // borderColor: lineColor,
           backgroundColor: pnlBackgroundColor("negative"),
+          borderRadius: 4,
+          maxBarThickness: 16,
         },
       ],
     };
@@ -208,12 +200,7 @@ const App = ({
 
   return (
     <div className={className}>
-      {loadingWrapper(
-        chartLoading,
-        <Bar options={options as any} data={lineData()} />,
-        "mt-[19.5px] h-[18px]",
-        4
-      )}
+      <Bar options={options as any} data={lineData()} />
     </div>
   );
 };
