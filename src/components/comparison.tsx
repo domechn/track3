@@ -62,6 +62,10 @@ const App = ({
 
   const [baseId, setBaseId] = useState<string>("");
   const [headId, setHeadId] = useState<string>("");
+  const [prevSelection, setPrevSelection] = useState({
+    baseId: "",
+    headId: "",
+  });
   const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
   const [currentQuickCompare, setCurrentQuickCompare] =
     useState<QuickCompareType | null>(null);
@@ -74,6 +78,11 @@ const App = ({
   const downloadedLogosRef = useRef<Set<string>>(new Set());
   const appCacheDirRef = useRef<string>("");
 
+  if (prevSelection.baseId !== baseId || prevSelection.headId !== headId) {
+    setPrevSelection({ baseId, headId });
+    setPageLoading(true);
+  }
+
   const baseDate = useMemo(() => {
     return _.find(dateOptions, { value: baseId })?.label;
   }, [dateOptions, baseId]);
@@ -85,7 +94,6 @@ const App = ({
   useEffect(() => {
     let cancelled = false;
     const gen = ++loadGenRef.current;
-    setPageLoading(true);
 
     (async () => {
       const data = await queryAllDataDates();
@@ -132,7 +140,6 @@ const App = ({
 
     let cancelled = false;
     const gen = ++loadGenRef.current;
-    setPageLoading(true);
 
     const fallback = setTimeout(() => {
       if (!cancelled && gen === loadGenRef.current) {

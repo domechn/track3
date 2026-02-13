@@ -22,7 +22,6 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const [pageLoading, setPageLoading] = useState(true);
-  const [prevRangeKey, setPrevRangeKey] = useState("");
   const loadedCountRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
@@ -34,11 +33,10 @@ const App = ({
       dateRange.end.getTime() >= dateRange.start.getTime(),
     [dateRange.start, dateRange.end]
   );
-  if (prevRangeKey !== rangeKey) {
-    setPrevRangeKey(rangeKey);
+  useEffect(() => {
     setPageLoading(hasValidRange);
     loadedCountRef.current = 0;
-  } 
+  }, [rangeKey, hasValidRange]);
 
   const reportLoaded = useCallback(() => {
     if (!hasValidRange) {

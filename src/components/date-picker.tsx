@@ -104,31 +104,31 @@ const App = ({
             </div>
             <div className="text-xs">
               <div
-                className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(10)}
               >
                 Last 10 Times
               </div>
               <div
-                className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(30)}
               >
                 Last 30 Times
               </div>
               <div
-                className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(50)}
               >
                 Last 50 Times
               </div>
               <div
-                className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(100)}
               >
                 Last 100 Times
               </div>
               <div
-                className="py-3 px-5 rounded-md hover:bg-gray-100 cursor-pointer"
+                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(-1)}
               >
                 All

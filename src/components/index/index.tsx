@@ -134,9 +134,10 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setLastSize(windowSize);
     }, resizeDelay); // to reduce resize count and cpu usage
+    return () => clearTimeout(timer);
   }, [windowSize]);
 
   const tDateRange = useMemo(
@@ -529,10 +530,6 @@ const App = () => {
 
   return (
     <div>
-      {/* fix color not render issue */}
-      <div className="hidden text-green-100 text-red-100 text-gray-100 text-green-200 text-red-200 text-gray-200 text-green-300 text-red-300 text-gray-300 text-green-400 text-red-400 text-gray-400 text-green-500 text-red-500 text-gray-500 text-green-600 text-red-600 text-gray-600 text-green-700 text-red-700 text-gray-700 text-green-800 text-red-800 text-gray-800 text-green-900 text-red-900 text-gray-900 bg-green-100 bg-red-100 bg-gray-100">
-        debug
-      </div>
       <HashRouter>
         <AppRoutes />
       </HashRouter>

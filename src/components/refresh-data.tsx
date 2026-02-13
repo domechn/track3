@@ -104,7 +104,7 @@ const App = ({
 
   return (
     <div>
-      <Button variant="ghost" onClick={handleButtonClick} disabled={refreshLoading}>
+      <Button variant="outline" onClick={handleButtonClick} disabled={refreshLoading}>
         <UpdateIcon
           className={`mr-2 h-4 w-4 ${refreshLoading && "animate-spin"}`}
         />

@@ -12,7 +12,7 @@ import { useContext, useEffect, useState } from "react";
 import { queryPNLTableValue, resizeChart } from "@/middlelayers/charts";
 import PNLChart from "@/components/pnl-chart";
 import { ChartResizeContext } from "@/App";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeTextClass } from "@/utils/color";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const chartName = "PNL of Asset";
@@ -92,8 +92,7 @@ const App = ({
   }
 
   function getPNLTextColor(val?: number): string {
-    const c = positiveNegativeColor(val ?? 0, quoteColor);
-    return `text-${c}-600`;
+    return positiveNegativeTextClass(val ?? 0, quoteColor, 600);
   }
 
   return (
@@ -110,7 +109,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">Last PNL</div>
               <div
-                className={`text-l font-bold ${getPNLTextColor(
+                className={`text-xl font-semibold ${getPNLTextColor(
                   pnlTableData.todayPNL?.value
                 )}`}
               >
@@ -130,7 +129,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">7T PNL</div>
               <div
-                className={`text-l font-bold ${getPNLTextColor(
+                className={`text-xl font-semibold ${getPNLTextColor(
                   pnlTableData.sevenTPnl?.value
                 )}`}
               >
@@ -150,7 +149,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">30T PNL</div>
               <div
-                className={`text-l font-bold ${getPNLTextColor(
+                className={`text-xl font-semibold ${getPNLTextColor(
                   pnlTableData.thirtyPNL?.value
                 )}`}
               >

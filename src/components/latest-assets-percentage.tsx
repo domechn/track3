@@ -233,10 +233,10 @@ const App = ({
             {pagedLatestAssetsPercentageData.map((d) => (
               <TableRow
                 key={d.coin}
-                className="h-[46px] cursor-pointer group"
+                className="h-[42px] cursor-pointer group"
                 onClick={() => navigate(`/coins/${d.coin}`)}
               >
-                <TableCell className="py-2">
+                <TableCell className="py-1.5">
                   <div className="flex flex-row items-center">
                     <img
                       className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
@@ -260,7 +260,7 @@ const App = ({
                     <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
                   </div>
                 </TableCell>
-                <TableCell className="text-right py-2">
+                <TableCell className="text-right py-1.5">
                   <div className="text-muted-foreground text-xs">
                     {currency.symbol +
                       prettyNumberToLocaleString(

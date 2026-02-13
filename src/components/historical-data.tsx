@@ -109,7 +109,6 @@ const App = ({
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
   const [detailSearch, setDetailSearch] = useState("");
   const [pageLoading, setPageLoading] = useState(true);
-  const [prevRangeKey, setPrevRangeKey] = useState("");
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   const [deleting, setDeleting] = useState(false);
@@ -123,10 +122,9 @@ const App = ({
     [dateRange.start, dateRange.end]
   );
 
-  if (prevRangeKey !== rangeKey) {
-    setPrevRangeKey(rangeKey);
+  useEffect(() => {
     setPageLoading(true);
-  }
+  }, [rangeKey]);
 
   const dataRows = useMemo<HistoricalListRow[]>(() => {
     return data.map((item, idx) => ({
@@ -202,7 +200,10 @@ const App = ({
     const currentGen = ++loadGenRef.current;
 
     try {
-      const records = await queryHistoricalData(-1);
+      const records = await queryHistoricalData(-1, true, {
+        dateRange,
+        includeTransactions: false,
+      });
       if (currentGen !== loadGenRef.current) {
         return;
       }
@@ -215,7 +216,7 @@ const App = ({
         setPageLoading(false);
       }
     }
-  }, []);
+  }, [dateRange]);
 
   useEffect(() => {
     loadAllData();

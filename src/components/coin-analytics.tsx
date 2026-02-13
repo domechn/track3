@@ -202,12 +202,14 @@ const App = ({
     () => `${symbol}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [symbol, dateRange.start, dateRange.end]
   );
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
 
-  useEffect(() => {
+  if (prevQueryKey !== queryKey) {
+    setPrevQueryKey(queryKey);
     setPageLoading(true);
     loadedCountRef.current = 0;
     loadGenRef.current += 1;
-  }, [queryKey]);
+  }
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;

@@ -25,6 +25,13 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.end, dateRange.start]
   );
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+
+  if (prevQueryKey !== queryKey) {
+    setPrevQueryKey(queryKey);
+    loadedCountRef.current = 0;
+    setPageLoading(true);
+  }
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;
@@ -34,8 +41,6 @@ const App = ({
   }, []);
 
   useEffect(() => {
-    loadedCountRef.current = 0;
-    setPageLoading(true);
     const timer = setTimeout(() => setPageLoading(false), 8000);
     return () => clearTimeout(timer);
   }, [queryKey]);

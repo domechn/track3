@@ -109,14 +109,14 @@ const App = ({
                   selectedTheme === "light" ? "border-foreground/60" : "border-muted"
                 }`}
               >
-                <div className="space-y-2 rounded-sm bg-[#ecedef] p-2">
-                  <div className="space-y-2 rounded-md bg-white p-2 shadow-sm">
-                    <div className="h-2 w-[80px] rounded-lg bg-[#ecedef]" />
-                    <div className="h-2 w-[100px] rounded-lg bg-[#ecedef]" />
+                <div className="space-y-2 rounded-sm bg-muted/60 p-2">
+                  <div className="space-y-2 rounded-md bg-card/90 p-2 shadow-sm border border-border/40">
+                    <div className="h-2 w-[80px] rounded-lg bg-muted" />
+                    <div className="h-2 w-[100px] rounded-lg bg-muted" />
                   </div>
-                  <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm">
-                    <div className="h-4 w-4 rounded-full bg-[#ecedef]" />
-                    <div className="h-2 w-[100px] rounded-lg bg-[#ecedef]" />
+                  <div className="flex items-center space-x-2 rounded-md bg-card/90 p-2 shadow-sm border border-border/40">
+                    <div className="h-4 w-4 rounded-full bg-muted" />
+                    <div className="h-2 w-[100px] rounded-lg bg-muted" />
                   </div>
                 </div>
               </div>
@@ -130,14 +130,14 @@ const App = ({
                   selectedTheme === "dark" ? "border-foreground/60" : "border-muted"
                 }`}
               >
-                <div className="space-y-2 rounded-sm bg-slate-950 p-2">
-                  <div className="space-y-2 rounded-md bg-slate-800 p-2 shadow-sm">
-                    <div className="h-2 w-[80px] rounded-lg bg-slate-400" />
-                    <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
+                <div className="space-y-2 rounded-sm bg-slate-950/95 p-2">
+                  <div className="space-y-2 rounded-md bg-slate-800/90 p-2 shadow-sm border border-white/10">
+                    <div className="h-2 w-[80px] rounded-lg bg-slate-400/80" />
+                    <div className="h-2 w-[100px] rounded-lg bg-slate-400/80" />
                   </div>
-                  <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm">
-                    <div className="h-4 w-4 rounded-full bg-slate-400" />
-                    <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
+                  <div className="flex items-center space-x-2 rounded-md bg-slate-800/90 p-2 shadow-sm border border-white/10">
+                    <div className="h-4 w-4 rounded-full bg-slate-400/80" />
+                    <div className="h-2 w-[100px] rounded-lg bg-slate-400/80" />
                   </div>
                 </div>
               </div>

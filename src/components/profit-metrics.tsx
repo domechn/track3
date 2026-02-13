@@ -9,7 +9,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { daysBetweenDates, timeToDateStr } from "@/utils/date";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeTextClass } from "@/utils/color";
 import React from "react";
 import { queryTotalValues } from "@/middlelayers/charts";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
@@ -275,10 +275,7 @@ const App = ({
               ) : (
                 <span>
                   <span
-                    className={`text-${positiveNegativeColor(
-                      1,
-                      quoteColor
-                    )}-700`}
+                    className={positiveNegativeTextClass(1, quoteColor, 700)}
                   >
                     {currency.symbol +
                       prettyNumberToLocaleString(
@@ -300,7 +297,7 @@ const App = ({
               ) : (
                 <span>
                   <span
-                    className={`text-${positiveNegativeColor(-1, quoteColor)}-700`}
+                    className={positiveNegativeTextClass(-1, quoteColor, 700)}
                   >
                     -
                     {currency.symbol +
@@ -319,10 +316,7 @@ const App = ({
             </div>
             <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
               <span
-                className={`text-${positiveNegativeColor(
-                  -1,
-                  quoteColor
-                )}-700`}
+                className={positiveNegativeTextClass(-1, quoteColor, 700)}
               >
                 {maxDrawdownData.value.toFixed(2)}%
               </span>{" "}

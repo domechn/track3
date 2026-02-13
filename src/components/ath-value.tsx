@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { queryMaxTotalValue, queryTotalValue } from "@/middlelayers/charts";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { timeToDateStr } from "@/utils/date";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeTextClass } from "@/utils/color";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const App = ({
@@ -118,10 +118,11 @@ const App = ({
             <div className="space-y-1">
               <div className="text-[11px] text-muted-foreground">% from ATH</div>
               <div
-                className={`text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto text-${positiveNegativeColor(
+                className={`text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto ${positiveNegativeTextClass(
                   percentageFromATH,
-                  quoteColor
-                )}-700`}
+                  quoteColor,
+                  700
+                )}`}
               >
                 {percentageFromATH.toFixed(2)}%
               </div>

@@ -23,7 +23,7 @@ import {
 } from "@/middlelayers/charts";
 import bluebird from "bluebird";
 import { ChartResizeContext } from "@/App";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeTextClass } from "@/utils/color";
 import {
   chartColors,
   createGradientFill,
@@ -329,8 +329,7 @@ const App = ({
     firstTotalValue: number
   ) {
     const pc = getPercentageChange(ts, totalValue, firstTotalValue);
-    const c = positiveNegativeColor(pc, quoteColor);
-    return `text-${c}-500`;
+    return positiveNegativeTextClass(pc, quoteColor, 500);
   }
 
   const options = {
@@ -472,7 +471,7 @@ const App = ({
               <path
                 d="M904.8 167.771429l-48.457143-48.457143a9.177143 9.177143 0 0 0-12.914286 0L119.2 843.314286a9.177143 9.177143 0 0 0 0 12.914285l48.457143 48.457143c3.542857 3.542857 9.371429 3.542857 12.914286 0L904.685714 180.571429c3.657143-3.428571 3.657143-9.257143 0.114286-12.8zM274.285714 438.857143c90.742857 0 164.571429-73.828571 164.571429-164.571429s-73.828571-164.571429-164.571429-164.571428-164.571429 73.828571-164.571428 164.571428 73.828571 164.571429 164.571428 164.571429z m0-246.857143c45.371429 0 82.285714 36.914286 82.285715 82.285714s-36.914286 82.285714-82.285715 82.285715-82.285714-36.914286-82.285714-82.285715 36.914286-82.285714 82.285714-82.285714z m475.428572 393.142857c-90.742857 0-164.571429 73.828571-164.571429 164.571429s73.828571 164.571429 164.571429 164.571428 164.571429-73.828571 164.571428-164.571428-73.828571-164.571429-164.571428-164.571429z m0 246.857143c-45.371429 0-82.285714-36.914286-82.285715-82.285714s36.914286-82.285714 82.285715-82.285715 82.285714 36.914286 82.285714 82.285715-36.914286 82.285714-82.285714 82.285714z"
                 p-id="4221"
-                fill="#515151"
+                fill="currentColor"
               ></path>
             </svg>
             <svg
@@ -495,7 +494,7 @@ const App = ({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{totalValueShower.formatTotalValue()}</div>
+          <div className="text-xl font-semibold">{totalValueShower.formatTotalValue()}</div>
           <p className="text-xs text-muted-foreground mb-2">
             <span
               className={changePercentageColorClass(

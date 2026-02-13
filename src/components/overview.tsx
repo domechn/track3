@@ -10,7 +10,7 @@ import {
   QuoteColor,
   TDateRange,
 } from "../middlelayers/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -36,6 +36,14 @@ const App = ({
   const [isShowMore, setIsShowMore] = useState<boolean>(false);
   const [pageLoading, setPageLoading] = useState(true);
   const loadedCountRef = useRef(0);
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+  useEffect(() => {
+    setPageLoading(true);
+    loadedCountRef.current = 0;
+  }, [rangeKey]);
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;
@@ -48,7 +56,7 @@ const App = ({
   useEffect(() => {
     const timer = setTimeout(() => setPageLoading(false), 8000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [rangeKey]);
 
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>

@@ -39,8 +39,18 @@ export async function refreshAllData(addProgress: AddProgressFunc) {
 }
 
 function generateTransactions(uid: string, before: AssetModel[], after: AssetModel[]): TransactionModel[] {
+	const getAssetKey = (asset: AssetModel) => `${asset.symbol}:${asset.wallet}`
+	const beforeAssetMap = new Map<string, AssetModel>()
+	const afterAssetMap = new Map<string, AssetModel>()
+	before.forEach((asset) => {
+		beforeAssetMap.set(getAssetKey(asset), asset)
+	})
+	after.forEach((asset) => {
+		afterAssetMap.set(getAssetKey(asset), asset)
+	})
+
 	const updatedTxns = _(after).map(a => {
-		const l = _(before).find(la => la.symbol === a.symbol && la.wallet === a.wallet)
+		const l = beforeAssetMap.get(getAssetKey(a))
 		if (!l) {
 			if (a.amount !== 0) {
 				return {
@@ -71,7 +81,7 @@ function generateTransactions(uid: string, before: AssetModel[], after: AssetMod
 			txnCreatedAt: a.createdAt,
 		} as TransactionModel
 	}).compact().value()
-	const removedTxns = _(before).filter(la => !_(after).find(a => a.symbol === la.symbol && a.wallet === la.wallet)).map(la => {
+	const removedTxns = _(before).filter(la => !afterAssetMap.has(getAssetKey(la))).map(la => {
 		if (la.amount === 0) {
 			return
 		}
@@ -706,40 +716,35 @@ export async function queryTopCoinsRank(dateRange: TDateRange, maxSize = DATA_MA
 
 	const reservedAssets = _(assets).reverse().value()
 
-	const getRankData = (symbol: string): {
-		timestamp: number,
-		rank?: number
-	}[] => {
-		return _(reservedAssets).filter(assets => !!_(assets).find(a => a.symbol === symbol))
-			.map(ass => ({
-				timestamp: new Date(ass[0]?.createdAt).getTime(),
-				rank: _(ass).sortBy("value").reverse().findIndex(a => a.symbol === symbol) + 1
-			})).map(d => {
-				if (d.rank > 10) {
-					return {
-						...d,
-						rank: undefined,
-					}
-				}
-				return d
-			}).value()
-	}
-
-
 	const step = reservedAssets.length > maxSize ? Math.floor(reservedAssets.length / maxSize) : 0
 	const filteredReservedAssets = _(reservedAssets).filter((_d, idx, arr) => {
 		if (step === 0) return true
 		return idx === 0 || idx === arr.length - 1 || (idx % step) === 0
 	}).value()
+	const timestamps = filteredReservedAssets.map((item) => new Date(item[0]?.createdAt).getTime())
 	const coins = getCoins(filteredReservedAssets)
+	const coinRankMap = new Map<string, Map<number, number>>()
+	coins.forEach((coin) => {
+		coinRankMap.set(coin, new Map<number, number>())
+	})
+	filteredReservedAssets.forEach((ass) => {
+		const timestamp = new Date(ass[0]?.createdAt).getTime()
+		const rankedAssets = _(ass).orderBy("value", "desc").take(10).value()
+		rankedAssets.forEach((asset, idx) => {
+			coinRankMap.get(asset.symbol)?.set(timestamp, idx + 1)
+		})
+	})
 	const colors = generateRandomColors(coins.length)
 
 	return {
-		timestamps: _(filteredReservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
+		timestamps,
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
-			rankData: getRankData(coin),
+			rankData: timestamps.map((timestamp) => ({
+				timestamp,
+				rank: coinRankMap.get(coin)?.get(timestamp),
+			})),
 		})).value()
 	}
 }
@@ -749,46 +754,40 @@ export async function queryTopCoinsPercentageChangeData(dateRange: TDateRange, m
 
 	const reservedAssets = _(assets).reverse().value()
 
-	const getPercentageData = (symbol: string): {
-		timestamp: number,
-		value: number,
-		price: number,
-	}[] => {
-		const coinDataList = _(reservedAssets).map(ass => _(ass).find(a => a.symbol === symbol)).compact()
-			.value()
-
-		if (coinDataList.length === 0) {
-			return []
-		}
-
-		const { value: firstCoinValue, price: firstCoinPrice } = coinDataList[0]
-
-
-		return _(coinDataList)
-			.map(a => ({
-				timestamp: new Date(a.createdAt).getTime(),
-				value: (a.value - firstCoinValue) / firstCoinValue * 100,
-				price: (a.price - firstCoinPrice) / firstCoinPrice * 100,
-			}))
-			.value()
-
-	}
-
-
 	const step = reservedAssets.length > maxSize ? Math.floor(reservedAssets.length / maxSize) : 0
 	const filteredReservedAssets = _(reservedAssets).filter((_d, idx, arr) => {
 		if (step === 0) return true
 		return idx === 0 || idx === arr.length - 1 || (idx % step) === 0
 	}).value()
+	const timestamps = filteredReservedAssets.map((item) => new Date(item[0]?.createdAt).getTime())
 	const coins = getCoins(filteredReservedAssets)
+	const coinAssetsBySymbol = new Map<string, AssetModel[]>()
+	filteredReservedAssets.forEach((ass) => {
+		ass.forEach((asset) => {
+			const items = coinAssetsBySymbol.get(asset.symbol) ?? []
+			items.push(asset)
+			coinAssetsBySymbol.set(asset.symbol, items)
+		})
+	})
 	const colors = generateRandomColors(coins.length)
 
 	return {
-		timestamps: _(filteredReservedAssets).flatten().map(t => new Date(t.createdAt).getTime()).uniq().value(),
+		timestamps,
 		coins: _(coins).map((coin, idx) => ({
 			coin,
 			lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
-			percentageData: getPercentageData(coin),
+			percentageData: (() => {
+				const coinDataList = coinAssetsBySymbol.get(coin) ?? []
+				if (coinDataList.length === 0) {
+					return []
+				}
+				const { value: firstCoinValue, price: firstCoinPrice } = coinDataList[0]
+				return coinDataList.map((asset) => ({
+					timestamp: new Date(asset.createdAt).getTime(),
+					value: (asset.value - firstCoinValue) / (firstCoinValue + 10 ** -21) * 100,
+					price: (asset.price - firstCoinPrice) / (firstCoinPrice + 10 ** -21) * 100,
+				}))
+			})(),
 		})).value()
 	}
 }
@@ -913,10 +912,29 @@ export async function queryCoinsAmountChange(symbol: string, dateRange: TDateRan
 }
 
 // gather: if true, group asset models by same symbol
-export async function queryHistoricalData(size = 30, gather = true): Promise<HistoricalData[]> {
-	const assetModels = gather ? await ASSET_HANDLER.listSymbolGroupedAssets(size) : await ASSET_HANDLER.listAssets(size)
+export async function queryHistoricalData(size = 30, gather = true, options?: {
+	dateRange?: TDateRange
+	includeTransactions?: boolean
+}): Promise<HistoricalData[]> {
+	const includeTransactions = options?.includeTransactions ?? true
+	const assetModels = options?.dateRange
+		? (
+			gather
+				? await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(options.dateRange.start, options.dateRange.end)
+				: await ASSET_HANDLER.listAssetsByDateRange(options.dateRange.start, options.dateRange.end)
+		)
+		: (
+			gather
+				? await ASSET_HANDLER.listSymbolGroupedAssets(size)
+				: await ASSET_HANDLER.listAssets(size)
+		)
 	const uuids = _(assetModels).flatMap(m => _(m).map('uuid').value()).compact().uniq().value()
-	const transactionModels = await TRANSACTION_HANDLER.listTransactionsByUUIDs(uuids)
+	const transactionModels = includeTransactions
+		? await TRANSACTION_HANDLER.listTransactionsByUUIDs(uuids)
+		: []
+	const transactionsByUUID: Record<string, TransactionModel[]> = includeTransactions
+		? _.groupBy(transactionModels, "uuid")
+		: {}
 
 	const assetsModelsToHistoricalData = (ams: AssetModel[]): HistoricalData => {
 		const uuid = _(ams).first()!.uuid
@@ -924,7 +942,7 @@ export async function queryHistoricalData(size = 30, gather = true): Promise<His
 			id: uuid,
 			createdAt: _(ams).first()!.createdAt,
 			assets: ams,
-			transactions: _(transactionModels).filter(t => t.uuid === uuid).value(),
+			transactions: includeTransactions ? (transactionsByUUID[uuid] ?? []) : [],
 			total: _(ams).sumBy('value'),
 		}
 	}

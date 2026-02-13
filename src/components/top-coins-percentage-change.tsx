@@ -2,7 +2,7 @@ import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timeToDateStr } from "@/utils/date";
 import { TDateRange, TopCoinsPercentageChangeData } from "@/middlelayers/types";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import _ from "lodash";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { BubbleDataPoint, Point } from "chart.js";
@@ -24,6 +24,11 @@ import {
 
 const prefix = "tcpc";
 const chartNameKey = "Change of Top Coins";
+const VALUE_KEY = getWholeKey("value");
+
+function getWholeKey(key: string): string {
+  return prefix + _(key).upperFirst();
+}
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
@@ -35,7 +40,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       coins: [],
     });
 
-  const [currentType, setCurrentType] = useState(getWholeKey("value")); // ['tcpcValue', 'tcpcPrice']
+  const [currentType, setCurrentType] = useState(VALUE_KEY); // ['tcpcValue', 'tcpcPrice']
   const chartRef =
     useRef<
       ChartJSOrUndefined<
@@ -58,7 +63,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     setTopCoinsPercentageChangeData(tcpcd);
   }
 
-  const options = {
+  const options = useMemo(() => ({
     maintainAspectRatio: false,
     responsive: true,
     hover: {
@@ -116,7 +121,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         },
       },
     },
-  };
+  }), [currentType, topCoinsPercentageChangeData.coins.length]);
 
   function getLabel() {
     return _.upperFirst(currentType.replace(prefix, ""));
@@ -130,7 +135,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     coinPercentageData.forEach((percentageData) => {
       coinRankDataMap.set(
         percentageData.timestamp,
-        currentType === getWholeKey("value")
+        currentType === VALUE_KEY
           ? percentageData.value
           : percentageData.price
       );
@@ -138,7 +143,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     return timestamps.map((date) => coinRankDataMap.get(date) ?? null);
   }
 
-  function lineData() {
+  const chartData = useMemo(() => {
     return {
       labels: topCoinsPercentageChangeData.timestamps.map((x) =>
         timeToDateStr(x)
@@ -157,26 +162,10 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         fill: true,
       })),
     };
-  }
+  }, [topCoinsPercentageChangeData, currentType]);
 
   function onTypeSelectChange(type: string) {
     setCurrentType(type);
-
-    const buttons = document.getElementsByClassName("active");
-
-    for (let i = 0; i < buttons.length; i++) {
-      if (
-        [getWholeKey("value"), getWholeKey("price")].includes(buttons[i].id)
-      ) {
-        buttons[i].classList.remove("active");
-      }
-    }
-
-    document.getElementById(type)?.classList.add("active");
-  }
-
-  function getWholeKey(key: string): string {
-    return prefix + _(key).upperFirst();
   }
 
   return (
@@ -190,7 +179,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         <CardContent className="space-y-2">
           <div>
             <ButtonGroup
-              defaultValue="value"
+              value={currentType === VALUE_KEY ? "value" : "price"}
               onValueChange={(val: string) =>
                 onTypeSelectChange(getWholeKey(val))
               }
@@ -207,7 +196,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
             <Line
               ref={chartRef}
               options={options as any}
-              data={lineData()}
+              data={chartData}
               plugins={[
                 {
                   id: "gradientFill",

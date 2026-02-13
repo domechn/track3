@@ -213,6 +213,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       }
     | undefined
   >(undefined);
+  const [addOtherAmountDraft, setAddOtherAmountDraft] = useState("");
 
   const [currencies, setCurrencies] = useState<CurrencyRateDetail[]>([]);
 
@@ -244,6 +245,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       amount: number;
     }[]
   >([]);
+  const [otherAmountDraftMap, setOtherAmountDraftMap] = useState<
+    Record<number, string>
+  >({});
 
   const preferCurrencyOptions = useMemo(
     () =>
@@ -384,7 +388,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     let saveError: Error | undefined;
 
     saveConfiguration(globalConfig)
-      .then(() => onConfigurationSave && onConfigurationSave())
+      .then(() => notifyConfigurationSaved())
       .catch((e) => (saveError = e))
       .finally(() => {
         if (saveError) {
@@ -398,13 +402,25 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function onUpdateCurrencyRatesClick() {
     updateCurrencyRates()
-      .then(() => onConfigurationSave && onConfigurationSave())
+      .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
           description: e.message ?? e,
           variant: "destructive",
         });
       });
+  }
+
+  function notifyConfigurationSaved() {
+    if (!onConfigurationSave) {
+      return;
+    }
+
+    const scrollY = window.scrollY;
+    onConfigurationSave();
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY });
+    });
   }
 
   function convertFormDataToConfigurationData(): GlobalConfig {
@@ -860,13 +876,42 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     markFormChanged();
   }
 
+  function parseAmountInput(raw: string): number {
+    if (!raw.trim()) {
+      return 0;
+    }
+    const parsed = Number(raw);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function handleOtherAmountInputChange(idx: number, val: string) {
+    setOtherAmountDraftMap((prev) => ({
+      ...prev,
+      [idx]: val,
+    }));
+  }
+
+  function commitOtherAmountInput(idx: number) {
+    const draft = otherAmountDraftMap[idx];
+    if (draft === undefined) {
+      return;
+    }
+
+    handleOthersChange(idx, "amount", `${parseAmountInput(draft)}`);
+    setOtherAmountDraftMap((prev) => {
+      const next = { ...prev };
+      delete next[idx];
+      return next;
+    });
+  }
+
   function onQuerySizeChanged(val: string) {
     const newVal = parseInt(val, 10);
     setQuerySize(newVal);
 
     // save to db directly
     saveQuerySize(newVal)
-      .then(() => onConfigurationSave && onConfigurationSave())
+      .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
           description: e.message ?? e,
@@ -880,7 +925,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     // mark form is changed
 
     savePreferCurrency(val)
-      .then(() => onConfigurationSave && onConfigurationSave())
+      .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
           description: e.message ?? e,
@@ -935,11 +980,18 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               </TableCell>
               <TableCell>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   name="amount"
                   placeholder="0"
-                  value={o.amount}
-                  onChange={(e) => handleOthersChange(idx, "amount", e.target.value)}
+                  value={otherAmountDraftMap[idx] ?? `${o.amount}`}
+                  onChange={(e) => handleOtherAmountInputChange(idx, e.target.value)}
+                  onBlur={() => commitOtherAmountInput(idx)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                 />
               </TableCell>
               <TableCell className="text-right">
@@ -1007,6 +1059,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function handleAddOther(val: { symbol: string; amount: number }) {
     setOthers([...others, val]);
+    setOtherAmountDraftMap({});
 
     // mark form is changed
     markFormChanged();
@@ -1014,6 +1067,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function handleRemoveOther(idx: number) {
     setOthers(_.filter(others, (_, i) => i !== idx));
+    setOtherAmountDraftMap({});
 
     // mark form is changed
     markFormChanged();
@@ -1536,9 +1590,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       });
       return;
     }
-    handleAddOther(addOtherConfig);
+    handleAddOther({
+      ...addOtherConfig,
+      amount: parseAmountInput(addOtherAmountDraft),
+    });
     // clear
     setAddOtherConfig(undefined);
+    setAddOtherAmountDraft("");
     setAddOtherDialogOpen(false);
   }
 
@@ -1599,12 +1657,16 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               </Label>
               <Input
                 id="amount"
-                type="number"
-                value={addOtherConfig?.amount ?? ""}
+                type="text"
+                inputMode="decimal"
+                value={addOtherAmountDraft}
                 onChange={(e) =>
+                  setAddOtherAmountDraft(e.target.value)
+                }
+                onBlur={() =>
                   setAddOtherConfig({
                     ...(addOtherConfig || defaultOtherConfig),
-                    amount: +e.target.value,
+                    amount: parseAmountInput(addOtherAmountDraft),
                   })
                 }
                 className="col-span-3"
