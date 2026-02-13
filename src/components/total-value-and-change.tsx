@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   AssetChangeData,
   CurrencyRateDetail,
@@ -189,6 +189,11 @@ const App = ({
   const [showPercentageInChart, setShowPercentageInChart] = useState(false);
 
   const [showValue, setShowValue] = useState(false);
+  const loadGenRef = useRef(0);
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
 
   const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
   const firstTotalValue = useMemo(() => assetChangeData.data[0]?.usdValue ?? 0, [assetChangeData]);
@@ -218,25 +223,35 @@ const App = ({
   }, [showValue, firstTotalValue, totalValue, totalValueShower]);
 
   useEffect(() => {
-    loadData(dateRange).then(() => {
+    const gen = ++loadGenRef.current;
+    loadData(dateRange, gen).then(() => {
+      if (gen !== loadGenRef.current) {
+        return;
+      }
       resizeChartWithDelay(chartName);
       reportLoaded();
     });
-  }, [dateRange]);
+  }, [rangeKey]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData(dr: TDateRange) {
-    return bluebird.all([loadTotalValue(), loadChartData(dr)]);
+  async function loadData(dr: TDateRange, gen: number) {
+    return bluebird.all([loadTotalValue(gen), loadChartData(dr, gen)]);
   }
 
-  async function loadTotalValue() {
+  async function loadTotalValue(gen: number) {
     const tv = await queryTotalValue();
+    if (gen !== loadGenRef.current) {
+      return;
+    }
     setTotalValueData(tv);
   }
 
-  async function loadChartData(dr: TDateRange) {
+  async function loadChartData(dr: TDateRange, gen: number) {
     const ac = await queryAssetChange(dr);
+    if (gen !== loadGenRef.current) {
+      return;
+    }
     setAssetChangeData(ac);
   }
 

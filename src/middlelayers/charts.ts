@@ -995,14 +995,12 @@ export async function queryAllDataDates(): Promise<{
 	id: string
 	date: string
 }[]> {
-	const assets = await ASSET_HANDLER.listSymbolGroupedAssets()
+	const records = await ASSET_HANDLER.listAllUUIDWithCreatedAt()
 
-	return _(assets)
-		.map(ass => _(ass).first())
-		.compact()
-		.map(as => ({
-			id: as.uuid,
-			date: timeToDateStr(new Date(as.createdAt).getTime())
+	return _(records)
+		.map(record => ({
+			id: record.uuid,
+			date: timeToDateStr(new Date(record.createdAt).getTime())
 		}))
 		.value()
 }

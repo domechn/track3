@@ -70,12 +70,12 @@ const App = () => {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-1 glass rounded-xl px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-1 glass rounded-xl px-2 py-1.5">
         {settingsTabs.map((tab) => (
           <TabLink key={tab.href} to={tab.href} title={tab.title} icon={tab.icon} />
         ))}
       </div>
-      <div className="max-w-3xl">
+      <div className="w-full">
         <Outlet />
         {lo.pathname === "/settings" && (
           <Navigate to="/settings/configuration" />

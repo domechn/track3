@@ -198,15 +198,16 @@ const App = ({
   const [pageLoading, setPageLoading] = useState(true);
   const loadedCountRef = useRef(0);
   const loadGenRef = useRef(0);
+  const queryKey = useMemo(
+    () => `${symbol}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [symbol, dateRange.start, dateRange.end]
+  );
 
-  // Track previous deps to reset loading synchronously during render (before paint)
-  const [prevDeps, setPrevDeps] = useState({ symbol, dateRange });
-  if (prevDeps.symbol !== symbol || prevDeps.dateRange !== dateRange) {
-    setPrevDeps({ symbol, dateRange });
+  useEffect(() => {
     setPageLoading(true);
     loadedCountRef.current = 0;
     loadGenRef.current += 1;
-  }
+  }, [queryKey]);
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;
@@ -260,7 +261,7 @@ const App = ({
 
     const timer = setTimeout(() => setPageLoading(false), 8000);
     return () => clearTimeout(timer);
-  }, [symbol, dateRange]);
+  }, [queryKey]);
 
   async function getLogoPath(symbol: string) {
     const acd = await getAppCacheDir();

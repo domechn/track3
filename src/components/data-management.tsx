@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useToast } from "@/components/ui/use-toast";
 import {
   checkIfDuplicatedHistoricalData,
@@ -5,24 +8,7 @@ import {
   importHistoricalData,
   readHistoricalDataFromFile,
 } from "@/middlelayers/data";
-import { useEffect, useState } from "react";
-
-import _ from "lodash";
-import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { open } from "@tauri-apps/plugin-dialog";
-import "@/components/common/scrollbar/index.css";
 import { UniqueIndexConflictResolver } from "@/middlelayers/types";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
 import {
   cleanAutoBackupDirectory,
   getAutoBackupDirectory,
@@ -32,6 +18,18 @@ import {
 } from "@/middlelayers/configuration";
 import { ExportData } from "@/middlelayers/datamanager";
 import { timeToDateStr } from "@/utils/date";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -39,33 +37,23 @@ import {
   TooltipTrigger,
 } from "./ui/tooltip";
 import { cn } from "@/lib/utils";
-import { InfoCircledIcon } from "@radix-ui/react-icons";
+import "@/components/common/scrollbar/index.css";
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();
-
   const [exportConfiguration, setExportConfiguration] = useState(false);
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
     useState(false);
-
-  const [exportData, setExportData] = useState<ExportData | undefined>(
-    undefined
-  );
-
-  const [autoBackupDirectory, setAutoBackupDirectory] = useState<
-    string | undefined
-  >();
-
-  const [lastBackupAt, setLastBackupAt] = useState<Date | undefined>();
-  const [lastImportAt, setLastImportAt] = useState<Date | undefined>();
+  const [exportData, setExportData] = useState<ExportData | undefined>(undefined);
+  const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
+  const [lastBackupAt, setLastBackupAt] = useState<Date>();
+  const [lastImportAt, setLastImportAt] = useState<Date>();
 
   useEffect(() => {
     loadAutoBackupDirectory().then((isSet) => {
-      if (!isSet) {
-        return;
+      if (isSet) {
+        loadAutoBackupTime();
       }
-
-      loadAutoBackupTime();
     });
   }, []);
 
@@ -78,16 +66,14 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function loadAutoBackupTime() {
     const laia = await getLastAutoImportAt();
     setLastImportAt(laia);
-
     const laba = await getLastAutoBackupAt();
     setLastBackupAt(laba);
   }
+
   async function onExportDataClick() {
     const exported = await exportHistoricalData(exportConfiguration);
     if (exported) {
-      toast({
-        description: "export data successfully",
-      });
+      toast({ description: "Export data successfully" });
     }
   }
 
@@ -101,14 +87,14 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     if (hasConflicts) {
       setShowConflictResolverDialog(true);
     } else {
-      return importData("IGNORE");
+      importData("IGNORE");
     }
   }
 
   async function importData(cr: UniqueIndexConflictResolver) {
     if (!exportData) {
       toast({
-        description: "no data to import",
+        description: "No data to import",
         variant: "destructive",
       });
       return;
@@ -118,11 +104,10 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         if (!imported) {
           return;
         }
-        toast({
-          description: "import data successfully",
-        });
-
-        onDataImported && onDataImported();
+        toast({ description: "Import data successfully" });
+        if (onDataImported) {
+          onDataImported();
+        }
       })
       .catch((err) => {
         toast({
@@ -136,41 +121,16 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       });
   }
 
-  function conflictResolverDialog() {
-    return (
-      <Dialog
-        open={showConflictResolverDialog}
-        onOpenChange={setShowConflictResolverDialog}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Conflicts Found!</DialogTitle>
-            <DialogDescription>
-              There are conflicts between the data you are importing and
-              existing data, please choose how to resolve them.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => importData("REPLACE")}>Overwrite</Button>
-            <Button onClick={() => importData("IGNORE")} variant="outline">
-              Ignore
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   async function onChooseAutoBackupFolderButtonClick() {
     const selected = await open({
       multiple: false,
       directory: true,
     });
-
     if (selected) {
-      const ss = selected as string;
-      await saveAutoBackupDirectory(ss);
-      setAutoBackupDirectory(ss);
+      const path = selected as string;
+      await saveAutoBackupDirectory(path);
+      setAutoBackupDirectory(path);
+      await loadAutoBackupTime();
     }
   }
 
@@ -181,114 +141,124 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
   return (
     <div className="space-y-6">
-      {conflictResolverDialog()}
+      <Dialog
+        open={showConflictResolverDialog}
+        onOpenChange={setShowConflictResolverDialog}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Conflicts Found</DialogTitle>
+            <DialogDescription>
+              Imported records overlap with existing history. Choose how to resolve
+              duplicated entries.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => importData("REPLACE")}>Overwrite</Button>
+            <Button onClick={() => importData("IGNORE")} variant="outline">
+              Ignore
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div>
         <h3 className="text-lg font-medium">Data Center</h3>
         <p className="text-sm text-muted-foreground">
-          Export or import your data.
+          Import, export and backup your local data safely.
         </p>
       </div>
 
-      <Separator className="my-6" />
-      <div className="space-y-3">
-        <div className="text-l font-bold text-left">Data Management</div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Import Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Load exported file and merge with current records.
+            </p>
+            <Button onClick={onImportDataClick} size="sm">
+              Import
+            </Button>
+          </CardContent>
+        </Card>
 
-        <div className="space-y-3">
-          <div className="text-sm font-bold text-left">Import Data</div>
-
-          <Button onClick={onImportDataClick} size="sm">
-            Import
-          </Button>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <div className="text-sm font-bold text-left py-2">
-              Select Exported Data
-            </div>
-            <div className="flex items-center space-x-2 mb-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Export Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center space-x-2">
               <Checkbox
                 id="exportConfigurationCheckbox"
                 checked={exportConfiguration}
                 onCheckedChange={(v) => setExportConfiguration(!!v)}
               />
-              <Label
-                htmlFor="exportConfigurationCheckbox"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Export Configuration
+              <Label htmlFor="exportConfigurationCheckbox" className="text-sm">
+                Include configuration
               </Label>
             </div>
-            <div className="flex items-center space-x-2 mb-2">
+            <div className="flex items-center space-x-2">
               <Checkbox id="exportDataCheckbox" checked={true} disabled />
-              <Label
-                htmlFor="exportDataCheckbox"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Export Historical Data
+              <Label htmlFor="exportDataCheckbox" className="text-sm">
+                Include historical data
               </Label>
             </div>
-          </div>
-
-          <Button onClick={onExportDataClick} size="sm">
-            Export
-          </Button>
-        </div>
+            <Button onClick={onExportDataClick} size="sm">
+              Export
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
-      <Separator className="my-6" />
-      <div className="space-y-3">
-        <div className="text-l font-bold text-left">Data Backup</div>
-
-        <div className="space-y-3">
-          <div>
-            <div className="text-sm font-bold text-left py-2">Auto Backup</div>
-            <div className="text-sm text-left text-gray-400 flex space-x-1">
-              {autoBackupDirectory && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <InfoCircledIcon className="text-muted-foreground w-[20px] h-[20px]" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div>
-                        <div className="flex space-x-2 text-xs">
-                          <div>Last Backup At:</div>
-                          <div className="text-muted-foreground">
-                            {lastBackupAt
-                              ? timeToDateStr(lastBackupAt, true)
-                              : "N/A"}
-                          </div>
-                        </div>
-                        <div className="flex space-x-2 text-xs">
-                          <div>Last Import At:</div>
-                          <div className="text-muted-foreground">
-                            {lastImportAt
-                              ? timeToDateStr(lastImportAt, true)
-                              : "N/A"}
-                          </div>
-                        </div>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              <div>
-                Data will be automatically backed up to the target folder every
-                24h or after refreshing.
-              </div>
-            </div>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Auto Backup
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoCircledIcon className="text-muted-foreground w-4 h-4 mt-0.5" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="space-y-1 text-xs">
+                    <div>
+                      Last Backup At:{" "}
+                      {lastBackupAt ? timeToDateStr(lastBackupAt, true) : "N/A"}
+                    </div>
+                    <div>
+                      Last Import At:{" "}
+                      {lastImportAt ? timeToDateStr(lastImportAt, true) : "N/A"}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <span>
+              Data is automatically backed up every 24h or after refresh when a
+              backup folder is configured.
+            </span>
           </div>
-          <div className="items-center grid gap-4 grid-cols-4">
+
+          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div
               className={cn(
-                "text-muted-foreground col-span-4 md:col-span-2 text-sm whitespace-nowrap overflow-x-scroll scrollbar-hide",
+                "text-sm text-muted-foreground whitespace-nowrap overflow-x-auto scrollbar-hide",
                 autoBackupDirectory ? "block" : "hidden"
               )}
             >
               {autoBackupDirectory}
             </div>
-            <div className="space-x-2 col-span-4 md:col-span-2">
+            <div className="flex items-center gap-2">
               <Button onClick={onChooseAutoBackupFolderButtonClick} size="sm">
                 Choose Folder
               </Button>
@@ -301,8 +271,8 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
               </Button>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

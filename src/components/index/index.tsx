@@ -149,8 +149,8 @@ const App = () => {
 
   const maxDateRange = useMemo(
     () => ({
-      start: _(availableDates).first() ?? new Date(1970, 1, 1),
-      end: _(availableDates).last() ?? new Date(9999, 12, 30, 23, 59, 59),
+      start: _(availableDates).first() ?? parseISO("1970-01-01"),
+      end: _(availableDates).last() ?? parseISO("1970-01-01"),
     }),
     [availableDates]
   );
@@ -231,14 +231,32 @@ const App = () => {
 
   async function loadInitialQueryDateRange() {
     const { dr, size } = await getInitialQueryDateRange();
-    setDateRange(dr);
+    setDateRange((prev) => {
+      const prevFrom = prev?.from?.getTime() ?? 0;
+      const prevTo = prev?.to?.getTime() ?? 0;
+      const nextFrom = dr?.from?.getTime() ?? 0;
+      const nextTo = dr?.to?.getTime() ?? 0;
+      if (prevFrom === nextFrom && prevTo === nextTo) {
+        return prev;
+      }
+      return dr;
+    });
     setOriginalQuerySize(size);
   }
 
   async function handleQuerySizeWhenConfigurationChange() {
     const { dr, size } = await getInitialQueryDateRange();
     if (size !== originalQuerySize) {
-      setDateRange(dr);
+      setDateRange((prev) => {
+        const prevFrom = prev?.from?.getTime() ?? 0;
+        const prevTo = prev?.to?.getTime() ?? 0;
+        const nextFrom = dr?.from?.getTime() ?? 0;
+        const nextTo = dr?.to?.getTime() ?? 0;
+        if (prevFrom === nextFrom && prevTo === nextTo) {
+          return prev;
+        }
+        return dr;
+      });
       setOriginalQuerySize(size);
     }
   }
@@ -262,9 +280,18 @@ const App = () => {
 
   function onDatePickerValueChange(
     _selectedTimes: number,
-    dateRange: DateRange | undefined
+    nextDateRange: DateRange | undefined
   ) {
-    setDateRange(dateRange);
+    setDateRange((prev) => {
+      const prevFrom = prev?.from?.getTime() ?? 0;
+      const prevTo = prev?.to?.getTime() ?? 0;
+      const nextFrom = nextDateRange?.from?.getTime() ?? 0;
+      const nextTo = nextDateRange?.to?.getTime() ?? 0;
+      if (prevFrom === nextFrom && prevTo === nextTo) {
+        return prev;
+      }
+      return nextDateRange;
+    });
   }
 
   function loadAllData() {
