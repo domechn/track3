@@ -8,7 +8,7 @@ import { timeToDateStr } from "@/utils/date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import _ from "lodash";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { queryPNLTableValue, resizeChart } from "@/middlelayers/charts";
 import PNLChart from "@/components/pnl-chart";
 import { ChartResizeContext } from "@/App";
@@ -31,11 +31,16 @@ const App = ({
 
   const [pnlTableData, setPnlTableData] = useState<PNLTableDate>({});
 
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+
   useEffect(() => {
     loadTableData().then(() => {
       reportLoaded();
     });
-  }, [dateRange]);
+  }, [rangeKey]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

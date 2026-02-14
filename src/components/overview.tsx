@@ -52,6 +52,11 @@ const App = ({
     }
   }, []);
 
+  const loadingContextValue = useMemo(
+    () => ({ reportLoaded }),
+    [reportLoaded]
+  );
+
   // Fallback timeout to ensure loading always resolves
   useEffect(() => {
     const timer = setTimeout(() => setPageLoading(false), 8000);
@@ -59,7 +64,7 @@ const App = ({
   }, [rangeKey]);
 
   return (
-    <OverviewLoadingContext.Provider value={{ reportLoaded }}>
+    <OverviewLoadingContext.Provider value={loadingContextValue}>
       <div className="relative min-h-[400px]">
         <Collapsible open={isShowMore} onOpenChange={setIsShowMore}>
           <StaggerContainer className="space-y-3">

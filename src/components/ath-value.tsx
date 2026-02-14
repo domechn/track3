@@ -35,9 +35,14 @@ const App = ({
   });
   const { reportLoaded } = useContext(OverviewLoadingContext);
 
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+
   useEffect(() => {
     loadData(dateRange);
-  }, [dateRange]);
+  }, [rangeKey]);
 
   async function loadData(dt: TDateRange) {
     try {

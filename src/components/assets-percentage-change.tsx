@@ -29,11 +29,16 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     [] as AssetsPercentageChangeData
   );
 
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+
   useEffect(() => {
     loadData(dateRange).then(() => {
       resizeChartWithDelay(chartName);
     });
-  }, [dateRange]);
+  }, [rangeKey]);
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData(dr: TDateRange) {
@@ -44,7 +49,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     setAssetsPercentageChangeData(data);
   }
 
-  const options = {
+  const options = useMemo(() => ({
     maintainAspectRatio: false,
     responsive: true,
     hover: {
@@ -116,40 +121,54 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         },
       },
     },
-  };
+  }), []);
 
-  function lineData() {
-    const topNDatasets = _(topN)
-      .map((s, idx) => {
-        const color = chartColors[idx % chartColors.length];
-        return {
-          label: s,
-          data: _(assetsPercentageChangeData)
-            .map(
-              (d) =>
-                _(d.percentages).find((p) => p.symbol === s)?.percentage ?? 0
-            )
-            .value(),
-          borderColor: color.main,
-          backgroundColor: color.bg,
-          fill: true,
-          borderWidth: 1.5,
-          tension: 0.4,
-          pointRadius: 0,
-        };
-      })
-      .compact()
-      .value();
+  const preparedData = useMemo(() => {
+    const topNSet = new Set(topN);
+    const labels: string[] = [];
+    const othersData: number[] = [];
+    const topNData = topN.map(() => [] as number[]);
+
+    assetsPercentageChangeData.forEach((entry) => {
+      labels.push(timeToDateStr(entry.timestamp));
+
+      const percentageBySymbol = new Map<string, number>();
+      let others = 0;
+
+      entry.percentages.forEach((item) => {
+        if (topNSet.has(item.symbol)) {
+          percentageBySymbol.set(item.symbol, item.percentage);
+          return;
+        }
+        others += item.percentage;
+      });
+
+      topN.forEach((symbol, idx) => {
+        topNData[idx].push(percentageBySymbol.get(symbol) ?? 0);
+      });
+      othersData.push(others);
+    });
+
+    return { labels, topNData, othersData };
+  }, [assetsPercentageChangeData, topN]);
+
+  const lineDataMemo = useMemo(() => {
+    const topNDatasets = topN.map((symbol, idx) => {
+      const color = chartColors[idx % chartColors.length];
+      return {
+        label: symbol,
+        data: preparedData.topNData[idx],
+        borderColor: color.main,
+        backgroundColor: color.bg,
+        fill: true,
+        borderWidth: 1.5,
+        tension: 0.4,
+        pointRadius: 0,
+      };
+    });
     const othersDatasets = {
       label: "Others",
-      data: _(assetsPercentageChangeData)
-        .map(
-          (d) =>
-            _(d.percentages)
-              .filter((p) => !topN.includes(p.symbol))
-              .sumBy("percentage") ?? 0
-        )
-        .value(),
+      data: preparedData.othersData,
       borderColor: "rgba(148,163,184,0.5)",
       backgroundColor: "rgba(148,163,184,0.15)",
       fill: true,
@@ -157,16 +176,12 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       tension: 0.4,
       pointRadius: 0,
     };
+
     return {
-      labels: assetsPercentageChangeData.map((x) => timeToDateStr(x.timestamp)),
+      labels: preparedData.labels,
       datasets: [...topNDatasets, othersDatasets],
     };
-  }
-
-  const lineDataMemo = useMemo(
-    () => lineData(),
-    [assetsPercentageChangeData, topN]
-  );
+  }, [preparedData, topN]);
 
   return (
     <div>

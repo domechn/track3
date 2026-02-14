@@ -15,7 +15,7 @@ import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { glassScaleOptions, glassTooltip } from "@/utils/chart-theme";
 import { timeToDateStr } from "@/utils/date";
 import _ from "lodash";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
@@ -36,12 +36,17 @@ const App = ({
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
 
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+
   useEffect(() => {
     loadChartData(dateRange).then(() => {
       resizeChartWithDelay(chartName);
       reportLoaded();
     });
-  }, [dateRange]);
+  }, [rangeKey]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

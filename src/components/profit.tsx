@@ -72,6 +72,11 @@ const App = ({
   const loadGenRef = useRef(0);
   const logoPathCacheRef = useRef<Map<string, string>>(new Map());
 
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+
   useEffect(() => {
     const gen = ++loadGenRef.current;
 
@@ -103,7 +108,7 @@ const App = ({
           reportLoaded();
         }
       });
-  }, [dateRange, reportLoaded]);
+  }, [rangeKey]);
 
   const topProfitData = useMemo(
     () => _(coinsProfit).takeRight(5).reverse().value(),

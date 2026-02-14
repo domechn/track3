@@ -59,12 +59,17 @@ const App = ({
   }, [latestAssetsPercentageData]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+
   useEffect(() => {
     loadData(dateRange).then(() => {
       resizeChartWithDelay(chartName);
       reportLoaded();
     });
-  }, [dateRange]);
+  }, [rangeKey]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

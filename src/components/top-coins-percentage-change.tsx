@@ -50,11 +50,16 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       >
     >(null);
 
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+
   useEffect(() => {
     loadData(dateRange).then(() => {
       resizeChartWithDelay(chartNameKey);
     });
-  }, [dateRange]);
+  }, [rangeKey]);
 
   useEffect(() => resizeChart(chartNameKey), [needResize]);
 

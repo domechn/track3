@@ -21,32 +21,37 @@ const initialState: ThemeProviderState = {
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
+function applyThemeToDOM(theme: Theme) {
+  const root = window.document.documentElement;
+  root.classList.remove("light", "dark");
+
+  if (theme === "system") {
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+      .matches
+      ? "dark"
+      : "light";
+    root.classList.add(systemTheme);
+  } else {
+    root.classList.add(theme);
+  }
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = "system",
   storageKey = themeLocalStorageKey,
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  );
+  const [theme, setTheme] = useState<Theme>(() => {
+    const stored = (localStorage.getItem(storageKey) as Theme) || defaultTheme;
+    // Apply theme synchronously during state initialization to prevent flash
+    applyThemeToDOM(stored);
+    return stored;
+  });
 
+  // Keep DOM in sync when theme changes after initial render
   useEffect(() => {
-    const root = window.document.documentElement;
-
-    root.classList.remove("light", "dark");
-
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
-
-      root.classList.add(systemTheme);
-      return;
-    }
-
-    root.classList.add(theme);
+    applyThemeToDOM(theme);
   }, [theme]);
 
   const value = {

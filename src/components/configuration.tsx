@@ -42,6 +42,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CexAnalyzer } from "@/middlelayers/datafetch/coins/cex/cex";
 import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
   MagnifyingGlassIcon,
   PlusIcon,
   ReloadIcon,
@@ -153,6 +155,7 @@ const querySizeOptions = [
 ];
 
 const defaultBaseCurrency = "USD";
+const CONFIG_LIST_PAGE_SIZE = 30;
 
 const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const { toast } = useToast();
@@ -248,6 +251,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const [otherAmountDraftMap, setOtherAmountDraftMap] = useState<
     Record<number, string>
   >({});
+  const [exchangePage, setExchangePage] = useState(0);
+  const [walletPage, setWalletPage] = useState(0);
+  const [othersPage, setOthersPage] = useState(0);
 
   const preferCurrencyOptions = useMemo(
     () =>
@@ -274,6 +280,34 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     () => wallets.filter((w) => w.active || !hideInactive),
     [wallets, hideInactive]
   );
+  const exchangePageCount = useMemo(
+    () => Math.max(Math.ceil(visibleExchanges.length / CONFIG_LIST_PAGE_SIZE), 1),
+    [visibleExchanges.length]
+  );
+  const walletPageCount = useMemo(
+    () => Math.max(Math.ceil(visibleWallets.length / CONFIG_LIST_PAGE_SIZE), 1),
+    [visibleWallets.length]
+  );
+  const pagedVisibleExchanges = useMemo(() => {
+    const start = exchangePage * CONFIG_LIST_PAGE_SIZE;
+    return visibleExchanges.slice(start, start + CONFIG_LIST_PAGE_SIZE);
+  }, [visibleExchanges, exchangePage]);
+  const pagedVisibleWallets = useMemo(() => {
+    const start = walletPage * CONFIG_LIST_PAGE_SIZE;
+    return visibleWallets.slice(start, start + CONFIG_LIST_PAGE_SIZE);
+  }, [visibleWallets, walletPage]);
+  const othersPageCount = useMemo(
+    () => Math.max(Math.ceil(others.length / CONFIG_LIST_PAGE_SIZE), 1),
+    [others.length]
+  );
+  const pagedOthers = useMemo(() => {
+    const start = othersPage * CONFIG_LIST_PAGE_SIZE;
+    return others.slice(start, start + CONFIG_LIST_PAGE_SIZE);
+  }, [others, othersPage]);
+  const pagedOthersStartIndex = useMemo(
+    () => othersPage * CONFIG_LIST_PAGE_SIZE,
+    [othersPage]
+  );
 
   const activeExchangeCount = useMemo(
     () => exchanges.filter((e) => e.active).length,
@@ -295,6 +329,18 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    setExchangePage((prev) => Math.min(prev, exchangePageCount - 1));
+  }, [exchangePageCount]);
+
+  useEffect(() => {
+    setWalletPage((prev) => Math.min(prev, walletPageCount - 1));
+  }, [walletPageCount]);
+
+  useEffect(() => {
+    setOthersPage((prev) => Math.min(prev, othersPageCount - 1));
+  }, [othersPageCount]);
 
   async function loadSupportedCurrencies() {
     const currencies = await listAllCurrencyRates();
@@ -680,14 +726,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     }
 
     return (
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead>Exchange</TableHead>
-            <TableHead>Alias</TableHead>
-            <TableHead>API Key</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="w-[170px]">Exchange</TableHead>
+            <TableHead className="w-[170px]">Alias</TableHead>
+            <TableHead className="w-[220px]">API Key</TableHead>
+            <TableHead className="w-[120px]">Status</TableHead>
+            <TableHead className="w-[84px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -696,25 +742,25 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               key={ex.type + ex.apiKey + idx}
               className="h-[42px] group align-middle"
             >
-              <TableCell>
+              <TableCell className="w-[170px]">
                 <div className="flex items-center gap-2 text-sm">
                   <img
                     className="w-[18px] h-[18px] rounded-full"
                     src={getWalletLogo(ex.type)}
                     alt={ex.type}
                   />
-                  <span>
+                  <span className="truncate">
                     {cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type}
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="text-sm">
+              <TableCell className="w-[170px] text-sm">
                 {ex.alias || `${ex.type}-${idx + 1}`}
               </TableCell>
-              <TableCell className="text-xs text-muted-foreground">
-                {maskSensitive(ex.apiKey)}
+              <TableCell className="w-[220px] text-xs text-muted-foreground">
+                <p className="truncate">{maskSensitive(ex.apiKey)}</p>
               </TableCell>
-              <TableCell>
+              <TableCell className="w-[120px]">
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={ex.active}
@@ -725,8 +771,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="text-right">
-                <div className="inline-flex items-center gap-1">
+              <TableCell className="w-[84px] text-right">
+                <div className="inline-flex w-[64px] items-center justify-end gap-1">
                   {isPro && (
                     <Button
                       size="icon"
@@ -768,14 +814,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     }
 
     return (
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead>Wallet</TableHead>
-            <TableHead>Alias</TableHead>
-            <TableHead>Address</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="w-[140px]">Wallet</TableHead>
+            <TableHead className="w-[170px]">Alias</TableHead>
+            <TableHead className="w-[320px]">Address</TableHead>
+            <TableHead className="w-[120px]">Status</TableHead>
+            <TableHead className="w-[84px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -784,7 +830,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               key={w.type + w.address + idx}
               className="h-[42px] group align-middle"
             >
-              <TableCell>
+              <TableCell className="w-[140px]">
                 <div className="flex items-center gap-2 text-sm">
                   <img
                     src={getWalletLogo(w.type)}
@@ -794,13 +840,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   <span>{w.type.toUpperCase()}</span>
                 </div>
               </TableCell>
-              <TableCell className="text-sm">
+              <TableCell className="w-[170px] text-sm">
                 {w.alias || `${w.type}-${idx + 1}`}
               </TableCell>
-              <TableCell className="max-w-[240px] text-xs text-muted-foreground">
+              <TableCell className="w-[320px] text-xs text-muted-foreground">
                 <p className="truncate">{w.address}</p>
               </TableCell>
-              <TableCell>
+              <TableCell className="w-[120px]">
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={w.active}
@@ -811,8 +857,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="text-right">
-                <div className="inline-flex items-center gap-1">
+              <TableCell className="w-[84px] text-right">
+                <div className="inline-flex w-[64px] items-center justify-end gap-1">
                   {isPro && (
                     <Button
                       size="icon"
@@ -935,7 +981,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   }
 
   function renderOthersForm(
-    vals: { alias?: string; symbol: string; amount: number }[]
+    vals: { alias?: string; symbol: string; amount: number }[],
+    startIndex = 0
   ) {
     if (vals.length === 0) {
       return (
@@ -956,8 +1003,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {vals.map((o, idx) => (
-            <TableRow key={"other" + idx} className="h-[42px] group align-middle">
+          {vals.map((o, idx) => {
+            const globalIdx = startIndex + idx;
+            return (
+            <TableRow
+              key={"other" + globalIdx}
+              className="h-[42px] group align-middle"
+            >
               <TableCell>
                 <Input
                   type="text"
@@ -965,7 +1017,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   placeholder="Main wallet"
                   value={o.alias ?? ""}
                   autoComplete="off"
-                  onChange={(e) => handleOthersChange(idx, "alias", e.target.value)}
+                  onChange={(e) => handleOthersChange(globalIdx, "alias", e.target.value)}
                 />
               </TableCell>
               <TableCell>
@@ -975,7 +1027,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   placeholder="BTC"
                   value={o.symbol}
                   autoComplete="off"
-                  onChange={(e) => handleOthersChange(idx, "symbol", e.target.value)}
+                  onChange={(e) => handleOthersChange(globalIdx, "symbol", e.target.value)}
                 />
               </TableCell>
               <TableCell>
@@ -984,9 +1036,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   inputMode="decimal"
                   name="amount"
                   placeholder="0"
-                  value={otherAmountDraftMap[idx] ?? `${o.amount}`}
-                  onChange={(e) => handleOtherAmountInputChange(idx, e.target.value)}
-                  onBlur={() => commitOtherAmountInput(idx)}
+                  value={otherAmountDraftMap[globalIdx] ?? `${o.amount}`}
+                  onChange={(e) => handleOtherAmountInputChange(globalIdx, e.target.value)}
+                  onBlur={() => commitOtherAmountInput(globalIdx)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       (e.target as HTMLInputElement).blur();
@@ -999,14 +1051,15 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7"
-                  onClick={() => handleRemoveOther(idx)}
+                  onClick={() => handleRemoveOther(globalIdx)}
                   title="Delete"
                 >
                   <TrashIcon className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     );
@@ -1866,7 +1919,36 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             {renderAddExchangeForm()}
           </div>
         </CardHeader>
-        <CardContent>{renderExchangeForm(visibleExchanges)}</CardContent>
+        <CardContent className="space-y-2">
+          {renderExchangeForm(pagedVisibleExchanges)}
+          {visibleExchanges.length > CONFIG_LIST_PAGE_SIZE ? (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExchangePage((prev) => Math.max(prev - 1, 0))}
+                disabled={exchangePage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {exchangePage + 1} / {exchangePageCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setExchangePage((prev) =>
+                    Math.min(prev + 1, exchangePageCount - 1)
+                  )
+                }
+                disabled={exchangePage >= exchangePageCount - 1}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
       </Card>
 
       <Card>
@@ -1883,7 +1965,34 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             {renderAddWalletForm()}
           </div>
         </CardHeader>
-        <CardContent>{renderWalletForm(visibleWallets)}</CardContent>
+        <CardContent className="space-y-2">
+          {renderWalletForm(pagedVisibleWallets)}
+          {visibleWallets.length > CONFIG_LIST_PAGE_SIZE ? (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWalletPage((prev) => Math.max(prev - 1, 0))}
+                disabled={walletPage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {walletPage + 1} / {walletPageCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setWalletPage((prev) => Math.min(prev + 1, walletPageCount - 1))
+                }
+                disabled={walletPage >= walletPageCount - 1}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
       </Card>
 
       <Card>
@@ -1900,7 +2009,34 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             {renderAddOtherForm()}
           </div>
         </CardHeader>
-        <CardContent>{renderOthersForm(others)}</CardContent>
+        <CardContent className="space-y-2">
+          {renderOthersForm(pagedOthers, pagedOthersStartIndex)}
+          {others.length > CONFIG_LIST_PAGE_SIZE ? (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOthersPage((prev) => Math.max(prev - 1, 0))}
+                disabled={othersPage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {othersPage + 1} / {othersPageCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setOthersPage((prev) => Math.min(prev + 1, othersPageCount - 1))
+                }
+                disabled={othersPage >= othersPageCount - 1}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
       </Card>
     </div>
   );

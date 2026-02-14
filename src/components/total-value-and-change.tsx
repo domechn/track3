@@ -296,7 +296,7 @@ const App = ({
     return ts.changePercentage();
   }
 
-  function formatLineData() {
+  const lineValues = useMemo(() => {
     const baseData = assetChangeData.data[0];
     if (!baseData) {
       return [];
@@ -321,7 +321,7 @@ const App = ({
       .map((d) => currencyWrapper(currency)(d.usdValue))
       .map((d) => (showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d))
       .value();
-  }
+  }, [assetChangeData, btcAsBase, currency, showPercentageInChart]);
 
   function changePercentageColorClass(
     ts: TotalValueShower,
@@ -332,7 +332,7 @@ const App = ({
     return positiveNegativeTextClass(pc, quoteColor, 500);
   }
 
-  const options = {
+  const options = useMemo(() => ({
     maintainAspectRatio: false,
     responsive: true,
     hover: {
@@ -426,15 +426,15 @@ const App = ({
         },
       },
     },
-  };
+  }), [showPercentageInChart, btcAsBase, currency.symbol, currency.currency, assetChangeData.timestamps]);
 
-  function lineData() {
+  const lineDataMemo = useMemo(() => {
     return {
       labels: assetChangeData.timestamps.map((x) => timeToDateStr(x)),
       datasets: [
         {
           label: "Value",
-          data: formatLineData(),
+          data: lineValues,
           borderColor: lineColor,
           backgroundColor: lineColor,
           borderWidth: 2,
@@ -445,7 +445,7 @@ const App = ({
         },
       ],
     };
-  }
+  }, [assetChangeData.timestamps, lineValues, lineColor]);
 
   return (
     <div>
@@ -510,7 +510,7 @@ const App = ({
           <div className="h-30">
             <Line
               options={options as any}
-              data={lineData()}
+              data={lineDataMemo}
               plugins={[
                 {
                   id: "gradientFill",

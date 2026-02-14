@@ -216,11 +216,11 @@ const App = ({
         setPageLoading(false);
       }
     }
-  }, [dateRange]);
+  }, [rangeKey]);
 
   useEffect(() => {
     loadAllData();
-  }, [loadAllData, rangeKey]);
+  }, [loadAllData]);
 
   // Fallback timeout to ensure loading always resolves
   useEffect(() => {

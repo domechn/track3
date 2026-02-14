@@ -121,16 +121,21 @@ const App = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    loadConfiguration();
-    handleAutoBackup()
-      .then(({ imported }) => {
-        if (imported) {
-          clearAllCache();
-        }
-      })
-      .finally(() => {
-        loadAllData();
-      });
+    Promise.all([
+      queryPreferCurrency().then((c) => setCurrentCurrency(c)),
+      getLicenseIfIsPro().then((l) => setIsProUser(!!l)),
+      getQuoteColor().then((c) => setQuoteColor(c)),
+    ]).then(() =>
+      handleAutoBackup()
+        .then(({ imported }) => {
+          if (imported) {
+            clearAllCache();
+          }
+        })
+        .finally(() => {
+          loadAllData();
+        })
+    );
   }, []);
 
   useEffect(() => {
@@ -181,21 +186,8 @@ const App = () => {
   }
 
   function loadConfiguration() {
-    loadCurrentCurrency();
-    loadIsProUser();
-    loadQuoteColor();
-  }
-
-  function loadCurrentCurrency() {
     queryPreferCurrency().then((c) => setCurrentCurrency(c));
-  }
-
-  function loadIsProUser() {
-    // currently only check if there is license in sqlite
     getLicenseIfIsPro().then((l) => setIsProUser(!!l));
-  }
-
-  function loadQuoteColor() {
     getQuoteColor().then((c) => setQuoteColor(c));
   }
 

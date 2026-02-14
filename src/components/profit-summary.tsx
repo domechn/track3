@@ -120,7 +120,7 @@ const App = ({
         .map((d) => d.firstDay.getFullYear())
         .uniq()
         .value(),
-    [dateRange]
+    [rangeKey]
   );
 
   useEffect(() => {

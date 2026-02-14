@@ -1,5 +1,5 @@
 import { TDateRange, TopCoinsRankData } from "@/middlelayers/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import _ from "lodash";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
@@ -10,6 +10,10 @@ import { downloadCoinLogos } from "@/middlelayers/data";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import bluebird from "bluebird";
 import { useNavigate } from "react-router-dom";
+import { Button } from "./ui/button";
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+
+const PAGE_SIZE = 20;
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const [topCoinsRankData, setTopCoinsRankData] = useState({
@@ -17,11 +21,17 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     coins: [],
   } as TopCoinsRankData);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+  const [page, setPage] = useState(0);
   const navigate = useNavigate();
+
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
 
   useEffect(() => {
     loadData(dateRange);
-  }, [dateRange]);
+  }, [rangeKey]);
 
   async function loadData(dr: TDateRange) {
     const tcr = await queryTopCoinsRank(dr);
@@ -69,6 +79,24 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     }[];
   }, [topCoinsRankData]);
 
+  const maxPage = useMemo(
+    () => Math.max(Math.ceil(rankRows.length / PAGE_SIZE) - 1, 0),
+    [rankRows.length]
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [rangeKey]);
+
+  useEffect(() => {
+    setPage((prev) => Math.min(prev, maxPage));
+  }, [maxPage]);
+
+  const pagedRows = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return rankRows.slice(start, start + PAGE_SIZE);
+  }, [rankRows, page]);
+
   function renderChangeBadge(change: number) {
     if (change > 0) {
       return (
@@ -102,7 +130,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         <CardContent>
           <Table>
             <TableBody>
-              {rankRows.map((row) => (
+              {pagedRows.map((row) => (
                 <TableRow
                   key={row.coin}
                   className="h-[42px] cursor-pointer group"
@@ -128,6 +156,29 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
               ))}
             </TableBody>
           </Table>
+          {rankRows.length > PAGE_SIZE ? (
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                disabled={page <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {page + 1} / {maxPage + 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.min(prev + 1, maxPage))}
+                disabled={page >= maxPage}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

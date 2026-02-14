@@ -202,14 +202,6 @@ const App = ({
     () => `${symbol}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [symbol, dateRange.start, dateRange.end]
   );
-  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
-
-  if (prevQueryKey !== queryKey) {
-    setPrevQueryKey(queryKey);
-    setPageLoading(true);
-    loadedCountRef.current = 0;
-    loadGenRef.current += 1;
-  }
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;
@@ -252,10 +244,18 @@ const App = ({
   const [logo, setLogo] = useState("");
 
   const [allowSymbols, setAllowSymbols] = useState<string[]>([]);
+  const [coinKeyword, setCoinKeyword] = useState("");
+  const [coinListLimit, setCoinListLimit] = useState(200);
 
   useEffect(() => {
     loadAllowedSymbols();
   }, []);
+
+  useEffect(() => {
+    setPageLoading(true);
+    loadedCountRef.current = 0;
+    loadGenRef.current += 1;
+  }, [queryKey]);
 
   useEffect(() => {
     loadSymbolData(symbol);
@@ -264,6 +264,13 @@ const App = ({
     const timer = setTimeout(() => setPageLoading(false), 8000);
     return () => clearTimeout(timer);
   }, [queryKey]);
+
+  useEffect(() => {
+    if (!coinSelectOpen) {
+      setCoinKeyword("");
+      setCoinListLimit(200);
+    }
+  }, [coinSelectOpen]);
 
   async function getLogoPath(symbol: string) {
     const acd = await getAppCacheDir();
@@ -332,14 +339,45 @@ const App = ({
     [currency, lastPrice]
   );
 
+  const allowSymbolRankMap = useMemo(() => {
+    const rankMap = new Map<string, number>();
+    allowSymbols.forEach((item, idx) => {
+      rankMap.set(item, idx + 1);
+    });
+    return rankMap;
+  }, [allowSymbols]);
+
   const rank = useMemo(() => {
-    const rankNum = _(allowSymbols).indexOf(symbol) + 1;
+    const rankNum = allowSymbolRankMap.get(symbol) ?? 0;
     if (rankNum === 0) {
       return "-";
     }
 
     return "#" + rankNum;
-  }, [symbol, allowSymbols]);
+  }, [symbol, allowSymbolRankMap]);
+
+  const filteredAllowSymbols = useMemo(() => {
+    const keyword = coinKeyword.trim().toUpperCase();
+    if (!keyword) {
+      return allowSymbols;
+    }
+    return allowSymbols.filter((item) =>
+      item.toUpperCase().includes(keyword)
+    );
+  }, [allowSymbols, coinKeyword]);
+
+  const visibleAllowSymbols = useMemo(
+    () => filteredAllowSymbols.slice(0, coinListLimit),
+    [filteredAllowSymbols, coinListLimit]
+  );
+
+  const txnIndexMap = useMemo(() => {
+    const indexMap = new Map<number, number>();
+    transactions.forEach((item, idx) => {
+      indexMap.set(item.id, idx);
+    });
+    return indexMap;
+  }, [transactions]);
 
   const profitStr = useMemo(
     () =>
@@ -427,7 +465,7 @@ const App = ({
       });
       return;
     }
-    const txnIndex = _(transactions).findIndex((act) => act.id === updateTxnId);
+    const txnIndex = txnIndexMap.get(updateTxnId) ?? -1;
     if (txnIndex === -1) {
       toast({
         description: "Invalid action",
@@ -464,7 +502,7 @@ const App = ({
       });
       return;
     }
-    const txnIndex = _(transactions).findIndex((act) => act.id === updateTxnId);
+    const txnIndex = txnIndexMap.get(updateTxnId) ?? -1;
     if (txnIndex === -1) {
       toast({
         description: "Invalid action",
@@ -715,17 +753,22 @@ const App = ({
                         <CommandInput
                           placeholder="Search coin..."
                           className="h-9"
+                          value={coinKeyword}
+                          onValueChange={(val) => {
+                            setCoinKeyword(val);
+                            setCoinListLimit(200);
+                          }}
                         />
                         <CommandList>
                           <CommandEmpty>No coin found.</CommandEmpty>
                           <CommandGroup>
-                            {allowSymbols.map((s) => (
+                            {visibleAllowSymbols.map((s) => (
                               <CommandItem
                                 key={s}
                                 value={s}
-                                onSelect={(v) => {
+                                onSelect={() => {
                                   setCoinSelectOpen(false);
-                                  navigate(`/coins/${v}`);
+                                  navigate(`/coins/${s}`);
                                 }}
                               >
                                 <div>{s}</div>
@@ -738,6 +781,17 @@ const App = ({
                               </CommandItem>
                             ))}
                           </CommandGroup>
+                          {filteredAllowSymbols.length > coinListLimit ? (
+                            <div className="px-2 py-2">
+                              <Button
+                                variant="ghost"
+                                className="w-full h-8"
+                                onClick={() => setCoinListLimit((prev) => prev + 200)}
+                              >
+                                Show More ({filteredAllowSymbols.length - coinListLimit})
+                              </Button>
+                            </div>
+                          ) : null}
                         </CommandList>
                       </Command>
                     </PopoverContent>
