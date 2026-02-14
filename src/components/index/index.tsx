@@ -93,11 +93,91 @@ export const RefreshButtonLoadingContext = React.createContext<{
   setProgress: React.Dispatch<React.SetStateAction<number>>;
 }>(null as any);
 
+function TopBar({
+  isProUser,
+  quoteColor,
+  currentCurrency,
+  availableDates,
+  dateRange,
+  onDatePickerValueChange,
+  lastRefreshAt,
+  onRefreshSuccess,
+}: {
+  isProUser: boolean;
+  quoteColor: QuoteColor;
+  currentCurrency: CurrencyRateDetail;
+  availableDates: Date[];
+  dateRange: DateRange | undefined;
+  onDatePickerValueChange: (
+    selectedTimes: number,
+    nextDateRange: DateRange | undefined
+  ) => void;
+  lastRefreshAt?: string;
+  onRefreshSuccess: () => void;
+}) {
+  const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState(0);
+
+  return (
+    <div className="sticky top-0 z-10 glass-subtle border-b relative">
+      <div className="flex h-12 items-center px-4">
+        {isProUser && (
+          <div className="mr-4">
+            <RealTimeTotalValue quoteColor={quoteColor} currency={currentCurrency} />
+          </div>
+        )}
+        <div className="ml-auto flex items-center space-x-3">
+          <DatePicker
+            availableDates={availableDates}
+            value={dateRange}
+            onDateChange={onDatePickerValueChange}
+          />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <RefreshButtonLoadingContext.Provider
+                    value={{
+                      buttonLoading: refreshButtonLoading,
+                      setButtonLoading: setRefreshButtonLoading,
+                      progress: refreshProgress,
+                      setProgress: setRefreshProgress,
+                    }}
+                  >
+                    <RefreshData
+                      loading={refreshButtonLoading}
+                      afterRefresh={(success) => {
+                        if (success) {
+                          onRefreshSuccess();
+                        }
+                      }}
+                    />
+                  </RefreshButtonLoadingContext.Provider>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  {lastRefreshAt
+                    ? "Last Refresh At: " + lastRefreshAt
+                    : "Never Refresh Before"}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+      {refreshProgress > 0 && refreshButtonLoading && (
+        <div className="absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none">
+          <Progress value={refreshProgress} className="w-[80%]" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 const App = () => {
   const { setNeedResize } = useContext(ChartResizeContext);
 
-  const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
-  const [refreshProgress, setRefreshProgress] = useState(0);
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
@@ -331,63 +411,16 @@ const App = () => {
           style={{ marginLeft: sidebarWidth }}
           className="transition-[margin-left] duration-300 ease-in-out"
         >
-          {/* Top bar */}
-          <div className="sticky top-0 z-10 glass-subtle border-b">
-            <div className="flex h-12 items-center px-4">
-              {isProUser && (
-                <div className="mr-4">
-                  <RealTimeTotalValue
-                    quoteColor={quoteColor}
-                    currency={currentCurrency}
-                  />
-                </div>
-              )}
-              <div className="ml-auto flex items-center space-x-3">
-                <DatePicker
-                  availableDates={availableDates}
-                  value={dateRange}
-                  onDateChange={onDatePickerValueChange}
-                />
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>
-                        <RefreshButtonLoadingContext.Provider
-                          value={{
-                            buttonLoading: refreshButtonLoading,
-                            setButtonLoading: setRefreshButtonLoading,
-                            progress: refreshProgress,
-                            setProgress: setRefreshProgress,
-                          }}
-                        >
-                          <RefreshData
-                            loading={refreshButtonLoading}
-                            afterRefresh={(success) => {
-                              if (success) {
-                                onDataChanged();
-                              }
-                            }}
-                          />
-                        </RefreshButtonLoadingContext.Provider>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        {lastRefreshAt
-                          ? "Last Refresh At: " + lastRefreshAt
-                          : "Never Refresh Before"}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </div>
-            {refreshProgress > 0 && refreshButtonLoading && (
-              <div className="flex items-center justify-center pb-1">
-                <Progress value={refreshProgress} className="w-[80%]" />
-              </div>
-            )}
-          </div>
+          <TopBar
+            isProUser={isProUser}
+            quoteColor={quoteColor}
+            currentCurrency={currentCurrency}
+            availableDates={availableDates}
+            dateRange={dateRange}
+            onDatePickerValueChange={onDatePickerValueChange}
+            lastRefreshAt={lastRefreshAt}
+            onRefreshSuccess={onDataChanged}
+          />
 
           {/* Main content */}
           <main className="p-5">
