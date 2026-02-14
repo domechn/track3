@@ -173,7 +173,7 @@ const App = ({
             currency={currency}
             dateRange={dateRange}
             quoteColor={quoteColor}
-            className="h-30"
+            className="h-[120px]"
           />
         </CardContent>
       </Card>

@@ -436,12 +436,19 @@ const App = ({
           label: "Value",
           data: lineValues,
           borderColor: lineColor,
-          backgroundColor: lineColor,
+          backgroundColor: (context: any) => {
+            const { chart } = context;
+            const { ctx, chartArea } = chart;
+            if (!chartArea) {
+              return chartColors[0].bg;
+            }
+            return createGradientFill(ctx, chartArea, lineColor);
+          },
           borderWidth: 2,
           tension: 0.4,
           pointRadius: 0,
           pointStyle: "rotRect",
-          fill: true,
+          fill: "start",
         },
       ],
     };
@@ -507,29 +514,8 @@ const App = ({
             </span>{" "}
             from {firstDate}
           </p>
-          <div className="h-30">
-            <Line
-              options={options as any}
-              data={lineDataMemo}
-              plugins={[
-                {
-                  id: "gradientFill",
-                  beforeDraw(chart: any) {
-                    const { ctx, chartArea } = chart;
-                    if (!chartArea) return;
-                    chart.data.datasets.forEach((ds: any) => {
-                      if (ds.fill) {
-                        ds.backgroundColor = createGradientFill(
-                          ctx,
-                          chartArea,
-                          lineColor
-                        );
-                      }
-                    });
-                  },
-                },
-              ]}
-            />
+          <div className="h-[120px]">
+            <Line options={options as any} data={lineDataMemo} />
           </div>
         </CardContent>
       </Card>

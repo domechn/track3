@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { cleanTotalProfitCache } from '@/middlelayers/charts'
 import { Menu, MenuItem } from '@tauri-apps/api/menu'
 
+export const APP_SOFT_REFRESH_EVENT = "track3:soft-refresh"
+
 type WindowSizeState = {
 	width: number | undefined
 	height: number | undefined
@@ -13,8 +15,17 @@ let cachedWindowSize: WindowSizeState = {
 	height: undefined,
 }
 let detachWindowListener: (() => void) | undefined
+let rightClickMenuPromise: Promise<Menu> | null = null
+let softRefreshLocked = false
+let lastSoftRefreshAt = 0
 
 function emitWindowSize(state: WindowSizeState) {
+	if (
+		cachedWindowSize.width === state.width &&
+		cachedWindowSize.height === state.height
+	) {
+		return
+	}
 	cachedWindowSize = state
 	windowSizeListeners.forEach((listener) => listener(state))
 }
@@ -87,18 +98,37 @@ export const useWindowSize = () => {
 }
 
 export function handleReloadClick() {
+	const now = Date.now()
+	if (softRefreshLocked || now - lastSoftRefreshAt < 1200) {
+		return
+	}
+	softRefreshLocked = true
+	lastSoftRefreshAt = now
 	cleanTotalProfitCache()
-	location.reload()
+	window.dispatchEvent(new Event(APP_SOFT_REFRESH_EVENT))
+	setTimeout(() => {
+		softRefreshLocked = false
+	}, 1200)
+}
+
+async function getRightClickMenu() {
+	if (!rightClickMenuPromise) {
+		rightClickMenuPromise = (async () => {
+			const reload = await MenuItem.new({
+				text: "Reload",
+				action: handleReloadClick
+			})
+			return Menu.new({
+				items: [reload],
+			})
+		})()
+	}
+	return rightClickMenuPromise
 }
 
 export async function renderRightClickMenu(event: React.MouseEvent) {
 	event.preventDefault()
-	const reload = await MenuItem.new({
-		text: "Reload",
-		action: handleReloadClick
-	})
-	const menu = await Menu.new({
-		items: [reload],
-	})
+	event.stopPropagation()
+	const menu = await getRightClickMenu()
 	menu.popup()
 }

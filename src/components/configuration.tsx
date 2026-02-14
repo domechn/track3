@@ -1,5 +1,5 @@
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
   getConfiguration,
   queryPreferCurrency,
@@ -2042,4 +2042,4 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   );
 };
 
-export default App;
+export default memo(App);
