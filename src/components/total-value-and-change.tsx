@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   AssetChangeData,
   CurrencyRateDetail,
@@ -21,10 +21,16 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { loadingWrapper } from "@/lib/loading";
 import bluebird from "bluebird";
 import { ChartResizeContext } from "@/App";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeTextClass } from "@/utils/color";
+import {
+  chartColors,
+  createGradientFill,
+  glassScaleOptions,
+  glassTooltip,
+} from "@/utils/chart-theme";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -166,12 +172,9 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
-  const lineColor = "rgba(255, 99, 71, 1)";
+  const lineColor = chartColors[0].main;
   const { needResize } = useContext(ChartResizeContext);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-
-  const [totalValueLoading, setTotalValueLoading] = useState(false);
-  const [chartLoading, setChartLoading] = useState(false);
+  const { reportLoaded } = useContext(OverviewLoadingContext);
 
   const [totalValueData, setTotalValueData] = useState<TotalValueData>({
     totalValue: 0,
@@ -186,6 +189,11 @@ const App = ({
   const [showPercentageInChart, setShowPercentageInChart] = useState(false);
 
   const [showValue, setShowValue] = useState(false);
+  const loadGenRef = useRef(0);
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
 
   const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
   const firstTotalValue = useMemo(() => assetChangeData.data[0]?.usdValue ?? 0, [assetChangeData]);
@@ -215,50 +223,37 @@ const App = ({
   }, [showValue, firstTotalValue, totalValue, totalValueShower]);
 
   useEffect(() => {
-    loadData(dateRange).then(() => {
+    const gen = ++loadGenRef.current;
+    loadData(dateRange, gen).then(() => {
+      if (gen !== loadGenRef.current) {
+        return;
+      }
       resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
+      reportLoaded();
     });
-  }, [dateRange]);
+  }, [rangeKey]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData(dr: TDateRange) {
-    return bluebird.all([loadTotalValue(), loadChartData(dr)]);
+  async function loadData(dr: TDateRange, gen: number) {
+    return bluebird.all([loadTotalValue(gen), loadChartData(dr, gen)]);
   }
 
-  async function loadTotalValue() {
-    updateLoading(true, "totalValue");
-    try {
-      const tv = await queryTotalValue();
-      setTotalValueData(tv);
-    } finally {
-      updateLoading(false, "totalValue");
-    }
-  }
-
-  async function loadChartData(dr: TDateRange) {
-    updateLoading(true, "chart");
-    try {
-      const ac = await queryAssetChange(dr);
-      setAssetChangeData(ac);
-    } finally {
-      updateLoading(false, "chart");
-    }
-  }
-
-  function updateLoading(val: boolean, loadingType: "chart" | "totalValue") {
-    // no need to set loading if already loaded ( like refresh data in overview page)
-    if (initialLoaded) {
+  async function loadTotalValue(gen: number) {
+    const tv = await queryTotalValue();
+    if (gen !== loadGenRef.current) {
       return;
     }
-    if (loadingType === "chart") {
-      setChartLoading(val);
-    } else if (loadingType === "totalValue") {
-      setTotalValueLoading(val);
-    }
+    setTotalValueData(tv);
   }
 
+  async function loadChartData(dr: TDateRange, gen: number) {
+    const ac = await queryAssetChange(dr);
+    if (gen !== loadGenRef.current) {
+      return;
+    }
+    setAssetChangeData(ac);
+  }
 
   function getTotalValueShower(
     btcAsBase: boolean,
@@ -301,7 +296,7 @@ const App = ({
     return ts.changePercentage();
   }
 
-  function formatLineData() {
+  const lineValues = useMemo(() => {
     const baseData = assetChangeData.data[0];
     if (!baseData) {
       return [];
@@ -326,7 +321,7 @@ const App = ({
       .map((d) => currencyWrapper(currency)(d.usdValue))
       .map((d) => (showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d))
       .value();
-  }
+  }, [assetChangeData, btcAsBase, currency, showPercentageInChart]);
 
   function changePercentageColorClass(
     ts: TotalValueShower,
@@ -334,13 +329,12 @@ const App = ({
     firstTotalValue: number
   ) {
     const pc = getPercentageChange(ts, totalValue, firstTotalValue);
-    const c = positiveNegativeColor(pc, quoteColor);
-    return `text-${c}-500`;
+    return positiveNegativeTextClass(pc, quoteColor, 500);
   }
 
-  const options = {
+  const options = useMemo(() => ({
     maintainAspectRatio: false,
-    responsive: false,
+    responsive: true,
     hover: {
       mode: "index",
       intersect: false,
@@ -362,6 +356,7 @@ const App = ({
         display: false,
       },
       tooltip: {
+        ...glassTooltip,
         callbacks: {
           label: (context: { parsed: { y: number } }) => {
             const v = context.parsed.y.toLocaleString();
@@ -382,6 +377,7 @@ const App = ({
           display: false,
         },
         ticks: {
+          ...glassScaleOptions.ticks,
           maxRotation: 0,
           minRotation: 0,
           align: "center",
@@ -416,6 +412,7 @@ const App = ({
         },
         offset: true,
         ticks: {
+          ...glassScaleOptions.ticks,
           precision: 2,
           maxTicksLimit: 4,
           callback: (value: any) => {
@@ -425,29 +422,30 @@ const App = ({
           },
         },
         grid: {
-          display: false,
+          ...glassScaleOptions.grid,
         },
       },
     },
-  };
+  }), [showPercentageInChart, btcAsBase, currency.symbol, currency.currency, assetChangeData.timestamps]);
 
-  function lineData() {
+  const lineDataMemo = useMemo(() => {
     return {
       labels: assetChangeData.timestamps.map((x) => timeToDateStr(x)),
       datasets: [
         {
           label: "Value",
-          data: formatLineData(),
+          data: lineValues,
           borderColor: lineColor,
           backgroundColor: lineColor,
-          borderWidth: assetChangeData.data.length > 20 ? 2 : 4,
-          tension: 0.1,
-          pointRadius: assetChangeData.data.length > 20 ? 0 : 0.3,
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 0,
           pointStyle: "rotRect",
+          fill: true,
         },
       ],
     };
-  }
+  }, [assetChangeData.timestamps, lineValues, lineColor]);
 
   return (
     <div>
@@ -456,7 +454,7 @@ const App = ({
         onMouseLeave={() => setShowValue(false)}
       >
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             Total Value In {totalValueShower.currencyName()}
           </CardTitle>
           <div className="flex space-x-2">
@@ -473,7 +471,7 @@ const App = ({
               <path
                 d="M904.8 167.771429l-48.457143-48.457143a9.177143 9.177143 0 0 0-12.914286 0L119.2 843.314286a9.177143 9.177143 0 0 0 0 12.914285l48.457143 48.457143c3.542857 3.542857 9.371429 3.542857 12.914286 0L904.685714 180.571429c3.657143-3.428571 3.657143-9.257143 0.114286-12.8zM274.285714 438.857143c90.742857 0 164.571429-73.828571 164.571429-164.571429s-73.828571-164.571429-164.571429-164.571428-164.571429 73.828571-164.571428 164.571428 73.828571 164.571429 164.571428 164.571429z m0-246.857143c45.371429 0 82.285714 36.914286 82.285715 82.285714s-36.914286 82.285714-82.285715 82.285715-82.285714-36.914286-82.285714-82.285715 36.914286-82.285714 82.285714-82.285714z m475.428572 393.142857c-90.742857 0-164.571429 73.828571-164.571429 164.571429s73.828571 164.571429 164.571429 164.571428 164.571429-73.828571 164.571428-164.571428-73.828571-164.571429-164.571428-164.571429z m0 246.857143c-45.371429 0-82.285714-36.914286-82.285715-82.285714s36.914286-82.285714 82.285715-82.285715 82.285714 36.914286 82.285714 82.285715-36.914286 82.285714-82.285714 82.285714z"
                 p-id="4221"
-                fill="#515151"
+                fill="currentColor"
               ></path>
             </svg>
             <svg
@@ -496,34 +494,42 @@ const App = ({
           </div>
         </CardHeader>
         <CardContent>
-          {loadingWrapper(
-            totalValueLoading,
-            <div className="text-2xl font-bold">{totalValueShower.formatTotalValue()}</div>,
-            "w-[80%] h-[32px]"
-          )}
-          {loadingWrapper(
-            totalValueLoading,
-            <p className="text-xs text-muted-foreground mb-2">
-              <span
-                className={changePercentageColorClass(
-                  totalValueShower,
-                  totalValue,
-                  firstTotalValue
-                )}
-              >
-                {changedValueOrPercentage}
-              </span>{" "}
-              from {firstDate}
-            </p>,
-            "w-[60%] h-[16px] mt-2"
-          )}
+          <div className="text-xl font-semibold">{totalValueShower.formatTotalValue()}</div>
+          <p className="text-xs text-muted-foreground mb-2">
+            <span
+              className={changePercentageColorClass(
+                totalValueShower,
+                totalValue,
+                firstTotalValue
+              )}
+            >
+              {changedValueOrPercentage}
+            </span>{" "}
+            from {firstDate}
+          </p>
           <div className="h-30">
-            {loadingWrapper(
-              chartLoading,
-              <Line options={options as any} data={lineData()} />,
-              "mt-[19.5px] h-[18px]",
-              4
-            )}
+            <Line
+              options={options as any}
+              data={lineDataMemo}
+              plugins={[
+                {
+                  id: "gradientFill",
+                  beforeDraw(chart: any) {
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) return;
+                    chart.data.datasets.forEach((ds: any) => {
+                      if (ds.fill) {
+                        ds.backgroundColor = createGradientFill(
+                          ctx,
+                          chartArea,
+                          lineColor
+                        );
+                      }
+                    });
+                  },
+                },
+              ]}
+            />
           </div>
         </CardContent>
       </Card>

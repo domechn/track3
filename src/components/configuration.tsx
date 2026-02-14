@@ -10,7 +10,6 @@ import {
   updateAllCurrencyRates,
 } from "@/middlelayers/configuration";
 import { useToast } from "@/components/ui/use-toast";
-import DeleteIcon from "@/assets/icons/delete-icon.png";
 import {
   Analyzer,
   GlobalConfig,
@@ -18,7 +17,6 @@ import {
 } from "@/middlelayers/datafetch/types";
 import { CurrencyRateDetail } from "@/middlelayers/types";
 import { listAllCurrencyRates } from "@/middlelayers/configuration";
-import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -43,7 +41,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CexAnalyzer } from "@/middlelayers/datafetch/coins/cex/cex";
-import { MagnifyingGlassIcon, ReloadIcon, UpdateIcon } from "@radix-ui/react-icons";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  ReloadIcon,
+  TrashIcon,
+  UpdateIcon,
+} from "@radix-ui/react-icons";
 import { BTCAnalyzer } from "@/middlelayers/datafetch/coins/btc";
 import { DOGEAnalyzer } from "@/middlelayers/datafetch/coins/doge";
 import { SOLAnalyzer } from "@/middlelayers/datafetch/coins/sol";
@@ -70,6 +76,14 @@ import {
   SUPPORT_CONS,
   WALLET_OPTIONS,
 } from "@/middlelayers/constants";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -141,6 +155,7 @@ const querySizeOptions = [
 ];
 
 const defaultBaseCurrency = "USD";
+const CONFIG_LIST_PAGE_SIZE = 30;
 
 const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const { toast } = useToast();
@@ -201,6 +216,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       }
     | undefined
   >(undefined);
+  const [addOtherAmountDraft, setAddOtherAmountDraft] = useState("");
 
   const [currencies, setCurrencies] = useState<CurrencyRateDetail[]>([]);
 
@@ -232,6 +248,12 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       amount: number;
     }[]
   >([]);
+  const [otherAmountDraftMap, setOtherAmountDraftMap] = useState<
+    Record<number, string>
+  >({});
+  const [exchangePage, setExchangePage] = useState(0);
+  const [walletPage, setWalletPage] = useState(0);
+  const [othersPage, setOthersPage] = useState(0);
 
   const preferCurrencyOptions = useMemo(
     () =>
@@ -249,6 +271,54 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     [currencies, preferCurrency]
   );
 
+  const visibleExchanges = useMemo(
+    () => exchanges.filter((e) => e.active || !hideInactive),
+    [exchanges, hideInactive]
+  );
+
+  const visibleWallets = useMemo(
+    () => wallets.filter((w) => w.active || !hideInactive),
+    [wallets, hideInactive]
+  );
+  const exchangePageCount = useMemo(
+    () => Math.max(Math.ceil(visibleExchanges.length / CONFIG_LIST_PAGE_SIZE), 1),
+    [visibleExchanges.length]
+  );
+  const walletPageCount = useMemo(
+    () => Math.max(Math.ceil(visibleWallets.length / CONFIG_LIST_PAGE_SIZE), 1),
+    [visibleWallets.length]
+  );
+  const pagedVisibleExchanges = useMemo(() => {
+    const start = exchangePage * CONFIG_LIST_PAGE_SIZE;
+    return visibleExchanges.slice(start, start + CONFIG_LIST_PAGE_SIZE);
+  }, [visibleExchanges, exchangePage]);
+  const pagedVisibleWallets = useMemo(() => {
+    const start = walletPage * CONFIG_LIST_PAGE_SIZE;
+    return visibleWallets.slice(start, start + CONFIG_LIST_PAGE_SIZE);
+  }, [visibleWallets, walletPage]);
+  const othersPageCount = useMemo(
+    () => Math.max(Math.ceil(others.length / CONFIG_LIST_PAGE_SIZE), 1),
+    [others.length]
+  );
+  const pagedOthers = useMemo(() => {
+    const start = othersPage * CONFIG_LIST_PAGE_SIZE;
+    return others.slice(start, start + CONFIG_LIST_PAGE_SIZE);
+  }, [others, othersPage]);
+  const pagedOthersStartIndex = useMemo(
+    () => othersPage * CONFIG_LIST_PAGE_SIZE,
+    [othersPage]
+  );
+
+  const activeExchangeCount = useMemo(
+    () => exchanges.filter((e) => e.active).length,
+    [exchanges]
+  );
+
+  const activeWalletCount = useMemo(
+    () => wallets.filter((w) => w.active).length,
+    [wallets]
+  );
+
   useEffect(() => {
     loadConfiguration();
     loadSupportedCurrencies();
@@ -259,6 +329,18 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    setExchangePage((prev) => Math.min(prev, exchangePageCount - 1));
+  }, [exchangePageCount]);
+
+  useEffect(() => {
+    setWalletPage((prev) => Math.min(prev, walletPageCount - 1));
+  }, [walletPageCount]);
+
+  useEffect(() => {
+    setOthersPage((prev) => Math.min(prev, othersPageCount - 1));
+  }, [othersPageCount]);
 
   async function loadSupportedCurrencies() {
     const currencies = await listAllCurrencyRates();
@@ -352,7 +434,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     let saveError: Error | undefined;
 
     saveConfiguration(globalConfig)
-      .then(() => onConfigurationSave && onConfigurationSave())
+      .then(() => notifyConfigurationSaved())
       .catch((e) => (saveError = e))
       .finally(() => {
         if (saveError) {
@@ -366,13 +448,25 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function onUpdateCurrencyRatesClick() {
     updateCurrencyRates()
-      .then(() => onConfigurationSave && onConfigurationSave())
+      .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
           description: e.message ?? e,
           variant: "destructive",
         });
       });
+  }
+
+  function notifyConfigurationSaved() {
+    if (!onConfigurationSave) {
+      return;
+    }
+
+    const scrollY = window.scrollY;
+    onConfigurationSave();
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY });
+    });
   }
 
   function convertFormDataToConfigurationData(): GlobalConfig {
@@ -417,6 +511,16 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       ...walletData,
       others,
     };
+  }
+
+  function maskSensitive(val: string) {
+    if (!val) {
+      return "-";
+    }
+    if (val.length <= 8) {
+      return val;
+    }
+    return `${val.slice(0, 4)}...${val.slice(-4)}`;
   }
 
   async function buildLogoMap(
@@ -613,123 +717,174 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       active: boolean;
     }[]
   ) {
-    const renderExchangeItems = () => {
-      return _(exs)
-        .map((ex, idx) => (
-          <Card
-            key={ex.type + ex.apiKey + idx}
-            className="cursor-pointer hover:shadow-lg group"
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
-              <CardTitle className="text-sm font-medium">
-                {cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type}
-              </CardTitle>
-              <div className="flex items-center">
-                {isPro && (
-                  <MagnifyingGlassIcon
-                    className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2 cursor-pointer"
-                    onClick={() => handleQuickLookExchange(ex)}
-                  />
-                )}
-                <img
-                  src={DeleteIcon}
-                  className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
-                  onClick={() => handleRemoveExchange(ex.type, ex.apiKey)}
-                />
-                <img
-                  className="h-4 w-4 text-muted-foreground"
-                  src={getWalletLogo(ex.type)}
-                ></img>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">
-                {ex.alias ?? ex.type + idx}
-              </div>
-              <p className="text-xs text-muted-foreground overflow-ellipsis overflow-hidden text-nowrap">
-                <span>{ex.apiKey}</span>
-              </p>
+    if (exs.length === 0) {
+      return (
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          No exchange found. Add your first CEX API key to start tracking.
+        </div>
+      );
+    }
 
-              <div className="flex items-center justify-end mt-2">
-                <Switch
-                  id="airplane-mode"
-                  checked={ex.active}
-                  onCheckedChange={() =>
-                    handleActiveExchange(ex.type, ex.apiKey)
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
-        ))
-        .value();
-    };
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-        {renderExchangeItems()}
-      </div>
+      <Table className="table-fixed">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[170px]">Exchange</TableHead>
+            <TableHead className="w-[170px]">Alias</TableHead>
+            <TableHead className="w-[220px]">API Key</TableHead>
+            <TableHead className="w-[120px]">Status</TableHead>
+            <TableHead className="w-[84px] text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {exs.map((ex, idx) => (
+            <TableRow
+              key={ex.type + ex.apiKey + idx}
+              className="h-[42px] group align-middle"
+            >
+              <TableCell className="w-[170px]">
+                <div className="flex items-center gap-2 text-sm">
+                  <img
+                    className="w-[18px] h-[18px] rounded-full"
+                    src={getWalletLogo(ex.type)}
+                    alt={ex.type}
+                  />
+                  <span className="truncate">
+                    {cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="w-[170px] text-sm">
+                {ex.alias || `${ex.type}-${idx + 1}`}
+              </TableCell>
+              <TableCell className="w-[220px] text-xs text-muted-foreground">
+                <p className="truncate">{maskSensitive(ex.apiKey)}</p>
+              </TableCell>
+              <TableCell className="w-[120px]">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={ex.active}
+                    onCheckedChange={() => handleActiveExchange(ex.type, ex.apiKey)}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {ex.active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="w-[84px] text-right">
+                <div className="inline-flex w-[64px] items-center justify-end gap-1">
+                  {isPro && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={() => handleQuickLookExchange(ex)}
+                      title="Quick look"
+                    >
+                      <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => handleRemoveExchange(ex.type, ex.apiKey)}
+                    title="Delete"
+                  >
+                    <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     );
   }
 
   function renderWalletForm(
     ws: { type: string; alias?: string; address: string; active: boolean }[]
   ) {
-    const renderWalletItems = () => {
-      return _(ws)
-        .map((w, idx) => {
-          return (
-            <Card
+    if (ws.length === 0) {
+      return (
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          No wallet found. Add your first wallet address to start tracking.
+        </div>
+      );
+    }
+
+    return (
+      <Table className="table-fixed">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[140px]">Wallet</TableHead>
+            <TableHead className="w-[170px]">Alias</TableHead>
+            <TableHead className="w-[320px]">Address</TableHead>
+            <TableHead className="w-[120px]">Status</TableHead>
+            <TableHead className="w-[84px] text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {ws.map((w, idx) => (
+            <TableRow
               key={w.type + w.address + idx}
-              className="cursor-pointer hover:shadow-lg group"
+              className="h-[42px] group align-middle"
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
-                <CardTitle className="text-sm font-medium">
-                  {w.type.toUpperCase()}
-                </CardTitle>
-                <div className="flex items-center">
-                  {isPro && (
-                    <MagnifyingGlassIcon
-                      className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2 cursor-pointer"
-                      onClick={() => handleQuickLookWallet(w)}
-                    />
-                  )}
-                  <img
-                    src={DeleteIcon}
-                    className="h-4 w-4 text-muted-foreground hidden group-hover:inline-block mr-2"
-                    onClick={() => handleRemoveWallet(w.type, w.address)}
-                  />
+              <TableCell className="w-[140px]">
+                <div className="flex items-center gap-2 text-sm">
                   <img
                     src={getWalletLogo(w.type)}
-                    className="h-4 w-4 text-muted-foreground mr-2"
+                    className="w-[18px] h-[18px] rounded-full"
+                    alt={w.type}
                   />
+                  <span>{w.type.toUpperCase()}</span>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">
-                  {w.alias ?? w.type + idx}
-                </div>
-                <p className="text-xs text-muted-foreground overflow-ellipsis overflow-hidden">
-                  <span>{w.address}</span>
-                </p>
-                <div className="flex items-center justify-end">
+              </TableCell>
+              <TableCell className="w-[170px] text-sm">
+                {w.alias || `${w.type}-${idx + 1}`}
+              </TableCell>
+              <TableCell className="w-[320px] text-xs text-muted-foreground">
+                <p className="truncate">{w.address}</p>
+              </TableCell>
+              <TableCell className="w-[120px]">
+                <div className="flex items-center gap-2">
                   <Switch
-                    id="airplane-mode"
                     checked={w.active}
-                    onCheckedChange={() =>
-                      handleActiveWallet(w.type, w.address)
-                    }
+                    onCheckedChange={() => handleActiveWallet(w.type, w.address)}
                   />
+                  <span className="text-xs text-muted-foreground">
+                    {w.active ? "Active" : "Inactive"}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })
-        .value();
-    };
-    return (
-      <div className="grid gap-4 sm:grid-cols-1 xl:grid-cols-1">
-        {renderWalletItems()}
-      </div>
+              </TableCell>
+              <TableCell className="w-[84px] text-right">
+                <div className="inline-flex w-[64px] items-center justify-end gap-1">
+                  {isPro && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={() => handleQuickLookWallet(w)}
+                      title="Quick look"
+                    >
+                      <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => handleRemoveWallet(w.type, w.address)}
+                    title="Delete"
+                  >
+                    <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     );
   }
 
@@ -740,11 +895,60 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     }
   }, [formChanged, hideInactive, groupUSD, exchanges, wallets, others]);
 
-  function handleOthersChange(idx: number, key: string, val: string) {
-    const nos = _.set(others, [idx, key], val);
-    setOthers([...nos]);
+  function handleOthersChange(
+    idx: number,
+    key: "alias" | "symbol" | "amount",
+    val: string
+  ) {
+    setOthers((prev) =>
+      prev.map((item, i) => {
+        if (i !== idx) {
+          return item;
+        }
+        if (key === "amount") {
+          const parsed = Number(val);
+          return {
+            ...item,
+            amount: Number.isNaN(parsed) ? 0 : parsed,
+          };
+        }
+        return {
+          ...item,
+          [key]: val,
+        };
+      })
+    );
     // mark form is changed
     markFormChanged();
+  }
+
+  function parseAmountInput(raw: string): number {
+    if (!raw.trim()) {
+      return 0;
+    }
+    const parsed = Number(raw);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function handleOtherAmountInputChange(idx: number, val: string) {
+    setOtherAmountDraftMap((prev) => ({
+      ...prev,
+      [idx]: val,
+    }));
+  }
+
+  function commitOtherAmountInput(idx: number) {
+    const draft = otherAmountDraftMap[idx];
+    if (draft === undefined) {
+      return;
+    }
+
+    handleOthersChange(idx, "amount", `${parseAmountInput(draft)}`);
+    setOtherAmountDraftMap((prev) => {
+      const next = { ...prev };
+      delete next[idx];
+      return next;
+    });
   }
 
   function onQuerySizeChanged(val: string) {
@@ -753,7 +957,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
     // save to db directly
     saveQuerySize(newVal)
-      .then(() => onConfigurationSave && onConfigurationSave())
+      .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
           description: e.message ?? e,
@@ -767,7 +971,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     // mark form is changed
 
     savePreferCurrency(val)
-      .then(() => onConfigurationSave && onConfigurationSave())
+      .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
           description: e.message ?? e,
@@ -777,46 +981,88 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   }
 
   function renderOthersForm(
-    vals: { alias?: string; symbol: string; amount: number }[]
+    vals: { alias?: string; symbol: string; amount: number }[],
+    startIndex = 0
   ) {
-    return _(vals)
-      .map((o, idx) => (
-        <div key={"other" + idx} className="grid gap-4 grid-cols-4">
-          <Input
-            type="text"
-            name="alias"
-            placeholder="alias, e.g. main wallet"
-            value={o.alias ?? ""}
-            className="w-15"
-            autoComplete="off"
-            onChange={(e) => handleOthersChange(idx, "alias", e.target.value)}
-          />
-          <Input
-            type="text"
-            name="symbol"
-            placeholder="symbol, e.g. BTC"
-            value={o.symbol}
-            className="w-15"
-            autoComplete="off"
-            onChange={(e) => handleOthersChange(idx, "symbol", e.target.value)}
-          />
-          <Input
-            type="number"
-            name="amount"
-            placeholder="amount"
-            value={o.amount}
-            className="w-30"
-            onChange={(e) => handleOthersChange(idx, "amount", e.target.value)}
-          />
-          <a
-            onClick={() => handleRemoveOther(idx)}
-            className="w-4 h-4 mt-2 cursor-pointer"
-          >
-            <img src={DeleteIcon} alt="delete" />
-          </a>
+    if (vals.length === 0) {
+      return (
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          No custom symbol yet.
         </div>
-      ))
-      .value();
+      );
+    }
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Alias</TableHead>
+            <TableHead>Symbol</TableHead>
+            <TableHead>Amount</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {vals.map((o, idx) => {
+            const globalIdx = startIndex + idx;
+            return (
+            <TableRow
+              key={"other" + globalIdx}
+              className="h-[42px] group align-middle"
+            >
+              <TableCell>
+                <Input
+                  type="text"
+                  name="alias"
+                  placeholder="Main wallet"
+                  value={o.alias ?? ""}
+                  autoComplete="off"
+                  onChange={(e) => handleOthersChange(globalIdx, "alias", e.target.value)}
+                />
+              </TableCell>
+              <TableCell>
+                <Input
+                  type="text"
+                  name="symbol"
+                  placeholder="BTC"
+                  value={o.symbol}
+                  autoComplete="off"
+                  onChange={(e) => handleOthersChange(globalIdx, "symbol", e.target.value)}
+                />
+              </TableCell>
+              <TableCell>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  name="amount"
+                  placeholder="0"
+                  value={otherAmountDraftMap[globalIdx] ?? `${o.amount}`}
+                  onChange={(e) => handleOtherAmountInputChange(globalIdx, e.target.value)}
+                  onBlur={() => commitOtherAmountInput(globalIdx)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
+                />
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => handleRemoveOther(globalIdx)}
+                  title="Delete"
+                >
+                  <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </TableCell>
+            </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    );
   }
 
   function handleRemoveExchange(exchangeType: string, exchangeApiKey: string) {
@@ -866,6 +1112,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function handleAddOther(val: { symbol: string; amount: number }) {
     setOthers([...others, val]);
+    setOtherAmountDraftMap({});
 
     // mark form is changed
     markFormChanged();
@@ -873,6 +1120,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function handleRemoveOther(idx: number) {
     setOthers(_.filter(others, (_, i) => i !== idx));
+    setOtherAmountDraftMap({});
 
     // mark form is changed
     markFormChanged();
@@ -1095,7 +1343,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         onOpenChange={setAddExchangeDialogOpen}
       >
         <DialogTrigger asChild>
-          <Button>Add</Button>
+          <Button variant="outline" size="sm">
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add Exchange
+          </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -1285,7 +1536,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     return (
       <Dialog open={addWalletDialogOpen} onOpenChange={setAddWalletDialogOpen}>
         <DialogTrigger asChild>
-          <Button>Add</Button>
+          <Button variant="outline" size="sm">
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add Wallet
+          </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -1389,9 +1643,13 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       });
       return;
     }
-    handleAddOther(addOtherConfig);
+    handleAddOther({
+      ...addOtherConfig,
+      amount: parseAmountInput(addOtherAmountDraft),
+    });
     // clear
     setAddOtherConfig(undefined);
+    setAddOtherAmountDraft("");
     setAddOtherDialogOpen(false);
   }
 
@@ -1399,7 +1657,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     return (
       <Dialog open={addOtherDialogOpen} onOpenChange={setAddOtherDialogOpen}>
         <DialogTrigger asChild>
-          <Button>Add</Button>
+          <Button variant="outline" size="sm">
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add Symbol
+          </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -1449,12 +1710,16 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               </Label>
               <Input
                 id="amount"
-                type="number"
-                value={addOtherConfig?.amount ?? ""}
+                type="text"
+                inputMode="decimal"
+                value={addOtherAmountDraft}
                 onChange={(e) =>
+                  setAddOtherAmountDraft(e.target.value)
+                }
+                onBlur={() =>
                   setAddOtherConfig({
                     ...(addOtherConfig || defaultOtherConfig),
-                    amount: +e.target.value,
+                    amount: parseAmountInput(addOtherAmountDraft),
                   })
                 }
                 className="col-span-3"
@@ -1477,124 +1742,302 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       <div>
         <h3 className="text-lg font-medium">Configuration</h3>
         <p className="text-sm text-muted-foreground">
-          Configure your exchanges, wallets, others addresses and other general
-          settings.
+          Manage exchanges, wallets, custom symbols, and global preferences.
         </p>
       </div>
-      <Separator />
-      <div className="space-y-5">
-        <div className="text-l font-bold text-left">General</div>
-        <div className="flex items-center space-x-2 mb-2">
-          <Checkbox
-            id="groupUSD"
-            checked={groupUSD}
-            onCheckedChange={(v) => onGroupUSDSelectChange(!!v)}
-          />
-          <Label
-            htmlFor="groupUSD"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-          >
-            Group Stable Coins into USDT ( e.g. USDC, TUSD, DAI etc.)
-          </Label>
-        </div>
-        <div className="flex items-center space-x-2 mb-2">
-          <Checkbox
-            id="hideInactive"
-            checked={hideInactive}
-            onCheckedChange={(v) => onHideInactiveSelectChange(!!v)}
-          />
-          <Label
-            htmlFor="hideInactive"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-          >
-            Hide Inactive Wallets and Exchanges
-          </Label>
-        </div>
-        <div className="space-y-2">
-          <div className="text-sm font-bold text-left">Count of Results</div>
-          <Select onValueChange={onQuerySizeChanged} value={querySize + ""}>
-            <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Configure QuerySize" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Size</SelectLabel>
-                {querySizeOptions.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <div className="text-sm font-bold text-left">Base Currency</div>
-          <div className="flex space-x-2 items-center">
-            <Select
-              onValueChange={onPreferCurrencyChanged}
-              value={preferCurrency}
-            >
-              <SelectTrigger className="w-[300px]">
-                <SelectValue placeholder="Configure Prefer Currency" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectLabel>Prefer Currency</SelectLabel>
-                  {preferCurrencyOptions.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <UpdateIcon
-                    className={`mr-2 h-4 w-4 cursor-pointer ${
-                      refreshCurrencyLoading && "animate-spin"
-                    }`}
-                    onClick={onUpdateCurrencyRatesClick}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Refresh Currency Rates</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
 
-            {preferredCurrencyDetail &&
-              preferCurrency !== defaultBaseCurrency && (
-                <div className="text-muted-foreground text-sm">
-                  {`1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
-                    preferredCurrencyDetail.rate
-                  )} ${preferredCurrencyDetail.currency}`}
-                </div>
-              )}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Exchanges
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-semibold">{exchanges.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {activeExchangeCount} active
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Wallets
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-semibold">{wallets.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {activeWalletCount} active
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Custom Symbols
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-semibold">{others.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Manual balance entries
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Base Currency
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-semibold">{preferCurrency}</div>
+            <p className="text-xs text-muted-foreground">Current quote base</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            General
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="groupUSD"
+              checked={groupUSD}
+              onCheckedChange={(v) => onGroupUSDSelectChange(!!v)}
+            />
+            <Label htmlFor="groupUSD" className="text-sm">
+              Group stable coins into USDT (USDC, TUSD, DAI...)
+            </Label>
           </div>
-        </div>
-      </div>
-      <Separator />
-      <div className="space-y-2">
-        <div className="text-l font-bold text-left">Exchanges</div>
-        {renderAddExchangeForm()}
-        {renderExchangeForm(exchanges.filter((e) => e.active || !hideInactive))}
-      </div>
-      <Separator />
-      <div className="space-y-2">
-        <div className="text-l font-bold text-left">Wallets</div>
-        {renderAddWalletForm()}
-        {renderWalletForm(wallets.filter((w) => w.active || !hideInactive))}
-      </div>
-      <Separator />
-      <div className="space-y-2">
-        {/* fixme: data misses when updated */}
-        <div className="text-l font-bold text-left">Others</div>
-        {renderAddOtherForm()}
-        {renderOthersForm(others)}
-      </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="hideInactive"
+              checked={hideInactive}
+              onCheckedChange={(v) => onHideInactiveSelectChange(!!v)}
+            />
+            <Label htmlFor="hideInactive" className="text-sm">
+              Hide inactive exchanges and wallets
+            </Label>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-muted-foreground">
+                Count of Results
+              </div>
+              <Select onValueChange={onQuerySizeChanged} value={querySize + ""}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Query size" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Size</SelectLabel>
+                    {querySizeOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-muted-foreground">
+                Base Currency
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  onValueChange={onPreferCurrencyChanged}
+                  value={preferCurrency}
+                >
+                  <SelectTrigger className="w-[280px]">
+                    <SelectValue placeholder="Prefer currency" />
+                  </SelectTrigger>
+                  <SelectContent className="overflow-y-auto max-h-[20rem]">
+                    <SelectGroup>
+                      <SelectLabel>Prefer Currency</SelectLabel>
+                      {preferCurrencyOptions.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={onUpdateCurrencyRatesClick}
+                      >
+                        <UpdateIcon
+                          className={`h-4 w-4 ${
+                            refreshCurrencyLoading ? "animate-spin" : ""
+                          }`}
+                        />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Refresh currency rates</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              {preferredCurrencyDetail &&
+                preferCurrency !== defaultBaseCurrency && (
+                  <p className="text-xs text-muted-foreground">
+                    {`1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
+                      preferredCurrencyDetail.rate
+                    )} ${preferredCurrencyDetail.currency}`}
+                  </p>
+                )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Exchanges
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {visibleExchanges.length} shown / {exchanges.length} total
+              </p>
+            </div>
+            {renderAddExchangeForm()}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {renderExchangeForm(pagedVisibleExchanges)}
+          {visibleExchanges.length > CONFIG_LIST_PAGE_SIZE ? (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExchangePage((prev) => Math.max(prev - 1, 0))}
+                disabled={exchangePage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {exchangePage + 1} / {exchangePageCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setExchangePage((prev) =>
+                    Math.min(prev + 1, exchangePageCount - 1)
+                  )
+                }
+                disabled={exchangePage >= exchangePageCount - 1}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Wallets
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {visibleWallets.length} shown / {wallets.length} total
+              </p>
+            </div>
+            {renderAddWalletForm()}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {renderWalletForm(pagedVisibleWallets)}
+          {visibleWallets.length > CONFIG_LIST_PAGE_SIZE ? (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWalletPage((prev) => Math.max(prev - 1, 0))}
+                disabled={walletPage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {walletPage + 1} / {walletPageCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setWalletPage((prev) => Math.min(prev + 1, walletPageCount - 1))
+                }
+                disabled={walletPage >= walletPageCount - 1}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Others
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Add manual holdings not covered by APIs
+              </p>
+            </div>
+            {renderAddOtherForm()}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {renderOthersForm(pagedOthers, pagedOthersStartIndex)}
+          {others.length > CONFIG_LIST_PAGE_SIZE ? (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOthersPage((prev) => Math.max(prev - 1, 0))}
+                disabled={othersPage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {othersPage + 1} / {othersPageCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setOthersPage((prev) => Math.min(prev + 1, othersPageCount - 1))
+                }
+                disabled={othersPage >= othersPageCount - 1}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 };

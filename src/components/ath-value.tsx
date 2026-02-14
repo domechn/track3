@@ -6,15 +6,13 @@ import {
   TotalValueData,
 } from "@/middlelayers/types";
 import _ from "lodash";
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { loadingWrapper } from "@/lib/loading";
 import { queryMaxTotalValue, queryTotalValue } from "@/middlelayers/charts";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { timeToDateStr } from "@/utils/date";
-import { positiveNegativeColor } from "@/utils/color";
-import { cn } from "@/lib/utils";
-import React from "react";
+import { positiveNegativeTextClass } from "@/utils/color";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const App = ({
   dateRange,
@@ -25,8 +23,6 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
-  const [loading, setLoading] = useState(false);
-  const [initialLoaded, setInitialLoaded] = useState(false);
   const [maxTotalValueData, setMaxTotalValueData] = useState<MaxTotalValueData>(
     {
       uuid: "",
@@ -37,23 +33,18 @@ const App = ({
   const [totalValueData, setTotalValueData] = useState<TotalValueData>({
     totalValue: 0,
   });
+  const { reportLoaded } = useContext(OverviewLoadingContext);
 
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
-    setLoading(val);
-  }
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
 
   useEffect(() => {
-    loadData(dateRange).then(() => {
-      setInitialLoaded(true);
-    });
-  }, [dateRange]);
+    loadData(dateRange);
+  }, [rangeKey]);
 
   async function loadData(dt: TDateRange) {
-    updateLoading(true);
-
     try {
       const [mtv, tv] = await Promise.all([
         queryMaxTotalValue(dt),
@@ -62,7 +53,7 @@ const App = ({
       setMaxTotalValueData(mtv);
       setTotalValueData(tv);
     } finally {
-      updateLoading(false);
+      reportLoaded();
     }
   }
 
@@ -76,83 +67,72 @@ const App = ({
       100
     );
   }, [totalValueData, maxTotalValueData]);
-
-  const needBreakTotalValueLine = useMemo(
+  const currentTotalValueText = useMemo(
     () =>
-      currencyWrapper(currency)(totalValueData.totalValue) >= 10 ** 8 ||
-      currencyWrapper(currency)(maxTotalValueData.totalValue) >= 10 ** 8,
-    [currency, totalValueData, maxTotalValueData]
+      currency.symbol +
+      prettyNumberToLocaleString(
+        currencyWrapper(currency)(totalValueData.totalValue)
+      ),
+    [currency, totalValueData]
   );
-
-  const MaxTotalValueView = React.memo(() => {
-    return (
-      <div
-        className={cn(
-          "grid gap-2 grid-cols-2",
-          needBreakTotalValueLine ? "" : "md:grid-cols-4"
-        )}
-      >
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            Current Total Value
-          </div>
-          <div className="text-xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-            {currency.symbol +
-              prettyNumberToLocaleString(
-                currencyWrapper(currency)(totalValueData.totalValue)
-              )}
-          </div>
-        </div>
-        {/* todo: jump to historical data record, when user clicks ath */}
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">ATH Total Value</div>
-          <div className="text-xl font-bold overflow-hidden whitespace-nowrap overflow-ellipsis">
-            {currency.symbol +
-              prettyNumberToLocaleString(
-                currencyWrapper(currency)(maxTotalValueData.totalValue)
-              )}
-          </div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">ATH Date</div>
-          <div className="text-xl font-bold">
-            {timeToDateStr(maxTotalValueData.date)}
-          </div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            <div>% from ATH</div>
-          </div>
-          <div
-            className={`text-xl text-${positiveNegativeColor(
-              percentageFromATH,
-              quoteColor
-            )}-700 font-bold`}
-          >
-            {percentageFromATH.toFixed(2)}%
-          </div>
-        </div>
-      </div>
-    );
-  });
+  const athTotalValueText = useMemo(
+    () =>
+      currency.symbol +
+      prettyNumberToLocaleString(
+        currencyWrapper(currency)(maxTotalValueData.totalValue)
+      ),
+    [currency, maxTotalValueData]
+  );
 
   return (
     <Card>
       <CardHeader className="space-y-0 pb-2">
-        <CardTitle>
-          <div className="col-span-2 text-sm font-medium font-bold">
-            All Time High
-          </div>
+        <CardTitle className="text-xs font-medium text-muted-foreground">
+          All Time High
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="mt-2">
-          {loadingWrapper(
-            loading,
-            <MaxTotalValueView />,
-            "mt-[16px] h-[24px]",
-            2
-          )}
+          <div className="space-y-3">
+            <div className="space-y-1 pb-2 border-b border-border/40">
+              <div className="text-[11px] text-muted-foreground">
+                Current Total Value
+              </div>
+              <div
+                className="text-sm md:text-base font-semibold tabular-nums whitespace-nowrap overflow-x-auto leading-snug"
+                title={currentTotalValueText}
+              >
+                {currentTotalValueText}
+              </div>
+            </div>
+            <div className="space-y-1 pb-2 border-b border-border/40">
+              <div className="text-[11px] text-muted-foreground">ATH Total Value</div>
+              <div
+                className="text-sm md:text-base font-semibold tabular-nums whitespace-nowrap overflow-x-auto leading-snug"
+                title={athTotalValueText}
+              >
+                {athTotalValueText}
+              </div>
+            </div>
+            <div className="space-y-1 pb-2 border-b border-border/40">
+              <div className="text-[11px] text-muted-foreground">ATH Date</div>
+              <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
+                {timeToDateStr(maxTotalValueData.date)}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-[11px] text-muted-foreground">% from ATH</div>
+              <div
+                className={`text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto ${positiveNegativeTextClass(
+                  percentageFromATH,
+                  quoteColor,
+                  700
+                )}`}
+              >
+                {percentageFromATH.toFixed(2)}%
+              </div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -1,7 +1,4 @@
-import _ from "lodash";
-import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
-import { getVersion } from "@/utils/app";
 import {
   cleanLicense,
   getLicenseIfIsPro,
@@ -11,6 +8,7 @@ import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { LicenseCenter } from "@/middlelayers/license";
 import { useToast } from "@/components/ui/use-toast";
@@ -25,6 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
+import { getVersion } from "@/utils/app";
 
 const App = ({
   onProStatusChange,
@@ -33,7 +32,6 @@ const App = ({
 }) => {
   const { toast } = useToast();
   const [version, setVersion] = useState<string>("0.1.0");
-
   const [activeLicense, setActiveLicense] = useState<string | undefined>();
   const [inputLicense, setInputLicense] = useState<string | undefined>();
   const [showLicense, setShowLicense] = useState(false);
@@ -46,9 +44,7 @@ const App = ({
   }, []);
 
   function loadVersion() {
-    getVersion().then((ver) => {
-      setVersion(ver);
-    });
+    getVersion().then(setVersion);
   }
 
   function loadLicense() {
@@ -58,17 +54,38 @@ const App = ({
     });
   }
 
+  async function inactiveDevice(license: string) {
+    const inactiveRes = await LicenseCenter.getInstance().inactiveLicense(license);
+    if (!inactiveRes.success) {
+      throw new Error(inactiveRes.error ?? "Inactive device failed");
+    }
+    await cleanLicense();
+    onProStatusChange(false);
+  }
+
+  async function activeDevice(license: string) {
+    const validRes = await LicenseCenter.getInstance().validateLicense(license);
+    if (!validRes.isValid) {
+      throw new Error("Invalid License Key");
+    }
+    const activeRes = await LicenseCenter.getInstance().activeLicense(license);
+    if (!activeRes.success) {
+      throw new Error(activeRes.error ?? "Active License Failed");
+    }
+    await saveLicense(license);
+    onProStatusChange(true);
+  }
+
   function onSaveLicenseClick() {
     if (!inputLicense) {
       return;
     }
     setSaveLicenseLoading(true);
-
     activeDevice(inputLicense)
       .then(() => {
         setActiveLicense(inputLicense);
         toast({
-          description: "License Key Saved",
+          description: "License key saved",
         });
       })
       .catch((err) => {
@@ -83,7 +100,6 @@ const App = ({
   }
 
   function onInactiveLicenseClick() {
-    // sleep 3s
     if (!activeLicense) {
       return;
     }
@@ -93,7 +109,7 @@ const App = ({
         setActiveLicense(undefined);
         setInputLicense(undefined);
         toast({
-          description: "Device Is Inactived",
+          description: "Device is inactived",
         });
       })
       .catch((err) => {
@@ -107,132 +123,127 @@ const App = ({
       });
   }
 
-  async function inactiveDevice(license: string) {
-    const inactiveRes = await LicenseCenter.getInstance().inactiveLicense(
-      license
-    );
-
-    if (!inactiveRes.success) {
-      throw new Error(inactiveRes.error ?? "Inactive device failed");
-    }
-
-    await cleanLicense();
-    onProStatusChange(false);
-  }
-
-  async function activeDevice(license: string) {
-    const validRes = await LicenseCenter.getInstance().validateLicense(license);
-    if (!validRes.isValid) {
-      throw new Error("Invalid License Key");
-    }
-    const activeRes = await LicenseCenter.getInstance().activeLicense(license);
-    if (!activeRes.success) {
-      throw new Error(activeRes.error ?? "Active License Failed");
-    }
-
-    await saveLicense(license);
-    onProStatusChange(true);
-  }
-
-  function onLicenseInputChange(val: string) {
-    setInputLicense(val);
-  }
-
-  function onViewOrHideClick() {
-    setShowLicense(!showLicense);
-  }
-
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-medium">System Info</h3>
         <p className="text-sm text-muted-foreground">
-          Show basic system information
+          View app version and manage Pro license state.
         </p>
       </div>
-      <Separator />
 
-      <div className="space-y-3">
-        <div className="text-l font-bold text-left">Version</div>
-        <div className="text-sm text-left text-gray-400">{version}</div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              App Version
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-semibold">{version}</div>
+            <p className="text-xs text-muted-foreground">Current installed build</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pro Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-semibold">
+              {activeLicense ? "Activated" : "Not Activated"}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {activeLicense ? "License already bound to this device" : "Enter a license key to activate Pro"}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="space-y-3">
-        <div className="text-l font-bold text-left">Pro Version</div>
-        <div className="text-sm text-left text-gray-400">
-          Enter License Key To Active Pro Version ({" "}
-          <a
-            href="https://track3.notion.site/How-to-get-license-key-by-free-a5e0e39614f54a06ab19ca5aaed58404?pvs=4"
-            target="_blank"
-            className="text-blue-500 underline"
-          >
-            How to get free license key?
-          </a>{" "}
-          )
-        </div>
-        <div className="flex space-x-2">
-          <Input
-            id="license"
-            autoComplete="off"
-            value={inputLicense ?? ""}
-            type={showLicense ? "text" : "password"}
-            onChange={(e) => onLicenseInputChange(e.target.value)}
-            placeholder="License Key"
-            className="w-[400px]"
-            disabled={!!activeLicense}
-          />
-          <a
-            onClick={onViewOrHideClick}
-            className={activeLicense || inputLicense ? "" : " hidden"}
-          >
-            <img
-              className="view-or-hide-icon mt-1"
-              src={showLicense ? ViewIcon : HideIcon}
-              alt="view-or-hide"
-              width={25}
-              height={25}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Pro License
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Enter your license key to activate Pro.{" "}
+            <a
+              href="https://track3.notion.site/How-to-get-license-key-by-free-a5e0e39614f54a06ab19ca5aaed58404?pvs=4"
+              target="_blank"
+              className="underline"
+            >
+              How to get free license key?
+            </a>
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              id="license"
+              autoComplete="off"
+              value={inputLicense ?? ""}
+              type={showLicense ? "text" : "password"}
+              onChange={(e) => setInputLicense(e.target.value)}
+              placeholder="License Key"
+              className="w-full max-w-[520px]"
+              disabled={!!activeLicense}
             />
-          </a>
-          <Button
-            onClick={onSaveLicenseClick}
-            disabled={saveLicenseLoading}
-            className={activeLicense ? "hidden" : "flex"}
-          >
-            {saveLicenseLoading && (
-              <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Active
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="destructive"
-                className={activeLicense ? "flex" : "hidden"}
-                disabled={inactiveLicenseLoading}
-              >
-                {inactiveLicenseLoading && (
-                  <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Inactive
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={onInactiveLicenseClick}>
-                  Confirm
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowLicense(!showLicense)}
+              className={activeLicense || inputLicense ? "" : "hidden"}
+            >
+              <img
+                className="view-or-hide-icon"
+                src={showLicense ? ViewIcon : HideIcon}
+                alt="view-or-hide"
+                width={18}
+                height={18}
+              />
+            </Button>
+            <Button
+              onClick={onSaveLicenseClick}
+              disabled={saveLicenseLoading}
+              className={activeLicense ? "hidden" : "inline-flex"}
+            >
+              {saveLicenseLoading && (
+                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Activate
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  className={activeLicense ? "inline-flex" : "hidden"}
+                  disabled={inactiveLicenseLoading}
+                >
+                  {inactiveLicenseLoading && (
+                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Inactivate
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Inactivate this device?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Current license binding on this device will be removed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onInactiveLicenseClick}>
+                    Confirm
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

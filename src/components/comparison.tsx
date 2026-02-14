@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import _ from "lodash";
+import bluebird from "bluebird";
 import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
+import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -11,6 +13,9 @@ import {
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
 import { parseDateToTS } from "@/utils/date";
+import { getImageApiPath } from "@/utils/app";
+import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
+import { downloadCoinLogos } from "@/middlelayers/data";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import {
   Select,
@@ -21,26 +26,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "./ui/table";
-import { loadingWrapper } from "@/lib/loading";
-import { Skeleton } from "./ui/skeleton";
 import { positiveNegativeColor } from "@/utils/color";
+import { StaggerContainer, FadeUp } from "./motion";
+import { Card, CardContent } from "./ui/card";
 
-type ComparisonData = {
-  name: string;
-  type: "price" | "amount" | "value";
+type MetricRow = {
   base: number;
   head: number;
+  changePercent: number;
+};
+
+type CoinComparison = {
+  symbol: string;
+  amount: MetricRow;
+  price: MetricRow;
+  value: MetricRow;
 };
 
 type QuickCompareType = "7D" | "1M" | "1Y" | "YTD" | "ALL";
+
+type DateOption = {
+  label: string;
+  value: string;
+};
 
 const App = ({
   currency,
@@ -49,126 +57,223 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
-  const [selectDatesLoading, setSelectDatesLoading] = useState<boolean>(false);
-  const [dataLoading, setDataLoading] = useState<boolean>(true);
+  const [pageLoading, setPageLoading] = useState(true);
+  const loadGenRef = useRef(0);
 
   const [baseId, setBaseId] = useState<string>("");
-  const [dateOptions, setDateOptions] = useState<
-    {
-      label: string;
-      value: string;
-    }[]
-  >([]);
-
+  const [headId, setHeadId] = useState<string>("");
+  const [prevSelection, setPrevSelection] = useState({
+    baseId: "",
+    headId: "",
+  });
+  const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
   const [currentQuickCompare, setCurrentQuickCompare] =
     useState<QuickCompareType | null>(null);
-
-  const baseDate = useMemo(() => {
-    return _.find(dateOptions, { value: "" + baseId })?.label;
-  }, [dateOptions, baseId]);
-  const [headId, setHeadId] = useState<string>("");
-  const headDate = useMemo(() => {
-    return _.find(dateOptions, { value: "" + headId })?.label;
-  }, [dateOptions, headId]);
 
   const [baseData, setBaseData] = useState<Asset[]>([]);
   const [headData, setHeadData] = useState<Asset[]>([]);
 
-  const [shouldMaskValue, setShowDetail] = useState<boolean>(false);
+  const [shouldMaskValue, setShouldMaskValue] = useState<boolean>(false);
+  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+  const downloadedLogosRef = useRef<Set<string>>(new Set());
+  const appCacheDirRef = useRef<string>("");
 
-  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
+  if (prevSelection.baseId !== baseId || prevSelection.headId !== headId) {
+    setPrevSelection({ baseId, headId });
+    setPageLoading(true);
+  }
 
-  const displayData = useMemo(() => {
-    return _(loadData(baseData, headData))
-      .map((d) => {
-        const cmp = prettyComparisonResult(d.type, d.base, d.head);
-        return {
-          name: d.name,
-          type: d.type,
-          base: showColumnVal(d, "base"),
-          head: showColumnVal(d, "head"),
-          cmpPercentage: cmp.cmpPercentage,
-          cmpValue: cmp.cmpValue,
-          color:
-            cmp.cmpPercentage === "-"
-              ? "black"
-              : positiveNegativeColor(
-                  getComparisonResultNumber(d.base, d.head),
-                  quoteColor
-                ),
-        };
-      })
-      .value();
-  }, [baseData, headData, shouldMaskValue]);
+  const baseDate = useMemo(() => {
+    return _.find(dateOptions, { value: baseId })?.label;
+  }, [dateOptions, baseId]);
+
+  const headDate = useMemo(() => {
+    return _.find(dateOptions, { value: headId })?.label;
+  }, [dateOptions, headId]);
 
   useEffect(() => {
-    loadAllSelectDates().then((data) => {
+    let cancelled = false;
+    const gen = ++loadGenRef.current;
+
+    (async () => {
+      const data = await queryAllDataDates();
+      if (cancelled || gen !== loadGenRef.current) {
+        return;
+      }
+
       const options = _(data)
         .map((d) => ({
           label: d.date,
-          value: "" + d.id,
+          value: `${d.id}`,
         }))
         .value();
 
-      // if headDate is not set, set it to the latest date
-      if (!headDate && options.length > 0) {
-        setHeadId(options[0].value);
-      }
-
-      // if baseDate is not set, set it to the second latest date
-      if (!baseDate && options.length > 0) {
-        setBaseId(options[1]?.value || options[0].value);
-      }
-
       setDateOptions(options);
-    });
+      if (options.length === 0) {
+        setBaseId("");
+        setHeadId("");
+        setPageLoading(false);
+        return;
+      }
+
+      setHeadId(options[0].value);
+      setBaseId(options[1]?.value || options[0].value);
+    })()
+      .catch(() => {
+        if (!cancelled && gen === loadGenRef.current) {
+          setDateOptions([]);
+          setBaseData([]);
+          setHeadData([]);
+          setPageLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!baseId) {
+    if (!baseId || !headId) {
       return;
     }
-    loadDataByUUID(baseId).then((data) => setBaseData(data));
-  }, [baseId]);
+
+    let cancelled = false;
+    const gen = ++loadGenRef.current;
+
+    const fallback = setTimeout(() => {
+      if (!cancelled && gen === loadGenRef.current) {
+        setPageLoading(false);
+      }
+    }, 8000);
+
+    Promise.all([loadDataByUUID(baseId), loadDataByUUID(headId)])
+      .then(([nextBaseData, nextHeadData]) => {
+        if (cancelled || gen !== loadGenRef.current) {
+          return;
+        }
+        setBaseData(nextBaseData);
+        setHeadData(nextHeadData);
+        setPageLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled && gen === loadGenRef.current) {
+          setBaseData([]);
+          setHeadData([]);
+          setPageLoading(false);
+        }
+      })
+      .finally(() => clearTimeout(fallback));
+
+    return () => {
+      cancelled = true;
+      clearTimeout(fallback);
+    };
+  }, [baseId, headId]);
+
+  const coinComparisons = useMemo((): CoinComparison[] => {
+    const baseMap = _.keyBy(baseData, "symbol");
+    const headMap = _.keyBy(headData, "symbol");
+    const symbols = _([...baseData, ...headData])
+      .map("symbol")
+      .uniq()
+      .value();
+
+    return symbols.map((symbol) => {
+      const baseItem = baseMap[symbol];
+      const headItem = headMap[symbol];
+
+      const makeRow = (baseVal: number, headVal: number): MetricRow => ({
+        base: baseVal,
+        head: headVal,
+        changePercent: baseVal ? ((headVal - baseVal) / baseVal) * 100 : 0,
+      });
+
+      return {
+        symbol,
+        amount: makeRow(baseItem?.amount || 0, headItem?.amount || 0),
+        price: makeRow(baseItem?.price || 0, headItem?.price || 0),
+        value: makeRow(baseItem?.value || 0, headItem?.value || 0),
+      };
+    });
+  }, [baseData, headData]);
+
+  const totalValue = useMemo(() => {
+    const baseTotal = _(baseData).sumBy("value");
+    const headTotal = _(headData).sumBy("value");
+    return {
+      base: baseTotal,
+      head: headTotal,
+      changePercent: baseTotal ? ((headTotal - baseTotal) / baseTotal) * 100 : 0,
+    };
+  }, [baseData, headData]);
+
+  const symbolsForLogos = useMemo(
+    () => _(coinComparisons).map("symbol").uniq().value(),
+    [coinComparisons]
+  );
 
   useEffect(() => {
-    if (!headId) {
+    if (symbolsForLogos.length === 0) {
       return;
     }
-    loadDataByUUID(headId).then((data) => setHeadData(data));
-  }, [headId]);
 
-  // update quick compare data ( baseId and headId )
+    let cancelled = false;
+    const missingSymbols = symbolsForLogos.filter(
+      (s) => !downloadedLogosRef.current.has(s)
+    );
+
+    if (missingSymbols.length > 0) {
+      missingSymbols.forEach((s) => downloadedLogosRef.current.add(s));
+      downloadCoinLogos(missingSymbols.map((symbol) => ({ symbol, price: 0 })));
+    }
+
+    (async () => {
+      if (!appCacheDirRef.current) {
+        appCacheDirRef.current = await getAppCacheDir();
+      }
+      const kvs = await bluebird.map(symbolsForLogos, async (s) => {
+        const path = await getImageApiPath(appCacheDirRef.current, s);
+        return { [s]: path };
+      });
+
+      if (cancelled) {
+        return;
+      }
+      setLogoMap((prev) => ({ ...prev, ..._.assign({}, ...kvs) }));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [symbolsForLogos]);
+
   useEffect(() => {
-    if (!currentQuickCompare) {
+    if (!currentQuickCompare || dateOptions.length === 0) {
       return;
     }
 
-    // set headId to latest
     const latestDate = dateOptions[0];
     setHeadId(latestDate.value);
 
-    // get days from QuickCompareType
     const days = parseDaysQuickCompareType(currentQuickCompare);
-    const baseDate =
+    const targetBaseDate =
       days >= 0
         ? new Date(parseDateToTS(latestDate.label) - days * 24 * 60 * 60 * 1000)
         : new Date(0);
 
-    // find the closest date
     const closestDate = _(dateOptions)
       .map((d) => ({
         ...d,
-        diff: Math.abs(parseDateToTS(d.label) - baseDate.getTime()),
+        diff: Math.abs(parseDateToTS(d.label) - targetBaseDate.getTime()),
       }))
       .sortBy("diff")
       .first();
 
-    if (!closestDate) {
-      return;
+    if (closestDate) {
+      setBaseId(closestDate.value);
     }
-    setBaseId(closestDate?.value);
-  }, [currentQuickCompare]);
+  }, [currentQuickCompare, dateOptions]);
 
   function parseDaysQuickCompareType(type: QuickCompareType): number {
     switch (type) {
@@ -178,13 +283,14 @@ const App = ({
         return 30;
       case "1Y":
         return 365;
-      case "YTD":
+      case "YTD": {
         const today = new Date();
         const year = today.getFullYear();
         const firstDayOfYear = new Date(year, 0, 1);
         return Math.floor(
           (today.getTime() - firstDayOfYear.getTime()) / (24 * 60 * 60 * 1000)
         );
+      }
       case "ALL":
         return -1;
       default:
@@ -192,27 +298,12 @@ const App = ({
     }
   }
 
-  async function loadAllSelectDates(): Promise<
-    {
-      id: string;
-      date: string;
-    }[]
-  > {
-    setSelectDatesLoading(true);
-    try {
-      const res = await queryAllDataDates();
-      return res;
-    } finally {
-      setSelectDatesLoading(false);
-    }
-  }
-
   function onBaseSelectChange(id: string) {
-    return onSelectChange(id, "base");
+    onSelectChange(id, "base");
   }
 
   function onHeadSelectChange(id: string) {
-    return onSelectChange(id, "head");
+    onSelectChange(id, "head");
   }
 
   function onSelectChange(id: string, type: "base" | "head") {
@@ -225,109 +316,12 @@ const App = ({
   }
 
   function onViewOrHideClick() {
-    setShowDetail(!shouldMaskValue);
-  }
-
-  function loadData(base: Asset[], head: Asset[]): ComparisonData[] {
-    const res: ComparisonData[] = [];
-    const symbols = _([...base, ...head])
-      .map("symbol")
-      .uniq()
-      .value();
-
-    // make total value and amount as the first two items
-    const baseTotal = _(base).sumBy("value");
-    const headTotal = _(head).sumBy("value");
-    if (!_(symbols).isEmpty()) {
-      res.push({
-        name: "Total Value",
-        type: "value",
-        base: baseTotal,
-        head: headTotal,
-      });
-    }
-
-    _(symbols).forEach((symbol) => {
-      const baseItem = _.find(base, { symbol });
-      const headItem = _.find(head, { symbol });
-
-      res.push({
-        name: symbol + " Amount",
-        type: "amount",
-        base: baseItem?.amount || 0,
-        head: headItem?.amount || 0,
-      });
-      res.push({
-        name: symbol + " Price",
-        type: "price",
-        base: baseItem?.price || 0,
-        head: headItem?.price || 0,
-      });
-
-      res.push({
-        name: symbol + " Value",
-        type: "value",
-        base: baseItem?.value || 0,
-        head: headItem?.value || 0,
-      });
-    });
-
-    return res;
+    setShouldMaskValue((prev) => !prev);
   }
 
   async function loadDataByUUID(uuid: string): Promise<Asset[]> {
-    setDataLoading(true);
-    try {
-      const data = await queryCoinDataByUUID(uuid);
-      const reversedData = _(data).sortBy("value").reverse().value();
-
-      const res = _(reversedData).value();
-
-      return res;
-    } finally {
-      setDataLoading(false);
-    }
-  }
-
-  function getComparisonResultNumber(base: number, head: number): number {
-    if (!base || !head) return 0;
-    return ((head - base) / base) * 100;
-  }
-
-  function prettyComparisonResult(
-    type: "price" | "amount" | "value",
-    base: number,
-    head: number
-  ): {
-    cmpPercentage: string;
-    cmpValue: string;
-  } {
-    const per = getComparisonResultNumber(base, head);
-    const perStr = prettyNumberToLocaleString(per < 0 ? -per : per);
-
-    const diff = head - base;
-    const cmpValue = showColumnValByType(type, Math.abs(diff));
-
-    if (perStr === "0.00" || perStr === "-0.00") {
-      return {
-        cmpPercentage: "-",
-        cmpValue: "-",
-      };
-    }
-
-    if (per > 0) {
-      const prefix = "↑ ";
-      return {
-        cmpPercentage: prefix + perStr + "%",
-        cmpValue: prefix + cmpValue,
-      };
-    }
-
-    const prefix = "↓ ";
-    return {
-      cmpPercentage: prefix + perStr + "%",
-      cmpValue: prefix + cmpValue,
-    };
+    const data = await queryCoinDataByUUID(uuid);
+    return _(data).sortBy("value").reverse().value();
   }
 
   function prettyNumber(
@@ -342,191 +336,315 @@ const App = ({
     if (!number) {
       return "-";
     }
+
     let convertedNumber = number;
     if (convertCurrency) {
       convertedNumber = currencyWrapper(currency)(number);
     }
-    let res = "" + convertedNumber;
+
+    let res = `${convertedNumber}`;
     if (type === "price") {
       res = prettyPriceNumberToLocaleString(convertedNumber);
     } else if (type === "amount") {
-      res = "" + prettyNumberKeepNDigitsAfterDecimalPoint(convertedNumber, 8);
+      res = `${prettyNumberKeepNDigitsAfterDecimalPoint(convertedNumber, 8)}`;
     } else if (type === "value") {
       res = prettyNumberToLocaleString(convertedNumber);
     }
+
     if (convertCurrency) {
       return `${currency.symbol} ${res}`;
     }
     return res;
   }
 
-  function showColumnVal(
-    item: ComparisonData,
-    valType: "base" | "head"
-  ): string {
-    return showColumnValByType(item.type, _(item).get(valType));
+  function formatVal(val: number, type: "price" | "amount" | "value"): string {
+    const shouldMask = shouldMaskValue && type !== "price";
+    const shouldConvertCurrency = type === "price" || type === "value";
+    return prettyNumber(val, type, shouldMask, shouldConvertCurrency);
   }
 
-  function showColumnValByType(
-    valType: "price" | "amount" | "value",
-    val: number
-  ) {
-    const shouldMask = shouldMaskValue && valType !== "price";
-    const shouldConvertCurrency = valType === "price" || valType === "value";
-    return prettyNumber(val, valType, shouldMask, shouldConvertCurrency);
+  function formatChangePercent(percent: number): string {
+    const absStr = prettyNumberToLocaleString(Math.abs(percent));
+    if (absStr === "0.00" || absStr === "-0.00") {
+      return "-";
+    }
+    const prefix = percent > 0 ? "↑ " : "↓ ";
+    return prefix + absStr + "%";
+  }
+
+  function formatDeltaValue(
+    diff: number,
+    type: "price" | "amount" | "value"
+  ): string {
+    const prefix = diff > 0 ? "+" : diff < 0 ? "-" : "";
+    const abs = Math.abs(diff);
+    const raw = formatVal(abs, type);
+    if (raw === "-") {
+      return "-";
+    }
+    if (prefix === "") {
+      return raw;
+    }
+    return `${prefix}${raw}`;
+  }
+
+  function changeClass(percent: number): string {
+    const absStr = prettyNumberToLocaleString(Math.abs(percent));
+    if (absStr === "0.00" || absStr === "-0.00") {
+      return "text-muted-foreground";
+    }
+
+    const color = positiveNegativeColor(percent, quoteColor);
+    if (color === "green") {
+      return "text-emerald-500";
+    }
+    if (color === "red") {
+      return "text-rose-500";
+    }
+    return "text-muted-foreground";
   }
 
   function onQuickCompareButtonClick(type: QuickCompareType) {
     setCurrentQuickCompare(type);
   }
 
+  const hasData = coinComparisons.length > 0;
+
   return (
-    <>
-      <div>
-        <div className="flex mb-4 items-center justify-end">
-          <div className="mr-5">
-            <a onClick={onViewOrHideClick}>
-              <img
-                src={shouldMaskValue ? HideIcon : ViewIcon}
-                alt="view-or-hide"
-                width={25}
-                height={25}
-              />
-            </a>
-          </div>
-          <div className="mr-2 text-gray-400 text-m flex items-center">
-            Quick Compare
-          </div>
-          <ButtonGroup
-            value={currentQuickCompare || ""}
-            onValueChange={(val: string) =>
-              onQuickCompareButtonClick(val as QuickCompareType)
-            }
-          >
-            <ButtonGroupItem value="7D">7D</ButtonGroupItem>
-            <ButtonGroupItem value="1M">1M</ButtonGroupItem>
-            <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
-            <ButtonGroupItem value="YTD">YTD</ButtonGroupItem>
-            <ButtonGroupItem value="ALL">ALL</ButtonGroupItem>
-          </ButtonGroup>
-        </div>
-      </div>
-      <div className="grid grid-cols-6 gap-4 mb-5">
-        <div className="col-start-2 col-end-4">
-          {loadingWrapper(
-            selectDatesLoading,
-            <Select onValueChange={onBaseSelectChange} value={baseId}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Base Date" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectLabel>Base Dates</SelectLabel>
-                  {dateOptions.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>,
-            "w-[40%]"
-          )}
-        </div>
-        <div className="col-end-7 col-span-2">
-          {loadingWrapper(
-            selectDatesLoading,
-            <Select onValueChange={onHeadSelectChange} value={headId}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Head Date" />
-              </SelectTrigger>
-              <SelectContent className="overflow-y-auto max-h-[20rem]">
-                <SelectGroup>
-                  <SelectLabel>Head Dates</SelectLabel>
-                  {dateOptions.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>,
-            "w-[40%]"
-          )}
-        </div>
-      </div>
-      <div className="px-10 mb-5">
-        {loadingWrapper(selectDatesLoading, <div></div>, "my-[20px]", 15)}
-        {displayData.length === 0 && (
-          <div className="text-center text-gray-600">No Data</div>
+    <div className="relative min-h-[400px]">
+      <StaggerContainer className="space-y-3">
+        <FadeUp>
+          <Card>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={onViewOrHideClick}
+                    className="cursor-pointer"
+                    aria-label={shouldMaskValue ? "show values" : "hide values"}
+                  >
+                    <img
+                      src={shouldMaskValue ? HideIcon : ViewIcon}
+                      alt="view-or-hide"
+                      width={22}
+                      height={22}
+                    />
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Select onValueChange={onBaseSelectChange} value={baseId}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Base Date" />
+                      </SelectTrigger>
+                      <SelectContent className="overflow-y-auto max-h-[20rem]">
+                        <SelectGroup>
+                          <SelectLabel>Base Dates</SelectLabel>
+                          {dateOptions.map((d) => (
+                            <SelectItem key={d.value} value={d.value}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-muted-foreground text-sm">vs</span>
+                    <Select onValueChange={onHeadSelectChange} value={headId}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Head Date" />
+                      </SelectTrigger>
+                      <SelectContent className="overflow-y-auto max-h-[20rem]">
+                        <SelectGroup>
+                          <SelectLabel>Head Dates</SelectLabel>
+                          {dateOptions.map((d) => (
+                            <SelectItem key={d.value} value={d.value}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-sm">Quick</span>
+                  <ButtonGroup
+                    value={currentQuickCompare || ""}
+                    onValueChange={(val: string) =>
+                      onQuickCompareButtonClick(val as QuickCompareType)
+                    }
+                  >
+                    <ButtonGroupItem value="7D">7D</ButtonGroupItem>
+                    <ButtonGroupItem value="1M">1M</ButtonGroupItem>
+                    <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
+                    <ButtonGroupItem value="YTD">YTD</ButtonGroupItem>
+                    <ButtonGroupItem value="ALL">ALL</ButtonGroupItem>
+                  </ButtonGroup>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </FadeUp>
+
+        {!hasData && !pageLoading && (
+          <FadeUp>
+            <Card>
+              <CardContent className="pt-5">
+                <div className="text-lg text-muted-foreground text-center py-8">
+                  No Data
+                </div>
+              </CardContent>
+            </Card>
+          </FadeUp>
         )}
-        {displayData.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>{baseDate}</TableHead>
-                <TableHead className="text-center">Difference</TableHead>
-                <TableHead className="text-right">{headDate}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dataLoading
-                ? _(5)
-                    .range()
-                    .map((i) => (
-                      <TableRow key={"comparison-loading-" + i}>
-                        {_(4)
-                          .range()
-                          .map((j) => (
-                            <TableCell
-                              key={`comparison-cell-loading-${i}-${j}`}
-                            >
-                              <Skeleton className="my-[10px] h-[20px] w-[100%]" />
-                            </TableCell>
-                          ))
-                          .value()}
-                      </TableRow>
-                    ))
-                    .value()
-                : displayData.map((item, index) => (
-                    <TableRow
-                      key={"comparison" + index}
-                      className={item.type !== "value" ? "border-none" : ""}
-                      onMouseEnter={() => setHoveredRowIndex(index)}
-                      onMouseLeave={() => setHoveredRowIndex(null)}
-                    >
-                      <TableCell className="font-medium max-w-[100px] truncate">
-                        {item.name}
-                      </TableCell>
-                      <TableCell>{item.base}</TableCell>
-                      <TableCell className={`text-${item.color}-500`}>
-                        <div className="h-6 overflow-hidden">
-                          <div
-                            className={`transform transition-all duration-300 ease-in-out ${
-                              hoveredRowIndex === index
-                                ? "-translate-y-6"
-                                : "translate-y-0"
-                            }`}
-                          >
-                            <div className="h-6 flex items-center justify-center">
-                              {item.cmpPercentage}
-                            </div>
-                            <div className="h-6 flex items-center justify-center">
-                              {item.cmpValue}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{item.head}</TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
+
+        {hasData && (
+          <>
+            <FadeUp>
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">
+                    Total Value
+                  </p>
+                  <div className="grid grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-center gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">{baseDate}</p>
+                      <p className="text-xl font-semibold truncate tabular-nums" title={formatVal(totalValue.base, "value")}>
+                        {formatVal(totalValue.base, "value")}
+                      </p>
+                    </div>
+                    <div className="text-center min-w-0">
+                      <p className="text-xs text-muted-foreground">Change</p>
+                      <p className={`text-sm font-semibold tabular-nums truncate ${changeClass(totalValue.changePercent)}`}>
+                        {formatChangePercent(totalValue.changePercent)}
+                      </p>
+                      <p
+                        className={`text-xs tabular-nums truncate ${changeClass(
+                          totalValue.changePercent
+                        )}`}
+                        title={formatDeltaValue(
+                          totalValue.head - totalValue.base,
+                          "value"
+                        )}
+                      >
+                        {formatDeltaValue(totalValue.head - totalValue.base, "value")}
+                      </p>
+                    </div>
+                    <div className="text-right min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">{headDate}</p>
+                      <p className="text-xl font-semibold truncate tabular-nums" title={formatVal(totalValue.head, "value")}>
+                        {formatVal(totalValue.head, "value")}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+
+            <FadeUp>
+              <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+                {coinComparisons.map((coin) => (
+                  <CoinCard
+                    key={coin.symbol}
+                    coin={coin}
+                    logo={logoMap[coin.symbol] || UnknownLogo}
+                    baseDate={baseDate}
+                    headDate={headDate}
+                    formatVal={formatVal}
+                    formatChangePercent={formatChangePercent}
+                    formatDeltaValue={formatDeltaValue}
+                    changeClass={changeClass}
+                  />
+                ))}
+              </div>
+            </FadeUp>
+          </>
         )}
-      </div>
-    </>
+      </StaggerContainer>
+      <div
+        className={`absolute inset-0 z-10 backdrop-blur-md bg-background/60 rounded-lg transition-opacity duration-500 ${
+          pageLoading ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
+    </div>
   );
 };
+
+function CoinCard({
+  coin,
+  logo,
+  baseDate,
+  headDate,
+  formatVal,
+  formatChangePercent,
+  formatDeltaValue,
+  changeClass,
+}: {
+  coin: CoinComparison;
+  logo: string;
+  baseDate?: string;
+  headDate?: string;
+  formatVal: (val: number, type: "price" | "amount" | "value") => string;
+  formatChangePercent: (percent: number) => string;
+  formatDeltaValue: (
+    diff: number,
+    type: "price" | "amount" | "value"
+  ) => string;
+  changeClass: (percent: number) => string;
+}) {
+  const metrics: { label: string; type: "amount" | "price" | "value"; row: MetricRow }[] = [
+    { label: "Amount", type: "amount", row: coin.amount },
+    { label: "Price", type: "price", row: coin.price },
+    { label: "Value", type: "value", row: coin.value },
+  ];
+
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-3">
+        <div className="flex items-center gap-2 mb-3">
+          <img
+            src={logo}
+            alt={coin.symbol}
+            className="w-[18px] h-[18px] rounded-full"
+          />
+          <span className="text-sm font-medium">{coin.symbol}</span>
+        </div>
+
+        <div className="grid grid-cols-[56px_minmax(0,1fr)_96px_minmax(0,1fr)] mb-1 gap-2">
+          <span className="text-xs text-muted-foreground">Metric</span>
+          <span className="text-xs text-muted-foreground truncate">{baseDate}</span>
+          <span className="text-xs text-muted-foreground text-center">Change</span>
+          <span className="text-xs text-muted-foreground text-right truncate">{headDate}</span>
+        </div>
+
+        <div className="space-y-2">
+          {metrics.map((m) => {
+            const baseText = formatVal(m.row.base, m.type);
+            const headText = formatVal(m.row.head, m.type);
+            const diffText = formatDeltaValue(m.row.head - m.row.base, m.type);
+            return (
+              <div key={m.type} className="grid grid-cols-[56px_minmax(0,1fr)_128px_minmax(0,1fr)] items-center gap-3 py-0.5">
+                <div className="text-xs text-muted-foreground">{m.label}</div>
+                <span className="text-sm truncate tabular-nums" title={baseText}>
+                  {baseText}
+                </span>
+                <div className="min-w-0 text-center truncate" title={`${formatChangePercent(m.row.changePercent)} (${diffText})`}>
+                  <span className={`text-xs tabular-nums ${changeClass(m.row.changePercent)}`}>
+                    {formatChangePercent(m.row.changePercent)}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums ml-1">
+                    ({diffText})
+                  </span>
+                </div>
+                <span className="text-sm text-right truncate tabular-nums" title={headText}>
+                  {headText}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default App;

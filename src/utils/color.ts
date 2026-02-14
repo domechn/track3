@@ -95,3 +95,22 @@ export function positiveNegativeColor(val: number, quoteColor: QuoteColor = 'gre
 		return quoteColor === 'green-up-red-down' ? "red" : "green"
 	}
 }
+
+export function positiveNegativeTextClass(
+	val: number,
+	quoteColor: QuoteColor = "green-up-red-down",
+	shade: 500 | 600 | 700 = 600
+) {
+	const tone = positiveNegativeColor(val, quoteColor)
+	if (tone === "gray") {
+		return "text-muted-foreground"
+	}
+
+	if (shade === 500) {
+		return tone === "green" ? "text-emerald-500" : "text-rose-500"
+	}
+	if (shade === 600) {
+		return tone === "green" ? "text-emerald-600" : "text-rose-600"
+	}
+	return tone === "green" ? "text-emerald-700" : "text-rose-700"
+}

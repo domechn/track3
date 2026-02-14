@@ -1,184 +1,184 @@
-import { Line } from "react-chartjs-2";
-import { useWindowSize } from "@/utils/hook";
-import { timeToDateStr } from "@/utils/date";
 import { TDateRange, TopCoinsRankData } from "@/middlelayers/types";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
-import { BubbleDataPoint, Point } from "chart.js";
+import { useEffect, useMemo, useRef, useState } from "react";
 import _ from "lodash";
-import { hideOtherLinesClickWrapper } from "@/utils/legend";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import {
-  queryTopCoinsRank,
-  resizeChart,
-  resizeChartWithDelay,
-} from "@/middlelayers/charts";
-import { loadingWrapper } from "@/lib/loading";
-import { ChartResizeContext } from "@/App";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
+import { queryTopCoinsRank } from "@/middlelayers/charts";
+import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
+import { getImageApiPath } from "@/utils/app";
+import { downloadCoinLogos } from "@/middlelayers/data";
+import UnknownLogo from "@/assets/icons/unknown-logo.svg";
+import bluebird from "bluebird";
+import { useNavigate } from "react-router-dom";
+import { Button } from "./ui/button";
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 
-const chartName = "Trend of Top Coins Rank";
+const PAGE_SIZE = 20;
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
-  const wsize = useWindowSize();
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const { needResize } = useContext(ChartResizeContext);
   const [topCoinsRankData, setTopCoinsRankData] = useState({
     timestamps: [],
     coins: [],
   } as TopCoinsRankData);
-  const chartRef =
-    useRef<
-      ChartJSOrUndefined<
-        "line",
-        (number | [number, number] | Point | BubbleDataPoint | null)[],
-        unknown
-      >
-    >(null);
+  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+  const [page, setPage] = useState(0);
+  const navigate = useNavigate();
+
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
 
   useEffect(() => {
-    loadData(dateRange).then(() => {
-      resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
-    });
-  }, [dateRange]);
-
-  useEffect(() => resizeChart(chartName), [needResize]);
+    loadData(dateRange);
+  }, [rangeKey]);
 
   async function loadData(dr: TDateRange) {
-    updateLoading(true);
-    try {
-      const tcr = await queryTopCoinsRank(dr);
-      setTopCoinsRankData(tcr);
-    } finally {
-      updateLoading(false);
-    }
+    const tcr = await queryTopCoinsRank(dr);
+    setTopCoinsRankData(tcr);
   }
 
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
-    }
+  useEffect(() => {
+    if (topCoinsRankData.coins.length === 0) return;
+    downloadCoinLogos(
+      topCoinsRankData.coins.map((c) => ({ symbol: c.coin, price: 0 }))
+    );
+    getLogoMap(topCoinsRankData.coins).then((m) => setLogoMap(m));
+  }, [topCoinsRankData]);
 
-    setLoading(val);
-  }
-
-  const options = {
-    maintainAspectRatio: false,
-    responsive: false,
-    hover: {
-      mode: "index",
-      intersect: false,
-    },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: false,
-        text: chartName,
-      },
-      datalabels: {
-        display: false,
-      },
-      tooltip: {
-        itemSort: (a: { raw: number }, b: { raw: number }) => {
-          return a.raw - b.raw;
-        },
-      },
-      legend: {
-        onClick: (e: any, legendItem: { datasetIndex: number }, legend: any) =>
-          hideOtherLinesClickWrapper(
-            _(topCoinsRankData.coins).size(),
-            chartRef.current
-          )(e, legendItem, legend),
-      },
-    },
-    scales: {
-      x: {
-        title: {
-          display: false,
-          text: "Date",
-        },
-        ticks: {
-          autoSkip: true,
-        },
-      },
-      y: {
-        title: {
-          display: false,
-          text: "Rank",
-        },
-        offset: true,
-        reverse: true,
-        ticks: {
-          precision: 0,
-          callback: function (value: number) {
-            return "#" + value;
-          },
-        },
-        grid: {
-          display: false,
-        },
-      },
-    },
-  };
-
-  function coinRankData(
-    timestamps: number[],
-    coinRankData: { rank?: number; timestamp: number }[]
-  ) {
-    const coinRankDataMap = new Map<number, number | undefined>();
-    coinRankData.forEach((rankData) => {
-      coinRankDataMap.set(rankData.timestamp, rankData.rank);
+  async function getLogoMap(coins: { coin: string }[]) {
+    const acd = await getAppCacheDir();
+    const kvs = await bluebird.map(coins, async (c) => {
+      const path = await getImageApiPath(acd, c.coin);
+      return { [c.coin]: path };
     });
-    return timestamps.map((date) => coinRankDataMap.get(date) || null);
+    return _.assign({}, ...kvs);
   }
 
-  function lineData() {
-    return {
-      labels: topCoinsRankData.timestamps.map((x) => timeToDateStr(x)),
-      datasets: topCoinsRankData.coins.map((coin) => ({
-        label: coin.coin,
-        data: coinRankData(topCoinsRankData.timestamps, coin.rankData),
-        borderColor: coin.lineColor,
-        backgroundColor: coin.lineColor,
-        borderWidth: 4,
-        tension: 0.1,
-        pointRadius: 0.2,
-        pointStyle: "rotRect",
-      })),
-    };
-  }
+  const rankRows = useMemo(() => {
+    return topCoinsRankData.coins
+      .map((coin) => {
+        const ranks = coin.rankData
+          .filter((r) => r.rank !== undefined)
+          .sort((a, b) => a.timestamp - b.timestamp);
+        if (ranks.length === 0) return null;
+        const firstRank = ranks[0].rank!;
+        const lastRank = ranks[ranks.length - 1].rank!;
+        const change = firstRank - lastRank; // positive = improved (lower rank number)
+        return {
+          coin: coin.coin,
+          rank: lastRank,
+          change,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a!.rank - b!.rank) as {
+      coin: string;
+      rank: number;
+      change: number;
+    }[];
+  }, [topCoinsRankData]);
 
-  const lineDataMemo = useMemo(() => lineData(), [topCoinsRankData]);
+  const maxPage = useMemo(
+    () => Math.max(Math.ceil(rankRows.length / PAGE_SIZE) - 1, 0),
+    [rankRows.length]
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [rangeKey]);
+
+  useEffect(() => {
+    setPage((prev) => Math.min(prev, maxPage));
+  }, [maxPage]);
+
+  const pagedRows = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return rankRows.slice(start, start + PAGE_SIZE);
+  }, [rankRows, page]);
+
+  function renderChangeBadge(change: number) {
+    if (change > 0) {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-500">
+          ↑{change}
+        </span>
+      );
+    }
+    if (change < 0) {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/15 text-rose-500">
+          ↓{Math.abs(change)}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+        —
+      </span>
+    );
+  }
 
   return (
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium font-bold">
-            Trend of Top Coins Rank
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Top Coins Rank
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div
-            style={{
-              height: Math.max((wsize.height || 100) / 2, 350),
-            }}
-          >
-            {loadingWrapper(
-              loading,
-              <Line
-                ref={chartRef}
-                options={options as any}
-                data={lineDataMemo}
-              />,
-              "mt-4",
-              10
-            )}
-          </div>
+        <CardContent>
+          <Table>
+            <TableBody>
+              {pagedRows.map((row) => (
+                <TableRow
+                  key={row.coin}
+                  className="h-[42px] cursor-pointer group"
+                  onClick={() => navigate(`/coins/${row.coin}`)}
+                >
+                  <TableCell className="w-[40px] text-muted-foreground font-mono text-xs py-1.5">
+                    #{row.rank}
+                  </TableCell>
+                  <TableCell className="py-1.5">
+                    <div className="flex items-center gap-2">
+                      <img
+                        className="w-[18px] h-[18px] rounded-full"
+                        src={logoMap[row.coin] || UnknownLogo}
+                        alt={row.coin}
+                      />
+                      <span className="font-medium text-sm">{row.coin}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right py-1.5">
+                    {renderChangeBadge(row.change)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {rankRows.length > PAGE_SIZE ? (
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                disabled={page <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {page + 1} / {maxPage + 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.min(prev + 1, maxPage))}
+                disabled={page >= maxPage}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

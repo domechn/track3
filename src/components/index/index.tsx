@@ -10,7 +10,12 @@ import {
   Tooltip as ChartTooltip,
   Legend,
 } from "chart.js";
-import { Tooltip as ReactTooltip } from "react-tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import Setting from "../settings";
 import RefreshData from "../refresh-data";
 import ChartDataLabels from "chartjs-plugin-datalabels";
@@ -22,6 +27,8 @@ import WalletAnalysis from "../wallet-analytics";
 import CoinAnalysis from "../coin-analytics";
 import DatePicker from "../date-picker";
 import RealTimeTotalValue from "../realtime-total-value";
+import Sidebar from "../sidebar";
+import { AnimatedPage } from "../motion";
 import "./index.css";
 import {
   Route,
@@ -44,19 +51,12 @@ import {
 } from "@/middlelayers/configuration";
 import { getDefaultCurrencyRate } from "@/middlelayers/configuration";
 import _ from "lodash";
-import { MainNav } from "@/components/index/main-nav";
 import Configuration from "@/components/configuration";
 import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
 import React from "react";
 import { ChartResizeContext } from "@/App";
 import { Progress } from "../ui/progress";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../ui/tooltip";
 import {
   autoBackupHistoricalData,
   autoImportHistoricalData,
@@ -118,24 +118,31 @@ const App = () => {
   const [hasData, setHasData] = useState(true);
 
   const [activeMenu, setActiveMenu] = useState("overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    loadConfiguration();
-    handleAutoBackup()
-      .then(({ imported }) => {
-        if (imported) {
-          clearAllCache();
-        }
-      })
-      .finally(() => {
-        loadAllData();
-      });
+    Promise.all([
+      queryPreferCurrency().then((c) => setCurrentCurrency(c)),
+      getLicenseIfIsPro().then((l) => setIsProUser(!!l)),
+      getQuoteColor().then((c) => setQuoteColor(c)),
+    ]).then(() =>
+      handleAutoBackup()
+        .then(({ imported }) => {
+          if (imported) {
+            clearAllCache();
+          }
+        })
+        .finally(() => {
+          loadAllData();
+        })
+    );
   }, []);
 
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setLastSize(windowSize);
     }, resizeDelay); // to reduce resize count and cpu usage
+    return () => clearTimeout(timer);
   }, [windowSize]);
 
   const tDateRange = useMemo(
@@ -148,8 +155,8 @@ const App = () => {
 
   const maxDateRange = useMemo(
     () => ({
-      start: _(availableDates).first() ?? new Date(1970, 1, 1),
-      end: _(availableDates).last() ?? new Date(9999, 12, 30, 23, 59, 59),
+      start: _(availableDates).first() ?? parseISO("1970-01-01"),
+      end: _(availableDates).last() ?? parseISO("1970-01-01"),
     }),
     [availableDates]
   );
@@ -157,6 +164,15 @@ const App = () => {
   useEffect(() => {
     resizeAllChartsInPage();
   }, [lastSize, activeMenu, hasData]);
+
+  // Trigger chart resize when sidebar collapses/expands
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+      setNeedResize((pre) => pre + 1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [sidebarCollapsed]);
 
   function resizeAllChartsInPage() {
     if (
@@ -170,21 +186,8 @@ const App = () => {
   }
 
   function loadConfiguration() {
-    loadCurrentCurrency();
-    loadIsProUser();
-    loadQuoteColor();
-  }
-
-  function loadCurrentCurrency() {
     queryPreferCurrency().then((c) => setCurrentCurrency(c));
-  }
-
-  function loadIsProUser() {
-    // currently only check if there is license in sqlite
     getLicenseIfIsPro().then((l) => setIsProUser(!!l));
-  }
-
-  function loadQuoteColor() {
     getQuoteColor().then((c) => setQuoteColor(c));
   }
 
@@ -221,14 +224,32 @@ const App = () => {
 
   async function loadInitialQueryDateRange() {
     const { dr, size } = await getInitialQueryDateRange();
-    setDateRange(dr);
+    setDateRange((prev) => {
+      const prevFrom = prev?.from?.getTime() ?? 0;
+      const prevTo = prev?.to?.getTime() ?? 0;
+      const nextFrom = dr?.from?.getTime() ?? 0;
+      const nextTo = dr?.to?.getTime() ?? 0;
+      if (prevFrom === nextFrom && prevTo === nextTo) {
+        return prev;
+      }
+      return dr;
+    });
     setOriginalQuerySize(size);
   }
 
   async function handleQuerySizeWhenConfigurationChange() {
     const { dr, size } = await getInitialQueryDateRange();
     if (size !== originalQuerySize) {
-      setDateRange(dr);
+      setDateRange((prev) => {
+        const prevFrom = prev?.from?.getTime() ?? 0;
+        const prevTo = prev?.to?.getTime() ?? 0;
+        const nextFrom = dr?.from?.getTime() ?? 0;
+        const nextTo = dr?.to?.getTime() ?? 0;
+        if (prevFrom === nextFrom && prevTo === nextTo) {
+          return prev;
+        }
+        return dr;
+      });
       setOriginalQuerySize(size);
     }
   }
@@ -252,9 +273,18 @@ const App = () => {
 
   function onDatePickerValueChange(
     _selectedTimes: number,
-    dateRange: DateRange | undefined
+    nextDateRange: DateRange | undefined
   ) {
-    setDateRange(dateRange);
+    setDateRange((prev) => {
+      const prevFrom = prev?.from?.getTime() ?? 0;
+      const prevTo = prev?.to?.getTime() ?? 0;
+      const nextFrom = nextDateRange?.from?.getTime() ?? 0;
+      const nextTo = nextDateRange?.to?.getTime() ?? 0;
+      if (prevFrom === nextFrom && prevTo === nextTo) {
+        return prev;
+      }
+      return nextDateRange;
+    });
   }
 
   function loadAllData() {
@@ -287,175 +317,163 @@ const App = () => {
       }
     }, [lo.pathname]);
 
+    const sidebarWidth = sidebarCollapsed ? 52 : 200;
+
     return (
-      <div className="pb-12">
-        <div className="fixed top-0 left-4 right-0 z-10 bg-background flex-col md:flex">
-          <div className="border-b">
+      <div className="min-h-screen">
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          isProUser={isProUser}
+        />
+
+        <div
+          style={{ marginLeft: sidebarWidth }}
+          className="transition-[margin-left] duration-300 ease-in-out"
+        >
+          {/* Top bar */}
+          <div className="sticky top-0 z-10 glass-subtle border-b">
             <div className="flex h-12 items-center px-4">
               {isProUser && (
+                <div className="mr-4">
+                  <RealTimeTotalValue
+                    quoteColor={quoteColor}
+                    currency={currentCurrency}
+                  />
+                </div>
+              )}
+              <div className="ml-auto flex items-center space-x-3">
+                <DatePicker
+                  availableDates={availableDates}
+                  value={dateRange}
+                  onDateChange={onDatePickerValueChange}
+                />
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <svg
-                        className="w-6 h-6 mr-4"
-                        viewBox="0 0 1024 1024"
-                        version="1.1"
-                        xmlns="http://www.w3.org/2000/svg"
-                        p-id="4334"
-                        width="16"
-                        height="16"
-                      >
-                        <path
-                          d="M27.913387 507.733333l32-298.666666c2.133333-21.333333 21.333333-38.4 42.666666-38.4h108.8c36.266667 0 68.266667 14.933333 89.6 38.4 23.466667 25.6 34.133333 57.6 29.866667 93.866666l-12.8 128c-6.4 68.266667-68.266667 123.733333-138.666667 123.733334H108.980053L85.513387 772.266667c-2.133333 21.333333-21.333333 38.4-42.666667 38.4h-4.266667C15.113387 808.533333-1.95328 787.2 0.180053 763.733333l27.733334-256zM140.980053 256L117.513387 469.333333h61.866666c25.6 0 51.2-21.333333 53.333334-46.933333l12.8-128c2.133333-10.666667-2.133333-19.2-8.533334-27.733333-6.4-6.4-14.933333-10.666667-25.6-10.666667H140.980053z m522.666667 174.933333c-4.266667 44.8-32 83.2-70.4 104.533334l34.133333 226.133333c4.266667 23.466667-12.8 44.8-36.266666 49.066667h-6.4c-21.333333 0-38.4-14.933333-42.666667-36.266667L510.04672 554.666667h-53.333333l-23.466667 217.6c-2.133333 21.333333-21.333333 38.4-42.666667 38.4h-4.266666c-23.466667-2.133333-40.533333-23.466667-38.4-46.933334l27.733333-256 32-298.666666c2.133333-21.333333 21.333333-38.4 42.666667-38.4h108.8c36.266667 0 68.266667 14.933333 89.6 38.4 23.466667 25.6 32 57.6 29.866666 93.866666l-14.933333 128z m-72.533333-136.533333c2.133333-10.666667-2.133333-19.2-8.533334-27.733333-4.266667-6.4-14.933333-10.666667-25.6-10.666667h-70.4l-23.466666 213.333333h61.866666c25.6 0 51.2-21.333333 53.333334-46.933333l12.8-128zM823.64672 810.666667c-36.266667 0-68.266667-14.933333-89.6-38.4-23.466667-25.6-34.133333-57.6-29.866667-93.866667l40.533334-384C751.113387 224 810.84672 170.666667 881.24672 170.666667h21.333333c36.266667 0 68.266667 14.933333 89.6 38.4 25.6 25.6 34.133333 59.733333 32 93.866666l-40.533333 384c-6.4 68.266667-68.266667 123.733333-138.666667 123.733334h-21.333333z m-36.266667-123.733334c-2.133333 10.666667 2.133333 19.2 8.533334 27.733334 6.4 6.4 17.066667 10.666667 27.733333 10.666666h21.333333c25.6 0 51.2-21.333333 53.333334-46.933333l40.533333-384c2.133333-10.666667-2.133333-19.2-8.533333-27.733333-6.4-6.4-14.933333-10.666667-27.733334-10.666667h-21.333333c-25.6 0-51.2 21.333333-53.333333 46.933333l-40.533334 384z"
-                          fill="#7C89EC"
-                          p-id="4335"
-                        ></path>
-                      </svg>
+                      <div>
+                        <RefreshButtonLoadingContext.Provider
+                          value={{
+                            buttonLoading: refreshButtonLoading,
+                            setButtonLoading: setRefreshButtonLoading,
+                            progress: refreshProgress,
+                            setProgress: setRefreshProgress,
+                          }}
+                        >
+                          <RefreshData
+                            loading={refreshButtonLoading}
+                            afterRefresh={(success) => {
+                              if (success) {
+                                onDataChanged();
+                              }
+                            }}
+                          />
+                        </RefreshButtonLoadingContext.Provider>
+                      </div>
                     </TooltipTrigger>
-                    <TooltipContent className="bg-slate-50 text-gray-600">
-                      <p>You are using PRO version 🎉</p>
+                    <TooltipContent>
+                      <p>
+                        {lastRefreshAt
+                          ? "Last Refresh At: " + lastRefreshAt
+                          : "Never Refresh Before"}
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              )}
-              <MainNav className="mx-0" />
-              <div className="ml-auto flex items-center space-x-4">
-                {isProUser && (
-                  <div>
-                    <RealTimeTotalValue
-                      quoteColor={quoteColor}
-                      currency={currentCurrency}
-                    />
-                  </div>
-                )}
-                <div>
-                  <DatePicker
-                    availableDates={availableDates}
-                    value={dateRange}
-                    onDateChange={onDatePickerValueChange}
-                  />
-                </div>
-                <div data-tooltip-id="last-refresh-at">
-                  <RefreshButtonLoadingContext.Provider
-                    value={{
-                      buttonLoading: refreshButtonLoading,
-                      setButtonLoading: setRefreshButtonLoading,
-                      progress: refreshProgress,
-                      setProgress: setRefreshProgress,
-                    }}
-                  >
-                    <RefreshData
-                      loading={refreshButtonLoading}
-                      afterRefresh={(success) => {
-                        if (success) {
-                          onDataChanged();
-                        }
-                      }}
-                    />
-                  </RefreshButtonLoadingContext.Provider>
-                </div>
               </div>
             </div>
+            {refreshProgress > 0 && refreshButtonLoading && (
+              <div className="flex items-center justify-center pb-1">
+                <Progress value={refreshProgress} className="w-[80%]" />
+              </div>
+            )}
           </div>
-          <div
-            className={`flex items-center justify-center mt-1`}
-            style={{
-              display:
-                refreshProgress > 0 && refreshButtonLoading ? "flex" : "none",
-            }}
-          >
-            <Progress value={refreshProgress} className="w-[80%]" />
-          </div>
-        </div>
-        <div className="mt-4">
-          <Outlet></Outlet>
+
+          {/* Main content */}
+          <main className="p-5">
+            <Outlet />
+          </main>
         </div>
       </div>
     );
   }
 
-  return (
-    <div>
-      {/* fix color not render issue */}
-      <div className="hidden text-green-100 text-red-100 text-gray-100 text-green-200 text-red-200 text-gray-200 text-green-300 text-red-300 text-gray-300 text-green-400 text-red-400 text-gray-400 text-green-500 text-red-500 text-gray-500 text-green-600 text-red-600 text-gray-600 text-green-700 text-red-700 text-gray-700 text-green-800 text-red-800 text-gray-800 text-green-900 text-red-900 text-gray-900 bg-green-100 bg-red-100 bg-gray-100">
-        debug
-      </div>
-      <ReactTooltip
-        id="last-refresh-at"
-        place="bottom"
-        content={
-          lastRefreshAt
-            ? "Last Refresh At: " + lastRefreshAt
-            : "Never Refresh Before"
-        }
-      />
-      <HashRouter>
-        <Layout />
-        <Routes>
-          <Route path="/" element={<Navigate to="/overview" />}></Route>
+  function AppRoutes() {
+    return (
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Navigate to="/overview" />} />
           <Route
-            path="/overview"
+            path="overview"
             element={
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <Overview
-                  currency={currentCurrency}
-                  dateRange={tDateRange}
-                  quoteColor={quoteColor}
-                />
-              </PageWrapper>
-            }
-          ></Route>
-
-          <Route
-            path="/summary"
-            element={
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <Summary
-                  currency={currentCurrency}
-                  dateRange={maxDateRange}
-                  quoteColor={quoteColor}
-                />
-              </PageWrapper>
-            }
-          ></Route>
-
-          <Route
-            path="/wallets"
-            element={
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <WalletAnalysis
-                  currency={currentCurrency}
-                  dateRange={tDateRange}
-                  quoteColor={quoteColor}
-                />
-              </PageWrapper>
+              <AnimatedPage>
+                <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                  <Overview
+                    currency={currentCurrency}
+                    dateRange={tDateRange}
+                    quoteColor={quoteColor}
+                  />
+                </PageWrapper>
+              </AnimatedPage>
             }
           />
           <Route
-            path="/comparison"
+            path="summary"
             element={
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <Comparison
-                  currency={currentCurrency}
-                  quoteColor={quoteColor}
-                />
-              </PageWrapper>
+              <AnimatedPage>
+                <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                  <Summary
+                    currency={currentCurrency}
+                    dateRange={maxDateRange}
+                    quoteColor={quoteColor}
+                  />
+                </PageWrapper>
+              </AnimatedPage>
             }
           />
           <Route
-            path="/history"
+            path="wallets"
             element={
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <HistoricalData
-                  currency={currentCurrency}
-                  dateRange={tDateRange}
-                  quoteColor={quoteColor}
-                  afterDataChanged={onDataChanged}
-                />
-              </PageWrapper>
+              <AnimatedPage>
+                <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                  <WalletAnalysis
+                    currency={currentCurrency}
+                    dateRange={tDateRange}
+                    quoteColor={quoteColor}
+                  />
+                </PageWrapper>
+              </AnimatedPage>
             }
           />
-          <Route path="/settings" element={<Setting />}>
+          <Route
+            path="comparison"
+            element={
+              <AnimatedPage>
+                <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                  <Comparison
+                    currency={currentCurrency}
+                    quoteColor={quoteColor}
+                  />
+                </PageWrapper>
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="history"
+            element={
+              <AnimatedPage>
+                <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                  <HistoricalData
+                    currency={currentCurrency}
+                    dateRange={tDateRange}
+                    quoteColor={quoteColor}
+                    afterDataChanged={onDataChanged}
+                  />
+                </PageWrapper>
+              </AnimatedPage>
+            }
+          />
+          <Route path="settings" element={<AnimatedPage><Setting /></AnimatedPage>}>
             <Route
               path="configuration"
               element={
@@ -488,16 +506,24 @@ const App = () => {
               }
             />
           </Route>
-
           <Route
-            path="/coins/:symbol"
+            path="coins/:symbol"
             element={
-              <CoinAnalysis currency={currentCurrency} dateRange={tDateRange} />
+              <AnimatedPage>
+                <CoinAnalysis currency={currentCurrency} dateRange={tDateRange} />
+              </AnimatedPage>
             }
-          ></Route>
-
+          />
           <Route path="*" element={<div>not found</div>} />
-        </Routes>
+        </Route>
+      </Routes>
+    );
+  }
+
+  return (
+    <div>
+      <HashRouter>
+        <AppRoutes />
       </HashRouter>
     </div>
   );

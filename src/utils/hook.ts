@@ -2,6 +2,53 @@ import { useEffect, useRef, useState } from 'react'
 import { cleanTotalProfitCache } from '@/middlelayers/charts'
 import { Menu, MenuItem } from '@tauri-apps/api/menu'
 
+type WindowSizeState = {
+	width: number | undefined
+	height: number | undefined
+}
+
+const windowSizeListeners = new Set<(state: WindowSizeState) => void>()
+let cachedWindowSize: WindowSizeState = {
+	width: undefined,
+	height: undefined,
+}
+let detachWindowListener: (() => void) | undefined
+
+function emitWindowSize(state: WindowSizeState) {
+	cachedWindowSize = state
+	windowSizeListeners.forEach((listener) => listener(state))
+}
+
+function ensureWindowSizeListener() {
+	if (detachWindowListener || typeof window === "undefined") {
+		return
+	}
+
+	let frame = 0
+	const handleResize = () => {
+		if (frame) {
+			cancelAnimationFrame(frame)
+		}
+		frame = requestAnimationFrame(() => {
+			emitWindowSize({
+				width: window.innerWidth,
+				height: window.innerHeight,
+			})
+			frame = 0
+		})
+	}
+
+	handleResize()
+	window.addEventListener("resize", handleResize)
+	detachWindowListener = () => {
+		if (frame) {
+			cancelAnimationFrame(frame)
+		}
+		window.removeEventListener("resize", handleResize)
+		detachWindowListener = undefined
+	}
+}
+
 export const useBeforeRender = (callback: () => unknown, deps: any) => {
 	const [isRun, setIsRun] = useState(false)
 
@@ -22,31 +69,20 @@ export const useComponentWillMount = (cb: () => unknown) => {
 }
 
 export const useWindowSize = () => {
-	// Initialize state with undefined width/height so server and client renders match
-	// Learn more here: https://joshwcomeau.com/react/the-perils-of-rehydration/
-	const [windowSize, setWindowSize] = useState({
-		width: undefined,
-		height: undefined,
-	} as {
-		width: number | undefined
-		height: number | undefined
-	})
+	const [windowSize, setWindowSize] = useState<WindowSizeState>(cachedWindowSize)
+
 	useEffect(() => {
-		// Handler to call on window resize
-		function handleResize() {
-			// Set window width/height to state
-			setWindowSize({
-				width: window.innerWidth,
-				height: window.innerHeight,
-			})
+		ensureWindowSizeListener()
+		windowSizeListeners.add(setWindowSize)
+		setWindowSize(cachedWindowSize)
+		return () => {
+			windowSizeListeners.delete(setWindowSize)
+			if (windowSizeListeners.size === 0) {
+				detachWindowListener?.()
+			}
 		}
-		// Add event listener
-		window.addEventListener("resize", handleResize)
-		// Call handler right away so state gets updated with initial window size
-		handleResize()
-		// Remove event listener on cleanup
-		return () => window.removeEventListener("resize", handleResize)
-	}, []) // Empty array ensures that effect is only run on mount
+	}, [])
+
 	return windowSize
 }
 

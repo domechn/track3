@@ -8,8 +8,8 @@ import {
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
+  prettyNumberToLocaleString,
 } from "@/utils/currency";
-import _ from "lodash";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { insertEllipsis } from "@/utils/string";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -18,12 +18,29 @@ import {
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
-import { loadingWrapper } from "@/lib/loading";
 import { ChartResizeContext } from "@/App";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { offsetHoveredItemWrapper } from "@/utils/legend";
+import { chartColors, glassTooltip } from "@/utils/chart-theme";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 
-const chartName = "Percentage And Total Value of Each Wallet";
+const chartName = "wallet-assets-percentage";
+
+type TopLimit = "8" | "12" | "20" | "all";
+
+function getWalletDisplayName(item: {
+  wallet: string;
+  walletType?: string;
+  walletAlias?: string;
+}) {
+  if (item.walletAlias) {
+    return item.walletType
+      ? `${item.walletType}-${item.walletAlias}`
+      : item.walletAlias;
+  }
+  return insertEllipsis(item.wallet, 16);
+}
 
 const App = ({
   currency,
@@ -38,155 +55,197 @@ const App = ({
 }) => {
   const size = useWindowSize();
   const chartRef = useRef<ChartJSOrUndefined<"pie", string[], unknown>>(null);
+  const loadGenRef = useRef(0);
   const { needResize } = useContext(ChartResizeContext);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { reportLoaded } = useContext(OverviewLoadingContext);
+
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
     useState<WalletAssetsPercentageData>([]);
-
-  const chartHasData = useMemo(
-    () =>
-      !_(walletAssetsPercentage)
-        .filter((p) => p.value > 0)
-        .isEmpty(),
-    [walletAssetsPercentage]
-  );
+  const [topLimit, setTopLimit] = useState<TopLimit>("12");
 
   useEffect(() => {
-    loadData(symbol).then(() => {
-      resizeChartWithDelay(chartName);
-      setInitialLoaded(true);
-    });
-  }, [symbol, dateRange]);
+    let mounted = true;
+    const gen = ++loadGenRef.current;
+
+    WALLET_ANALYZER.queryWalletAssetsPercentage(symbol)
+      .then((wap) => {
+        if (!mounted || gen !== loadGenRef.current) {
+          return;
+        }
+        setWalletAssetsPercentage(wap);
+        resizeChartWithDelay(chartName);
+      })
+      .finally(() => {
+        if (mounted) {
+          reportLoaded();
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [dateRange, reportLoaded, symbol]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData(s?: string) {
-    updateLoading(true);
+  const positiveWallets = useMemo(
+    () => walletAssetsPercentage.filter((item) => item.value > 0),
+    [walletAssetsPercentage]
+  );
 
-    try {
-      const wap = await WALLET_ANALYZER.queryWalletAssetsPercentage(s);
-      setWalletAssetsPercentage(wap);
-    } finally {
-      updateLoading(false);
-    }
-  }
-
-  function updateLoading(val: boolean) {
-    if (initialLoaded) {
-      return;
+  const chartItems = useMemo(() => {
+    const sorted = [...positiveWallets].sort((a, b) => b.value - a.value);
+    if (topLimit === "all") {
+      return sorted;
     }
 
-    setLoading(val);
-  }
+    const limit = Number(topLimit);
+    if (sorted.length <= limit) {
+      return sorted;
+    }
 
-  const options = {
-    maintainAspectRatio: false,
-    responsive: false,
-    layout: {
-      padding: 20,
-    },
-    plugins: {
-      // text is set for resizing
-      title: { display: false, text: chartName },
-      legend: {
-        display: true,
-        position: "right",
-        font: {
-          size: 13,
+    const head = sorted.slice(0, limit);
+    const rest = sorted.slice(limit);
+    const restValue = rest.reduce((sum, item) => sum + item.value, 0);
+    const restAmount = rest.reduce((sum, item) => sum + item.amount, 0);
+    const restPercentage = rest.reduce((sum, item) => sum + item.percentage, 0);
+
+    head.push({
+      wallet: "others",
+      walletAlias: "Others",
+      percentage: restPercentage,
+      value: restValue,
+      amount: restAmount,
+      chartColor: chartColors[(limit + 1) % chartColors.length].main,
+    });
+
+    return head;
+  }, [positiveWallets, topLimit]);
+
+  const chartHasData = chartItems.length > 0;
+
+  const totalValue = useMemo(
+    () => positiveWallets.reduce((sum, item) => sum + item.value, 0),
+    [positiveWallets]
+  );
+  const topWallet = positiveWallets[0];
+
+  const chartData = useMemo(
+    () => ({
+      labels: chartItems.map(
+        (item) => `${item.percentage.toFixed(2)}% ${getWalletDisplayName(item)}`
+      ),
+      datasets: [
+        {
+          data: chartItems.map((item) =>
+            currencyWrapper(currency)(item.value).toFixed(2)
+          ),
+          borderColor: "rgba(255,255,255,0.15)",
+          backgroundColor: chartItems.map(
+            (_item, i) => chartColors[i % chartColors.length].main
+          ),
+          borderWidth: 2,
+          hoverOffset: 12,
         },
-        labels: { font: {} },
-        onHover: (e: any, legendItem: { index: number }, legend: any) =>
-          offsetHoveredItemWrapper(chartRef.current)(e, legendItem, legend),
-        // disable onclick
-        onClick: () => {},
-      },
-      datalabels: {
-        display: false,
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: { dataIndex: number; parsed: number }) => {
-            const p = walletAssetsPercentage[context.dataIndex];
-            if (p && displayAmount) {
-              return `${prettyNumberKeepNDigitsAfterDecimalPoint(
-                p.amount,
-                4
-              )} / ${currency.symbol}${context.parsed.toLocaleString()}`;
-            }
+      ],
+    }),
+    [chartItems, currency]
+  );
 
-            return `${currency.symbol}${context.parsed.toLocaleString()}`;
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      responsive: true,
+      layout: {
+        padding: 20,
+      },
+      plugins: {
+        title: { display: false, text: chartName },
+        legend: {
+          display: true,
+          position: "right" as const,
+          labels: { font: { size: 11 } },
+          onHover: (e: unknown, legendItem: { index: number }, legend: unknown) =>
+            offsetHoveredItemWrapper(chartRef.current)(e, legendItem, legend),
+          onClick: () => {},
+        },
+        datalabels: {
+          display: false,
+        },
+        tooltip: {
+          ...glassTooltip,
+          callbacks: {
+            label: (context: { dataIndex: number; parsed: number }) => {
+              const item = chartItems[context.dataIndex];
+              if (!item) {
+                return `${currency.symbol}${context.parsed.toLocaleString()}`;
+              }
+
+              if (displayAmount) {
+                return `${prettyNumberKeepNDigitsAfterDecimalPoint(
+                  item.amount,
+                  4
+                )} / ${currency.symbol}${context.parsed.toLocaleString()}`;
+              }
+
+              return `${currency.symbol}${context.parsed.toLocaleString()}`;
+            },
           },
         },
       },
-    },
-  };
+    }),
+    [chartItems, currency.symbol, displayAmount]
+  );
 
-  function lineData() {
-    return {
-      labels: _(walletAssetsPercentage)
-        .map(
-          (d) =>
-            `${d.percentage.toFixed(2)}% ` +
-            (d.walletAlias
-              ? `${d.walletType}-${d.walletAlias}`
-              : insertEllipsis(d.wallet, 16))
-        )
-        .value(),
-      datasets: [
-        {
-          data: _(walletAssetsPercentage)
-            .map((d) => currencyWrapper(currency)(d.value).toFixed(2))
-            .value(),
-          borderColor: _(walletAssetsPercentage)
-            .map((d) => d.chartColor)
-            .value(),
-          backgroundColor: _(walletAssetsPercentage)
-            .map((d) => d.chartColor)
-            .value(),
-          borderWidth: 1,
-          hoverOffset: 35,
-        },
-      ],
-    };
-  }
+  const chartHeight = Math.max(Math.min((size.height || 760) * 0.55, 520), 340);
 
   return (
-    <div>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium font-bold">
-            {symbol ? symbol + " " : ""}Percentage And Total Value of Each
-            Wallet
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div
-            className="flex items-center justify-center"
-            style={{
-              height: Math.max((size.height || 100) / 2, 400),
-            }}
-          >
-            {loadingWrapper(
-              loading,
-              chartHasData ? (
-                <Pie
-                  ref={chartRef}
-                  options={options as any}
-                  data={lineData()}
-                />
-              ) : (
-                <div className="text-3xl text-gray-300 m-auto">
-                  No Available Data For Selected Dates
-                </div>
-              ),
-              "mt-6 h-[30px]",
-              6
-            )}
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {symbol ? `${symbol} ` : ""}Wallet Allocation
+        </CardTitle>
+        <ButtonGroup value={topLimit} onValueChange={(v) => setTopLimit(v as TopLimit)}>
+          <ButtonGroupItem value="8">Top 8</ButtonGroupItem>
+          <ButtonGroupItem value="12">Top 12</ButtonGroupItem>
+          <ButtonGroupItem value="20">Top 20</ButtonGroupItem>
+          <ButtonGroupItem value="all">All</ButtonGroupItem>
+        </ButtonGroup>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
+          <div>
+            Wallets: <span className="text-foreground">{positiveWallets.length}</span>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+          <div>
+            Showing: <span className="text-foreground">{chartItems.length}</span>
+          </div>
+          <div>
+            Total Value:{" "}
+            <span className="text-foreground">
+              {currency.symbol}
+              {prettyNumberToLocaleString(currencyWrapper(currency)(totalValue))}
+            </span>
+          </div>
+          <div>
+            Top Wallet:{" "}
+            <span className="text-foreground">
+              {topWallet ? getWalletDisplayName(topWallet) : "-"}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center" style={{ height: chartHeight }}>
+          {chartHasData ? (
+            <Pie ref={chartRef} options={options as any} data={chartData} />
+          ) : (
+            <div className="text-lg text-muted-foreground m-auto">
+              No Available Data For Selected Dates
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
