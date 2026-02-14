@@ -62,10 +62,6 @@ const App = ({
 
   const [baseId, setBaseId] = useState<string>("");
   const [headId, setHeadId] = useState<string>("");
-  const [prevSelection, setPrevSelection] = useState({
-    baseId: "",
-    headId: "",
-  });
   const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
   const [currentQuickCompare, setCurrentQuickCompare] =
     useState<QuickCompareType | null>(null);
@@ -78,10 +74,12 @@ const App = ({
   const downloadedLogosRef = useRef<Set<string>>(new Set());
   const appCacheDirRef = useRef<string>("");
 
-  if (prevSelection.baseId !== baseId || prevSelection.headId !== headId) {
-    setPrevSelection({ baseId, headId });
+  useEffect(() => {
+    if (!baseId || !headId) {
+      return;
+    }
     setPageLoading(true);
-  }
+  }, [baseId, headId]);
 
   const baseDate = useMemo(() => {
     return _.find(dateOptions, { value: baseId })?.label;

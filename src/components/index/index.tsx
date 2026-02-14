@@ -35,14 +35,12 @@ import {
   Routes,
   HashRouter,
   Outlet,
-  useLocation,
   Navigate,
 } from "react-router-dom";
 
 import { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAvailableDates, queryLastRefreshAt } from "@/middlelayers/charts";
-import { useWindowSize } from "@/utils/hook";
 import {
   queryPreferCurrency,
   getLicenseIfIsPro,
@@ -55,7 +53,6 @@ import Configuration from "@/components/configuration";
 import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
 import React from "react";
-import { ChartResizeContext } from "@/App";
 import { Progress } from "../ui/progress";
 import {
   autoBackupHistoricalData,
@@ -70,6 +67,8 @@ import {
   getMemoryCacheInstance,
 } from "@/middlelayers/datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
+import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
+import { ChartResizeContext } from "@/App";
 
 ChartJS.register(
   ...registerables,
@@ -83,8 +82,6 @@ ChartJS.register(
   Legend,
   ChartDataLabels
 );
-
-const resizeDelay = 200; // 200 ms
 
 export const RefreshButtonLoadingContext = React.createContext<{
   buttonLoading: boolean;
@@ -175,9 +172,235 @@ function TopBar({
   );
 }
 
-const App = () => {
-  const { setNeedResize } = useContext(ChartResizeContext);
+type LayoutProps = {
+  sidebarCollapsed: boolean;
+  onSidebarToggle: () => void;
+  isProUser: boolean;
+  quoteColor: QuoteColor;
+  currentCurrency: CurrencyRateDetail;
+  availableDates: Date[];
+  dateRange: DateRange | undefined;
+  onDatePickerValueChange: (
+    selectedTimes: number,
+    nextDateRange: DateRange | undefined
+  ) => void;
+  lastRefreshAt?: string;
+  onRefreshSuccess: () => void;
+};
 
+function Layout({
+  sidebarCollapsed,
+  onSidebarToggle,
+  isProUser,
+  quoteColor,
+  currentCurrency,
+  availableDates,
+  dateRange,
+  onDatePickerValueChange,
+  lastRefreshAt,
+  onRefreshSuccess,
+}: LayoutProps) {
+  const sidebarWidth = sidebarCollapsed ? 52 : 200;
+
+  return (
+    <div className="min-h-screen">
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={onSidebarToggle}
+        isProUser={isProUser}
+      />
+
+      <div
+        style={{ marginLeft: sidebarWidth }}
+        className="transition-[margin-left] duration-300 ease-in-out"
+      >
+        <TopBar
+          isProUser={isProUser}
+          quoteColor={quoteColor}
+          currentCurrency={currentCurrency}
+          availableDates={availableDates}
+          dateRange={dateRange}
+          onDatePickerValueChange={onDatePickerValueChange}
+          lastRefreshAt={lastRefreshAt}
+          onRefreshSuccess={onRefreshSuccess}
+        />
+
+        {/* Main content */}
+        <main className="p-5">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
+
+type AppRoutesProps = {
+  sidebarCollapsed: boolean;
+  onSidebarToggle: () => void;
+  isProUser: boolean;
+  setIsProUser: React.Dispatch<React.SetStateAction<boolean>>;
+  quoteColor: QuoteColor;
+  setQuoteColor: React.Dispatch<React.SetStateAction<QuoteColor>>;
+  currentCurrency: CurrencyRateDetail;
+  availableDates: Date[];
+  dateRange: DateRange | undefined;
+  tDateRange: { start: Date; end: Date };
+  maxDateRange: { start: Date; end: Date };
+  hasData: boolean;
+  onDatePickerValueChange: (
+    selectedTimes: number,
+    nextDateRange: DateRange | undefined
+  ) => void;
+  lastRefreshAt?: string;
+  onDataChanged: () => void;
+  handleConfigurationSave: () => void;
+};
+
+function AppRoutes({
+  sidebarCollapsed,
+  onSidebarToggle,
+  isProUser,
+  setIsProUser,
+  quoteColor,
+  setQuoteColor,
+  currentCurrency,
+  availableDates,
+  dateRange,
+  tDateRange,
+  maxDateRange,
+  hasData,
+  onDatePickerValueChange,
+  lastRefreshAt,
+  onDataChanged,
+  handleConfigurationSave,
+}: AppRoutesProps) {
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <Layout
+            sidebarCollapsed={sidebarCollapsed}
+            onSidebarToggle={onSidebarToggle}
+            isProUser={isProUser}
+            quoteColor={quoteColor}
+            currentCurrency={currentCurrency}
+            availableDates={availableDates}
+            dateRange={dateRange}
+            onDatePickerValueChange={onDatePickerValueChange}
+            lastRefreshAt={lastRefreshAt}
+            onRefreshSuccess={onDataChanged}
+          />
+        }
+      >
+        <Route index element={<Navigate to="/overview" />} />
+        <Route
+          path="overview"
+          element={
+            <AnimatedPage>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                <Overview
+                  currency={currentCurrency}
+                  dateRange={tDateRange}
+                  quoteColor={quoteColor}
+                />
+              </PageWrapper>
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="summary"
+          element={
+            <AnimatedPage>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                <Summary
+                  currency={currentCurrency}
+                  dateRange={maxDateRange}
+                  quoteColor={quoteColor}
+                />
+              </PageWrapper>
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="wallets"
+          element={
+            <AnimatedPage>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                <WalletAnalysis
+                  currency={currentCurrency}
+                  dateRange={tDateRange}
+                  quoteColor={quoteColor}
+                />
+              </PageWrapper>
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="comparison"
+          element={
+            <AnimatedPage>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                <Comparison currency={currentCurrency} quoteColor={quoteColor} />
+              </PageWrapper>
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="history"
+          element={
+            <AnimatedPage>
+              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+                <HistoricalData
+                  currency={currentCurrency}
+                  dateRange={tDateRange}
+                  quoteColor={quoteColor}
+                  afterDataChanged={onDataChanged}
+                />
+              </PageWrapper>
+            </AnimatedPage>
+          }
+        />
+        <Route path="settings" element={<AnimatedPage><Setting /></AnimatedPage>}>
+          <Route
+            path="configuration"
+            element={<Configuration onConfigurationSave={handleConfigurationSave} />}
+          />
+          <Route
+            path="appearance"
+            element={<Appearance onQuoteColorChange={(v) => setQuoteColor(v)} />}
+          />
+          <Route
+            path="data"
+            element={<DataManagement onDataImported={onDataChanged} />}
+          />
+          <Route
+            path="systemInfo"
+            element={
+              <SystemInfo
+                onProStatusChange={(act: boolean) => {
+                  setIsProUser(act);
+                }}
+              />
+            }
+          />
+        </Route>
+        <Route
+          path="coins/:symbol"
+          element={
+            <AnimatedPage>
+              <CoinAnalysis currency={currentCurrency} dateRange={tDateRange} />
+            </AnimatedPage>
+          }
+        />
+        <Route path="*" element={<div>not found</div>} />
+      </Route>
+    </Routes>
+  );
+}
+
+const App = () => {
+  const { setNeedResize } = React.useContext(ChartResizeContext);
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
@@ -185,8 +408,6 @@ const App = () => {
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const windowSize = useWindowSize();
-  const [lastSize, setLastSize] = useState(windowSize);
   const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(
     undefined
   );
@@ -197,8 +418,8 @@ const App = () => {
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
 
-  const [activeMenu, setActiveMenu] = useState("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebarResizeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -218,13 +439,6 @@ const App = () => {
     );
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLastSize(windowSize);
-    }, resizeDelay); // to reduce resize count and cpu usage
-    return () => clearTimeout(timer);
-  }, [windowSize]);
-
   const tDateRange = useMemo(
     () => ({
       start: dateRange?.from ?? parseISO("1970-01-01"),
@@ -240,30 +454,6 @@ const App = () => {
     }),
     [availableDates]
   );
-
-  useEffect(() => {
-    resizeAllChartsInPage();
-  }, [lastSize, activeMenu, hasData]);
-
-  // Trigger chart resize when sidebar collapses/expands
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      window.dispatchEvent(new Event("resize"));
-      setNeedResize((pre) => pre + 1);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [sidebarCollapsed]);
-
-  function resizeAllChartsInPage() {
-    if (
-      lastSize.width === windowSize.width &&
-      lastSize.height === windowSize.height
-    ) {
-      setNeedResize((pre) => {
-        return pre + 1;
-      });
-    }
-  }
 
   function loadConfiguration() {
     queryPreferCurrency().then((c) => setCurrentCurrency(c));
@@ -285,38 +475,6 @@ const App = () => {
     };
   }
 
-  async function loadLastRefreshAt() {
-    const lra = await queryLastRefreshAt();
-    setLastRefreshAt(lra);
-
-    if (lra) {
-      setHasData(true);
-    } else {
-      setHasData(false);
-    }
-  }
-
-  async function loadDatePickerData() {
-    loadInitialQueryDateRange();
-    const days = await getAvailableDates();
-    setAvailableDates(days);
-  }
-
-  async function loadInitialQueryDateRange() {
-    const { dr, size } = await getInitialQueryDateRange();
-    setDateRange((prev) => {
-      const prevFrom = prev?.from?.getTime() ?? 0;
-      const prevTo = prev?.to?.getTime() ?? 0;
-      const nextFrom = dr?.from?.getTime() ?? 0;
-      const nextTo = dr?.to?.getTime() ?? 0;
-      if (prevFrom === nextFrom && prevTo === nextTo) {
-        return prev;
-      }
-      return dr;
-    });
-    setOriginalQuerySize(size);
-  }
-
   async function handleQuerySizeWhenConfigurationChange() {
     const { dr, size } = await getInitialQueryDateRange();
     if (size !== originalQuerySize) {
@@ -335,10 +493,27 @@ const App = () => {
   }
 
   function onDataChanged() {
-    loadAllData();
+    const currentHash = window.location.hash || "";
+    const isSettingsRoute = currentHash.startsWith("#/settings");
+    if (!isSettingsRoute) {
+      loadAllData();
+    }
     autoBackupHistoricalData(true);
     clearAllCache();
   }
+
+  const onDataChangedRef = useRef(onDataChanged);
+  onDataChangedRef.current = onDataChanged;
+
+  useEffect(() => {
+    const handleSoftRefresh = () => {
+      onDataChangedRef.current();
+    };
+    window.addEventListener(APP_SOFT_REFRESH_EVENT, handleSoftRefresh);
+    return () => {
+      window.removeEventListener(APP_SOFT_REFRESH_EVENT, handleSoftRefresh);
+    };
+  }, []);
 
   function clearAllCache() {
     console.debug("clear all cache");
@@ -368,195 +543,91 @@ const App = () => {
   }
 
   function loadAllData() {
-    // set a loading delay to show the loading animation
-    loadLastRefreshAt();
-    loadDatePickerData();
+    Promise.all([
+      queryLastRefreshAt(),
+      getAvailableDates(),
+      getInitialQueryDateRange(),
+    ]).then(([lra, days, queryInfo]) => {
+      setLastRefreshAt((prev) => (prev === lra ? prev : lra));
+      setHasData((prev) => {
+        const nextHasData = !!lra;
+        return prev === nextHasData ? prev : nextHasData;
+      });
+      setAvailableDates((prev) => (isSameDateList(prev, days) ? prev : days));
+
+      const { dr, size } = queryInfo;
+      setDateRange((prev) => {
+        const prevFrom = prev?.from?.getTime() ?? 0;
+        const prevTo = prev?.to?.getTime() ?? 0;
+        const nextFrom = dr?.from?.getTime() ?? 0;
+        const nextTo = dr?.to?.getTime() ?? 0;
+        if (prevFrom === nextFrom && prevTo === nextTo) {
+          return prev;
+        }
+        return dr;
+      });
+      setOriginalQuerySize((prev) => (prev === size ? prev : size));
+    });
   }
 
-  function Layout() {
-    const lo = useLocation();
-
-    useEffect(() => {
-      const loPath = lo.pathname;
-
-      switch (loPath) {
-        case "/overview":
-          setActiveMenu("overview");
-          break;
-        case "/wallets":
-          setActiveMenu("wallets");
-          break;
-        default:
-          if (lo.pathname.startsWith("/coins/")) {
-            setActiveMenu("coins");
-            break;
-          }
-          // not important
-          setActiveMenu("");
-          break;
+  function isSameDateList(prev: Date[], next: Date[]) {
+    if (prev.length !== next.length) {
+      return false;
+    }
+    for (let i = 0; i < prev.length; i++) {
+      if (prev[i]?.getTime() !== next[i]?.getTime()) {
+        return false;
       }
-    }, [lo.pathname]);
-
-    const sidebarWidth = sidebarCollapsed ? 52 : 200;
-
-    return (
-      <div className="min-h-screen">
-        <Sidebar
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          isProUser={isProUser}
-        />
-
-        <div
-          style={{ marginLeft: sidebarWidth }}
-          className="transition-[margin-left] duration-300 ease-in-out"
-        >
-          <TopBar
-            isProUser={isProUser}
-            quoteColor={quoteColor}
-            currentCurrency={currentCurrency}
-            availableDates={availableDates}
-            dateRange={dateRange}
-            onDatePickerValueChange={onDatePickerValueChange}
-            lastRefreshAt={lastRefreshAt}
-            onRefreshSuccess={onDataChanged}
-          />
-
-          {/* Main content */}
-          <main className="p-5">
-            <Outlet />
-          </main>
-        </div>
-      </div>
-    );
+    }
+    return true;
   }
 
-  function AppRoutes() {
-    return (
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/overview" />} />
-          <Route
-            path="overview"
-            element={
-              <AnimatedPage>
-                <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                  <Overview
-                    currency={currentCurrency}
-                    dateRange={tDateRange}
-                    quoteColor={quoteColor}
-                  />
-                </PageWrapper>
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="summary"
-            element={
-              <AnimatedPage>
-                <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                  <Summary
-                    currency={currentCurrency}
-                    dateRange={maxDateRange}
-                    quoteColor={quoteColor}
-                  />
-                </PageWrapper>
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="wallets"
-            element={
-              <AnimatedPage>
-                <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                  <WalletAnalysis
-                    currency={currentCurrency}
-                    dateRange={tDateRange}
-                    quoteColor={quoteColor}
-                  />
-                </PageWrapper>
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="comparison"
-            element={
-              <AnimatedPage>
-                <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                  <Comparison
-                    currency={currentCurrency}
-                    quoteColor={quoteColor}
-                  />
-                </PageWrapper>
-              </AnimatedPage>
-            }
-          />
-          <Route
-            path="history"
-            element={
-              <AnimatedPage>
-                <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                  <HistoricalData
-                    currency={currentCurrency}
-                    dateRange={tDateRange}
-                    quoteColor={quoteColor}
-                    afterDataChanged={onDataChanged}
-                  />
-                </PageWrapper>
-              </AnimatedPage>
-            }
-          />
-          <Route path="settings" element={<AnimatedPage><Setting /></AnimatedPage>}>
-            <Route
-              path="configuration"
-              element={
-                <Configuration
-                  onConfigurationSave={() => {
-                    handleQuerySizeWhenConfigurationChange();
-                    loadConfiguration();
-                  }}
-                />
-              }
-            />
-            <Route
-              path="appearance"
-              element={
-                <Appearance onQuoteColorChange={(v) => setQuoteColor(v)} />
-              }
-            />
-            <Route
-              path="data"
-              element={<DataManagement onDataImported={onDataChanged} />}
-            />
-            <Route
-              path="systemInfo"
-              element={
-                <SystemInfo
-                  onProStatusChange={(act: boolean) => {
-                    setIsProUser(act);
-                  }}
-                />
-              }
-            />
-          </Route>
-          <Route
-            path="coins/:symbol"
-            element={
-              <AnimatedPage>
-                <CoinAnalysis currency={currentCurrency} dateRange={tDateRange} />
-              </AnimatedPage>
-            }
-          />
-          <Route path="*" element={<div>not found</div>} />
-        </Route>
-      </Routes>
-    );
-  }
+  const handleConfigurationSave = useCallback(() => {
+    handleQuerySizeWhenConfigurationChange();
+    loadConfiguration();
+  }, [originalQuerySize]);
+
+  const handleSidebarToggle = useCallback(() => {
+    setSidebarCollapsed((prev) => !prev);
+
+    if (sidebarResizeTimerRef.current) {
+      window.clearTimeout(sidebarResizeTimerRef.current);
+    }
+    // Trigger resize after sidebar width transition ends.
+    sidebarResizeTimerRef.current = window.setTimeout(() => {
+      setNeedResize((prev) => prev + 1);
+    }, 320);
+  }, [setNeedResize]);
+
+  useEffect(() => {
+    return () => {
+      if (sidebarResizeTimerRef.current) {
+        window.clearTimeout(sidebarResizeTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div>
       <HashRouter>
-        <AppRoutes />
+        <AppRoutes
+          sidebarCollapsed={sidebarCollapsed}
+          onSidebarToggle={handleSidebarToggle}
+          isProUser={isProUser}
+          setIsProUser={setIsProUser}
+          quoteColor={quoteColor}
+          setQuoteColor={setQuoteColor}
+          currentCurrency={currentCurrency}
+          availableDates={availableDates}
+          dateRange={dateRange}
+          tDateRange={tDateRange}
+          maxDateRange={maxDateRange}
+          hasData={hasData}
+          onDatePickerValueChange={onDatePickerValueChange}
+          lastRefreshAt={lastRefreshAt}
+          onDataChanged={onDataChanged}
+          handleConfigurationSave={handleConfigurationSave}
+        />
       </HashRouter>
     </div>
   );
