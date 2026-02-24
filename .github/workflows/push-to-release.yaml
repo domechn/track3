@@ -1,0 +1,16 @@
+name: "push-master-to-release"
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  push-to-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push master to release branch
+        run: |
+          git push origin master:release --force
