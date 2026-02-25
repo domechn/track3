@@ -90,9 +90,13 @@ const App = ({
             errorMessage: description,
           };
         } else {
-          toast({
-            description: "Refresh successfully!",
-          });
+          const currentHash = window.location.hash || "";
+          const isSettingsRoute = currentHash.startsWith("#/settings");
+          if (!isSettingsRoute) {
+            toast({
+              description: "Refresh successfully!",
+            });
+          }
         }
         trackEventWithClientID("data_refreshed", trackProps);
 
