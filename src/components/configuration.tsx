@@ -63,12 +63,6 @@ import { getImageApiPath } from "@/utils/app";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import bluebird from "bluebird";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "./ui/tooltip";
 import { Switch } from "./ui/switch";
 import { SUIAnalyzer } from "@/middlelayers/datafetch/coins/sui";
 import {
@@ -1870,27 +1864,18 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={onUpdateCurrencyRatesClick}
-                      >
-                        <UpdateIcon
-                          className={`h-4 w-4 ${
-                            refreshCurrencyLoading ? "animate-spin" : ""
-                          }`}
-                        />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Refresh currency rates</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={onUpdateCurrencyRatesClick}
+                >
+                  <UpdateIcon
+                    className={`h-4 w-4 ${
+                      refreshCurrencyLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                </Button>
               </div>
               {preferredCurrencyDetail &&
                 preferCurrency !== defaultBaseCurrency && (
