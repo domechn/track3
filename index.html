@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track3 — Privacy-First Crypto Portfolio Tracker</title>
+  <meta name="description" content="Track3 is a privacy-focused desktop app to analyze your crypto assets across centralized exchanges and web3 wallets. No backend server, all data stored locally." />
+  <meta name="keywords" content="crypto, portfolio, tracker, bitcoin, ethereum, solana, binance, okx, privacy, desktop, tauri" />
+  <meta property="og:title" content="Track3 — Privacy-First Crypto Portfolio Tracker" />
+  <meta property="og:description" content="Analyze your crypto assets on centralized exchanges and web3 wallets. All data stored locally with encryption." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://domechn.github.io/track3/" />
+  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/domechn/track3/master/src-tauri/app-icon.png" />
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #09090b;
+      --bg-card: #18181b;
+      --bg-card-hover: #1f1f23;
+      --border: #27272a;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --accent: #6d5cff;
+      --accent-hover: #8577ff;
+      --accent-glow: rgba(109, 92, 255, .25);
+      --green: #22c55e;
+      --radius: 12px;
+    }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+    ul { list-style: none; }
+
+    /* ── Utility ── */
+    .container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+    /* ── Animated gradient background blobs ── */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: .15;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .blob--1 { width: 600px; height: 600px; background: var(--accent); top: -120px; left: -100px; }
+    .blob--2 { width: 500px; height: 500px; background: #22c55e; bottom: 10%; right: -80px; }
+
+    /* ── Header / Nav ── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(9,9,11,.7);
+      border-bottom: 1px solid var(--border);
+      transition: box-shadow .3s;
+    }
+    header.scrolled { box-shadow: 0 2px 24px rgba(0,0,0,.4); }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .nav__brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; }
+    .nav__brand img { width: 32px; height: 32px; border-radius: 8px; }
+    .nav__links { display: flex; gap: 32px; }
+    .nav__links a { font-size: .9rem; color: var(--text-muted); transition: color .2s; }
+    .nav__links a:hover { color: var(--text); }
+    .nav__cta {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent); color: #fff; font-size: .85rem; font-weight: 600;
+      padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;
+      transition: background .2s, box-shadow .2s;
+    }
+    .nav__cta:hover { background: var(--accent-hover); box-shadow: 0 0 20px var(--accent-glow); }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative; z-index: 1;
+      text-align: center;
+      padding: 160px 24px 80px;
+    }
+    .hero__badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(109,92,255,.12); border: 1px solid rgba(109,92,255,.25);
+      border-radius: 999px; padding: 6px 16px; font-size: .8rem; color: var(--accent);
+      margin-bottom: 28px; font-weight: 500;
+    }
+    .hero__badge svg { width: 14px; height: 14px; }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5.5vw, 4rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      line-height: 1.12;
+      margin-bottom: 20px;
+    }
+    .hero h1 span { background: linear-gradient(135deg, var(--accent), #22c55e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { color: var(--text-muted); font-size: 1.15rem; max-width: 580px; margin: 0 auto 40px; }
+    .hero__actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 28px; border-radius: 10px; font-size: .95rem; font-weight: 600;
+      border: none; cursor: pointer; transition: all .25s;
+    }
+    .btn--primary { background: var(--accent); color: #fff; }
+    .btn--primary:hover { background: var(--accent-hover); box-shadow: 0 0 32px var(--accent-glow); transform: translateY(-2px); }
+    .btn--outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn--outline:hover { border-color: var(--text-muted); transform: translateY(-2px); }
+    .btn svg { width: 18px; height: 18px; }
+
+    .hero__platforms {
+      margin-top: 20px;
+      font-size: .8rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Screenshot carousel ── */
+    .screenshots {
+      position: relative; z-index: 1;
+      padding: 0 0 100px;
+    }
+    .screenshots__track {
+      display: flex;
+      gap: 24px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      padding: 0 24px 20px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .screenshots__track::-webkit-scrollbar { display: none; }
+    .screenshots__track img {
+      flex: 0 0 min(85vw, 880px);
+      scroll-snap-align: center;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+      transition: transform .3s;
+    }
+    .screenshots__track img:hover { transform: scale(1.015); }
+    .screenshots__dots {
+      display: flex; justify-content: center; gap: 8px; margin-top: 24px;
+    }
+    .screenshots__dots button {
+      width: 8px; height: 8px; border-radius: 50%; border: none;
+      background: var(--border); cursor: pointer; transition: background .2s, transform .2s;
+      padding: 0;
+    }
+    .screenshots__dots button.active { background: var(--accent); transform: scale(1.3); }
+
+    /* ── Section styling ── */
+    .section { position: relative; z-index: 1; padding: 100px 0; }
+    .section__label {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: .75rem; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--accent); font-weight: 600; margin-bottom: 12px;
+    }
+    .section__title {
+      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+      font-weight: 700;
+      letter-spacing: -.02em;
+      margin-bottom: 16px;
+    }
+    .section__desc { color: var(--text-muted); max-width: 580px; font-size: 1.05rem; margin-bottom: 56px; }
+
+    /* ── Features grid ── */
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .feature {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      transition: border-color .3s, transform .3s, box-shadow .3s;
+    }
+    .feature:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+    .feature__icon {
+      width: 48px; height: 48px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px; font-size: 1.4rem;
+    }
+    .feature__icon--purple { background: rgba(109,92,255,.15); color: var(--accent); }
+    .feature__icon--green { background: rgba(34,197,94,.15); color: var(--green); }
+    .feature__icon--blue { background: rgba(59,130,246,.15); color: #3b82f6; }
+    .feature__icon--amber { background: rgba(245,158,11,.15); color: #f59e0b; }
+    .feature__icon--rose { background: rgba(244,63,94,.15); color: #f43f5e; }
+    .feature__icon--cyan { background: rgba(6,182,212,.15); color: #06b6d4; }
+    .feature h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+    .feature p { color: var(--text-muted); font-size: .9rem; line-height: 1.55; }
+
+    /* ── Exchanges ── */
+    .exchanges { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-top: 48px; }
+    .exchange {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 24px;
+      font-weight: 500; font-size: .95rem;
+      transition: border-color .3s, transform .3s;
+    }
+    .exchange:hover { border-color: var(--text-muted); transform: translateY(-2px); }
+    .exchange__logo { font-size: 1.3rem; }
+
+    /* ── Chains grid ── */
+    .chains {
+      display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 32px;
+    }
+    .chain {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 16px;
+      font-size: .82rem; color: var(--text-muted); font-weight: 500;
+      transition: border-color .2s;
+    }
+    .chain:hover { border-color: var(--text-muted); color: var(--text); }
+
+    /* ── Privacy banner ── */
+    .privacy-banner {
+      position: relative; z-index: 1;
+      background: linear-gradient(135deg, rgba(109,92,255,.08), rgba(34,197,94,.08));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 64px 48px;
+      text-align: center;
+      margin: 0 auto;
+      max-width: 900px;
+    }
+    .privacy-banner h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; margin-bottom: 16px; }
+    .privacy-banner p { color: var(--text-muted); max-width: 540px; margin: 0 auto 32px; font-size: 1rem; }
+    .privacy-checks { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; }
+    .privacy-check {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .9rem; font-weight: 500;
+    }
+    .privacy-check svg { color: var(--green); width: 20px; height: 20px; flex-shrink: 0; }
+
+    /* ── CTA section ── */
+    .cta {
+      position: relative; z-index: 1;
+      text-align: center;
+      padding: 120px 24px;
+    }
+    .cta h2 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -.02em;
+      margin-bottom: 16px;
+    }
+    .cta p { color: var(--text-muted); font-size: 1.1rem; margin-bottom: 36px; }
+
+    /* ── Footer ── */
+    footer {
+      position: relative; z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 40px 0;
+    }
+    .footer__inner {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+    }
+    .footer__left { color: var(--text-muted); font-size: .85rem; }
+    .footer__links { display: flex; gap: 24px; }
+    .footer__links a { color: var(--text-muted); font-size: .85rem; transition: color .2s; }
+    .footer__links a:hover { color: var(--text); }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(32px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in {
+      opacity: 0;
+      transform: translateY(32px);
+      transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1);
+    }
+    .animate-in.visible { opacity: 1; transform: translateY(0); }
+
+    /* hero elements animate on load */
+    .hero__badge { animation: fadeUp .6s .1s both; }
+    .hero h1 { animation: fadeUp .6s .2s both; }
+    .hero p { animation: fadeUp .6s .35s both; }
+    .hero__actions { animation: fadeUp .6s .5s both; }
+    .hero__platforms { animation: fadeUp .6s .6s both; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .nav__links { display: none; }
+      .hero { padding: 130px 20px 60px; }
+      .section { padding: 64px 0; }
+      .privacy-banner { padding: 40px 24px; }
+      .privacy-checks { gap: 16px; }
+      .cta { padding: 80px 20px; }
+      .features { grid-template-columns: 1fr; }
+      .footer__inner { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background blobs -->
+  <div class="blob blob--1"></div>
+  <div class="blob blob--2"></div>
+
+  <!-- Header -->
+  <header id="header">
+    <nav class="container nav">
+      <a href="#" class="nav__brand">
+        <img src="https://raw.githubusercontent.com/domechn/track3/master/src-tauri/app-icon.png" alt="Track3 icon" />
+        Track3
+      </a>
+      <div class="nav__links">
+        <a href="#features">Features</a>
+        <a href="#exchanges">Exchanges</a>
+        <a href="#screenshots">Screenshots</a>
+        <a href="#privacy">Privacy</a>
+      </div>
+      <a href="https://github.com/domechn/track3/releases/latest" class="nav__cta" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero__badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Privacy-first &middot; Open Source &middot; Desktop App
+    </div>
+    <h1>Unlock the insights of<br/>your <span>crypto assets</span></h1>
+    <p>
+      Track3 is a desktop portfolio tracker that aggregates your balances from centralized exchanges and web3 wallets.
+      No servers, no wallet signatures — all data stays on your machine.
+    </p>
+    <div class="hero__actions">
+      <a href="https://github.com/domechn/track3/releases/latest" class="btn btn--primary" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Latest Release
+      </a>
+      <a href="https://github.com/domechn/track3" class="btn btn--outline" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        View on GitHub
+      </a>
+    </div>
+    <p class="hero__platforms">Available on macOS, Windows, and Linux</p>
+  </section>
+
+  <!-- Screenshots -->
+  <section class="screenshots" id="screenshots">
+    <div class="screenshots__track" id="screenshotTrack">
+      <img src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc1.jpg" alt="Track3 Overview Dashboard" loading="lazy" />
+      <img src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc2.jpg" alt="Track3 Asset Analytics" loading="lazy" />
+      <img src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc3.jpg" alt="Track3 Wallet Analysis" loading="lazy" />
+      <img src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc4.jpg" alt="Track3 Coin Details" loading="lazy" />
+      <img src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc5.jpg" alt="Track3 Configuration" loading="lazy" />
+      <img src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc6.jpg" alt="Track3 Data Export" loading="lazy" />
+      <img src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc7.jpg" alt="Track3 PnL Chart" loading="lazy" />
+    </div>
+    <div class="screenshots__dots" id="screenshotDots"></div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="animate-in">
+        <p class="section__label">&#10024; Features</p>
+        <h2 class="section__title">Everything you need to track your portfolio</h2>
+        <p class="section__desc">
+          From exchange balances to on-chain wallets, Track3 brings all your crypto holdings into one
+          private, beautiful dashboard.
+        </p>
+      </div>
+      <div class="features">
+        <div class="feature animate-in">
+          <div class="feature__icon feature__icon--purple">&#128274;</div>
+          <h3>100% Local & Encrypted</h3>
+          <p>All data is stored locally in an encrypted SQLite database. No servers, no cloud — your API keys and wallet addresses never leave your machine.</p>
+        </div>
+        <div class="feature animate-in">
+          <div class="feature__icon feature__icon--green">&#128200;</div>
+          <h3>Rich Analytics & Charts</h3>
+          <p>Dozens of charts including asset proportions, PnL curves, top coins ranking, wallet breakdowns, historical performance, and more.</p>
+        </div>
+        <div class="feature animate-in">
+          <div class="feature__icon feature__icon--blue">&#128279;</div>
+          <h3>CEX & Web3 in One Place</h3>
+          <p>Connect centralized exchanges via read-only API keys and track on-chain wallets (BTC, ETH, SOL, DOGE, TON, SUI) simultaneously.</p>
+        </div>
+        <div class="feature animate-in">
+          <div class="feature__icon feature__icon--amber">&#128176;</div>
+          <h3>Profit & Loss Tracking</h3>
+          <p>Track your realized and unrealized PnL with cost-basis calculations, asset change history, and ATH (all-time-high) monitoring.</p>
+        </div>
+        <div class="feature animate-in">
+          <div class="feature__icon feature__icon--rose">&#128230;</div>
+          <h3>Backup & Restore</h3>
+          <p>Export your data to local files and import on other devices. Sync between machines using iCloud, Dropbox, or any cloud drive.</p>
+        </div>
+        <div class="feature animate-in">
+          <div class="feature__icon feature__icon--cyan">&#9939;</div>
+          <h3>No Wallet Signature Required</h3>
+          <p>Track3 only reads public on-chain data and exchange balances. It never requires transaction signing or fund access permissions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Exchanges & Chains -->
+  <section class="section" id="exchanges">
+    <div class="container" style="text-align:center;">
+      <div class="animate-in">
+        <p class="section__label">&#128257; Supported Platforms</p>
+        <h2 class="section__title">Connect your exchanges & wallets</h2>
+        <p class="section__desc" style="margin-left:auto;margin-right:auto;">
+          Track3 supports the most popular centralized exchanges and blockchains out of the box.
+          Only readonly API access is needed.
+        </p>
+      </div>
+      <div class="exchanges animate-in">
+        <div class="exchange"><span class="exchange__logo">&#127312;</span> Binance</div>
+        <div class="exchange"><span class="exchange__logo">&#127320;</span> OKX</div>
+        <div class="exchange"><span class="exchange__logo">&#127313;</span> Bitget</div>
+        <div class="exchange"><span class="exchange__logo">&#127318;</span> Kraken</div>
+        <div class="exchange"><span class="exchange__logo">&#127316;</span> Gate.io</div>
+        <div class="exchange"><span class="exchange__logo">&#127313;</span> Bybit</div>
+        <div class="exchange"><span class="exchange__logo">&#127314;</span> Coinbase</div>
+      </div>
+
+      <div class="animate-in" style="margin-top:64px;">
+        <h3 style="font-size:1.15rem;font-weight:600;margin-bottom:8px;">Supported Blockchains</h3>
+        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:20px;">Base chains for all users · 15+ EVM chains for Pro users</p>
+        <div class="chains">
+          <span class="chain">Bitcoin</span>
+          <span class="chain">Ethereum</span>
+          <span class="chain">BNB Chain</span>
+          <span class="chain">Solana</span>
+          <span class="chain">Dogecoin</span>
+          <span class="chain">TON</span>
+          <span class="chain">SUI</span>
+          <span class="chain">TRON</span>
+          <span class="chain" style="border-color: var(--accent); color: var(--accent);">+ Polygon (Pro)</span>
+          <span class="chain" style="border-color: var(--accent); color: var(--accent);">+ Arbitrum (Pro)</span>
+          <span class="chain" style="border-color: var(--accent); color: var(--accent);">+ Optimism (Pro)</span>
+          <span class="chain" style="border-color: var(--accent); color: var(--accent);">+ Avalanche (Pro)</span>
+          <span class="chain" style="border-color: var(--accent); color: var(--accent);">+ Base (Pro)</span>
+          <span class="chain" style="border-color: var(--accent); color: var(--accent);">+ More …</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="section" id="privacy">
+    <div class="container">
+      <div class="privacy-banner animate-in">
+        <p class="section__label" style="justify-content:center;">&#128737;&#65039; Privacy</p>
+        <h2>Your data, your control</h2>
+        <p>Track3 is designed from the ground up with privacy as a core principle. There is no backend server collecting your information — everything runs locally on your desktop.</p>
+        <div class="privacy-checks">
+          <div class="privacy-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            No data collection
+          </div>
+          <div class="privacy-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Encrypted local storage
+          </div>
+          <div class="privacy-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Open source
+          </div>
+          <div class="privacy-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Read-only API access
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <h2>Start tracking your crypto<br/>the private way</h2>
+    <p>Download Track3 for free and take control of your portfolio data.</p>
+    <div class="hero__actions">
+      <a href="https://github.com/domechn/track3/releases/latest" class="btn btn--primary" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download for Free
+      </a>
+      <a href="https://github.com/domechn/track3" class="btn btn--outline" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        Star on GitHub
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer__inner">
+      <div class="footer__left">&copy; 2024 Track3 &middot; Built with Tauri &amp; React</div>
+      <div class="footer__links">
+        <a href="https://github.com/domechn/track3" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/domechn/track3/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://deepwiki.com/domechn/track3" target="_blank" rel="noopener">Wiki</a>
+        <a href="https://github.com/domechn/track3/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* ── Header scroll effect ── */
+    const header = document.getElementById('header');
+    window.addEventListener('scroll', () => {
+      header.classList.toggle('scrolled', window.scrollY > 20);
+    }, { passive: true });
+
+    /* ── Scroll-reveal animation ── */
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+
+    /* ── Screenshot carousel dots ── */
+    const track = document.getElementById('screenshotTrack');
+    const dotsContainer = document.getElementById('screenshotDots');
+    const images = track.querySelectorAll('img');
+    let currentIdx = 0;
+
+    // Create dots
+    images.forEach((_, i) => {
+      const dot = document.createElement('button');
+      dot.setAttribute('aria-label', 'Go to screenshot ' + (i + 1));
+      if (i === 0) dot.classList.add('active');
+      dot.addEventListener('click', () => {
+        images[i].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      });
+      dotsContainer.appendChild(dot);
+    });
+
+    // Observe which image is visible
+    const dotObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const idx = Array.from(images).indexOf(e.target);
+          dotsContainer.querySelectorAll('button').forEach((d, i) => {
+            d.classList.toggle('active', i === idx);
+          });
+        }
+      });
+    }, { root: track, threshold: 0.6 });
+    images.forEach(img => dotObserver.observe(img));
+
+    /* ── Smooth scroll for anchor links ── */
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+
+</body>
+</html>
