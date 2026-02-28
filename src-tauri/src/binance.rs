@@ -1,5 +1,6 @@
 use binance::{
     account::Account, api::Binance as BinanceApi, futures::account::FuturesAccount,
+    margin::Margin,
     util::build_signed_request, wallet::Wallet,
 };
 use std::collections::HashMap;
@@ -46,6 +47,8 @@ impl Binance {
         let funding: Wallet =
             BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
         let futures: FuturesAccount =
+            BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
+        let margin: Margin =
             BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
         let acc = account.get_account().await?;
         // spot
@@ -112,6 +115,26 @@ impl Binance {
                 res.insert(asset.to_owned(), amount);
             }
         });
+
+        // cross margin
+        // some accounts may not have margin enabled, so we handle the error gracefully
+        let margin_details = margin.details().await;
+        if let Ok(margin_details) = margin_details {
+            margin_details.user_assets.into_iter().for_each(|asset| {
+                let amount = asset.net_asset;
+                if res.contains_key(&asset.asset) {
+                    let val = res.get(&asset.asset).unwrap();
+                    res.insert(asset.asset.to_owned(), val + amount);
+                } else {
+                    res.insert(asset.asset.to_owned(), amount);
+                }
+            });
+        } else {
+            println!(
+                "Failed to fetch cross margin account balances, error: {:?}",
+                margin_details.err()
+            );
+        }
 
         // futures
         // some accounts may not have futures enabled, so we handle the error gracefully
