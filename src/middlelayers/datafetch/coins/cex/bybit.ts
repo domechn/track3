@@ -11,6 +11,7 @@ type WalletBalanceResp = {
 		list: {
 			coin: {
 				coin: string
+				equity?: string
 				walletBalance: string
 				availableToWithdraw: string
 			}[]
@@ -107,7 +108,7 @@ export class BybitExchange implements Exchanger {
 		_(resp.result.list).forEach(account => {
 			_(account.coin).forEach(coin => {
 				const symbol = coin.coin
-				const balance = parseFloat(coin.walletBalance) || 0
+				const balance = parseFloat(coin.equity ?? coin.walletBalance) || 0
 				balances[symbol] = (balances[symbol] || 0) + balance
 			})
 		})
