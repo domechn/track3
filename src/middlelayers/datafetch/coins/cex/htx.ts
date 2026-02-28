@@ -2,6 +2,7 @@ import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
 import _ from 'lodash'
+import { addToBalanceMap } from './balance-utils'
 
 type AccountResp = {
 	status: string
@@ -104,7 +105,7 @@ export class HtxExchange implements Exchanger {
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
 		const accounts = await this.fetchAccounts()
-		const [spotBalance, earnBalance, futuresBalance] = await Promise.all([
+		const [spotBalance, earnBalance, futuresBalance, crossMarginBalance] = await Promise.all([
 			this.fetchSpotBalance(accounts),
 			this.fetchEarnBalance(accounts).catch(e => {
 				console.error("Fetch HTX earn balance failed:", e)
@@ -113,6 +114,10 @@ export class HtxExchange implements Exchanger {
 			this.fetchFuturesBalance().catch(e => {
 				console.error("Fetch HTX futures balance failed:", e)
 				return {}
+			}),
+			this.fetchCrossMarginBalance(accounts).catch(e => {
+				console.error("Fetch HTX cross margin balance failed:", e)
+				return {}
 			})
 		])
 
@@ -120,7 +125,58 @@ export class HtxExchange implements Exchanger {
 			.mergeWith(spotBalance, (a: number, b: number) => (a || 0) + (b || 0))
 			.mergeWith(earnBalance, (a: number, b: number) => (a || 0) + (b || 0))
 			.mergeWith(futuresBalance, (a: number, b: number) => (a || 0) + (b || 0))
+			.mergeWith(crossMarginBalance, (a: number, b: number) => (a || 0) + (b || 0))
 			.value()
+	}
+
+	private async fetchCrossMarginBalance(accounts: AccountResp['data']): Promise<{ [k: string]: number }> {
+		const crossMarginAccounts = _(accounts)
+			.filter(a => (a.type === "super-margin" || a.type === "cross-margin") && a.state === "working")
+			.value()
+
+		if (crossMarginAccounts.length === 0) {
+			return {}
+		}
+
+		const includedTypes = new Set(["trade", "frozen", "loan", "interest"])
+		const balances: { [k: string]: number } = {}
+
+		for (const account of crossMarginAccounts) {
+			const resp = await this.fetchSpot<AccountBalanceResp>("GET", `/v1/account/accounts/${account.id}/balance`)
+			if (resp.status !== "ok") {
+				continue
+			}
+
+			const grouped: { [k: string]: { trade: number, frozen: number, loan: number, interest: number } } = {}
+			_(resp.data.list).forEach(item => {
+				if (!includedTypes.has(item.type)) {
+					return
+				}
+				const symbol = item.currency.toUpperCase()
+				const amount = parseFloat(item.balance) || 0
+				if (!grouped[symbol]) {
+					grouped[symbol] = { trade: 0, frozen: 0, loan: 0, interest: 0 }
+				}
+				if (item.type === "trade") {
+					grouped[symbol].trade += amount
+				} else if (item.type === "frozen") {
+					grouped[symbol].frozen += amount
+				} else if (item.type === "loan") {
+					grouped[symbol].loan += amount
+				} else if (item.type === "interest") {
+					grouped[symbol].interest += amount
+				}
+			})
+
+			_(grouped).forEach((component, symbol) => {
+				const loan = component.loan > 0 ? component.loan : -component.loan
+				const interest = component.interest > 0 ? component.interest : -component.interest
+				const net = component.trade + component.frozen - loan - interest
+				addToBalanceMap(balances, symbol, net)
+			})
+		}
+
+		return balances
 	}
 
 	private async fetchAccounts(): Promise<AccountResp['data']> {

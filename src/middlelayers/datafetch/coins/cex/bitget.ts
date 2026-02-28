@@ -4,6 +4,7 @@ import { sendHttpRequest } from '../../utils/http'
 import _ from 'lodash'
 import bluebird from 'bluebird'
 import qs from 'qs'
+import { addToBalanceMap, netAssetFromBalanceFields } from './balance-utils'
 
 type SpotAccountResp = {
 	coin: string
@@ -26,6 +27,16 @@ type SavingAccountResp = {
 type EarnAccountResp = {
 	amount: string
 	coin: string
+}[]
+
+type CrossMarginAssetResp = {
+	coin: string
+	totalAmount: string
+	available: string
+	frozen: string
+	borrow: string
+	interest: string
+	net: string
 }[]
 
 type TickerData = {
@@ -70,7 +81,8 @@ export class BitgetExchange implements Exchanger {
 			this.fetchSpotBalance(),
 			// this.fetchSavingBalance(),
 			this.fetchFutureBalance(),
-			this.fetchEarnBalance()
+			this.fetchEarnBalance(),
+			this.fetchCrossMarginBalance()
 		], (v) => v)
 
 		return _(resp).reduce((acc, v) =>
@@ -146,6 +158,28 @@ export class BitgetExchange implements Exchanger {
 				.value()
 		} catch (e) {
 			console.error("Fetch earn balance failed", e)
+			return {}
+		}
+	}
+
+	private async fetchCrossMarginBalance(): Promise<{ [k: string]: number }> {
+		const path = "/api/v2/margin/crossed/account/assets"
+		try {
+			const resp = await this.fetch<{ data: CrossMarginAssetResp }>("GET", path)
+			const balances: { [k: string]: number } = {}
+			_(resp.data).forEach(asset => {
+				const amount = netAssetFromBalanceFields({
+					net: asset.net,
+					available: asset.available,
+					locked: asset.frozen,
+					borrowed: asset.borrow,
+					interest: asset.interest,
+				})
+				addToBalanceMap(balances, asset.coin, amount)
+			})
+			return balances
+		} catch (e) {
+			console.error("Fetch cross margin balance failed", e)
 			return {}
 		}
 	}
