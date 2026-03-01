@@ -1877,14 +1877,23 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   />
                 </Button>
               </div>
-              {preferredCurrencyDetail &&
-                preferCurrency !== defaultBaseCurrency && (
-                  <p className="text-xs text-muted-foreground">
-                    {`1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
-                      preferredCurrencyDetail.rate
-                    )} ${preferredCurrencyDetail.currency}`}
-                  </p>
-                )}
+              <p className="min-h-4 text-xs text-muted-foreground">
+                <span
+                  className={`block transition-opacity duration-250 ${
+                    preferredCurrencyDetail &&
+                    preferCurrency !== defaultBaseCurrency
+                      ? "opacity-100"
+                      : "opacity-0"
+                  }`}
+                >
+                  {preferredCurrencyDetail &&
+                  preferCurrency !== defaultBaseCurrency
+                    ? `1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
+                        preferredCurrencyDetail.rate
+                      )} ${preferredCurrencyDetail.currency}`
+                    : "\u00A0"}
+                </span>
+              </p>
             </div>
           </div>
         </CardContent>
