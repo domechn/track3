@@ -4,12 +4,19 @@ import { sendHttpRequest } from '../../utils/http'
 import _ from 'lodash'
 import bluebird from 'bluebird'
 import { getMemoryCacheInstance } from '../../utils/cache'
+import { addToBalanceMap, toNumber, toNumberOptional } from './balance-utils'
 
 type AccountBalanceResp = {
 	data: {
 		details: {
 			ccy: string
-			eq: string
+			eq?: string
+			availEq?: string
+			frozenBal?: string
+			cashBal?: string
+			upl?: string
+			liabilities?: string
+			interest?: string
 		}[]
 	}[]
 }
@@ -111,9 +118,32 @@ export class OkxExchange implements Exchanger {
 		const path = "/account/balance"
 		const resp = await this.fetch<AccountBalanceResp>("GET", path, "")
 
-		const allBalances = _(resp.data).flatMap(d => d.details).keyBy("ccy").mapValues("eq").value()
+		const parseNetAsset = (detail: AccountBalanceResp['data'][number]['details'][number]): number => {
+			const eq = toNumberOptional(detail.eq)
+			if (eq !== undefined) {
+				return eq
+			}
 
-		return _(allBalances).mapValues(v => parseFloat(v)).value()
+			const availEq = toNumberOptional(detail.availEq)
+			const frozenBal = toNumberOptional(detail.frozenBal)
+			if (availEq !== undefined || frozenBal !== undefined) {
+				return (availEq || 0) + (frozenBal || 0)
+			}
+
+			const cashBal = toNumber(detail.cashBal)
+			const upl = toNumber(detail.upl)
+			const liabilities = toNumber(detail.liabilities)
+			const interest = toNumber(detail.interest)
+			return cashBal + upl - liabilities - interest
+		}
+
+		const balances: { [k: string]: number } = {}
+		_(resp.data).flatMap(d => d.details).forEach(detail => {
+			const amount = parseNetAsset(detail)
+			addToBalanceMap(balances, detail.ccy, amount)
+		})
+
+		return balances
 	}
 
 	private async fetchSavingBalance(): Promise<{ [k: string]: number }> {
