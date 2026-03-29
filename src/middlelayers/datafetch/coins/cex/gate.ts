@@ -3,7 +3,7 @@ import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
 import _ from 'lodash'
 import bluebird from 'bluebird'
-import { addToBalanceMap, netAssetFromBalanceFields } from './balance-utils'
+import { addToBalanceMap, netAssetFromBalanceFields, toNumber } from './balance-utils'
 
 type PortfolioAccountResp = {
 	user_id: number,
@@ -49,6 +49,27 @@ type EarnAccountResp = {
 	currency: string,
 	amount: string
 }[]
+
+type StakingAssetResp = {
+	mortgage_coin: string
+	mortgage_amount: string
+}[]
+
+type FixedTermLendListResp = {
+	code: number
+	message: string
+	data: {
+		list: {
+			asset: string
+			principal: string
+		}[]
+		total: number
+	}
+}
+
+type DualBalanceResp = {
+	user_total_interest_usdt: string
+}
 
 type MarginAccountResp = {
 	currency_pair: string,
@@ -104,6 +125,9 @@ export class GateExchange implements Exchanger {
 		const resp = await bluebird.map([
 			this.fetchSpotBalance(),
 			this.fetchEarnBalance(),
+			this.fetchFixedTermBalance(),
+			this.fetchStakingBalance(),
+			this.fetchDualInvestmentBalance(),
 			this.fetchPortfolioBalance(),
 			this.fetchMarginBalance(),
 			this.functionOthersBalance(),
@@ -138,7 +162,75 @@ export class GateExchange implements Exchanger {
 		const path = "/earn/uni/lends"
 		const resp = await this.fetch<EarnAccountResp>("GET", path, "")
 
-		return _(resp).keyBy("currency").mapValues(v => parseFloat(v.amount)).value()
+		return _(resp).keyBy("currency").mapValues(v => toNumber(v.amount)).value()
+	}
+
+	private async fetchFixedTermBalance(): Promise<{ [k: string]: number }> {
+		try {
+			const balances: { [k: string]: number } = {}
+			let page = 1
+			const limit = 100
+
+			while (true) {
+				const queryParam = this.buildQueryParam({ order_type: 1, page, limit })
+				const resp = await this.fetch<FixedTermLendListResp>("GET", "/earn/fixed-term/user/lend", queryParam)
+				
+				if (resp.code !== 0) {
+					throw new Error(resp.message || "Fetch fixed-term balance failed")
+				}
+
+				const orders = resp.data?.list ?? []
+				_(orders).forEach((order) => {
+					addToBalanceMap(balances, order.asset, toNumber(order.principal))
+				})
+
+				const total = resp.data?.total ?? 0
+				if (orders.length === 0 || orders.length < limit || page * limit >= total) {
+					break
+				}
+				page += 1
+			}
+
+			return balances
+		} catch (e) {
+			console.error("Fetch fixed-term balance failed", e)
+			return {}
+		}
+	}
+
+	private async fetchStakingBalance(): Promise<{ [k: string]: number }> {
+		try {
+			const resp = await this.fetch<StakingAssetResp>("GET", "/earn/staking/assets", "")
+			
+			const balances: { [k: string]: number } = {}
+
+			_(resp).forEach((asset) => {
+				const coins = asset.mortgage_coin.split(",").map(v => v.trim()).filter(Boolean)
+				if (coins.length !== 1) {
+					console.warn("Skip multi-coin Gate staking asset", asset.mortgage_coin)
+					return
+				}
+				addToBalanceMap(balances, coins[0], toNumber(asset.mortgage_amount))
+			})
+
+			return balances
+		} catch (e) {
+			console.error("Fetch staking balance failed", e)
+			return {}
+		}
+	}
+
+	private async fetchDualInvestmentBalance(): Promise<{ [k: string]: number }> {
+		try {
+			const resp = await this.fetch<DualBalanceResp>("GET", "/earn/dual/balance", "")
+			
+			return {
+				USDT: toNumber(resp.user_total_interest_usdt),
+			}
+		} catch (e) {
+			console.error("Fetch dual investment balance failed", e)
+			return {}
+		}
 	}
 
 	private async fetchPortfolioBalance(): Promise<{ [k: string]: number }> {
@@ -194,22 +286,31 @@ export class GateExchange implements Exchanger {
 
 	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {
 		const url = `${this.endpoint}${this.apiPrefix}${path}`
+		const requestUrl = queryParam ? `${url}?${queryParam}` : url
 
-		const sigHeader = this.generateSignature(method, this.apiPrefix + path, queryParam)
+		const sigHeader = this.generateSignature(method, this.apiPrefix + path, queryParam, "")
 
 		const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', ...sigHeader }
 
-		const resp = await sendHttpRequest<T>(method, url, 5000, headers)
+		const resp = await sendHttpRequest<T>(method, requestUrl, 5000, headers)
 		return resp
 	}
 
-	private generateSignature(method: string, url: string, queryParam: string): { [k: string]: string } {
+	private buildQueryParam(params: { [k: string]: string | number | undefined }): string {
+		return _(params)
+			.toPairs()
+			.filter(([, value]) => value !== undefined)
+			.map(([key, value]) => `${key}=${value!.toString()}`)
+			.join("&")
+	}
+
+	private generateSignature(method: string, url: string, queryParam: string, payloadString: string): { [k: string]: string } {
 		const key = this.apiKey
 		const secret = this.secret
 
-		const t = Date.now() / 1000
+		const t = Math.floor(Date.now() / 1000)
 
-		const hashedPayload = CryptoJS.SHA512(queryParam).toString(CryptoJS.enc.Hex)
+		const hashedPayload = CryptoJS.SHA512(payloadString).toString(CryptoJS.enc.Hex)
 		const s = `${method}\n${url}\n${queryParam}\n${hashedPayload}\n${t}`
 
 		const sign = CryptoJS.HmacSHA512(s, secret).toString(CryptoJS.enc.Hex)
