@@ -35,14 +35,25 @@ type ETHStakingBalanceResp = {
 	}[]
 }
 
+type DualInvestmentOrderHistoryResp = {
+	data: {
+		ordId: string
+		state: string
+		notionalSz: string
+		notionalCcy: string
+	}[]
+}
+
 export class OkxExchange implements Exchanger {
 	private readonly apiKey: string
 	private readonly secret: string
 	private readonly password: string
 	private readonly alias?: string
+	private readonly dualInvestmentOrderHistoryIntervalMs = 1100
 
 	private readonly endpoint = "https://www.okx.com"
 	private readonly apiPrefix = "/api/v5"
+	private dualInvestmentOrderHistoryNextRequestAt = 0
 
 	constructor(
 		apiKey: string,
@@ -70,9 +81,16 @@ export class OkxExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const [sb, ssb, fb, esb, sdb] = await bluebird.map([this.fetchSpotBalance(), this.fetchSavingBalance(), this.fetchFundingBalance(), this.fetchETHStakingBalance(), this.fetchStakingDefiBalance()], (v) => v)
+		const [sb, ssb, fb, esb, sdb, dib] = await bluebird.map([
+			this.fetchSpotBalance(),
+			this.fetchSavingBalance(),
+			this.fetchFundingBalance(),
+			this.fetchETHStakingBalance(),
+			this.fetchStakingDefiBalance(),
+			this.fetchDualInvestmentBalance(),
+		], (v) => v)
 		const merge = (arrs: { [k: string]: number }[]) => _(arrs).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
-		const balance: { [k: string]: number } = merge([sb, ssb, fb, sdb])
+		const balance: { [k: string]: number } = merge([sb, ssb, fb, sdb, dib])
 		_(esb).forEach((v, k) => {
 			const bv = balance[k] || 0
 
@@ -180,8 +198,63 @@ export class OkxExchange implements Exchanger {
 		return res
 	}
 
+	private async fetchDualInvestmentBalance(): Promise<{ [k: string]: number }> {
+		const res: { [k: string]: number } = {}
+		// const activeStates = ["initial", "live", "pending_settle", "pending_redeem"] as const
+
+		const orders = await this.fetchDualInvestmentOrdersByState("live")
+		_(orders).forEach(order => {
+			const amount = parseFloat(order.notionalSz) || 0
+			if (!order.notionalCcy || amount <= 0) {
+				return
+			}
+
+			res[order.notionalCcy] = (res[order.notionalCcy] || 0) + amount
+		})
+
+		return res
+	}
+
+	private async fetchDualInvestmentOrdersByState(state: "initial" | "live" | "pending_settle" | "pending_redeem"): Promise<DualInvestmentOrderHistoryResp["data"]> {
+		const orders: DualInvestmentOrderHistoryResp["data"] = []
+		const limit = 100
+		let endId: string | undefined
+
+		while (true) {
+			const queryParam = this.buildQueryParam({
+				state,
+				limit: limit.toString(),
+				endId,
+			})
+			const resp = await this.fetchDualInvestmentOrderHistory(queryParam)
+
+			orders.push(...resp.data)
+			if (resp.data.length < limit) {
+				break
+			}
+
+			endId = _(resp.data).last()?.ordId
+			if (!endId) {
+				break
+			}
+		}
+
+		return orders
+	}
+
+	private async fetchDualInvestmentOrderHistory(queryParam: string): Promise<DualInvestmentOrderHistoryResp> {
+		const now = Date.now()
+		const waitMs = this.dualInvestmentOrderHistoryNextRequestAt - now
+		if (waitMs > 0) {
+			await bluebird.delay(waitMs)
+		}
+
+		this.dualInvestmentOrderHistoryNextRequestAt = Date.now() + this.dualInvestmentOrderHistoryIntervalMs
+		return this.fetch<DualInvestmentOrderHistoryResp>("GET", "/finance/sfp/dcd/order-history", queryParam)
+	}
+
 	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {
-		const url = `${this.endpoint}${this.apiPrefix}${path}`
+		const url = `${this.endpoint}${this.apiPrefix}${path}${queryParam}`
 
 		const sigHeader = this.generateSignature(method, this.apiPrefix + path, queryParam)
 
@@ -190,6 +263,18 @@ export class OkxExchange implements Exchanger {
 		const resp = await sendHttpRequest<T>(method, url, 5000, headers)
 
 		return resp
+	}
+
+	private buildQueryParam(params: { [k: string]: string | undefined }): string {
+		const searchParams = new URLSearchParams()
+		_(params).forEach((value, key) => {
+			if (value !== undefined && value !== '') {
+				searchParams.append(key, value)
+			}
+		})
+
+		const query = searchParams.toString()
+		return query ? `?${query}` : ''
 	}
 
 	private generateSignature(method: string, path: string, queryParam: string): { [k: string]: string } {
