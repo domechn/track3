@@ -3,6 +3,7 @@ import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
 import _ from 'lodash'
 import bluebird from 'bluebird'
+import { addToBalanceMap, netAssetFromBalanceFields } from './balance-utils'
 
 type PortfolioAccountResp = {
 	user_id: number,
@@ -49,6 +50,24 @@ type EarnAccountResp = {
 	amount: string
 }[]
 
+type MarginAccountResp = {
+	currency_pair: string,
+	base: {
+		currency: string,
+		available: string,
+		locked: string,
+		borrowed: string,
+		interest: string,
+	},
+	quote: {
+		currency: string,
+		available: string,
+		locked: string,
+		borrowed: string,
+		interest: string,
+	}
+}[]
+
 export class GateExchange implements Exchanger {
 
 	private readonly apiKey: string
@@ -82,7 +101,13 @@ export class GateExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const resp = await bluebird.map([this.fetchSpotBalance(), this.fetchEarnBalance(), this.fetchPortfolioBalance(), this.functionOthersBalance()], (v) => v)
+		const resp = await bluebird.map([
+			this.fetchSpotBalance(),
+			this.fetchEarnBalance(),
+			this.fetchPortfolioBalance(),
+			this.fetchMarginBalance(),
+			this.functionOthersBalance(),
+		], (v) => v)
 		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
 	}
 
@@ -131,12 +156,40 @@ export class GateExchange implements Exchanger {
 		}
 	}
 
+	private async fetchMarginBalance(): Promise<{ [k: string]: number }> {
+		const path = "/margin/accounts"
+		try {
+			const resp = await this.fetch<MarginAccountResp>("GET", path, "")
+
+			const balances: { [k: string]: number } = {}
+			const mergeLeg = (leg: { currency: string, available: string, locked: string, borrowed: string, interest: string }) => {
+				const net = netAssetFromBalanceFields({
+					available: leg.available,
+					locked: leg.locked,
+					borrowed: leg.borrowed,
+					interest: leg.interest,
+				})
+				addToBalanceMap(balances, leg.currency, net)
+			}
+
+			_(resp).forEach((account) => {
+				mergeLeg(account.base)
+				mergeLeg(account.quote)
+			})
+
+			return balances
+		} catch (e) {
+			console.error("Fetch margin balance failed", e)
+			return {}
+		}
+	}
+
 	// total balance in USDT
 	private async functionOthersBalance(): Promise<{ [k: string]: number }> {
 		const path = "/wallet/total_balance"
 		const resp = await this.fetch<TotalBalanceResp>("GET", path, "")
 
-		return _(resp.details).pickBy((v, k) => ["futures", "options", "payment", "quant", "margin"].includes(k)).mapKeys(v => v.currency).mapValues(v => parseFloat(v.amount)).value()
+		return _(resp.details).pickBy((v, k) => ["futures", "options", "payment", "quant"].includes(k)).mapKeys(v => v.currency).mapValues(v => parseFloat(v.amount)).value()
 	}
 
 	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {
