@@ -11,6 +11,7 @@ import { BitgetExchange } from './bitget'
 import { CoinbaseExchange } from './coinbase'
 import { BybitExchange } from './bybit'
 import { HtxExchange } from './htx'
+import { MexcExchange } from './mexc'
 
 export interface Exchanger {
 	getExchangeName(): string
@@ -68,6 +69,8 @@ export class CexAnalyzer implements Analyzer {
 					return new BybitExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				case "htx":
 					return new HtxExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
+				case "mexc":
+					return new MexcExchange(exCfg.initParams.apiKey, exCfg.initParams.secret, exCfg.alias)
 				default:
 					return new OtherCexExchanges(exCfg.name, exCfg.initParams, exCfg.alias)
 			}
