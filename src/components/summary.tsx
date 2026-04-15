@@ -92,7 +92,7 @@ const App = ({
             <FadeUp>
               <div className="rounded-xl border bg-card text-card-foreground shadow glass px-4 py-10 text-center">
                 <div className="text-lg text-muted-foreground">
-                  Select a valid date range to view summary metrics.
+                  Historical data is required to view summary metrics.
                 </div>
               </div>
             </FadeUp>
@@ -101,7 +101,7 @@ const App = ({
         {pageLoading && (
           <PageLoadingOverlay
             title="Loading summary data"
-            description="Refreshing all-time-high and profit summary metrics for the selected range."
+            description="Refreshing all-time-high and profit summary metrics across the full available history."
           />
         )}
       </div>

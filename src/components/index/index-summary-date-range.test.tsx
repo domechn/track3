@@ -150,7 +150,7 @@ beforeEach(() => {
 });
 
 describe("Summary route date range", () => {
-  it("passes the selected date range to the summary page instead of the full available range", async () => {
+  it("passes the full available range to the summary page instead of the selected date range", async () => {
     render(
       <ChartResizeContext.Provider
         value={{
@@ -164,7 +164,7 @@ describe("Summary route date range", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("summary-range")).toHaveTextContent(
-        "2024-04-02T00:00:00.000Z|2024-04-03T00:00:00.000Z"
+        "2024-04-01T00:00:00.000Z|2024-04-04T00:00:00.000Z"
       );
     });
   });
