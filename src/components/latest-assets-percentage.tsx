@@ -100,7 +100,7 @@ const App = ({
   }, [latestAssetsPercentageData]);
 
   async function loadData(dr: TDateRange) {
-    const lap = await queryLatestAssetsPercentage();
+    const lap = await queryLatestAssetsPercentage(dr);
     setLatestAssetsPercentageData(lap);
   }
 

@@ -171,9 +171,9 @@ class AssetHandler implements AssetHandlerImpl {
 	}
 
 	// get max amount of owned asset by symbol
-	async getMaxAmountBySymbol(symbol: string): Promise<number> {
-		const sql = `SELECT sum(amount) as amount FROM ${this.assetTableName} WHERE symbol = ? GROUP BY uuid ORDER BY amount DESC LIMIT 1`
-		const models = await selectFromDatabaseWithSql<AssetModel>(sql, [symbol])
+	async getMaxAmountBySymbol(symbol: string, start?: Date, end?: Date): Promise<number> {
+		const sql = `SELECT sum(amount) as amount FROM ${this.assetTableName} WHERE symbol = ? ${start ? "AND createdAt >= ?" : ""} ${end ? "AND createdAt <= ?" : ""} GROUP BY uuid ORDER BY amount DESC LIMIT 1`
+		const models = await selectFromDatabaseWithSql<AssetModel>(sql, [symbol, ..._([start, end]).compact().map(d => d.toISOString()).value()])
 
 		return models[0]?.amount || 0
 	}

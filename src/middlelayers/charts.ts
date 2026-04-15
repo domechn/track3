@@ -529,8 +529,8 @@ async function queryCoinsData(lastAssets: AssetModel[], addProgress: AddProgress
 	return queryCoinsDataByWalletCoins(assets, config, lastAssets, userProInfo, addProgress)
 }
 
-export async function queryAssetMaxAmountBySymbol(symbol: string): Promise<number> {
-	return ASSET_HANDLER.getMaxAmountBySymbol(symbol)
+export async function queryAssetMaxAmountBySymbol(symbol: string, dateRange?: TDateRange): Promise<number> {
+	return ASSET_HANDLER.getMaxAmountBySymbol(symbol, dateRange?.start, dateRange?.end)
 }
 
 // return all transactions for exporting data
@@ -538,7 +538,11 @@ export function queryAllTransactions(): Promise<TransactionModel[]> {
 	return TRANSACTION_HANDLER.listTransactions()
 }
 
-export async function queryLastAssetsBySymbol(symbol: string): Promise<Asset | undefined> {
+export async function queryLastAssetsBySymbol(symbol: string, dateRange?: TDateRange): Promise<Asset | undefined> {
+	if (dateRange) {
+		const models = await ASSET_HANDLER.listAssetsMaxCreatedAt(dateRange.start, dateRange.end, symbol)
+		return convertAssetModelsToAsset(symbol, [models])
+	}
 	const models = await ASSET_HANDLER.listAssetsBySymbol(symbol, 1)
 	return convertAssetModelsToAsset(symbol, models)
 }
@@ -587,7 +591,15 @@ async function deleteTransactionsByAssetID(id: number): Promise<void> {
 	return TRANSACTION_HANDLER.deleteTransactionsByAssetID(id)
 }
 
-export async function queryTotalValue(): Promise<TotalValueData> {
+export async function queryTotalValue(dateRange?: TDateRange): Promise<TotalValueData> {
+	if (dateRange) {
+		const results = await ASSET_HANDLER.listTotalValueRecords(dateRange.start, dateRange.end)
+		const latest = _(results).last()
+		return {
+			totalValue: latest?.totalValue || 0,
+		}
+	}
+
 	const results = await ASSET_HANDLER.listSymbolGroupedAssets(1)
 
 	if (results.length === 0) {
@@ -840,10 +852,10 @@ export async function queryLatestAssets(): Promise<Asset[]> {
 		})).value()
 }
 
-export async function queryLatestAssetsPercentage(): Promise<LatestAssetsPercentageData> {
-	const size = 1
-
-	const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size)
+export async function queryLatestAssetsPercentage(dateRange?: TDateRange): Promise<LatestAssetsPercentageData> {
+	const assets = dateRange
+		? await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(dateRange.start, dateRange.end)
+		: await ASSET_HANDLER.listSymbolGroupedAssets(1)
 	if (assets.length === 0) {
 		return []
 	}
