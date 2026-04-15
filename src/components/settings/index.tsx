@@ -52,8 +52,9 @@ function TabLink({
   return (
     <Link
       to={to}
+      aria-current={match ? "page" : undefined}
       className={cn(
-        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+        "flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
         match
           ? "bg-accent/80 text-accent-foreground"
           : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
@@ -70,11 +71,15 @@ const App = () => {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-1 glass rounded-xl px-2 py-1.5">
+      <h1 className="sr-only">Settings</h1>
+      <nav
+        aria-label="Settings sections"
+        className="flex flex-wrap items-center gap-1 glass rounded-xl px-2 py-1.5"
+      >
         {settingsTabs.map((tab) => (
           <TabLink key={tab.href} to={tab.href} title={tab.title} icon={tab.icon} />
         ))}
-      </div>
+      </nav>
       <div className="w-full">
         <Outlet />
         {lo.pathname === "/settings" && (
