@@ -63,7 +63,7 @@ SQLite with versioned migrations in `src-tauri/migrations/` (v1→v5). Key table
 
 ## Build Requirements
 
-- Node.js 20+, Yarn, Rust 1.81.0+
+- Node.js 24+, Yarn, Rust 1.94.1+
 - macOS: Xcode CLI tools
 - Linux: `libwebkit2gtk-4.0-dev`, `libappindicator3-dev`, and related system libs
 - Windows: MSVC toolchain

@@ -13,13 +13,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            args: ''
+            args: ""
           - os: macos-latest
             args: --target x86_64-apple-darwin
           - os: macos-latest
             args: --target aarch64-apple-darwin
           - os: windows-latest
-            args: ''
+            args: ""
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -27,11 +27,11 @@ jobs:
       - name: setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.81.0
+          toolchain: 1.94.1
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: install target (mac only)
         if: matrix.os == 'macos-latest'
         run: |
-            rustup target add x86_64-apple-darwin
+          rustup target add x86_64-apple-darwin
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         shell: bash
@@ -83,9 +83,9 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Install Node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - run: yarn
 
