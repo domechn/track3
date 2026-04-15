@@ -6,8 +6,9 @@ import {
   TDateRange,
 } from "@/middlelayers/types";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { StaggerContainer, FadeUp } from "./motion";
+import PageLoadingOverlay from "./page-loading-overlay";
 
 const App = ({
   currency,
@@ -25,13 +26,11 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.end, dateRange.start]
   );
-  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
 
-  if (prevQueryKey !== queryKey) {
-    setPrevQueryKey(queryKey);
+  useLayoutEffect(() => {
     loadedCountRef.current = 0;
     setPageLoading(true);
-  }
+  }, [queryKey]);
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;
@@ -40,14 +39,10 @@ const App = ({
     }
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setPageLoading(false), 8000);
-    return () => clearTimeout(timer);
-  }, [queryKey]);
-
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
-      <div className="relative min-h-[400px]">
+      <div className="relative min-h-[400px]" aria-busy={pageLoading}>
+        <h1 className="sr-only">Wallets</h1>
         <StaggerContainer className="space-y-3">
           <FadeUp>
             <WalletAssetsPercentage currency={currency} dateRange={dateRange} />
@@ -60,11 +55,12 @@ const App = ({
             />
           </FadeUp>
         </StaggerContainer>
-        <div
-          className={`absolute inset-0 z-10 backdrop-blur-md bg-background/60 rounded-lg transition-opacity duration-500 ${
-            pageLoading ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        />
+        {pageLoading && (
+          <PageLoadingOverlay
+            title="Loading wallet analytics"
+            description="Refreshing wallet allocation and wallet performance cards."
+          />
+        )}
       </div>
     </OverviewLoadingContext.Provider>
   );

@@ -65,6 +65,7 @@ import {
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
 import { StaggerContainer, FadeUp } from "./motion";
+import PageLoadingOverlay from "./page-loading-overlay";
 
 type HistoricalListRow = {
   id: string;
@@ -221,15 +222,6 @@ const App = ({
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
-
-  // Fallback timeout to ensure loading always resolves
-  useEffect(() => {
-    if (!pageLoading) {
-      return;
-    }
-    const timer = setTimeout(() => setPageLoading(false), 8000);
-    return () => clearTimeout(timer);
-  }, [pageLoading, rangeKey]);
 
   const maxDataPage = useMemo(() => {
     const pageCount = Math.ceil(dataRows.length / pageSize);
@@ -413,7 +405,9 @@ const App = ({
   const latestRow = dataRows[0] ?? null;
 
   return (
-    <StaggerContainer className="space-y-4">
+    <div aria-busy={pageLoading}>
+      <h1 className="sr-only">Historical Data</h1>
+      <StaggerContainer className="space-y-4">
       <Dialog
         open={isModalOpen}
         onOpenChange={(open) => {
@@ -693,6 +687,8 @@ const App = ({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label="Previous page"
+                  className="h-11 w-11 px-0 sm:h-8 sm:w-8"
                   onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
                   disabled={dataPage <= 0}
                 >
@@ -723,6 +719,8 @@ const App = ({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label="Next page"
+                  className="h-11 w-11 px-0 sm:h-8 sm:w-8"
                   onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
                   disabled={dataPage >= maxDataPage}
                 >
@@ -852,11 +850,12 @@ const App = ({
                 </Table>
               </ScrollArea>
 
-              <div
-                className={`absolute inset-0 z-10 rounded-lg backdrop-blur-md bg-background/60 transition-opacity duration-500 ${
-                  pageLoading ? "opacity-100" : "opacity-0 pointer-events-none"
-                }`}
-              />
+               {pageLoading && (
+                 <PageLoadingOverlay
+                   title="Loading historical data"
+                   description="Refreshing stored snapshots and historical totals for the selected range."
+                 />
+               )}
 
               {emptyState ? (
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -869,7 +868,8 @@ const App = ({
           </CardContent>
         </Card>
       </FadeUp>
-    </StaggerContainer>
+      </StaggerContainer>
+    </div>
   );
 };
 

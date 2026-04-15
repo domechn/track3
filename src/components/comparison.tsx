@@ -29,6 +29,8 @@ import {
 import { positiveNegativeColor } from "@/utils/color";
 import { StaggerContainer, FadeUp } from "./motion";
 import { Card, CardContent } from "./ui/card";
+import { Button } from "./ui/button";
+import PageLoadingOverlay from "./page-loading-overlay";
 
 type MetricRow = {
   base: number;
@@ -139,12 +141,6 @@ const App = ({
     let cancelled = false;
     const gen = ++loadGenRef.current;
 
-    const fallback = setTimeout(() => {
-      if (!cancelled && gen === loadGenRef.current) {
-        setPageLoading(false);
-      }
-    }, 8000);
-
     Promise.all([loadDataByUUID(baseId), loadDataByUUID(headId)])
       .then(([nextBaseData, nextHeadData]) => {
         if (cancelled || gen !== loadGenRef.current) {
@@ -160,12 +156,10 @@ const App = ({
           setHeadData([]);
           setPageLoading(false);
         }
-      })
-      .finally(() => clearTimeout(fallback));
+      });
 
     return () => {
       cancelled = true;
-      clearTimeout(fallback);
     };
   }, [baseId, headId]);
 
@@ -409,18 +403,22 @@ const App = ({
   const hasData = coinComparisons.length > 0;
 
   return (
-    <div className="relative min-h-[400px]">
+    <div className="relative min-h-[400px]" aria-busy={pageLoading}>
+      <h1 className="sr-only">Comparison</h1>
       <StaggerContainer className="space-y-3">
         <FadeUp>
           <Card>
             <CardContent className="pt-5 pb-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-3">
-                  <button
+                  <Button
                     type="button"
                     onClick={onViewOrHideClick}
-                    className="cursor-pointer"
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
                     aria-label={shouldMaskValue ? "show values" : "hide values"}
+                    aria-pressed={shouldMaskValue}
                   >
                     <img
                       src={shouldMaskValue ? HideIcon : ViewIcon}
@@ -428,7 +426,7 @@ const App = ({
                       width={22}
                       height={22}
                     />
-                  </button>
+                  </Button>
                   <div className="flex items-center gap-2">
                     <Select onValueChange={onBaseSelectChange} value={baseId}>
                       <SelectTrigger className="w-[150px]">
@@ -558,11 +556,12 @@ const App = ({
           </>
         )}
       </StaggerContainer>
-      <div
-        className={`absolute inset-0 z-10 backdrop-blur-md bg-background/60 rounded-lg transition-opacity duration-500 ${
-          pageLoading ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-      />
+      {pageLoading && (
+        <PageLoadingOverlay
+          title="Loading comparison data"
+          description="Refreshing base and comparison snapshots for the selected dates."
+        />
+      )}
     </div>
   );
 };
