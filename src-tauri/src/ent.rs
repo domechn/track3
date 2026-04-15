@@ -1,5 +1,5 @@
 use magic_crypt::{new_magic_crypt, MagicCrypt256, MagicCryptTrait};
-use rand::Rng;
+use uuid::Uuid;
 
 pub struct Ent {
     salt: String,
@@ -37,12 +37,12 @@ impl Ent {
     }
 
     fn get_rand_str(&self, size: i32) -> String {
-        let mut rng = rand::thread_rng();
-        let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        Uuid::new_v4()
+            .simple()
+            .to_string()
             .chars()
-            .collect();
-        let string: String = (0..size).map(|_| rng.choose(&chars).unwrap()).collect();
-        string
+            .take(size as usize)
+            .collect()
     }
 
     pub fn encrypt(&self, data: String) -> Result<String, Box<dyn std::error::Error>> {
