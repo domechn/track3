@@ -10,7 +10,7 @@ import {
   QuoteColor,
   TDateRange,
 } from "../middlelayers/types";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -40,7 +40,7 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end]
   );
-  useEffect(() => {
+  useLayoutEffect(() => {
     setPageLoading(true);
     loadedCountRef.current = 0;
   }, [rangeKey]);
@@ -57,15 +57,10 @@ const App = ({
     [reportLoaded]
   );
 
-  // Fallback timeout to ensure loading always resolves
-  useEffect(() => {
-    const timer = setTimeout(() => setPageLoading(false), 8000);
-    return () => clearTimeout(timer);
-  }, [rangeKey]);
-
   return (
     <OverviewLoadingContext.Provider value={loadingContextValue}>
-      <div className="relative min-h-[400px]">
+      <div className="relative min-h-[400px]" aria-busy={pageLoading}>
+        <h1 className="sr-only">Overview</h1>
         <Collapsible open={isShowMore} onOpenChange={setIsShowMore}>
           <StaggerContainer className="space-y-3">
             <div className="grid gap-5 grid-cols-2">
@@ -121,13 +116,26 @@ const App = ({
             </StaggerContainer>
           </CollapsibleContent>
         </Collapsible>
-        <div
-          className={`absolute inset-0 z-10 backdrop-blur-md bg-background/60 rounded-lg transition-opacity duration-500 ${
-            pageLoading
-              ? "opacity-100"
-              : "opacity-0 pointer-events-none"
-          }`}
-        />
+        {pageLoading && (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/65 px-4 backdrop-blur-md"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <div className="glass-subtle flex max-w-sm flex-col items-center gap-3 rounded-xl px-5 py-4 text-center">
+              <div className="h-2 w-24 rounded-full bg-primary/20">
+                <div className="h-full w-1/2 animate-pulse rounded-full bg-primary/70 motion-reduce:animate-none" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Loading overview data</p>
+                <p className="text-xs text-muted-foreground">
+                  Updating your portfolio cards for the selected date range.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </OverviewLoadingContext.Provider>
   );

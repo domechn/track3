@@ -42,10 +42,22 @@ const App = ({
   );
 
   useEffect(() => {
-    loadChartData(dateRange).then(() => {
-      resizeChartWithDelay(chartName);
-      reportLoaded();
-    });
+    let active = true;
+    void loadChartData(dateRange)
+      .then(() => {
+        if (active) {
+          resizeChartWithDelay(chartName);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          reportLoaded();
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [rangeKey]);
 
   useEffect(() => resizeChart(chartName), [needResize]);

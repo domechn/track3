@@ -37,9 +37,16 @@ const App = ({
   );
 
   useEffect(() => {
-    loadTableData().then(() => {
-      reportLoaded();
+    let active = true;
+    void loadTableData().finally(() => {
+      if (active) {
+        reportLoaded();
+      }
     });
+
+    return () => {
+      active = false;
+    };
   }, [rangeKey]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
@@ -107,9 +114,9 @@ const App = ({
           <CardTitle className="text-sm font-medium text-muted-foreground">PNL Analysis</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <div
-              className="flex flex-col items-center justify-center border-r border-border/50"
+              className="flex min-h-[88px] flex-col items-center justify-center border-b border-border/50 pb-3 sm:min-h-0 sm:border-b-0 sm:border-r sm:pb-0"
               title={formatTimestampData(pnlTableData.todayPNL?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">Last PNL</div>
@@ -129,7 +136,7 @@ const App = ({
               </p>
             </div>
             <div
-              className="flex flex-col items-center justify-center border-r border-border/50"
+              className="flex min-h-[88px] flex-col items-center justify-center border-b border-border/50 pb-3 sm:min-h-0 sm:border-b-0 sm:border-r sm:pb-0"
               title={formatTimestampData(pnlTableData.sevenTPnl?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">7T PNL</div>
@@ -149,7 +156,7 @@ const App = ({
               </p>
             </div>
             <div
-              className="flex flex-col items-center justify-center"
+              className="flex min-h-[88px] flex-col items-center justify-center"
               title={formatTimestampData(pnlTableData.thirtyPNL?.timestamp)}
             >
               <div className="text-xs text-muted-foreground">30T PNL</div>

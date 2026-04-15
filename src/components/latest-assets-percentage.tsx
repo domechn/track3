@@ -22,7 +22,7 @@ import { Separator } from "./ui/separator";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import bluebird from "bluebird";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import {
   queryLatestAssetsPercentage,
@@ -52,7 +52,6 @@ const App = ({
   const chartRef =
     useRef<ChartJSOrUndefined<"doughnut", number[], unknown>>(null);
   const pageSize = 5;
-  const navigate = useNavigate();
 
   const percentageData = useMemo(() => {
     return splitTopAndOtherData(latestAssetsPercentageData);
@@ -65,10 +64,22 @@ const App = ({
   );
 
   useEffect(() => {
-    loadData(dateRange).then(() => {
-      resizeChartWithDelay(chartName);
-      reportLoaded();
-    });
+    let active = true;
+    void loadData(dateRange)
+      .then(() => {
+        if (active) {
+          resizeChartWithDelay(chartName);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          reportLoaded();
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [rangeKey]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
@@ -214,6 +225,8 @@ const App = ({
             <Button
               variant="outline"
               size="sm"
+              aria-label="Previous token holdings page"
+              className="h-11 min-w-[44px] px-3 sm:h-8 sm:min-w-[32px]"
               onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
               disabled={dataPage <= 0}
             >
@@ -225,6 +238,8 @@ const App = ({
             <Button
               variant="outline"
               size="sm"
+              aria-label="Next token holdings page"
+              className="h-11 min-w-[44px] px-3 sm:h-8 sm:min-w-[32px]"
               onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
               disabled={dataPage >= maxDataPage}
             >
@@ -236,13 +251,13 @@ const App = ({
         <Table>
           <TableBody>
             {pagedLatestAssetsPercentageData.map((d) => (
-              <TableRow
-                key={d.coin}
-                className="h-[42px] cursor-pointer group"
-                onClick={() => navigate(`/coins/${d.coin}`)}
-              >
+              <TableRow key={d.coin} className="h-[42px]">
                 <TableCell className="py-1.5">
-                  <div className="flex flex-row items-center">
+                  <Link
+                    to={`/coins/${d.coin}`}
+                    aria-label={`Open ${d.coin} details`}
+                    className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
                     <img
                       className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
                       src={logoMap[d.coin] || UnknownLogo}
@@ -263,7 +278,7 @@ const App = ({
                       {d.coin}
                     </div>
                     <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
-                  </div>
+                  </Link>
                 </TableCell>
                 <TableCell className="text-right py-1.5">
                   <div className="text-muted-foreground text-xs">

@@ -18,7 +18,7 @@ import _ from "lodash";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
 import { positiveNegativeColor } from "@/utils/color";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
@@ -67,7 +67,6 @@ const App = ({
     }[]
   >([]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
-  const navigate = useNavigate();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
   const logoPathCacheRef = useRef<Map<string, string>>(new Map());
@@ -179,16 +178,16 @@ const App = ({
     rankStart = 1
   ) =>
     rows.map((d, idx) => (
-      <TableRow
-        key={d.symbol}
-        className="h-[42px] cursor-pointer group"
-        onClick={() => navigate(`/coins/${d.symbol}`)}
-      >
+      <TableRow key={d.symbol} className="h-[42px]">
         <TableCell className="w-[36px] py-1.5 text-xs text-muted-foreground font-mono">
           #{rankStart + idx}
         </TableCell>
         <TableCell className="py-1.5">
-          <div className="flex flex-row items-center">
+          <Link
+            to={`/coins/${d.symbol}`}
+            aria-label={`Open ${d.symbol} details`}
+            className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
             <img
               className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
               src={logoMap[d.symbol] || UnknownLogo}
@@ -196,7 +195,7 @@ const App = ({
             />
             <div className="font-medium text-sm">{d.symbol}</div>
             <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
-          </div>
+          </Link>
         </TableCell>
         <TableCell className="text-right py-1.5">
           <div className={`text-sm ${getToneClass(d.value, quoteColor)}`}>
