@@ -7,6 +7,9 @@
     "type": "git",
     "url": "https://github.com/domechn/track3.git"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "resolutions": {
     "tailwindcss/**/picomatch": "^2.3.2"
   },
@@ -88,7 +91,7 @@
     "@types/crypto-js": "^4.2.1",
     "@types/lodash": "^4.14.194",
     "@types/md5": "^2.3.2",
-    "@types/node": "^20.8.10",
+    "@types/node": "^24.0.0",
     "@types/qs": "^6.9.15",
     "@types/query-string": "^6.3.0",
     "@types/react": "^18.0.15",
