@@ -242,11 +242,11 @@ const App = ({
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData(dr: TDateRange, gen: number) {
-    return bluebird.all([loadTotalValue(gen), loadChartData(dr, gen)]);
+    return bluebird.all([loadTotalValue(dr, gen), loadChartData(dr, gen)]);
   }
 
-  async function loadTotalValue(gen: number) {
-    const tv = await queryTotalValue();
+  async function loadTotalValue(dr: TDateRange, gen: number) {
+    const tv = await queryTotalValue(dr);
     if (gen !== loadGenRef.current) {
       return;
     }

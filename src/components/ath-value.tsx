@@ -48,7 +48,7 @@ const App = ({
     try {
       const [mtv, tv] = await Promise.all([
         queryMaxTotalValue(dt),
-        queryTotalValue(),
+        queryTotalValue(dt),
       ]);
       setMaxTotalValueData(mtv);
       setTotalValueData(tv);

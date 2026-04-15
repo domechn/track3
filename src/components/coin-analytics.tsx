@@ -258,7 +258,7 @@ const App = ({
   }, [queryKey]);
 
   useEffect(() => {
-    loadSymbolData(symbol);
+    loadSymbolData(symbol, dateRange);
     setDataPage(0);
 
     const timer = setTimeout(() => setPageLoading(false), 8000);
@@ -406,21 +406,15 @@ const App = ({
       : prettyPriceNumberToLocaleString(amount);
   }
 
-  async function loadSymbolData(s: string) {
+  async function loadSymbolData(s: string, selectedRange: TDateRange) {
     const gen = loadGenRef.current;
 
     // fetch all data before setting any state to avoid multiple re-renders
     const [txns, tp, la, ama, lp] = await Promise.all([
-      queryTransactionsBySymbolAndDateRange(s, dateRange),
-      calculateTotalProfit(
-        {
-          start: new Date(1970, 0, 1),
-          end: new Date(2999, 12, 30, 23, 59, 59),
-        },
-        s
-      ),
-      queryLastAssetsBySymbol(s),
-      queryAssetMaxAmountBySymbol(s),
+      queryTransactionsBySymbolAndDateRange(s, selectedRange),
+      calculateTotalProfit(selectedRange, s),
+      queryLastAssetsBySymbol(s, selectedRange),
+      queryAssetMaxAmountBySymbol(s, selectedRange),
       getLogoPath(s),
     ]);
 
