@@ -30,9 +30,7 @@
       "providerShortName": null,
       "signingIdentity": null
     },
-    "resources": [
-      "migrations/**/*"
-    ],
+    "resources": ["migrations/**/*"],
     "shortDescription": "",
     "linux": {
       "deb": {
@@ -43,7 +41,7 @@
   },
   "productName": "track3",
   "mainBinaryName": "track3",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "identifier": "dev.track3.track3",
   "plugins": {
     "updater": {
@@ -65,10 +63,7 @@
     ],
     "security": {
       "assetProtocol": {
-        "scope": [
-          "$RESOURCE/**",
-          "$APPCACHE/**"
-        ],
+        "scope": ["$RESOURCE/**", "$APPCACHE/**"],
         "enable": true
       }
     }
