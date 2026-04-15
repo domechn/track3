@@ -245,6 +245,7 @@ type AppRoutesProps = {
   availableDates: Date[];
   dateRange: DateRange | undefined;
   tDateRange: { start: Date; end: Date };
+  maxDateRange: { start: Date; end: Date };
   hasData: boolean;
   onDatePickerValueChange: (
     selectedTimes: number,
@@ -266,6 +267,7 @@ function AppRoutes({
   availableDates,
   dateRange,
   tDateRange,
+  maxDateRange,
   hasData,
   onDatePickerValueChange,
   lastRefreshAt,
@@ -310,10 +312,10 @@ function AppRoutes({
           path="summary"
           element={
             <AnimatedPage>
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+              <PageWrapper dateRange={maxDateRange} hasData={hasData}>
                 <Summary
                   currency={currentCurrency}
-                  dateRange={tDateRange}
+                  dateRange={maxDateRange}
                   quoteColor={quoteColor}
                 />
               </PageWrapper>
@@ -619,6 +621,7 @@ const App = () => {
           availableDates={availableDates}
           dateRange={dateRange}
           tDateRange={tDateRange}
+          maxDateRange={maxDateRange}
           hasData={hasData}
           onDatePickerValueChange={onDatePickerValueChange}
           lastRefreshAt={lastRefreshAt}
