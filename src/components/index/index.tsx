@@ -29,6 +29,7 @@ import DatePicker from "../date-picker";
 import RealTimeTotalValue from "../realtime-total-value";
 import Sidebar from "../sidebar";
 import { AnimatedPage } from "../motion";
+import PageLoadingOverlay from "../page-loading-overlay";
 import "./index.css";
 import {
   Route,
@@ -175,6 +176,7 @@ function TopBar({
 type LayoutProps = {
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
+  initializing: boolean;
   isProUser: boolean;
   quoteColor: QuoteColor;
   currentCurrency: CurrencyRateDetail;
@@ -191,6 +193,7 @@ type LayoutProps = {
 function Layout({
   sidebarCollapsed,
   onSidebarToggle,
+  initializing,
   isProUser,
   quoteColor,
   currentCurrency,
@@ -227,7 +230,15 @@ function Layout({
 
         {/* Main content */}
         <main className="p-5">
-          <Outlet />
+          <div className="relative min-h-[400px]" aria-busy={initializing}>
+            <Outlet />
+            {initializing && (
+              <PageLoadingOverlay
+                title="Loading portfolio data"
+                description="Preparing your latest balances, date range, and overview cards."
+              />
+            )}
+          </div>
         </main>
       </div>
     </div>
@@ -237,6 +248,7 @@ function Layout({
 type AppRoutesProps = {
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
+  initializing: boolean;
   isProUser: boolean;
   setIsProUser: React.Dispatch<React.SetStateAction<boolean>>;
   quoteColor: QuoteColor;
@@ -259,6 +271,7 @@ type AppRoutesProps = {
 function AppRoutes({
   sidebarCollapsed,
   onSidebarToggle,
+  initializing,
   isProUser,
   setIsProUser,
   quoteColor,
@@ -282,6 +295,7 @@ function AppRoutes({
           <Layout
             sidebarCollapsed={sidebarCollapsed}
             onSidebarToggle={onSidebarToggle}
+            initializing={initializing}
             isProUser={isProUser}
             quoteColor={quoteColor}
             currentCurrency={currentCurrency}
@@ -417,26 +431,48 @@ const App = () => {
 
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
+  const [initializing, setInitializing] = useState(true);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarResizeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      queryPreferCurrency().then((c) => setCurrentCurrency(c)),
-      getLicenseIfIsPro().then((l) => setIsProUser(!!l)),
-      getQuoteColor().then((c) => setQuoteColor(c)),
-    ]).then(() =>
-      handleAutoBackup()
-        .then(({ imported }) => {
+    let active = true;
+
+    void Promise.all([
+      queryPreferCurrency().then((c) => {
+        if (active) {
+          setCurrentCurrency(c);
+        }
+      }),
+      getLicenseIfIsPro().then((l) => {
+        if (active) {
+          setIsProUser(!!l);
+        }
+      }),
+      getQuoteColor().then((c) => {
+        if (active) {
+          setQuoteColor(c);
+        }
+      }),
+    ])
+      .then(() =>
+        handleAutoBackup().then(({ imported }) => {
           if (imported) {
             clearAllCache();
           }
         })
-        .finally(() => {
-          loadAllData();
-        })
-    );
+      )
+      .then(() => loadAllData(active))
+      .finally(() => {
+        if (active) {
+          setInitializing(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const tDateRange = useMemo(
@@ -542,12 +578,15 @@ const App = () => {
     });
   }
 
-  function loadAllData() {
-    Promise.all([
+  function loadAllData(active = true) {
+    return Promise.all([
       queryLastRefreshAt(),
       getAvailableDates(),
       getInitialQueryDateRange(),
     ]).then(([lra, days, queryInfo]) => {
+      if (!active) {
+        return;
+      }
       setLastRefreshAt((prev) => (prev === lra ? prev : lra));
       setHasData((prev) => {
         const nextHasData = !!lra;
@@ -613,6 +652,7 @@ const App = () => {
         <AppRoutes
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={handleSidebarToggle}
+          initializing={initializing}
           isProUser={isProUser}
           setIsProUser={setIsProUser}
           quoteColor={quoteColor}
