@@ -95,7 +95,7 @@ describe("Overview loading state", () => {
 
   it("clears the loading announcement after the overview sections report loaded", async () => {
     mockReportCounts.totalValue = 1;
-    mockReportCounts.pnl = 2;
+    mockReportCounts.pnl = 1;
     mockReportCounts.latestAssets = 1;
     mockReportCounts.profit = 1;
 

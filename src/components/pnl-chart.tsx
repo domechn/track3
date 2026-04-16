@@ -17,7 +17,6 @@ import { timeToDateStr } from "@/utils/date";
 import _ from "lodash";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { Bar } from "react-chartjs-2";
-import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const chartName = "PNL of Asset";
 
@@ -33,7 +32,6 @@ const App = ({
   className?: string;
 }) => {
   const { needResize } = useContext(ChartResizeContext);
-  const { reportLoaded } = useContext(OverviewLoadingContext);
   const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
 
   const rangeKey = useMemo(
@@ -47,11 +45,6 @@ const App = ({
       .then(() => {
         if (active) {
           resizeChartWithDelay(chartName);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          reportLoaded();
         }
       });
 
