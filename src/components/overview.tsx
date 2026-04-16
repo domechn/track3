@@ -22,7 +22,7 @@ import AssetsPercentageChange from "./assets-percentage-change";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
-const MAIN_COMPONENT_COUNT = 5;
+const MAIN_COMPONENT_COUNT = 4;
 
 const App = ({
   currency,

@@ -80,7 +80,7 @@ const App = ({
     const gen = ++loadGenRef.current;
 
     calculateTotalProfit(dateRange)
-      .then(async (res) => {
+      .then((res) => {
         if (gen !== loadGenRef.current) {
           return;
         }
@@ -89,18 +89,6 @@ const App = ({
         setProfit(res.total);
         setProfitPercentage(res.percentage);
         setCoinsProfit(sortedCoins);
-
-        const symbols = _(
-          sortedCoins.slice(0, 5).concat(sortedCoins.slice(-5))
-        )
-          .map((coin) => coin.symbol)
-          .uniq()
-          .value();
-        const m = await getLogoMap(symbols);
-        if (gen !== loadGenRef.current) {
-          return;
-        }
-        setLogoMap((prev) => ({ ...prev, ...m }));
       })
       .finally(() => {
         if (gen === loadGenRef.current) {
@@ -108,6 +96,27 @@ const App = ({
         }
       });
   }, [rangeKey]);
+
+  useEffect(() => {
+    const gen = loadGenRef.current;
+    const symbols = _(
+      coinsProfit.slice(0, 5).concat(coinsProfit.slice(-5))
+    )
+      .map((coin) => coin.symbol)
+      .uniq()
+      .value();
+
+    if (symbols.length === 0) {
+      return;
+    }
+
+    void getLogoMap(symbols).then((m) => {
+      if (gen !== loadGenRef.current) {
+        return;
+      }
+      setLogoMap((prev) => ({ ...prev, ...m }));
+    });
+  }, [coinsProfit]);
 
   const topProfitData = useMemo(
     () => _(coinsProfit).takeRight(5).reverse().value(),
