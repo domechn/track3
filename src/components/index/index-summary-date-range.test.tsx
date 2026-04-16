@@ -150,6 +150,26 @@ beforeEach(() => {
 });
 
 describe("Summary route date range", () => {
+  it("shows an app loading overlay while startup data is still being prepared", async () => {
+    vi.mocked(queryPreferCurrency).mockImplementation(
+      () => new Promise(() => {})
+    );
+
+    render(
+      <ChartResizeContext.Provider
+        value={{
+          needResize: 0,
+          setNeedResize: vi.fn() as React.Dispatch<React.SetStateAction<number>>,
+        }}
+      >
+        <App />
+      </ChartResizeContext.Provider>
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(/loading portfolio data/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/preparing your latest balances/i);
+  });
+
   it("passes the full available range to the summary page instead of the selected date range", async () => {
     render(
       <ChartResizeContext.Provider
