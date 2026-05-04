@@ -54,7 +54,7 @@ class FiatTotalValue implements TotalValueShower {
   constructor(
     currency: CurrencyRateDetail,
     prevValue: number,
-    latestValue: number
+    latestValue: number,
   ) {
     this.currency = currency;
     this.prevValue = prevValue;
@@ -64,7 +64,7 @@ class FiatTotalValue implements TotalValueShower {
     return (
       this.currency.symbol +
       prettyNumberToLocaleString(
-        currencyWrapper(this.currency)(this.latestValue)
+        currencyWrapper(this.currency)(this.latestValue),
       )
     );
   }
@@ -110,7 +110,7 @@ class BTCTotalValue implements TotalValueShower {
     prevValue: number,
     latestValue: number,
     preBtcPrice: number,
-    latestBtcPrice: number
+    latestBtcPrice: number,
   ) {
     this.prevValue = prevValue;
     this.latestValue = latestValue;
@@ -193,12 +193,18 @@ const App = ({
   const loadGenRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
 
   const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
-  const firstTotalValue = useMemo(() => assetChangeData.data[0]?.usdValue ?? 0, [assetChangeData]);
-  const firstDate = useMemo(() => timeToDateStr(assetChangeData.timestamps[0] ?? 0), [assetChangeData]);
+  const firstTotalValue = useMemo(
+    () => assetChangeData.data[0]?.usdValue ?? 0,
+    [assetChangeData],
+  );
+  const firstDate = useMemo(
+    () => timeToDateStr(assetChangeData.timestamps[0] ?? 0),
+    [assetChangeData],
+  );
 
   const totalValueShower = useMemo(
     () =>
@@ -206,16 +212,20 @@ const App = ({
         btcAsBase,
         firstTotalValue,
         totalValue,
-        assetChangeData
+        assetChangeData,
       ),
-    [assetChangeData, firstTotalValue, totalValue, btcAsBase]
+    [assetChangeData, firstTotalValue, totalValue, btcAsBase],
   );
 
   const changedValueOrPercentage = useMemo(() => {
     if (showValue) {
       return totalValueShower.formatChangeValue();
     }
-    let val = getPercentageChange(totalValueShower, totalValue, firstTotalValue);
+    let val = getPercentageChange(
+      totalValueShower,
+      totalValue,
+      firstTotalValue,
+    );
     const p = getUpOrDown(val);
     if (val < 0) {
       val = -val;
@@ -265,21 +275,17 @@ const App = ({
     btcAsBase: boolean,
     firstTotalValue: number,
     totalValue: number,
-    assetChangeData: AssetChangeData
+    assetChangeData: AssetChangeData,
   ) {
     if (btcAsBase) {
       return new BTCTotalValue(
         firstTotalValue,
         totalValue,
         assetChangeData.data[0]?.btcPrice ?? 0,
-        assetChangeData.data[assetChangeData.data.length - 1]?.btcPrice ?? 0
+        assetChangeData.data[assetChangeData.data.length - 1]?.btcPrice ?? 0,
       );
     }
-    return new FiatTotalValue(
-      currency,
-      firstTotalValue,
-      totalValue
-    );
+    return new FiatTotalValue(currency, firstTotalValue, totalValue);
   }
 
   function getUpOrDown(val: number) {
@@ -290,7 +296,7 @@ const App = ({
   function getPercentageChange(
     ts: TotalValueShower,
     totalValue: number,
-    firstTotalValue: number
+    firstTotalValue: number,
   ) {
     // to handle empty data
     if (totalValue === firstTotalValue) {
@@ -319,7 +325,7 @@ const App = ({
       return _(assetChangeData.data)
         .map((d) => (d.btcPrice ? d.usdValue / d.btcPrice : 0))
         .map((d) =>
-          showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d
+          showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d,
         )
         .value();
     }
@@ -332,107 +338,116 @@ const App = ({
   function changePercentageColorClass(
     ts: TotalValueShower,
     totalValue: number,
-    firstTotalValue: number
+    firstTotalValue: number,
   ) {
     const pc = getPercentageChange(ts, totalValue, firstTotalValue);
     return positiveNegativeTextClass(pc, quoteColor, 500);
   }
 
-  const options = useMemo(() => ({
-    maintainAspectRatio: false,
-    responsive: true,
-    hover: {
-      mode: "index",
-      intersect: false,
-    },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: false,
-        // text is set for resizing
-        text: chartName,
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      responsive: true,
+      hover: {
+        mode: "index",
+        intersect: false,
       },
-      datalabels: {
-        display: false,
+      interaction: {
+        mode: "index",
+        intersect: false,
       },
-      legend: {
-        display: false,
-      },
-      tooltip: {
-        ...glassTooltip,
-        callbacks: {
-          label: (context: { parsed: { y: number } }) => {
-            const v = context.parsed.y.toLocaleString();
-            if (showPercentageInChart) {
-              return `${v}%`;
-            }
-            if (btcAsBase) {
-              return `${btcSymbol}${v}`;
-            }
-            return currency.symbol + v;
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
+      plugins: {
         title: {
           display: false,
+          // text is set for resizing
+          text: chartName,
         },
-        ticks: {
-          ...glassScaleOptions.ticks,
-          maxRotation: 0,
-          minRotation: 0,
-          align: "center",
-          autoSkip: false,
-          callback: function (val: number, index: number) {
-            const data = assetChangeData.timestamps;
-
-            const size = data.length;
-            const start = 0;
-            const end = size - 1;
-
-            // only show start and end date
-            if (index === start) {
-              return timeToDateStr(data[index]);
-            }
-
-            if (index === end) {
-              return timeToDateStr(data[index]);
-            }
-
-            return "";
-          },
-        },
-        grid: {
+        datalabels: {
           display: false,
         },
-      },
-      y: {
-        title: {
+        legend: {
           display: false,
-          text: currency.currency,
         },
-        offset: true,
-        ticks: {
-          ...glassScaleOptions.ticks,
-          precision: 2,
-          maxTicksLimit: 4,
-          callback: (value: any) => {
-            return showPercentageInChart
-              ? `${value.toLocaleString()}%`
-              : simplifyNumber(value);
+        tooltip: {
+          ...glassTooltip,
+          callbacks: {
+            label: (context: { parsed: { y: number } }) => {
+              const v = context.parsed.y.toLocaleString();
+              if (showPercentageInChart) {
+                return `${v}%`;
+              }
+              if (btcAsBase) {
+                return `${btcSymbol}${v}`;
+              }
+              return currency.symbol + v;
+            },
           },
         },
-        grid: {
-          ...glassScaleOptions.grid,
+      },
+      scales: {
+        x: {
+          title: {
+            display: false,
+          },
+          ticks: {
+            ...glassScaleOptions.ticks,
+            maxRotation: 0,
+            minRotation: 0,
+            align: "center",
+            autoSkip: false,
+            callback: function (val: number, index: number) {
+              const data = assetChangeData.timestamps;
+
+              const size = data.length;
+              const start = 0;
+              const end = size - 1;
+
+              // only show start and end date
+              if (index === start) {
+                return timeToDateStr(data[index]);
+              }
+
+              if (index === end) {
+                return timeToDateStr(data[index]);
+              }
+
+              return "";
+            },
+          },
+          grid: {
+            display: false,
+          },
+        },
+        y: {
+          title: {
+            display: false,
+            text: currency.currency,
+          },
+          offset: true,
+          ticks: {
+            ...glassScaleOptions.ticks,
+            precision: 2,
+            maxTicksLimit: 4,
+            callback: (value: any) => {
+              return showPercentageInChart
+                ? `${value.toLocaleString()}%`
+                : simplifyNumber(value);
+            },
+          },
+          grid: {
+            ...glassScaleOptions.grid,
+          },
         },
       },
-    },
-  }), [showPercentageInChart, btcAsBase, currency.symbol, currency.currency, assetChangeData.timestamps]);
+    }),
+    [
+      showPercentageInChart,
+      btcAsBase,
+      currency.symbol,
+      currency.currency,
+      assetChangeData.timestamps,
+    ],
+  );
 
   const lineDataMemo = useMemo(() => {
     return {
@@ -461,8 +476,9 @@ const App = ({
   }, [assetChangeData.timestamps, lineValues, lineColor]);
 
   return (
-    <div>
+    <div className="h-full">
       <Card
+        className="flex h-full flex-col"
         onMouseEnter={() => setShowValue(true)}
         onMouseLeave={() => setShowValue(false)}
       >
@@ -524,21 +540,23 @@ const App = ({
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="text-xl font-semibold">{totalValueShower.formatTotalValue()}</div>
+        <CardContent className="flex flex-1 flex-col">
+          <div className="text-xl font-semibold">
+            {totalValueShower.formatTotalValue()}
+          </div>
           <p className="text-xs text-muted-foreground mb-2">
             <span
               className={changePercentageColorClass(
                 totalValueShower,
                 totalValue,
-                firstTotalValue
+                firstTotalValue,
               )}
             >
               {changedValueOrPercentage}
             </span>{" "}
             from {firstDate}
           </p>
-          <div className="h-[120px]">
+          <div className="min-h-[120px] flex-1">
             <Line options={options as any} data={lineDataMemo} />
           </div>
         </CardContent>

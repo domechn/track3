@@ -38,7 +38,7 @@ const App = ({
   const loadedCountRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
   useLayoutEffect(() => {
     setPageLoading(true);
@@ -52,10 +52,7 @@ const App = ({
     }
   }, []);
 
-  const loadingContextValue = useMemo(
-    () => ({ reportLoaded }),
-    [reportLoaded]
-  );
+  const loadingContextValue = useMemo(() => ({ reportLoaded }), [reportLoaded]);
 
   return (
     <OverviewLoadingContext.Provider value={loadingContextValue}>
@@ -64,14 +61,14 @@ const App = ({
         <Collapsible open={isShowMore} onOpenChange={setIsShowMore}>
           <StaggerContainer className="space-y-3">
             <div className="grid gap-5 grid-cols-2">
-              <FadeUp className="col-span-2 md:col-span-1">
+              <FadeUp className="col-span-2 h-full md:col-span-1">
                 <TotalValue
                   currency={currency}
                   dateRange={dateRange}
                   quoteColor={quoteColor}
                 />
               </FadeUp>
-              <FadeUp className="col-span-2 md:col-span-1">
+              <FadeUp className="col-span-2 h-full md:col-span-1">
                 <PNL
                   currency={currency}
                   dateRange={dateRange}

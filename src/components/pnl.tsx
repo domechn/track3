@@ -33,7 +33,7 @@ const App = ({
 
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
 
   useEffect(() => {
@@ -108,12 +108,14 @@ const App = ({
   }
 
   return (
-    <div>
-      <Card>
+    <div className="h-full">
+      <Card className="flex h-full flex-col">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">PNL Analysis</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            PNL Analysis
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-1 flex-col">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <div
               className="flex min-h-[88px] flex-col items-center justify-center border-b border-border/50 pb-3 sm:min-h-0 sm:border-b-0 sm:border-r sm:pb-0"
@@ -122,14 +124,14 @@ const App = ({
               <div className="text-xs text-muted-foreground">Last PNL</div>
               <div
                 className={`text-xl font-semibold ${getPNLTextColor(
-                  pnlTableData.todayPNL?.value
+                  pnlTableData.todayPNL?.value,
                 )}`}
               >
                 {formatPNLPercentage(pnlTableData.todayPNL?.value)}
               </div>
               <p
                 className={`text-xs ${getPNLTextColor(
-                  pnlTableData.todayPNL?.value
+                  pnlTableData.todayPNL?.value,
                 )}`}
               >
                 {formatPNLValue(pnlTableData.todayPNL?.value)}
@@ -142,14 +144,14 @@ const App = ({
               <div className="text-xs text-muted-foreground">7T PNL</div>
               <div
                 className={`text-xl font-semibold ${getPNLTextColor(
-                  pnlTableData.sevenTPnl?.value
+                  pnlTableData.sevenTPnl?.value,
                 )}`}
               >
                 {formatPNLPercentage(pnlTableData.sevenTPnl?.value)}
               </div>
               <p
                 className={`text-xs ${getPNLTextColor(
-                  pnlTableData.sevenTPnl?.value
+                  pnlTableData.sevenTPnl?.value,
                 )}`}
               >
                 {formatPNLValue(pnlTableData.sevenTPnl?.value)}
@@ -162,14 +164,14 @@ const App = ({
               <div className="text-xs text-muted-foreground">30T PNL</div>
               <div
                 className={`text-xl font-semibold ${getPNLTextColor(
-                  pnlTableData.thirtyPNL?.value
+                  pnlTableData.thirtyPNL?.value,
                 )}`}
               >
                 {formatPNLPercentage(pnlTableData.thirtyPNL?.value)}
               </div>
               <p
                 className={`text-xs ${getPNLTextColor(
-                  pnlTableData.thirtyPNL?.value
+                  pnlTableData.thirtyPNL?.value,
                 )}`}
               >
                 {formatPNLValue(pnlTableData.thirtyPNL?.value)}
@@ -180,7 +182,7 @@ const App = ({
             currency={currency}
             dateRange={dateRange}
             quoteColor={quoteColor}
-            className="h-[120px]"
+            className="min-h-[120px] flex-1"
           />
         </CardContent>
       </Card>
