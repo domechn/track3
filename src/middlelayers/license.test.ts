@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getClientID } from "@/utils/app";
 import { getLicenseIfIsPro, PRO_API_ENDPOINT } from "./configuration";
 import { sendHttpRequest } from "./datafetch/utils/http";
-import { LicenseCenter } from "./license";
+import * as licenseModule from "./license";
+import { isProVersion, LicenseCenter } from "./license";
 
 vi.mock("@/utils/app", () => ({
   getClientID: vi.fn(),
@@ -22,9 +23,72 @@ const clientId = "client-123";
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getClientID).mockResolvedValue(clientId);
+
+  const clearLicenseCache = (licenseModule as Record<string, unknown>)
+    .clearLicenseCache;
+  if (typeof clearLicenseCache === "function") {
+    clearLicenseCache();
+  }
 });
 
 describe("LicenseCenter subscription APIs", () => {
+  it("reuses the cached pro status for the same stored license", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+    vi.mocked(sendHttpRequest).mockResolvedValue({ isPro: true });
+
+    const first = await isProVersion();
+    const second = await isProVersion();
+
+    expect(first).toEqual({
+      isPro: true,
+      license: "stored-license",
+    });
+    expect(second).toEqual(first);
+    expect(sendHttpRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears cached license lookups on demand", async () => {
+    const clearLicenseCache = (
+      licenseModule as { clearLicenseCache?: () => void }
+    ).clearLicenseCache;
+
+    expect(clearLicenseCache).toBeTypeOf("function");
+
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+    vi.mocked(sendHttpRequest).mockResolvedValue({ isPro: true });
+
+    await isProVersion();
+    await isProVersion();
+    clearLicenseCache?.();
+    await isProVersion();
+
+    expect(sendHttpRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses the cached subscription info for the stored license", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+    vi.mocked(sendHttpRequest).mockResolvedValue({
+      planType: "yearly",
+      status: "active",
+      currentPeriodEnd: "2026-06-01T00:00:00.000Z",
+      cancelAtPeriodEnd: false,
+      isLegacy: false,
+    });
+
+    const first = await LicenseCenter.getInstance().getSubscriptionInfo();
+    const second = await LicenseCenter.getInstance().getSubscriptionInfo();
+
+    expect(first).toEqual({
+      planType: "yearly",
+      status: "active",
+      currentPeriodEnd: "2026-06-01T00:00:00.000Z",
+      cancelAtPeriodEnd: false,
+      isLegacy: false,
+    });
+    expect(second).toEqual(first);
+    expect(sendHttpRequest).toHaveBeenCalledTimes(1);
+  });
+
   it("creates a Stripe checkout session with the selected plan", async () => {
     vi.mocked(sendHttpRequest).mockResolvedValueOnce({
       sessionId: "cs_test_123",

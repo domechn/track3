@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReloadIcon } from "@radix-ui/react-icons";
-import { LicenseCenter } from "@/middlelayers/license";
+import { clearLicenseCache, LicenseCenter } from "@/middlelayers/license";
 import { useToast } from "@/components/ui/use-toast";
 import {
   AlertDialog,
@@ -49,7 +49,8 @@ const App = ({
   const [showLegacyInput, setShowLegacyInput] = useState(false);
 
   // subscription states
-  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
+  const [subscriptionInfo, setSubscriptionInfo] =
+    useState<SubscriptionInfo | null>(null);
   const [subLoading, setSubLoading] = useState(false);
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -91,11 +92,13 @@ const App = ({
   }
 
   async function inactiveDevice(license: string) {
-    const inactiveRes = await LicenseCenter.getInstance().inactiveLicense(license);
+    const inactiveRes =
+      await LicenseCenter.getInstance().inactiveLicense(license);
     if (!inactiveRes.success) {
       throw new Error(inactiveRes.error ?? "Inactive device failed");
     }
     await cleanLicense();
+    clearLicenseCache();
     setSubscriptionInfo(null);
     onProStatusChange(false);
   }
@@ -110,6 +113,7 @@ const App = ({
       throw new Error(activeRes.error ?? "Active License Failed");
     }
     await saveLicense(license);
+    clearLicenseCache();
     onProStatusChange(true);
   }
 
@@ -163,7 +167,8 @@ const App = ({
   async function onSubscribe(planType: "monthly" | "yearly") {
     setSubLoading(true);
     try {
-      const { sessionId, url } = await LicenseCenter.getInstance().createCheckoutSession(planType);
+      const { sessionId, url } =
+        await LicenseCenter.getInstance().createCheckoutSession(planType);
       await openUrl(url);
 
       const license = await pollForLicense(sessionId);
@@ -180,9 +185,13 @@ const App = ({
     }
   }
 
-  async function pollForLicense(sessionId: string, maxAttempts = 100): Promise<string> {
+  async function pollForLicense(
+    sessionId: string,
+    maxAttempts = 100,
+  ): Promise<string> {
     for (let i = 0; i < maxAttempts; i++) {
-      const result = await LicenseCenter.getInstance().getCheckoutStatus(sessionId);
+      const result =
+        await LicenseCenter.getInstance().getCheckoutStatus(sessionId);
       if (result.status === "completed" && result.license) {
         return result.license;
       }
@@ -192,7 +201,7 @@ const App = ({
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
     throw new Error(
-      "Payment verification timed out. Your license may still be processing — check back in a moment."
+      "Payment verification timed out. Your license may still be processing — check back in a moment.",
     );
   }
 
@@ -203,7 +212,8 @@ const App = ({
       await openUrl(url);
     } catch (err) {
       toast({
-        description: err instanceof Error ? err.message : "Failed to open customer portal",
+        description:
+          err instanceof Error ? err.message : "Failed to open customer portal",
         variant: "destructive",
       });
     } finally {
@@ -235,7 +245,8 @@ const App = ({
     }
   }
 
-  const isSubscribed = activeLicense && subscriptionInfo && !subscriptionInfo.isLegacy;
+  const isSubscribed =
+    activeLicense && subscriptionInfo && !subscriptionInfo.isLegacy;
 
   return (
     <div className="space-y-6">
@@ -255,7 +266,9 @@ const App = ({
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">{version}</div>
-            <p className="text-xs text-muted-foreground">Current installed build</p>
+            <p className="text-xs text-muted-foreground">
+              Current installed build
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -273,7 +286,7 @@ const App = ({
                 ? "Loading..."
                 : activeLicense
                   ? subscriptionInfo
-                    ? `${subscriptionStatusLabel(subscriptionInfo.status)}${subscriptionInfo.planType ? ` — ${subscriptionInfo.planType === 'monthly' ? 'Monthly' : 'Yearly'}` : ''}`
+                    ? `${subscriptionStatusLabel(subscriptionInfo.status)}${subscriptionInfo.planType ? ` — ${subscriptionInfo.planType === "monthly" ? "Monthly" : "Yearly"}` : ""}`
                     : "License activated"
                   : "Subscribe to unlock Pro features"}
             </p>
@@ -294,29 +307,46 @@ const App = ({
               <div>
                 <span className="text-muted-foreground">Plan</span>
                 <p className="font-medium">
-                  {subscriptionInfo.planType === "monthly" ? "Monthly" : "Yearly"}
+                  {subscriptionInfo.planType === "monthly"
+                    ? "Monthly"
+                    : "Yearly"}
                 </p>
               </div>
               <div>
                 <span className="text-muted-foreground">Status</span>
-                <p className="font-medium">{subscriptionStatusLabel(subscriptionInfo.status)}</p>
+                <p className="font-medium">
+                  {subscriptionStatusLabel(subscriptionInfo.status)}
+                </p>
               </div>
               <div>
                 <span className="text-muted-foreground">
                   {subscriptionInfo.cancelAtPeriodEnd ? "Expires" : "Renews"}
                 </span>
-                <p className="font-medium">{formatPeriodEnd(subscriptionInfo.currentPeriodEnd)}</p>
+                <p className="font-medium">
+                  {formatPeriodEnd(subscriptionInfo.currentPeriodEnd)}
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={onManageSubscription} disabled={portalLoading}>
-                {portalLoading && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
+              <Button
+                variant="outline"
+                onClick={onManageSubscription}
+                disabled={portalLoading}
+              >
+                {portalLoading && (
+                  <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Manage Subscription
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" disabled={inactiveLicenseLoading}>
-                    {inactiveLicenseLoading && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
+                  <Button
+                    variant="destructive"
+                    disabled={inactiveLicenseLoading}
+                  >
+                    {inactiveLicenseLoading && (
+                      <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Inactivate
                   </Button>
                 </AlertDialogTrigger>
@@ -324,7 +354,8 @@ const App = ({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Inactivate this device?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Current license binding on this device will be removed. This does not cancel your Stripe subscription.
+                      Current license binding on this device will be removed.
+                      This does not cancel your Stripe subscription.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -350,7 +381,8 @@ const App = ({
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              You are using a legacy license. It will continue to work indefinitely.
+              You are using a legacy license. It will continue to work
+              indefinitely.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Input
@@ -379,8 +411,13 @@ const App = ({
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" disabled={inactiveLicenseLoading}>
-                    {inactiveLicenseLoading && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
+                  <Button
+                    variant="destructive"
+                    disabled={inactiveLicenseLoading}
+                  >
+                    {inactiveLicenseLoading && (
+                      <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Inactivate
                   </Button>
                 </AlertDialogTrigger>
@@ -414,18 +451,26 @@ const App = ({
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Subscribe to unlock real-time portfolio tracking, expanded chain support, and premium data providers.
+              Subscribe to unlock real-time portfolio tracking, expanded chain
+              support, and premium data providers.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border p-4 space-y-3">
                 <div className="text-sm font-medium">Monthly</div>
-                <div className="text-2xl font-bold">$9.99<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+                <div className="text-2xl font-bold">
+                  $9.99
+                  <span className="text-sm font-normal text-muted-foreground">
+                    /mo
+                  </span>
+                </div>
                 <Button
                   className="w-full"
                   onClick={() => onSubscribe("monthly")}
                   disabled={subLoading}
                 >
-                  {subLoading && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
+                  {subLoading && (
+                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Subscribe Monthly
                 </Button>
               </div>
@@ -436,13 +481,20 @@ const App = ({
                   </span>
                 </div>
                 <div className="text-sm font-medium">Yearly</div>
-                <div className="text-2xl font-bold">$79.99<span className="text-sm font-normal text-muted-foreground">/yr</span></div>
+                <div className="text-2xl font-bold">
+                  $79.99
+                  <span className="text-sm font-normal text-muted-foreground">
+                    /yr
+                  </span>
+                </div>
                 <Button
                   className="w-full"
                   onClick={() => onSubscribe("yearly")}
                   disabled={subLoading}
                 >
-                  {subLoading && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
+                  {subLoading && (
+                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Subscribe Yearly
                 </Button>
               </div>

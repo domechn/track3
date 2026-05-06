@@ -2,6 +2,43 @@ import { getClientID } from "@/utils/app";
 import { sendHttpRequest } from "./datafetch/utils/http";
 import { getLicenseIfIsPro, PRO_API_ENDPOINT } from "./configuration";
 import { UserLicenseInfo } from "@/middlelayers/types";
+import { getMemoryCacheInstance } from "./datafetch/utils/cache";
+import { CACHE_GROUP_KEYS } from "./consts";
+
+type SubscriptionInfo = {
+  planType: "monthly" | "yearly" | null;
+  status: "active" | "past_due" | "canceled" | "incomplete" | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  isLegacy: boolean;
+};
+
+const LICENSE_CACHE_TTL_SECONDS = 5 * 60;
+const LICENSE_CACHE_KEY_PREFIXES = {
+  proStatus: "pro-status",
+  subscriptionInfo: "subscription-info",
+};
+
+const licenseCache = getMemoryCacheInstance(
+  CACHE_GROUP_KEYS.LICENSE_CACHE_GROUP_KEY,
+);
+
+function makeLicenseCacheKey(prefix: string, license?: string | null): string {
+  return `${prefix}:${license ?? "anonymous"}`;
+}
+
+function getCachedLicenseValue<T>(key: string): T | undefined {
+  return licenseCache.getCache<T>(key);
+}
+
+function setCachedLicenseValue<T>(key: string, value: T): T {
+  licenseCache.setCache(key, value, LICENSE_CACHE_TTL_SECONDS);
+  return value;
+}
+
+export function clearLicenseCache(): void {
+  licenseCache.clearCache();
+}
 
 export async function isProVersion(): Promise<UserLicenseInfo> {
   // check if pro user
@@ -90,6 +127,15 @@ export class LicenseCenter {
   }
 
   public async isProUser(license: string): Promise<boolean> {
+    const cacheKey = makeLicenseCacheKey(
+      LICENSE_CACHE_KEY_PREFIXES.proStatus,
+      license,
+    );
+    const cached = getCachedLicenseValue<boolean>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     const resp = await sendHttpRequest<{
       isPro: boolean;
     }>("POST", this.isProEndpoint, 10000, {
@@ -97,7 +143,7 @@ export class LicenseCenter {
       "x-track3-api-key": license,
     });
 
-    return resp.isPro;
+    return setCachedLicenseValue(cacheKey, resp.isPro);
   }
 
   public async createCheckoutSession(planType: "monthly" | "yearly"): Promise<{
@@ -152,21 +198,18 @@ export class LicenseCenter {
     return resp;
   }
 
-  public async getSubscriptionInfo(): Promise<{
-    planType: "monthly" | "yearly" | null;
-    status: "active" | "past_due" | "canceled" | "incomplete" | null;
-    currentPeriodEnd: string | null;
-    cancelAtPeriodEnd: boolean;
-    isLegacy: boolean;
-  }> {
+  public async getSubscriptionInfo(): Promise<SubscriptionInfo> {
     const license = await getLicenseIfIsPro();
-    const resp = await sendHttpRequest<{
-      planType: "monthly" | "yearly" | null;
-      status: "active" | "past_due" | "canceled" | "incomplete" | null;
-      currentPeriodEnd: string | null;
-      cancelAtPeriodEnd: boolean;
-      isLegacy: boolean;
-    }>(
+    const cacheKey = makeLicenseCacheKey(
+      LICENSE_CACHE_KEY_PREFIXES.subscriptionInfo,
+      license,
+    );
+    const cached = getCachedLicenseValue<SubscriptionInfo>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const resp = await sendHttpRequest<SubscriptionInfo>(
       "POST",
       this.subscriptionInfoEndpoint,
       10000,
@@ -177,6 +220,6 @@ export class LicenseCenter {
       { action: "subscription-info" },
     );
 
-    return resp;
+    return setCachedLicenseValue(cacheKey, resp);
   }
 }

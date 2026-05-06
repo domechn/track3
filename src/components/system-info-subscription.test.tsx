@@ -5,6 +5,7 @@ import SystemInfo from "@/components/system-info";
 
 const mocks = vi.hoisted(() => ({
   activeLicense: vi.fn(),
+  clearLicenseCache: vi.fn(),
   cleanLicense: vi.fn(),
   createCheckoutSession: vi.fn(),
   getCheckoutStatus: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 }));
 
 vi.mock("@/middlelayers/license", () => ({
+  clearLicenseCache: mocks.clearLicenseCache,
   LicenseCenter: {
     getInstance: () => ({
       activeLicense: mocks.activeLicense,
@@ -97,10 +99,37 @@ describe("System Info subscription management", () => {
       expect(mocks.validateLicense).toHaveBeenCalledWith("license-from-stripe");
       expect(mocks.activeLicense).toHaveBeenCalledWith("license-from-stripe");
       expect(mocks.saveLicense).toHaveBeenCalledWith("license-from-stripe");
+      expect(mocks.clearLicenseCache).toHaveBeenCalledTimes(1);
       expect(onProStatusChange).toHaveBeenCalledWith(true);
     });
     expect(mocks.toast).toHaveBeenCalledWith({
       description: "Pro subscription activated!",
+    });
+  });
+
+  it("clears the license cache after inactivating the device", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
+    mocks.getSubscriptionInfo.mockResolvedValue({
+      planType: "monthly",
+      status: "active",
+      currentPeriodEnd: "2026-06-01T00:00:00.000Z",
+      cancelAtPeriodEnd: false,
+      isLegacy: false,
+    });
+    mocks.inactiveLicense.mockResolvedValue({ success: true });
+    mocks.cleanLicense.mockResolvedValue(undefined);
+
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^inactivate$/i }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /confirm/i }));
+
+    await waitFor(() => {
+      expect(mocks.inactiveLicense).toHaveBeenCalledWith("stored-license");
+      expect(mocks.cleanLicense).toHaveBeenCalled();
+      expect(mocks.clearLicenseCache).toHaveBeenCalledTimes(1);
     });
   });
 
