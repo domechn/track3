@@ -12,8 +12,10 @@ import { UniqueIndexConflictResolver } from "@/middlelayers/types";
 import {
   cleanAutoBackupDirectory,
   getAutoBackupDirectory,
+  getBlacklistCoins,
   getLastAutoImportAt,
   getLastAutoBackupAt,
+  removeFromBlacklist,
   saveAutoBackupDirectory,
 } from "@/middlelayers/configuration";
 import { ExportData } from "@/middlelayers/datamanager";
@@ -44,10 +46,13 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [exportConfiguration, setExportConfiguration] = useState(false);
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
     useState(false);
-  const [exportData, setExportData] = useState<ExportData | undefined>(undefined);
+  const [exportData, setExportData] = useState<ExportData | undefined>(
+    undefined,
+  );
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
   const [lastImportAt, setLastImportAt] = useState<Date>();
+  const [blacklist, setBlacklist] = useState<string[]>([]);
 
   useEffect(() => {
     loadAutoBackupDirectory().then((isSet) => {
@@ -55,6 +60,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         loadAutoBackupTime();
       }
     });
+    getBlacklistCoins().then(setBlacklist);
   }, []);
 
   async function loadAutoBackupDirectory() {
@@ -139,6 +145,14 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     setAutoBackupDirectory(undefined);
   }
 
+  async function onRemoveFromBlacklist(symbol: string) {
+    await removeFromBlacklist(symbol);
+    setBlacklist((prev) =>
+      prev.filter((s) => s.toUpperCase() !== symbol.toUpperCase()),
+    );
+    toast({ description: `"${symbol}" removed from blacklist` });
+  }
+
   return (
     <div className="space-y-6">
       <Dialog
@@ -149,8 +163,8 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
           <DialogHeader>
             <DialogTitle>Conflicts Found</DialogTitle>
             <DialogDescription>
-              Imported records overlap with existing history. Choose how to resolve
-              duplicated entries.
+              Imported records overlap with existing history. Choose how to
+              resolve duplicated entries.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -253,7 +267,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             <div
               className={cn(
                 "text-sm text-muted-foreground whitespace-nowrap overflow-x-auto scrollbar-hide",
-                autoBackupDirectory ? "block" : "hidden"
+                autoBackupDirectory ? "block" : "hidden",
               )}
             >
               {autoBackupDirectory}
@@ -271,6 +285,43 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Token Blacklist
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Blacklisted tokens are excluded from all portfolio queries and data
+            refresh operations.
+          </p>
+          {blacklist.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No blacklisted tokens
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {blacklist.map((symbol) => (
+                <div
+                  key={symbol}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-background/30 px-3 py-1 text-sm"
+                >
+                  <span>{symbol}</span>
+                  <button
+                    aria-label={`Remove ${symbol} from blacklist`}
+                    className="text-muted-foreground hover:text-foreground transition-colors text-xs leading-none"
+                    onClick={() => onRemoveFromBlacklist(symbol)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
