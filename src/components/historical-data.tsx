@@ -6,6 +6,7 @@ import {
   queryRestoreHistoricalData,
   restoreHistoricalData,
 } from "@/middlelayers/charts";
+import { addToBlacklist } from "@/middlelayers/configuration";
 import {
   CurrencyRateDetail,
   HistoricalData,
@@ -391,6 +392,15 @@ const App = ({
     [afterDataChanged, onDeletionUndoClick, toast]
   );
 
+  const onHistoricalDataDetailDeleteAndBlacklistClick = useCallback(
+    (id: number, symbol: string) => {
+      addToBlacklist(symbol).then(() => {
+        onHistoricalDataDetailDeleteClick(id);
+      });
+    },
+    [onHistoricalDataDetailDeleteClick]
+  );
+
   const onRowClick = useCallback((id: string) => {
     setSelectedDataId(id);
     setDetailLimit(DETAIL_PAGE_SIZE);
@@ -552,10 +562,17 @@ const App = ({
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() =>
+                                  onHistoricalDataDetailDeleteAndBlacklistClick(item.assetId, item.symbol)
+                                }
+                              >
+                                Delete & Blacklist
+                              </AlertDialogAction>
+                              <AlertDialogAction
+                                onClick={() =>
                                   onHistoricalDataDetailDeleteClick(item.assetId)
                                 }
                               >
-                                Confirm
+                                Delete
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>

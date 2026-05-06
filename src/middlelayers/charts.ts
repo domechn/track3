@@ -4,7 +4,7 @@ import { isSameWallet } from '../lib/utils'
 import { AddProgressFunc, Asset, AssetAction, AssetChangeData, AssetModel, AssetsPercentageChangeData, CoinsAmountAndValueChangeData, HistoricalData, LatestAssetsPercentageData, MaxTotalValueData, PNLChartData, PNLTableDate, RestoreHistoricalData, TDateRange, TopCoinsPercentageChangeData, TopCoinsRankData, TotalValueData, TotalValuesData, Transaction, TransactionModel, TransactionType, UserLicenseInfo, WalletCoinUSD } from './types'
 
 import { loadPortfolios, queryCoinPrices, queryStableCoins } from './data'
-import { getConfiguration, saveStableCoins } from './configuration'
+import { getConfiguration, getBlacklistCoins, saveStableCoins } from './configuration'
 import { calculateTotalValue } from './datafetch/utils/coins'
 import { timeToDateStr } from '../utils/date'
 import { WalletAnalyzer } from './wallet'
@@ -509,6 +509,12 @@ async function queryCoinsDataByWalletCoins(assets: WalletCoin[], config: GlobalC
 	if (addProgress) {
 		addProgress(5)
 	}
+	const blacklist = await getBlacklistCoins()
+	if (blacklist.length > 0) {
+		const blacklistedSymbols = _(blacklist).map(s => s.toUpperCase()).value()
+		return filteredTotals.filter(t => !blacklistedSymbols.includes(t.symbol.toUpperCase()))
+	}
+
 	return filteredTotals
 }
 
@@ -842,8 +848,11 @@ export async function queryLatestAssets(): Promise<Asset[]> {
 		return []
 	}
 
+	const blacklist = await getBlacklistCoins()
+	const blacklistedSymbols = _(blacklist).map(s => s.toUpperCase()).value()
 	return _(assets[0])
 		.filter(a => a.amount !== 0)
+		.filter(a => !blacklistedSymbols.includes(a.symbol.toUpperCase()))
 		.map(a => ({
 			symbol: a.symbol,
 			amount: a.amount,
@@ -860,8 +869,10 @@ export async function queryLatestAssetsPercentage(dateRange?: TDateRange): Promi
 		return []
 	}
 
-	// ignore coins whose amount is 0
-	const latest = _(assets[0]).filter(a => a.amount !== 0).value()
+	// ignore coins whose amount is 0 and blacklisted symbols
+	const blacklist = await getBlacklistCoins()
+	const blacklistedSymbols = _(blacklist).map(s => s.toUpperCase()).value()
+	const latest = _(assets[0]).filter(a => a.amount !== 0 && !blacklistedSymbols.includes(a.symbol.toUpperCase())).value()
 	const backgroundColors = generateRandomColors(_(latest).size())
 
 	const total = _(latest).sumBy("value") + 10 ** -21 // avoid total is 0

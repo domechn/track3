@@ -30,6 +30,7 @@ const quoteColorId = "8"
 const clientInfoFixId = "998"
 const licenseFixId = "997"
 const stableCoinsId = "996"
+const blacklistCoinsId = "995"
 
 export const themeLocalStorageKey = "track3-ui-theme"
 
@@ -219,6 +220,31 @@ export async function getStableCoins(): Promise<string[]> {
 
 export async function saveStableCoins(stableCoins: string[]) {
 	return saveConfigurationById(stableCoinsId, stableCoins.join(','), false)
+}
+
+// blacklist
+export async function getBlacklistCoins(): Promise<string[]> {
+	const model = await getConfigurationById(blacklistCoinsId)
+	return model?.data ? model.data.split(',').filter(Boolean) : []
+}
+
+export async function saveBlacklistCoins(symbols: string[]) {
+	return saveConfigurationById(blacklistCoinsId, symbols.join(','), false)
+}
+
+export async function addToBlacklist(symbol: string) {
+	const current = await getBlacklistCoins()
+	const upper = symbol.toUpperCase()
+	if (!current.includes(upper)) {
+		current.push(upper)
+		await saveBlacklistCoins(current)
+	}
+}
+
+export async function removeFromBlacklist(symbol: string) {
+	const upper = symbol.toUpperCase()
+	const current = await getBlacklistCoins()
+	await saveBlacklistCoins(current.filter(s => s !== upper))
 }
 
 // license
