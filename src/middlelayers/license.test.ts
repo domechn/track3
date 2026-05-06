@@ -40,10 +40,10 @@ describe("LicenseCenter subscription APIs", () => {
     });
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "POST",
-      `${PRO_API_ENDPOINT}/api/stripe/create-checkout-session`,
+      `${PRO_API_ENDPOINT}/api/stripe`,
       15000,
       { "x-track3-client-id": clientId },
-      { planType: "yearly" },
+      { action: "create-checkout-session", planType: "yearly" },
     );
   });
 
@@ -62,7 +62,7 @@ describe("LicenseCenter subscription APIs", () => {
     });
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "GET",
-      `${PRO_API_ENDPOINT}/api/stripe/checkout-status?session_id=cs_test_123`,
+      `${PRO_API_ENDPOINT}/api/stripe?action=checkout-status&session_id=cs_test_123`,
       10000,
     );
   });
@@ -78,12 +78,13 @@ describe("LicenseCenter subscription APIs", () => {
     expect(result).toEqual({ url: "https://billing.stripe.test/portal" });
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "POST",
-      `${PRO_API_ENDPOINT}/api/stripe/customer-portal`,
+      `${PRO_API_ENDPOINT}/api/stripe`,
       10000,
       {
         "x-track3-client-id": clientId,
         "x-track3-api-key": "stored-license",
       },
+      { action: "customer-portal" },
     );
   });
 
@@ -108,12 +109,13 @@ describe("LicenseCenter subscription APIs", () => {
     });
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "POST",
-      `${PRO_API_ENDPOINT}/api/license/subscription-info`,
+      `${PRO_API_ENDPOINT}/api/license`,
       10000,
       {
         "x-track3-client-id": clientId,
         "x-track3-api-key": "",
       },
+      { action: "subscription-info" },
     );
   });
 });
