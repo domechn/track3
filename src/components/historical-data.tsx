@@ -41,7 +41,13 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import { Input } from "./ui/input";
 import {
   Table,
@@ -97,7 +103,7 @@ const App = ({
   afterDataChanged?: (
     action: "delete" | "undoDeletion",
     uuid?: string,
-    id?: number
+    id?: number,
   ) => unknown;
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
@@ -121,7 +127,7 @@ const App = ({
   const loadGenRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
 
   useEffect(() => {
@@ -183,7 +189,7 @@ const App = ({
         missing.map(async (symbol) => ({
           symbol,
           path: await getImageApiPath(acd, symbol),
-        }))
+        })),
       );
 
       setLogoMap((prev) => {
@@ -278,16 +284,12 @@ const App = ({
       return rankData.length;
     }
     return rankData.filter((item) =>
-      item.symbol.toUpperCase().includes(keyword)
+      item.symbol.toUpperCase().includes(keyword),
     ).length;
   }, [rankData, detailSearch]);
 
   const onDeletionUndoClick = useCallback(
-    (rhd: {
-      uuid?: string;
-      id?: number;
-      rhd: RestoreHistoricalData;
-    }) => {
+    (rhd: { uuid?: string; id?: number; rhd: RestoreHistoricalData }) => {
       restoreHistoricalData(rhd.rhd).then(() => {
         setIsModalOpen(false);
 
@@ -296,7 +298,7 @@ const App = ({
         }
       });
     },
-    [afterDataChanged]
+    [afterDataChanged],
   );
 
   const onHistoricalDataDeleteClick = useCallback(
@@ -334,13 +336,13 @@ const App = ({
           toast({
             description: e.message,
             variant: "destructive",
-          })
+          }),
         )
         .finally(() => {
           setDeleting(false);
         });
     },
-    [afterDataChanged, onDeletionUndoClick, toast]
+    [afterDataChanged, onDeletionUndoClick, toast],
   );
 
   const onHistoricalDataDetailDeleteClick = useCallback(
@@ -376,20 +378,20 @@ const App = ({
             prev.map((record) => ({
               ...record,
               assets: record.assets.filter((asset) => asset.id !== id),
-            }))
+            })),
           );
         })
         .catch((e) =>
           toast({
             description: e.message,
             variant: "destructive",
-          })
+          }),
         )
         .finally(() => {
           setDeleting(false);
         });
     },
-    [afterDataChanged, onDeletionUndoClick, toast]
+    [afterDataChanged, onDeletionUndoClick, toast],
   );
 
   const onHistoricalDataDetailDeleteAndBlacklistClick = useCallback(
@@ -398,7 +400,7 @@ const App = ({
         onHistoricalDataDetailDeleteClick(id);
       });
     },
-    [onHistoricalDataDetailDeleteClick]
+    [onHistoricalDataDetailDeleteClick],
   );
 
   const onRowClick = useCallback((id: string) => {
@@ -418,473 +420,519 @@ const App = ({
     <div aria-busy={pageLoading}>
       <h1 className="sr-only">Historical Data</h1>
       <StaggerContainer className="space-y-4">
-      <Dialog
-        open={isModalOpen}
-        onOpenChange={(open) => {
-          setIsModalOpen(open);
-          if (!open) {
-            setSelectedDataId(null);
-          }
-        }}
-      >
-        <DialogContent className="min-w-[80%]">
-          <DialogHeader>
-            <DialogTitle>Historical Data Detail</DialogTitle>
-            {selectedData ? (
-              <p className="text-xs text-muted-foreground">
-                {timeToDateStr(new Date(selectedData.createdAt).getTime(), true)}
-                {" · "}
-                {currency.symbol}
-                {prettyNumberToLocaleString(
-                  currencyWrapper(currency)(selectedData.total)
-                )}
-              </p>
-            ) : null}
-          </DialogHeader>
-          <div className="grid gap-2 md:grid-cols-3">
-            <div className="rounded-lg border border-border/40 bg-background/30 p-3">
-              <p className="text-sm font-medium text-muted-foreground">Assets</p>
-              <p className="text-xl font-semibold">{rankData.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Value greater than $1
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/40 bg-background/30 p-3">
-              <p className="text-sm font-medium text-muted-foreground">
-                Visible Rows
-              </p>
-              <p className="text-xl font-semibold">
-                {Math.min(detailLimit, filteredRankDataCount)} /{" "}
-                {filteredRankDataCount}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Increment by {DETAIL_PAGE_SIZE}
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/40 bg-background/30 p-3">
-              <p className="text-sm font-medium text-muted-foreground">Filter</p>
-              <Input
-                value={detailSearch}
-                onChange={(e) => {
-                  setDetailSearch(e.target.value);
-                  setDetailLimit(DETAIL_PAGE_SIZE);
-                }}
-                placeholder="Search symbol, e.g. BTC"
-                className="mt-1 h-8 text-sm"
-              />
-            </div>
-          </div>
-          <ScrollArea className="w-full max-h-[70vh]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="h-[42px]">Rank</TableHead>
-                  <TableHead className="h-[42px]">Asset</TableHead>
-                  <TableHead className="h-[42px] text-right">Price</TableHead>
-                  <TableHead className="h-[42px] text-right">Amount</TableHead>
-                  <TableHead className="h-[42px] text-right">Value</TableHead>
-                  <TableHead className="h-[42px]">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleRankData.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      className="py-6 text-center text-sm text-muted-foreground"
-                      colSpan={6}
-                    >
-                      No assets matched current filter
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-                {visibleRankData.map((item) => {
-                  const apiPath = logoMap[item.symbol] || UnknownLogo;
-                  return (
-                    <TableRow
-                      key={"historical-data-detail-row-" + item.assetId}
-                      className="hover:bg-muted/40 transition-colors"
-                    >
-                      <TableCell className="py-1.5 text-sm"># {item.rank}</TableCell>
-                      <TableCell className="py-1.5">
-                        <div className="flex items-center gap-1 text-sm">
-                          <img
-                            className="inline-block w-[18px] h-[18px] rounded-full"
-                            src={apiPath}
-                            alt={item.symbol}
-                          />
-                          <p>{item.symbol}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-1.5 text-right text-sm">
-                        {currency.symbol}
-                        {prettyPriceNumberToLocaleString(
-                          currencyWrapper(currency)(item.price)
-                        )}
-                      </TableCell>
-                      <TableCell className="py-1.5 text-right text-sm">
-                        {prettyNumberKeepNDigitsAfterDecimalPoint(item.amount, 4)}
-                      </TableCell>
-                      <TableCell className="py-1.5 text-right text-sm">
-                        {currency.symbol}
-                        {prettyNumberToLocaleString(
-                          currencyWrapper(currency)(item.value)
-                        )}
-                      </TableCell>
-                      <TableCell className="py-1.5">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <button
-                              className="opacity-80 hover:opacity-100 transition-opacity"
-                              disabled={deleting}
-                            >
-                              <img
-                                src={DeleteIcon}
-                                alt="delete"
-                                style={{
-                                  border: 0,
-                                  height: 18,
-                                  width: 18,
-                                }}
-                              />
-                            </button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Are you absolutely sure?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Deleting this asset may affect income and trend
-                                calculations. Confirm to continue.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  onHistoricalDataDetailDeleteAndBlacklistClick(item.assetId, item.symbol)
-                                }
-                              >
-                                Delete & Blacklist
-                              </AlertDialogAction>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  onHistoricalDataDetailDeleteClick(item.assetId)
-                                }
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-          {filteredRankDataCount > DETAIL_PAGE_SIZE ? (
-            <Button
-              variant="ghost"
-              className="border-t border-border/40 rounded-none hover:bg-muted/50"
-              onClick={() => {
-                if (detailLimit >= filteredRankDataCount) {
-                  setDetailLimit(DETAIL_PAGE_SIZE);
-                  return;
-                }
-                setDetailLimit((prev) => prev + DETAIL_PAGE_SIZE);
-              }}
-            >
-              {detailLimit >= filteredRankDataCount
-                ? "Show Less"
-                : `Show More (${Math.min(
-                    DETAIL_PAGE_SIZE,
-                    filteredRankDataCount - detailLimit
-                  )})`}
-            </Button>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <FadeUp>
-        <div className="grid gap-3 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Records
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-semibold">{dataRows.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Historical snapshots stored
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Page Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-semibold">
-                {totalPages === 0 ? "0 / 0" : `${dataPage + 1} / ${totalPages}`}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Showing {loadedRangeStart}-{loadedRangeEnd}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Latest Snapshot
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-semibold">
-                {latestRow
-                  ? `${currency.symbol}${prettyNumberToLocaleString(
-                      currencyWrapper(currency)(latestRow.total)
-                    )}`
-                  : "-"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {latestRow
-                  ? timeToDateStr(new Date(latestRow.createdAt).getTime(), true)
-                  : "No data"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </FadeUp>
-
-      <FadeUp>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              History Records
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Click a row to view detailed holdings
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-              <div>
-                {pageLoading ? "Loading..." : `Total ${dataRows.length} records`}
-                {dataRows.length
-                  ? ` · Showing ${loadedRangeStart}-${loadedRangeEnd}`
-                  : ""}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Rows</span>
-                <Select
-                  value={String(pageSize)}
-                  onValueChange={(value) => {
-                    setPageSize(Number(value));
-                    setDataPage(0);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[84px] text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {[10, 20, 50].map((size) => (
-                        <SelectItem key={size} value={String(size)}>
-                          {size}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label="Previous page"
-                  className="h-11 w-11 px-0 sm:h-8 sm:w-8"
-                  onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
-                  disabled={dataPage <= 0}
-                >
-                  <ChevronLeftIcon />
-                </Button>
-                <Select
-                  value={String(dataPage)}
-                  onValueChange={(v) => {
-                    setDataPage(Number(v));
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[120px] text-sm">
-                    <SelectValue placeholder="Select Page" />
-                  </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[20rem]">
-                    <SelectGroup>
-                      {_.range(maxDataPage + 1).map((pageIdx) => (
-                        <SelectItem
-                          key={"historical-idx-" + pageIdx}
-                          value={String(pageIdx)}
-                        >
-                          {pageIdx + 1} / {maxDataPage + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label="Next page"
-                  className="h-11 w-11 px-0 sm:h-8 sm:w-8"
-                  onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
-                  disabled={dataPage >= maxDataPage}
-                >
-                  <ChevronRightIcon />
-                </Button>
-              </div>
-            </div>
-
-            <div className="relative min-h-[300px]">
-              <ScrollArea className="w-full max-h-[62vh] rounded-lg border border-border/40 bg-background/20">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="h-[42px]">Date</TableHead>
-                      <TableHead className="h-[42px] text-right">Total</TableHead>
-                      <TableHead className="h-[42px] text-right">Change</TableHead>
-                      <TableHead className="h-[42px]">Assets</TableHead>
-                      <TableHead className="h-[42px]">Opt</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedRows.map((row, idx) => {
-                      const isLatest = dataPage === 0 && idx === 0;
-                      const topAssets = _(row.assets)
-                        .filter((asset) => asset.value > 0)
-                        .sortBy("value")
-                        .reverse()
-                        .take(7)
-                        .value();
-
-                      return (
-                        <TableRow
-                          key={"historical-row-" + row.id}
-                          className="group cursor-pointer hover:bg-muted/40 transition-colors"
-                          onClick={() => onRowClick(row.id)}
-                        >
-                          <TableCell className="py-1.5 text-sm">
-                            <div className="flex flex-col">
-                              <span>
-                                {timeToDateStr(new Date(row.createdAt).getTime(), true)}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {row.id.slice(0, 8)}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-1.5 text-right text-sm font-semibold">
-                            {currency.symbol}
-                            {prettyNumberToLocaleString(
-                              currencyWrapper(currency)(row.total)
-                            )}
-                          </TableCell>
-                          <TableCell
-                            className="py-1.5 text-right text-sm"
-                            style={{
-                              color: positiveNegativeColor(row.change ?? 0, quoteColor),
-                            }}
-                          >
-                            {row.change === null
-                              ? "-"
-                              : `${row.change > 0 ? "+" : ""}${currency.symbol}${prettyNumberToLocaleString(
-                                  currencyWrapper(currency)(Math.abs(row.change))
-                                )}`}
-                          </TableCell>
-                          <TableCell className="py-1.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <ImageStack
-                                imageSrcs={topAssets.map(
-                                  (asset) => logoMap[asset.symbol] || UnknownLogo
-                                )}
-                                imageWidth={18}
-                                imageHeight={18}
-                              />
-                              <span className="text-xs text-muted-foreground">
-                                {row.assets.length} assets
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-1.5">
-                            {isLatest ? (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <button
-                                    className="hidden group-hover:inline-block opacity-80 hover:opacity-100 transition-opacity"
-                                    onClick={(e) => e.stopPropagation()}
-                                    disabled={deleting}
-                                  >
-                                    <img
-                                      src={DeleteIcon}
-                                      alt="delete"
-                                      style={{
-                                        border: 0,
-                                        height: 18,
-                                        width: 18,
-                                      }}
-                                    />
-                                  </button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Delete latest record?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      The latest snapshot will be removed. You
-                                      can restore it immediately via Undo.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() =>
-                                        onHistoricalDataDeleteClick(row.id)
-                                      }
-                                    >
-                                      Confirm
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            ) : null}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-
-               {pageLoading && (
-                 <PageLoadingOverlay
-                   title="Loading historical data"
-                   description="Refreshing stored snapshots and historical totals for the selected range."
-                 />
-               )}
-
-              {emptyState ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-lg text-muted-foreground">
-                    No historical records
-                  </p>
-                </div>
+        <Dialog
+          open={isModalOpen}
+          onOpenChange={(open) => {
+            setIsModalOpen(open);
+            if (!open) {
+              setSelectedDataId(null);
+            }
+          }}
+        >
+          <DialogContent className="min-w-[80%]">
+            <DialogHeader>
+              <DialogTitle>Historical Data Detail</DialogTitle>
+              <DialogDescription className="sr-only">
+                Review assets in the selected historical snapshot.
+              </DialogDescription>
+              {selectedData ? (
+                <p className="text-xs text-muted-foreground">
+                  {timeToDateStr(
+                    new Date(selectedData.createdAt).getTime(),
+                    true,
+                  )}
+                  {" · "}
+                  {currency.symbol}
+                  {prettyNumberToLocaleString(
+                    currencyWrapper(currency)(selectedData.total),
+                  )}
+                </p>
               ) : null}
+            </DialogHeader>
+            <div className="grid gap-2 md:grid-cols-3">
+              <div className="rounded-lg border border-border/40 bg-background/30 p-3">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Assets
+                </p>
+                <p className="text-xl font-semibold">{rankData.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Value greater than $1
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/40 bg-background/30 p-3">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Visible Rows
+                </p>
+                <p className="text-xl font-semibold">
+                  {Math.min(detailLimit, filteredRankDataCount)} /{" "}
+                  {filteredRankDataCount}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Increment by {DETAIL_PAGE_SIZE}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/40 bg-background/30 p-3">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Filter
+                </p>
+                <Input
+                  value={detailSearch}
+                  onChange={(e) => {
+                    setDetailSearch(e.target.value);
+                    setDetailLimit(DETAIL_PAGE_SIZE);
+                  }}
+                  placeholder="Search symbol, e.g. BTC"
+                  className="mt-1 h-8 text-sm"
+                />
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </FadeUp>
+            <ScrollArea className="w-full max-h-[70vh]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="h-[42px]">Rank</TableHead>
+                    <TableHead className="h-[42px]">Asset</TableHead>
+                    <TableHead className="h-[42px] text-right">Price</TableHead>
+                    <TableHead className="h-[42px] text-right">
+                      Amount
+                    </TableHead>
+                    <TableHead className="h-[42px] text-right">Value</TableHead>
+                    <TableHead className="h-[42px]">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibleRankData.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        className="py-6 text-center text-sm text-muted-foreground"
+                        colSpan={6}
+                      >
+                        No assets matched current filter
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                  {visibleRankData.map((item) => {
+                    const apiPath = logoMap[item.symbol] || UnknownLogo;
+                    return (
+                      <TableRow
+                        key={"historical-data-detail-row-" + item.assetId}
+                        className="hover:bg-muted/40 transition-colors"
+                      >
+                        <TableCell className="py-1.5 text-sm">
+                          # {item.rank}
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <div className="flex items-center gap-1 text-sm">
+                            <img
+                              className="inline-block w-[18px] h-[18px] rounded-full"
+                              src={apiPath}
+                              alt={item.symbol}
+                            />
+                            <p>{item.symbol}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-1.5 text-right text-sm">
+                          {currency.symbol}
+                          {prettyPriceNumberToLocaleString(
+                            currencyWrapper(currency)(item.price),
+                          )}
+                        </TableCell>
+                        <TableCell className="py-1.5 text-right text-sm">
+                          {prettyNumberKeepNDigitsAfterDecimalPoint(
+                            item.amount,
+                            4,
+                          )}
+                        </TableCell>
+                        <TableCell className="py-1.5 text-right text-sm">
+                          {currency.symbol}
+                          {prettyNumberToLocaleString(
+                            currencyWrapper(currency)(item.value),
+                          )}
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button
+                                className="opacity-80 hover:opacity-100 transition-opacity"
+                                disabled={deleting}
+                              >
+                                <img
+                                  src={DeleteIcon}
+                                  alt="delete"
+                                  style={{
+                                    border: 0,
+                                    height: 18,
+                                    width: 18,
+                                  }}
+                                />
+                              </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Are you absolutely sure?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Deleting this asset may affect income and
+                                  trend calculations. Confirm to continue.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() =>
+                                    onHistoricalDataDetailDeleteAndBlacklistClick(
+                                      item.assetId,
+                                      item.symbol,
+                                    )
+                                  }
+                                >
+                                  Delete & Blacklist
+                                </AlertDialogAction>
+                                <AlertDialogAction
+                                  onClick={() =>
+                                    onHistoricalDataDetailDeleteClick(
+                                      item.assetId,
+                                    )
+                                  }
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+            {filteredRankDataCount > DETAIL_PAGE_SIZE ? (
+              <Button
+                variant="ghost"
+                className="border-t border-border/40 rounded-none hover:bg-muted/50"
+                onClick={() => {
+                  if (detailLimit >= filteredRankDataCount) {
+                    setDetailLimit(DETAIL_PAGE_SIZE);
+                    return;
+                  }
+                  setDetailLimit((prev) => prev + DETAIL_PAGE_SIZE);
+                }}
+              >
+                {detailLimit >= filteredRankDataCount
+                  ? "Show Less"
+                  : `Show More (${Math.min(
+                      DETAIL_PAGE_SIZE,
+                      filteredRankDataCount - detailLimit,
+                    )})`}
+              </Button>
+            ) : null}
+          </DialogContent>
+        </Dialog>
+
+        <FadeUp>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Records
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xl font-semibold">{dataRows.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Historical snapshots stored
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Page Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xl font-semibold">
+                  {totalPages === 0
+                    ? "0 / 0"
+                    : `${dataPage + 1} / ${totalPages}`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Showing {loadedRangeStart}-{loadedRangeEnd}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Latest Snapshot
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xl font-semibold">
+                  {latestRow
+                    ? `${currency.symbol}${prettyNumberToLocaleString(
+                        currencyWrapper(currency)(latestRow.total),
+                      )}`
+                    : "-"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {latestRow
+                    ? timeToDateStr(
+                        new Date(latestRow.createdAt).getTime(),
+                        true,
+                      )
+                    : "No data"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </FadeUp>
+
+        <FadeUp>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                History Records
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Click a row to view detailed holdings
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                <div>
+                  {pageLoading
+                    ? "Loading..."
+                    : `Total ${dataRows.length} records`}
+                  {dataRows.length
+                    ? ` · Showing ${loadedRangeStart}-${loadedRangeEnd}`
+                    : ""}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Rows</span>
+                  <Select
+                    value={String(pageSize)}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setDataPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[84px] text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {[10, 20, 50].map((size) => (
+                          <SelectItem key={size} value={String(size)}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label="Previous page"
+                    className="h-11 w-11 px-0 sm:h-8 sm:w-8"
+                    onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
+                    disabled={dataPage <= 0}
+                  >
+                    <ChevronLeftIcon />
+                  </Button>
+                  <Select
+                    value={String(dataPage)}
+                    onValueChange={(v) => {
+                      setDataPage(Number(v));
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[120px] text-sm">
+                      <SelectValue placeholder="Select Page" />
+                    </SelectTrigger>
+                    <SelectContent className="overflow-y-auto max-h-[20rem]">
+                      <SelectGroup>
+                        {_.range(maxDataPage + 1).map((pageIdx) => (
+                          <SelectItem
+                            key={"historical-idx-" + pageIdx}
+                            value={String(pageIdx)}
+                          >
+                            {pageIdx + 1} / {maxDataPage + 1}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label="Next page"
+                    className="h-11 w-11 px-0 sm:h-8 sm:w-8"
+                    onClick={() =>
+                      setDataPage(Math.min(dataPage + 1, maxDataPage))
+                    }
+                    disabled={dataPage >= maxDataPage}
+                  >
+                    <ChevronRightIcon />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="relative min-h-[300px]">
+                <ScrollArea className="w-full max-h-[62vh] rounded-lg border border-border/40 bg-background/20">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="h-[42px]">Date</TableHead>
+                        <TableHead className="h-[42px] text-right">
+                          Total
+                        </TableHead>
+                        <TableHead className="h-[42px] text-right">
+                          Change
+                        </TableHead>
+                        <TableHead className="h-[42px]">Assets</TableHead>
+                        <TableHead className="h-[42px]">Opt</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pagedRows.map((row, idx) => {
+                        const isLatest = dataPage === 0 && idx === 0;
+                        const topAssets = _(row.assets)
+                          .filter((asset) => asset.value > 0)
+                          .sortBy("value")
+                          .reverse()
+                          .take(7)
+                          .value();
+
+                        return (
+                          <TableRow
+                            key={"historical-row-" + row.id}
+                            className="group cursor-pointer hover:bg-muted/40 transition-colors"
+                            onClick={() => onRowClick(row.id)}
+                          >
+                            <TableCell className="py-1.5 text-sm">
+                              <div className="flex flex-col">
+                                <span>
+                                  {timeToDateStr(
+                                    new Date(row.createdAt).getTime(),
+                                    true,
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {row.id.slice(0, 8)}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-1.5 text-right text-sm font-semibold">
+                              {currency.symbol}
+                              {prettyNumberToLocaleString(
+                                currencyWrapper(currency)(row.total),
+                              )}
+                            </TableCell>
+                            <TableCell
+                              className="py-1.5 text-right text-sm"
+                              style={{
+                                color: positiveNegativeColor(
+                                  row.change ?? 0,
+                                  quoteColor,
+                                ),
+                              }}
+                            >
+                              {row.change === null
+                                ? "-"
+                                : `${row.change > 0 ? "+" : ""}${currency.symbol}${prettyNumberToLocaleString(
+                                    currencyWrapper(currency)(
+                                      Math.abs(row.change),
+                                    ),
+                                  )}`}
+                            </TableCell>
+                            <TableCell className="py-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <ImageStack
+                                  imageSrcs={topAssets.map(
+                                    (asset) =>
+                                      logoMap[asset.symbol] || UnknownLogo,
+                                  )}
+                                  imageWidth={18}
+                                  imageHeight={18}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  {row.assets.length} assets
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-1.5">
+                              {isLatest ? (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <button
+                                      className="hidden group-hover:inline-block opacity-80 hover:opacity-100 transition-opacity"
+                                      onClick={(e) => e.stopPropagation()}
+                                      disabled={deleting}
+                                    >
+                                      <img
+                                        src={DeleteIcon}
+                                        alt="delete"
+                                        style={{
+                                          border: 0,
+                                          height: 18,
+                                          width: 18,
+                                        }}
+                                      />
+                                    </button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Delete latest record?
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        The latest snapshot will be removed. You
+                                        can restore it immediately via Undo.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() =>
+                                          onHistoricalDataDeleteClick(row.id)
+                                        }
+                                      >
+                                        Confirm
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              ) : null}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+
+                {pageLoading && (
+                  <PageLoadingOverlay
+                    title="Loading historical data"
+                    description="Refreshing stored snapshots and historical totals for the selected range."
+                  />
+                )}
+
+                {emptyState ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-lg text-muted-foreground">
+                      No historical records
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+        </FadeUp>
       </StaggerContainer>
     </div>
   );

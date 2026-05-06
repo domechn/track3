@@ -46,7 +46,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [exportConfiguration, setExportConfiguration] = useState(false);
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
     useState(false);
-  const [exportData, setExportData] = useState<ExportData | undefined>(undefined);
+  const [exportData, setExportData] = useState<ExportData | undefined>(
+    undefined,
+  );
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
   const [lastImportAt, setLastImportAt] = useState<Date>();
@@ -145,7 +147,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
   async function onRemoveFromBlacklist(symbol: string) {
     await removeFromBlacklist(symbol);
-    setBlacklist(prev => prev.filter(s => s !== symbol));
+    setBlacklist((prev) =>
+      prev.filter((s) => s.toUpperCase() !== symbol.toUpperCase()),
+    );
     toast({ description: `"${symbol}" removed from blacklist` });
   }
 
@@ -159,8 +163,8 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
           <DialogHeader>
             <DialogTitle>Conflicts Found</DialogTitle>
             <DialogDescription>
-              Imported records overlap with existing history. Choose how to resolve
-              duplicated entries.
+              Imported records overlap with existing history. Choose how to
+              resolve duplicated entries.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -263,7 +267,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             <div
               className={cn(
                 "text-sm text-muted-foreground whitespace-nowrap overflow-x-auto scrollbar-hide",
-                autoBackupDirectory ? "block" : "hidden"
+                autoBackupDirectory ? "block" : "hidden",
               )}
             >
               {autoBackupDirectory}
@@ -296,7 +300,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             refresh operations.
           </p>
           {blacklist.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No blacklisted tokens</p>
+            <p className="text-sm text-muted-foreground">
+              No blacklisted tokens
+            </p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {blacklist.map((symbol) => (
@@ -306,6 +312,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
                 >
                   <span>{symbol}</span>
                   <button
+                    aria-label={`Remove ${symbol} from blacklist`}
                     className="text-muted-foreground hover:text-foreground transition-colors text-xs leading-none"
                     onClick={() => onRemoveFromBlacklist(symbol)}
                   >
