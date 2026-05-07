@@ -1,0 +1,979 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Download Track3</title>
+    <meta
+      name="description"
+      content="Download the latest Track3 desktop app for macOS, Windows, or Linux. We detect your system and recommend the right installer."
+    />
+    <meta property="og:title" content="Download Track3" />
+    <meta
+      property="og:description"
+      content="Get the latest Track3 installer for macOS, Windows, or Linux with automatic platform recommendations."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://domechn.github.io/track3/download.html"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      href="https://raw.githubusercontent.com/domechn/track3/master/src-tauri/app-icon.png"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #ffffff;
+        --surface: rgba(255, 255, 255, 0.92);
+        --surface-soft: #f5f3ff;
+        --surface-strong: #efecff;
+        --border: rgba(23, 20, 34, 0.1);
+        --border-strong: rgba(109, 92, 255, 0.2);
+        --text: #171422;
+        --text-muted: #68627d;
+        --text-soft: #8d86a3;
+        --accent: #6d5cff;
+        --accent-hover: #5a49ed;
+        --accent-soft: #efecff;
+        --green: #3f8f53;
+        --shadow: 0 20px 60px rgba(73, 63, 148, 0.1);
+        --shadow-lg: 0 28px 90px rgba(73, 63, 148, 0.16);
+        --radius: 28px;
+        --radius-card: 22px;
+      }
+      html {
+        scroll-behavior: smooth;
+        font-size: 16px;
+        background: var(--bg);
+      }
+      body {
+        font-family: "Manrope", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        background: #ffffff;
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(23, 20, 34, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(23, 20, 34, 0.025) 1px, transparent 1px);
+        background-size: 32px 32px;
+        opacity: 0.45;
+        mask-image: linear-gradient(
+          180deg,
+          rgba(0, 0, 0, 0.28),
+          transparent 92%
+        );
+        -webkit-mask-image: linear-gradient(
+          180deg,
+          rgba(0, 0, 0, 0.28),
+          transparent 92%
+        );
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      img {
+        display: block;
+        max-width: 100%;
+      }
+      button {
+        font: inherit;
+      }
+      .container {
+        width: min(1180px, calc(100% - 48px));
+        margin: 0 auto;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-soft);
+      }
+      .shell-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        padding: 18px 0 0;
+      }
+      .shell-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 12px 22px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        box-shadow: 0 12px 40px rgba(45, 36, 95, 0.08);
+      }
+      .shell-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .shell-brand img {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(109, 92, 255, 0.22);
+      }
+      .shell-links {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .shell-link,
+      .shell-link--primary,
+      .download-button,
+      .download-button--ghost {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 48px;
+        padding: 0 20px;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          border-color 0.2s,
+          box-shadow 0.2s,
+          transform 0.2s,
+          color 0.2s;
+      }
+      .shell-link {
+        border: 1px solid var(--border);
+        background: #ffffff;
+        color: var(--text);
+      }
+      .shell-link:hover {
+        background: var(--surface-soft);
+        border-color: var(--border-strong);
+      }
+      .shell-link--primary,
+      .download-button {
+        background: var(--accent);
+        color: #ffffff;
+        box-shadow: 0 12px 28px rgba(109, 92, 255, 0.24);
+      }
+      .shell-link--primary:hover,
+      .download-button:hover {
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 16px 34px rgba(109, 92, 255, 0.3);
+      }
+      .download-button[aria-disabled="true"] {
+        pointer-events: none;
+        opacity: 0.6;
+      }
+      .download-button:disabled,
+      .download-button--ghost:disabled,
+      .download-option:disabled {
+        cursor: wait;
+        opacity: 0.72;
+      }
+      .download-button--ghost {
+        border: 1px solid var(--border);
+        background: #ffffff;
+        color: var(--text);
+      }
+      .download-button--ghost:hover {
+        border-color: var(--border-strong);
+        background: var(--surface-soft);
+      }
+      .page {
+        padding: 48px 0 120px;
+      }
+      .hero {
+        padding: 54px 0 34px;
+      }
+      .hero__layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+        gap: 28px;
+        align-items: start;
+      }
+      .hero__content,
+      .hero__side {
+        padding: 34px;
+        border: 1px solid var(--border);
+        border-radius: 34px;
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow: var(--shadow);
+      }
+      .hero__content .eyebrow {
+        margin-bottom: 18px;
+      }
+      .hero h1 {
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: clamp(2.8rem, 6vw, 5rem);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+        margin-bottom: 18px;
+        max-width: 9ch;
+      }
+      .hero h1 span {
+        color: var(--accent-hover);
+      }
+      .hero p {
+        color: var(--text-muted);
+        max-width: 58ch;
+        font-size: 1.04rem;
+      }
+      .hero__meta {
+        display: grid;
+        gap: 14px;
+      }
+      .hero__meta-item {
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--surface-soft);
+      }
+      .hero__meta-item strong {
+        display: block;
+        font-size: 1rem;
+        margin-bottom: 4px;
+      }
+      .hero__meta-item span {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+      .section {
+        padding: 28px 0;
+      }
+      .download-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+        gap: 28px;
+        align-items: start;
+      }
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 32px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: var(--shadow);
+      }
+      .panel--accent {
+        background: linear-gradient(
+          180deg,
+          rgba(239, 236, 255, 0.78),
+          rgba(255, 255, 255, 0.98)
+        );
+        border-color: rgba(109, 92, 255, 0.18);
+      }
+      .panel__body {
+        padding: 32px;
+      }
+      .panel__header {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      .panel__title {
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+      }
+      .panel__text {
+        color: var(--text-muted);
+      }
+      .download-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 40px;
+        padding: 0 14px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #ffffff;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.73rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-soft);
+      }
+      .pill--accent {
+        border-color: rgba(109, 92, 255, 0.22);
+        background: var(--accent-soft);
+        color: var(--accent-hover);
+      }
+      .recommendation__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 22px 0 20px;
+      }
+      .release-meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .release-meta__item {
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: #ffffff;
+      }
+      .release-meta__label {
+        display: block;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-soft);
+        margin-bottom: 6px;
+      }
+      .release-meta__value {
+        display: block;
+        font-weight: 700;
+      }
+      .manual-groups {
+        display: grid;
+        gap: 16px;
+      }
+      .manual-group {
+        padding: 22px;
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: #ffffff;
+      }
+      .manual-group__header {
+        margin-bottom: 16px;
+      }
+      .manual-group__title {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .manual-group__copy {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+      .manual-group__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .download-option {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 46px;
+        padding: 0 16px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #ffffff;
+        color: var(--text);
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          border-color 0.2s,
+          transform 0.2s;
+      }
+      .download-option:hover {
+        background: var(--surface-soft);
+        border-color: var(--border-strong);
+        transform: translateY(-1px);
+      }
+      .download-option__meta {
+        color: var(--text-soft);
+        font-size: 0.82rem;
+      }
+      .release-notes {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        color: var(--text-muted);
+        font-size: 0.95rem;
+      }
+      .release-notes ul {
+        list-style: disc;
+        padding-left: 20px;
+        margin-top: 10px;
+      }
+      .release-notes li + li {
+        margin-top: 6px;
+      }
+      .footer {
+        padding-top: 24px;
+        color: var(--text-soft);
+        font-size: 0.9rem;
+      }
+      @media (max-width: 980px) {
+        .hero__layout,
+        .download-layout,
+        .release-meta {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 720px) {
+        .container {
+          width: min(100% - 32px, 1180px);
+        }
+        .shell-nav {
+          padding: 12px 14px;
+          border-radius: 28px;
+        }
+        .shell-links {
+          width: 100%;
+          justify-content: space-between;
+        }
+        .shell-link,
+        .shell-link--primary {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+        .page {
+          padding: 34px 0 90px;
+        }
+        .hero {
+          padding-top: 32px;
+        }
+        .hero__content,
+        .hero__side,
+        .panel__body,
+        .manual-group {
+          padding: 24px;
+        }
+        .recommendation__actions,
+        .manual-group__actions {
+          flex-direction: column;
+        }
+        .download-button,
+        .download-button--ghost,
+        .download-option {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="shell-header">
+      <div class="container shell-nav">
+        <a href="./index.html" class="shell-brand">
+          <img
+            src="https://raw.githubusercontent.com/domechn/track3/master/src-tauri/app-icon.png"
+            alt="Track3 icon"
+          />
+          Track3
+        </a>
+        <div class="shell-links">
+          <a href="./index.html" class="shell-link">Back to Home</a>
+          <a
+            href="https://github.com/domechn/track3/releases"
+            class="shell-link--primary"
+            target="_blank"
+            rel="noopener"
+            >View Releases</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="hero">
+        <div class="container hero__layout">
+          <div class="hero__content">
+            <p class="eyebrow">Download Track3</p>
+            <h1>Get the <span>right build</span> for your system</h1>
+            <p>
+              We detect your operating system, look up the latest Track3
+              release, and recommend the most suitable installer for macOS,
+              Windows, or Linux. If detection is ambiguous, you can still choose
+              manually.
+            </p>
+          </div>
+          <aside class="hero__side">
+            <div class="hero__meta">
+              <div class="hero__meta-item">
+                <strong>Recommended installer</strong>
+                <span>
+                  We resolve the newest matching installer only after you click.
+                </span>
+              </div>
+              <div class="hero__meta-item">
+                <strong>No upfront version lookup</strong>
+                <span>
+                  The page stays static until you request a download, then it
+                  fetches the latest public release from GitHub.
+                </span>
+              </div>
+              <div class="hero__meta-item">
+                <strong>Manual fallback included</strong>
+                <span>
+                  macOS, Windows, and Linux package buttons are always available
+                  below if you want to choose manually.
+                </span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="container download-layout">
+          <section
+            class="panel panel--accent"
+            aria-labelledby="recommendedTitle"
+          >
+            <div class="panel__body">
+              <div class="panel__header">
+                <div class="download-badges">
+                  <span class="pill pill--accent" id="platformBadge"
+                    >Detecting your device</span
+                  >
+                  <span class="pill" id="statusBadge"
+                    >Fetch latest on click</span
+                  >
+                </div>
+                <h2 class="panel__title" id="recommendedTitle">
+                  Choose your download
+                </h2>
+                <p class="panel__text" id="recommendedText">
+                  This page does not preload release metadata. We only look up
+                  the newest Track3 installer after you press a download button.
+                </p>
+              </div>
+
+              <div
+                class="recommendation__actions"
+                id="recommendedActions"
+              ></div>
+
+              <div class="release-notes" id="downloadHint">
+                When you click a button, Track3 fetches the latest public GitHub
+                release, finds the matching installer, and redirects you to that
+                file.
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel" aria-labelledby="manualDownloadsTitle">
+            <div class="panel__body">
+              <div class="panel__header">
+                <p class="eyebrow">Manual Downloads</p>
+                <h2 class="panel__title" id="manualDownloadsTitle">
+                  Package Formats
+                </h2>
+                <p class="panel__text">
+                  Pick the format you want. Each button resolves the newest
+                  matching asset only when clicked.
+                </p>
+              </div>
+              <div class="manual-groups" id="manualDownloads"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <div class="container footer">
+        Download buttons resolve to the latest public GitHub release only when
+        you click them.
+      </div>
+    </main>
+
+    <script type="module">
+      import {
+        detectPlatform,
+        resolveLatestDownloadUrl,
+      } from "./download-page.mjs";
+
+      const latestMetadataUrl =
+        "https://github.com/domechn/track3/releases/latest/download/latest.json";
+      const releasesPageUrl =
+        "https://github.com/domechn/track3/releases/latest";
+
+      const platformBadge = document.getElementById("platformBadge");
+      const statusBadge = document.getElementById("statusBadge");
+      const recommendedTitle = document.getElementById("recommendedTitle");
+      const recommendedText = document.getElementById("recommendedText");
+      const recommendedActions = document.getElementById("recommendedActions");
+      const downloadHint = document.getElementById("downloadHint");
+      const manualDownloads = document.getElementById("manualDownloads");
+
+      const platform = detectPlatform();
+      platformBadge.textContent = platform.label;
+      let latestMetadataPromise = null;
+
+      const kindLabels = {
+        dmg: "DMG installer",
+        "app-tar-gz": ".app archive",
+        exe: "EXE setup",
+        msi: "MSI package",
+        appimage: "AppImage",
+        deb: "DEB package",
+        rpm: "RPM package",
+      };
+
+      const manualGroups = [
+        {
+          title: "macOS (Apple Silicon)",
+          copy: "Best choice for M-series Macs.",
+          options: [
+            {
+              label: "DMG installer",
+              target: { os: "macos", arch: "arm64", kind: "dmg" },
+            },
+            {
+              label: ".app archive",
+              target: { os: "macos", arch: "arm64", kind: "app-tar-gz" },
+            },
+          ],
+        },
+        {
+          title: "macOS (Intel)",
+          copy: "For older Intel-based Macs.",
+          options: [
+            {
+              label: "DMG installer",
+              target: { os: "macos", arch: "x64", kind: "dmg" },
+            },
+            {
+              label: ".app archive",
+              target: { os: "macos", arch: "x64", kind: "app-tar-gz" },
+            },
+          ],
+        },
+        {
+          title: "Windows",
+          copy: "Choose the standard setup or MSI package.",
+          options: [
+            {
+              label: "EXE setup",
+              target: { os: "windows", arch: "x64", kind: "exe" },
+            },
+            {
+              label: "MSI package",
+              target: { os: "windows", arch: "x64", kind: "msi" },
+            },
+          ],
+        },
+        {
+          title: "Linux",
+          copy: "AppImage first, with DEB and RPM alternatives.",
+          options: [
+            {
+              label: "AppImage",
+              target: { os: "linux", arch: "x64", kind: "appimage" },
+            },
+            {
+              label: "DEB package",
+              target: { os: "linux", arch: "x64", kind: "deb" },
+            },
+            {
+              label: "RPM package",
+              target: { os: "linux", arch: "x64", kind: "rpm" },
+            },
+          ],
+        },
+      ];
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function formatAssetLabel(kind) {
+        return kindLabels[kind] ?? kind;
+      }
+
+      function renderDownloadButton(target, label, className, meta = "") {
+        const kindAttr = target.kind
+          ? ` data-download-kind="${escapeHtml(target.kind)}"`
+          : "";
+        return `
+          <button
+            type="button"
+            class="${className}"
+            data-download-os="${escapeHtml(target.os)}"
+            data-download-arch="${escapeHtml(target.arch)}"${kindAttr}
+          >
+            <span>${escapeHtml(label)}</span>
+            ${meta ? `<span class="download-option__meta">${escapeHtml(meta)}</span>` : ""}
+          </button>
+        `;
+      }
+
+      function renderExternalLink(label, className = "download-button--ghost") {
+        return `<a class="${className}" href="${releasesPageUrl}">${escapeHtml(label)}</a>`;
+      }
+
+      function getRecommendedView(detectedPlatform) {
+        if (
+          detectedPlatform.os === "macos" &&
+          detectedPlatform.arch === "arm64"
+        ) {
+          return {
+            title: `Recommended for ${detectedPlatform.label}`,
+            text: "We will fetch the newest Apple Silicon DMG only after you click the button below.",
+            actions: [
+              renderDownloadButton(
+                { os: "macos", arch: "arm64", kind: "dmg" },
+                "Download DMG for Apple Silicon",
+                "download-button",
+              ),
+            ],
+          };
+        }
+
+        if (
+          detectedPlatform.os === "macos" &&
+          detectedPlatform.arch === "x64"
+        ) {
+          return {
+            title: `Recommended for ${detectedPlatform.label}`,
+            text: "We will fetch the newest Intel Mac DMG only after you click the button below.",
+            actions: [
+              renderDownloadButton(
+                { os: "macos", arch: "x64", kind: "dmg" },
+                "Download DMG for Intel Mac",
+                "download-button",
+              ),
+            ],
+          };
+        }
+
+        if (detectedPlatform.os === "macos") {
+          return {
+            title: "Choose your Mac download",
+            text: "Your browser did not expose the Mac chip type clearly, so choose Apple Silicon or Intel before we resolve the newest installer.",
+            actions: [
+              renderDownloadButton(
+                { os: "macos", arch: "arm64", kind: "dmg" },
+                "Download DMG for Apple Silicon",
+                "download-button",
+              ),
+              renderDownloadButton(
+                { os: "macos", arch: "x64", kind: "dmg" },
+                "Download DMG for Intel Mac",
+                "download-button--ghost",
+              ),
+            ],
+          };
+        }
+
+        if (detectedPlatform.os === "windows") {
+          return {
+            title: "Recommended for Windows",
+            text: "We will fetch the newest Windows setup installer only after you click. An MSI option is still available below.",
+            actions: [
+              renderDownloadButton(
+                { os: "windows", arch: "x64", kind: "exe" },
+                "Download Windows Setup",
+                "download-button",
+              ),
+              renderDownloadButton(
+                { os: "windows", arch: "x64", kind: "msi" },
+                "Use MSI instead",
+                "download-button--ghost",
+              ),
+            ],
+          };
+        }
+
+        if (
+          detectedPlatform.os === "linux" &&
+          detectedPlatform.arch === "x64"
+        ) {
+          return {
+            title: "Recommended for Linux",
+            text: "We will fetch the newest AppImage only after you click. DEB and RPM remain available below.",
+            actions: [
+              renderDownloadButton(
+                { os: "linux", arch: "x64", kind: "appimage" },
+                "Download AppImage",
+                "download-button",
+              ),
+              renderDownloadButton(
+                { os: "linux", arch: "x64", kind: "deb" },
+                "Use DEB instead",
+                "download-button--ghost",
+              ),
+            ],
+          };
+        }
+
+        if (detectedPlatform.os === "linux") {
+          return {
+            title: "Choose your Linux package",
+            text: "Track3 currently publishes Linux x64 packages. Use one of the manual format buttons below if that matches your machine.",
+            actions: [
+              renderExternalLink(
+                "Open latest GitHub release",
+                "download-button",
+              ),
+            ],
+          };
+        }
+
+        return {
+          title: "Choose your download",
+          text: "We could not confidently detect your system. Use the package buttons below or open the latest GitHub release.",
+          actions: [
+            renderExternalLink("Open latest GitHub release", "download-button"),
+          ],
+        };
+      }
+
+      function renderManualDownloads() {
+        return manualGroups
+          .map(
+            (group) => `
+              <section class="manual-group">
+                <div class="manual-group__header">
+                  <h3 class="manual-group__title">${escapeHtml(group.title)}</h3>
+                  <p class="manual-group__copy">${escapeHtml(group.copy)}</p>
+                </div>
+                <div class="manual-group__actions">
+                  ${group.options
+                    .map((option) =>
+                      renderDownloadButton(
+                        option.target,
+                        option.label,
+                        "download-option",
+                        "Fetch on click",
+                      ),
+                    )
+                    .join("")}
+                </div>
+              </section>
+            `,
+          )
+          .join("");
+      }
+
+      async function getLatestMetadata() {
+        if (!latestMetadataPromise) {
+          latestMetadataPromise = fetch(latestMetadataUrl)
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(
+                  `latest.json responded with ${response.status}`,
+                );
+              }
+
+              return response.json();
+            })
+            .catch((error) => {
+              latestMetadataPromise = null;
+              throw error;
+            });
+        }
+
+        return latestMetadataPromise;
+      }
+
+      function applyRecommendedView() {
+        const view = getRecommendedView(platform);
+        recommendedTitle.textContent = view.title;
+        recommendedText.textContent = view.text;
+        recommendedActions.innerHTML = view.actions.join("");
+      }
+
+      async function handleDownloadClick(event) {
+        const button = event.target.closest("[data-download-os]");
+        if (!button) {
+          return;
+        }
+
+        event.preventDefault();
+
+        const target = {
+          os: button.dataset.downloadOs,
+          arch: button.dataset.downloadArch,
+          kind: button.dataset.downloadKind || undefined,
+        };
+        const previousStatus = statusBadge.textContent;
+        const previousText = recommendedText.textContent;
+
+        statusBadge.textContent = "Finding latest release…";
+        recommendedText.textContent =
+          "Fetching the newest Track3 release from GitHub, then redirecting you to the requested installer.";
+        button.disabled = true;
+
+        try {
+          const latestMetadata = await getLatestMetadata();
+          const downloadUrl = resolveLatestDownloadUrl(latestMetadata, target);
+
+          if (!downloadUrl) {
+            throw new Error(
+              "No matching installer found in the latest release.",
+            );
+          }
+
+          statusBadge.textContent = "Starting download…";
+          recommendedText.textContent = `Opening ${formatAssetLabel(
+            target.kind,
+          )} from v${latestMetadata.version}.`;
+          window.location.href = downloadUrl;
+        } catch (error) {
+          statusBadge.textContent = "Opening GitHub fallback";
+          recommendedText.textContent =
+            "We could not resolve that installer automatically, so the latest GitHub release page will open instead.";
+          downloadHint.innerHTML = `<p>${escapeHtml(
+            error.message,
+          )}. The latest GitHub release page is opening as a fallback.</p>`;
+          window.location.href = releasesPageUrl;
+        } finally {
+          setTimeout(() => {
+            button.disabled = false;
+            statusBadge.textContent = previousStatus;
+            recommendedText.textContent = previousText;
+          }, 1200);
+        }
+      }
+
+      applyRecommendedView();
+      manualDownloads.innerHTML = renderManualDownloads();
+      document.addEventListener("click", handleDownloadClick);
+    </script>
+  </body>
+</html>
