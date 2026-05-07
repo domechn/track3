@@ -66,4 +66,46 @@ describe("asset type aware coin utilities", () => {
       },
     ]);
   });
+
+  it("prefers asset-type-specific price keys when the same symbol exists across asset classes", () => {
+    const result = calculateTotalValue(
+      [
+        {
+          wallet: "wallet-1",
+          symbol: "BTC",
+          amount: 1,
+          assetType: "crypto",
+        },
+        {
+          wallet: "broker-1",
+          symbol: "BTC",
+          amount: 2,
+          assetType: "stock",
+        },
+      ] as WalletCoin[],
+      {
+        "crypto:BTC": 100000,
+        "stock:BTC": 15,
+      },
+    );
+
+    expect(result).toEqual([
+      {
+        wallet: "wallet-1",
+        symbol: "BTC",
+        amount: 1,
+        assetType: "crypto",
+        price: 100000,
+        usdValue: 100000,
+      },
+      {
+        wallet: "broker-1",
+        symbol: "BTC",
+        amount: 2,
+        assetType: "stock",
+        price: 15,
+        usdValue: 30,
+      },
+    ]);
+  });
 });

@@ -7,6 +7,7 @@ import {
   CurrencyRateDetail,
   TDateRange,
 } from "@/middlelayers/types";
+import { AssetType } from "@/middlelayers/datafetch/types";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useContext, useEffect, useMemo, useState } from "react";
@@ -23,6 +24,7 @@ import {
   glassScaleOptions,
   glassTooltip,
 } from "@/utils/chart-theme";
+import { formatAssetLabel } from "@/utils/assets";
 
 const chartName = "Trend of Coin";
 
@@ -30,10 +32,12 @@ const App = ({
   currency,
   dateRange,
   symbol,
+  assetType,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   symbol: string;
+  assetType?: AssetType;
 }) => {
   const wsize = useWindowSize();
   const { needResize } = useContext(ChartResizeContext);
@@ -53,16 +57,25 @@ const App = ({
   );
 
   useEffect(() => {
-    loadData(symbol, dateRange).then(() => {
+    loadData(symbol, dateRange, assetType).then(() => {
       resizeChartWithDelay(chartName);
       reportLoaded();
     });
-  }, [dateRange, symbol]);
+  }, [dateRange, symbol, assetType]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData(symbol: string, dateRange: TDateRange) {
-    const cac = await queryCoinsAmountChange(symbol, dateRange);
+  async function loadData(
+    symbol: string,
+    dateRange: TDateRange,
+    selectedAssetType?: AssetType,
+  ) {
+    const cac = await queryCoinsAmountChange(
+      symbol,
+      dateRange,
+      undefined,
+      selectedAssetType,
+    );
     if (!cac) {
       return;
     }
@@ -201,7 +214,7 @@ const App = ({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Trend of {symbol}
+            Trend of {formatAssetLabel({ symbol, assetType })}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">

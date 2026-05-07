@@ -21,6 +21,7 @@ import {
   glassScaleOptions,
   glassTooltip,
 } from "@/utils/chart-theme";
+import { formatAssetLabel } from "@/utils/assets";
 
 const prefix = "tcpc";
 const chartNameKey = "Change of Top Coins";
@@ -154,7 +155,10 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         timeToDateStr(x)
       ),
       datasets: topCoinsPercentageChangeData.coins.map((coin, idx) => ({
-        label: coin.coin,
+        label: formatAssetLabel({
+          symbol: coin.coin,
+          assetType: coin.assetType,
+        }),
         data: coinPercentageData(
           topCoinsPercentageChangeData.timestamps,
           coin.percentageData

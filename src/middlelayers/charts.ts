@@ -6,6 +6,7 @@ import {
   Asset,
   AssetAction,
   AssetChangeData,
+  AssetReference,
   AssetModel,
   AssetsPercentageChangeData,
   CoinsAmountAndValueChangeData,
@@ -33,7 +34,11 @@ import {
   getBlacklistCoins,
   saveStableCoins,
 } from "./configuration";
-import { calculateTotalValue, getAssetType } from "./datafetch/utils/coins";
+import {
+  calculateTotalValue,
+  getAssetIdentity,
+  getAssetType,
+} from "./datafetch/utils/coins";
 import { fetchStockPrices } from "./datafetch/utils/price";
 import { timeToDateStr } from "../utils/date";
 import { WalletAnalyzer } from "./wallet";
@@ -46,7 +51,7 @@ import {
   getLocalStorageCacheInstance,
   getMemoryCacheInstance,
 } from "./datafetch/utils/cache";
-import { GlobalConfig, WalletCoin } from "./datafetch/types";
+import { AssetType, GlobalConfig, WalletCoin } from "./datafetch/types";
 import { CACHE_GROUP_KEYS } from "./consts";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 
@@ -56,6 +61,25 @@ const DATA_MAX_POINTS = 100;
 export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
   ASSET_HANDLER.listAssets(size),
 );
+
+function filterByAssetType<T extends { assetType?: AssetType }>(
+  items: T[],
+  assetType?: AssetType,
+): T[] {
+  return assetType
+    ? items.filter((item) => getAssetType(item) === assetType)
+    : items;
+}
+
+function toAssetReference(asset: {
+  symbol: string;
+  assetType?: AssetType;
+}): AssetReference {
+  return {
+    symbol: asset.symbol,
+    assetType: getAssetType(asset),
+  };
+}
 
 export async function refreshAllData(addProgress: AddProgressFunc) {
   const lastAssets = _(await ASSET_HANDLER.listAssets(1))
@@ -228,8 +252,13 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
 
 // listAllowedSymbols return all symbol names
 // returns sort by latest value desc
-export async function listAllowedSymbols(): Promise<string[]> {
-  return ASSET_HANDLER.listSortedSymbolsByCurrentValue();
+export async function listAllowedSymbols(): Promise<AssetReference[]> {
+  const groupedAssets = await ASSET_HANDLER.listSymbolGroupedAssets(1);
+  return _((groupedAssets[0] ?? []))
+    .filter((asset) => asset.amount !== 0)
+    .orderBy(["value", "symbol"], ["desc", "asc"])
+    .map((asset) => toAssetReference(asset))
+    .value();
 }
 
 type TotalProfit = {
@@ -240,6 +269,7 @@ type TotalProfit = {
   percentage?: number;
   coins: {
     symbol: string;
+    assetType: AssetType;
     // coin profit
     value: number;
     // coin profit percentage
@@ -336,14 +366,14 @@ export async function fixSymbolDataIfNeeded(symbol: string) {
 export async function queryTransactionsBySymbolAndDateRange(
   symbol: string,
   dateRange: TDateRange,
+  assetType?: AssetType,
 ): Promise<Transaction[]> {
   const models = await TRANSACTION_HANDLER.listTransactionsByDateRange(
     dateRange.start,
     dateRange.end,
     symbol,
   );
-  return _(models)
-    .flatten()
+  return _(filterByAssetType(_(models).flatten().value(), assetType))
     .map((m) => ({
       id: m.id,
       assetID: m.assetID,
@@ -363,59 +393,72 @@ export async function queryTransactionsBySymbolAndDateRange(
 export async function calculateTotalProfit(
   dateRange: TDateRange,
   symbol?: string,
+  assetType?: AssetType,
 ): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
   const cache = getLocalStorageCacheInstance(
     CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY,
   );
-  const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}-${symbol ?? "all"}`;
+  const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}-${symbol ?? "all"}-${assetType ?? "all"}`;
   const c = cache.getCache<TotalProfit>(key);
   if (c) {
     return c;
   }
 
   // const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
-  const latestAssets = await ASSET_HANDLER.listAssetsMaxCreatedAt(
-    dateRange.start,
-    dateRange.end,
-    symbol,
+  const latestAssets = filterByAssetType(
+    await ASSET_HANDLER.listAssetsMaxCreatedAt(
+      dateRange.start,
+      dateRange.end,
+      symbol,
+    ),
+    assetType,
   );
   // group latestAssets by symbol, can sum amount and value
   const dateRangeAssets = _(latestAssets)
-    .groupBy("symbol")
-    .map((assets, symbol) => {
+    .groupBy((asset) => getAssetIdentity(asset))
+    .map((assets) => {
+      const first = _(assets).first();
       const allAmount = _(assets).sumBy("amount");
       const allValue = _(assets).sumBy("value");
       return {
-        symbol,
+        symbol: first?.symbol ?? "",
+        assetType: getAssetType(first),
         price: allAmount === 0 ? 0 : allValue / allAmount,
         amount: allAmount,
         value: allValue,
         // all createdAt are same, so just get the first one
-        createdAt: _(assets).first()?.createdAt,
+        createdAt: first?.createdAt,
       };
     })
     .value();
-  const earliestAssets = await ASSET_HANDLER.listAssetsMinCreatedAt(
-    dateRange.start,
-    dateRange.end,
-    symbol,
+  const earliestAssets = filterByAssetType(
+    await ASSET_HANDLER.listAssetsMinCreatedAt(
+      dateRange.start,
+      dateRange.end,
+      symbol,
+    ),
+    assetType,
   );
 
-  const allTransactions = await TRANSACTION_HANDLER.listTransactionsByDateRange(
-    dateRange.start,
-    dateRange.end,
-    symbol,
+  const allTransactions = filterByAssetType(
+    _(await TRANSACTION_HANDLER.listTransactionsByDateRange(
+      dateRange.start,
+      dateRange.end,
+      symbol,
+    ))
+      .flatten()
+      .value(),
+    assetType,
   );
   // todo: handle if one asset has multiple transactions
   const allTransactionsAssetIdMap = _(allTransactions)
-    .flatten()
     .groupBy("assetID")
     .mapValues((t) => t[0])
     .value();
 
   const dateRangeEarliestAssets = _(earliestAssets)
-    .groupBy("symbol")
-    .map((assets, symbol) => {
+    .groupBy((asset) => getAssetIdentity(asset))
+    .map((assets) => {
       const bsAssets = _(assets)
         .filter((a) => {
           const txn = allTransactionsAssetIdMap[a.id];
@@ -428,21 +471,23 @@ export async function calculateTotalProfit(
           (a) => (allTransactionsAssetIdMap[a.id]?.price ?? a.price) * a.amount,
         )
         .sum();
+      const first = _(assets).first();
       return {
-        symbol,
+        symbol: first?.symbol ?? "",
+        assetType: getAssetType(first),
         price: allAmount === 0 ? 0 : allValue / allAmount,
         amount: allAmount,
         value: allValue,
         // all createdAt are same, so just get the first one
-        createdAt: _(assets).first()?.createdAt,
+        createdAt: first?.createdAt,
       };
     })
     .value();
 
   const groupedTransactions = _(allTransactions)
-    .flatten()
-    .groupBy("symbol")
-    .map((txns, symbol) => {
+    .groupBy((txn) => getAssetIdentity(txn))
+    .map((txns) => {
+      const first = _(txns).first();
       const symbolTxns = _(txns)
         .sortBy("txnCreatedAt")
         .map((txn) => {
@@ -455,8 +500,13 @@ export async function calculateTotalProfit(
         .compact()
         .value();
       return {
-        symbol,
-        latest: _(dateRangeAssets).find((a) => a.symbol === txns[0].symbol),
+        symbol: first?.symbol ?? "",
+        assetType: getAssetType(first),
+        latest: _(dateRangeAssets).find(
+          (a) =>
+            a.symbol === first?.symbol &&
+            a.assetType === getAssetType(first),
+        ),
         actions: symbolTxns,
       };
     })
@@ -467,14 +517,16 @@ export async function calculateTotalProfit(
         return;
       }
       const beforeBuyAmount =
-        _(dateRangeEarliestAssets).find((a) => a.symbol === d.symbol)?.amount ??
-        0;
+        _(dateRangeEarliestAssets).find(
+          (a) => a.symbol === d.symbol && a.assetType === d.assetType,
+        )?.amount ?? 0;
 
       const beforeCost =
-        _(dateRangeEarliestAssets).find((a) => a.symbol === d.symbol)?.value ??
-        0;
+        _(dateRangeEarliestAssets).find(
+          (a) => a.symbol === d.symbol && a.assetType === d.assetType,
+        )?.value ?? 0;
       const beforeCreatedAt = _(dateRangeEarliestAssets).find(
-        (a) => a.symbol === d.symbol,
+        (a) => a.symbol === d.symbol && a.assetType === d.assetType,
       )?.createdAt;
       const beforeSellAmount = 0;
       const beforeSell = 0;
@@ -518,6 +570,7 @@ export async function calculateTotalProfit(
           : ((realizedProfit + unrealizedProfit) / cost) * 100;
       return {
         symbol: d.symbol,
+        assetType: d.assetType,
         value: realizedProfit + unrealizedProfit,
         realSpentValue: cost,
         buyAmount,
@@ -611,9 +664,21 @@ async function queryCoinsDataByWalletCoins(
       : Promise.resolve({}),
     fetchStockPrices(stockPriceSymbols),
   ]);
+  const typedCryptoPriceMap = _(cryptoPriceMap)
+    .mapKeys((_price, symbol) =>
+      getAssetIdentity({ symbol, assetType: "crypto" }),
+    )
+    .value();
+  const typedStockPriceMap = _(stockPriceMap)
+    .mapKeys((_price, symbol) =>
+      getAssetIdentity({ symbol, assetType: "stock" }),
+    )
+    .value();
   const priceMap = {
     ...cryptoPriceMap,
     ...stockPriceMap,
+    ...typedCryptoPriceMap,
+    ...typedStockPriceMap,
   };
   if (addProgress) {
     addProgress(10);
@@ -793,11 +858,22 @@ async function queryCoinsData(
 export async function queryAssetMaxAmountBySymbol(
   symbol: string,
   dateRange?: TDateRange,
+  assetType?: AssetType,
 ): Promise<number> {
-  return ASSET_HANDLER.getMaxAmountBySymbol(
-    symbol,
-    dateRange?.start,
-    dateRange?.end,
+  const groupedAssets = dateRange
+    ? await ASSET_HANDLER.listAssetsBySymbolByDateRange(
+        symbol,
+        dateRange.start,
+        dateRange.end,
+      )
+    : await ASSET_HANDLER.listAssetsBySymbol(symbol);
+
+  return (
+    _(groupedAssets)
+      .map((models) => filterByAssetType(models, assetType))
+      .filter((models) => models.length > 0)
+      .map((models) => _(models).sumBy("amount"))
+      .max() ?? 0
   );
 }
 
@@ -809,6 +885,7 @@ export function queryAllTransactions(): Promise<TransactionModel[]> {
 export async function queryLastAssetsBySymbol(
   symbol: string,
   dateRange?: TDateRange,
+  assetType?: AssetType,
 ): Promise<Asset | undefined> {
   if (dateRange) {
     const models = await ASSET_HANDLER.listAssetsMaxCreatedAt(
@@ -816,33 +893,36 @@ export async function queryLastAssetsBySymbol(
       dateRange.end,
       symbol,
     );
-    return convertAssetModelsToAsset(symbol, [models]);
+    return convertAssetModelsToAsset(filterByAssetType(models, assetType));
   }
   const models = await ASSET_HANDLER.listAssetsBySymbol(symbol, 1);
-  return convertAssetModelsToAsset(symbol, models);
+  return convertAssetModelsToAsset(
+    filterByAssetType(_(models).flatten().value(), assetType),
+  );
 }
 
-// models: must only contain same symbol assets
-function convertAssetModelsToAsset(
-  symbol: string,
-  models: AssetModel[][],
-): Asset | undefined {
-  const model = _(models)
-    .flatten()
-    .reduce((acc, cur) => ({
-      ...acc,
+// models: must only contain same symbol and asset type assets
+function convertAssetModelsToAsset(models: AssetModel[]): Asset | undefined {
+  if (models.length === 0) {
+    return;
+  }
+
+  const first = models[0];
+  const total = _(models).reduce(
+    (acc, cur) => ({
       amount: acc.amount + cur.amount,
       value: acc.value + cur.value,
-    }));
+    }),
+    { amount: 0, value: 0 },
+  );
 
-  return model
-    ? ({
-        symbol,
-        amount: model.amount,
-        value: model.value,
-        price: model.price,
-      } as Asset)
-    : undefined;
+  return {
+    symbol: first.symbol,
+    assetType: getAssetType(first),
+    amount: total.amount,
+    value: total.value,
+    price: first.price,
+  };
 }
 
 export async function queryAssetsAfterCreatedAt(
@@ -990,15 +1070,26 @@ export async function queryPNLTableValue(): Promise<PNLTableDate> {
 export async function queryTopNAssets(
   dateRange: TDateRange,
   n: number,
-): Promise<string[]> {
-  const assets = await ASSET_HANDLER.listTopNAssetsByDateRange(
-    n,
+): Promise<AssetReference[]> {
+  const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(
     dateRange.start,
     dateRange.end,
   );
 
   return _(assets)
-    .map((a) => a.symbol)
+    .flatten()
+    .groupBy((asset) => getAssetIdentity(asset))
+    .map((group) => ({
+      symbol: group[0].symbol,
+      assetType: getAssetType(group[0]),
+      totalValue: _(group).sumBy("value"),
+    }))
+    .orderBy(["totalValue", "symbol"], ["desc", "asc"])
+    .take(n)
+    .map((asset) => ({
+      symbol: asset.symbol,
+      assetType: asset.assetType,
+    }))
     .value();
 }
 
@@ -1017,6 +1108,7 @@ export async function queryAssetsPercentageChange(
     timestamp: number;
     data: {
       symbol: string;
+      assetType: AssetType;
       percentage: number;
     }[];
   } => {
@@ -1028,6 +1120,7 @@ export async function queryAssetsPercentageChange(
         data: _(asts)
           .map((a) => ({
             symbol: a.symbol,
+            assetType: getAssetType(a),
             percentage: 0,
           }))
           .value(),
@@ -1039,6 +1132,7 @@ export async function queryAssetsPercentageChange(
       data: _(asts)
         .map((a) => ({
           symbol: a.symbol,
+          assetType: getAssetType(a),
           percentage: (a.value / total) * 100,
         }))
         .value(),
@@ -1083,13 +1177,13 @@ export async function queryTopCoinsRank(
   const coins = getCoins(filteredReservedAssets);
   const coinRankMap = new Map<string, Map<number, number>>();
   coins.forEach((coin) => {
-    coinRankMap.set(coin, new Map<number, number>());
+    coinRankMap.set(getAssetIdentity(coin), new Map<number, number>());
   });
   filteredReservedAssets.forEach((ass) => {
     const timestamp = new Date(ass[0]?.createdAt).getTime();
     const rankedAssets = _(ass).orderBy("value", "desc").take(10).value();
     rankedAssets.forEach((asset, idx) => {
-      coinRankMap.get(asset.symbol)?.set(timestamp, idx + 1);
+      coinRankMap.get(getAssetIdentity(asset))?.set(timestamp, idx + 1);
     });
   });
   const colors = generateRandomColors(coins.length);
@@ -1098,11 +1192,12 @@ export async function queryTopCoinsRank(
     timestamps,
     coins: _(coins)
       .map((coin, idx) => ({
-        coin,
+        coin: coin.symbol,
+        assetType: coin.assetType,
         lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
         rankData: timestamps.map((timestamp) => ({
           timestamp,
-          rank: coinRankMap.get(coin)?.get(timestamp),
+          rank: coinRankMap.get(getAssetIdentity(coin))?.get(timestamp),
         })),
       }))
       .value(),
@@ -1137,9 +1232,10 @@ export async function queryTopCoinsPercentageChangeData(
   const coinAssetsBySymbol = new Map<string, AssetModel[]>();
   filteredReservedAssets.forEach((ass) => {
     ass.forEach((asset) => {
-      const items = coinAssetsBySymbol.get(asset.symbol) ?? [];
+      const assetKey = getAssetIdentity(asset);
+      const items = coinAssetsBySymbol.get(assetKey) ?? [];
       items.push(asset);
-      coinAssetsBySymbol.set(asset.symbol, items);
+      coinAssetsBySymbol.set(assetKey, items);
     });
   });
   const colors = generateRandomColors(coins.length);
@@ -1148,10 +1244,11 @@ export async function queryTopCoinsPercentageChangeData(
     timestamps,
     coins: _(coins)
       .map((coin, idx) => ({
-        coin,
+        coin: coin.symbol,
+        assetType: coin.assetType,
         lineColor: `rgba(${colors[idx].R}, ${colors[idx].G}, ${colors[idx].B}, 1)`,
         percentageData: (() => {
-          const coinDataList = coinAssetsBySymbol.get(coin) ?? [];
+          const coinDataList = coinAssetsBySymbol.get(getAssetIdentity(coin)) ?? [];
           if (coinDataList.length === 0) {
             return [];
           }
@@ -1177,7 +1274,7 @@ export async function queryLastRefreshAt(): Promise<string | undefined> {
   return lc ? timeToDateStr(new Date(lc).getTime(), true) : undefined;
 }
 
-function getCoins(assets: AssetModel[][], size = 10): string[] {
+function getCoins(assets: AssetModel[][], size = 10): AssetReference[] {
   // only take top 10 coins in each item
   return _(assets)
     .map((as) =>
@@ -1188,8 +1285,8 @@ function getCoins(assets: AssetModel[][], size = 10): string[] {
         .value(),
     )
     .flatten()
-    .map((a) => a.symbol)
-    .uniq()
+      .uniqBy((asset) => getAssetIdentity(asset))
+      .map((asset) => toAssetReference(asset))
     .value();
 }
 
@@ -1312,16 +1409,21 @@ export async function queryCoinsAmountChange(
   symbol: string,
   dateRange: TDateRange,
   maxSize = DATA_MAX_POINTS,
+  assetType?: AssetType,
 ): Promise<CoinsAmountAndValueChangeData | undefined> {
   const assets = await ASSET_HANDLER.listAssetsBySymbolByDateRange(
     symbol,
     dateRange.start,
     dateRange.end,
   );
-  if (!assets) {
+  const filteredAssets = _(assets)
+    .map((models) => filterByAssetType(models, assetType))
+    .filter((models) => models.length > 0)
+    .value();
+  if (filteredAssets.length === 0) {
     return;
   }
-  const reservedAssets = _(assets).reverse().value();
+  const reservedAssets = _(filteredAssets).reverse().value();
 
   const getAmountsAndTimestamps = (
     models: AssetModel[][],

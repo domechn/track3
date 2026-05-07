@@ -10,6 +10,8 @@ export type IbkrFlexPosition = {
 
 const flexEndpoint =
   "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest";
+const getStatementEndpoint =
+  "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement";
 
 export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
   const parser = new DOMParser();
@@ -53,6 +55,23 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
 
 function firstTagText(doc: Document, tagName: string): string | undefined {
   return doc.getElementsByTagName(tagName)[0]?.textContent?.trim();
+}
+
+export function getIbkrFlexStatementUrl(xml: string, token: string): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, "text/xml");
+
+  const statementUrl = firstTagText(doc, "Url");
+  if (statementUrl) {
+    return statementUrl;
+  }
+
+  const referenceCode = firstTagText(doc, "ReferenceCode");
+  if (referenceCode) {
+    return `${getStatementEndpoint}?t=${encodeURIComponent(token)}&q=${encodeURIComponent(referenceCode)}&v=3`;
+  }
+
+  throw new Error("IBKR Flex response did not include a statement URL");
 }
 
 export class IbkrBroker implements StockBroker {
@@ -119,10 +138,7 @@ export class IbkrBroker implements StockBroker {
       throw new Error(`IBKR Flex request failed: ${status}`);
     }
 
-    const statementUrl = firstTagText(doc, "Url");
-    if (!statementUrl) {
-      throw new Error("IBKR Flex response did not include a statement URL");
-    }
+    const statementUrl = getIbkrFlexStatementUrl(responseXml, this.token);
 
     this.flexXml = await sendHttpTextRequest("GET", statementUrl, 30000);
     return this.flexXml;

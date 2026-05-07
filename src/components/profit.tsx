@@ -21,6 +21,12 @@ import { positiveNegativeColor } from "@/utils/color";
 import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import {
+  buildAssetDetailsPath,
+  formatAssetLabel,
+  getAssetLogoKey,
+  shouldDownloadCryptoLogo,
+} from "@/utils/assets";
 
 function getToneClass(value: number, quoteColor: QuoteColor) {
   if (value === 0) {
@@ -62,6 +68,7 @@ const App = ({
   const [coinsProfit, setCoinsProfit] = useState<
     {
       symbol: string;
+      assetType: "crypto" | "stock";
       percentage?: number;
       value: number;
     }[]
@@ -99,18 +106,17 @@ const App = ({
 
   useEffect(() => {
     const gen = loadGenRef.current;
-    const symbols = _(
+    const assets = _(
       coinsProfit.slice(0, 5).concat(coinsProfit.slice(-5))
     )
-      .map((coin) => coin.symbol)
-      .uniq()
+      .uniqBy((coin) => getAssetLogoKey(coin))
       .value();
 
-    if (symbols.length === 0) {
+    if (assets.length === 0) {
       return;
     }
 
-    void getLogoMap(symbols).then((m) => {
+    void getLogoMap(assets).then((m) => {
       if (gen !== loadGenRef.current) {
         return;
       }
@@ -141,36 +147,43 @@ const App = ({
     [coinsProfit]
   );
 
-  async function getLogoMap(symbols: string[]) {
+  async function getLogoMap(
+    assets: { symbol: string; assetType: "crypto" | "stock" }[]
+  ) {
     const acd = await getAppCacheDir();
-    const symbolsNeedLoad = symbols.filter(
-      (symbol) => !logoPathCacheRef.current.has(symbol)
+    const assetsNeedLoad = assets.filter(
+      (asset) =>
+        shouldDownloadCryptoLogo(asset) &&
+        !logoPathCacheRef.current.has(getAssetLogoKey(asset))
     );
 
-    if (symbolsNeedLoad.length === 0) {
-      return symbols.reduce((acc, symbol) => {
-        const path = logoPathCacheRef.current.get(symbol);
+    if (assetsNeedLoad.length === 0) {
+      return assets.reduce((acc, asset) => {
+        const key = getAssetLogoKey(asset);
+        const path = logoPathCacheRef.current.get(key);
         if (path) {
-          acc[symbol] = path;
+          acc[key] = path;
         }
         return acc;
       }, {} as { [x: string]: string });
     }
 
     const kvs = await bluebird.map(
-      symbolsNeedLoad,
-      async (symbol) => {
-        const path = await getImageApiPath(acd, symbol);
-        logoPathCacheRef.current.set(symbol, path);
-        return { [symbol]: path };
+      assetsNeedLoad,
+      async (asset) => {
+        const path = await getImageApiPath(acd, asset.symbol);
+        const key = getAssetLogoKey(asset);
+        logoPathCacheRef.current.set(key, path);
+        return { [key]: path };
       },
       { concurrency: 6 }
     );
 
-    const cachedMap = symbols.reduce((acc, symbol) => {
-      const path = logoPathCacheRef.current.get(symbol);
+    const cachedMap = assets.reduce((acc, asset) => {
+      const key = getAssetLogoKey(asset);
+      const path = logoPathCacheRef.current.get(key);
       if (path) {
-        acc[symbol] = path;
+        acc[key] = path;
       }
       return acc;
     }, {} as { [x: string]: string });
@@ -181,28 +194,29 @@ const App = ({
   const renderRows = (
     rows: {
       symbol: string;
+      assetType: "crypto" | "stock";
       percentage?: number;
       value: number;
     }[],
     rankStart = 1
   ) =>
     rows.map((d, idx) => (
-      <TableRow key={d.symbol} className="h-[42px]">
+      <TableRow key={getAssetLogoKey(d)} className="h-[42px]">
         <TableCell className="w-[36px] py-1.5 text-xs text-muted-foreground font-mono">
           #{rankStart + idx}
         </TableCell>
         <TableCell className="py-1.5">
           <Link
-            to={`/coins/${d.symbol}`}
-            aria-label={`Open ${d.symbol} details`}
+            to={buildAssetDetailsPath(d)}
+            aria-label={`Open ${formatAssetLabel(d)} details`}
             className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <img
               className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-              src={logoMap[d.symbol] || UnknownLogo}
-              alt={d.symbol}
+              src={logoMap[getAssetLogoKey(d)] || UnknownLogo}
+              alt={formatAssetLabel(d)}
             />
-            <div className="font-medium text-sm">{d.symbol}</div>
+            <div className="font-medium text-sm">{formatAssetLabel(d)}</div>
             <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
           </Link>
         </TableCell>

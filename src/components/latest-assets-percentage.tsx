@@ -34,7 +34,12 @@ import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { chartColors, glassTooltip } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
-import { getAssetType } from "@/middlelayers/datafetch/utils/coins";
+import {
+  buildAssetDetailsPath,
+  formatAssetLabel,
+  getAssetLogoKey,
+  shouldDownloadCryptoLogo,
+} from "@/utils/assets";
 
 const chartName = "Percentage of Assets";
 
@@ -89,7 +94,7 @@ const App = ({
     // download coin logos
     downloadCoinLogos(
       _(latestAssetsPercentageData)
-        .filter((d) => getAssetType(d) === "crypto")
+        .filter((d) => shouldDownloadCryptoLogo(d))
         .map((d) => ({
           symbol: d.coin,
           price: d.value / (d.amount || 1),
@@ -126,8 +131,13 @@ const App = ({
   async function getLogoMap(d: LatestAssetsPercentageData) {
     const acd = await getAppCacheDir();
     const kvs = await bluebird.map(d, async (coin) => {
+      const assetRef = { symbol: coin.coin, assetType: coin.assetType };
+      if (!shouldDownloadCryptoLogo(coin)) {
+        return { [getAssetLogoKey(assetRef)]: "" };
+      }
+
       const path = await getImageApiPath(acd, coin.coin);
-      return { [coin.coin]: path };
+      return { [getAssetLogoKey(assetRef)]: path };
     });
 
     return _.assign({}, ...kvs);
@@ -253,17 +263,27 @@ const App = ({
         <Table>
           <TableBody>
             {pagedLatestAssetsPercentageData.map((d) => (
-              <TableRow key={d.coin} className="h-[42px]">
+              <TableRow
+                key={getAssetLogoKey({ symbol: d.coin, assetType: d.assetType })}
+                className="h-[42px]"
+              >
                 <TableCell className="py-1.5">
                   <Link
-                    to={`/coins/${d.coin}`}
-                    aria-label={`Open ${d.coin} details`}
+                    to={buildAssetDetailsPath({
+                      symbol: d.coin,
+                      assetType: d.assetType,
+                    })}
+                    aria-label={`Open ${formatAssetLabel({ symbol: d.coin, assetType: d.assetType })} details`}
                     className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <img
                       className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-                      src={logoMap[d.coin] || UnknownLogo}
-                      alt={d.coin}
+                      src={
+                        logoMap[
+                          getAssetLogoKey({ symbol: d.coin, assetType: d.assetType })
+                        ] || UnknownLogo
+                      }
+                      alt={formatAssetLabel({ symbol: d.coin, assetType: d.assetType })}
                     />
                     <div
                       className="mr-1 font-medium text-sm"
@@ -274,11 +294,11 @@ const App = ({
                         : prettyPriceNumberToLocaleString(d.amount)}
                     </div>
                     <div className="text-muted-foreground text-xs truncate">
-                      {d.coin}
+                      {formatAssetLabel({ symbol: d.coin, assetType: d.assetType })}
                     </div>
-                    {getAssetType(d) !== "crypto" ? (
+                    {d.assetType !== "crypto" ? (
                       <span className="ml-2 rounded-sm border border-border px-1.5 py-0.5 text-[10px] uppercase leading-none text-muted-foreground">
-                        {getAssetType(d)}
+                        {d.assetType}
                       </span>
                     ) : null}
                     <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />

@@ -100,6 +100,8 @@ export type Asset = {
   price: number;
 };
 
+export type AssetReference = Pick<Asset, "symbol" | "assetType">;
+
 export type CloudUser = {
   id: string;
   publicKey: string;
@@ -114,6 +116,7 @@ export type TopCoinsRankData = {
   timestamps: number[];
   coins: {
     coin: string;
+    assetType: AssetType;
     lineColor: string;
     rankData: {
       rank?: number;
@@ -126,6 +129,7 @@ export type AssetsPercentageChangeData = {
   timestamp: number;
   percentages: {
     symbol: string;
+    assetType: AssetType;
     percentage: number;
   }[];
 }[];
@@ -134,6 +138,7 @@ export type TopCoinsPercentageChangeData = {
   timestamps: number[];
   coins: {
     coin: string;
+    assetType: AssetType;
     lineColor: string;
     percentageData: {
       // coin values percentage

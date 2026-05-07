@@ -31,6 +31,11 @@ import { StaggerContainer, FadeUp } from "./motion";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import PageLoadingOverlay from "./page-loading-overlay";
+import {
+  formatAssetLabel,
+  getAssetLogoKey,
+  shouldDownloadCryptoLogo,
+} from "@/utils/assets";
 
 type MetricRow = {
   base: number;
@@ -40,6 +45,7 @@ type MetricRow = {
 
 type CoinComparison = {
   symbol: string;
+  assetType: "crypto" | "stock";
   amount: MetricRow;
   price: MetricRow;
   value: MetricRow;
@@ -164,16 +170,17 @@ const App = ({
   }, [baseId, headId]);
 
   const coinComparisons = useMemo((): CoinComparison[] => {
-    const baseMap = _.keyBy(baseData, "symbol");
-    const headMap = _.keyBy(headData, "symbol");
-    const symbols = _([...baseData, ...headData])
-      .map("symbol")
+    const baseMap = _.keyBy(baseData, (asset) => getAssetLogoKey(asset));
+    const headMap = _.keyBy(headData, (asset) => getAssetLogoKey(asset));
+    const assetKeys = _([...baseData, ...headData])
+      .map((asset) => getAssetLogoKey(asset))
       .uniq()
       .value();
 
-    return symbols.map((symbol) => {
-      const baseItem = baseMap[symbol];
-      const headItem = headMap[symbol];
+    return assetKeys.map((assetKey) => {
+      const baseItem = baseMap[assetKey];
+      const headItem = headMap[assetKey];
+      const ref = headItem ?? baseItem;
 
       const makeRow = (baseVal: number, headVal: number): MetricRow => ({
         base: baseVal,
@@ -182,7 +189,8 @@ const App = ({
       });
 
       return {
-        symbol,
+        symbol: ref?.symbol ?? "",
+        assetType: ref?.assetType ?? "crypto",
         amount: makeRow(baseItem?.amount || 0, headItem?.amount || 0),
         price: makeRow(baseItem?.price || 0, headItem?.price || 0),
         value: makeRow(baseItem?.value || 0, headItem?.value || 0),
@@ -201,7 +209,11 @@ const App = ({
   }, [baseData, headData]);
 
   const symbolsForLogos = useMemo(
-    () => _(coinComparisons).map("symbol").uniq().value(),
+    () =>
+      _(coinComparisons)
+        .filter((coin) => shouldDownloadCryptoLogo(coin))
+        .uniqBy((coin) => getAssetLogoKey(coin))
+        .value(),
     [coinComparisons]
   );
 
@@ -212,21 +224,23 @@ const App = ({
 
     let cancelled = false;
     const missingSymbols = symbolsForLogos.filter(
-      (s) => !downloadedLogosRef.current.has(s)
+      (asset) => !downloadedLogosRef.current.has(getAssetLogoKey(asset))
     );
 
     if (missingSymbols.length > 0) {
-      missingSymbols.forEach((s) => downloadedLogosRef.current.add(s));
-      downloadCoinLogos(missingSymbols.map((symbol) => ({ symbol, price: 0 })));
+      missingSymbols.forEach((asset) =>
+        downloadedLogosRef.current.add(getAssetLogoKey(asset))
+      );
+      downloadCoinLogos(missingSymbols.map((asset) => ({ symbol: asset.symbol, price: 0 })));
     }
 
     (async () => {
       if (!appCacheDirRef.current) {
         appCacheDirRef.current = await getAppCacheDir();
       }
-      const kvs = await bluebird.map(symbolsForLogos, async (s) => {
-        const path = await getImageApiPath(appCacheDirRef.current, s);
-        return { [s]: path };
+      const kvs = await bluebird.map(symbolsForLogos, async (asset) => {
+        const path = await getImageApiPath(appCacheDirRef.current, asset.symbol);
+        return { [getAssetLogoKey(asset)]: path };
       });
 
       if (cancelled) {
@@ -540,9 +554,9 @@ const App = ({
               <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
                 {coinComparisons.map((coin) => (
                   <CoinCard
-                    key={coin.symbol}
+                    key={getAssetLogoKey(coin)}
                     coin={coin}
-                    logo={logoMap[coin.symbol] || UnknownLogo}
+                    logo={logoMap[getAssetLogoKey(coin)] || UnknownLogo}
                     baseDate={baseDate}
                     headDate={headDate}
                     formatVal={formatVal}
@@ -600,10 +614,10 @@ function CoinCard({
         <div className="flex items-center gap-2 mb-3">
           <img
             src={logo}
-            alt={coin.symbol}
+            alt={formatAssetLabel(coin)}
             className="w-[18px] h-[18px] rounded-full"
           />
-          <span className="text-sm font-medium">{coin.symbol}</span>
+          <span className="text-sm font-medium">{formatAssetLabel(coin)}</span>
         </div>
 
         <div className="grid grid-cols-[56px_minmax(0,1fr)_96px_minmax(0,1fr)] mb-1 gap-2">

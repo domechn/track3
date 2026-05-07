@@ -87,6 +87,7 @@ beforeEach(() => {
     coins: [
       {
         symbol: "DOGE",
+        assetType: "crypto",
         value: -60,
         percentage: -6,
         buyAmount: 1,
@@ -96,6 +97,7 @@ beforeEach(() => {
       },
       {
         symbol: "SOL",
+        assetType: "crypto",
         value: -40,
         percentage: -4,
         buyAmount: 1,
@@ -105,6 +107,7 @@ beforeEach(() => {
       },
       {
         symbol: "XRP",
+        assetType: "crypto",
         value: -30,
         percentage: -3,
         buyAmount: 1,
@@ -114,6 +117,7 @@ beforeEach(() => {
       },
       {
         symbol: "ADA",
+        assetType: "crypto",
         value: -20,
         percentage: -2,
         buyAmount: 1,
@@ -123,6 +127,7 @@ beforeEach(() => {
       },
       {
         symbol: "LTC",
+        assetType: "crypto",
         value: -10,
         percentage: -1,
         buyAmount: 1,
@@ -132,6 +137,7 @@ beforeEach(() => {
       },
       {
         symbol: "ETH",
+        assetType: "crypto",
         value: 10,
         percentage: 1,
         buyAmount: 1,
@@ -141,6 +147,7 @@ beforeEach(() => {
       },
       {
         symbol: "SUI",
+        assetType: "crypto",
         value: 20,
         percentage: 2,
         buyAmount: 1,
@@ -150,6 +157,7 @@ beforeEach(() => {
       },
       {
         symbol: "BNB",
+        assetType: "crypto",
         value: 30,
         percentage: 3,
         buyAmount: 1,
@@ -159,6 +167,7 @@ beforeEach(() => {
       },
       {
         symbol: "TON",
+        assetType: "crypto",
         value: 40,
         percentage: 4,
         buyAmount: 1,
@@ -168,6 +177,7 @@ beforeEach(() => {
       },
       {
         symbol: "BTC",
+        assetType: "crypto",
         value: 80,
         percentage: 8,
         buyAmount: 1,
@@ -233,7 +243,7 @@ describe("Overview semantic controls", () => {
     const btcLink = await screen.findByRole("link", {
       name: /open btc details/i,
     });
-    expect(btcLink).toHaveAttribute("href", "/coins/BTC");
+    expect(btcLink).toHaveAttribute("href", "/coins/BTC?assetType=crypto");
   });
 
   it("renders latest asset entries as detail links", async () => {
@@ -250,6 +260,6 @@ describe("Overview semantic controls", () => {
     const btcLink = await screen.findByRole("link", {
       name: /open btc details/i,
     });
-    expect(btcLink).toHaveAttribute("href", "/coins/BTC");
+    expect(btcLink).toHaveAttribute("href", "/coins/BTC?assetType=crypto");
   });
 });

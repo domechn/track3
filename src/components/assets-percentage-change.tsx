@@ -1,4 +1,8 @@
-import { AssetsPercentageChangeData, TDateRange } from "@/middlelayers/types";
+import {
+  AssetReference,
+  AssetsPercentageChangeData,
+  TDateRange,
+} from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useWindowSize } from "@/utils/hook";
 import { useContext, useEffect, useMemo, useState } from "react";
@@ -18,12 +22,13 @@ import {
   glassScaleOptions,
   glassTooltip,
 } from "@/utils/chart-theme";
+import { formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
 
 const chartName = "Coins Percentage Overview";
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const wsize = useWindowSize();
-  const [topN, setTopN] = useState<string[]>([]);
+  const [topN, setTopN] = useState<AssetReference[]>([]);
   const { needResize } = useContext(ChartResizeContext);
   const [assetsPercentageChangeData, setAssetsPercentageChangeData] = useState(
     [] as AssetsPercentageChangeData
@@ -124,7 +129,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   }), []);
 
   const preparedData = useMemo(() => {
-    const topNSet = new Set(topN);
+    const topNSet = new Set(topN.map((asset) => getAssetLogoKey(asset)));
     const labels: string[] = [];
     const othersData: number[] = [];
     const topNData = topN.map(() => [] as number[]);
@@ -132,19 +137,22 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     assetsPercentageChangeData.forEach((entry) => {
       labels.push(timeToDateStr(entry.timestamp));
 
-      const percentageBySymbol = new Map<string, number>();
+      const percentageByAsset = new Map<string, number>();
       let others = 0;
 
       entry.percentages.forEach((item) => {
-        if (topNSet.has(item.symbol)) {
-          percentageBySymbol.set(item.symbol, item.percentage);
+        const assetKey = getAssetLogoKey(item);
+        if (topNSet.has(assetKey)) {
+          percentageByAsset.set(assetKey, item.percentage);
           return;
         }
         others += item.percentage;
       });
 
-      topN.forEach((symbol, idx) => {
-        topNData[idx].push(percentageBySymbol.get(symbol) ?? 0);
+      topN.forEach((asset, idx) => {
+        topNData[idx].push(
+          percentageByAsset.get(getAssetLogoKey(asset)) ?? 0,
+        );
       });
       othersData.push(others);
     });
@@ -153,10 +161,10 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   }, [assetsPercentageChangeData, topN]);
 
   const lineDataMemo = useMemo(() => {
-    const topNDatasets = topN.map((symbol, idx) => {
+    const topNDatasets = topN.map((asset, idx) => {
       const color = chartColors[idx % chartColors.length];
       return {
-        label: symbol,
+        label: formatAssetLabel(asset),
         data: preparedData.topNData[idx],
         borderColor: color.main,
         backgroundColor: color.bg,

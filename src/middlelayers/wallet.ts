@@ -3,7 +3,7 @@ import { getConfiguration } from "./configuration";
 import { CexAnalyzer } from "./datafetch/coins/cex/cex";
 import { StockAnalyzer } from "./datafetch/coins/stock/stock-analyzer";
 import md5 from "md5";
-import { Addresses } from "./datafetch/types";
+import { Addresses, AssetType } from "./datafetch/types";
 import {
   AssetModel,
   WalletAssetsChangeData,
@@ -11,6 +11,7 @@ import {
 } from "./types";
 import { generateRandomColors } from "../utils/color";
 import { SUPPORT_CONS } from "./constants";
+import { getAssetType } from "./datafetch/utils/coins";
 
 export class WalletAnalyzer {
   // key is wallet address md5 hash
@@ -154,10 +155,15 @@ export class WalletAnalyzer {
   // else only return the wallet assets of the symbol
   public async queryWalletAssetsPercentage(
     symbol?: string,
+    assetType?: AssetType,
   ): Promise<WalletAssetsPercentageData> {
     const assetModels = (await this.queryAssets(1))[0];
     const assets = _(assetModels)
-      .filter((a) => !symbol || a.symbol === symbol)
+      .filter(
+        (a) =>
+          (!symbol || a.symbol === symbol) &&
+          (!assetType || getAssetType(a) === assetType),
+      )
       .value();
     // check if there is wallet column
     const hasWallet = _(assets).find((a) => !!a.wallet);

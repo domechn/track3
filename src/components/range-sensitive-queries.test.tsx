@@ -194,7 +194,9 @@ beforeEach(() => {
     totalValue: 2500,
     date: new Date("2024-04-13T00:00:00.000Z"),
   });
-  vi.mocked(listAllowedSymbols).mockResolvedValue(["BTC"]);
+  vi.mocked(listAllowedSymbols).mockResolvedValue([
+    { symbol: "BTC", assetType: "crypto" },
+  ]);
   vi.mocked(queryTransactionsBySymbolAndDateRange).mockResolvedValue([]);
   vi.mocked(calculateTotalProfit).mockResolvedValue({
     total: 100,
@@ -202,6 +204,7 @@ beforeEach(() => {
     coins: [
       {
         symbol: "BTC",
+        assetType: "crypto",
         value: 100,
         percentage: 10,
         buyAmount: 1,
@@ -342,10 +345,23 @@ describe("Range-sensitive component queries", () => {
       expect(queryTransactionsBySymbolAndDateRange).toHaveBeenCalledWith(
         "BTC",
         rangeA,
+        "crypto",
       );
-      expect(calculateTotalProfit).toHaveBeenCalledWith(rangeA, "BTC");
-      expect(queryLastAssetsBySymbol).toHaveBeenCalledWith("BTC", rangeA);
-      expect(queryAssetMaxAmountBySymbol).toHaveBeenCalledWith("BTC", rangeA);
+      expect(calculateTotalProfit).toHaveBeenCalledWith(
+        rangeA,
+        "BTC",
+        "crypto",
+      );
+      expect(queryLastAssetsBySymbol).toHaveBeenCalledWith(
+        "BTC",
+        rangeA,
+        "crypto",
+      );
+      expect(queryAssetMaxAmountBySymbol).toHaveBeenCalledWith(
+        "BTC",
+        rangeA,
+        "crypto",
+      );
     });
 
     view.rerender(
@@ -367,12 +383,62 @@ describe("Range-sensitive component queries", () => {
       expect(queryTransactionsBySymbolAndDateRange).toHaveBeenLastCalledWith(
         "BTC",
         rangeB,
+        "crypto",
       );
-      expect(calculateTotalProfit).toHaveBeenLastCalledWith(rangeB, "BTC");
-      expect(queryLastAssetsBySymbol).toHaveBeenLastCalledWith("BTC", rangeB);
+      expect(calculateTotalProfit).toHaveBeenLastCalledWith(
+        rangeB,
+        "BTC",
+        "crypto",
+      );
+      expect(queryLastAssetsBySymbol).toHaveBeenLastCalledWith(
+        "BTC",
+        rangeB,
+        "crypto",
+      );
       expect(queryAssetMaxAmountBySymbol).toHaveBeenLastCalledWith(
         "BTC",
         rangeB,
+        "crypto",
+      );
+    });
+  });
+
+  it("passes assetType from the route query string to coin analytics queries", async () => {
+    render(
+      <MemoryRouter initialEntries={["/coins/BTC?assetType=stock"]}>
+        <OverviewLoadingContext.Provider value={{ reportLoaded }}>
+          <Routes>
+            <Route
+              path="/coins/:symbol"
+              element={
+                <CoinAnalysis currency={usdCurrency} dateRange={rangeA} />
+              }
+            />
+          </Routes>
+        </OverviewLoadingContext.Provider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(queryTransactionsBySymbolAndDateRange).toHaveBeenCalledWith(
+        "BTC",
+        rangeA,
+        "stock",
+      );
+      expect(calculateTotalProfit).toHaveBeenCalledWith(
+        rangeA,
+        "BTC",
+        "stock",
+      );
+      expect(queryLastAssetsBySymbol).toHaveBeenCalledWith(
+        "BTC",
+        rangeA,
+        "stock",
+      );
+      expect(queryAssetMaxAmountBySymbol).toHaveBeenCalledWith(
+        "BTC",
+        rangeA,
+        "stock",
       );
     });
   });

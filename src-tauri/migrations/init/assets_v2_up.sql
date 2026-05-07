@@ -9,6 +9,6 @@ CREATE TABLE IF NOT EXISTS assets_v2 (
 	value REAL NOT NULL,
 	price REAL  NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS unique_uuid_symbol_amount_wallet ON assets_v2 (uuid, asset_type, symbol, wallet);
+CREATE UNIQUE INDEX IF NOT EXISTS unique_uuid_asset_type_symbol_wallet ON assets_v2 (uuid, asset_type, symbol, wallet);
 CREATE INDEX IF NOT EXISTS symbol_idx ON assets_v2 (symbol);
 CREATE INDEX IF NOT EXISTS createdAt_idx ON assets_v2 (createdAt);

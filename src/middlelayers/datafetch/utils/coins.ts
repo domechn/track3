@@ -6,6 +6,14 @@ export function getAssetType(asset?: { assetType?: AssetType }): AssetType {
   return asset?.assetType ?? "crypto";
 }
 
+export function getAssetIdentity(asset?: {
+  symbol?: string;
+  assetType?: AssetType;
+}): string {
+  const symbol = asset?.symbol?.trim().toUpperCase() ?? "";
+  return `${getAssetType(asset)}:${symbol}`;
+}
+
 export function combineCoinLists(coinLists: WalletCoin[][]): WalletCoin[] {
   return _(coinLists)
     .flatten()
@@ -37,8 +45,10 @@ export function calculateTotalValue(
 ): WalletCoinUSD[] {
   const usdtInUsd = priceMap["USDT"] ?? 1;
   const getPriceFromWalletCoin = (w: WalletCoin) => {
+    const symbol = w.symbol.trim().toUpperCase();
+    const assetPriceKey = getAssetIdentity(w);
     if (!w.price) {
-      return priceMap[w.symbol] ?? 0;
+      return priceMap[assetPriceKey] ?? priceMap[symbol] ?? priceMap[w.symbol] ?? 0;
     }
 
     if (w.price.base == "usdt") {

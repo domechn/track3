@@ -9,15 +9,17 @@ import {
 } from "@/middlelayers/charts";
 import {
   Asset,
+  AssetReference,
   CurrencyRateDetail,
   TDateRange,
   Transaction,
   TransactionType,
 } from "@/middlelayers/types";
+import { AssetType } from "@/middlelayers/datafetch/types";
 import _ from "lodash";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -68,6 +70,13 @@ import {
 import { cn } from "@/lib/utils";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import {
+  buildAssetDetailsPath,
+  formatAssetLabel,
+  getAssetLogoKey,
+  parseAssetTypeSearchParam,
+  shouldDownloadCryptoLogo,
+} from "@/utils/assets";
 import {
   Select,
   SelectContent,
@@ -191,16 +200,19 @@ const App = ({
   dateRange: TDateRange;
 }) => {
   const { symbol } = useParams() as { symbol: string };
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const pageSize = 20;
   const LOAD_COUNT = 3; // loadSymbolData, CoinsAmountAndValueChange, WalletAssetsPercentage
+  const assetType = parseAssetTypeSearchParam(searchParams.get("assetType"));
 
   const [pageLoading, setPageLoading] = useState(true);
   const loadedCountRef = useRef(0);
   const loadGenRef = useRef(0);
   const queryKey = useMemo(
-    () => `${symbol}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [symbol, dateRange.start, dateRange.end]
+    () =>
+      `${symbol}-${assetType}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [symbol, assetType, dateRange.start, dateRange.end]
   );
 
   const reportLoaded = useCallback(() => {
@@ -243,7 +255,7 @@ const App = ({
 
   const [logo, setLogo] = useState("");
 
-  const [allowSymbols, setAllowSymbols] = useState<string[]>([]);
+  const [allowSymbols, setAllowSymbols] = useState<AssetReference[]>([]);
   const [coinKeyword, setCoinKeyword] = useState("");
   const [coinListLimit, setCoinListLimit] = useState(200);
 
@@ -258,7 +270,7 @@ const App = ({
   }, [queryKey]);
 
   useEffect(() => {
-    loadSymbolData(symbol, dateRange);
+    loadSymbolData(symbol, dateRange, assetType);
     setDataPage(0);
 
     const timer = setTimeout(() => setPageLoading(false), 8000);
@@ -272,7 +284,10 @@ const App = ({
     }
   }, [coinSelectOpen]);
 
-  async function getLogoPath(symbol: string) {
+  async function getLogoPath(symbol: string, selectedAssetType: AssetType) {
+    if (!shouldDownloadCryptoLogo({ assetType: selectedAssetType })) {
+      return "";
+    }
     const acd = await getAppCacheDir();
     return getImageApiPath(acd, symbol);
   }
@@ -342,13 +357,14 @@ const App = ({
   const allowSymbolRankMap = useMemo(() => {
     const rankMap = new Map<string, number>();
     allowSymbols.forEach((item, idx) => {
-      rankMap.set(item, idx + 1);
+      rankMap.set(getAssetLogoKey(item), idx + 1);
     });
     return rankMap;
   }, [allowSymbols]);
 
   const rank = useMemo(() => {
-    const rankNum = allowSymbolRankMap.get(symbol) ?? 0;
+    const rankNum =
+      allowSymbolRankMap.get(getAssetLogoKey({ symbol, assetType })) ?? 0;
     if (rankNum === 0) {
       return "-";
     }
@@ -362,7 +378,7 @@ const App = ({
       return allowSymbols;
     }
     return allowSymbols.filter((item) =>
-      item.toUpperCase().includes(keyword)
+      formatAssetLabel(item).toUpperCase().includes(keyword)
     );
   }, [allowSymbols, coinKeyword]);
 
@@ -406,16 +422,20 @@ const App = ({
       : prettyPriceNumberToLocaleString(amount);
   }
 
-  async function loadSymbolData(s: string, selectedRange: TDateRange) {
+  async function loadSymbolData(
+    s: string,
+    selectedRange: TDateRange,
+    selectedAssetType: AssetType,
+  ) {
     const gen = loadGenRef.current;
 
     // fetch all data before setting any state to avoid multiple re-renders
     const [txns, tp, la, ama, lp] = await Promise.all([
-      queryTransactionsBySymbolAndDateRange(s, selectedRange),
-      calculateTotalProfit(selectedRange, s),
-      queryLastAssetsBySymbol(s, selectedRange),
-      queryAssetMaxAmountBySymbol(s, selectedRange),
-      getLogoPath(s),
+      queryTransactionsBySymbolAndDateRange(s, selectedRange, selectedAssetType),
+      calculateTotalProfit(selectedRange, s, selectedAssetType),
+      queryLastAssetsBySymbol(s, selectedRange, selectedAssetType),
+      queryAssetMaxAmountBySymbol(s, selectedRange, selectedAssetType),
+      getLogoPath(s, selectedAssetType),
     ]);
 
     // ignore stale results if symbol/dateRange changed while loading
@@ -426,7 +446,9 @@ const App = ({
     setMaxPosition(ama);
     setLogo(lp);
 
-    const detail = _(tp.coins).find((c) => c.symbol === s);
+    const detail = _(tp.coins).find(
+      (c) => c.symbol === s && c.assetType === selectedAssetType,
+    );
     if (detail) {
       setBuyAmount(detail.buyAmount);
       setSellAmount(detail.sellAmount);
@@ -724,7 +746,7 @@ const App = ({
                 <img
                   className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
                   src={logo || UnknownLogo}
-                  alt={symbol}
+                  alt={formatAssetLabel({ symbol, assetType })}
                 />
                 <div className="w-[100%] h-[32px] overflow-hidden">
                   <Popover
@@ -738,7 +760,9 @@ const App = ({
                         aria-expanded={coinSelectOpen}
                         className="h-[100%] w-[100%] text-xl font-semibold border-none shadow-none focus:ring-0 flex justify-between items-center"
                       >
-                        <div className='truncate'>{symbol}</div>
+                        <div className='truncate'>
+                          {formatAssetLabel({ symbol, assetType })}
+                        </div>
                         <CaretSortIcon className="h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -758,18 +782,21 @@ const App = ({
                           <CommandGroup>
                             {visibleAllowSymbols.map((s) => (
                               <CommandItem
-                                key={s}
-                                value={s}
+                                key={getAssetLogoKey(s)}
+                                value={formatAssetLabel(s)}
                                 onSelect={() => {
                                   setCoinSelectOpen(false);
-                                  navigate(`/coins/${s}`);
+                                  navigate(buildAssetDetailsPath(s));
                                 }}
                               >
-                                <div>{s}</div>
+                                <div>{formatAssetLabel(s)}</div>
                                 <CheckIcon
                                   className={cn(
                                     "ml-auto h-4 w-4",
-                                    s === symbol ? "opacity-100" : "opacity-0"
+                                    getAssetLogoKey(s) ===
+                                      getAssetLogoKey({ symbol, assetType })
+                                      ? "opacity-100"
+                                      : "opacity-0"
                                   )}
                                 />
                               </CommandItem>
@@ -951,6 +978,7 @@ const App = ({
         <CoinsAmountAndValueChange
           currency={currency}
           symbol={symbol}
+          assetType={assetType}
           dateRange={dateRange}
         />
       </FadeUp>
@@ -959,6 +987,7 @@ const App = ({
           currency={currency}
           dateRange={dateRange}
           symbol={symbol}
+          assetType={assetType}
           displayAmount={true}
         />
       </FadeUp>

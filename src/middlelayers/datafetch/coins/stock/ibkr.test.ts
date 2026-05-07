@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseIbkrFlexOpenPositions } from "./ibkr";
+import {
+  getIbkrFlexStatementUrl,
+  parseIbkrFlexOpenPositions,
+} from "./ibkr";
 
 describe("IBKR Flex parser", () => {
   it("extracts stock positions and mark prices from OpenPositions XML", () => {
@@ -20,5 +23,17 @@ describe("IBKR Flex parser", () => {
       { symbol: "AAPL", amount: 3, price: 200.5 },
       { symbol: "MSFT", amount: 1.5, price: 410 },
     ]);
+  });
+
+  it("builds a GetStatement URL from the Flex reference code response", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<FlexStatementResponse>
+  <Status>Success</Status>
+  <ReferenceCode>abc123</ReferenceCode>
+</FlexStatementResponse>`;
+
+    expect(getIbkrFlexStatementUrl(xml, "token-1")).toBe(
+      "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?t=token-1&q=abc123&v=3",
+    );
   });
 });
