@@ -10,7 +10,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-
 describe("fetchStockPrices", () => {
   it("uses Yahoo chart responses that do not require quote crumb cookies", async () => {
     vi.mocked(sendHttpRequest)

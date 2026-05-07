@@ -13,14 +13,18 @@ export type IbkrFlexPosition = {
 type IbkrBrokerOptions = {
   statementPollDelayMs?: number;
   maxStatementPollAttempts?: number;
+  maxSendRequestRetries?: number;
+  initialStatementDelayMs?: number;
 };
 
-const flexEndpoint =
-  "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest";
-const getStatementEndpoint =
-  "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement";
+const flexServiceEndpoint =
+  "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService";
+const sendRequestEndpoint = `${flexServiceEndpoint}/SendRequest`;
+const getStatementEndpoint = `${flexServiceEndpoint}/GetStatement`;
 const defaultStatementPollDelayMs = 1000;
 const defaultMaxStatementPollAttempts = 6;
+const defaultMaxSendRequestRetries = 5;
+const defaultInitialStatementDelayMs = 5000;
 
 export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
   const parser = new DOMParser();
@@ -78,17 +82,12 @@ export function getIbkrFlexStatementUrl(xml: string, token: string): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, "text/xml");
 
-  const statementUrl = firstTagText(doc, "Url");
-  if (statementUrl) {
-    return statementUrl;
-  }
-
   const referenceCode = firstTagText(doc, "ReferenceCode");
   if (referenceCode) {
     return `${getStatementEndpoint}?t=${encodeURIComponent(token)}&q=${encodeURIComponent(referenceCode)}&v=3`;
   }
 
-  throw new Error("IBKR Flex response did not include a statement URL");
+  throw new Error("IBKR Flex response did not include a reference code");
 }
 
 function isFlexReportXml(xml: string): boolean {
@@ -130,11 +129,26 @@ function isFlexStatementPending(xml: string): boolean {
     return false;
   }
 
+  // IBKR transient error codes documented with "try again shortly" semantics.
+  const pendingCodes = new Set([
+    "1001",
+    "1004",
+    "1005",
+    "1006",
+    "1007",
+    "1008",
+    "1009",
+    "1018",
+    "1019",
+    "1021",
+  ]);
   const message = err.errorMessage?.toLowerCase() ?? "";
   return (
-    err.errorCode === "1019" ||
+    (err.errorCode != null && pendingCodes.has(err.errorCode)) ||
     message.includes("generation in progress") ||
-    message.includes("please try again")
+    message.includes("please try again") ||
+    message.includes("being generated") ||
+    message.includes("please wait")
   );
 }
 
@@ -163,6 +177,8 @@ export class IbkrBroker implements StockBroker {
   private readonly alias?: string;
   private readonly statementPollDelayMs: number;
   private readonly maxStatementPollAttempts: number;
+  private readonly maxSendRequestRetries: number;
+  private readonly initialStatementDelayMs: number;
   private flexXml?: string;
 
   constructor(
@@ -178,6 +194,10 @@ export class IbkrBroker implements StockBroker {
       options.statementPollDelayMs ?? defaultStatementPollDelayMs;
     this.maxStatementPollAttempts =
       options.maxStatementPollAttempts ?? defaultMaxStatementPollAttempts;
+    this.maxSendRequestRetries =
+      options.maxSendRequestRetries ?? defaultMaxSendRequestRetries;
+    this.initialStatementDelayMs =
+      options.initialStatementDelayMs ?? defaultInitialStatementDelayMs;
   }
 
   getBrokerName(): string {
@@ -212,34 +232,81 @@ export class IbkrBroker implements StockBroker {
       return this.flexXml;
     }
 
-    const requestUrl = `${flexEndpoint}?t=${encodeURIComponent(this.token)}&q=${encodeURIComponent(this.queryId)}&v=3`;
-    const responseXml = await sendHttpTextRequest("GET", requestUrl, 20000);
-    if (isFlexReportXml(responseXml)) {
-      this.flexXml = responseXml;
-      return responseXml;
-    }
-    assertSuccessfulFlexResponse(responseXml);
+    const requestUrl = `${sendRequestEndpoint}?t=${encodeURIComponent(this.token)}&q=${encodeURIComponent(this.queryId)}&v=3`;
 
-    const statementUrl = getIbkrFlexStatementUrl(responseXml, this.token);
+    // Phase 1: submit the SendRequest and retry if IBKR is transiently busy.
+    // Uses a separate counter so transient send failures don't eat the
+    // GetStatement polling budget.
+    let sendResponseXml: string | undefined;
+    let lastSendXml = "";
+    for (let attempt = 1; attempt <= this.maxSendRequestRetries; attempt++) {
+      const xml = await sendHttpTextRequest("GET", requestUrl, 20000);
+      lastSendXml = xml;
+      if (isFlexReportXml(xml)) {
+        this.flexXml = xml;
+        return xml;
+      }
+      if (!isFlexStatementPending(xml)) {
+        assertSuccessfulFlexResponse(xml);
+        sendResponseXml = xml;
+        break;
+      }
+      if (attempt < this.maxSendRequestRetries) {
+        await wait(this.getStatementPollDelay(attempt));
+      }
+    }
+
+    if (!sendResponseXml) {
+      const err = getFlexResponseError(lastSendXml);
+      const detail = err
+        ? [err.status, err.errorCode, err.errorMessage]
+            .filter(Boolean)
+            .join(": ")
+        : lastSendXml.slice(0, 200);
+      throw new Error(
+        `IBKR Flex SendRequest was not ready after ${this.maxSendRequestRetries} attempts: ${detail}`,
+      );
+    }
+
+    let pollUrl = getIbkrFlexStatementUrl(sendResponseXml, this.token);
+
+    // Wait for IBKR to finish generating the report before the first poll,
+    // matching the ~5 s delay that IBKR's own examples recommend.
+    await wait(this.initialStatementDelayMs);
 
     for (let attempt = 1; attempt <= this.maxStatementPollAttempts; attempt++) {
-      const statementXml = await sendHttpTextRequest("GET", statementUrl, 30000);
+      const statementXml = await sendHttpTextRequest("GET", pollUrl, 30000);
       if (isFlexReportXml(statementXml)) {
         this.flexXml = statementXml;
         return statementXml;
       }
 
-      if (!isFlexStatementPending(statementXml)) {
-        assertSuccessfulFlexResponse(statementXml);
-        throw new Error("IBKR Flex statement response did not include a report");
+      if (isFlexStatementPending(statementXml)) {
+        if (attempt < this.maxStatementPollAttempts) {
+          await wait(this.getStatementPollDelay(attempt));
+        }
+        continue;
       }
 
-      if (attempt < this.maxStatementPollAttempts) {
-        await wait(this.getStatementPollDelay(attempt));
+      // IBKR may return another <Url> hop before the final report is available.
+      // Follow it (counted as one polling attempt) instead of failing immediately.
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(statementXml, "text/xml");
+      const redirectUrl = doc
+        .getElementsByTagName("Url")[0]
+        ?.textContent?.trim();
+      if (redirectUrl && redirectUrl !== pollUrl) {
+        pollUrl = redirectUrl;
+        continue;
       }
+
+      assertSuccessfulFlexResponse(statementXml);
+      throw new Error("IBKR Flex statement response did not include a report");
     }
 
-    throw new Error("IBKR Flex statement was not ready before polling timed out");
+    throw new Error(
+      "IBKR Flex statement was not ready before polling timed out",
+    );
   }
 
   private getStatementPollDelay(attempt: number): number {

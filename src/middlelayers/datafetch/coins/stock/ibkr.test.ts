@@ -45,17 +45,18 @@ describe("IBKR Flex parser", () => {
 <FlexStatementResponse>
   <Status>Success</Status>
   <ReferenceCode>abc123</ReferenceCode>
+  <url>https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement</url>
 </FlexStatementResponse>`;
 
     expect(getIbkrFlexStatementUrl(xml, "token-1")).toBe(
-      "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?t=token-1&q=abc123&v=3",
+      "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/GetStatement?t=token-1&q=abc123&v=3",
     );
   });
 
   it("verifies required fields without fetching a Flex report", async () => {
-    await expect(new IbkrBroker("token-1", "query-1").verifyConfig()).resolves.toBe(
-      true,
-    );
+    await expect(
+      new IbkrBroker("token-1", "query-1").verifyConfig(),
+    ).resolves.toBe(true);
 
     expect(sendHttpTextRequest).not.toHaveBeenCalled();
   });
@@ -86,6 +87,7 @@ describe("IBKR Flex parser", () => {
 
     const broker = new (IbkrBroker as any)("token-1", "query-1", undefined, {
       statementPollDelayMs: 0,
+      initialStatementDelayMs: 0,
       maxStatementPollAttempts: 3,
     });
 
@@ -94,7 +96,8 @@ describe("IBKR Flex parser", () => {
   });
 
   it("converts non-USD IBKR mark prices to USD", async () => {
-    vi.mocked(sendHttpTextRequest).mockResolvedValueOnce(`<?xml version="1.0" encoding="UTF-8"?>
+    vi.mocked(sendHttpTextRequest)
+      .mockResolvedValueOnce(`<?xml version="1.0" encoding="UTF-8"?>
 <FlexQueryResponse>
   <FlexStatements>
     <FlexStatement>
@@ -116,5 +119,40 @@ describe("IBKR Flex parser", () => {
       AAPL: 200,
       SHOP: 100,
     });
+  });
+
+  it("retries the initial SendRequest when IBKR returns a transient 1001 error", async () => {
+    vi.mocked(sendHttpTextRequest)
+      .mockResolvedValueOnce(`<?xml version="1.0" encoding="UTF-8"?>
+<FlexStatementResponse>
+  <Status>Fail</Status>
+  <ErrorCode>1001</ErrorCode>
+  <ErrorMessage>Statement could not be generated at this time. Please try again shortly.</ErrorMessage>
+</FlexStatementResponse>`)
+      .mockResolvedValueOnce(`<?xml version="1.0" encoding="UTF-8"?>
+<FlexStatementResponse>
+  <Status>Success</Status>
+  <ReferenceCode>ref42</ReferenceCode>
+</FlexStatementResponse>`)
+      .mockResolvedValueOnce(`<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse>
+  <FlexStatements>
+    <FlexStatement>
+      <OpenPositions>
+        <OpenPosition symbol="AAPL" assetCategory="STK" position="5" markPrice="210.00" currency="USD" />
+      </OpenPositions>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>`);
+
+    const broker = new (IbkrBroker as any)("token-1", "query-1", undefined, {
+      statementPollDelayMs: 0,
+      initialStatementDelayMs: 0,
+      maxSendRequestRetries: 2,
+      maxStatementPollAttempts: 3,
+    });
+
+    await expect(broker.fetchPositions()).resolves.toEqual({ AAPL: 5 });
+    expect(sendHttpTextRequest).toHaveBeenCalledTimes(3);
   });
 });

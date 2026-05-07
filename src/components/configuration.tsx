@@ -733,6 +733,53 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     }
   }
 
+  async function handleQuickLookStockBroker(broker: {
+    type: string;
+    alias?: string;
+    token: string;
+    queryId: string;
+  }) {
+    setQuickLookTitle(broker.alias ?? broker.type);
+    setQuickLookData([]);
+    setQuickLookLogoMap({});
+    setQuickLookLoading(true);
+    setQuickLookOpen(true);
+
+    try {
+      const ana = new StockAnalyzer({
+        stockConfig: {
+          brokers: [
+            {
+              name: broker.type,
+              alias: broker.alias,
+              initParams: {
+                token: broker.token,
+                queryId: broker.queryId,
+              },
+              active: true,
+            },
+          ],
+        },
+      });
+
+      const coins = await ana.loadPortfolio();
+      const filtered = coins
+        .filter((c) => c.amount > 0)
+        .sort((a, b) => b.amount - a.amount)
+        .map((c) => ({ symbol: c.symbol, amount: c.amount }));
+      setQuickLookData(filtered);
+      buildLogoMap(filtered).then(setQuickLookLogoMap);
+    } catch (e: any) {
+      toast({
+        description: "Failed to fetch positions: " + (e.message || e),
+        variant: "destructive",
+      });
+      setQuickLookOpen(false);
+    } finally {
+      setQuickLookLoading(false);
+    }
+  }
+
   function renderQuickLookDialog() {
     return (
       <Dialog
@@ -962,17 +1009,30 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 </div>
               </TableCell>
               <TableCell className="w-[84px] text-right">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() =>
-                    handleRemoveStockBroker(broker.type, broker.queryId)
-                  }
-                  title="Delete"
-                >
-                  <TrashIcon className="h-4 w-4 text-muted-foreground" />
-                </Button>
+                <div className="inline-flex w-[64px] items-center justify-end gap-1">
+                  {isPro && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={() => handleQuickLookStockBroker(broker)}
+                      title="Quick look"
+                    >
+                      <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() =>
+                      handleRemoveStockBroker(broker.type, broker.queryId)
+                    }
+                    title="Delete"
+                  >
+                    <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
