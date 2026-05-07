@@ -222,9 +222,8 @@
       }
       .hero__layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-        gap: 28px;
-        align-items: start;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
       }
       .hero__content,
       .hero__side {
@@ -233,6 +232,11 @@
         border-radius: 34px;
         background: rgba(255, 255, 255, 0.84);
         box-shadow: var(--shadow);
+      }
+      .hero__content {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
       }
       .hero__content .eyebrow {
         margin-bottom: 18px;
@@ -256,6 +260,16 @@
       .hero__meta {
         display: grid;
         gap: 14px;
+        width: 100%;
+      }
+      .hero__signals {
+        display: grid;
+        gap: 14px;
+        width: min(100%, 720px);
+      }
+      .hero__signals .download-badges,
+      .hero__signals .release-notes {
+        margin: 0;
       }
       .hero__meta-item {
         padding: 16px 18px;
@@ -274,12 +288,6 @@
       }
       .section {
         padding: 28px 0;
-      }
-      .download-layout {
-        display: grid;
-        grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
-        gap: 28px;
-        align-items: start;
       }
       .panel {
         border: 1px solid var(--border);
@@ -445,7 +453,6 @@
       }
       @media (max-width: 980px) {
         .hero__layout,
-        .download-layout,
         .release-meta {
           grid-template-columns: 1fr;
         }
@@ -520,14 +527,32 @@
           <div class="hero__content">
             <p class="eyebrow">Download Track3</p>
             <h1>Get the <span>right build</span> for your system</h1>
-            <p>
+            <div
+              class="recommendation__actions hero__actions"
+              id="recommendedActions"
+            ></div>
+            <p id="recommendedText">
               We detect your operating system, look up the latest Track3
               release, and recommend the most suitable installer for macOS,
               Windows, or Linux. If detection is ambiguous, you can still choose
               manually.
             </p>
+            <div class="hero__signals">
+              <div class="download-badges">
+                <span class="pill pill--accent" id="platformBadge"
+                  >Detecting your device</span
+                >
+                <span class="pill" id="statusBadge">Fetch latest on click</span>
+              </div>
+
+              <div class="release-notes" id="downloadHint">
+                When you click a button, Track3 reads the latest version metadata
+                hosted on this site, matches the right installer, and redirects
+                you to the GitHub download.
+              </div>
+            </div>
           </div>
-          <aside class="hero__side">
+          <section class="hero__side" aria-label="Download details">
             <div class="hero__meta">
               <div class="hero__meta-item">
                 <strong>Recommended installer</strong>
@@ -539,7 +564,7 @@
                 <strong>No upfront version lookup</strong>
                 <span>
                   The page stays static until you request a download, then it
-                  fetches the latest public release from GitHub.
+                  reads the current version metadata from this site.
                 </span>
               </div>
               <div class="hero__meta-item">
@@ -550,49 +575,13 @@
                 </span>
               </div>
             </div>
-          </aside>
+          </section>
         </div>
       </section>
 
       <section class="section">
-        <div class="container download-layout">
-          <section
-            class="panel panel--accent"
-            aria-labelledby="recommendedTitle"
-          >
-            <div class="panel__body">
-              <div class="panel__header">
-                <div class="download-badges">
-                  <span class="pill pill--accent" id="platformBadge"
-                    >Detecting your device</span
-                  >
-                  <span class="pill" id="statusBadge"
-                    >Fetch latest on click</span
-                  >
-                </div>
-                <h2 class="panel__title" id="recommendedTitle">
-                  Choose your download
-                </h2>
-                <p class="panel__text" id="recommendedText">
-                  This page does not preload release metadata. We only look up
-                  the newest Track3 installer after you press a download button.
-                </p>
-              </div>
-
-              <div
-                class="recommendation__actions"
-                id="recommendedActions"
-              ></div>
-
-              <div class="release-notes" id="downloadHint">
-                When you click a button, Track3 fetches the latest public GitHub
-                release, finds the matching installer, and redirects you to that
-                file.
-              </div>
-            </div>
-          </section>
-
-          <aside class="panel" aria-labelledby="manualDownloadsTitle">
+        <div class="container">
+          <section class="panel" aria-labelledby="manualDownloadsTitle">
             <div class="panel__body">
               <div class="panel__header">
                 <p class="eyebrow">Manual Downloads</p>
@@ -606,13 +595,13 @@
               </div>
               <div class="manual-groups" id="manualDownloads"></div>
             </div>
-          </aside>
+          </section>
         </div>
       </section>
 
       <div class="container footer">
-        Download buttons resolve to the latest public GitHub release only when
-        you click them.
+        Download buttons resolve from this site's latest release metadata only
+        when you click them.
       </div>
     </main>
 
@@ -622,14 +611,12 @@
         resolveLatestDownloadUrl,
       } from "./download-page.mjs";
 
-      const latestMetadataUrl =
-        "https://github.com/domechn/track3/releases/latest/download/latest.json";
+      const latestMetadataUrl = new URL("./latest.json", window.location.href);
       const releasesPageUrl =
         "https://github.com/domechn/track3/releases/latest";
 
       const platformBadge = document.getElementById("platformBadge");
       const statusBadge = document.getElementById("statusBadge");
-      const recommendedTitle = document.getElementById("recommendedTitle");
       const recommendedText = document.getElementById("recommendedText");
       const recommendedActions = document.getElementById("recommendedActions");
       const downloadHint = document.getElementById("downloadHint");
@@ -879,7 +866,7 @@
                         option.target,
                         option.label,
                         "download-option",
-                        "Fetch on click",
+                        "Resolve on click",
                       ),
                     )
                     .join("")}
@@ -892,11 +879,13 @@
 
       async function getLatestMetadata() {
         if (!latestMetadataPromise) {
-          latestMetadataPromise = fetch(latestMetadataUrl)
+          latestMetadataPromise = fetch(latestMetadataUrl, {
+            cache: "no-store",
+          })
             .then((response) => {
               if (!response.ok) {
                 throw new Error(
-                  `latest.json responded with ${response.status}`,
+                  `Site latest.json responded with ${response.status}`,
                 );
               }
 
@@ -913,7 +902,6 @@
 
       function applyRecommendedView() {
         const view = getRecommendedView(platform);
-        recommendedTitle.textContent = view.title;
         recommendedText.textContent = view.text;
         recommendedActions.innerHTML = view.actions.join("");
       }
@@ -936,7 +924,7 @@
 
         statusBadge.textContent = "Finding latest release…";
         recommendedText.textContent =
-          "Fetching the newest Track3 release from GitHub, then redirecting you to the requested installer.";
+          "Reading the newest Track3 version metadata from this site, then redirecting you to the requested installer.";
         button.disabled = true;
 
         try {
@@ -957,7 +945,7 @@
         } catch (error) {
           statusBadge.textContent = "Opening GitHub fallback";
           recommendedText.textContent =
-            "We could not resolve that installer automatically, so the latest GitHub release page will open instead.";
+            "We could not read the latest installer metadata from this site, so the latest GitHub release page will open instead.";
           downloadHint.innerHTML = `<p>${escapeHtml(
             error.message,
           )}. The latest GitHub release page is opening as a fallback.</p>`;
