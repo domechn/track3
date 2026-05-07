@@ -13,10 +13,22 @@ type SubscriptionInfo = {
   isLegacy: boolean;
 };
 
+export type SubscriptionPlan = {
+  planType: "monthly" | "yearly";
+  currency: string;
+  unitAmountCents: number;
+  interval: "month" | "year";
+};
+
+export type SubscriptionPlansResponse = {
+  plans: SubscriptionPlan[];
+};
+
 const LICENSE_CACHE_TTL_SECONDS = 5 * 60;
 const LICENSE_CACHE_KEY_PREFIXES = {
   proStatus: "pro-status",
   subscriptionInfo: "subscription-info",
+  subscriptionPlans: "subscription-plans",
 };
 
 const licenseCache = getMemoryCacheInstance(
@@ -218,6 +230,26 @@ export class LicenseCenter {
         "x-track3-api-key": license ?? "",
       },
       { action: "subscription-info" },
+    );
+
+    return setCachedLicenseValue(cacheKey, resp);
+  }
+
+  public async getSubscriptionPlans(): Promise<SubscriptionPlansResponse> {
+    const cacheKey = makeLicenseCacheKey(
+      LICENSE_CACHE_KEY_PREFIXES.subscriptionPlans,
+    );
+    const cached = getCachedLicenseValue<SubscriptionPlansResponse>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const resp = await sendHttpRequest<SubscriptionPlansResponse>(
+      "POST",
+      this.subscriptionInfoEndpoint,
+      10000,
+      undefined,
+      { action: "subscription-plans" },
     );
 
     return setCachedLicenseValue(cacheKey, resp);
