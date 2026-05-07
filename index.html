@@ -22,6 +22,12 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://domechn.github.io/track3/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
     <link
       rel="icon"
       type="image/png"
@@ -37,31 +43,59 @@
         padding: 0;
       }
       :root {
-        --bg: #09090b;
-        --bg-card: #18181b;
-        --bg-card-hover: #1f1f23;
-        --border: #27272a;
-        --text: #fafafa;
-        --text-muted: #a1a1aa;
+        --bg: #ffffff;
+        --surface: rgba(255, 255, 255, 0.78);
+        --surface-solid: #ffffff;
+        --surface-soft: #f1efff;
+        --border: rgba(24, 19, 13, 0.12);
+        --border-strong: rgba(24, 19, 13, 0.18);
+        --text: #171422;
+        --text-muted: #68627d;
+        --text-soft: #8d86a3;
         --accent: #6d5cff;
-        --accent-hover: #8577ff;
-        --accent-glow: rgba(109, 92, 255, 0.25);
-        --green: #22c55e;
-        --radius: 12px;
+        --accent-hover: #5a49ed;
+        --accent-soft: #efecff;
+        --green: #3f8f53;
+        --rose: #d9d3ff;
+        --shadow: 0 20px 60px rgba(73, 63, 148, 0.1);
+        --shadow-lg: 0 28px 90px rgba(73, 63, 148, 0.14);
+        --radius: 26px;
+        --radius-card: 22px;
       }
       html {
         scroll-behavior: smooth;
         font-size: 16px;
+        background: var(--bg);
       }
       body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-          Arial, sans-serif;
-        background: var(--bg);
+        font-family: "Manrope", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        background: #ffffff;
         color: var(--text);
         line-height: 1.6;
         -webkit-font-smoothing: antialiased;
         overflow-x: hidden;
+        min-height: 100vh;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(24, 19, 13, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(24, 19, 13, 0.03) 1px, transparent 1px);
+        background-size: 32px 32px;
+        opacity: 0.45;
+        mask-image: linear-gradient(
+          180deg,
+          rgba(0, 0, 0, 0.32),
+          transparent 92%
+        );
+        -webkit-mask-image: linear-gradient(
+          180deg,
+          rgba(0, 0, 0, 0.32),
+          transparent 92%
+        );
       }
       a {
         color: inherit;
@@ -77,7 +111,7 @@
 
       /* ── Utility ── */
       .container {
-        max-width: 1140px;
+        max-width: 1180px;
         margin: 0 auto;
         padding: 0 24px;
       }
@@ -89,155 +123,222 @@
         clip: rect(0, 0, 0, 0);
       }
 
-      /* ── Animated gradient background blobs ── */
+      /* ── Background blobs ── */
       .blob {
-        position: fixed;
-        border-radius: 50%;
-        filter: blur(120px);
-        opacity: 0.15;
-        pointer-events: none;
-        z-index: 0;
+        display: none;
       }
       .blob--1 {
-        width: 600px;
-        height: 600px;
-        background: var(--accent);
-        top: -120px;
-        left: -100px;
+        width: 520px;
+        height: 520px;
+        background: rgba(217, 211, 255, 0.9);
+        top: -140px;
+        left: -120px;
       }
       .blob--2 {
-        width: 500px;
-        height: 500px;
-        background: #22c55e;
-        bottom: 10%;
-        right: -80px;
+        width: 420px;
+        height: 420px;
+        background: rgba(109, 92, 255, 0.24);
+        bottom: 8%;
+        right: -110px;
       }
 
       /* ── Header / Nav ── */
       header {
         position: fixed;
-        top: 0;
+        top: 18px;
         left: 0;
         right: 0;
         z-index: 100;
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        background: rgba(9, 9, 11, 0.7);
-        border-bottom: 1px solid var(--border);
-        transition: box-shadow 0.3s;
+        transition: transform 0.3s ease;
       }
-      header.scrolled {
-        box-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
+      header.scrolled .nav {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 42px rgba(45, 36, 95, 0.12);
+        border-color: var(--border-strong);
       }
       .nav {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        height: 64px;
+        gap: 22px;
+        min-height: 72px;
+        padding: 12px 22px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        box-shadow: 0 12px 40px rgba(45, 36, 95, 0.08);
+        transition:
+          box-shadow 0.3s,
+          transform 0.3s,
+          border-color 0.3s;
       }
       .nav__brand {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
+        font-family: "Space Grotesk", "Manrope", sans-serif;
         font-weight: 700;
-        font-size: 1.15rem;
+        font-size: 1.12rem;
+        letter-spacing: -0.02em;
       }
       .nav__brand img {
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(109, 92, 255, 0.22);
       }
       .nav__links {
         display: flex;
-        gap: 32px;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
       }
       .nav__links a {
-        font-size: 0.9rem;
+        padding: 10px 14px;
+        border-radius: 999px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
         color: var(--text-muted);
-        transition: color 0.2s;
+        transition:
+          color 0.2s,
+          background 0.2s;
       }
       .nav__links a:hover {
         color: var(--text);
+        background: var(--surface-soft);
       }
       .nav__cta {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         background: var(--accent);
         color: #fff;
-        font-size: 0.85rem;
-        font-weight: 600;
-        padding: 8px 18px;
-        border-radius: 8px;
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: 0.84rem;
+        font-weight: 700;
+        padding: 10px 18px;
+        border-radius: 999px;
         border: none;
         cursor: pointer;
+        box-shadow: 0 12px 28px rgba(109, 92, 255, 0.26);
         transition:
           background 0.2s,
-          box-shadow 0.2s;
+          box-shadow 0.2s,
+          transform 0.2s;
       }
       .nav__cta:hover {
         background: var(--accent-hover);
-        box-shadow: 0 0 20px var(--accent-glow);
+        box-shadow: 0 16px 34px rgba(109, 92, 255, 0.34);
+        transform: translateY(-1px);
       }
 
       /* ── Hero ── */
       .hero {
         position: relative;
         z-index: 1;
-        text-align: center;
-        padding: 160px 24px 80px;
+        padding: 146px 0 88px;
+      }
+      .hero__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+        gap: 28px;
+        align-items: stretch;
+      }
+      .hero__content,
+      .hero__aside {
+        border: 1px solid var(--border);
+        border-radius: 36px;
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: var(--shadow);
+      }
+      .hero__content {
+        padding: 48px 52px 44px;
+      }
+      .hero__aside {
+        padding: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
       }
       .hero__badge {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: rgba(109, 92, 255, 0.12);
-        border: 1px solid rgba(109, 92, 255, 0.25);
+        background: var(--accent-soft);
+        border: 1px solid rgba(109, 92, 255, 0.22);
         border-radius: 999px;
-        padding: 6px 16px;
-        font-size: 0.8rem;
-        color: var(--accent);
-        margin-bottom: 28px;
+        padding: 10px 16px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        color: var(--text);
+        margin-bottom: 22px;
         font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
       .hero__badge svg {
         width: 14px;
         height: 14px;
+        color: var(--accent-hover);
       }
-      .hero h1 {
-        font-size: clamp(2.4rem, 5.5vw, 4rem);
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        line-height: 1.12;
-        margin-bottom: 20px;
+      .hero__eyebrow,
+      .hero__aside-label,
+      .section__label,
+      .hero__platforms,
+      .plan h3 {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-soft);
       }
-      .hero h1 span {
-        background: linear-gradient(135deg, var(--accent), #22c55e);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+      .hero__eyebrow {
+        margin-bottom: 18px;
       }
-      .hero p {
+      .hero__content h1 {
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: clamp(3rem, 6vw, 5.5rem);
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        line-height: 0.98;
+        margin-bottom: 22px;
+        max-width: 10.5ch;
+      }
+      .hero__content h1 span {
+        color: var(--accent-hover);
+      }
+      .hero__copy {
         color: var(--text-muted);
-        font-size: 1.15rem;
-        max-width: 580px;
-        margin: 0 auto 40px;
+        font-size: 1.08rem;
+        max-width: 620px;
+        margin: 0 0 34px;
       }
       .hero__actions {
         display: flex;
         gap: 14px;
-        justify-content: center;
+        justify-content: flex-start;
         flex-wrap: wrap;
+        margin-bottom: 24px;
       }
       .btn {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 14px 28px;
-        border-radius: 10px;
+        padding: 15px 24px;
+        border-radius: 999px;
+        font-family: "Space Grotesk", "Manrope", sans-serif;
         font-size: 0.95rem;
         font-weight: 600;
-        border: none;
+        border: 1px solid transparent;
         cursor: pointer;
         transition: all 0.25s;
       }
@@ -247,26 +348,96 @@
       }
       .btn--primary:hover {
         background: var(--accent-hover);
-        box-shadow: 0 0 32px var(--accent-glow);
+        box-shadow: 0 18px 36px rgba(109, 92, 255, 0.28);
         transform: translateY(-2px);
       }
       .btn--outline {
-        background: transparent;
+        background: rgba(255, 255, 255, 0.7);
         color: var(--text);
-        border: 1px solid var(--border);
+        border-color: var(--border-strong);
       }
       .btn--outline:hover {
-        border-color: var(--text-muted);
+        background: #fff;
+        border-color: rgba(24, 19, 13, 0.4);
         transform: translateY(-2px);
       }
       .btn svg {
         width: 18px;
         height: 18px;
       }
-
       .hero__platforms {
-        margin-top: 20px;
-        font-size: 0.8rem;
+        color: var(--text-soft);
+      }
+      .hero__aside-title {
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: 1.68rem;
+        line-height: 1.06;
+        letter-spacing: -0.04em;
+        max-width: 12ch;
+      }
+      .hero__aside-copy {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+      }
+      .hero__highlights {
+        display: grid;
+        gap: 12px;
+      }
+      .hero__highlight {
+        display: flex;
+        gap: 12px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--surface-solid);
+      }
+      .hero__dot {
+        width: 10px;
+        height: 10px;
+        margin-top: 8px;
+        border-radius: 50%;
+        background: var(--accent);
+        flex-shrink: 0;
+      }
+      .hero__highlight strong {
+        display: block;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+      }
+      .hero__highlight span {
+        color: var(--text-muted);
+        font-size: 0.86rem;
+        line-height: 1.45;
+      }
+      .hero__stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: auto;
+      }
+      .hero__stat {
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.96),
+          rgba(239, 236, 255, 0.82)
+        );
+      }
+      .hero__stat strong {
+        display: block;
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: 1.5rem;
+        line-height: 1;
+        margin-bottom: 6px;
+      }
+      .hero__stat span {
+        display: block;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.74rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
         color: var(--text-muted);
       }
 
@@ -274,8 +445,27 @@
       .screenshots {
         position: relative;
         z-index: 1;
-        padding: 0 0 100px;
-        scroll-margin-top: 84px;
+        padding: 14px 0 100px;
+        scroll-margin-top: 120px;
+        background: #ffffff;
+      }
+      .screenshots__intro {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 28px;
+        margin-bottom: 26px;
+      }
+      .screenshots__intro-note {
+        max-width: 420px;
+        color: var(--text-muted);
+        font-size: 0.98rem;
+      }
+      .screenshots__frame {
+        padding: 28px 0 22px;
+        border-top: 1px solid var(--border-strong);
+        border-bottom: 1px solid var(--border);
+        background: #ffffff;
       }
       .screenshots__track {
         display: flex;
@@ -290,28 +480,33 @@
         display: none;
       }
       .screenshots__track img {
-        flex: 0 0 min(85vw, 880px);
+        flex: 0 0 min(88vw, 960px);
         scroll-snap-align: center;
-        border-radius: var(--radius);
+        border-radius: 32px;
         border: 1px solid var(--border);
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        transition: transform 0.3s;
+        background: #fff;
+        padding: 12px;
+        box-shadow: var(--shadow-lg);
+        transition:
+          transform 0.3s,
+          box-shadow 0.3s;
       }
       .screenshots__track img:hover {
-        transform: scale(1.015);
+        transform: translateY(-4px) scale(1.01);
+        box-shadow: 0 34px 90px rgba(73, 63, 148, 0.16);
       }
       .screenshots__dots {
         display: flex;
         justify-content: center;
         gap: 8px;
-        margin-top: 24px;
+        margin-top: 8px;
       }
       .screenshots__dots button {
         width: 8px;
         height: 8px;
         border-radius: 50%;
         border: none;
-        background: var(--border);
+        background: rgba(24, 19, 13, 0.18);
         cursor: pointer;
         transition:
           background 0.2s,
@@ -319,165 +514,180 @@
         padding: 0;
       }
       .screenshots__dots button.active {
-        background: var(--accent);
-        transform: scale(1.3);
+        background: var(--text);
+        transform: scale(1.35);
       }
 
       /* ── Section styling ── */
       .section {
         position: relative;
         z-index: 1;
-        padding: 100px 0;
-        scroll-margin-top: 84px;
+        padding: 96px 0;
+        scroll-margin-top: 120px;
+      }
+      .section + .section {
+        border-top: 1px solid rgba(24, 19, 13, 0.08);
       }
       .section__label {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--accent);
-        font-weight: 600;
-        margin-bottom: 12px;
+        margin-bottom: 14px;
       }
       .section__title {
-        font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: clamp(2rem, 4vw, 3.4rem);
         font-weight: 700;
-        letter-spacing: -0.02em;
-        margin-bottom: 16px;
+        letter-spacing: -0.04em;
+        line-height: 1.05;
+        margin-bottom: 18px;
+        max-width: 15ch;
       }
       .section__desc {
         color: var(--text-muted);
-        max-width: 580px;
-        font-size: 1.05rem;
-        margin-bottom: 56px;
+        max-width: 620px;
+        font-size: 1.04rem;
+        margin-bottom: 50px;
       }
 
       /* ── Features grid ── */
       .features {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         gap: 20px;
       }
       .feature {
-        background: var(--bg-card);
+        background: rgba(255, 255, 255, 0.76);
         border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 32px;
+        border-radius: var(--radius-card);
+        padding: 28px;
+        box-shadow: 0 8px 24px rgba(73, 63, 148, 0.05);
         transition:
           border-color 0.3s,
           transform 0.3s,
           box-shadow 0.3s;
       }
       .feature:hover {
-        border-color: var(--accent);
+        border-color: rgba(24, 19, 13, 0.24);
         transform: translateY(-4px);
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+        box-shadow: var(--shadow);
       }
       .feature__icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 10px;
+        width: 54px;
+        height: 54px;
+        border-radius: 18px;
         display: flex;
         align-items: center;
         justify-content: center;
         margin-bottom: 20px;
         font-size: 1.4rem;
+        border: 1px solid rgba(24, 19, 13, 0.06);
       }
       .feature__icon--purple {
-        background: rgba(109, 92, 255, 0.15);
-        color: var(--accent);
+        background: rgba(109, 92, 255, 0.14);
+        color: var(--accent-hover);
       }
       .feature__icon--green {
-        background: rgba(34, 197, 94, 0.15);
+        background: rgba(63, 143, 83, 0.14);
         color: var(--green);
       }
       .feature__icon--blue {
-        background: rgba(59, 130, 246, 0.15);
-        color: #3b82f6;
+        background: rgba(118, 160, 230, 0.18);
+        color: #3264bf;
       }
       .feature__icon--amber {
-        background: rgba(245, 158, 11, 0.15);
-        color: #f59e0b;
+        background: rgba(109, 92, 255, 0.16);
+        color: var(--accent-hover);
       }
       .feature__icon--rose {
-        background: rgba(244, 63, 94, 0.15);
-        color: #f43f5e;
+        background: rgba(217, 211, 255, 0.26);
+        color: var(--accent);
       }
       .feature__icon--cyan {
-        background: rgba(6, 182, 212, 0.15);
-        color: #06b6d4;
+        background: rgba(99, 196, 209, 0.18);
+        color: #1c8092;
       }
       .feature h3 {
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin-bottom: 8px;
+        font-size: 1.08rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      .feature p,
+      .pro-feature p,
+      .plan__desc,
+      .plan__list,
+      .pricing__note,
+      .privacy-banner p,
+      .footer__left,
+      .footer__links a {
+        color: var(--text-muted);
       }
       .feature p {
-        color: var(--text-muted);
-        font-size: 0.9rem;
-        line-height: 1.55;
+        font-size: 0.92rem;
+        line-height: 1.58;
       }
 
       /* ── Exchanges ── */
       .exchanges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        justify-content: center;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 14px;
         margin-top: 48px;
       }
       .exchange {
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 10px;
-        background: var(--bg-card);
+        background: rgba(255, 255, 255, 0.76);
         border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 14px 24px;
-        font-weight: 500;
-        font-size: 0.95rem;
+        border-radius: 999px;
+        padding: 18px 20px;
+        font-weight: 600;
+        font-size: 0.94rem;
         transition:
           border-color 0.3s,
-          transform 0.3s;
+          transform 0.3s,
+          box-shadow 0.3s;
       }
       .exchange:hover {
-        border-color: var(--text-muted);
+        border-color: var(--border-strong);
         transform: translateY(-2px);
+        box-shadow: 0 12px 28px rgba(73, 63, 148, 0.1);
       }
       .exchange__logo {
-        font-size: 1.3rem;
+        font-size: 1.1rem;
       }
 
       /* ── Chains grid ── */
       .chains {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 12px;
         justify-content: center;
         margin-top: 32px;
       }
       .chain {
-        background: var(--bg-card);
+        background: rgba(255, 255, 255, 0.78);
         border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 8px 16px;
-        font-size: 0.82rem;
+        border-radius: 999px;
+        padding: 10px 16px;
+        font-size: 0.8rem;
         color: var(--text-muted);
-        font-weight: 500;
-        transition: border-color 0.2s;
+        font-weight: 600;
+        transition:
+          border-color 0.2s,
+          color 0.2s,
+          background 0.2s;
       }
       .chain:hover {
-        border-color: var(--text-muted);
+        border-color: var(--border-strong);
         color: var(--text);
+        background: #fff;
       }
 
       /* ── Pro subscription ── */
       .pricing {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-        gap: 32px;
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 28px;
         align-items: start;
       }
       .pro-features {
@@ -485,98 +695,108 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 16px;
       }
-      .pro-feature {
-        background: var(--bg-card);
+      .pro-feature,
+      .plan {
+        background: rgba(255, 255, 255, 0.76);
         border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 22px;
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow);
+      }
+      .pro-feature {
+        padding: 24px;
       }
       .pro-feature h3 {
         font-size: 1rem;
-        font-weight: 600;
+        font-weight: 700;
         margin-bottom: 8px;
       }
       .pro-feature p {
-        color: var(--text-muted);
         font-size: 0.9rem;
-        line-height: 1.55;
+        line-height: 1.58;
       }
       .plans {
         display: grid;
         gap: 16px;
+        position: sticky;
+        top: 118px;
       }
       .plan {
         position: relative;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 28px;
+        padding: 30px;
         overflow: hidden;
       }
       .plan--featured {
-        border-color: var(--accent);
-        box-shadow: 0 16px 50px rgba(109, 92, 255, 0.16);
+        border-color: rgba(109, 92, 255, 0.34);
+        background: linear-gradient(
+          180deg,
+          #f1eeff 0%,
+          rgba(255, 255, 255, 0.94) 100%
+        );
+        box-shadow: 0 22px 60px rgba(109, 92, 255, 0.2);
       }
       .plan__badge {
         position: absolute;
-        top: 18px;
-        right: 18px;
-        border: 1px solid rgba(109, 92, 255, 0.4);
-        color: var(--accent);
+        top: 20px;
+        right: 20px;
+        border: 1px solid rgba(109, 92, 255, 0.24);
+        background: rgba(255, 255, 255, 0.86);
+        color: var(--text);
         border-radius: 999px;
-        padding: 4px 10px;
-        font-size: 0.72rem;
-        font-weight: 700;
+        padding: 6px 10px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 600;
       }
       .plan h3 {
-        font-size: 0.95rem;
-        color: var(--text-muted);
-        font-weight: 600;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
       }
       .plan__price {
         display: flex;
         align-items: baseline;
-        gap: 6px;
-        font-size: 2.4rem;
-        font-weight: 800;
-        margin-bottom: 8px;
+        gap: 8px;
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: 3rem;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        margin-bottom: 10px;
       }
       .plan__price span {
         color: var(--text-muted);
-        font-size: 0.9rem;
+        font-family: "Manrope", sans-serif;
+        font-size: 0.95rem;
         font-weight: 600;
       }
       .plan__desc {
-        color: var(--text-muted);
-        font-size: 0.9rem;
+        font-size: 0.92rem;
         margin-bottom: 20px;
       }
       .plan__list {
         display: grid;
-        gap: 10px;
-        color: var(--text-muted);
+        gap: 12px;
         font-size: 0.88rem;
       }
       .plan__list li {
         display: flex;
-        gap: 8px;
+        gap: 10px;
         align-items: flex-start;
       }
       .plan__list li::before {
         content: "";
-        width: 7px;
-        height: 7px;
-        flex: 0 0 7px;
-        margin-top: 8px;
+        width: 8px;
+        height: 8px;
+        flex: 0 0 8px;
+        margin-top: 7px;
         border-radius: 999px;
-        background: var(--green);
+        background: var(--accent-hover);
       }
       .pricing__note {
-        color: var(--text-muted);
+        border-top: 1px solid var(--border);
         font-size: 0.82rem;
-        margin-top: 18px;
-        line-height: 1.5;
+        margin-top: 4px;
+        padding-top: 16px;
+        line-height: 1.56;
       }
 
       /* ── Privacy banner ── */
@@ -585,30 +805,34 @@
         z-index: 1;
         background: linear-gradient(
           135deg,
-          rgba(109, 92, 255, 0.08),
-          rgba(34, 197, 94, 0.08)
+          rgba(255, 255, 255, 0.96),
+          rgba(239, 236, 255, 0.82)
         );
         border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 64px 48px;
+        border-radius: 36px;
+        padding: 56px 48px;
         text-align: center;
         margin: 0 auto;
-        max-width: 900px;
+        max-width: 920px;
+        box-shadow: var(--shadow);
       }
-      .privacy-banner h2 {
-        font-size: clamp(1.6rem, 3vw, 2.2rem);
+      .privacy-banner h2,
+      .cta h2 {
+        font-family: "Space Grotesk", "Manrope", sans-serif;
+        font-size: clamp(2rem, 4vw, 3rem);
         font-weight: 700;
+        line-height: 1.04;
+        letter-spacing: -0.05em;
         margin-bottom: 16px;
       }
       .privacy-banner p {
-        color: var(--text-muted);
         max-width: 540px;
         margin: 0 auto 32px;
         font-size: 1rem;
       }
       .privacy-checks {
         display: flex;
-        gap: 32px;
+        gap: 14px;
         justify-content: center;
         flex-wrap: wrap;
       }
@@ -616,8 +840,12 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        padding: 14px 18px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.72);
         font-size: 0.9rem;
-        font-weight: 500;
+        font-weight: 600;
       }
       .privacy-check svg {
         color: var(--green);
@@ -631,18 +859,46 @@
         position: relative;
         z-index: 1;
         text-align: center;
-        padding: 120px 24px;
+        padding: 30px 0 120px;
       }
-      .cta h2 {
-        font-size: clamp(2rem, 4vw, 3rem);
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        margin-bottom: 16px;
+      .cta__panel {
+        border-radius: 38px;
+        padding: 64px 52px;
+        background: linear-gradient(
+          135deg,
+          #8d82ff 0%,
+          #6d5cff 56%,
+          #5542e8 100%
+        );
+        box-shadow: 0 28px 80px rgba(109, 92, 255, 0.32);
+        color: #fff;
+      }
+      .cta .section__label {
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.74);
+        margin-bottom: 18px;
       }
       .cta p {
-        color: var(--text-muted);
-        font-size: 1.1rem;
-        margin-bottom: 36px;
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 1.08rem;
+        max-width: 560px;
+        margin: 0 auto 36px;
+      }
+      .cta .hero__actions {
+        justify-content: center;
+        margin-bottom: 0;
+      }
+      .cta .btn--primary {
+        background: rgba(255, 255, 255, 0.96);
+        color: var(--accent-hover);
+      }
+      .cta .btn--outline {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.26);
+        color: #fff;
+      }
+      .cta .btn--outline:hover {
+        background: rgba(255, 255, 255, 0.2);
       }
 
       /* ── Footer ── */
@@ -650,7 +906,8 @@
         position: relative;
         z-index: 1;
         border-top: 1px solid var(--border);
-        padding: 40px 0;
+        padding: 34px 0 44px;
+        background: rgba(255, 255, 255, 0.28);
       }
       .footer__inner {
         display: flex;
@@ -659,8 +916,8 @@
         flex-wrap: wrap;
         gap: 16px;
       }
-      .footer__left {
-        color: var(--text-muted);
+      .footer__left,
+      .footer__links a {
         font-size: 0.85rem;
       }
       .footer__links {
@@ -668,8 +925,6 @@
         gap: 24px;
       }
       .footer__links a {
-        color: var(--text-muted);
-        font-size: 0.85rem;
         transition: color 0.2s;
       }
       .footer__links a:hover {
@@ -703,56 +958,127 @@
       .hero__badge {
         animation: fadeUp 0.6s 0.1s both;
       }
-      .hero h1 {
-        animation: fadeUp 0.6s 0.2s both;
+      .hero__eyebrow {
+        animation: fadeUp 0.6s 0.18s both;
       }
-      .hero p {
-        animation: fadeUp 0.6s 0.35s both;
+      .hero__content h1 {
+        animation: fadeUp 0.6s 0.26s both;
       }
-      .hero__actions {
-        animation: fadeUp 0.6s 0.5s both;
+      .hero__copy {
+        animation: fadeUp 0.6s 0.4s both;
       }
-      .hero__platforms {
-        animation: fadeUp 0.6s 0.6s both;
+      .hero .hero__actions {
+        animation: fadeUp 0.6s 0.52s both;
+      }
+      .hero .hero__platforms {
+        animation: fadeUp 0.6s 0.62s both;
       }
 
       /* ── Responsive ── */
-      @media (max-width: 768px) {
-        .nav__links {
-          display: none;
-        }
-        .hero {
-          padding: 130px 20px 60px;
-        }
-        .section {
-          padding: 64px 0;
-        }
-        .privacy-banner {
-          padding: 40px 24px;
-        }
-        .privacy-checks {
-          gap: 16px;
-        }
-        .cta {
-          padding: 80px 20px;
-        }
-        .features {
-          grid-template-columns: 1fr;
-        }
+      @media (max-width: 980px) {
+        .hero__grid,
         .pricing {
           grid-template-columns: 1fr;
         }
+        .screenshots__intro {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .plans {
+          position: static;
+        }
+      }
+      @media (max-width: 768px) {
+        .container {
+          padding: 0 18px;
+        }
+        header {
+          top: 12px;
+        }
+        .nav {
+          min-height: 64px;
+          padding: 10px 14px;
+          border-radius: 26px;
+        }
+        .nav__links {
+          display: none;
+        }
+        .nav__cta {
+          padding: 10px 14px;
+        }
+        .hero {
+          padding: 110px 0 64px;
+        }
+        .hero__content,
+        .hero__aside,
+        .privacy-banner,
+        .cta__panel {
+          border-radius: 28px;
+          padding: 24px;
+        }
+        .hero__content h1 {
+          font-size: clamp(2.5rem, 14vw, 3.8rem);
+          max-width: none;
+        }
+        .hero__actions {
+          width: 100%;
+        }
+        .btn {
+          justify-content: center;
+          width: 100%;
+        }
+        .hero__stats {
+          grid-template-columns: 1fr;
+        }
+        .screenshots {
+          padding-bottom: 84px;
+        }
+        .screenshots__frame {
+          padding-top: 20px;
+        }
+        .screenshots__track {
+          gap: 18px;
+          padding: 0 18px 18px;
+        }
+        .screenshots__track img {
+          flex-basis: calc(100vw - 36px);
+          border-radius: 24px;
+          padding: 8px;
+        }
+        .section {
+          padding: 72px 0;
+        }
+        .features,
         .pro-features {
           grid-template-columns: 1fr;
         }
+        .plan__badge {
+          position: static;
+          display: inline-flex;
+          margin-bottom: 14px;
+        }
+        .privacy-checks {
+          justify-content: flex-start;
+        }
+        .privacy-check {
+          width: 100%;
+          justify-content: flex-start;
+        }
+        .cta {
+          padding: 20px 0 96px;
+        }
         .footer__inner {
           flex-direction: column;
-          text-align: center;
+          align-items: flex-start;
+        }
+        .footer__links {
+          flex-wrap: wrap;
+          gap: 14px 18px;
         }
       }
     </style>
   </head>
-  <body>
+  <body id="top">
     <!-- Background blobs -->
     <div class="blob blob--1"></div>
     <div class="blob blob--2"></div>
@@ -760,7 +1086,7 @@
     <!-- Header -->
     <header id="header">
       <nav class="container nav">
-        <a href="#" class="nav__brand">
+        <a href="#top" class="nav__brand">
           <img
             src="https://raw.githubusercontent.com/domechn/track3/master/src-tauri/app-icon.png"
             alt="Track3 icon"
@@ -799,103 +1125,188 @@
 
     <!-- Hero -->
     <section class="hero">
-      <div class="hero__badge">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-        Privacy-first &middot; Open Source &middot; Desktop App
+      <div class="container">
+        <div class="hero__grid">
+          <div class="hero__content">
+            <div class="hero__badge">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              Privacy-first &middot; Open Source &middot; Desktop App
+            </div>
+            <p class="hero__eyebrow">
+              Private portfolio intelligence for serious holders
+            </p>
+            <h1>Unlock the insights of your <span>crypto assets</span></h1>
+            <p class="hero__copy">
+              Track3 is a desktop portfolio tracker that aggregates your
+              balances from centralized exchanges and web3 wallets. No servers,
+              no wallet signatures, and no cloud sync requirement. Your data
+              stays on your machine.
+            </p>
+            <div class="hero__actions">
+              <a
+                href="https://github.com/domechn/track3/releases/latest"
+                class="btn btn--primary"
+                target="_blank"
+                rel="noopener"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Download Latest Release
+              </a>
+              <a
+                href="https://github.com/domechn/track3"
+                class="btn btn--outline"
+                target="_blank"
+                rel="noopener"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
+                  />
+                </svg>
+                View on GitHub
+              </a>
+            </div>
+            <p class="hero__platforms">
+              Available on macOS, Windows, and Linux
+            </p>
+          </div>
+
+          <aside class="hero__aside animate-in" aria-label="Track3 highlights">
+            <p class="hero__aside-label">Why Track3</p>
+            <h2 class="hero__aside-title">
+              One calm workspace for exchanges, wallets, and portfolio history.
+            </h2>
+            <p class="hero__aside-copy">
+              Bring together balances, PnL, on-chain holdings, and refresh
+              status without giving up control of your raw data.
+            </p>
+            <div class="hero__highlights">
+              <div class="hero__highlight">
+                <span class="hero__dot"></span>
+                <div>
+                  <strong>Read-only connections</strong>
+                  <span>
+                    Use exchange API keys without granting trade or withdrawal
+                    permissions.
+                  </span>
+                </div>
+              </div>
+              <div class="hero__highlight">
+                <span class="hero__dot"></span>
+                <div>
+                  <strong>Encrypted local storage</strong>
+                  <span>
+                    Portfolio history, API keys, and imported data stay on your
+                    device.
+                  </span>
+                </div>
+              </div>
+              <div class="hero__highlight">
+                <span class="hero__dot"></span>
+                <div>
+                  <strong>Expanded Pro coverage</strong>
+                  <span>
+                    Add TRON plus 85+ EVM chains when you need deeper wallet
+                    monitoring.
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="hero__stats">
+              <div class="hero__stat">
+                <strong>7+</strong>
+                <span>Exchanges</span>
+              </div>
+              <div class="hero__stat">
+                <strong>85+</strong>
+                <span>Pro EVM chains</span>
+              </div>
+              <div class="hero__stat">
+                <strong>100%</strong>
+                <span>Local storage</span>
+              </div>
+            </div>
+          </aside>
+        </div>
       </div>
-      <h1>Unlock the insights of<br />your <span>crypto assets</span></h1>
-      <p>
-        Track3 is a desktop portfolio tracker that aggregates your balances from
-        centralized exchanges and web3 wallets. No servers, no wallet signatures
-        — all data stays on your machine.
-      </p>
-      <div class="hero__actions">
-        <a
-          href="https://github.com/domechn/track3/releases/latest"
-          class="btn btn--primary"
-          target="_blank"
-          rel="noopener"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Download Latest Release
-        </a>
-        <a
-          href="https://github.com/domechn/track3"
-          class="btn btn--outline"
-          target="_blank"
-          rel="noopener"
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-            />
-          </svg>
-          View on GitHub
-        </a>
-      </div>
-      <p class="hero__platforms">Available on macOS, Windows, and Linux</p>
     </section>
 
     <!-- Screenshots -->
     <section class="screenshots" id="screenshots">
-      <div class="screenshots__track" id="screenshotTrack">
-        <img
-          src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc1.jpg"
-          alt="Track3 Overview Dashboard"
-          loading="lazy"
-        />
-        <img
-          src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc2.jpg"
-          alt="Track3 Asset Analytics"
-          loading="lazy"
-        />
-        <img
-          src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc3.jpg"
-          alt="Track3 Wallet Analysis"
-          loading="lazy"
-        />
-        <img
-          src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc4.jpg"
-          alt="Track3 Coin Details"
-          loading="lazy"
-        />
-        <img
-          src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc5.jpg"
-          alt="Track3 Configuration"
-          loading="lazy"
-        />
-        <img
-          src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc6.jpg"
-          alt="Track3 Data Export"
-          loading="lazy"
-        />
-        <img
-          src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc7.jpg"
-          alt="Track3 PnL Chart"
-          loading="lazy"
-        />
+      <div class="container">
+        <div class="screenshots__intro animate-in">
+          <div class="screenshots__intro-copy">
+            <p class="section__label">Preview</p>
+            <h2 class="section__title">
+              A calmer command center for your portfolio
+            </h2>
+          </div>
+          <p class="screenshots__intro-note">
+            Overview dashboards, wallet analysis, exports, charts, and settings
+            all live inside one focused desktop workspace.
+          </p>
+        </div>
       </div>
-      <div class="screenshots__dots" id="screenshotDots"></div>
+      <div class="screenshots__frame">
+        <div class="screenshots__track" id="screenshotTrack">
+          <img
+            src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc1.jpg"
+            alt="Track3 Overview Dashboard"
+            loading="lazy"
+          />
+          <img
+            src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc2.jpg"
+            alt="Track3 Asset Analytics"
+            loading="lazy"
+          />
+          <img
+            src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc3.jpg"
+            alt="Track3 Wallet Analysis"
+            loading="lazy"
+          />
+          <img
+            src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc4.jpg"
+            alt="Track3 Coin Details"
+            loading="lazy"
+          />
+          <img
+            src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc5.jpg"
+            alt="Track3 Configuration"
+            loading="lazy"
+          />
+          <img
+            src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc6.jpg"
+            alt="Track3 Data Export"
+            loading="lazy"
+          />
+          <img
+            src="https://raw.githubusercontent.com/domechn/track3/master/images/demo/sc7.jpg"
+            alt="Track3 PnL Chart"
+            loading="lazy"
+          />
+        </div>
+        <div class="screenshots__dots" id="screenshotDots"></div>
+      </div>
     </section>
 
     <!-- Features -->
@@ -1232,50 +1643,57 @@
 
     <!-- CTA -->
     <section class="cta">
-      <h2>Start tracking your crypto<br />the private way</h2>
-      <p>Download Track3 for free and take control of your portfolio data.</p>
-      <div class="hero__actions">
-        <a
-          href="https://github.com/domechn/track3/releases/latest"
-          class="btn btn--primary"
-          target="_blank"
-          rel="noopener"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Download for Free
-        </a>
-        <a
-          href="https://github.com/domechn/track3"
-          class="btn btn--outline"
-          target="_blank"
-          rel="noopener"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polyline points="15 3 21 3 21 9" />
-            <polyline points="9 21 3 21 3 15" />
-            <line x1="21" y1="3" x2="14" y2="10" />
-            <line x1="3" y1="21" x2="10" y2="14" />
-          </svg>
-          Star on GitHub
-        </a>
+      <div class="container">
+        <div class="cta__panel animate-in">
+          <p class="section__label">Download</p>
+          <h2>Start tracking your crypto<br />the private way</h2>
+          <p>
+            Download Track3 for free and take control of your portfolio data.
+          </p>
+          <div class="hero__actions">
+            <a
+              href="https://github.com/domechn/track3/releases/latest"
+              class="btn btn--primary"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download for Free
+            </a>
+            <a
+              href="https://github.com/domechn/track3"
+              class="btn btn--outline"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+              Star on GitHub
+            </a>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1380,9 +1798,12 @@
 
       /* ── Smooth scroll for anchor links ── */
       document.querySelectorAll('a[href^="#"]').forEach((a) => {
+        const href = a.getAttribute("href");
+        if (!href || href === "#") return;
+
         a.addEventListener("click", (e) => {
           e.preventDefault();
-          const target = document.querySelector(a.getAttribute("href"));
+          const target = document.querySelector(href);
           if (target) target.scrollIntoView({ behavior: "smooth" });
         });
       });
