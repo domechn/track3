@@ -1,6 +1,19 @@
 import { sendHttpRequest } from "./http";
 import _ from "lodash";
 
+type YahooChartResponse = {
+  chart?: {
+    result?: {
+      meta?: {
+        symbol?: string;
+        regularMarketPrice?: number;
+        previousClose?: number;
+        chartPreviousClose?: number;
+      };
+    }[];
+  };
+};
+
 export async function fetchStockPrices(
   symbols: string[],
 ): Promise<{ [symbol: string]: number }> {
@@ -13,31 +26,24 @@ export async function fetchStockPrices(
     return {};
   }
 
-  const resp = await sendHttpRequest<{
-    quoteResponse?: {
-      result?: {
-        symbol: string;
-        regularMarketPrice?: number;
-        postMarketPrice?: number;
-        preMarketPrice?: number;
-      }[];
-    };
-  }>(
-    "GET",
-    `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(normalizedSymbols.join(","))}`,
-    10000,
+  const entries = await Promise.all(
+    normalizedSymbols.map(async (symbol) => {
+      const resp = await sendHttpRequest<YahooChartResponse>(
+        "GET",
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+        10000,
+      );
+      const meta = resp.chart?.result?.[0]?.meta;
+      const price =
+        meta?.regularMarketPrice ??
+        meta?.previousClose ??
+        meta?.chartPreviousClose;
+      if (!meta?.symbol || price === undefined || !Number.isFinite(price)) {
+        return;
+      }
+      return [meta.symbol.toUpperCase(), price] as const;
+    }),
   );
 
-  return _(resp.quoteResponse?.result ?? [])
-    .filter(
-      (q) =>
-        q.regularMarketPrice !== undefined ||
-        q.postMarketPrice !== undefined ||
-        q.preMarketPrice !== undefined,
-    )
-    .mapKeys((q) => q.symbol.toUpperCase())
-    .mapValues(
-      (q) => q.regularMarketPrice ?? q.postMarketPrice ?? q.preMarketPrice ?? 0,
-    )
-    .value();
+  return _(entries).compact().fromPairs().value();
 }
