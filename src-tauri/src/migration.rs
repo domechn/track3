@@ -618,17 +618,10 @@ impl Migration for V6TV7 {
         }
     }
 
-    fn need_to_run(&self, _previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
-        let path = Path::new(&self.app_dir);
-        let sqlite_path = get_sqlite_file_path(path);
-        let rt = Runtime::new().unwrap();
-        return Ok(rt.block_on(async move {
-            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
-            let assets_has_asset_type = column_exists(&mut conn, ASSETS_V2_TABLE_NAME, "asset_type").await;
-            let transactions_has_asset_type = column_exists(&mut conn, TRANSACTION_TABLE_NAME, "asset_type").await;
-            conn.close().await.unwrap();
-            !assets_has_asset_type || !transactions_has_asset_type
-        }));
+    fn need_to_run(&self, previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let res = compare_to(previous_version, "0.7.0", Cmp::Lt).unwrap();
+        println!("check if from v0.6 to v0.7 in rust, {:?}", res);
+        return Ok(res);
     }
 
     fn migrate(&self) {
