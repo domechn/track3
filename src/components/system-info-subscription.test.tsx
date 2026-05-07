@@ -18,11 +18,13 @@ const mocks = vi.hoisted(() => ({
   openUrl: vi.fn(),
   saveLicense: vi.fn(),
   toast: vi.fn(),
+  trackEventWithClientID: vi.fn(),
   validateLicense: vi.fn(),
 }));
 
 vi.mock("@/utils/app", () => ({
   getVersion: mocks.getVersion,
+  trackEventWithClientID: mocks.trackEventWithClientID,
 }));
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
@@ -138,30 +140,27 @@ describe("System Info subscription management", () => {
     ).toHaveClass("mt-auto");
   });
 
-  it("starts yearly checkout and activates the returned license", async () => {
-    const onProStatusChange = vi.fn();
-
-    render(<SystemInfo onProStatusChange={onProStatusChange} />);
+  it("tracks subscribe clicks and shows that subscriptions are not supported yet", async () => {
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
 
     fireEvent.click(
       await screen.findByRole("button", { name: /subscribe yearly/i }),
     );
 
     await waitFor(() => {
-      expect(mocks.createCheckoutSession).toHaveBeenCalledWith("yearly");
-      expect(mocks.openUrl).toHaveBeenCalledWith(
-        "https://checkout.stripe.test/session",
+      expect(mocks.trackEventWithClientID).toHaveBeenCalledWith(
+        "subscription_subscribe_clicked",
+        { planType: "yearly" },
       );
-      expect(mocks.getCheckoutStatus).toHaveBeenCalledWith("cs_test_123");
-      expect(mocks.validateLicense).toHaveBeenCalledWith("license-from-stripe");
-      expect(mocks.activeLicense).toHaveBeenCalledWith("license-from-stripe");
-      expect(mocks.saveLicense).toHaveBeenCalledWith("license-from-stripe");
-      expect(mocks.clearLicenseCache).toHaveBeenCalledTimes(1);
-      expect(onProStatusChange).toHaveBeenCalledWith(true);
+      expect(mocks.toast).toHaveBeenCalledWith({
+        description:
+          "Subscription is not supported yet. Please wait for future updates.",
+      });
     });
-    expect(mocks.toast).toHaveBeenCalledWith({
-      description: "Pro subscription activated!",
-    });
+    expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
+    expect(mocks.openUrl).not.toHaveBeenCalledWith(
+      "https://checkout.stripe.test/session",
+    );
   });
 
   it("clears the license cache after inactivating the device", async () => {
@@ -211,6 +210,9 @@ describe("System Info subscription management", () => {
     );
 
     await waitFor(() => {
+      expect(mocks.trackEventWithClientID).toHaveBeenCalledWith(
+        "subscription_open_clicked",
+      );
       expect(mocks.getCustomerPortalUrl).toHaveBeenCalled();
       expect(mocks.openUrl).toHaveBeenCalledWith(
         "https://billing.stripe.test/portal",

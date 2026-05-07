@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
-import { getVersion } from "@/utils/app";
+import { getVersion, trackEventWithClientID } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 type SubscriptionInfo = {
@@ -56,7 +56,6 @@ const App = ({
   // subscription states
   const [subscriptionInfo, setSubscriptionInfo] =
     useState<SubscriptionInfo | null>(null);
-  const [subLoading, setSubLoading] = useState(false);
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] =
@@ -182,6 +181,7 @@ const App = ({
   }
 
   async function onSubscribe(planType: "monthly" | "yearly") {
+    /*
     setSubLoading(true);
     try {
       const { sessionId, url } =
@@ -200,8 +200,18 @@ const App = ({
     } finally {
       setSubLoading(false);
     }
+    */
+
+    await trackEventWithClientID("subscription_subscribe_clicked", {
+      planType,
+    });
+    toast({
+      description:
+        "Subscription is not supported yet. Please wait for future updates.",
+    });
   }
 
+  /*
   async function pollForLicense(
     sessionId: string,
     maxAttempts = 100,
@@ -221,10 +231,12 @@ const App = ({
       "Payment verification timed out. Your license may still be processing — check back in a moment.",
     );
   }
+  */
 
   async function onManageSubscription() {
     setPortalLoading(true);
     try {
+      await trackEventWithClientID("subscription_open_clicked");
       const { url } = await LicenseCenter.getInstance().getCustomerPortalUrl();
       await openUrl(url);
     } catch (err) {
@@ -530,11 +542,8 @@ const App = ({
                   <Button
                     className="w-full"
                     onClick={() => onSubscribe("monthly")}
-                    disabled={subLoading || !monthlyPlan}
+                    disabled={!monthlyPlan}
                   >
-                    {subLoading && (
-                      <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                    )}
                     Subscribe Monthly
                   </Button>
                 </div>
@@ -561,11 +570,8 @@ const App = ({
                   <Button
                     className="w-full"
                     onClick={() => onSubscribe("yearly")}
-                    disabled={subLoading || !yearlyPlan}
+                    disabled={!yearlyPlan}
                   >
-                    {subLoading && (
-                      <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                    )}
                     Subscribe Yearly
                   </Button>
                 </div>
