@@ -44,7 +44,7 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
     let asset_actions =
         fs::read_to_string(resource_dir.join("migrations/init/asset_prices_up.sql")).unwrap();
     let transactions =
-        fs::read_to_string(resource_dir.join("migrations/v04t05/transactions_up.sql")).unwrap();
+        fs::read_to_string(resource_dir.join("migrations/init/transactions_up.sql")).unwrap();
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
