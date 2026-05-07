@@ -5,12 +5,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Comparison from "@/components/comparison";
 
 vi.mock("@/components/motion", () => ({
-  StaggerContainer: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div className={className}>{children}</div>
-  ),
-  FadeUp: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div className={className}>{children}</div>
-  ),
+  StaggerContainer: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
+  FadeUp: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
 }));
 
 vi.mock("@tauri-apps/api/path", () => ({
@@ -18,9 +26,11 @@ vi.mock("@tauri-apps/api/path", () => ({
 }));
 
 vi.mock("@/utils/app", () => ({
-  getImageApiPath: vi.fn().mockImplementation((_dir: string, symbol: string) =>
-    Promise.resolve(`/logos/${symbol}.png`)
-  ),
+  getImageApiPath: vi
+    .fn()
+    .mockImplementation((_dir: string, symbol: string) =>
+      Promise.resolve(`/logos/${symbol}.png`),
+    ),
 }));
 
 vi.mock("@/middlelayers/data", () => ({
@@ -32,10 +42,7 @@ vi.mock("@/middlelayers/charts", () => ({
   queryCoinDataByUUID: vi.fn(),
 }));
 
-import {
-  queryAllDataDates,
-  queryCoinDataByUUID,
-} from "@/middlelayers/charts";
+import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
@@ -53,14 +60,22 @@ describe("Comparison page", () => {
     ] as never);
     vi.mocked(queryCoinDataByUUID).mockReturnValue(pending);
 
-    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+    render(
+      <Comparison currency={usdCurrency} quoteColor="green-up-red-down" />,
+    );
 
-    expect(screen.getByRole("heading", { level: 1, name: /comparison/i })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(/loading comparison data/i);
+    expect(
+      screen.getByRole("heading", { level: 1, name: /comparison/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /loading comparison data/i,
+    );
 
     vi.advanceTimersByTime(9000);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/loading comparison data/i);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /loading comparison data/i,
+    );
     vi.useRealTimers();
   });
 
@@ -72,12 +87,30 @@ describe("Comparison page", () => {
     ] as never);
     vi.mocked(queryCoinDataByUUID).mockImplementation(async (uuid: string) => {
       if (uuid === "1") {
-        return [{ symbol: "BTC", amount: 1, value: 1200, price: 1200 }];
+        return [
+          {
+            symbol: "BTC",
+            assetType: "crypto",
+            amount: 1,
+            value: 1200,
+            price: 1200,
+          },
+        ];
       }
-      return [{ symbol: "BTC", amount: 0.8, value: 900, price: 1125 }];
+      return [
+        {
+          symbol: "BTC",
+          assetType: "crypto",
+          amount: 0.8,
+          value: 900,
+          price: 1125,
+        },
+      ];
     });
 
-    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+    render(
+      <Comparison currency={usdCurrency} quoteColor="green-up-red-down" />,
+    );
 
     await waitFor(() => {
       expect(screen.queryByRole("status")).not.toBeInTheDocument();

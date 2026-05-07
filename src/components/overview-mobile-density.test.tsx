@@ -27,9 +27,11 @@ vi.mock("@tauri-apps/api/path", () => ({
 }));
 
 vi.mock("@/utils/app", () => ({
-  getImageApiPath: vi.fn().mockImplementation((_dir: string, symbol: string) =>
-    Promise.resolve(`/logos/${symbol}.png`)
-  ),
+  getImageApiPath: vi
+    .fn()
+    .mockImplementation((_dir: string, symbol: string) =>
+      Promise.resolve(`/logos/${symbol}.png`),
+    ),
 }));
 
 vi.mock("@/middlelayers/data", () => ({
@@ -52,13 +54,18 @@ function renderWithProviders(node: React.ReactNode) {
   return render(
     <MemoryRouter>
       <ChartResizeContext.Provider
-        value={{ needResize: 0, setNeedResize: vi.fn() as React.Dispatch<React.SetStateAction<number>> }}
+        value={{
+          needResize: 0,
+          setNeedResize: vi.fn() as React.Dispatch<
+            React.SetStateAction<number>
+          >,
+        }}
       >
         <OverviewLoadingContext.Provider value={{ reportLoaded: vi.fn() }}>
           {node}
         </OverviewLoadingContext.Provider>
       </ChartResizeContext.Provider>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -70,8 +77,22 @@ beforeEach(() => {
     thirtyPNL: { value: -40, timestamp: 1710566400 },
   });
   vi.mocked(queryLatestAssetsPercentage).mockResolvedValue([
-    { coin: "BTC", amount: 0.5, percentage: 55, value: 825, chartColor: "#f59e0b" },
-    { coin: "ETH", amount: 2, percentage: 45, value: 675, chartColor: "#3b82f6" },
+    {
+      coin: "BTC",
+      assetType: "crypto",
+      amount: 0.5,
+      percentage: 55,
+      value: 825,
+      chartColor: "#f59e0b",
+    },
+    {
+      coin: "ETH",
+      assetType: "crypto",
+      amount: 2,
+      percentage: 45,
+      value: 675,
+      chartColor: "#3b82f6",
+    },
   ]);
 });
 
@@ -80,12 +101,16 @@ describe("Overview mobile density", () => {
     renderWithProviders(
       <PNL
         currency={usdCurrency}
-        dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+        dateRange={{
+          start: new Date("2024-04-15"),
+          end: new Date("2024-04-16"),
+        }}
         quoteColor="green-up-red-down"
-      />
+      />,
     );
 
-    const summaryGrid = (await screen.findByText("Last PNL")).parentElement?.parentElement;
+    const summaryGrid = (await screen.findByText("Last PNL")).parentElement
+      ?.parentElement;
 
     expect(summaryGrid).not.toBeNull();
     expect(summaryGrid).toHaveClass("grid-cols-1");
@@ -96,8 +121,11 @@ describe("Overview mobile density", () => {
     renderWithProviders(
       <LatestAssetsPercentage
         currency={usdCurrency}
-        dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
-      />
+        dateRange={{
+          start: new Date("2024-04-15"),
+          end: new Date("2024-04-16"),
+        }}
+      />,
     );
 
     const previousButton = await screen.findByRole("button", {

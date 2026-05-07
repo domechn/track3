@@ -34,6 +34,7 @@ import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { chartColors, glassTooltip } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { getAssetType } from "@/middlelayers/datafetch/utils/coins";
 
 const chartName = "Percentage of Assets";
 
@@ -60,7 +61,7 @@ const App = ({
 
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
 
   useEffect(() => {
@@ -88,11 +89,12 @@ const App = ({
     // download coin logos
     downloadCoinLogos(
       _(latestAssetsPercentageData)
+        .filter((d) => getAssetType(d) === "crypto")
         .map((d) => ({
           symbol: d.coin,
           price: d.value / (d.amount || 1),
         }))
-        .value()
+        .value(),
     );
 
     // set logo map
@@ -107,7 +109,7 @@ const App = ({
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
     const mp = Math.floor(
-      latestAssetsPercentageData.length / pageSize - 0.000000000001
+      latestAssetsPercentageData.length / pageSize - 0.000000000001,
     );
     return mp >= 0 ? mp : 0;
   }, [latestAssetsPercentageData]);
@@ -116,9 +118,9 @@ const App = ({
     () =>
       latestAssetsPercentageData.slice(
         dataPage * pageSize,
-        (dataPage + 1) * pageSize
+        (dataPage + 1) * pageSize,
       ),
-    [latestAssetsPercentageData, dataPage]
+    [latestAssetsPercentageData, dataPage],
   );
 
   async function getLogoMap(d: LatestAssetsPercentageData) {
@@ -198,7 +200,7 @@ const App = ({
           data: d.map((coin) => currencyWrapper(currency)(coin.value)),
           borderColor: "rgba(255,255,255,0.15)",
           backgroundColor: d.map(
-            (_coin, i) => chartColors[i % chartColors.length].main
+            (_coin, i) => chartColors[i % chartColors.length].main,
           ),
           borderWidth: 2,
           hoverOffset: 12,
@@ -268,15 +270,17 @@ const App = ({
                       title={"" + d.amount}
                     >
                       {d.amount >= 1
-                        ? prettyNumberKeepNDigitsAfterDecimalPoint(
-                            d.amount,
-                            4
-                          )
+                        ? prettyNumberKeepNDigitsAfterDecimalPoint(d.amount, 4)
                         : prettyPriceNumberToLocaleString(d.amount)}
                     </div>
                     <div className="text-muted-foreground text-xs truncate">
                       {d.coin}
                     </div>
+                    {getAssetType(d) !== "crypto" ? (
+                      <span className="ml-2 rounded-sm border border-border px-1.5 py-0.5 text-[10px] uppercase leading-none text-muted-foreground">
+                        {getAssetType(d)}
+                      </span>
+                    ) : null}
                     <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
                   </Link>
                 </TableCell>
@@ -284,7 +288,7 @@ const App = ({
                   <div className="text-muted-foreground text-xs">
                     {currency.symbol +
                       prettyNumberToLocaleString(
-                        currencyWrapper(currency)(d.value)
+                        currencyWrapper(currency)(d.value),
                       )}
                   </div>
                 </TableCell>

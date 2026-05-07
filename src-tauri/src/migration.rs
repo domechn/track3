@@ -43,6 +43,8 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         fs::read_to_string(resource_dir.join("migrations/init/currency_rates_up.sql")).unwrap();
     let asset_actions =
         fs::read_to_string(resource_dir.join("migrations/init/asset_prices_up.sql")).unwrap();
+    let transactions =
+        fs::read_to_string(resource_dir.join("migrations/v04t05/transactions_up.sql")).unwrap();
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
@@ -52,6 +54,7 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         conn.execute(assets_v2.as_str()).await.unwrap();
         conn.execute(currency_rates_sync.as_str()).await.unwrap();
         conn.execute(asset_actions.as_str()).await.unwrap();
+        conn.execute(transactions.as_str()).await.unwrap();
 
         // record current app version
         sqlx::query(
@@ -600,6 +603,74 @@ impl Migration for V4TV5 {
             println!("migrate from v0.4 to v0.5 in tokio spawn done");
         });
     }
+}
+
+pub struct V6TV7 {
+    app_dir: String,
+    resource_dir: String,
+}
+
+impl Migration for V6TV7 {
+    fn new(app_dir: String, resource_dir: String) -> Self {
+        V6TV7 {
+            app_dir,
+            resource_dir,
+        }
+    }
+
+    fn need_to_run(&self, _previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let path = Path::new(&self.app_dir);
+        let sqlite_path = get_sqlite_file_path(path);
+        let rt = Runtime::new().unwrap();
+        return Ok(rt.block_on(async move {
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            let assets_has_asset_type = column_exists(&mut conn, ASSETS_V2_TABLE_NAME, "asset_type").await;
+            let transactions_has_asset_type = column_exists(&mut conn, TRANSACTION_TABLE_NAME, "asset_type").await;
+            conn.close().await.unwrap();
+            !assets_has_asset_type || !transactions_has_asset_type
+        }));
+    }
+
+    fn migrate(&self) {
+        let app_dir = Path::new(&self.app_dir);
+        let resource_dir = Path::new(&self.resource_dir);
+        println!("migrate stock asset type support");
+        let sqlite_path = get_sqlite_file_path(app_dir);
+        let transactions_up =
+            fs::read_to_string(resource_dir.join("migrations/v04t05/transactions_up.sql")).unwrap();
+        let asset_type_up =
+            fs::read_to_string(resource_dir.join("migrations/v06t07/asset_type_up.sql")).unwrap();
+
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move {
+            println!("migrate stock asset type support in tokio spawn");
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            if !column_exists(&mut conn, ASSETS_V2_TABLE_NAME, "asset_type").await {
+                conn.execute("ALTER TABLE assets_v2 ADD COLUMN asset_type TEXT NOT NULL DEFAULT 'crypto'")
+                    .await
+                    .unwrap();
+            }
+            conn.execute(transactions_up.as_str()).await.unwrap();
+            if !column_exists(&mut conn, TRANSACTION_TABLE_NAME, "asset_type").await {
+                conn.execute("ALTER TABLE transactions ADD COLUMN asset_type TEXT NOT NULL DEFAULT 'crypto'")
+                    .await
+                    .unwrap();
+            }
+            conn.execute(asset_type_up.as_str()).await.unwrap();
+            conn.close().await.unwrap();
+            println!("migrate stock asset type support in tokio spawn done");
+        });
+    }
+}
+
+async fn column_exists(conn: &mut SqliteConnection, table_name: &str, column_name: &str) -> bool {
+    let sql = format!("SELECT COUNT(*) FROM pragma_table_info('{}') WHERE name = ?", table_name);
+    let count: i64 = sqlx::query_scalar(sql.as_str())
+    .bind(column_name)
+    .fetch_one(conn)
+    .await
+    .unwrap_or(0);
+    count > 0
 }
 
 impl V4TV5 {

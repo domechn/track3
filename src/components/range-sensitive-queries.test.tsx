@@ -24,9 +24,11 @@ vi.mock("@tauri-apps/api/path", () => ({
 }));
 
 vi.mock("@/utils/app", () => ({
-  getImageApiPath: vi.fn().mockImplementation((_dir: string, symbol: string) =>
-    Promise.resolve(`/logos/${symbol}.png`)
-  ),
+  getImageApiPath: vi
+    .fn()
+    .mockImplementation((_dir: string, symbol: string) =>
+      Promise.resolve(`/logos/${symbol}.png`),
+    ),
 }));
 
 vi.mock("@/middlelayers/data", () => ({
@@ -115,14 +117,16 @@ function renderWithOverviewProviders(node: React.ReactNode) {
       <ChartResizeContext.Provider
         value={{
           needResize: 0,
-          setNeedResize: vi.fn() as React.Dispatch<React.SetStateAction<number>>,
+          setNeedResize: vi.fn() as React.Dispatch<
+            React.SetStateAction<number>
+          >,
         }}
       >
         <OverviewLoadingContext.Provider value={{ reportLoaded }}>
           {node}
         </OverviewLoadingContext.Provider>
       </ChartResizeContext.Provider>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -133,11 +137,13 @@ function renderCoinAnalysis(dateRange: { start: Date; end: Date }) {
         <Routes>
           <Route
             path="/coins/:symbol"
-            element={<CoinAnalysis currency={usdCurrency} dateRange={dateRange} />}
+            element={
+              <CoinAnalysis currency={usdCurrency} dateRange={dateRange} />
+            }
           />
         </Routes>
       </OverviewLoadingContext.Provider>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -153,15 +159,35 @@ beforeEach(() => {
     data: [
       { usdValue: 900, btcPrice: 50000 },
       {
-        usdValue: dateRange.end.getTime() === rangeA.end.getTime() ? 1100 : 2200,
+        usdValue:
+          dateRange.end.getTime() === rangeA.end.getTime() ? 1100 : 2200,
         btcPrice: 55000,
       },
     ],
   }));
-  vi.mocked(queryLatestAssetsPercentage).mockImplementation(async (dateRange) =>
-    dateRange?.end.getTime() === rangeA.end.getTime()
-      ? [{ coin: "BTC", amount: 1, value: 1100, percentage: 100, chartColor: "#f59e0b" }]
-      : [{ coin: "ETH", amount: 2, value: 2200, percentage: 100, chartColor: "#3b82f6" }]
+  vi.mocked(queryLatestAssetsPercentage).mockImplementation(
+    async (dateRange) =>
+      dateRange?.end.getTime() === rangeA.end.getTime()
+        ? [
+            {
+              coin: "BTC",
+              assetType: "crypto",
+              amount: 1,
+              value: 1100,
+              percentage: 100,
+              chartColor: "#f59e0b",
+            },
+          ]
+        : [
+            {
+              coin: "ETH",
+              assetType: "crypto",
+              amount: 2,
+              value: 2200,
+              percentage: 100,
+              chartColor: "#3b82f6",
+            },
+          ],
   );
   vi.mocked(queryMaxTotalValue).mockResolvedValue({
     uuid: "record-1",
@@ -187,6 +213,7 @@ beforeEach(() => {
   });
   vi.mocked(queryLastAssetsBySymbol).mockResolvedValue({
     symbol: "BTC",
+    assetType: "crypto",
     amount: 1,
     value: 1100,
     price: 1100,
@@ -201,7 +228,7 @@ describe("Range-sensitive component queries", () => {
         currency={usdCurrency}
         dateRange={rangeA}
         quoteColor="green-up-red-down"
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -214,7 +241,9 @@ describe("Range-sensitive component queries", () => {
         <ChartResizeContext.Provider
           value={{
             needResize: 0,
-            setNeedResize: vi.fn() as React.Dispatch<React.SetStateAction<number>>,
+            setNeedResize: vi.fn() as React.Dispatch<
+              React.SetStateAction<number>
+            >,
           }}
         >
           <OverviewLoadingContext.Provider value={{ reportLoaded }}>
@@ -225,7 +254,7 @@ describe("Range-sensitive component queries", () => {
             />
           </OverviewLoadingContext.Provider>
         </ChartResizeContext.Provider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -236,7 +265,7 @@ describe("Range-sensitive component queries", () => {
 
   it("passes the selected range to token holding queries", async () => {
     const view = renderWithOverviewProviders(
-      <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeA} />
+      <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeA} />,
     );
 
     await waitFor(() => {
@@ -248,14 +277,16 @@ describe("Range-sensitive component queries", () => {
         <ChartResizeContext.Provider
           value={{
             needResize: 0,
-            setNeedResize: vi.fn() as React.Dispatch<React.SetStateAction<number>>,
+            setNeedResize: vi.fn() as React.Dispatch<
+              React.SetStateAction<number>
+            >,
           }}
         >
           <OverviewLoadingContext.Provider value={{ reportLoaded }}>
             <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeB} />
           </OverviewLoadingContext.Provider>
         </ChartResizeContext.Provider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -269,7 +300,7 @@ describe("Range-sensitive component queries", () => {
         currency={usdCurrency}
         dateRange={rangeA}
         quoteColor="green-up-red-down"
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -282,7 +313,9 @@ describe("Range-sensitive component queries", () => {
         <ChartResizeContext.Provider
           value={{
             needResize: 0,
-            setNeedResize: vi.fn() as React.Dispatch<React.SetStateAction<number>>,
+            setNeedResize: vi.fn() as React.Dispatch<
+              React.SetStateAction<number>
+            >,
           }}
         >
           <OverviewLoadingContext.Provider value={{ reportLoaded }}>
@@ -293,7 +326,7 @@ describe("Range-sensitive component queries", () => {
             />
           </OverviewLoadingContext.Provider>
         </ChartResizeContext.Provider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -306,7 +339,10 @@ describe("Range-sensitive component queries", () => {
     const view = renderCoinAnalysis(rangeA);
 
     await waitFor(() => {
-      expect(queryTransactionsBySymbolAndDateRange).toHaveBeenCalledWith("BTC", rangeA);
+      expect(queryTransactionsBySymbolAndDateRange).toHaveBeenCalledWith(
+        "BTC",
+        rangeA,
+      );
       expect(calculateTotalProfit).toHaveBeenCalledWith(rangeA, "BTC");
       expect(queryLastAssetsBySymbol).toHaveBeenCalledWith("BTC", rangeA);
       expect(queryAssetMaxAmountBySymbol).toHaveBeenCalledWith("BTC", rangeA);
@@ -318,21 +354,26 @@ describe("Range-sensitive component queries", () => {
           <Routes>
             <Route
               path="/coins/:symbol"
-              element={<CoinAnalysis currency={usdCurrency} dateRange={rangeB} />}
+              element={
+                <CoinAnalysis currency={usdCurrency} dateRange={rangeB} />
+              }
             />
           </Routes>
         </OverviewLoadingContext.Provider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
       expect(queryTransactionsBySymbolAndDateRange).toHaveBeenLastCalledWith(
         "BTC",
-        rangeB
+        rangeB,
       );
       expect(calculateTotalProfit).toHaveBeenLastCalledWith(rangeB, "BTC");
       expect(queryLastAssetsBySymbol).toHaveBeenLastCalledWith("BTC", rangeB);
-      expect(queryAssetMaxAmountBySymbol).toHaveBeenLastCalledWith("BTC", rangeB);
+      expect(queryAssetMaxAmountBySymbol).toHaveBeenLastCalledWith(
+        "BTC",
+        rangeB,
+      );
     });
   });
 });

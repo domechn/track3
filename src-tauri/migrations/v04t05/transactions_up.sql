@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	uuid TEXT NOT NULL, -- batch data id
 	assetID INTEGER NOT NULL,
+	asset_type TEXT NOT NULL DEFAULT 'crypto',
 	wallet TEXT NOT NULL,
 	symbol TEXT NOT NULL,
 	amount REAL NOT NULL,

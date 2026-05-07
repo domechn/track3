@@ -9,7 +9,7 @@ use track3::{
     info::get_coin_info_provider,
     migration::{
         init_sqlite_file, init_sqlite_tables, is_first_run, load_previous_version,
-        prepare_required_data, Migration, V1TV2, V2TV3, V3TV4, V4TV5,
+        prepare_required_data, Migration, V1TV2, V2TV3, V3TV4, V4TV5, V6TV7,
     },
     types::CoinWithPrice,
 };
@@ -161,6 +161,7 @@ fn main() {
             let v2tv3 = V2TV3::new(app_dir_str.clone(), resource_dir_str.clone());
             let v3tv4 = V3TV4::new(app_dir_str.clone(), resource_dir_str.clone());
             let v4tv5 = V4TV5::new(app_dir_str.clone(), resource_dir_str.clone());
+            let v6tv7 = V6TV7::new(app_dir_str.clone(), resource_dir_str.clone());
 
             let pv = load_previous_version(app_dir.as_path()).unwrap();
             if v1tv2.need_to_run(&pv).unwrap() {
@@ -177,6 +178,10 @@ fn main() {
 
             if v4tv5.need_to_run(&pv).unwrap() {
                 v4tv5.migrate();
+            }
+
+            if v6tv7.need_to_run(&pv).unwrap() {
+                v6tv7.migrate();
             }
 
             prepare_required_data(app_version.clone(), app_dir.as_path());
