@@ -24,7 +24,7 @@ const getStatementEndpoint = `${flexServiceEndpoint}/GetStatement`;
 const defaultStatementPollDelayMs = 1000;
 const defaultMaxStatementPollAttempts = 6;
 const defaultMaxSendRequestRetries = 5;
-const defaultInitialStatementDelayMs = 5000;
+const defaultInitialStatementDelayMs = 20000;
 
 export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
   const parser = new DOMParser();
@@ -271,7 +271,7 @@ export class IbkrBroker implements StockBroker {
     let pollUrl = getIbkrFlexStatementUrl(sendResponseXml, this.token);
 
     // Wait for IBKR to finish generating the report before the first poll,
-    // matching the ~5 s delay that IBKR's own examples recommend.
+    // matching the delay that IBKR's own examples recommend.
     await wait(this.initialStatementDelayMs);
 
     for (let attempt = 1; attempt <= this.maxStatementPollAttempts; attempt++) {
