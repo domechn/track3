@@ -636,8 +636,16 @@ impl Migration for V6TV7 {
         let resource_dir = Path::new(&self.resource_dir);
         println!("migrate stock asset type support");
         let sqlite_path = get_sqlite_file_path(app_dir);
+        let assets_v2_asset_type_up = fs::read_to_string(
+            resource_dir.join("migrations/v06t07/assets_v2_asset_type_up.sql"),
+        )
+        .unwrap();
         let transactions_up =
             fs::read_to_string(resource_dir.join("migrations/v04t05/transactions_up.sql")).unwrap();
+        let transactions_asset_type_up = fs::read_to_string(
+            resource_dir.join("migrations/v06t07/transactions_asset_type_up.sql"),
+        )
+        .unwrap();
         let asset_type_up =
             fs::read_to_string(resource_dir.join("migrations/v06t07/asset_type_up.sql")).unwrap();
 
@@ -646,15 +654,11 @@ impl Migration for V6TV7 {
             println!("migrate stock asset type support in tokio spawn");
             let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
             if !column_exists(&mut conn, ASSETS_V2_TABLE_NAME, "asset_type").await {
-                conn.execute("ALTER TABLE assets_v2 ADD COLUMN asset_type TEXT NOT NULL DEFAULT 'crypto'")
-                    .await
-                    .unwrap();
+                conn.execute(assets_v2_asset_type_up.as_str()).await.unwrap();
             }
             conn.execute(transactions_up.as_str()).await.unwrap();
             if !column_exists(&mut conn, TRANSACTION_TABLE_NAME, "asset_type").await {
-                conn.execute("ALTER TABLE transactions ADD COLUMN asset_type TEXT NOT NULL DEFAULT 'crypto'")
-                    .await
-                    .unwrap();
+                conn.execute(transactions_asset_type_up.as_str()).await.unwrap();
             }
             conn.execute(asset_type_up.as_str()).await.unwrap();
             conn.close().await.unwrap();
