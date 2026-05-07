@@ -243,11 +243,12 @@
       }
       .hero h1 {
         font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: clamp(2.8rem, 6vw, 5rem);
+        font-size: clamp(1rem, 4.6vw, 4rem);
         line-height: 0.98;
         letter-spacing: -0.05em;
         margin-bottom: 18px;
-        max-width: 9ch;
+        max-width: none;
+        white-space: nowrap;
       }
       .hero h1 span {
         color: var(--accent-hover);
@@ -259,6 +260,7 @@
       }
       .hero__meta {
         display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 14px;
         width: 100%;
       }
@@ -456,6 +458,9 @@
         .release-meta {
           grid-template-columns: 1fr;
         }
+        .hero__meta {
+          grid-template-columns: 1fr;
+        }
       }
       @media (max-width: 720px) {
         .container {
@@ -546,9 +551,9 @@
               </div>
 
               <div class="release-notes" id="downloadHint">
-                When you click a button, Track3 reads the latest version metadata
-                hosted on this site, matches the right installer, and redirects
-                you to the GitHub download.
+                When you click a button, Track3 reads the latest version
+                metadata hosted on this site, matches the right installer, and
+                redirects you to the GitHub download.
               </div>
             </div>
           </div>
