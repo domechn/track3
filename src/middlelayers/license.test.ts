@@ -89,6 +89,54 @@ describe("LicenseCenter subscription APIs", () => {
     expect(sendHttpRequest).toHaveBeenCalledTimes(1);
   });
 
+  it("reuses the cached subscription plans", async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValue({
+      plans: [
+        {
+          planType: "monthly",
+          currency: "usd",
+          unitAmountCents: 1299,
+          interval: "month",
+        },
+        {
+          planType: "yearly",
+          currency: "usd",
+          unitAmountCents: 9999,
+          interval: "year",
+        },
+      ],
+    });
+
+    const first = await LicenseCenter.getInstance().getSubscriptionPlans();
+    const second = await LicenseCenter.getInstance().getSubscriptionPlans();
+
+    expect(first).toEqual({
+      plans: [
+        {
+          planType: "monthly",
+          currency: "usd",
+          unitAmountCents: 1299,
+          interval: "month",
+        },
+        {
+          planType: "yearly",
+          currency: "usd",
+          unitAmountCents: 9999,
+          interval: "year",
+        },
+      ],
+    });
+    expect(second).toEqual(first);
+    expect(sendHttpRequest).toHaveBeenCalledTimes(1);
+    expect(sendHttpRequest).toHaveBeenCalledWith(
+      "POST",
+      `${PRO_API_ENDPOINT}/api/license`,
+      10000,
+      undefined,
+      { action: "subscription-plans" },
+    );
+  });
+
   it("creates a Stripe checkout session with the selected plan", async () => {
     vi.mocked(sendHttpRequest).mockResolvedValueOnce({
       sessionId: "cs_test_123",

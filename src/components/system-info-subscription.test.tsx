@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   createCheckoutSession: vi.fn(),
   getCheckoutStatus: vi.fn(),
   getCustomerPortalUrl: vi.fn(),
+  getSubscriptionPlans: vi.fn(),
   getLicenseIfIsPro: vi.fn(),
   getSubscriptionInfo: vi.fn(),
   getVersion: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock("@/middlelayers/license", () => ({
       createCheckoutSession: mocks.createCheckoutSession,
       getCheckoutStatus: mocks.getCheckoutStatus,
       getCustomerPortalUrl: mocks.getCustomerPortalUrl,
+      getSubscriptionPlans: mocks.getSubscriptionPlans,
       getSubscriptionInfo: mocks.getSubscriptionInfo,
       inactiveLicense: mocks.inactiveLicense,
       validateLicense: mocks.validateLicense,
@@ -75,12 +77,67 @@ beforeEach(() => {
     cancelAtPeriodEnd: false,
     isLegacy: false,
   });
+  mocks.getSubscriptionPlans.mockResolvedValue({
+    plans: [
+      {
+        planType: "monthly",
+        currency: "usd",
+        unitAmountCents: 1299,
+        interval: "month",
+      },
+      {
+        planType: "yearly",
+        currency: "usd",
+        unitAmountCents: 9999,
+        interval: "year",
+      },
+    ],
+  });
   mocks.getCustomerPortalUrl.mockResolvedValue({
     url: "https://billing.stripe.test/portal",
   });
 });
 
 describe("System Info subscription management", () => {
+  it("loads plan prices from the subscription plan API", async () => {
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+
+    expect(await screen.findByText("$12.99")).toBeInTheDocument();
+    expect(screen.getByText("$99.99")).toBeInTheDocument();
+    expect(mocks.getSubscriptionPlans).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the Pro benefits page from the upgrade card", async () => {
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /view pro benefits/i }),
+    );
+
+    expect(mocks.openUrl).toHaveBeenCalledWith("https://track3.domc.me/");
+  });
+
+  it("keeps both subscribe buttons aligned at the bottom of plan cards", async () => {
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+
+    expect(await screen.findByTestId("monthly-plan-card")).toHaveClass(
+      "flex",
+      "h-full",
+      "flex-col",
+    );
+    expect(screen.getByTestId("yearly-plan-card")).toHaveClass(
+      "flex",
+      "h-full",
+      "flex-col",
+    );
+    expect(
+      screen.getByRole("button", { name: /subscribe monthly/i }).parentElement,
+    ).toHaveClass("mt-auto");
+    expect(
+      screen.getByRole("button", { name: /subscribe yearly/i }).parentElement,
+    ).toHaveClass("mt-auto");
+  });
+
   it("starts yearly checkout and activates the returned license", async () => {
     const onProStatusChange = vi.fn();
 

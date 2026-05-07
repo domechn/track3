@@ -10,7 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReloadIcon } from "@radix-ui/react-icons";
-import { clearLicenseCache, LicenseCenter } from "@/middlelayers/license";
+import {
+  clearLicenseCache,
+  LicenseCenter,
+  type SubscriptionPlan,
+  type SubscriptionPlansResponse,
+} from "@/middlelayers/license";
 import { useToast } from "@/components/ui/use-toast";
 import {
   AlertDialog,
@@ -54,10 +59,13 @@ const App = ({
   const [subLoading, setSubLoading] = useState(false);
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [subscriptionPlans, setSubscriptionPlans] =
+    useState<SubscriptionPlansResponse | null>(null);
 
   useEffect(() => {
     loadVersion();
     loadLicense();
+    loadSubscriptionPlans();
   }, []);
 
   useEffect(() => {
@@ -88,6 +96,15 @@ const App = ({
       setSubscriptionInfo(null);
     } finally {
       setSubInfoLoading(false);
+    }
+  }
+
+  async function loadSubscriptionPlans() {
+    try {
+      const plans = await LicenseCenter.getInstance().getSubscriptionPlans();
+      setSubscriptionPlans(plans);
+    } catch {
+      setSubscriptionPlans(null);
     }
   }
 
@@ -221,6 +238,10 @@ const App = ({
     }
   }
 
+  async function onViewBenefits() {
+    await openUrl("https://track3.domc.me/");
+  }
+
   function formatPeriodEnd(dateStr: string | null): string {
     if (!dateStr) return "N/A";
     return new Date(dateStr).toLocaleDateString(undefined, {
@@ -245,8 +266,44 @@ const App = ({
     }
   }
 
+  function getPlan(planType: "monthly" | "yearly"): SubscriptionPlan | null {
+    return (
+      subscriptionPlans?.plans.find((plan) => plan.planType === planType) ??
+      null
+    );
+  }
+
+  function formatPlanPrice(plan: SubscriptionPlan | null): string {
+    if (!plan) return "Loading...";
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: plan.currency.toUpperCase(),
+      minimumFractionDigits: plan.unitAmountCents % 100 === 0 ? 0 : 2,
+      maximumFractionDigits: 2,
+    }).format(plan.unitAmountCents / 100);
+  }
+
+  function getYearlySavingsLabel(
+    monthlyPlan: SubscriptionPlan | null,
+    yearlyPlan: SubscriptionPlan | null,
+  ): string | null {
+    if (!monthlyPlan || !yearlyPlan) return null;
+
+    const annualMonthlyCost = monthlyPlan.unitAmountCents * 12;
+    if (annualMonthlyCost <= yearlyPlan.unitAmountCents) return null;
+
+    const discount = Math.round(
+      ((annualMonthlyCost - yearlyPlan.unitAmountCents) / annualMonthlyCost) *
+        100,
+    );
+    return `Save ${discount}%`;
+  }
+
   const isSubscribed =
     activeLicense && subscriptionInfo && !subscriptionInfo.isLegacy;
+  const monthlyPlan = getPlan("monthly");
+  const yearlyPlan = getPlan("yearly");
+  const yearlySavingsLabel = getYearlySavingsLabel(monthlyPlan, yearlyPlan);
 
   return (
     <div className="space-y-6">
@@ -454,49 +511,64 @@ const App = ({
               Subscribe to unlock real-time portfolio tracking, expanded chain
               support, and premium data providers.
             </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border p-4 space-y-3">
+            <Button variant="outline" onClick={onViewBenefits}>
+              View Pro Benefits
+            </Button>
+            <div className="grid items-stretch gap-4 sm:grid-cols-2">
+              <div
+                className="flex h-full flex-col gap-3 rounded-lg border p-4"
+                data-testid="monthly-plan-card"
+              >
                 <div className="text-sm font-medium">Monthly</div>
                 <div className="text-2xl font-bold">
-                  $9.99
+                  {formatPlanPrice(monthlyPlan)}
                   <span className="text-sm font-normal text-muted-foreground">
                     /mo
                   </span>
                 </div>
-                <Button
-                  className="w-full"
-                  onClick={() => onSubscribe("monthly")}
-                  disabled={subLoading}
-                >
-                  {subLoading && (
-                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Subscribe Monthly
-                </Button>
-              </div>
-              <div className="rounded-lg border border-primary p-4 space-y-3 relative">
-                <div className="absolute -top-2 right-3">
-                  <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
-                    Save 33%
-                  </span>
+                <div className="mt-auto">
+                  <Button
+                    className="w-full"
+                    onClick={() => onSubscribe("monthly")}
+                    disabled={subLoading || !monthlyPlan}
+                  >
+                    {subLoading && (
+                      <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Subscribe Monthly
+                  </Button>
                 </div>
+              </div>
+              <div
+                className="relative flex h-full flex-col gap-3 rounded-lg border border-primary p-4"
+                data-testid="yearly-plan-card"
+              >
+                {yearlySavingsLabel && (
+                  <div className="absolute -top-2 right-3">
+                    <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                      {yearlySavingsLabel}
+                    </span>
+                  </div>
+                )}
                 <div className="text-sm font-medium">Yearly</div>
                 <div className="text-2xl font-bold">
-                  $79.99
+                  {formatPlanPrice(yearlyPlan)}
                   <span className="text-sm font-normal text-muted-foreground">
                     /yr
                   </span>
                 </div>
-                <Button
-                  className="w-full"
-                  onClick={() => onSubscribe("yearly")}
-                  disabled={subLoading}
-                >
-                  {subLoading && (
-                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Subscribe Yearly
-                </Button>
+                <div className="mt-auto">
+                  <Button
+                    className="w-full"
+                    onClick={() => onSubscribe("yearly")}
+                    disabled={subLoading || !yearlyPlan}
+                  >
+                    {subLoading && (
+                      <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Subscribe Yearly
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
