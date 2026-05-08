@@ -14,6 +14,7 @@ import {
   RestoreHistoricalData,
   TDateRange,
 } from "@/middlelayers/types";
+import type { AssetType } from "@/middlelayers/datafetch/types";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 import _ from "lodash";
 
@@ -28,8 +29,8 @@ import {
 import { downloadCoinLogos } from "@/middlelayers/data";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import ImageStack from "./common/image-stack";
+import AssetLabel from "./common/asset-label";
 import { getImageApiPath } from "@/utils/app";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import { Button } from "./ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import {
@@ -57,6 +58,7 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
+import { resolveAssetLogoSrc } from "@/utils/assets";
 import { ScrollArea } from "./ui/scroll-area";
 import { ToastAction } from "./ui/toast";
 import { positiveNegativeColor } from "@/utils/color";
@@ -87,6 +89,7 @@ type RankData = {
   assetId: number;
   rank: number;
   symbol: string;
+  assetType?: AssetType;
   value: number;
   amount: number;
   price: number;
@@ -264,6 +267,7 @@ const App = ({
         rank: idx + 1,
         amount: asset.amount,
         symbol: asset.symbol,
+        assetType: asset.assetType,
         value: asset.value,
         price: asset.price,
       }))
@@ -326,6 +330,7 @@ const App = ({
               </ToastAction>
             ),
           });
+          setData((prev) => prev.filter((record) => record.id !== uuid));
           if (afterDataChanged) {
             afterDataChanged("delete", uuid, undefined);
           }
@@ -512,7 +517,10 @@ const App = ({
                     </TableRow>
                   ) : null}
                   {visibleRankData.map((item) => {
-                    const apiPath = logoMap[item.symbol] || UnknownLogo;
+                    const apiPath = resolveAssetLogoSrc(
+                      item,
+                      logoMap[item.symbol],
+                    );
                     return (
                       <TableRow
                         key={"historical-data-detail-row-" + item.assetId}
@@ -528,7 +536,7 @@ const App = ({
                               src={apiPath}
                               alt={item.symbol}
                             />
-                            <p>{item.symbol}</p>
+                            <AssetLabel asset={item} />
                           </div>
                         </TableCell>
                         <TableCell className="py-1.5 text-right text-sm">
@@ -850,9 +858,11 @@ const App = ({
                             <TableCell className="py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <ImageStack
-                                  imageSrcs={topAssets.map(
-                                    (asset) =>
-                                      logoMap[asset.symbol] || UnknownLogo,
+                                  imageSrcs={topAssets.map((asset) =>
+                                    resolveAssetLogoSrc(
+                                      asset,
+                                      logoMap[asset.symbol],
+                                    ),
                                   )}
                                   imageWidth={18}
                                   imageHeight={18}

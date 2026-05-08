@@ -13,7 +13,6 @@ import {
 import { calculateTotalProfit } from "@/middlelayers/charts";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import _ from "lodash";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
@@ -21,10 +20,12 @@ import { positiveNegativeColor } from "@/utils/color";
 import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import AssetLabel from "@/components/common/asset-label";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 
@@ -80,7 +81,7 @@ const App = ({
 
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
 
   useEffect(() => {
@@ -106,9 +107,7 @@ const App = ({
 
   useEffect(() => {
     const gen = loadGenRef.current;
-    const assets = _(
-      coinsProfit.slice(0, 5).concat(coinsProfit.slice(-5))
-    )
+    const assets = _(coinsProfit.slice(0, 5).concat(coinsProfit.slice(-5)))
       .uniqBy((coin) => getAssetLogoKey(coin))
       .value();
 
@@ -126,46 +125,52 @@ const App = ({
 
   const topProfitData = useMemo(
     () => _(coinsProfit).takeRight(5).reverse().value(),
-    [coinsProfit]
+    [coinsProfit],
   );
-  const topLossData = useMemo(() => _(coinsProfit).take(5).value(), [coinsProfit]);
+  const topLossData = useMemo(
+    () => _(coinsProfit).take(5).value(),
+    [coinsProfit],
+  );
 
   const totalToneClass = useMemo(
     () => getToneClass(profit, quoteColor),
-    [profit, quoteColor]
+    [profit, quoteColor],
   );
   const totalToneBadgeClass = useMemo(
     () => getToneBadgeClass(profit, quoteColor),
-    [profit, quoteColor]
+    [profit, quoteColor],
   );
   const positiveCount = useMemo(
     () => coinsProfit.filter((coin) => coin.value > 0).length,
-    [coinsProfit]
+    [coinsProfit],
   );
   const negativeCount = useMemo(
     () => coinsProfit.filter((coin) => coin.value < 0).length,
-    [coinsProfit]
+    [coinsProfit],
   );
 
   async function getLogoMap(
-    assets: { symbol: string; assetType: "crypto" | "stock" }[]
+    assets: { symbol: string; assetType: "crypto" | "stock" }[],
   ) {
     const acd = await getAppCacheDir();
     const assetsNeedLoad = assets.filter(
       (asset) =>
         shouldDownloadCryptoLogo(asset) &&
-        !logoPathCacheRef.current.has(getAssetLogoKey(asset))
+        !logoPathCacheRef.current.has(getAssetLogoKey(asset)),
     );
 
     if (assetsNeedLoad.length === 0) {
-      return assets.reduce((acc, asset) => {
-        const key = getAssetLogoKey(asset);
-        const path = logoPathCacheRef.current.get(key);
-        if (path) {
-          acc[key] = path;
-        }
-        return acc;
-      }, {} as { [x: string]: string });
+      return assets.reduce(
+        (acc, asset) => {
+          const key = getAssetLogoKey(asset);
+          const path = logoPathCacheRef.current.get(key);
+          if (path) {
+            acc[key] = path;
+          }
+          return acc;
+        },
+        {} as { [x: string]: string },
+      );
     }
 
     const kvs = await bluebird.map(
@@ -176,17 +181,20 @@ const App = ({
         logoPathCacheRef.current.set(key, path);
         return { [key]: path };
       },
-      { concurrency: 6 }
+      { concurrency: 6 },
     );
 
-    const cachedMap = assets.reduce((acc, asset) => {
-      const key = getAssetLogoKey(asset);
-      const path = logoPathCacheRef.current.get(key);
-      if (path) {
-        acc[key] = path;
-      }
-      return acc;
-    }, {} as { [x: string]: string });
+    const cachedMap = assets.reduce(
+      (acc, asset) => {
+        const key = getAssetLogoKey(asset);
+        const path = logoPathCacheRef.current.get(key);
+        if (path) {
+          acc[key] = path;
+        }
+        return acc;
+      },
+      {} as { [x: string]: string },
+    );
 
     return _.assign({}, ...kvs, cachedMap);
   }
@@ -198,7 +206,7 @@ const App = ({
       percentage?: number;
       value: number;
     }[],
-    rankStart = 1
+    rankStart = 1,
   ) =>
     rows.map((d, idx) => (
       <TableRow key={getAssetLogoKey(d)} className="h-[42px]">
@@ -213,10 +221,14 @@ const App = ({
           >
             <img
               className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-              src={logoMap[getAssetLogoKey(d)] || UnknownLogo}
+              src={resolveAssetLogoSrc(d, logoMap[getAssetLogoKey(d)])}
               alt={formatAssetLabel(d)}
             />
-            <div className="font-medium text-sm">{formatAssetLabel(d)}</div>
+            <AssetLabel
+              asset={d}
+              className="min-w-0"
+              labelClassName="font-medium text-sm"
+            />
             <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
           </Link>
         </TableCell>
@@ -225,7 +237,7 @@ const App = ({
             {(d.value < 0 ? "-" : "+") +
               currency.symbol +
               prettyNumberToLocaleString(
-                currencyWrapper(currency)(Math.abs(d.value))
+                currencyWrapper(currency)(Math.abs(d.value)),
               )}
           </div>
           {showCoinsProfitPercentage && (
@@ -259,7 +271,7 @@ const App = ({
               {(profit < 0 ? "-" : "+") +
                 currency.symbol +
                 prettyNumberToLocaleString(
-                  currencyWrapper(currency)(Math.abs(profit))
+                  currencyWrapper(currency)(Math.abs(profit)),
                 )}
             </div>
             <div className="text-xs text-muted-foreground">

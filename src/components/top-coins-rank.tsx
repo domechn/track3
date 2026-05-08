@@ -7,15 +7,16 @@ import { queryTopCoinsRank } from "@/middlelayers/charts";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { getImageApiPath } from "@/utils/app";
 import { downloadCoinLogos } from "@/middlelayers/data";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import bluebird from "bluebird";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import AssetLabel from "./common/asset-label";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 
@@ -32,7 +33,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
 
   useEffect(() => {
@@ -49,22 +50,26 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     downloadCoinLogos(
       topCoinsRankData.coins
         .filter((coin) => shouldDownloadCryptoLogo(coin))
-        .map((c) => ({ symbol: c.coin, price: 0 }))
+        .map((c) => ({ symbol: c.coin, price: 0 })),
     );
     getLogoMap(topCoinsRankData.coins).then((m) => setLogoMap(m));
   }, [topCoinsRankData]);
 
   async function getLogoMap(
-    coins: { coin: string; assetType: "crypto" | "stock" }[]
+    coins: { coin: string; assetType: "crypto" | "stock" }[],
   ) {
     const acd = await getAppCacheDir();
     const kvs = await bluebird.map(coins, async (c) => {
       if (!shouldDownloadCryptoLogo(c)) {
-        return { [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: "" };
+        return {
+          [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: "",
+        };
       }
 
       const path = await getImageApiPath(acd, c.coin);
-      return { [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: path };
+      return {
+        [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: path,
+      };
     });
     return _.assign({}, ...kvs);
   }
@@ -97,7 +102,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   const maxPage = useMemo(
     () => Math.max(Math.ceil(rankRows.length / PAGE_SIZE) - 1, 0),
-    [rankRows.length]
+    [rankRows.length],
   );
 
   useEffect(() => {
@@ -148,14 +153,17 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
             <TableBody>
               {pagedRows.map((row) => (
                 <TableRow
-                  key={getAssetLogoKey({ symbol: row.coin, assetType: row.assetType })}
+                  key={getAssetLogoKey({
+                    symbol: row.coin,
+                    assetType: row.assetType,
+                  })}
                   className="h-[42px] cursor-pointer group"
                   onClick={() =>
                     navigate(
                       buildAssetDetailsPath({
                         symbol: row.coin,
                         assetType: row.assetType,
-                      })
+                      }),
                     )
                   }
                 >
@@ -166,25 +174,27 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                     <div className="flex items-center gap-2">
                       <img
                         className="w-[18px] h-[18px] rounded-full"
-                        src={
+                        src={resolveAssetLogoSrc(
+                          { symbol: row.coin, assetType: row.assetType },
                           logoMap[
                             getAssetLogoKey({
                               symbol: row.coin,
                               assetType: row.assetType,
                             })
-                          ] || UnknownLogo
-                        }
+                          ],
+                        )}
                         alt={formatAssetLabel({
                           symbol: row.coin,
                           assetType: row.assetType,
                         })}
                       />
-                      <span className="font-medium text-sm">
-                        {formatAssetLabel({
+                      <AssetLabel
+                        asset={{
                           symbol: row.coin,
                           assetType: row.assetType,
-                        })}
-                      </span>
+                        }}
+                        labelClassName="font-medium text-sm"
+                      />
                     </div>
                   </TableCell>
                   <TableCell className="text-right py-1.5">

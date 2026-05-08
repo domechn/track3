@@ -63,10 +63,10 @@ import { TonAnalyzer } from "@/middlelayers/datafetch/coins/ton";
 import { isProVersion } from "@/middlelayers/license";
 import { getImageApiPath } from "@/utils/app";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import bluebird from "bluebird";
 import { Switch } from "./ui/switch";
 import { SUIAnalyzer } from "@/middlelayers/datafetch/coins/sui";
+import { resolveAssetLogoSrc } from "@/utils/assets";
 import {
   CEX_OPTIONS,
   STOCK_BROKER_OPTIONS,
@@ -191,7 +191,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const [quickLookOpen, setQuickLookOpen] = useState(false);
   const [quickLookLoading, setQuickLookLoading] = useState(false);
   const [quickLookData, setQuickLookData] = useState<
-    { symbol: string; amount: number }[]
+    { symbol: string; amount: number; assetType?: "crypto" | "stock" }[]
   >([]);
   const [quickLookLogoMap, setQuickLookLogoMap] = useState<{
     [x: string]: string;
@@ -655,7 +655,11 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       const filtered = coins
         .filter((c) => c.amount > 0)
         .sort((a, b) => b.amount - a.amount)
-        .map((c) => ({ symbol: c.symbol, amount: c.amount }));
+        .map((c) => ({
+          symbol: c.symbol,
+          amount: c.amount,
+          assetType: c.assetType,
+        }));
       setQuickLookData(filtered);
       buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
@@ -821,7 +825,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     <div className="flex items-center">
                       <img
                         className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
-                        src={quickLookLogoMap[item.symbol] || UnknownLogo}
+                        src={resolveAssetLogoSrc(
+                          item,
+                          quickLookLogoMap[item.symbol],
+                        )}
                         alt={item.symbol}
                       />
                       <span className="font-medium">{item.symbol}</span>

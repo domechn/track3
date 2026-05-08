@@ -61,6 +61,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 }));
 
 import {
+  deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
   queryHistoricalData,
   queryRestoreHistoricalData,
@@ -77,6 +78,7 @@ beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   vi.mocked(addToBlacklist).mockResolvedValue(undefined);
+  vi.mocked(deleteHistoricalDataByUUID).mockResolvedValue(undefined);
   vi.mocked(deleteHistoricalDataDetailById).mockResolvedValue(undefined);
   vi.mocked(queryRestoreHistoricalData).mockResolvedValue({} as never);
 });
@@ -199,5 +201,94 @@ describe("Historical Data page", () => {
       expect(queryRestoreHistoricalData).toHaveBeenCalledWith(7);
       expect(deleteHistoricalDataDetailById).toHaveBeenCalledWith(7);
     });
+  });
+
+  it("removes a deleted snapshot from the current list without waiting for a reload", async () => {
+    const afterDataChanged = vi.fn();
+    vi.mocked(queryHistoricalData).mockResolvedValue([
+      {
+        id: "snapshot-1",
+        createdAt: "2024-04-16T12:00:00.000Z",
+        total: 1200,
+        assets: [
+          {
+            id: 7,
+            uuid: "snapshot-1",
+            createdAt: "2024-04-16T12:00:00.000Z",
+            assetType: "crypto",
+            symbol: "BTC",
+            amount: 1,
+            value: 1200,
+            price: 1200,
+          },
+        ],
+        transactions: [],
+      },
+    ]);
+
+    render(
+      <HistoricalData
+        afterDataChanged={afterDataChanged}
+        currency={usdCurrency}
+        dateRange={dateRange}
+        quoteColor="green-up-red-down"
+      />,
+    );
+
+    expect(await screen.findByText("snapshot")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /delete/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm/i }));
+
+    await waitFor(() => {
+      expect(deleteHistoricalDataByUUID).toHaveBeenCalledWith("snapshot-1");
+      expect(screen.queryByText("snapshot")).not.toBeInTheDocument();
+      expect(afterDataChanged).toHaveBeenCalledWith(
+        "delete",
+        "snapshot-1",
+        undefined,
+      );
+    });
+  });
+
+  it("shows a stock badge in historical data detail rows", async () => {
+    vi.mocked(queryHistoricalData).mockResolvedValue([
+      {
+        id: "snapshot-1",
+        createdAt: "2024-04-16T12:00:00.000Z",
+        total: 1200,
+        assets: [
+          {
+            id: 7,
+            uuid: "snapshot-1",
+            createdAt: "2024-04-16T12:00:00.000Z",
+            assetType: "stock",
+            symbol: "AAPL",
+            amount: 1,
+            value: 1200,
+            price: 1200,
+          },
+        ],
+        transactions: [],
+      },
+    ]);
+
+    render(
+      <HistoricalData
+        currency={usdCurrency}
+        dateRange={dateRange}
+        quoteColor="green-up-red-down"
+      />,
+    );
+
+    fireEvent.click(await screen.findByText("snapshot"));
+    const detailDialog = await screen.findByRole("dialog", {
+      name: /historical data detail/i,
+    });
+
+    expect(within(detailDialog).getByText("AAPL")).toBeInTheDocument();
+    expect(
+      within(detailDialog).getByText("stock", { selector: "span" }),
+    ).toBeInTheDocument();
   });
 });

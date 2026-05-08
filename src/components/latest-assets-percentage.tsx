@@ -19,7 +19,6 @@ import {
 import { downloadCoinLogos } from "@/middlelayers/data";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import bluebird from "bluebird";
 import { Link } from "react-router-dom";
@@ -34,10 +33,12 @@ import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { chartColors, glassTooltip } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import AssetLabel from "@/components/common/asset-label";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 
@@ -264,7 +265,10 @@ const App = ({
           <TableBody>
             {pagedLatestAssetsPercentageData.map((d) => (
               <TableRow
-                key={getAssetLogoKey({ symbol: d.coin, assetType: d.assetType })}
+                key={getAssetLogoKey({
+                  symbol: d.coin,
+                  assetType: d.assetType,
+                })}
                 className="h-[42px]"
               >
                 <TableCell className="py-1.5">
@@ -278,12 +282,19 @@ const App = ({
                   >
                     <img
                       className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-                      src={
+                      src={resolveAssetLogoSrc(
+                        { symbol: d.coin, assetType: d.assetType },
                         logoMap[
-                          getAssetLogoKey({ symbol: d.coin, assetType: d.assetType })
-                        ] || UnknownLogo
-                      }
-                      alt={formatAssetLabel({ symbol: d.coin, assetType: d.assetType })}
+                          getAssetLogoKey({
+                            symbol: d.coin,
+                            assetType: d.assetType,
+                          })
+                        ],
+                      )}
+                      alt={formatAssetLabel({
+                        symbol: d.coin,
+                        assetType: d.assetType,
+                      })}
                     />
                     <div
                       className="mr-1 font-medium text-sm"
@@ -293,14 +304,11 @@ const App = ({
                         ? prettyNumberKeepNDigitsAfterDecimalPoint(d.amount, 4)
                         : prettyPriceNumberToLocaleString(d.amount)}
                     </div>
-                    <div className="text-muted-foreground text-xs truncate">
-                      {formatAssetLabel({ symbol: d.coin, assetType: d.assetType })}
-                    </div>
-                    {d.assetType !== "crypto" ? (
-                      <span className="ml-2 rounded-sm border border-border px-1.5 py-0.5 text-[10px] uppercase leading-none text-muted-foreground">
-                        {d.assetType}
-                      </span>
-                    ) : null}
+                    <AssetLabel
+                      asset={{ symbol: d.coin, assetType: d.assetType }}
+                      className="min-w-0"
+                      labelClassName="text-muted-foreground text-xs truncate"
+                    />
                     <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
                   </Link>
                 </TableCell>

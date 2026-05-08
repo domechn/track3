@@ -27,7 +27,6 @@ import {
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import {
   Table,
   TableBody,
@@ -70,11 +69,13 @@ import {
 import { cn } from "@/lib/utils";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import AssetLabel from "./common/asset-label";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
   parseAssetTypeSearchParam,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import {
@@ -212,7 +213,7 @@ const App = ({
   const queryKey = useMemo(
     () =>
       `${symbol}-${assetType}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [symbol, assetType, dateRange.start, dateRange.end]
+    [symbol, assetType, dateRange.start, dateRange.end],
   );
 
   const reportLoaded = useCallback(() => {
@@ -300,7 +301,7 @@ const App = ({
     // init wallet alias map
     const wa = new WalletAnalyzer(async () => []);
     wa.listWalletAliases(
-      _(transactions).map("wallet").compact().uniq().value()
+      _(transactions).map("wallet").compact().uniq().value(),
     ).then((res) => {
       const wam: { [k: string]: string | undefined } = {};
       _(res).forEach((k, v) => {
@@ -326,16 +327,16 @@ const App = ({
         ? "∞"
         : currency.symbol +
           prettyPriceNumberToLocaleString(
-            currencyWrapper(currency)(_.max([breakevenPrice, 0]) || 0)
+            currencyWrapper(currency)(_.max([breakevenPrice, 0]) || 0),
           ),
-    [currency, breakevenPrice]
+    [currency, breakevenPrice],
   );
 
   const sellPriceStr = useMemo(
     () =>
       currency.symbol +
       prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellAvgPrice)),
-    [currency, sellAvgPrice]
+    [currency, sellAvgPrice],
   );
   const sellAmountStr = useMemo(() => prettyAmount(sellAmount), [sellAmount]);
 
@@ -343,7 +344,7 @@ const App = ({
     () =>
       currency.symbol +
       prettyPriceNumberToLocaleString(currencyWrapper(currency)(costAvgPrice)),
-    [currency, costAvgPrice]
+    [currency, costAvgPrice],
   );
   const buyAmountStr = useMemo(() => prettyAmount(buyAmount), [buyAmount]);
   const lastPrice = useMemo(() => lastAsset?.price || 0, [lastAsset]);
@@ -351,7 +352,7 @@ const App = ({
     () =>
       currency.symbol +
       prettyPriceNumberToLocaleString(currencyWrapper(currency)(lastPrice)),
-    [currency, lastPrice]
+    [currency, lastPrice],
   );
 
   const allowSymbolRankMap = useMemo(() => {
@@ -378,13 +379,13 @@ const App = ({
       return allowSymbols;
     }
     return allowSymbols.filter((item) =>
-      formatAssetLabel(item).toUpperCase().includes(keyword)
+      formatAssetLabel(item).toUpperCase().includes(keyword),
     );
   }, [allowSymbols, coinKeyword]);
 
   const visibleAllowSymbols = useMemo(
     () => filteredAllowSymbols.slice(0, coinListLimit),
-    [filteredAllowSymbols, coinListLimit]
+    [filteredAllowSymbols, coinListLimit],
   );
 
   const txnIndexMap = useMemo(() => {
@@ -399,21 +400,21 @@ const App = ({
     () =>
       currency.symbol +
       prettyNumberToLocaleString(currencyWrapper(currency)(profit)),
-    [currency, profit]
+    [currency, profit],
   );
 
   const positionsStr = useMemo(
     () => prettyAmount(lastAsset?.amount || 0),
-    [lastAsset]
+    [lastAsset],
   );
   const maxPositionsStr = useMemo(
     () => prettyAmount(maxPosition),
-    [maxPosition]
+    [maxPosition],
   );
 
   const profitRate = useMemo(
     () => (profitPercentage ? profitPercentage.toFixed(2) : 0),
-    [profitPercentage]
+    [profitPercentage],
   );
 
   function prettyAmount(amount: number) {
@@ -431,7 +432,11 @@ const App = ({
 
     // fetch all data before setting any state to avoid multiple re-renders
     const [txns, tp, la, ama, lp] = await Promise.all([
-      queryTransactionsBySymbolAndDateRange(s, selectedRange, selectedAssetType),
+      queryTransactionsBySymbolAndDateRange(
+        s,
+        selectedRange,
+        selectedAssetType,
+      ),
       calculateTotalProfit(selectedRange, s, selectedAssetType),
       queryLastAssetsBySymbol(s, selectedRange, selectedAssetType),
       queryAssetMaxAmountBySymbol(s, selectedRange, selectedAssetType),
@@ -549,7 +554,7 @@ const App = ({
 
     const tableHasData = useMemo(
       () => !_(historicalData).isEmpty(),
-      [historicalData]
+      [historicalData],
     );
 
     const getAmountStr = (act: Transaction) => {
@@ -565,7 +570,7 @@ const App = ({
 
     const getValueStr = (act: Transaction) => {
       const raw = `${currency.symbol}${prettyPriceNumberToLocaleString(
-        currencyWrapper(currency)(act.price * act.amount)
+        currencyWrapper(currency)(act.price * act.amount),
       )}`;
       if (act.txnType === "sell") {
         return `-${raw}`;
@@ -633,7 +638,9 @@ const App = ({
                     </TableCell>
                     <TableCell className="py-1.5">
                       <div className="flex space-x-2">
-                        <div className="text-muted-foreground text-sm">{act.txnType}</div>
+                        <div className="text-muted-foreground text-sm">
+                          {act.txnType}
+                        </div>
                         <Pencil2Icon
                           className="h-4 w-4 cursor-pointer hidden group-hover:inline-block text-muted-foreground"
                           onClick={() => {
@@ -649,7 +656,7 @@ const App = ({
                         <div className="text-muted-foreground text-sm">
                           {currency.symbol}
                           {prettyPriceNumberToLocaleString(
-                            currencyWrapper(currency)(act.price)
+                            currencyWrapper(currency)(act.price),
                           )}
                         </div>
                         <Pencil2Icon
@@ -671,7 +678,7 @@ const App = ({
                       <div className="text-muted-foreground text-sm">
                         {timeToDateStr(
                           new Date(act.txnCreatedAt).getTime(),
-                          true
+                          true,
                         )}
                       </div>
                     </TableCell>
@@ -699,310 +706,327 @@ const App = ({
 
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
-    <div className="relative min-h-[400px]">
-    <StaggerContainer className="space-y-4">
-      <UpdatePriceDialog
-        open={updatePriceDialogOpen}
-        onOpenChange={setUpdatePriceDialogOpen}
-        updatePriceValue={updatePriceValue}
-        setUpdatePriceValue={setUpdatePriceValue}
-        onSave={onUpdatePriceDialogSaveClick}
-        currency={currency}
-      />
+      <div className="relative min-h-[400px]">
+        <StaggerContainer className="space-y-4">
+          <UpdatePriceDialog
+            open={updatePriceDialogOpen}
+            onOpenChange={setUpdatePriceDialogOpen}
+            updatePriceValue={updatePriceValue}
+            setUpdatePriceValue={setUpdatePriceValue}
+            onSave={onUpdatePriceDialogSaveClick}
+            currency={currency}
+          />
 
-      <UpdateTransactionTypeDialog
-        open={updateTxnDialogOpen}
-        onOpenChange={setUpdateTxnTypeDialogOpen}
-        updateTxnTypeValue={updateTxnTypeValue}
-        setUpdateTxnTypeValue={setUpdateTxnTypeValue}
-        onSave={onUpdateTxnTypeDialogSaveClick}
-      />
-      <div className="grid gap-4 grid-cols-6">
-        <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Symbol</CardTitle>
-              <svg
-                viewBox="0 0 1024 1024"
-                version="1.1"
-                xmlns="http://www.w3.org/2000/svg"
-                p-id="2876"
-                className="h-4 w-4 text-muted-foreground"
-              >
-                <path
-                  d="M580.8 468.8H448c-38.4 0-68.8-30.4-68.8-64s30.4-64 68.8-64h192c25.6 0 43.2-17.6 43.2-43.2s-17.6-43.2-43.2-43.2h-84.8v-43.2c0-25.6-17.6-43.2-43.2-43.2s-43.2 17.6-43.2 43.2V256h-17.6c-84.8 0-153.6 68.8-153.6 148.8s68.8 148.8 153.6 148.8h132.8c38.4 0 68.8 30.4 68.8 64s-33.6 64-72 64H384c-25.6 0-43.2 17.6-43.2 43.2S358.4 768 384 768h84.8v43.2c0 25.6 17.6 43.2 43.2 43.2s43.2-17.6 43.2-43.2V768h25.6c84.8 0 153.6-68.8 153.6-148.8s-68.8-150.4-153.6-150.4z"
-                  p-id="2877"
-                  fill="currentColor"
-                ></path>
-                <path
-                  d="M512 0C230.4 0 0 230.4 0 512s230.4 512 512 512 512-230.4 512-512S793.6 0 512 0z m0 939.2c-235.2 0-427.2-192-427.2-427.2S276.8 84.8 512 84.8s427.2 192 427.2 427.2-192 427.2-427.2 427.2z"
-                  p-id="2878"
-                  fill="currentColor"
-                ></path>
-              </svg>
-            </CardHeader>
-            <CardContent>
-              <div className="flex">
-                <img
-                  className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
-                  src={logo || UnknownLogo}
-                  alt={formatAssetLabel({ symbol, assetType })}
-                />
-                <div className="w-[100%] h-[32px] overflow-hidden">
-                  <Popover
-                    open={coinSelectOpen}
-                    onOpenChange={setCoinSelectOpen}
+          <UpdateTransactionTypeDialog
+            open={updateTxnDialogOpen}
+            onOpenChange={setUpdateTxnTypeDialogOpen}
+            updateTxnTypeValue={updateTxnTypeValue}
+            setUpdateTxnTypeValue={setUpdateTxnTypeValue}
+            onSave={onUpdateTxnTypeDialogSaveClick}
+          />
+          <div className="grid gap-4 grid-cols-6">
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Symbol
+                  </CardTitle>
+                  <svg
+                    viewBox="0 0 1024 1024"
+                    version="1.1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    p-id="2876"
+                    className="h-4 w-4 text-muted-foreground"
                   >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={coinSelectOpen}
-                        className="h-[100%] w-[100%] text-xl font-semibold border-none shadow-none focus:ring-0 flex justify-between items-center"
+                    <path
+                      d="M580.8 468.8H448c-38.4 0-68.8-30.4-68.8-64s30.4-64 68.8-64h192c25.6 0 43.2-17.6 43.2-43.2s-17.6-43.2-43.2-43.2h-84.8v-43.2c0-25.6-17.6-43.2-43.2-43.2s-43.2 17.6-43.2 43.2V256h-17.6c-84.8 0-153.6 68.8-153.6 148.8s68.8 148.8 153.6 148.8h132.8c38.4 0 68.8 30.4 68.8 64s-33.6 64-72 64H384c-25.6 0-43.2 17.6-43.2 43.2S358.4 768 384 768h84.8v43.2c0 25.6 17.6 43.2 43.2 43.2s43.2-17.6 43.2-43.2V768h25.6c84.8 0 153.6-68.8 153.6-148.8s-68.8-150.4-153.6-150.4z"
+                      p-id="2877"
+                      fill="currentColor"
+                    ></path>
+                    <path
+                      d="M512 0C230.4 0 0 230.4 0 512s230.4 512 512 512 512-230.4 512-512S793.6 0 512 0z m0 939.2c-235.2 0-427.2-192-427.2-427.2S276.8 84.8 512 84.8s427.2 192 427.2 427.2-192 427.2-427.2 427.2z"
+                      p-id="2878"
+                      fill="currentColor"
+                    ></path>
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex">
+                    <img
+                      className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
+                      src={resolveAssetLogoSrc({ symbol, assetType }, logo)}
+                      alt={formatAssetLabel({ symbol, assetType })}
+                    />
+                    <div className="w-[100%] h-[32px] overflow-hidden">
+                      <Popover
+                        open={coinSelectOpen}
+                        onOpenChange={setCoinSelectOpen}
                       >
-                        <div className='truncate'>
-                          {formatAssetLabel({ symbol, assetType })}
-                        </div>
-                        <CaretSortIcon className="h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[100%] p-1">
-                      <Command>
-                        <CommandInput
-                          placeholder="Search coin..."
-                          className="h-9"
-                          value={coinKeyword}
-                          onValueChange={(val) => {
-                            setCoinKeyword(val);
-                            setCoinListLimit(200);
-                          }}
-                        />
-                        <CommandList>
-                          <CommandEmpty>No coin found.</CommandEmpty>
-                          <CommandGroup>
-                            {visibleAllowSymbols.map((s) => (
-                              <CommandItem
-                                key={getAssetLogoKey(s)}
-                                value={formatAssetLabel(s)}
-                                onSelect={() => {
-                                  setCoinSelectOpen(false);
-                                  navigate(buildAssetDetailsPath(s));
-                                }}
-                              >
-                                <div>{formatAssetLabel(s)}</div>
-                                <CheckIcon
-                                  className={cn(
-                                    "ml-auto h-4 w-4",
-                                    getAssetLogoKey(s) ===
-                                      getAssetLogoKey({ symbol, assetType })
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                          {filteredAllowSymbols.length > coinListLimit ? (
-                            <div className="px-2 py-2">
-                              <Button
-                                variant="ghost"
-                                className="w-full h-8"
-                                onClick={() => setCoinListLimit((prev) => prev + 200)}
-                              >
-                                Show More ({filteredAllowSymbols.length - coinListLimit})
-                              </Button>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={coinSelectOpen}
+                            className="h-[100%] w-[100%] text-xl font-semibold border-none shadow-none focus:ring-0 flex justify-between items-center"
+                          >
+                            <div className="min-w-0">
+                              <AssetLabel
+                                asset={{ symbol, assetType }}
+                                className="max-w-full"
+                                labelClassName="truncate"
+                              />
                             </div>
-                          ) : null}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                <div>rank:</div>
-                <div>{rank}</div>
-              </div>
-            </CardContent>
-          </Card>
-        </FadeUp>
-        <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                Breakeven Price
-              </CardTitle>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                className="h-4 w-4 text-muted-foreground"
-              >
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {breakEvenPriceStr}
-              </div>
-              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                <div>last price:</div>
-                <div>{lastPriceStr}</div>
-              </div>
-            </CardContent>
-          </Card>
-        </FadeUp>
-        <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Positions</CardTitle>
-              <svg
-                className="h-4 w-4 text-muted-foreground"
-                viewBox="0 0 1024 1024"
-                version="1.1"
-                xmlns="http://www.w3.org/2000/svg"
-                p-id="3273"
-                width="16"
-                height="16"
-              >
-                <path
-                  d="M205.971 159.72c23.856-65.521 103.802-93.332 177.05-66.675L804.79 246.58H836.8c68.04 0 123.2 55.162 123.2 123.204v123.204a33.602 33.602 0 0 1-33.6 33.6c-37.114 0-67.2 30.088-67.2 67.203 0 37.114 30.086 67.202 67.2 67.202 18.557 0 33.6 15.043 33.6 33.6v123.204C960 885.838 904.84 941 836.8 941H187.2C119.16 941 64 885.838 64 817.796V694.593c0-18.558 15.043-33.601 33.6-33.601 37.114 0 67.2-30.088 67.2-67.202 0-37.115-30.086-67.202-67.2-67.202-18.557 0-33.6-15.044-33.6-33.601V369.783c0-63.618 48.216-115.98 110.096-122.52l31.875-87.542z m630 153.291H792.66l-0.067 0.168-0.493-0.179-606.07 0.011c-14.86 0-29.112 5.9-39.62 16.402A55.983 55.983 0 0 0 130 369.01v93.832c58.002 14.918 100.853 67.534 100.853 130.164 0 62.629-42.851 115.245-100.853 130.163v93.832a55.983 55.983 0 0 0 16.41 39.597A56.045 56.045 0 0 0 186.03 873h649.94c14.86 0 29.112-5.9 39.62-16.402A55.983 55.983 0 0 0 892 817.001V723.17c-58.002-14.918-100.853-67.534-100.853-130.163 0-62.63 42.851-115.246 100.853-130.164V369.01a55.983 55.983 0 0 0-16.41-39.597 56.045 56.045 0 0 0-39.62-16.402zM645.4 634c18.557 0 33.6 15.222 33.6 34s-15.043 34-33.6 34H376.6c-18.557 0-33.6-15.222-33.6-34s15.043-34 33.6-34h268.8z m0-157c18.557 0 33.6 15.222 33.6 34s-15.043 34-33.6 34H376.6c-18.557 0-33.6-15.222-33.6-34s15.043-34 33.6-34h268.8zM359.018 156.031c-40.828-14.807-80.807-0.959-90.796 26.392L245 246h362l-247.982-89.969z"
-                  fill="currentColor"
-                  p-id="3274"
-                ></path>
-              </svg>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {positionsStr}
-              </div>
-              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                <div>max positions:</div>
-                <div>{maxPositionsStr}</div>
-              </div>
-            </CardContent>
-          </Card>
-        </FadeUp>
-        <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Profit</CardTitle>
-              <svg
-                viewBox="0 0 1024 1024"
-                version="1.1"
-                xmlns="http://www.w3.org/2000/svg"
-                p-id="1885"
-                className="h-4 w-4 text-muted-foreground"
-              >
-                <path
-                  d="M162.016 580.992L192.032 640q-31.008 30.016-32 64 4 64 102.496 111.008T512.032 864q151.008-2.016 249.504-48.992T864.032 704q-0.992-34.016-32-64l31.008-59.008q31.008 26.016 48 56.992T928.032 704q-4.992 99.008-123.008 160.512T512.032 928q-175.008-2.016-292.992-63.488T96.032 704q0-35.008 17.504-66.016t48.512-56.992z m0-192L192.032 448q-31.008 30.016-32 64 4 64 102.496 111.008T512.032 672q151.008-2.016 249.504-48.992T864.032 512q-0.992-34.016-32-64l31.008-59.008q31.008 26.016 48 56.992T928.032 512q-4.992 99.008-123.008 160.512T512.032 736q-175.008-2.016-292.992-63.488T96.032 512q0-35.008 17.504-66.016t48.512-56.992zM512 544q-175.008-2.016-292.992-63.488T96 320q4.992-99.008 123.008-160.512T512 96q175.008 2.016 292.992 63.488T928 320q-4.992 99.008-123.008 160.512T512 544z m0-64q151.008-2.016 249.504-48.992T864 320q-4-64-102.496-111.008T512 160q-151.008 2.016-249.504 48.992T160 320q4 64 102.496 111.008T512 480z"
-                  p-id="1886"
-                  fill="currentColor"
-                ></path>
-              </svg>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {profitStr}
-              </div>
-              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                <div>profit rate:</div>
-                <div>{profitRate}%</div>
-              </div>
-            </CardContent>
-          </Card>
-        </FadeUp>
-        <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Cost Price</CardTitle>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                className="h-4 w-4 text-muted-foreground"
-              >
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {costPriceStr}
-              </div>
-              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                <div>buy amount:</div>
-                <div>{buyAmountStr}</div>
-              </div>
-            </CardContent>
-          </Card>
-        </FadeUp>
+                            <CaretSortIcon className="h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[100%] p-1">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search coin..."
+                              className="h-9"
+                              value={coinKeyword}
+                              onValueChange={(val) => {
+                                setCoinKeyword(val);
+                                setCoinListLimit(200);
+                              }}
+                            />
+                            <CommandList>
+                              <CommandEmpty>No coin found.</CommandEmpty>
+                              <CommandGroup>
+                                {visibleAllowSymbols.map((s) => (
+                                  <CommandItem
+                                    key={getAssetLogoKey(s)}
+                                    value={formatAssetLabel(s)}
+                                    onSelect={() => {
+                                      setCoinSelectOpen(false);
+                                      navigate(buildAssetDetailsPath(s));
+                                    }}
+                                  >
+                                    <AssetLabel asset={s} className="min-w-0" />
+                                    <CheckIcon
+                                      className={cn(
+                                        "ml-auto h-4 w-4",
+                                        getAssetLogoKey(s) ===
+                                          getAssetLogoKey({ symbol, assetType })
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                              {filteredAllowSymbols.length > coinListLimit ? (
+                                <div className="px-2 py-2">
+                                  <Button
+                                    variant="ghost"
+                                    className="w-full h-8"
+                                    onClick={() =>
+                                      setCoinListLimit((prev) => prev + 200)
+                                    }
+                                  >
+                                    Show More (
+                                    {filteredAllowSymbols.length -
+                                      coinListLimit}
+                                    )
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>rank:</div>
+                    <div>{rank}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    Breakeven Price
+                  </CardTitle>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {breakEvenPriceStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>last price:</div>
+                    <div>{lastPriceStr}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Positions
+                  </CardTitle>
+                  <svg
+                    className="h-4 w-4 text-muted-foreground"
+                    viewBox="0 0 1024 1024"
+                    version="1.1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    p-id="3273"
+                    width="16"
+                    height="16"
+                  >
+                    <path
+                      d="M205.971 159.72c23.856-65.521 103.802-93.332 177.05-66.675L804.79 246.58H836.8c68.04 0 123.2 55.162 123.2 123.204v123.204a33.602 33.602 0 0 1-33.6 33.6c-37.114 0-67.2 30.088-67.2 67.203 0 37.114 30.086 67.202 67.2 67.202 18.557 0 33.6 15.043 33.6 33.6v123.204C960 885.838 904.84 941 836.8 941H187.2C119.16 941 64 885.838 64 817.796V694.593c0-18.558 15.043-33.601 33.6-33.601 37.114 0 67.2-30.088 67.2-67.202 0-37.115-30.086-67.202-67.2-67.202-18.557 0-33.6-15.044-33.6-33.601V369.783c0-63.618 48.216-115.98 110.096-122.52l31.875-87.542z m630 153.291H792.66l-0.067 0.168-0.493-0.179-606.07 0.011c-14.86 0-29.112 5.9-39.62 16.402A55.983 55.983 0 0 0 130 369.01v93.832c58.002 14.918 100.853 67.534 100.853 130.164 0 62.629-42.851 115.245-100.853 130.163v93.832a55.983 55.983 0 0 0 16.41 39.597A56.045 56.045 0 0 0 186.03 873h649.94c14.86 0 29.112-5.9 39.62-16.402A55.983 55.983 0 0 0 892 817.001V723.17c-58.002-14.918-100.853-67.534-100.853-130.163 0-62.63 42.851-115.246 100.853-130.164V369.01a55.983 55.983 0 0 0-16.41-39.597 56.045 56.045 0 0 0-39.62-16.402zM645.4 634c18.557 0 33.6 15.222 33.6 34s-15.043 34-33.6 34H376.6c-18.557 0-33.6-15.222-33.6-34s15.043-34 33.6-34h268.8z m0-157c18.557 0 33.6 15.222 33.6 34s-15.043 34-33.6 34H376.6c-18.557 0-33.6-15.222-33.6-34s15.043-34 33.6-34h268.8zM359.018 156.031c-40.828-14.807-80.807-0.959-90.796 26.392L245 246h362l-247.982-89.969z"
+                      fill="currentColor"
+                      p-id="3274"
+                    ></path>
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {positionsStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>max positions:</div>
+                    <div>{maxPositionsStr}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Profit
+                  </CardTitle>
+                  <svg
+                    viewBox="0 0 1024 1024"
+                    version="1.1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    p-id="1885"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path
+                      d="M162.016 580.992L192.032 640q-31.008 30.016-32 64 4 64 102.496 111.008T512.032 864q151.008-2.016 249.504-48.992T864.032 704q-0.992-34.016-32-64l31.008-59.008q31.008 26.016 48 56.992T928.032 704q-4.992 99.008-123.008 160.512T512.032 928q-175.008-2.016-292.992-63.488T96.032 704q0-35.008 17.504-66.016t48.512-56.992z m0-192L192.032 448q-31.008 30.016-32 64 4 64 102.496 111.008T512.032 672q151.008-2.016 249.504-48.992T864.032 512q-0.992-34.016-32-64l31.008-59.008q31.008 26.016 48 56.992T928.032 512q-4.992 99.008-123.008 160.512T512.032 736q-175.008-2.016-292.992-63.488T96.032 512q0-35.008 17.504-66.016t48.512-56.992zM512 544q-175.008-2.016-292.992-63.488T96 320q4.992-99.008 123.008-160.512T512 96q175.008 2.016 292.992 63.488T928 320q-4.992 99.008-123.008 160.512T512 544z m0-64q151.008-2.016 249.504-48.992T864 320q-4-64-102.496-111.008T512 160q-151.008 2.016-249.504 48.992T160 320q4 64 102.496 111.008T512 480z"
+                      p-id="1886"
+                      fill="currentColor"
+                    ></path>
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {profitStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>profit rate:</div>
+                    <div>{profitRate}%</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Cost Price
+                  </CardTitle>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {costPriceStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>buy amount:</div>
+                    <div>{buyAmountStr}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
 
-        <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Sell Price</CardTitle>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                className="h-4 w-4 text-muted-foreground"
-              >
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
-                {sellPriceStr}
-              </div>
-              <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                <div>sell amount:</div>
-                <div>{sellAmountStr}</div>
-              </div>
-            </CardContent>
-          </Card>
-        </FadeUp>
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Sell Price
+                  </CardTitle>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {sellPriceStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>sell amount:</div>
+                    <div>{sellAmountStr}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+          </div>
+          <FadeUp>
+            <CoinsAmountAndValueChange
+              currency={currency}
+              symbol={symbol}
+              assetType={assetType}
+              dateRange={dateRange}
+            />
+          </FadeUp>
+          <FadeUp>
+            <WalletAssetsPercentage
+              currency={currency}
+              dateRange={dateRange}
+              symbol={symbol}
+              assetType={assetType}
+              displayAmount={true}
+            />
+          </FadeUp>
+          <FadeUp>
+            <HistoryTable />
+          </FadeUp>
+        </StaggerContainer>
+        <div
+          className={`absolute inset-0 z-10 backdrop-blur-md bg-background/60 rounded-lg transition-opacity duration-500 ${
+            pageLoading ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        />
       </div>
-      <FadeUp>
-        <CoinsAmountAndValueChange
-          currency={currency}
-          symbol={symbol}
-          assetType={assetType}
-          dateRange={dateRange}
-        />
-      </FadeUp>
-      <FadeUp>
-        <WalletAssetsPercentage
-          currency={currency}
-          dateRange={dateRange}
-          symbol={symbol}
-          assetType={assetType}
-          displayAmount={true}
-        />
-      </FadeUp>
-      <FadeUp>
-        <HistoryTable />
-      </FadeUp>
-    </StaggerContainer>
-    <div
-      className={`absolute inset-0 z-10 backdrop-blur-md bg-background/60 rounded-lg transition-opacity duration-500 ${
-        pageLoading
-          ? "opacity-100"
-          : "opacity-0 pointer-events-none"
-      }`}
-    />
-    </div>
     </OverviewLoadingContext.Provider>
   );
 };
