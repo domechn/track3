@@ -13,7 +13,6 @@ export type IbkrFlexPosition = {
 type IbkrBrokerOptions = {
   statementPollDelayMs?: number;
   maxStatementPollAttempts?: number;
-  maxSendRequestRetries?: number;
   initialStatementDelayMs?: number;
 };
 
@@ -23,7 +22,6 @@ const sendRequestEndpoint = `${flexServiceEndpoint}/SendRequest`;
 const getStatementEndpoint = `${flexServiceEndpoint}/GetStatement`;
 const defaultStatementPollDelayMs = 1000;
 const defaultMaxStatementPollAttempts = 6;
-const defaultMaxSendRequestRetries = 5;
 const defaultInitialStatementDelayMs = 20000;
 
 export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
@@ -177,7 +175,6 @@ export class IbkrBroker implements StockBroker {
   private readonly alias?: string;
   private readonly statementPollDelayMs: number;
   private readonly maxStatementPollAttempts: number;
-  private readonly maxSendRequestRetries: number;
   private readonly initialStatementDelayMs: number;
   private flexXml?: string;
 
@@ -194,8 +191,6 @@ export class IbkrBroker implements StockBroker {
       options.statementPollDelayMs ?? defaultStatementPollDelayMs;
     this.maxStatementPollAttempts =
       options.maxStatementPollAttempts ?? defaultMaxStatementPollAttempts;
-    this.maxSendRequestRetries =
-      options.maxSendRequestRetries ?? defaultMaxSendRequestRetries;
     this.initialStatementDelayMs =
       options.initialStatementDelayMs ?? defaultInitialStatementDelayMs;
   }
@@ -234,41 +229,15 @@ export class IbkrBroker implements StockBroker {
 
     const requestUrl = `${sendRequestEndpoint}?t=${encodeURIComponent(this.token)}&q=${encodeURIComponent(this.queryId)}&v=3`;
 
-    // Phase 1: submit the SendRequest and retry if IBKR is transiently busy.
-    // Uses a separate counter so transient send failures don't eat the
-    // GetStatement polling budget.
-    let sendResponseXml: string | undefined;
-    let lastSendXml = "";
-    for (let attempt = 1; attempt <= this.maxSendRequestRetries; attempt++) {
-      const xml = await sendHttpTextRequest("GET", requestUrl, 20000);
-      lastSendXml = xml;
-      if (isFlexReportXml(xml)) {
-        this.flexXml = xml;
-        return xml;
-      }
-      if (!isFlexStatementPending(xml)) {
-        assertSuccessfulFlexResponse(xml);
-        sendResponseXml = xml;
-        break;
-      }
-      if (attempt < this.maxSendRequestRetries) {
-        await wait(this.getStatementPollDelay(attempt));
-      }
+    // Phase 1: submit the SendRequest once to obtain the reference code.
+    const sendXml = await sendHttpTextRequest("GET", requestUrl, 20000);
+    if (isFlexReportXml(sendXml)) {
+      this.flexXml = sendXml;
+      return sendXml;
     }
+    assertSuccessfulFlexResponse(sendXml);
 
-    if (!sendResponseXml) {
-      const err = getFlexResponseError(lastSendXml);
-      const detail = err
-        ? [err.status, err.errorCode, err.errorMessage]
-            .filter(Boolean)
-            .join(": ")
-        : lastSendXml.slice(0, 200);
-      throw new Error(
-        `IBKR Flex SendRequest was not ready after ${this.maxSendRequestRetries} attempts: ${detail}`,
-      );
-    }
-
-    let pollUrl = getIbkrFlexStatementUrl(sendResponseXml, this.token);
+    const pollUrl = getIbkrFlexStatementUrl(sendXml, this.token);
 
     // Wait for IBKR to finish generating the report before the first poll,
     // matching the delay that IBKR's own examples recommend.
@@ -285,18 +254,6 @@ export class IbkrBroker implements StockBroker {
         if (attempt < this.maxStatementPollAttempts) {
           await wait(this.getStatementPollDelay(attempt));
         }
-        continue;
-      }
-
-      // IBKR may return another <Url> hop before the final report is available.
-      // Follow it (counted as one polling attempt) instead of failing immediately.
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(statementXml, "text/xml");
-      const redirectUrl = doc
-        .getElementsByTagName("Url")[0]
-        ?.textContent?.trim();
-      if (redirectUrl && redirectUrl !== pollUrl) {
-        pollUrl = redirectUrl;
         continue;
       }
 
