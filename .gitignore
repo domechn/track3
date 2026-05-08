@@ -27,4 +27,4 @@ dist-ssr
 .local/
 
 track3-ios/
-docs/
+.docs/
