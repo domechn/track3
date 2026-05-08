@@ -12,6 +12,12 @@ import bluebird from "bluebird";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import {
+  buildAssetDetailsPath,
+  formatAssetLabel,
+  getAssetLogoKey,
+  shouldDownloadCryptoLogo,
+} from "@/utils/assets";
 
 const PAGE_SIZE = 20;
 
@@ -41,16 +47,24 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   useEffect(() => {
     if (topCoinsRankData.coins.length === 0) return;
     downloadCoinLogos(
-      topCoinsRankData.coins.map((c) => ({ symbol: c.coin, price: 0 }))
+      topCoinsRankData.coins
+        .filter((coin) => shouldDownloadCryptoLogo(coin))
+        .map((c) => ({ symbol: c.coin, price: 0 }))
     );
     getLogoMap(topCoinsRankData.coins).then((m) => setLogoMap(m));
   }, [topCoinsRankData]);
 
-  async function getLogoMap(coins: { coin: string }[]) {
+  async function getLogoMap(
+    coins: { coin: string; assetType: "crypto" | "stock" }[]
+  ) {
     const acd = await getAppCacheDir();
     const kvs = await bluebird.map(coins, async (c) => {
+      if (!shouldDownloadCryptoLogo(c)) {
+        return { [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: "" };
+      }
+
       const path = await getImageApiPath(acd, c.coin);
-      return { [c.coin]: path };
+      return { [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: path };
     });
     return _.assign({}, ...kvs);
   }
@@ -67,6 +81,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         const change = firstRank - lastRank; // positive = improved (lower rank number)
         return {
           coin: coin.coin,
+          assetType: coin.assetType,
           rank: lastRank,
           change,
         };
@@ -74,6 +89,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       .filter(Boolean)
       .sort((a, b) => a!.rank - b!.rank) as {
       coin: string;
+      assetType: "crypto" | "stock";
       rank: number;
       change: number;
     }[];
@@ -132,9 +148,16 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
             <TableBody>
               {pagedRows.map((row) => (
                 <TableRow
-                  key={row.coin}
+                  key={getAssetLogoKey({ symbol: row.coin, assetType: row.assetType })}
                   className="h-[42px] cursor-pointer group"
-                  onClick={() => navigate(`/coins/${row.coin}`)}
+                  onClick={() =>
+                    navigate(
+                      buildAssetDetailsPath({
+                        symbol: row.coin,
+                        assetType: row.assetType,
+                      })
+                    )
+                  }
                 >
                   <TableCell className="w-[40px] text-muted-foreground font-mono text-xs py-1.5">
                     #{row.rank}
@@ -143,10 +166,25 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                     <div className="flex items-center gap-2">
                       <img
                         className="w-[18px] h-[18px] rounded-full"
-                        src={logoMap[row.coin] || UnknownLogo}
-                        alt={row.coin}
+                        src={
+                          logoMap[
+                            getAssetLogoKey({
+                              symbol: row.coin,
+                              assetType: row.assetType,
+                            })
+                          ] || UnknownLogo
+                        }
+                        alt={formatAssetLabel({
+                          symbol: row.coin,
+                          assetType: row.assetType,
+                        })}
                       />
-                      <span className="font-medium text-sm">{row.coin}</span>
+                      <span className="font-medium text-sm">
+                        {formatAssetLabel({
+                          symbol: row.coin,
+                          assetType: row.assetType,
+                        })}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right py-1.5">

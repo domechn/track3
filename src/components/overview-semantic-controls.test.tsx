@@ -24,9 +24,11 @@ vi.mock("@tauri-apps/api/path", () => ({
 }));
 
 vi.mock("@/utils/app", () => ({
-  getImageApiPath: vi.fn().mockImplementation((_dir: string, symbol: string) =>
-    Promise.resolve(`/logos/${symbol}.png`)
-  ),
+  getImageApiPath: vi
+    .fn()
+    .mockImplementation((_dir: string, symbol: string) =>
+      Promise.resolve(`/logos/${symbol}.png`),
+    ),
 }));
 
 vi.mock("@/middlelayers/data", () => ({
@@ -55,13 +57,18 @@ function renderWithProviders(node: React.ReactNode) {
   return render(
     <MemoryRouter>
       <ChartResizeContext.Provider
-        value={{ needResize: 0, setNeedResize: vi.fn() as React.Dispatch<React.SetStateAction<number>> }}
+        value={{
+          needResize: 0,
+          setNeedResize: vi.fn() as React.Dispatch<
+            React.SetStateAction<number>
+          >,
+        }}
       >
         <OverviewLoadingContext.Provider value={{ reportLoaded: vi.fn() }}>
           {node}
         </OverviewLoadingContext.Provider>
       </ChartResizeContext.Provider>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -78,21 +85,125 @@ beforeEach(() => {
     total: 140,
     percentage: 14,
     coins: [
-      { symbol: "DOGE", value: -60, percentage: -6, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "SOL", value: -40, percentage: -4, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "XRP", value: -30, percentage: -3, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "ADA", value: -20, percentage: -2, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "LTC", value: -10, percentage: -1, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "ETH", value: 10, percentage: 1, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "SUI", value: 20, percentage: 2, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "BNB", value: 30, percentage: 3, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "TON", value: 40, percentage: 4, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
-      { symbol: "BTC", value: 80, percentage: 8, buyAmount: 1, sellAmount: 1, costAvgPrice: 1, sellAvgPrice: 1 },
+      {
+        symbol: "DOGE",
+        assetType: "crypto",
+        value: -60,
+        percentage: -6,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "SOL",
+        assetType: "crypto",
+        value: -40,
+        percentage: -4,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "XRP",
+        assetType: "crypto",
+        value: -30,
+        percentage: -3,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "ADA",
+        assetType: "crypto",
+        value: -20,
+        percentage: -2,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "LTC",
+        assetType: "crypto",
+        value: -10,
+        percentage: -1,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "ETH",
+        assetType: "crypto",
+        value: 10,
+        percentage: 1,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "SUI",
+        assetType: "crypto",
+        value: 20,
+        percentage: 2,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "BNB",
+        assetType: "crypto",
+        value: 30,
+        percentage: 3,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "TON",
+        assetType: "crypto",
+        value: 40,
+        percentage: 4,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
+      {
+        symbol: "BTC",
+        assetType: "crypto",
+        value: 80,
+        percentage: 8,
+        buyAmount: 1,
+        sellAmount: 1,
+        costAvgPrice: 1,
+        sellAvgPrice: 1,
+      },
     ],
   });
   vi.mocked(queryLatestAssetsPercentage).mockResolvedValue([
-    { coin: "BTC", amount: 0.5, percentage: 55, value: 825, chartColor: "#f59e0b" },
-    { coin: "ETH", amount: 2, percentage: 45, value: 675, chartColor: "#3b82f6" },
+    {
+      coin: "BTC",
+      assetType: "crypto",
+      amount: 0.5,
+      percentage: 55,
+      value: 825,
+      chartColor: "#f59e0b",
+    },
+    {
+      coin: "ETH",
+      assetType: "crypto",
+      amount: 2,
+      percentage: 45,
+      value: 675,
+      chartColor: "#3b82f6",
+    },
   ]);
 });
 
@@ -101,16 +212,19 @@ describe("Overview semantic controls", () => {
     renderWithProviders(
       <TotalValue
         currency={usdCurrency}
-        dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+        dateRange={{
+          start: new Date("2024-04-15"),
+          end: new Date("2024-04-16"),
+        }}
         quoteColor="green-up-red-down"
-      />
+      />,
     );
 
     expect(
-      await screen.findByRole("button", { name: /show percentage change/i })
+      await screen.findByRole("button", { name: /show percentage change/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /switch total value base currency/i })
+      screen.getByRole("button", { name: /switch total value base currency/i }),
     ).toBeInTheDocument();
   });
 
@@ -118,28 +232,34 @@ describe("Overview semantic controls", () => {
     renderWithProviders(
       <Profit
         currency={usdCurrency}
-        dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+        dateRange={{
+          start: new Date("2024-04-15"),
+          end: new Date("2024-04-16"),
+        }}
         quoteColor="green-up-red-down"
-      />
+      />,
     );
 
     const btcLink = await screen.findByRole("link", {
       name: /open btc details/i,
     });
-    expect(btcLink).toHaveAttribute("href", "/coins/BTC");
+    expect(btcLink).toHaveAttribute("href", "/coins/BTC?assetType=crypto");
   });
 
   it("renders latest asset entries as detail links", async () => {
     renderWithProviders(
       <LatestAssetsPercentage
         currency={usdCurrency}
-        dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
-      />
+        dateRange={{
+          start: new Date("2024-04-15"),
+          end: new Date("2024-04-16"),
+        }}
+      />,
     );
 
     const btcLink = await screen.findByRole("link", {
       name: /open btc details/i,
     });
-    expect(btcLink).toHaveAttribute("href", "/coins/BTC");
+    expect(btcLink).toHaveAttribute("href", "/coins/BTC?assetType=crypto");
   });
 });

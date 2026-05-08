@@ -5,6 +5,7 @@ import {
   TDateRange,
   WalletAssetsPercentageData,
 } from "@/middlelayers/types";
+import { AssetType } from "@/middlelayers/datafetch/types";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -24,6 +25,7 @@ import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { chartColors, glassTooltip } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import { formatAssetLabel } from "@/utils/assets";
 
 const chartName = "wallet-assets-percentage";
 
@@ -46,11 +48,13 @@ const App = ({
   currency,
   dateRange,
   symbol,
+  assetType,
   displayAmount,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   symbol?: string;
+  assetType?: AssetType;
   displayAmount?: boolean;
 }) => {
   const size = useWindowSize();
@@ -67,7 +71,7 @@ const App = ({
     let mounted = true;
     const gen = ++loadGenRef.current;
 
-    WALLET_ANALYZER.queryWalletAssetsPercentage(symbol)
+    WALLET_ANALYZER.queryWalletAssetsPercentage(symbol, assetType)
       .then((wap) => {
         if (!mounted || gen !== loadGenRef.current) {
           return;
@@ -84,7 +88,7 @@ const App = ({
     return () => {
       mounted = false;
     };
-  }, [dateRange, reportLoaded, symbol]);
+  }, [dateRange, reportLoaded, symbol, assetType]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
@@ -203,7 +207,7 @@ const App = ({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
         <CardTitle className="text-sm font-medium text-muted-foreground">
-          {symbol ? `${symbol} ` : ""}Wallet Allocation
+          {symbol ? `${formatAssetLabel({ symbol, assetType })} ` : ""}Wallet Allocation
         </CardTitle>
         <ButtonGroup value={topLimit} onValueChange={(v) => setTopLimit(v as TopLimit)}>
           <ButtonGroupItem value="8">Top 8</ButtonGroupItem>

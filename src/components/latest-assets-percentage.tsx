@@ -34,6 +34,12 @@ import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
 import { chartColors, glassTooltip } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import {
+  buildAssetDetailsPath,
+  formatAssetLabel,
+  getAssetLogoKey,
+  shouldDownloadCryptoLogo,
+} from "@/utils/assets";
 
 const chartName = "Percentage of Assets";
 
@@ -60,7 +66,7 @@ const App = ({
 
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
 
   useEffect(() => {
@@ -88,11 +94,12 @@ const App = ({
     // download coin logos
     downloadCoinLogos(
       _(latestAssetsPercentageData)
+        .filter((d) => shouldDownloadCryptoLogo(d))
         .map((d) => ({
           symbol: d.coin,
           price: d.value / (d.amount || 1),
         }))
-        .value()
+        .value(),
     );
 
     // set logo map
@@ -107,7 +114,7 @@ const App = ({
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
     const mp = Math.floor(
-      latestAssetsPercentageData.length / pageSize - 0.000000000001
+      latestAssetsPercentageData.length / pageSize - 0.000000000001,
     );
     return mp >= 0 ? mp : 0;
   }, [latestAssetsPercentageData]);
@@ -116,16 +123,21 @@ const App = ({
     () =>
       latestAssetsPercentageData.slice(
         dataPage * pageSize,
-        (dataPage + 1) * pageSize
+        (dataPage + 1) * pageSize,
       ),
-    [latestAssetsPercentageData, dataPage]
+    [latestAssetsPercentageData, dataPage],
   );
 
   async function getLogoMap(d: LatestAssetsPercentageData) {
     const acd = await getAppCacheDir();
     const kvs = await bluebird.map(d, async (coin) => {
+      const assetRef = { symbol: coin.coin, assetType: coin.assetType };
+      if (!shouldDownloadCryptoLogo(coin)) {
+        return { [getAssetLogoKey(assetRef)]: "" };
+      }
+
       const path = await getImageApiPath(acd, coin.coin);
-      return { [coin.coin]: path };
+      return { [getAssetLogoKey(assetRef)]: path };
     });
 
     return _.assign({}, ...kvs);
@@ -198,7 +210,7 @@ const App = ({
           data: d.map((coin) => currencyWrapper(currency)(coin.value)),
           borderColor: "rgba(255,255,255,0.15)",
           backgroundColor: d.map(
-            (_coin, i) => chartColors[i % chartColors.length].main
+            (_coin, i) => chartColors[i % chartColors.length].main,
           ),
           borderWidth: 2,
           hoverOffset: 12,
@@ -251,32 +263,44 @@ const App = ({
         <Table>
           <TableBody>
             {pagedLatestAssetsPercentageData.map((d) => (
-              <TableRow key={d.coin} className="h-[42px]">
+              <TableRow
+                key={getAssetLogoKey({ symbol: d.coin, assetType: d.assetType })}
+                className="h-[42px]"
+              >
                 <TableCell className="py-1.5">
                   <Link
-                    to={`/coins/${d.coin}`}
-                    aria-label={`Open ${d.coin} details`}
+                    to={buildAssetDetailsPath({
+                      symbol: d.coin,
+                      assetType: d.assetType,
+                    })}
+                    aria-label={`Open ${formatAssetLabel({ symbol: d.coin, assetType: d.assetType })} details`}
                     className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <img
                       className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-                      src={logoMap[d.coin] || UnknownLogo}
-                      alt={d.coin}
+                      src={
+                        logoMap[
+                          getAssetLogoKey({ symbol: d.coin, assetType: d.assetType })
+                        ] || UnknownLogo
+                      }
+                      alt={formatAssetLabel({ symbol: d.coin, assetType: d.assetType })}
                     />
                     <div
                       className="mr-1 font-medium text-sm"
                       title={"" + d.amount}
                     >
                       {d.amount >= 1
-                        ? prettyNumberKeepNDigitsAfterDecimalPoint(
-                            d.amount,
-                            4
-                          )
+                        ? prettyNumberKeepNDigitsAfterDecimalPoint(d.amount, 4)
                         : prettyPriceNumberToLocaleString(d.amount)}
                     </div>
                     <div className="text-muted-foreground text-xs truncate">
-                      {d.coin}
+                      {formatAssetLabel({ symbol: d.coin, assetType: d.assetType })}
                     </div>
+                    {d.assetType !== "crypto" ? (
+                      <span className="ml-2 rounded-sm border border-border px-1.5 py-0.5 text-[10px] uppercase leading-none text-muted-foreground">
+                        {d.assetType}
+                      </span>
+                    ) : null}
                     <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
                   </Link>
                 </TableCell>
@@ -284,7 +308,7 @@ const App = ({
                   <div className="text-muted-foreground text-xs">
                     {currency.symbol +
                       prettyNumberToLocaleString(
-                        currencyWrapper(currency)(d.value)
+                        currencyWrapper(currency)(d.value),
                       )}
                   </div>
                 </TableCell>

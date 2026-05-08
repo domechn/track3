@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getDatabase } from "./database";
-import { GlobalConfig } from "./datafetch/types";
+import { GlobalConfig, StockConfig } from "./datafetch/types";
 import { ConfigurationModel, CurrencyRateDetail } from "./types";
 import yaml from "yaml";
 import { CURRENCY_RATE_HANDLER } from "./entities/currency";
@@ -18,6 +18,7 @@ const generalFixId = "1";
 const exchangesConfigId = "10";
 const walletsConfigId = "11";
 const generalConfigId = "12";
+const stockConfigId = "20";
 
 const walletKeys = [
   "btc",
@@ -43,11 +44,13 @@ const blacklistCoinsId = "995";
 export const themeLocalStorageKey = "track3-ui-theme";
 
 export async function getConfiguration(): Promise<GlobalConfig | undefined> {
-  const [exchangesModel, walletsModel, generalModel] = await Promise.all([
-    getConfigurationById(exchangesConfigId),
-    getConfigurationById(walletsConfigId),
-    getConfigurationModelById(generalConfigId),
-  ]);
+  const [exchangesModel, walletsModel, generalModel, stockConfig] =
+    await Promise.all([
+      getConfigurationById(exchangesConfigId),
+      getConfigurationById(walletsConfigId),
+      getConfigurationModelById(generalConfigId),
+      getStockConfig(),
+    ]);
 
   // new-format exists: merge and return
   if (exchangesModel || walletsModel || generalModel) {
@@ -63,6 +66,7 @@ export async function getConfiguration(): Promise<GlobalConfig | undefined> {
       ...exchanges,
       ...wallets,
       ...general,
+      stockConfig,
     } as GlobalConfig;
   }
 
@@ -73,6 +77,7 @@ export async function getConfiguration(): Promise<GlobalConfig | undefined> {
   }
 
   const cfg = yaml.parse(legacyModel.data) as GlobalConfig;
+  cfg.stockConfig = stockConfig;
   await migrateConfigurationToSplit(cfg);
   return cfg;
 }
@@ -89,7 +94,20 @@ export async function saveConfiguration(cfg: GlobalConfig) {
     saveConfigurationById(exchangesConfigId, exchangesData),
     saveConfigurationById(walletsConfigId, walletsData),
     saveConfigurationById(generalConfigId, generalData, false),
+    saveStockConfig(cfg.stockConfig ?? { brokers: [] }),
   ]);
+}
+
+export async function getStockConfig(): Promise<StockConfig> {
+  const model = await getConfigurationById(stockConfigId);
+  if (!model?.data) {
+    return { brokers: [] };
+  }
+  return yaml.parse(model.data) as StockConfig;
+}
+
+export async function saveStockConfig(cfg: StockConfig) {
+  return saveConfigurationById(stockConfigId, yaml.stringify(cfg));
 }
 
 // used for import data

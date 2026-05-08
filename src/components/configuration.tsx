@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import {
   Analyzer,
   GlobalConfig,
+  StockConfig,
   TokenConfig,
 } from "@/middlelayers/datafetch/types";
 import { CurrencyRateDetail } from "@/middlelayers/types";
@@ -41,6 +42,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CexAnalyzer } from "@/middlelayers/datafetch/coins/cex/cex";
+import { StockAnalyzer } from "@/middlelayers/datafetch/coins/stock/stock-analyzer";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -67,6 +69,7 @@ import { Switch } from "./ui/switch";
 import { SUIAnalyzer } from "@/middlelayers/datafetch/coins/sui";
 import {
   CEX_OPTIONS,
+  STOCK_BROKER_OPTIONS,
   SUPPORT_CONS,
   WALLET_OPTIONS,
 } from "@/middlelayers/constants";
@@ -85,6 +88,9 @@ const initialConfiguration: GlobalConfig = {
     hideInactive: false,
   },
   exchanges: [],
+  stockConfig: {
+    brokers: [],
+  },
   erc20: {
     addresses: [],
   },
@@ -122,6 +128,13 @@ const defaultWalletConfig = {
   active: true,
 };
 
+const defaultStockBrokerConfig = {
+  type: "ibkr",
+  token: "",
+  queryId: "",
+  active: true,
+};
+
 const defaultOtherConfig = {
   symbol: "",
   amount: 0,
@@ -130,6 +143,8 @@ const defaultOtherConfig = {
 const supportCoins = SUPPORT_CONS;
 
 const cexOptions = CEX_OPTIONS;
+
+const stockBrokerOptions = STOCK_BROKER_OPTIONS;
 
 const walletOptions = WALLET_OPTIONS;
 
@@ -159,10 +174,14 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   const [formChanged, setFormChanged] = useState(false);
   const [preferCurrency, setPreferCurrency] = useState(defaultBaseCurrency);
   const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
+  const [addStockBrokerDialogOpen, setAddStockBrokerDialogOpen] =
+    useState(false);
   const [addWalletDialogOpen, setAddWalletDialogOpen] = useState(false);
   const [addOtherDialogOpen, setAddOtherDialogOpen] = useState(false);
 
   const [saveCexConfigLoading, setSaveCexConfigLoading] = useState(false);
+  const [saveStockBrokerConfigLoading, setSaveStockBrokerConfigLoading] =
+    useState(false);
   const [saveWalletConfigLoading, setSaveWalletConfigLoading] = useState(false);
 
   const [refreshCurrencyLoading, setRefreshCurrencyLoading] = useState(false);
@@ -202,6 +221,16 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       }
     | undefined
   >(undefined);
+  const [addStockBrokerConfig, setAddStockBrokerConfig] = useState<
+    | {
+        type: string;
+        token: string;
+        queryId: string;
+        alias?: string;
+        active: boolean;
+      }
+    | undefined
+  >(undefined);
   const [addOtherConfig, setAddOtherConfig] = useState<
     | {
         alias?: string;
@@ -235,6 +264,16 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     }[]
   >([]);
 
+  const [stockBrokers, setStockBrokers] = useState<
+    {
+      alias?: string;
+      type: string;
+      token: string;
+      queryId: string;
+      active: boolean;
+    }[]
+  >([]);
+
   const [others, setOthers] = useState<
     {
       alias?: string;
@@ -246,6 +285,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     Record<number, string>
   >({});
   const [exchangePage, setExchangePage] = useState(0);
+  const [stockBrokerPage, setStockBrokerPage] = useState(0);
   const [walletPage, setWalletPage] = useState(0);
   const [othersPage, setOthersPage] = useState(0);
 
@@ -257,42 +297,60 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           label: `${c.currency} - ${c.alias}`,
         }))
         .value(),
-    [currencies]
+    [currencies],
   );
 
   const preferredCurrencyDetail = useMemo(
     () => _(currencies).find((c) => c.currency === preferCurrency),
-    [currencies, preferCurrency]
+    [currencies, preferCurrency],
   );
 
   const visibleExchanges = useMemo(
     () => exchanges.filter((e) => e.active || !hideInactive),
-    [exchanges, hideInactive]
+    [exchanges, hideInactive],
+  );
+
+  const visibleStockBrokers = useMemo(
+    () => stockBrokers.filter((broker) => broker.active || !hideInactive),
+    [stockBrokers, hideInactive],
   );
 
   const visibleWallets = useMemo(
     () => wallets.filter((w) => w.active || !hideInactive),
-    [wallets, hideInactive]
+    [wallets, hideInactive],
   );
   const exchangePageCount = useMemo(
-    () => Math.max(Math.ceil(visibleExchanges.length / CONFIG_LIST_PAGE_SIZE), 1),
-    [visibleExchanges.length]
+    () =>
+      Math.max(Math.ceil(visibleExchanges.length / CONFIG_LIST_PAGE_SIZE), 1),
+    [visibleExchanges.length],
+  );
+  const stockBrokerPageCount = useMemo(
+    () =>
+      Math.max(
+        Math.ceil(visibleStockBrokers.length / CONFIG_LIST_PAGE_SIZE),
+        1,
+      ),
+    [visibleStockBrokers.length],
   );
   const walletPageCount = useMemo(
     () => Math.max(Math.ceil(visibleWallets.length / CONFIG_LIST_PAGE_SIZE), 1),
-    [visibleWallets.length]
+    [visibleWallets.length],
   );
   const pagedVisibleExchanges = useMemo(() => {
     const start = exchangePage * CONFIG_LIST_PAGE_SIZE;
     return visibleExchanges.slice(start, start + CONFIG_LIST_PAGE_SIZE);
   }, [visibleExchanges, exchangePage]);
+  const pagedVisibleStockBrokers = useMemo(() => {
+    const start = stockBrokerPage * CONFIG_LIST_PAGE_SIZE;
+    return visibleStockBrokers.slice(start, start + CONFIG_LIST_PAGE_SIZE);
+  }, [visibleStockBrokers, stockBrokerPage]);
   const pagedVisibleWallets = useMemo(() => {
     const start = walletPage * CONFIG_LIST_PAGE_SIZE;
     return visibleWallets.slice(start, start + CONFIG_LIST_PAGE_SIZE);
   }, [visibleWallets, walletPage]);
   const othersPageCount = useMemo(
     () => Math.max(Math.ceil(others.length / CONFIG_LIST_PAGE_SIZE), 1),
-    [others.length]
+    [others.length],
   );
   const pagedOthers = useMemo(() => {
     const start = othersPage * CONFIG_LIST_PAGE_SIZE;
@@ -300,17 +358,22 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   }, [others, othersPage]);
   const pagedOthersStartIndex = useMemo(
     () => othersPage * CONFIG_LIST_PAGE_SIZE,
-    [othersPage]
+    [othersPage],
   );
 
   const activeExchangeCount = useMemo(
     () => exchanges.filter((e) => e.active).length,
-    [exchanges]
+    [exchanges],
+  );
+
+  const activeStockBrokerCount = useMemo(
+    () => stockBrokers.filter((broker) => broker.active).length,
+    [stockBrokers],
   );
 
   const activeWalletCount = useMemo(
     () => wallets.filter((w) => w.active).length,
-    [wallets]
+    [wallets],
   );
 
   useEffect(() => {
@@ -327,6 +390,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   useEffect(() => {
     setExchangePage((prev) => Math.min(prev, exchangePageCount - 1));
   }, [exchangePageCount]);
+
+  useEffect(() => {
+    setStockBrokerPage((prev) => Math.min(prev, stockBrokerPageCount - 1));
+  }, [stockBrokerPageCount]);
 
   useEffect(() => {
     setWalletPage((prev) => Math.min(prev, walletPageCount - 1));
@@ -365,7 +432,19 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               passphrase: ex.initParams.passphrase,
               active: ex.active ?? true,
             }))
-            .value()
+            .value(),
+        );
+
+        setStockBrokers(
+          _(globalConfig.stockConfig?.brokers ?? [])
+            .map((broker) => ({
+              type: broker.name,
+              alias: broker.alias,
+              token: broker.initParams.token,
+              queryId: broker.initParams.queryId,
+              active: broker.active ?? true,
+            }))
+            .value(),
         );
 
         setWallets(
@@ -389,10 +468,10 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     active: na.active ?? true,
                   };
                 })
-                .value()
+                .value(),
             )
             .flatten()
-            .value()
+            .value(),
         );
 
         setOthers(globalConfig.others);
@@ -478,6 +557,20 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       }))
       .value();
 
+    const stockBrokerData: StockConfig = {
+      brokers: _(stockBrokers)
+        .map((broker) => ({
+          name: broker.type,
+          alias: broker.alias,
+          initParams: {
+            token: broker.token,
+            queryId: broker.queryId,
+          },
+          active: broker.active,
+        }))
+        .value(),
+    };
+
     const walletData = _(wallets)
       .groupBy("type")
       .mapValues((ws) => ({
@@ -497,6 +590,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         hideInactive,
       },
       exchanges: exchangesData,
+      stockConfig: stockBrokerData,
       // expand wallet
       ..._(supportCoins)
         .mapKeys((c) => c)
@@ -518,7 +612,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
   }
 
   async function buildLogoMap(
-    coins: { symbol: string }[]
+    coins: { symbol: string }[],
   ): Promise<{ [x: string]: string }> {
     const acd = await getAppCacheDir();
     const kvs = await bluebird.map(coins, async (coin) => {
@@ -639,6 +733,53 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     }
   }
 
+  async function handleQuickLookStockBroker(broker: {
+    type: string;
+    alias?: string;
+    token: string;
+    queryId: string;
+  }) {
+    setQuickLookTitle(broker.alias ?? broker.type);
+    setQuickLookData([]);
+    setQuickLookLogoMap({});
+    setQuickLookLoading(true);
+    setQuickLookOpen(true);
+
+    try {
+      const ana = new StockAnalyzer({
+        stockConfig: {
+          brokers: [
+            {
+              name: broker.type,
+              alias: broker.alias,
+              initParams: {
+                token: broker.token,
+                queryId: broker.queryId,
+              },
+              active: true,
+            },
+          ],
+        },
+      });
+
+      const coins = await ana.loadPortfolio();
+      const filtered = coins
+        .filter((c) => c.amount > 0)
+        .sort((a, b) => b.amount - a.amount)
+        .map((c) => ({ symbol: c.symbol, amount: c.amount }));
+      setQuickLookData(filtered);
+      buildLogoMap(filtered).then(setQuickLookLogoMap);
+    } catch (e: any) {
+      toast({
+        description: "Failed to fetch positions: " + (e.message || e),
+        variant: "destructive",
+      });
+      setQuickLookOpen(false);
+    } finally {
+      setQuickLookLoading(false);
+    }
+  }
+
   function renderQuickLookDialog() {
     return (
       <Dialog
@@ -655,9 +796,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Quick Look - {quickLookTitle}</DialogTitle>
-            <DialogDescription>
-              Current asset balances
-            </DialogDescription>
+            <DialogDescription>Current asset balances</DialogDescription>
           </DialogHeader>
           <div className="max-h-[400px] overflow-y-auto">
             {quickLookLoading ? (
@@ -709,7 +848,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
       password?: string;
       passphrase?: string;
       active: boolean;
-    }[]
+    }[],
   ) {
     if (exs.length === 0) {
       return (
@@ -744,7 +883,8 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                     alt={ex.type}
                   />
                   <span className="truncate">
-                    {cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type}
+                    {cexOptions.find((c) => c.value === ex.type)?.label ??
+                      ex.type}
                   </span>
                 </div>
               </TableCell>
@@ -758,7 +898,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={ex.active}
-                    onCheckedChange={() => handleActiveExchange(ex.type, ex.apiKey)}
+                    onCheckedChange={() =>
+                      handleActiveExchange(ex.type, ex.apiKey)
+                    }
                   />
                   <span className="text-xs text-muted-foreground">
                     {ex.active ? "Active" : "Inactive"}
@@ -796,8 +938,111 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     );
   }
 
+  function renderStockBrokerForm(
+    brokers: {
+      type: string;
+      alias?: string;
+      token: string;
+      queryId: string;
+      active: boolean;
+    }[],
+  ) {
+    if (brokers.length === 0) {
+      return (
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          No stock broker found.
+        </div>
+      );
+    }
+
+    return (
+      <Table className="table-fixed">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[170px]">Broker</TableHead>
+            <TableHead className="w-[170px]">Alias</TableHead>
+            <TableHead className="w-[180px]">Query ID</TableHead>
+            <TableHead className="w-[180px]">Token</TableHead>
+            <TableHead className="w-[120px]">Status</TableHead>
+            <TableHead className="w-[84px] text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {brokers.map((broker, idx) => (
+            <TableRow
+              key={broker.type + broker.queryId + idx}
+              className="h-[42px] group align-middle"
+            >
+              <TableCell className="w-[170px]">
+                <div className="flex items-center gap-2 text-sm">
+                  <img
+                    className="w-[18px] h-[18px] rounded-full"
+                    src={UnknownLogo}
+                    alt={broker.type}
+                  />
+                  <span className="truncate">
+                    {stockBrokerOptions.find((c) => c.value === broker.type)
+                      ?.label ?? broker.type}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="w-[170px] text-sm">
+                {broker.alias || `${broker.type}-${idx + 1}`}
+              </TableCell>
+              <TableCell className="w-[180px] text-xs text-muted-foreground">
+                <p className="truncate">{broker.queryId}</p>
+              </TableCell>
+              <TableCell className="w-[180px] text-xs text-muted-foreground">
+                <p className="truncate">{maskSensitive(broker.token)}</p>
+              </TableCell>
+              <TableCell className="w-[120px]">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={broker.active}
+                    onCheckedChange={() =>
+                      handleActiveStockBroker(broker.type, broker.queryId)
+                    }
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {broker.active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="w-[84px] text-right">
+                <div className="inline-flex w-[64px] items-center justify-end gap-1">
+                  {isPro && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={() => handleQuickLookStockBroker(broker)}
+                      title="Quick look"
+                    >
+                      <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() =>
+                      handleRemoveStockBroker(broker.type, broker.queryId)
+                    }
+                    title="Delete"
+                  >
+                    <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  }
+
   function renderWalletForm(
-    ws: { type: string; alias?: string; address: string; active: boolean }[]
+    ws: { type: string; alias?: string; address: string; active: boolean }[],
   ) {
     if (ws.length === 0) {
       return (
@@ -844,7 +1089,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={w.active}
-                    onCheckedChange={() => handleActiveWallet(w.type, w.address)}
+                    onCheckedChange={() =>
+                      handleActiveWallet(w.type, w.address)
+                    }
                   />
                   <span className="text-xs text-muted-foreground">
                     {w.active ? "Active" : "Inactive"}
@@ -887,12 +1134,20 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     if (formChanged) {
       submitConfiguration();
     }
-  }, [formChanged, hideInactive, groupUSD, exchanges, wallets, others]);
+  }, [
+    formChanged,
+    hideInactive,
+    groupUSD,
+    exchanges,
+    stockBrokers,
+    wallets,
+    others,
+  ]);
 
   function handleOthersChange(
     idx: number,
     key: "alias" | "symbol" | "amount",
-    val: string
+    val: string,
   ) {
     setOthers((prev) =>
       prev.map((item, i) => {
@@ -910,7 +1165,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           ...item,
           [key]: val,
         };
-      })
+      }),
     );
     // mark form is changed
     markFormChanged();
@@ -976,7 +1231,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function renderOthersForm(
     vals: { alias?: string; symbol: string; amount: number }[],
-    startIndex = 0
+    startIndex = 0,
   ) {
     if (vals.length === 0) {
       return (
@@ -1000,58 +1255,64 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           {vals.map((o, idx) => {
             const globalIdx = startIndex + idx;
             return (
-            <TableRow
-              key={"other" + globalIdx}
-              className="h-[42px] group align-middle"
-            >
-              <TableCell>
-                <Input
-                  type="text"
-                  name="alias"
-                  placeholder="Main wallet"
-                  value={o.alias ?? ""}
-                  autoComplete="off"
-                  onChange={(e) => handleOthersChange(globalIdx, "alias", e.target.value)}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="text"
-                  name="symbol"
-                  placeholder="BTC"
-                  value={o.symbol}
-                  autoComplete="off"
-                  onChange={(e) => handleOthersChange(globalIdx, "symbol", e.target.value)}
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  name="amount"
-                  placeholder="0"
-                  value={otherAmountDraftMap[globalIdx] ?? `${o.amount}`}
-                  onChange={(e) => handleOtherAmountInputChange(globalIdx, e.target.value)}
-                  onBlur={() => commitOtherAmountInput(globalIdx)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      (e.target as HTMLInputElement).blur();
+              <TableRow
+                key={"other" + globalIdx}
+                className="h-[42px] group align-middle"
+              >
+                <TableCell>
+                  <Input
+                    type="text"
+                    name="alias"
+                    placeholder="Main wallet"
+                    value={o.alias ?? ""}
+                    autoComplete="off"
+                    onChange={(e) =>
+                      handleOthersChange(globalIdx, "alias", e.target.value)
                     }
-                  }}
-                />
-              </TableCell>
-              <TableCell className="text-right">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => handleRemoveOther(globalIdx)}
-                  title="Delete"
-                >
-                  <TrashIcon className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </TableCell>
-            </TableRow>
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="text"
+                    name="symbol"
+                    placeholder="BTC"
+                    value={o.symbol}
+                    autoComplete="off"
+                    onChange={(e) =>
+                      handleOthersChange(globalIdx, "symbol", e.target.value)
+                    }
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    name="amount"
+                    placeholder="0"
+                    value={otherAmountDraftMap[globalIdx] ?? `${o.amount}`}
+                    onChange={(e) =>
+                      handleOtherAmountInputChange(globalIdx, e.target.value)
+                    }
+                    onBlur={() => commitOtherAmountInput(globalIdx)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => handleRemoveOther(globalIdx)}
+                    title="Delete"
+                  >
+                    <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </TableCell>
+              </TableRow>
             );
           })}
         </TableBody>
@@ -1061,7 +1322,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function handleRemoveExchange(exchangeType: string, exchangeApiKey: string) {
     const idx = _(exchanges).findIndex(
-      (ex) => ex.type === exchangeType && ex.apiKey === exchangeApiKey
+      (ex) => ex.type === exchangeType && ex.apiKey === exchangeApiKey,
     );
     if (idx < 0) {
       throw new Error(`cannot find exchange ${exchangeType}/${exchangeApiKey}`);
@@ -1074,7 +1335,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function handleActiveExchange(exchangeType: string, exchangeApiKey: string) {
     const idx = _(exchanges).findIndex(
-      (ex) => ex.type === exchangeType && ex.apiKey === exchangeApiKey
+      (ex) => ex.type === exchangeType && ex.apiKey === exchangeApiKey,
     );
     if (idx < 0) {
       throw new Error(`cannot find exchange ${exchangeType}/${exchangeApiKey}`);
@@ -1088,7 +1349,50 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           };
         }
         return ex;
-      })
+      }),
+    );
+    markFormChanged();
+  }
+
+  function handleAddStockBroker(val: {
+    type: string;
+    token: string;
+    queryId: string;
+    alias?: string;
+    active: boolean;
+  }) {
+    setStockBrokers([...stockBrokers, val]);
+    markFormChanged();
+  }
+
+  function handleRemoveStockBroker(brokerType: string, queryId: string) {
+    const idx = _(stockBrokers).findIndex(
+      (broker) => broker.type === brokerType && broker.queryId === queryId,
+    );
+    if (idx < 0) {
+      throw new Error(`cannot find stock broker ${brokerType}/${queryId}`);
+    }
+    setStockBrokers(_.filter(stockBrokers, (_, i) => i !== idx));
+    markFormChanged();
+  }
+
+  function handleActiveStockBroker(brokerType: string, queryId: string) {
+    const idx = _(stockBrokers).findIndex(
+      (broker) => broker.type === brokerType && broker.queryId === queryId,
+    );
+    if (idx < 0) {
+      throw new Error(`cannot find stock broker ${brokerType}/${queryId}`);
+    }
+    setStockBrokers(
+      _.map(stockBrokers, (broker, i) => {
+        if (i === idx) {
+          return {
+            ...broker,
+            active: !broker.active,
+          };
+        }
+        return broker;
+      }),
     );
     markFormChanged();
   }
@@ -1122,7 +1426,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function handleRemoveWallet(walletType: string, walletAddress: string) {
     const idx = _(wallets).findIndex(
-      (w) => w.type === walletType && w.address === walletAddress
+      (w) => w.type === walletType && w.address === walletAddress,
     );
     if (idx < 0) {
       throw new Error(`cannot find wallet ${walletType}/${walletAddress}`);
@@ -1135,7 +1439,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
 
   function handleActiveWallet(walletType: string, walletAddress: string) {
     const idx = _(wallets).findIndex(
-      (w) => w.type === walletType && w.address === walletAddress
+      (w) => w.type === walletType && w.address === walletAddress,
     );
     if (idx < 0) {
       throw new Error(`cannot find wallet ${walletType}/${walletAddress}`);
@@ -1149,7 +1453,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           };
         }
         return w;
-      })
+      }),
     );
     markFormChanged();
   }
@@ -1192,6 +1496,65 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     });
 
     return ana.verifyConfigs();
+  }
+
+  function validateStockBrokerConfig(cfg: {
+    type: string;
+    token: string;
+    queryId: string;
+  }) {
+    const ana = new StockAnalyzer({
+      stockConfig: {
+        brokers: [
+          {
+            name: cfg.type,
+            initParams: {
+              token: cfg.token,
+              queryId: cfg.queryId,
+            },
+          },
+        ],
+      },
+    });
+
+    return ana.verifyConfigs();
+  }
+
+  function onAddStockBrokerFormSubmit() {
+    if (
+      !addStockBrokerConfig ||
+      !addStockBrokerConfig.type ||
+      !addStockBrokerConfig.token ||
+      !addStockBrokerConfig.queryId
+    ) {
+      toast({
+        description: "Broker type, token and query id are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaveStockBrokerConfigLoading(true);
+    validateStockBrokerConfig(addStockBrokerConfig)
+      .then((valid) => {
+        if (!valid) {
+          toast({
+            description: "Invalid stock broker configuration",
+            variant: "destructive",
+          });
+          return;
+        }
+        handleAddStockBroker(addStockBrokerConfig);
+        setAddStockBrokerConfig(undefined);
+        setAddStockBrokerDialogOpen(false);
+      })
+      .catch((e) => {
+        toast({
+          description: e.message ?? e,
+          variant: "destructive",
+        });
+      })
+      .finally(() => setSaveStockBrokerConfigLoading(false));
   }
 
   // submit button clicked in add exchange form
@@ -1277,7 +1640,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           {
             erc20: initPayload,
           },
-          ""
+          "",
         );
         break;
       case "sol":
@@ -1305,7 +1668,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
           {
             trc20: initPayload,
           },
-          ""
+          "",
         );
         break;
       default:
@@ -1479,6 +1842,123 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               disabled={saveCexConfigLoading}
             >
               {saveCexConfigLoading && (
+                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  function renderAddStockBrokerForm() {
+    return (
+      <Dialog
+        open={addStockBrokerDialogOpen}
+        onOpenChange={setAddStockBrokerDialogOpen}
+      >
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add Stock Broker
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Stock Broker</DialogTitle>
+            <DialogDescription>
+              Add broker credentials here. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="stockBrokerType" className="text-right">
+                Type
+              </Label>
+              <Select
+                onValueChange={(e) =>
+                  setAddStockBrokerConfig({
+                    ...(addStockBrokerConfig || defaultStockBrokerConfig),
+                    type: e,
+                  })
+                }
+                value={addStockBrokerConfig?.type ?? ""}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select Broker" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Broker</SelectLabel>
+                    {stockBrokerOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="stockBrokerAlias" className="text-right">
+                Alias
+              </Label>
+              <Input
+                id="stockBrokerAlias"
+                autoComplete="off"
+                value={addStockBrokerConfig?.alias ?? ""}
+                onChange={(e) =>
+                  setAddStockBrokerConfig({
+                    ...(addStockBrokerConfig || defaultStockBrokerConfig),
+                    alias: e.target.value,
+                  })
+                }
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="stockBrokerToken" className="text-right">
+                Token
+              </Label>
+              <Input
+                id="stockBrokerToken"
+                type="password"
+                value={addStockBrokerConfig?.token ?? ""}
+                onChange={(e) =>
+                  setAddStockBrokerConfig({
+                    ...(addStockBrokerConfig || defaultStockBrokerConfig),
+                    token: e.target.value,
+                  })
+                }
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="stockBrokerQueryId" className="text-right">
+                Query ID
+              </Label>
+              <Input
+                id="stockBrokerQueryId"
+                autoComplete="off"
+                value={addStockBrokerConfig?.queryId ?? ""}
+                onChange={(e) =>
+                  setAddStockBrokerConfig({
+                    ...(addStockBrokerConfig || defaultStockBrokerConfig),
+                    queryId: e.target.value,
+                  })
+                }
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="submit"
+              onClick={onAddStockBrokerFormSubmit}
+              disabled={saveStockBrokerConfigLoading}
+            >
+              {saveStockBrokerConfigLoading && (
                 <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
               )}
               Save changes
@@ -1707,9 +2187,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 type="text"
                 inputMode="decimal"
                 value={addOtherAmountDraft}
-                onChange={(e) =>
-                  setAddOtherAmountDraft(e.target.value)
-                }
+                onChange={(e) => setAddOtherAmountDraft(e.target.value)}
                 onBlur={() =>
                   setAddOtherConfig({
                     ...(addOtherConfig || defaultOtherConfig),
@@ -1740,7 +2218,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -1751,6 +2229,19 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             <div className="text-xl font-semibold">{exchanges.length}</div>
             <p className="text-xs text-muted-foreground">
               {activeExchangeCount} active
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Stock Brokers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-semibold">{stockBrokers.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {activeStockBrokerCount} active
             </p>
           </CardContent>
         </Card>
@@ -1817,7 +2308,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               onCheckedChange={(v) => onHideInactiveSelectChange(!!v)}
             />
             <Label htmlFor="hideInactive" className="text-sm">
-              Hide inactive exchanges and wallets
+              Hide inactive exchanges, brokers, and wallets
             </Label>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -1889,13 +2380,61 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                   {preferredCurrencyDetail &&
                   preferCurrency !== defaultBaseCurrency
                     ? `1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
-                        preferredCurrencyDetail.rate
+                        preferredCurrencyDetail.rate,
                       )} ${preferredCurrencyDetail.currency}`
                     : "\u00A0"}
                 </span>
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Stock Brokers
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {visibleStockBrokers.length} shown / {stockBrokers.length} total
+              </p>
+            </div>
+            {renderAddStockBrokerForm()}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {renderStockBrokerForm(pagedVisibleStockBrokers)}
+          {visibleStockBrokers.length > CONFIG_LIST_PAGE_SIZE ? (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setStockBrokerPage((prev) => Math.max(prev - 1, 0))
+                }
+                disabled={stockBrokerPage <= 0}
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {stockBrokerPage + 1} / {stockBrokerPageCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setStockBrokerPage((prev) =>
+                    Math.min(prev + 1, stockBrokerPageCount - 1),
+                  )
+                }
+                disabled={stockBrokerPage >= stockBrokerPageCount - 1}
+              >
+                <ChevronRightIcon />
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -1933,7 +2472,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 size="sm"
                 onClick={() =>
                   setExchangePage((prev) =>
-                    Math.min(prev + 1, exchangePageCount - 1)
+                    Math.min(prev + 1, exchangePageCount - 1),
                   )
                 }
                 disabled={exchangePage >= exchangePageCount - 1}
@@ -1978,7 +2517,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  setWalletPage((prev) => Math.min(prev + 1, walletPageCount - 1))
+                  setWalletPage((prev) =>
+                    Math.min(prev + 1, walletPageCount - 1),
+                  )
                 }
                 disabled={walletPage >= walletPageCount - 1}
               >
@@ -2022,7 +2563,9 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  setOthersPage((prev) => Math.min(prev + 1, othersPageCount - 1))
+                  setOthersPage((prev) =>
+                    Math.min(prev + 1, othersPageCount - 1),
+                  )
                 }
                 disabled={othersPage >= othersPageCount - 1}
               >

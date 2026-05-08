@@ -43,6 +43,8 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         fs::read_to_string(resource_dir.join("migrations/init/currency_rates_up.sql")).unwrap();
     let asset_actions =
         fs::read_to_string(resource_dir.join("migrations/init/asset_prices_up.sql")).unwrap();
+    let transactions =
+        fs::read_to_string(resource_dir.join("migrations/init/transactions_up.sql")).unwrap();
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
@@ -52,6 +54,7 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         conn.execute(assets_v2.as_str()).await.unwrap();
         conn.execute(currency_rates_sync.as_str()).await.unwrap();
         conn.execute(asset_actions.as_str()).await.unwrap();
+        conn.execute(transactions.as_str()).await.unwrap();
 
         // record current app version
         sqlx::query(
@@ -599,6 +602,157 @@ impl Migration for V4TV5 {
             conn.close().await.unwrap();
             println!("migrate from v0.4 to v0.5 in tokio spawn done");
         });
+    }
+}
+
+pub struct V6TV7 {
+    app_dir: String,
+    resource_dir: String,
+}
+
+impl Migration for V6TV7 {
+    fn new(app_dir: String, resource_dir: String) -> Self {
+        V6TV7 {
+            app_dir,
+            resource_dir,
+        }
+    }
+
+    fn need_to_run(&self, previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let res = compare_to(previous_version, "0.7.0", Cmp::Lt).unwrap();
+        println!("check if from v0.6 to v0.7 in rust, {:?}", res);
+        return Ok(res);
+    }
+
+    fn migrate(&self) {
+        let app_dir = Path::new(&self.app_dir);
+        let resource_dir = Path::new(&self.resource_dir);
+        println!("migrate stock asset type support");
+        let sqlite_path = get_sqlite_file_path(app_dir);
+        let assets_v2_asset_type_up = fs::read_to_string(
+            resource_dir.join("migrations/v06t07/assets_v2_asset_type_up.sql"),
+        )
+        .unwrap();
+        let transactions_up =
+            fs::read_to_string(resource_dir.join("migrations/v04t05/transactions_up.sql")).unwrap();
+        let transactions_asset_type_up = fs::read_to_string(
+            resource_dir.join("migrations/v06t07/transactions_asset_type_up.sql"),
+        )
+        .unwrap();
+
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move {
+            println!("migrate stock asset type support in tokio spawn");
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            if !column_exists(&mut conn, ASSETS_V2_TABLE_NAME, "asset_type").await {
+                conn.execute(assets_v2_asset_type_up.as_str()).await.unwrap();
+            }
+            conn.execute(transactions_up.as_str()).await.unwrap();
+            if !column_exists(&mut conn, TRANSACTION_TABLE_NAME, "asset_type").await {
+                conn.execute(transactions_asset_type_up.as_str()).await.unwrap();
+            }
+            conn.close().await.unwrap();
+            println!("migrate stock asset type support in tokio spawn done");
+        });
+    }
+}
+
+async fn column_exists(conn: &mut SqliteConnection, table_name: &str, column_name: &str) -> bool {
+    let sql = format!("SELECT COUNT(*) FROM pragma_table_info('{}') WHERE name = ?", table_name);
+    let count: i64 = sqlx::query_scalar(sql.as_str())
+    .bind(column_name)
+    .fetch_one(conn)
+    .await
+    .unwrap_or(0);
+    count > 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{column_exists, get_sqlite_file_path, Migration, V6TV7, ASSETS_V2_TABLE_NAME, TRANSACTION_TABLE_NAME};
+    use sqlx::{Connection, Executor, Row, SqliteConnection};
+    use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+    use tokio::runtime::Runtime;
+
+    fn make_temp_dir(prefix: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("track3-{prefix}-{unique}"));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn v6t7_migration_supports_split_sql_files_without_legacy_asset_type_file() {
+        let app_dir = make_temp_dir("app");
+        let resource_dir = make_temp_dir("resources");
+        let v04t05 = resource_dir.join("migrations/v04t05");
+        let v06t07 = resource_dir.join("migrations/v06t07");
+        fs::create_dir_all(&v04t05).unwrap();
+        fs::create_dir_all(&v06t07).unwrap();
+
+        fs::write(
+            v04t05.join("transactions_up.sql"),
+            "CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL, assetID INTEGER NOT NULL, wallet TEXT NOT NULL, symbol TEXT NOT NULL, amount REAL NOT NULL, price REAL NOT NULL, txnType TEXT NOT NULL, txnCreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP);",
+        )
+        .unwrap();
+        fs::write(
+            v06t07.join("assets_v2_asset_type_up.sql"),
+            "ALTER TABLE assets_v2 ADD COLUMN asset_type TEXT NOT NULL DEFAULT 'crypto';\nDROP INDEX IF EXISTS unique_uuid_symbol_amount_wallet;\nCREATE UNIQUE INDEX IF NOT EXISTS unique_uuid_asset_type_symbol_wallet ON assets_v2 (uuid, asset_type, symbol, wallet);",
+        )
+        .unwrap();
+        fs::write(
+            v06t07.join("transactions_asset_type_up.sql"),
+            "ALTER TABLE transactions ADD COLUMN asset_type TEXT NOT NULL DEFAULT 'crypto';",
+        )
+        .unwrap();
+
+        let sqlite_path = get_sqlite_file_path(app_dir.as_path());
+        fs::File::create(&sqlite_path).unwrap();
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            conn.execute(
+                "CREATE TABLE assets_v2 (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP, wallet TEXT NOT NULL, symbol TEXT NOT NULL, amount REAL NOT NULL, value REAL NOT NULL, price REAL NOT NULL);",
+            )
+            .await
+            .unwrap();
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS unique_uuid_symbol_amount_wallet ON assets_v2 (uuid, symbol, wallet);",
+            )
+            .await
+            .unwrap();
+            conn.close().await.unwrap();
+        });
+
+        let migration = V6TV7::new(
+            app_dir.to_string_lossy().to_string(),
+            resource_dir.to_string_lossy().to_string(),
+        );
+
+        migration.migrate();
+
+        rt.block_on(async {
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            assert!(column_exists(&mut conn, ASSETS_V2_TABLE_NAME, "asset_type").await);
+            assert!(column_exists(&mut conn, TRANSACTION_TABLE_NAME, "asset_type").await);
+
+            let index_names = sqlx::query("PRAGMA index_list('assets_v2')")
+                .fetch_all(&mut conn)
+                .await
+                .unwrap();
+            let names = index_names
+                .into_iter()
+                .map(|row| row.get::<String, _>(1))
+                .collect::<Vec<_>>();
+            assert!(names.iter().any(|name| name == "unique_uuid_asset_type_symbol_wallet"));
+            conn.close().await.unwrap();
+        });
+
+        fs::remove_dir_all(app_dir).unwrap();
+        fs::remove_dir_all(resource_dir).unwrap();
     }
 }
 
