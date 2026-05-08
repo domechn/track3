@@ -3,12 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Download Track3</title>
+    <title>Download Track3 — Privacy-First Desktop Portfolio Tracker</title>
     <meta
       name="description"
-      content="Download the latest Track3 desktop app for macOS, Windows, or Linux. We detect your system and recommend the right installer."
+      content="Download the latest Track3 desktop app for macOS, Windows, or Linux. We detect your system and recommend the best installer for your device."
     />
-    <meta property="og:title" content="Download Track3" />
+    <meta
+      property="og:title"
+      content="Download Track3 — Privacy-First Desktop Portfolio Tracker"
+    />
     <meta
       property="og:description"
       content="Get the latest Track3 installer for macOS, Windows, or Linux with automatic platform recommendations."
@@ -538,9 +541,8 @@
             ></div>
             <p id="recommendedText">
               We detect your operating system, look up the latest Track3
-              release, and recommend the most suitable installer for macOS,
-              Windows, or Linux. If detection is ambiguous, you can still choose
-              manually.
+              release, and recommend the best installer for macOS, Windows, or
+              Linux. If detection is unclear, you can still choose manually.
             </p>
             <div class="hero__signals">
               <div class="download-badges">
@@ -552,7 +554,7 @@
 
               <div class="release-notes" id="downloadHint">
                 When you click a button, Track3 reads the latest version
-                metadata hosted on this site, matches the right installer, and
+                metadata from this site, matches the correct installer, and
                 redirects you to the GitHub download.
               </div>
             </div>
@@ -562,21 +564,21 @@
               <div class="hero__meta-item">
                 <strong>Recommended installer</strong>
                 <span>
-                  We resolve the newest matching installer only after you click.
+                  We resolve the latest matching installer only after you click.
                 </span>
               </div>
               <div class="hero__meta-item">
                 <strong>No upfront version lookup</strong>
                 <span>
-                  The page stays static until you request a download, then it
-                  reads the current version metadata from this site.
+                  The page stays static until you request a download. Only then
+                  does it read the current version metadata from this site.
                 </span>
               </div>
               <div class="hero__meta-item">
                 <strong>Manual fallback included</strong>
                 <span>
                   macOS, Windows, and Linux package buttons are always available
-                  below if you want to choose manually.
+                  below if you prefer to choose manually.
                 </span>
               </div>
             </div>
@@ -594,7 +596,7 @@
                   Package Formats
                 </h2>
                 <p class="panel__text">
-                  Pick the format you want. Each button resolves the newest
+                  Pick the format you want. Each button resolves the latest
                   matching asset only when clicked.
                 </p>
               </div>
@@ -606,7 +608,7 @@
 
       <div class="container footer">
         Download buttons resolve from this site's latest release metadata only
-        when you click them.
+        after you click them.
       </div>
     </main>
 
@@ -644,7 +646,7 @@
       const manualGroups = [
         {
           title: "macOS (Apple Silicon)",
-          copy: "Best choice for M-series Macs.",
+          copy: "Best for Apple Silicon Macs.",
           options: [
             {
               label: "DMG installer",
@@ -658,7 +660,7 @@
         },
         {
           title: "macOS (Intel)",
-          copy: "For older Intel-based Macs.",
+          copy: "For Intel-based Macs.",
           options: [
             {
               label: "DMG installer",
@@ -672,7 +674,7 @@
         },
         {
           title: "Windows",
-          copy: "Choose the standard setup or MSI package.",
+          copy: "Choose the standard installer or the MSI package.",
           options: [
             {
               label: "EXE setup",
@@ -686,7 +688,7 @@
         },
         {
           title: "Linux",
-          copy: "AppImage first, with DEB and RPM alternatives.",
+          copy: "Start with AppImage, or choose DEB or RPM instead.",
           options: [
             {
               label: "AppImage",
@@ -745,7 +747,7 @@
         ) {
           return {
             title: `Recommended for ${detectedPlatform.label}`,
-            text: "We will fetch the newest Apple Silicon DMG only after you click the button below.",
+            text: "We will fetch the latest Apple Silicon DMG after you click the button below.",
             actions: [
               renderDownloadButton(
                 { os: "macos", arch: "arm64", kind: "dmg" },
@@ -762,7 +764,7 @@
         ) {
           return {
             title: `Recommended for ${detectedPlatform.label}`,
-            text: "We will fetch the newest Intel Mac DMG only after you click the button below.",
+            text: "We will fetch the latest Intel Mac DMG after you click the button below.",
             actions: [
               renderDownloadButton(
                 { os: "macos", arch: "x64", kind: "dmg" },
@@ -776,7 +778,7 @@
         if (detectedPlatform.os === "macos") {
           return {
             title: "Choose your Mac download",
-            text: "Your browser did not expose the Mac chip type clearly, so choose Apple Silicon or Intel before we resolve the newest installer.",
+            text: "Your browser did not clearly expose your Mac chip type, so choose Apple Silicon or Intel before we resolve the latest installer.",
             actions: [
               renderDownloadButton(
                 { os: "macos", arch: "arm64", kind: "dmg" },
@@ -795,7 +797,7 @@
         if (detectedPlatform.os === "windows") {
           return {
             title: "Recommended for Windows",
-            text: "We will fetch the newest Windows setup installer only after you click. An MSI option is still available below.",
+            text: "We will fetch the latest Windows setup installer after you click. An MSI option is also available below.",
             actions: [
               renderDownloadButton(
                 { os: "windows", arch: "x64", kind: "exe" },
@@ -817,7 +819,7 @@
         ) {
           return {
             title: "Recommended for Linux",
-            text: "We will fetch the newest AppImage only after you click. DEB and RPM remain available below.",
+            text: "We will fetch the latest AppImage after you click. DEB and RPM packages are still available below.",
             actions: [
               renderDownloadButton(
                 { os: "linux", arch: "x64", kind: "appimage" },
@@ -929,7 +931,7 @@
 
         statusBadge.textContent = "Finding latest release…";
         recommendedText.textContent =
-          "Reading the newest Track3 version metadata from this site, then redirecting you to the requested installer.";
+          "Reading the latest Track3 version metadata from this site, then redirecting you to the requested installer.";
         button.disabled = true;
 
         try {
