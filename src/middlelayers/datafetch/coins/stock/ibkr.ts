@@ -87,7 +87,7 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
           position.getAttribute("price") ??
           "0",
       );
-      if (!symbol || !amount) {
+      if (!rawSymbol || !amount) {
         return;
       }
 
@@ -98,11 +98,6 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
       )
         .trim()
         .toUpperCase();
-      const market = (
-        position.getAttribute("listingExchange") ??
-        position.getAttribute("exchange") ??
-        ""
-      ).trim();
 
       const market = (
         position.getAttribute("listingExchange") ??
@@ -245,7 +240,7 @@ export class IbkrBroker implements StockBroker {
   }
 
   getBrokerName(): string {
-    return "ibkr";
+    return "IBKR";
   }
 
   getIdentity(): string {

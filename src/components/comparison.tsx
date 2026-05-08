@@ -5,7 +5,6 @@ import _ from "lodash";
 import bluebird from "bluebird";
 import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -31,9 +30,11 @@ import { StaggerContainer, FadeUp } from "./motion";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import PageLoadingOverlay from "./page-loading-overlay";
+import AssetLabel from "./common/asset-label";
 import {
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 
@@ -124,15 +125,14 @@ const App = ({
 
       setHeadId(options[0].value);
       setBaseId(options[1]?.value || options[0].value);
-    })()
-      .catch(() => {
-        if (!cancelled && gen === loadGenRef.current) {
-          setDateOptions([]);
-          setBaseData([]);
-          setHeadData([]);
-          setPageLoading(false);
-        }
-      });
+    })().catch(() => {
+      if (!cancelled && gen === loadGenRef.current) {
+        setDateOptions([]);
+        setBaseData([]);
+        setHeadData([]);
+        setPageLoading(false);
+      }
+    });
 
     return () => {
       cancelled = true;
@@ -204,7 +204,9 @@ const App = ({
     return {
       base: baseTotal,
       head: headTotal,
-      changePercent: baseTotal ? ((headTotal - baseTotal) / baseTotal) * 100 : 0,
+      changePercent: baseTotal
+        ? ((headTotal - baseTotal) / baseTotal) * 100
+        : 0,
     };
   }, [baseData, headData]);
 
@@ -214,7 +216,7 @@ const App = ({
         .filter((coin) => shouldDownloadCryptoLogo(coin))
         .uniqBy((coin) => getAssetLogoKey(coin))
         .value(),
-    [coinComparisons]
+    [coinComparisons],
   );
 
   useEffect(() => {
@@ -224,14 +226,16 @@ const App = ({
 
     let cancelled = false;
     const missingSymbols = symbolsForLogos.filter(
-      (asset) => !downloadedLogosRef.current.has(getAssetLogoKey(asset))
+      (asset) => !downloadedLogosRef.current.has(getAssetLogoKey(asset)),
     );
 
     if (missingSymbols.length > 0) {
       missingSymbols.forEach((asset) =>
-        downloadedLogosRef.current.add(getAssetLogoKey(asset))
+        downloadedLogosRef.current.add(getAssetLogoKey(asset)),
       );
-      downloadCoinLogos(missingSymbols.map((asset) => ({ symbol: asset.symbol, price: 0 })));
+      downloadCoinLogos(
+        missingSymbols.map((asset) => ({ symbol: asset.symbol, price: 0 })),
+      );
     }
 
     (async () => {
@@ -239,7 +243,10 @@ const App = ({
         appCacheDirRef.current = await getAppCacheDir();
       }
       const kvs = await bluebird.map(symbolsForLogos, async (asset) => {
-        const path = await getImageApiPath(appCacheDirRef.current, asset.symbol);
+        const path = await getImageApiPath(
+          appCacheDirRef.current,
+          asset.symbol,
+        );
         return { [getAssetLogoKey(asset)]: path };
       });
 
@@ -294,7 +301,7 @@ const App = ({
         const year = today.getFullYear();
         const firstDayOfYear = new Date(year, 0, 1);
         return Math.floor(
-          (today.getTime() - firstDayOfYear.getTime()) / (24 * 60 * 60 * 1000)
+          (today.getTime() - firstDayOfYear.getTime()) / (24 * 60 * 60 * 1000),
         );
       }
       case "ALL":
@@ -334,7 +341,7 @@ const App = ({
     number: number,
     type: "price" | "amount" | "value",
     shouldMask = false,
-    convertCurrency = false
+    convertCurrency = false,
   ): string {
     if (shouldMask) {
       return "***";
@@ -380,7 +387,7 @@ const App = ({
 
   function formatDeltaValue(
     diff: number,
-    type: "price" | "amount" | "value"
+    type: "price" | "amount" | "value",
   ): string {
     const prefix = diff > 0 ? "+" : diff < 0 ? "-" : "";
     const abs = Math.abs(diff);
@@ -517,31 +524,46 @@ const App = ({
                   </p>
                   <div className="grid grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-center gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground truncate">{baseDate}</p>
-                      <p className="text-xl font-semibold truncate tabular-nums" title={formatVal(totalValue.base, "value")}>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {baseDate}
+                      </p>
+                      <p
+                        className="text-xl font-semibold truncate tabular-nums"
+                        title={formatVal(totalValue.base, "value")}
+                      >
                         {formatVal(totalValue.base, "value")}
                       </p>
                     </div>
                     <div className="text-center min-w-0">
                       <p className="text-xs text-muted-foreground">Change</p>
-                      <p className={`text-sm font-semibold tabular-nums truncate ${changeClass(totalValue.changePercent)}`}>
+                      <p
+                        className={`text-sm font-semibold tabular-nums truncate ${changeClass(totalValue.changePercent)}`}
+                      >
                         {formatChangePercent(totalValue.changePercent)}
                       </p>
                       <p
                         className={`text-xs tabular-nums truncate ${changeClass(
-                          totalValue.changePercent
+                          totalValue.changePercent,
                         )}`}
                         title={formatDeltaValue(
                           totalValue.head - totalValue.base,
-                          "value"
+                          "value",
                         )}
                       >
-                        {formatDeltaValue(totalValue.head - totalValue.base, "value")}
+                        {formatDeltaValue(
+                          totalValue.head - totalValue.base,
+                          "value",
+                        )}
                       </p>
                     </div>
                     <div className="text-right min-w-0">
-                      <p className="text-xs text-muted-foreground truncate">{headDate}</p>
-                      <p className="text-xl font-semibold truncate tabular-nums" title={formatVal(totalValue.head, "value")}>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {headDate}
+                      </p>
+                      <p
+                        className="text-xl font-semibold truncate tabular-nums"
+                        title={formatVal(totalValue.head, "value")}
+                      >
                         {formatVal(totalValue.head, "value")}
                       </p>
                     </div>
@@ -556,7 +578,10 @@ const App = ({
                   <CoinCard
                     key={getAssetLogoKey(coin)}
                     coin={coin}
-                    logo={logoMap[getAssetLogoKey(coin)] || UnknownLogo}
+                    logo={resolveAssetLogoSrc(
+                      coin,
+                      logoMap[getAssetLogoKey(coin)],
+                    )}
                     baseDate={baseDate}
                     headDate={headDate}
                     formatVal={formatVal}
@@ -598,11 +623,15 @@ function CoinCard({
   formatChangePercent: (percent: number) => string;
   formatDeltaValue: (
     diff: number,
-    type: "price" | "amount" | "value"
+    type: "price" | "amount" | "value",
   ) => string;
   changeClass: (percent: number) => string;
 }) {
-  const metrics: { label: string; type: "amount" | "price" | "value"; row: MetricRow }[] = [
+  const metrics: {
+    label: string;
+    type: "amount" | "price" | "value";
+    row: MetricRow;
+  }[] = [
     { label: "Amount", type: "amount", row: coin.amount },
     { label: "Price", type: "price", row: coin.price },
     { label: "Value", type: "value", row: coin.value },
@@ -617,14 +646,20 @@ function CoinCard({
             alt={formatAssetLabel(coin)}
             className="w-[18px] h-[18px] rounded-full"
           />
-          <span className="text-sm font-medium">{formatAssetLabel(coin)}</span>
+          <AssetLabel asset={coin} labelClassName="text-sm font-medium" />
         </div>
 
         <div className="grid grid-cols-[56px_minmax(0,1fr)_96px_minmax(0,1fr)] mb-1 gap-2">
           <span className="text-xs text-muted-foreground">Metric</span>
-          <span className="text-xs text-muted-foreground truncate">{baseDate}</span>
-          <span className="text-xs text-muted-foreground text-center">Change</span>
-          <span className="text-xs text-muted-foreground text-right truncate">{headDate}</span>
+          <span className="text-xs text-muted-foreground truncate">
+            {baseDate}
+          </span>
+          <span className="text-xs text-muted-foreground text-center">
+            Change
+          </span>
+          <span className="text-xs text-muted-foreground text-right truncate">
+            {headDate}
+          </span>
         </div>
 
         <div className="space-y-2">
@@ -633,20 +668,34 @@ function CoinCard({
             const headText = formatVal(m.row.head, m.type);
             const diffText = formatDeltaValue(m.row.head - m.row.base, m.type);
             return (
-              <div key={m.type} className="grid grid-cols-[56px_minmax(0,1fr)_128px_minmax(0,1fr)] items-center gap-3 py-0.5">
+              <div
+                key={m.type}
+                className="grid grid-cols-[56px_minmax(0,1fr)_128px_minmax(0,1fr)] items-center gap-3 py-0.5"
+              >
                 <div className="text-xs text-muted-foreground">{m.label}</div>
-                <span className="text-sm truncate tabular-nums" title={baseText}>
+                <span
+                  className="text-sm truncate tabular-nums"
+                  title={baseText}
+                >
                   {baseText}
                 </span>
-                <div className="min-w-0 text-center truncate" title={`${formatChangePercent(m.row.changePercent)} (${diffText})`}>
-                  <span className={`text-xs tabular-nums ${changeClass(m.row.changePercent)}`}>
+                <div
+                  className="min-w-0 text-center truncate"
+                  title={`${formatChangePercent(m.row.changePercent)} (${diffText})`}
+                >
+                  <span
+                    className={`text-xs tabular-nums ${changeClass(m.row.changePercent)}`}
+                  >
                     {formatChangePercent(m.row.changePercent)}
                   </span>
                   <span className="text-[11px] text-muted-foreground tabular-nums ml-1">
                     ({diffText})
                   </span>
                 </div>
-                <span className="text-sm text-right truncate tabular-nums" title={headText}>
+                <span
+                  className="text-sm text-right truncate tabular-nums"
+                  title={headText}
+                >
                   {headText}
                 </span>
               </div>

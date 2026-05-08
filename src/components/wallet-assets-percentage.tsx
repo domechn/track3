@@ -25,6 +25,7 @@ import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { chartColors, glassTooltip } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import AssetLabel from "./common/asset-label";
 import { formatAssetLabel } from "@/utils/assets";
 
 const chartName = "wallet-assets-percentage";
@@ -94,7 +95,7 @@ const App = ({
 
   const positiveWallets = useMemo(
     () => walletAssetsPercentage.filter((item) => item.value > 0),
-    [walletAssetsPercentage]
+    [walletAssetsPercentage],
   );
 
   const chartItems = useMemo(() => {
@@ -130,30 +131,31 @@ const App = ({
 
   const totalValue = useMemo(
     () => positiveWallets.reduce((sum, item) => sum + item.value, 0),
-    [positiveWallets]
+    [positiveWallets],
   );
   const topWallet = positiveWallets[0];
 
   const chartData = useMemo(
     () => ({
       labels: chartItems.map(
-        (item) => `${item.percentage.toFixed(2)}% ${getWalletDisplayName(item)}`
+        (item) =>
+          `${item.percentage.toFixed(2)}% ${getWalletDisplayName(item)}`,
       ),
       datasets: [
         {
           data: chartItems.map((item) =>
-            currencyWrapper(currency)(item.value).toFixed(2)
+            currencyWrapper(currency)(item.value).toFixed(2),
           ),
           borderColor: "rgba(255,255,255,0.15)",
           backgroundColor: chartItems.map(
-            (_item, i) => chartColors[i % chartColors.length].main
+            (_item, i) => chartColors[i % chartColors.length].main,
           ),
           borderWidth: 2,
           hoverOffset: 12,
         },
       ],
     }),
-    [chartItems, currency]
+    [chartItems, currency],
   );
 
   const options = useMemo(
@@ -169,7 +171,11 @@ const App = ({
           display: true,
           position: "right" as const,
           labels: { font: { size: 11 } },
-          onHover: (e: unknown, legendItem: { index: number }, legend: unknown) =>
+          onHover: (
+            e: unknown,
+            legendItem: { index: number },
+            legend: unknown,
+          ) =>
             offsetHoveredItemWrapper(chartRef.current)(e, legendItem, legend),
           onClick: () => {},
         },
@@ -188,7 +194,7 @@ const App = ({
               if (displayAmount) {
                 return `${prettyNumberKeepNDigitsAfterDecimalPoint(
                   item.amount,
-                  4
+                  4,
                 )} / ${currency.symbol}${context.parsed.toLocaleString()}`;
               }
 
@@ -198,7 +204,7 @@ const App = ({
         },
       },
     }),
-    [chartItems, currency.symbol, displayAmount]
+    [chartItems, currency.symbol, displayAmount],
   );
 
   const chartHeight = Math.max(Math.min((size.height || 760) * 0.55, 520), 340);
@@ -206,10 +212,20 @@ const App = ({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {symbol ? `${formatAssetLabel({ symbol, assetType })} ` : ""}Wallet Allocation
+        <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted-foreground">
+          {symbol ? (
+            <>
+              <AssetLabel asset={{ symbol, assetType }} />
+              <span>Wallet Allocation</span>
+            </>
+          ) : (
+            "Wallet Allocation"
+          )}
         </CardTitle>
-        <ButtonGroup value={topLimit} onValueChange={(v) => setTopLimit(v as TopLimit)}>
+        <ButtonGroup
+          value={topLimit}
+          onValueChange={(v) => setTopLimit(v as TopLimit)}
+        >
           <ButtonGroupItem value="8">Top 8</ButtonGroupItem>
           <ButtonGroupItem value="12">Top 12</ButtonGroupItem>
           <ButtonGroupItem value="20">Top 20</ButtonGroupItem>
@@ -219,16 +235,20 @@ const App = ({
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
           <div>
-            Wallets: <span className="text-foreground">{positiveWallets.length}</span>
+            Wallets:{" "}
+            <span className="text-foreground">{positiveWallets.length}</span>
           </div>
           <div>
-            Showing: <span className="text-foreground">{chartItems.length}</span>
+            Showing:{" "}
+            <span className="text-foreground">{chartItems.length}</span>
           </div>
           <div>
             Total Value:{" "}
             <span className="text-foreground">
               {currency.symbol}
-              {prettyNumberToLocaleString(currencyWrapper(currency)(totalValue))}
+              {prettyNumberToLocaleString(
+                currencyWrapper(currency)(totalValue),
+              )}
             </span>
           </div>
           <div>
@@ -239,7 +259,10 @@ const App = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-center" style={{ height: chartHeight }}>
+        <div
+          className="flex items-center justify-center"
+          style={{ height: chartHeight }}
+        >
           {chartHasData ? (
             <Pie ref={chartRef} options={options as any} data={chartData} />
           ) : (

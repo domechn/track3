@@ -24,6 +24,7 @@ import {
   glassScaleOptions,
   glassTooltip,
 } from "@/utils/chart-theme";
+import AssetLabel from "./common/asset-label";
 import { formatAssetLabel } from "@/utils/assets";
 
 const chartName = "Trend of Coin";
@@ -53,7 +54,7 @@ const App = ({
 
   const chartHasData = useMemo(
     () => !_(coinsAmountAndValueChangeData.timestamps).isEmpty(),
-    [coinsAmountAndValueChangeData]
+    [coinsAmountAndValueChangeData],
   );
 
   useEffect(() => {
@@ -213,8 +214,9 @@ const App = ({
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Trend of {formatAssetLabel({ symbol, assetType })}
+          <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted-foreground">
+            <span>Trend of</span>
+            <AssetLabel asset={{ symbol, assetType }} />
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -234,20 +236,18 @@ const App = ({
                     beforeDraw(chart: any) {
                       const { ctx, chartArea } = chart;
                       if (!chartArea) return;
-                      chart.data.datasets.forEach(
-                        (ds: any, idx: number) => {
-                          if (ds.fill) {
-                            const colorIdx = idx === 0 ? 0 : 5;
-                            ds.backgroundColor = createGradientFill(
-                              ctx,
-                              chartArea,
-                              chartColors[colorIdx].main,
-                              0.2,
-                              0.0
-                            );
-                          }
+                      chart.data.datasets.forEach((ds: any, idx: number) => {
+                        if (ds.fill) {
+                          const colorIdx = idx === 0 ? 0 : 5;
+                          ds.backgroundColor = createGradientFill(
+                            ctx,
+                            chartArea,
+                            chartColors[colorIdx].main,
+                            0.2,
+                            0.0,
+                          );
                         }
-                      );
+                      });
                     },
                   },
                 ]}
