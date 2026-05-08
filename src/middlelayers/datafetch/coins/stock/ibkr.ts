@@ -76,7 +76,7 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
         return;
       }
 
-      const symbol = position.getAttribute("symbol")?.trim().toUpperCase();
+      const rawSymbol = position.getAttribute("symbol")?.trim().toUpperCase();
       const amount = parseFloat(
         position.getAttribute("position") ??
           position.getAttribute("quantity") ??
@@ -104,8 +104,14 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
         ""
       ).trim();
 
+      const market = (
+        position.getAttribute("listingExchange") ??
+        position.getAttribute("exchange") ??
+        ""
+      ).trim();
+
       return {
-        symbol,
+        symbol: rawSymbol,
         amount,
         price: Number.isFinite(rawPrice) ? rawPrice : 0,
         currency: currency || "USD",
