@@ -10,7 +10,7 @@ import {
   TotalValueData,
 } from "./types";
 import { getBlacklistCoins } from "./configuration";
-import { getAssetIdentity, getAssetType } from "./datafetch/utils/coins";
+import { getAssetType } from "./datafetch/utils/coins";
 import { timeToDateStr } from "../utils/date";
 import { ASSET_HANDLER } from "./entities/assets";
 import { AssetType } from "./datafetch/types";

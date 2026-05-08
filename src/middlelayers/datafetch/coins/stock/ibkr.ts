@@ -1,13 +1,15 @@
 import _ from "lodash";
 import { listAllCurrencyRates } from "../../../configuration";
 import { sendHttpTextRequest } from "../../utils/http";
-import { StockBroker } from "./stock-broker";
+import { StockBroker, applyMarketSuffix } from "./stock-broker";
 
 export type IbkrFlexPosition = {
   symbol: string;
   amount: number;
   price: number;
   currency: string;
+  /** Raw IBKR listingExchange / exchange value, e.g. "SEHK", "NYSE". */
+  market: string;
 };
 
 type IbkrBrokerOptions = {
@@ -22,7 +24,7 @@ const sendRequestEndpoint = `${flexServiceEndpoint}/SendRequest`;
 const getStatementEndpoint = `${flexServiceEndpoint}/GetStatement`;
 const defaultStatementPollDelayMs = 1000;
 const defaultMaxStatementPollAttempts = 6;
-const defaultInitialStatementDelayMs = 20000;
+const defaultInitialStatementDelayMs = 5000;
 
 export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
   const parser = new DOMParser();
@@ -39,7 +41,7 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
         return;
       }
 
-      const symbol = position.getAttribute("symbol")?.trim().toUpperCase();
+      const rawSymbol = position.getAttribute("symbol")?.trim().toUpperCase();
       const amount = parseFloat(
         position.getAttribute("position") ??
           position.getAttribute("quantity") ??
@@ -57,15 +59,22 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
       )
         .trim()
         .toUpperCase();
-      if (!symbol || !amount) {
+      if (!rawSymbol || !amount) {
         return;
       }
 
+      const market = (
+        position.getAttribute("listingExchange") ??
+        position.getAttribute("exchange") ??
+        ""
+      ).trim();
+
       return {
-        symbol,
+        symbol: rawSymbol,
         amount,
         price: Number.isFinite(price) ? price : 0,
         currency: currency || "USD",
+        market,
       };
     })
     .compact()
@@ -209,13 +218,19 @@ export class IbkrBroker implements StockBroker {
 
   async fetchPositions(): Promise<{ [symbol: string]: number }> {
     const positions = parseIbkrFlexOpenPositions(await this.fetchFlexXml());
-    return _(positions).mapKeys("symbol").mapValues("amount").value();
+    return _(positions)
+      .mapKeys((pos) => applyMarketSuffix(pos.symbol, pos.market, pos.currency))
+      .mapValues("amount")
+      .value();
   }
 
   async fetchPositionsPrice(): Promise<{ [symbol: string]: number }> {
     const positions = parseIbkrFlexOpenPositions(await this.fetchFlexXml());
     const priceBySymbol = await this.convertPositionPricesToUsd(positions);
-    return _(priceBySymbol).mapKeys("symbol").mapValues("price").value();
+    return _(priceBySymbol)
+      .mapKeys((pos) => applyMarketSuffix(pos.symbol, pos.market, pos.currency))
+      .mapValues("price")
+      .value();
   }
 
   async verifyConfig(): Promise<boolean> {
@@ -244,6 +259,9 @@ export class IbkrBroker implements StockBroker {
     await wait(this.initialStatementDelayMs);
 
     for (let attempt = 1; attempt <= this.maxStatementPollAttempts; attempt++) {
+      console.debug(`IBKR Flex statement poll attempt ${attempt}`, {
+        attempt,
+      });
       const statementXml = await sendHttpTextRequest("GET", pollUrl, 30000);
       if (isFlexReportXml(statementXml)) {
         this.flexXml = statementXml;
