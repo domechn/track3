@@ -977,7 +977,7 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 <div className="flex items-center gap-2 text-sm">
                   <img
                     className="w-[18px] h-[18px] rounded-full"
-                    src={UnknownLogo}
+                    src={getWalletLogo(broker.type)}
                     alt={broker.type}
                   />
                   <span className="truncate">

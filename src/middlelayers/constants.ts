@@ -4,6 +4,7 @@ import OkexLogo from "@/assets/icons/okex-logo.svg";
 import BitgetLogo from "@/assets/icons/bitget-logo.svg";
 import KrakenLogo from "@/assets/icons/kraken-logo.svg";
 import BTCLogo from "@/assets/icons/btc-logo.svg";
+import IBKRLogo from "@/assets/icons/ibkr-logo.svg";
 import ETHLogo from "@/assets/icons/eth-logo.svg";
 import SOLLogo from "@/assets/icons/sol-logo.svg";
 import DOGELogo from "@/assets/icons/doge-logo.svg";
@@ -47,6 +48,7 @@ export const WALLET_LOGS: { [k: string]: string } = {
   trc20: TRONLogo,
   ton: TONLogo,
   sui: SUILogo,
+  ibkr: IBKRLogo,
 };
 
 // for select options when creating new exchange in configuration

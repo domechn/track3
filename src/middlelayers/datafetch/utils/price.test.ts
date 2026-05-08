@@ -50,4 +50,27 @@ describe("fetchStockPrices", () => {
       10000,
     );
   });
+
+  it("rejects when a Yahoo request fails", async () => {
+    vi.mocked(sendHttpRequest)
+      .mockRejectedValueOnce(new Error("rate limited"))
+      .mockResolvedValueOnce({
+        chart: {
+          result: [
+            {
+              meta: {
+                symbol: "MSFT",
+                regularMarketPrice: 412.88,
+              },
+            },
+          ],
+        },
+      });
+
+    await expect(fetchStockPrices(["AAPL", "MSFT"])).rejects.toThrow(
+      "rate limited",
+    );
+
+    expect(sendHttpRequest).toHaveBeenCalledTimes(1);
+  });
 });
