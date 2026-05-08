@@ -44,9 +44,11 @@
 
 ## Pro Users
 
-[How to become pro user for free?](https://track3.notion.site/How-to-get-license-key-by-free-a5e0e39614f54a06ab19ca5aaed58404?pvs=4)
-
-1. Support 85+ EVM compatible Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base. And Most ERC20 Tokens on these chains.
+1. Support 85+ EVM compatible Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base, and most ERC20 tokens on these chains.
+2. Support TRON wallets and TRC20 assets.
+3. Support per-exchange and per-wallet asset views.
+4. Support real-time portfolio value in the top bar.
+5. Support real-time prices for all tracked assets during refresh.
 
 ## Installation
 
