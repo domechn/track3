@@ -6,7 +6,7 @@
 
 <div align="center">
 
-### Analyze your crypto assets on centralized exchanges and web3 wallets
+### Track crypto and stock assets across exchanges, brokers and wallets
 
 [![author][author-image]][author-url]
 [![license][license-image]][license-url]
@@ -32,8 +32,15 @@
 1. **No wallet signature required. No backend server, all data is stored locally by default**
 2. Support Binance, OKX, Bitget, Kraken, Gate.io, Coinbase, Bybit, HTX and MEXC. **Readonly access is enough**. API key setup references: [Binance](https://www.binance.com/en-BH/support/faq/how-to-create-api-360002502072), [OKX](https://use.autoview.com/hc/en-us/articles/360004576632-OKEx-Creating-an-API), [Gate.io](https://www.gate.io/help/guide/common/17521/how-to-utilize-api), [MEXC](https://www.mexc.com/user/openapi)
 3. Support BTC, ETH, BNB, SOL and Doge ( Base Users ).
-4. Support dozens of charts to analyze data such as wallet proportion, proportion of each currency asset, changes, etc.
-5. Support Data backup and restore. Users can export data to local files and import them to other devices, or share them between multi devices by cloud drive ( e.g. iCloud ).
+4. Support stock broker positions from Interactive Brokers (IBKR) through Flex Web Service imports with Query ID and Token.
+5. Support dozens of charts to analyze data such as asset allocation, wallet proportion, position changes, profit and loss, and more.
+6. Support data backup and restore. Users can export data to local files and import them to other devices, or share them between multiple devices by cloud drive ( e.g. iCloud ).
+
+## Supported Sources
+
+- Centralized exchanges: Binance, OKX, Bitget, Kraken, Gate.io, Coinbase, Bybit, HTX, MEXC
+- Wallets: BTC, ETH, BNB, SOL, Doge
+- Stock brokers: Interactive Brokers (IBKR)
 
 ## Pro Users
 
