@@ -26,32 +26,71 @@ const defaultStatementPollDelayMs = 1000;
 const defaultMaxStatementPollAttempts = 6;
 const defaultInitialStatementDelayMs = 5000;
 
+function firstTagText(
+  scope: Document | Element,
+  tagName: string,
+): string | undefined {
+  return scope.getElementsByTagName(tagName)[0]?.textContent?.trim();
+}
+
+function parseIbkrFlexCashPosition(
+  doc: Document,
+): IbkrFlexPosition | undefined {
+  const totalStartingCash = _(
+    Array.from(doc.getElementsByTagName("CashReportCurrency")),
+  )
+    .filter(
+      (reportCurrency) =>
+        reportCurrency.getAttribute("currency") === "BASE_SUMMARY",
+    )
+    .map((reportCurrency) =>
+      parseFloat(reportCurrency.getAttribute("startingCash") ?? "NaN"),
+    )
+    .filter((value) => Number.isFinite(value) && value !== 0)
+    .sum();
+
+  if (!Number.isFinite(totalStartingCash) || totalStartingCash === 0) {
+    return;
+  }
+
+  return {
+    symbol: "USD",
+    amount: totalStartingCash,
+    price: 1,
+    currency: "USD",
+    market: "",
+  };
+}
+
 export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, "text/xml");
-  const positions = Array.from(doc.getElementsByTagName("OpenPosition"));
-
-  return _(positions)
+  const stockPositions = _(Array.from(doc.getElementsByTagName("OpenPosition")))
     .map((position) => {
-      const assetCategory =
+      const assetCategory = (
         position.getAttribute("assetCategory") ??
         position.getAttribute("assetClass") ??
-        "";
-      if (assetCategory.toUpperCase() !== "STK") {
+        ""
+      ).toUpperCase();
+      if (assetCategory !== "STK") {
         return;
       }
 
-      const rawSymbol = position.getAttribute("symbol")?.trim().toUpperCase();
+      const symbol = position.getAttribute("symbol")?.trim().toUpperCase();
       const amount = parseFloat(
         position.getAttribute("position") ??
           position.getAttribute("quantity") ??
           "0",
       );
-      const price = parseFloat(
+      const rawPrice = parseFloat(
         position.getAttribute("markPrice") ??
           position.getAttribute("price") ??
           "0",
       );
+      if (!symbol || !amount) {
+        return;
+      }
+
       const currency = (
         position.getAttribute("currency") ??
         position.getAttribute("currencyPrimary") ??
@@ -59,10 +98,6 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
       )
         .trim()
         .toUpperCase();
-      if (!rawSymbol || !amount) {
-        return;
-      }
-
       const market = (
         position.getAttribute("listingExchange") ??
         position.getAttribute("exchange") ??
@@ -70,19 +105,19 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
       ).trim();
 
       return {
-        symbol: rawSymbol,
+        symbol,
         amount,
-        price: Number.isFinite(price) ? price : 0,
+        price: Number.isFinite(rawPrice) ? rawPrice : 0,
         currency: currency || "USD",
         market,
       };
     })
     .compact()
     .value();
-}
+  const cashPosition = parseIbkrFlexCashPosition(doc);
+  console.log("Parsed IBKR Flex positions", cashPosition);
 
-function firstTagText(doc: Document, tagName: string): string | undefined {
-  return doc.getElementsByTagName(tagName)[0]?.textContent?.trim();
+  return cashPosition ? [...stockPositions, cashPosition] : stockPositions;
 }
 
 export function getIbkrFlexStatementUrl(xml: string, token: string): string {
@@ -136,7 +171,6 @@ function isFlexStatementPending(xml: string): boolean {
     return false;
   }
 
-  // IBKR transient error codes documented with "try again shortly" semantics.
   const pendingCodes = new Set([
     "1001",
     "1004",
@@ -244,7 +278,6 @@ export class IbkrBroker implements StockBroker {
 
     const requestUrl = `${sendRequestEndpoint}?t=${encodeURIComponent(this.token)}&q=${encodeURIComponent(this.queryId)}&v=3`;
 
-    // Phase 1: submit the SendRequest once to obtain the reference code.
     const sendXml = await sendHttpTextRequest("GET", requestUrl, 20000);
     if (isFlexReportXml(sendXml)) {
       this.flexXml = sendXml;
@@ -254,8 +287,6 @@ export class IbkrBroker implements StockBroker {
 
     const pollUrl = getIbkrFlexStatementUrl(sendXml, this.token);
 
-    // Wait for IBKR to finish generating the report before the first poll,
-    // matching the delay that IBKR's own examples recommend.
     await wait(this.initialStatementDelayMs);
 
     for (let attempt = 1; attempt <= this.maxStatementPollAttempts; attempt++) {

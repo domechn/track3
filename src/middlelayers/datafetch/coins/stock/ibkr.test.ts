@@ -20,23 +20,44 @@ beforeEach(() => {
 });
 
 describe("IBKR Flex parser", () => {
-  it("extracts stock positions and mark prices from OpenPositions XML", () => {
+  it("extracts stock positions and USD cash from CashReport XML", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <FlexQueryResponse>
   <FlexStatements>
     <FlexStatement>
+      <CashReport>
+        <CashReportCurrency currency="BASE_SUMMARY" startingCash="100" />
+      </CashReport>
       <OpenPositions>
         <OpenPosition symbol="AAPL" assetCategory="STK" position="3" markPrice="200.50" />
         <OpenPosition symbol="MSFT" assetCategory="STK" position="1.5" markPrice="410" />
-        <OpenPosition symbol="USD" assetCategory="CASH" position="100" markPrice="1" />
       </OpenPositions>
     </FlexStatement>
   </FlexStatements>
 </FlexQueryResponse>`;
 
     expect(parseIbkrFlexOpenPositions(xml)).toEqual([
-      { symbol: "AAPL", amount: 3, price: 200.5, currency: "USD", market: "" },
-      { symbol: "MSFT", amount: 1.5, price: 410, currency: "USD", market: "" },
+      {
+        symbol: "AAPL",
+        amount: 3,
+        price: 200.5,
+        currency: "USD",
+        market: "",
+      },
+      {
+        symbol: "MSFT",
+        amount: 1.5,
+        price: 410,
+        currency: "USD",
+        market: "",
+      },
+      {
+        symbol: "USD",
+        amount: 100,
+        price: 1,
+        currency: "USD",
+        market: "",
+      },
     ]);
   });
 
@@ -95,12 +116,15 @@ describe("IBKR Flex parser", () => {
     expect(sendHttpTextRequest).toHaveBeenCalledTimes(3);
   });
 
-  it("converts non-USD IBKR mark prices to USD", async () => {
+  it("returns CashReport cash and converts stock prices to USD", async () => {
     vi.mocked(sendHttpTextRequest)
       .mockResolvedValueOnce(`<?xml version="1.0" encoding="UTF-8"?>
 <FlexQueryResponse>
   <FlexStatements>
     <FlexStatement>
+      <CashReport>
+        <CashReportCurrency currency="BASE_SUMMARY" startingCash="140" />
+      </CashReport>
       <OpenPositions>
         <OpenPosition symbol="AAPL" assetCategory="STK" position="3" markPrice="200" currency="USD" />
         <OpenPosition symbol="SHOP" assetCategory="STK" position="4" markPrice="140" currency="CAD" />
@@ -110,14 +134,21 @@ describe("IBKR Flex parser", () => {
 </FlexQueryResponse>`);
     vi.mocked(listAllCurrencyRates).mockResolvedValue([
       { currency: "USD", alias: "US dollar", symbol: "$", rate: 1 },
-      { currency: "CAD", alias: "Canadian dollar", symbol: "$", rate: 1.4 },
+      { currency: "CAD", alias: "Canadian dollar", symbol: "$", rate: 2 },
     ] as never);
 
     const broker = new IbkrBroker("token-1", "query-1");
 
+    await expect(broker.fetchPositions()).resolves.toEqual({
+      AAPL: 3,
+      USD: 140,
+      "SHOP.TRT": 4,
+    });
+
     await expect(broker.fetchPositionsPrice()).resolves.toEqual({
       AAPL: 200,
-      "SHOP.TRT": 100,
+      USD: 1,
+      "SHOP.TRT": 70,
     });
   });
 });
