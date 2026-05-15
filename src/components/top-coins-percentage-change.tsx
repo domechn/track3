@@ -26,6 +26,52 @@ import { formatAssetLabel } from "@/utils/assets";
 const prefix = "tcpc";
 const chartNameKey = "Change of Top Coins";
 const VALUE_KEY = getWholeKey("value");
+const PERCENTAGE_DISPLAY_LIMIT = 1000;
+
+type CoinPercentagePoint = {
+  value: number;
+  price: number;
+  timestamp: number;
+};
+
+type PercentageDataset = {
+  label?: string;
+  rawPercentageData?: (number | null)[];
+};
+
+function clampPercentageForDisplay(value: number): number {
+  if (!Number.isFinite(value)) {
+    if (value > 0) return PERCENTAGE_DISPLAY_LIMIT;
+    if (value < 0) return -PERCENTAGE_DISPLAY_LIMIT;
+    return 0;
+  }
+
+  return Math.max(
+    -PERCENTAGE_DISPLAY_LIMIT,
+    Math.min(PERCENTAGE_DISPLAY_LIMIT, value),
+  );
+}
+
+function formatPercentage(value: number): string {
+  if (!Number.isFinite(value)) return `${value}%`;
+
+  return `${value.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
+function getTooltipPercentageValue(context: {
+  dataset: PercentageDataset;
+  dataIndex: number;
+  parsed?: { y?: number | null };
+  raw?: number | null;
+}): number {
+  const rawValue = context.dataset.rawPercentageData?.[context.dataIndex];
+  if (typeof rawValue === "number") return rawValue;
+  if (typeof context.parsed?.y === "number") return context.parsed.y;
+  if (typeof context.raw === "number") return context.raw;
+  return 0;
+}
 
 function getWholeKey(key: string): string {
   return prefix + _(key).upperFirst();
@@ -53,7 +99,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
+    [dateRange.start, dateRange.end],
   );
 
   useEffect(() => {
@@ -69,65 +115,78 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     setTopCoinsPercentageChangeData(tcpcd);
   }
 
-  const options = useMemo(() => ({
-    maintainAspectRatio: false,
-    responsive: true,
-    hover: {
-      mode: "index",
-      intersect: false,
-    },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: false,
-        text: `Change of Top Coins ${getLabel()} Percentage`,
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      responsive: true,
+      hover: {
+        mode: "index",
+        intersect: false,
       },
-      tooltip: {
-        ...glassTooltip,
-        itemSort: (a: { raw: number }, b: { raw: number }) => {
-          return b.raw - a.raw;
-        },
+      interaction: {
+        mode: "index",
+        intersect: false,
       },
-      datalabels: {
-        display: false,
-      },
-      legend: {
-        onClick: (e: any, legendItem: { datasetIndex: number }, legend: any) =>
-          hideOtherLinesClickWrapper(
-            _(topCoinsPercentageChangeData.coins).size(),
-            chartRef.current
-          )(e, legendItem, legend),
-      },
-    },
-    scales: {
-      x: {
+      plugins: {
         title: {
           display: false,
-          text: "Date",
+          text: `Change of Top Coins ${getLabel()} Percentage`,
         },
-      },
-      y: {
-        title: {
-          display: false,
-          text: "Percentage",
-        },
-        offset: true,
-        ticks: {
-          ...glassScaleOptions.ticks,
-          precision: 2,
-          callback: function (value: number) {
-            return value + "%";
+        tooltip: {
+          ...glassTooltip,
+          itemSort: (a: any, b: any) => {
+            return getTooltipPercentageValue(b) - getTooltipPercentageValue(a);
+          },
+          callbacks: {
+            label: (context: any) => {
+              const value = getTooltipPercentageValue(context);
+              return ` ${context.dataset.label}: ${formatPercentage(value)}`;
+            },
           },
         },
-        grid: {
-          ...glassScaleOptions.grid,
+        datalabels: {
+          display: false,
+        },
+        legend: {
+          onClick: (
+            e: any,
+            legendItem: { datasetIndex: number },
+            legend: any,
+          ) =>
+            hideOtherLinesClickWrapper(
+              _(topCoinsPercentageChangeData.coins).size(),
+              chartRef.current,
+            )(e, legendItem, legend),
         },
       },
-    },
-  }), [currentType, topCoinsPercentageChangeData.coins.length]);
+      scales: {
+        x: {
+          title: {
+            display: false,
+            text: "Date",
+          },
+        },
+        y: {
+          title: {
+            display: false,
+            text: "Percentage",
+          },
+          offset: true,
+          ticks: {
+            ...glassScaleOptions.ticks,
+            precision: 2,
+            callback: function (value: number) {
+              return value + "%";
+            },
+          },
+          grid: {
+            ...glassScaleOptions.grid,
+          },
+        },
+      },
+    }),
+    [currentType, topCoinsPercentageChangeData.coins.length],
+  );
 
   function getLabel() {
     return _.upperFirst(currentType.replace(prefix, ""));
@@ -135,41 +194,49 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   function coinPercentageData(
     timestamps: number[],
-    coinPercentageData: { value: number; price: number; timestamp: number }[]
+    coinPercentageData: CoinPercentagePoint[],
   ) {
     const coinRankDataMap = new Map<number, number>();
     coinPercentageData.forEach((percentageData) => {
       coinRankDataMap.set(
         percentageData.timestamp,
-        currentType === VALUE_KEY
-          ? percentageData.value
-          : percentageData.price
+        currentType === VALUE_KEY ? percentageData.value : percentageData.price,
       );
     });
-    return timestamps.map((date) => coinRankDataMap.get(date) ?? null);
+    const rawData = timestamps.map((date) => coinRankDataMap.get(date) ?? null);
+    const displayData = rawData.map((value) =>
+      value === null ? null : clampPercentageForDisplay(value),
+    );
+
+    return { displayData, rawData };
   }
 
   const chartData = useMemo(() => {
     return {
       labels: topCoinsPercentageChangeData.timestamps.map((x) =>
-        timeToDateStr(x)
+        timeToDateStr(x),
       ),
-      datasets: topCoinsPercentageChangeData.coins.map((coin, idx) => ({
-        label: formatAssetLabel({
-          symbol: coin.coin,
-          assetType: coin.assetType,
-        }),
-        data: coinPercentageData(
+      datasets: topCoinsPercentageChangeData.coins.map((coin, idx) => {
+        const { displayData, rawData } = coinPercentageData(
           topCoinsPercentageChangeData.timestamps,
-          coin.percentageData
-        ),
-        borderColor: chartColors[idx % chartColors.length].main,
-        backgroundColor: chartColors[idx % chartColors.length].bg,
-        borderWidth: 2,
-        tension: 0.4,
-        pointRadius: 0,
-        fill: true,
-      })),
+          coin.percentageData,
+        );
+
+        return {
+          label: formatAssetLabel({
+            symbol: coin.coin,
+            assetType: coin.assetType,
+          }),
+          data: displayData,
+          rawPercentageData: rawData,
+          borderColor: chartColors[idx % chartColors.length].main,
+          backgroundColor: chartColors[idx % chartColors.length].bg,
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 0,
+          fill: true,
+        };
+      }),
     };
   }, [topCoinsPercentageChangeData, currentType]);
 
@@ -212,19 +279,17 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                   beforeDraw(chart: any) {
                     const { ctx, chartArea } = chart;
                     if (!chartArea) return;
-                    chart.data.datasets.forEach(
-                      (ds: any, idx: number) => {
-                        if (ds.fill) {
-                          ds.backgroundColor = createGradientFill(
-                            ctx,
-                            chartArea,
-                            chartColors[idx % chartColors.length].main,
-                            0.2,
-                            0.0
-                          );
-                        }
+                    chart.data.datasets.forEach((ds: any, idx: number) => {
+                      if (ds.fill) {
+                        ds.backgroundColor = createGradientFill(
+                          ctx,
+                          chartArea,
+                          chartColors[idx % chartColors.length].main,
+                          0.2,
+                          0.0,
+                        );
                       }
-                    );
+                    });
                   },
                 },
               ]}
