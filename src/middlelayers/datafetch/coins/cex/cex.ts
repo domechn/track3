@@ -260,8 +260,13 @@ function coinSymbolHandler(name: string): string | undefined {
   if (name.startsWith(ld) && name.length > ld.length + 1) {
     return;
   }
-  if (name == "BETH" || name == "ETH2") {
+  // for binance
+  if (name === "BETH" || name === "ETH2") {
     return "ETH";
+  }
+  // for bitget
+  if (name === "BGBTC") {
+    return "BTC";
   }
   return name;
 }
