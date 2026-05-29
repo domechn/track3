@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(yarn build:*)",
+      "Bash(node -e:*)",
+      "Bash(yarn install:*)",
+      "Bash(xxd)",
+      "Bash(npx tsc *)",
+      "Bash(npx -y tsc --noEmit -p /Users/dmc/domgoer/track3/tsconfig.json)",
+      "Bash(npm install *)",
+      "Bash(python3 *)",
+      "Read(//Users/dmc/domgoer/**)",
+      "Bash(git -C /Users/dmc/domgoer/track3 branch -a)",
+      "Bash(git ls-tree *)",
+      "Bash(git fetch *)",
+      "Bash(gh api *)"
+    ]
+  }
+}
