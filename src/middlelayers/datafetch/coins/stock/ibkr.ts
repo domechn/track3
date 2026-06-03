@@ -44,7 +44,7 @@ function parseIbkrFlexCashPosition(
         reportCurrency.getAttribute("currency") === "BASE_SUMMARY",
     )
     .map((reportCurrency) =>
-      parseFloat(reportCurrency.getAttribute("startingCash") ?? "NaN"),
+      parseFloat(reportCurrency.getAttribute("endingCash") ?? "NaN"),
     )
     .filter((value) => Number.isFinite(value) && value !== 0)
     .sum();
