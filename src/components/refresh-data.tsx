@@ -28,7 +28,7 @@ const App = ({
   const retry = async (
     fn: () => Promise<unknown>,
     times: number,
-    interval: number
+    interval: number,
   ): Promise<unknown> => {
     try {
       const res = await fn();
@@ -60,18 +60,23 @@ const App = ({
 
     let refreshError: Error | undefined;
 
-    retry(
-      async () => {
-        clearProgress();
-        return refreshAllData(addProgress);
-      },
-      retries,
-      retryInterval
-    )
-      .then(async () => {
+    updateAllCurrencyRates()
+      .catch(() => {
+        // non-fatal: proceed with refresh even if rate update fails
+      })
+      .then(() =>
+        retry(
+          async () => {
+            clearProgress();
+            return refreshAllData(addProgress);
+          },
+          retries,
+          retryInterval,
+        ),
+      )
+      .then(() => {
         // clean cache after all analyzers finished successfully
         getMemoryCacheInstance("data-fetch").clearCache();
-        return updateAllCurrencyRates();
       })
       .catch((err) => {
         refreshError = err;
@@ -104,7 +109,11 @@ const App = ({
 
   return (
     <div>
-      <Button variant="outline" onClick={handleButtonClick} disabled={refreshLoading}>
+      <Button
+        variant="outline"
+        onClick={handleButtonClick}
+        disabled={refreshLoading}
+      >
         <UpdateIcon
           className={`mr-2 h-4 w-4 ${refreshLoading && "animate-spin"}`}
         />

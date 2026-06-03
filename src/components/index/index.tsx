@@ -31,13 +31,7 @@ import Sidebar from "../sidebar";
 import { AnimatedPage } from "../motion";
 import PageLoadingOverlay from "../page-loading-overlay";
 import "./index.css";
-import {
-  Route,
-  Routes,
-  HashRouter,
-  Outlet,
-  Navigate,
-} from "react-router-dom";
+import { Route, Routes, HashRouter, Outlet, Navigate } from "react-router-dom";
 
 import { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -81,7 +75,7 @@ ChartJS.register(
   Title,
   ChartTooltip,
   Legend,
-  ChartDataLabels
+  ChartDataLabels,
 );
 
 export const RefreshButtonLoadingContext = React.createContext<{
@@ -108,7 +102,7 @@ function TopBar({
   dateRange: DateRange | undefined;
   onDatePickerValueChange: (
     selectedTimes: number,
-    nextDateRange: DateRange | undefined
+    nextDateRange: DateRange | undefined,
   ) => void;
   lastRefreshAt?: string;
   onRefreshSuccess: () => void;
@@ -121,7 +115,10 @@ function TopBar({
       <div className="flex h-12 items-center px-4">
         {isProUser && (
           <div className="mr-4">
-            <RealTimeTotalValue quoteColor={quoteColor} currency={currentCurrency} />
+            <RealTimeTotalValue
+              quoteColor={quoteColor}
+              currency={currentCurrency}
+            />
           </div>
         )}
         <div className="ml-auto flex items-center space-x-3">
@@ -184,7 +181,7 @@ type LayoutProps = {
   dateRange: DateRange | undefined;
   onDatePickerValueChange: (
     selectedTimes: number,
-    nextDateRange: DateRange | undefined
+    nextDateRange: DateRange | undefined,
   ) => void;
   lastRefreshAt?: string;
   onRefreshSuccess: () => void;
@@ -261,7 +258,7 @@ type AppRoutesProps = {
   hasData: boolean;
   onDatePickerValueChange: (
     selectedTimes: number,
-    nextDateRange: DateRange | undefined
+    nextDateRange: DateRange | undefined,
   ) => void;
   lastRefreshAt?: string;
   onDataChanged: () => void;
@@ -355,7 +352,10 @@ function AppRoutes({
           element={
             <AnimatedPage>
               <PageWrapper dateRange={tDateRange} hasData={hasData}>
-                <Comparison currency={currentCurrency} quoteColor={quoteColor} />
+                <Comparison
+                  currency={currentCurrency}
+                  quoteColor={quoteColor}
+                />
               </PageWrapper>
             </AnimatedPage>
           }
@@ -375,14 +375,25 @@ function AppRoutes({
             </AnimatedPage>
           }
         />
-        <Route path="settings" element={<AnimatedPage><Setting /></AnimatedPage>}>
+        <Route
+          path="settings"
+          element={
+            <AnimatedPage>
+              <Setting />
+            </AnimatedPage>
+          }
+        >
           <Route
             path="configuration"
-            element={<Configuration onConfigurationSave={handleConfigurationSave} />}
+            element={
+              <Configuration onConfigurationSave={handleConfigurationSave} />
+            }
           />
           <Route
             path="appearance"
-            element={<Appearance onQuoteColorChange={(v) => setQuoteColor(v)} />}
+            element={
+              <Appearance onQuoteColorChange={(v) => setQuoteColor(v)} />
+            }
           />
           <Route
             path="data"
@@ -423,10 +434,10 @@ const App = () => {
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [currentCurrency, setCurrentCurrency] = useState<CurrencyRateDetail>(
-    getDefaultCurrencyRate()
+    getDefaultCurrencyRate(),
   );
 
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
@@ -461,7 +472,7 @@ const App = () => {
           if (imported) {
             clearAllCache();
           }
-        })
+        }),
       )
       .then(() => loadAllData(active))
       .finally(() => {
@@ -480,7 +491,7 @@ const App = () => {
       start: dateRange?.from ?? parseISO("1970-01-01"),
       end: dateRange?.to ?? parseISO("1970-01-01"),
     }),
-    [dateRange]
+    [dateRange],
   );
 
   const maxDateRange = useMemo(
@@ -488,7 +499,7 @@ const App = () => {
       start: _(availableDates).first() ?? parseISO("1970-01-01"),
       end: _(availableDates).last() ?? parseISO("1970-01-01"),
     }),
-    [availableDates]
+    [availableDates],
   );
 
   function loadConfiguration() {
@@ -555,16 +566,16 @@ const App = () => {
     console.debug("clear all cache");
     // clear all cache
     getLocalStorageCacheInstance(
-      CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY
+      CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY,
     ).clearCache();
     getMemoryCacheInstance(
-      CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY
+      CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY,
     ).clearCache();
   }
 
   function onDatePickerValueChange(
     _selectedTimes: number,
-    nextDateRange: DateRange | undefined
+    nextDateRange: DateRange | undefined,
   ) {
     setDateRange((prev) => {
       const prevFrom = prev?.from?.getTime() ?? 0;
