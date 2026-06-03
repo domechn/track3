@@ -45,8 +45,8 @@ vi.mock("@/components/ui/use-toast", () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(updateAllCurrencyRates).mockResolvedValue(undefined);
-  vi.mocked(refreshAllData).mockResolvedValue(undefined);
+  vi.mocked(updateAllCurrencyRates).mockResolvedValue(undefined as never);
+  vi.mocked(refreshAllData).mockResolvedValue(undefined as never);
   vi.mocked(getMemoryCacheInstance).mockReturnValue({
     clearCache: vi.fn(),
   } as never);
@@ -57,9 +57,11 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const callOrder: string[] = [];
     vi.mocked(updateAllCurrencyRates).mockImplementation(async () => {
       callOrder.push("updateAllCurrencyRates");
+      return undefined as never;
     });
     vi.mocked(refreshAllData).mockImplementation(async () => {
       callOrder.push("refreshAllData");
+      return undefined as never;
     });
 
     const user = userEvent.setup();

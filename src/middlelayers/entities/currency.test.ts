@@ -29,12 +29,16 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(saveModelsToDatabase).mockResolvedValue(undefined as never);
-  vi.mocked(ExchangeRate).mockImplementation(() => ({
-    listAllCurrencyRates: vi.fn().mockResolvedValue([
-      { currency: "USD", rate: 1 },
-      { currency: "HKD", rate: 7.84 },
-    ]),
-  }));
+  vi.mocked(ExchangeRate).mockImplementation(
+    () =>
+      ({
+        queryUrl: "",
+        listAllCurrencyRates: vi.fn().mockResolvedValue([
+          { currency: "USD", rate: 1 },
+          { currency: "HKD", rate: 7.84 },
+        ]),
+      }) as never,
+  );
 });
 
 describe("CurrencyRateHandler.listCurrencyRates — staleness", () => {
