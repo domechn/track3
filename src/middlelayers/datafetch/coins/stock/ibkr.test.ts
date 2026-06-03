@@ -26,7 +26,7 @@ describe("IBKR Flex parser", () => {
   <FlexStatements>
     <FlexStatement>
       <CashReport>
-        <CashReportCurrency currency="BASE_SUMMARY" startingCash="100" />
+        <CashReportCurrency currency="BASE_SUMMARY" endingCash="100" />
       </CashReport>
       <OpenPositions>
         <OpenPosition symbol="AAPL" assetCategory="STK" position="3" markPrice="200.50" />
@@ -123,7 +123,7 @@ describe("IBKR Flex parser", () => {
   <FlexStatements>
     <FlexStatement>
       <CashReport>
-        <CashReportCurrency currency="BASE_SUMMARY" startingCash="140" />
+        <CashReportCurrency currency="BASE_SUMMARY" endingCash="140" />
       </CashReport>
       <OpenPositions>
         <OpenPosition symbol="AAPL" assetCategory="STK" position="3" markPrice="200" currency="USD" />
