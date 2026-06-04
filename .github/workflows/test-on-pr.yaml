@@ -20,12 +20,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: enable corepack
-        run: corepack enable
+        run: |
+          corepack enable
+          corepack prepare yarn@4.9.2 --activate
       - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: yarn4
+          cache: yarn
           cache-dependency-path: yarn.lock
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
