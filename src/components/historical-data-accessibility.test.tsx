@@ -155,6 +155,39 @@ describe("Historical Data page", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a minus sign for negative changes in history records", async () => {
+    vi.mocked(queryHistoricalData).mockResolvedValue([
+      {
+        id: "snapshot-1",
+        createdAt: "2024-04-16T12:00:00.000Z",
+        total: 1000,
+        assets: [],
+        transactions: [],
+      },
+      {
+        id: "snapshot-2",
+        createdAt: "2024-04-15T12:00:00.000Z",
+        total: 1500,
+        assets: [],
+        transactions: [],
+      },
+    ]);
+
+    render(
+      <HistoricalData
+        currency={usdCurrency}
+        dateRange={dateRange}
+        quoteColor="green-up-red-down"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/-\$500(?:\.00)?/)).toBeInTheDocument();
+  });
+
   it("adds a token to the blacklist before deleting a detail row", async () => {
     vi.mocked(queryHistoricalData).mockResolvedValue([
       {

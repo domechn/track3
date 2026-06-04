@@ -108,7 +108,9 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
       return {
         symbol: rawSymbol,
         amount,
-        price: Number.isFinite(rawPrice) ? rawPrice : 0,
+        // price: Number.isFinite(rawPrice) ? rawPrice : 0,
+        // do not return price here
+        price: 0,
         currency: currency || "USD",
         market,
       };
