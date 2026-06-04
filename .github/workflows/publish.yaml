@@ -28,6 +28,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: yarn
+          cache-dependency-path: yarn.lock
+      - name: enable corepack
+        run: corepack enable
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -45,22 +49,8 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           rustup target add x86_64-apple-darwin
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        shell: bash
-        run: |
-          yarn config set cacheFolder ~/.yarn/cache
-          echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
-      - name: Yarn cache
-        uses: actions/cache@v4
-        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
       - name: install frontend dependencies
-        run: yarn install # change this to npm or pnpm depending on which one you use
+        run: corepack yarn install --immutable
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -86,10 +76,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: yarn
+          cache-dependency-path: yarn.lock
 
-      - run: yarn
+      - name: Enable Corepack
+        run: corepack enable
+
+      - run: corepack yarn install --immutable
 
       - name: Create Update
-        run: yarn update-release
+        run: corepack yarn update-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

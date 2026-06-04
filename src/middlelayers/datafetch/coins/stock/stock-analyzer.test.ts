@@ -11,7 +11,9 @@ const mockBroker = {
 };
 
 vi.mock("./ibkr", () => ({
-  IbkrBroker: vi.fn().mockImplementation(() => mockBroker),
+  IbkrBroker: vi.fn(function MockIbkrBroker() {
+    return mockBroker;
+  }),
 }));
 
 describe("StockAnalyzer", () => {
