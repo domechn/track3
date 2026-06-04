@@ -1,6 +1,7 @@
 import _ from "lodash";
 import { memo, useEffect, useMemo, useState } from "react";
 import {
+  getCachedPreferCurrency,
   getConfiguration,
   queryPreferCurrency,
   queryQuerySize,
@@ -41,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CexAnalyzer } from "@/middlelayers/datafetch/coins/cex/cex";
 import { StockAnalyzer } from "@/middlelayers/datafetch/coins/stock/stock-analyzer";
 import {
@@ -166,13 +168,26 @@ const querySizeOptions = [
 const defaultBaseCurrency = "USD";
 const CONFIG_LIST_PAGE_SIZE = 30;
 
-const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
+const App = ({
+  onConfigurationSave,
+  initialPreferCurrency,
+}: {
+  onConfigurationSave?: () => void;
+  initialPreferCurrency?: string;
+}) => {
   const { toast } = useToast();
+  const warmStartPreferCurrency =
+    initialPreferCurrency || getCachedPreferCurrency();
   const [groupUSD, setGroupUSD] = useState(true);
   const [hideInactive, setHideInactive] = useState(false);
   const [querySize, setQuerySize] = useState(0);
   const [formChanged, setFormChanged] = useState(false);
-  const [preferCurrency, setPreferCurrency] = useState(defaultBaseCurrency);
+  const [preferCurrency, setPreferCurrency] = useState(
+    warmStartPreferCurrency || defaultBaseCurrency,
+  );
+  const [preferCurrencyLoading, setPreferCurrencyLoading] = useState(
+    !warmStartPreferCurrency,
+  );
   const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
   const [addStockBrokerDialogOpen, setAddStockBrokerDialogOpen] =
     useState(false);
@@ -412,7 +427,27 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
     // load query size
     queryQuerySize().then((s) => setQuerySize(s));
 
-    queryPreferCurrency().then((c) => setPreferCurrency(c.currency));
+    const shouldSkipPreferCurrencyQuery =
+      !!initialPreferCurrency && initialPreferCurrency !== defaultBaseCurrency;
+
+    if (shouldSkipPreferCurrencyQuery) {
+      setPreferCurrency(initialPreferCurrency);
+      setPreferCurrencyLoading(false);
+    } else {
+      if (!warmStartPreferCurrency) {
+        setPreferCurrencyLoading(true);
+      }
+
+      queryPreferCurrency()
+        .then((c) => setPreferCurrency(c.currency))
+        .catch((e) => {
+          toast({
+            description: "get prefer currency failed:" + (e.message || e),
+            variant: "destructive",
+          });
+        })
+        .finally(() => setPreferCurrencyLoading(false));
+    }
 
     getConfiguration()
       .then((d) => {
@@ -2285,8 +2320,16 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold">{preferCurrency}</div>
-            <p className="text-xs text-muted-foreground">Current quote base</p>
+            {preferCurrencyLoading ? (
+              <Skeleton className="h-7 w-20" />
+            ) : (
+              <div className="text-xl font-semibold">{preferCurrency}</div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {preferCurrencyLoading
+                ? "Loading base currency..."
+                : "Current quote base"}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -2344,29 +2387,34 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
                 Base Currency
               </div>
               <div className="flex items-center gap-2">
-                <Select
-                  onValueChange={onPreferCurrencyChanged}
-                  value={preferCurrency}
-                >
-                  <SelectTrigger className="w-[280px]">
-                    <SelectValue placeholder="Prefer currency" />
-                  </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[20rem]">
-                    <SelectGroup>
-                      <SelectLabel>Prefer Currency</SelectLabel>
-                      {preferCurrencyOptions.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                {preferCurrencyLoading ? (
+                  <Skeleton className="h-10 w-[280px]" />
+                ) : (
+                  <Select
+                    onValueChange={onPreferCurrencyChanged}
+                    value={preferCurrency}
+                  >
+                    <SelectTrigger className="w-[280px]">
+                      <SelectValue placeholder="Prefer currency" />
+                    </SelectTrigger>
+                    <SelectContent className="overflow-y-auto max-h-[20rem]">
+                      <SelectGroup>
+                        <SelectLabel>Prefer Currency</SelectLabel>
+                        {preferCurrencyOptions.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                )}
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8"
                   onClick={onUpdateCurrencyRatesClick}
+                  disabled={preferCurrencyLoading || refreshCurrencyLoading}
                 >
                   <UpdateIcon
                     className={`h-4 w-4 ${
@@ -2378,13 +2426,15 @@ const App = ({ onConfigurationSave }: { onConfigurationSave?: () => void }) => {
               <p className="min-h-4 text-xs text-muted-foreground">
                 <span
                   className={`block transition-opacity duration-250 ${
+                    !preferCurrencyLoading &&
                     preferredCurrencyDetail &&
                     preferCurrency !== defaultBaseCurrency
                       ? "opacity-100"
                       : "opacity-0"
                   }`}
                 >
-                  {preferredCurrencyDetail &&
+                  {!preferCurrencyLoading &&
+                  preferredCurrencyDetail &&
                   preferCurrency !== defaultBaseCurrency
                     ? `1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
                         preferredCurrencyDetail.rate,

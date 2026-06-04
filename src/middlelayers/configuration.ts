@@ -40,6 +40,7 @@ const clientInfoFixId = "998";
 const licenseFixId = "997";
 const stableCoinsId = "996";
 const blacklistCoinsId = "995";
+const preferCurrencyLocalStorageKey = "track3-prefer-currency";
 
 export const themeLocalStorageKey = "track3-ui-theme";
 
@@ -229,14 +230,40 @@ export async function queryPreferCurrency(): Promise<CurrencyRateDetail> {
   const pc = model?.data;
 
   if (!pc) {
-    return CURRENCY_RATE_HANDLER.getDefaultCurrencyRate();
+    const defaultRate = CURRENCY_RATE_HANDLER.getDefaultCurrencyRate();
+    cachePreferCurrency(defaultRate.currency);
+    return defaultRate;
   }
 
-  return CURRENCY_RATE_HANDLER.getCurrencyRateByCurrency(pc);
+  const rate = await CURRENCY_RATE_HANDLER.getCurrencyRateByCurrency(pc);
+  cachePreferCurrency(rate.currency);
+  return rate;
 }
 
 export async function savePreferCurrency(currency: string) {
+  cachePreferCurrency(currency);
   await saveConfigurationById(preferCurrencyId, currency, false);
+}
+
+export function getCachedPreferCurrency(): string | undefined {
+  try {
+    const cached = localStorage.getItem(preferCurrencyLocalStorageKey)?.trim();
+    return cached ? cached.toUpperCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function cachePreferCurrency(currency: string) {
+  if (!currency) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(preferCurrencyLocalStorageKey, currency.toUpperCase());
+  } catch {
+    // Ignore cache write failures, persisted configuration remains source of truth.
+  }
 }
 
 export async function getClientIDConfiguration(): Promise<string | undefined> {
