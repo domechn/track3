@@ -24,14 +24,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: enable corepack
-        run: corepack enable
       - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: yarn
-          cache-dependency-path: yarn.lock
+      - name: enable corepack
+        run: |
+          corepack enable
+          corepack prepare yarn@4.9.2 --activate
+      - name: get yarn cache
+        id: yarn-cache
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - name: cache yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.yarn-cache.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -73,15 +82,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: yarn
-          cache-dependency-path: yarn.lock
+
+      - name: Enable Corepack
+        run: |
+          corepack enable
+          corepack prepare yarn@4.9.2 --activate
+
+      - name: Get Yarn cache
+        id: yarn-cache
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.yarn-cache.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
 
       - run: corepack yarn install --immutable
 
