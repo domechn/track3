@@ -12,6 +12,8 @@ vi.mock("../datafetch/currencies", () => ({
   ExchangeRate: vi.fn(),
 }));
 
+const mockListAllCurrencyRates = vi.fn();
+
 function makeRow(currency: string, rate: number, ageMs = 0, priority = 0) {
   return {
     id: 1,
@@ -29,16 +31,16 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(saveModelsToDatabase).mockResolvedValue(undefined as never);
-  vi.mocked(ExchangeRate).mockImplementation(
-    () =>
-      ({
-        queryUrl: "",
-        listAllCurrencyRates: vi.fn().mockResolvedValue([
-          { currency: "USD", rate: 1 },
-          { currency: "HKD", rate: 7.84 },
-        ]),
-      }) as never,
-  );
+  mockListAllCurrencyRates.mockResolvedValue([
+    { currency: "USD", rate: 1 },
+    { currency: "HKD", rate: 7.84 },
+  ]);
+  vi.mocked(ExchangeRate).mockImplementation(function MockExchangeRate(
+    this: any,
+  ) {
+    this.queryUrl = "";
+    this.listAllCurrencyRates = mockListAllCurrencyRates;
+  } as never);
 });
 
 describe("CurrencyRateHandler.listCurrencyRates — staleness", () => {

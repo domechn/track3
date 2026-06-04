@@ -9,10 +9,10 @@ Track3 is a privacy-focused desktop cryptocurrency portfolio tracker built with 
 ## Development Commands
 
 ```bash
-yarn install          # Install frontend dependencies
-yarn tauri dev        # Launch app in development mode (starts Vite on port 1420 + Tauri)
-yarn build            # TypeScript compile + Vite production build (frontend only)
-yarn tauri build      # Build distributable desktop app
+corepack yarn install          # Install frontend dependencies
+corepack yarn tauri dev        # Launch app in development mode (starts Vite on port 1420 + Tauri)
+corepack yarn build            # TypeScript compile + Vite production build (frontend only)
+corepack yarn tauri build      # Build distributable desktop app
 ```
 
 No test framework or linter is currently configured.
@@ -39,6 +39,7 @@ No test framework or linter is currently configured.
 ### Rust Backend (`src-tauri/`)
 
 Exposes Tauri commands to frontend via `invoke()`:
+
 - `query_coins_prices` — CoinGecko price queries
 - `query_binance_balance` — Binance API integration
 - `encrypt` / `decrypt` — Config encryption via magic-crypt
@@ -63,7 +64,7 @@ SQLite with versioned migrations in `src-tauri/migrations/` (v1→v5). Key table
 
 ## Build Requirements
 
-- Node.js 24+, Yarn, Rust 1.94.1+
+- Node.js 24+, Yarn 4.x (via Corepack), Rust 1.94.1+
 - macOS: Xcode CLI tools
 - Linux: `libwebkit2gtk-4.0-dev`, `libappindicator3-dev`, and related system libs
 - Windows: MSVC toolchain

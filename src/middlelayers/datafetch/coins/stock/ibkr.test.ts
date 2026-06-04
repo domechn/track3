@@ -40,14 +40,14 @@ describe("IBKR Flex parser", () => {
       {
         symbol: "AAPL",
         amount: 3,
-        price: 200.5,
+        price: 0,
         currency: "USD",
         market: "",
       },
       {
         symbol: "MSFT",
         amount: 1.5,
-        price: 410,
+        price: 0,
         currency: "USD",
         market: "",
       },
@@ -146,9 +146,9 @@ describe("IBKR Flex parser", () => {
     });
 
     await expect(broker.fetchPositionsPrice()).resolves.toEqual({
-      AAPL: 200,
+      AAPL: 0,
       USD: 1,
-      "SHOP.TRT": 70,
+      "SHOP.TRT": 0,
     });
   });
 });

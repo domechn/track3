@@ -19,12 +19,12 @@ Use this skill when the user asks to:
 
 The current Track3 version bump workflow updates the same version string in these files:
 
-| File | Field to update |
-| --- | --- |
-| `package.json` | top-level `"version"` |
-| `src-tauri/Cargo.toml` | package `version` |
-| `src-tauri/Cargo.lock` | `[[package]]` entry where `name = "track3"` |
-| `src-tauri/tauri.conf.json` | top-level `"version"` |
+| File                        | Field to update                             |
+| --------------------------- | ------------------------------------------- |
+| `package.json`              | top-level `"version"`                       |
+| `src-tauri/Cargo.toml`      | package `version`                           |
+| `src-tauri/Cargo.lock`      | `[[package]]` entry where `name = "track3"` |
+| `src-tauri/tauri.conf.json` | top-level `"version"`                       |
 
 From the observed unstaged upgrade pattern, the semantic change is the version bump itself. Formatter-only churn in `tauri.conf.json` can happen, but it is not part of the required release logic.
 
@@ -38,7 +38,7 @@ From the observed unstaged upgrade pattern, the semantic change is the version b
    - do **not** change `productName`, `identifier`, bundle settings, or updater settings
    - avoid unrelated formatting churn when possible
 5. Review the resulting diff and confirm it only contains the expected version-sync changes.
-6. If validation is appropriate for the task, run the normal repo verification command(s), typically `yarn build`.
+6. If validation is appropriate for the task, run the normal repo verification command(s), typically `corepack yarn build`.
 
 ## Release Note Workflow
 
