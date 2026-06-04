@@ -39,6 +39,7 @@ No test framework or linter is currently configured.
 ### Rust Backend (`src-tauri/`)
 
 Exposes Tauri commands to frontend via `invoke()`:
+
 - `query_coins_prices` — CoinGecko price queries
 - `query_binance_balance` — Binance API integration
 - `encrypt` / `decrypt` — Config encryption via magic-crypt
