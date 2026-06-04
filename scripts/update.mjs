@@ -1,34 +1,71 @@
 // @ts-nocheck
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import fetch from "node-fetch";
 import { getOctokit, context } from "@actions/github";
 
+const APP_RELEASE_TAG_PREFIX = "app-v";
 const UPDATE_TAG_NAME = "updater";
 const UPDATE_FILE_NAME = "update.json";
-
-let updateData = undefined;
+const UPDATE_MANIFEST_PATTERN = /(^|[-_.])latest\.json$/;
+const DEFAULT_RELEASE_NOTES =
+  "See the assets to download this version and install.";
 
 const octokit = getOctokit(process.env.GITHUB_TOKEN);
 const options = { owner: context.repo.owner, repo: context.repo.repo };
 
-const { data: release } = await octokit.rest.repos.getLatestRelease(options);
-let found = false;
-// eslint-disable-next-line camelcase
-for (const { name, browser_download_url } of release.assets) {
-  if (name === "latest.json") {
-    // download latest.json and read its content
-    const response = await fetch(browser_download_url);
-    const latest = await response.json();
-    updateData = latest;
-    found = true;
-    break;
+async function getCurrentAppReleaseTag() {
+  const tauriConfig = JSON.parse(
+    await readFile(resolve(process.cwd(), "src-tauri/tauri.conf.json"), "utf8"),
+  );
+
+  return `${APP_RELEASE_TAG_PREFIX}${tauriConfig.version}`;
+}
+
+async function getPublishedAppRelease() {
+  const appReleaseTag = await getCurrentAppReleaseTag();
+
+  try {
+    const { data: release } = await octokit.rest.repos.getReleaseByTag({
+      ...options,
+      tag: appReleaseTag,
+    });
+
+    return release;
+  } catch (error) {
+    if (error?.status !== 404) {
+      throw error;
+    }
+
+    const { data: release } =
+      await octokit.rest.repos.getLatestRelease(options);
+
+    return release;
   }
 }
 
-if (!found) {
-  throw new Error("latest.json not found");
+function getManifestAsset(release) {
+  const manifestAsset = release.assets.find(({ name }) =>
+    UPDATE_MANIFEST_PATTERN.test(name),
+  );
+
+  if (manifestAsset) {
+    return manifestAsset;
+  }
+
+  const assetNames =
+    release.assets.map(({ name }) => name).join(", ") || "(none)";
+  throw new Error(
+    `Updater manifest not found in release ${release.tag_name}. Assets: ${assetNames}`,
+  );
 }
 
-updateData.notes = release.body ?? "See the assets to download this version and install."
+const release = await getPublishedAppRelease();
+const { browser_download_url: manifestUrl } = getManifestAsset(release);
+const response = await fetch(manifestUrl);
+const updateData = await response.json();
+
+updateData.notes = release.body ?? DEFAULT_RELEASE_NOTES;
 
 const { data: updater } = await octokit.rest.repos.getReleaseByTag({
   ...options,
