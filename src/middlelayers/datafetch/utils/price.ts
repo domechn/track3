@@ -16,7 +16,7 @@ type YahooChartResponse = {
   };
 };
 
-const YAHOO_REQUEST_DELAY_MS = 500;
+const YAHOO_REQUEST_DELAY_MS = 1000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

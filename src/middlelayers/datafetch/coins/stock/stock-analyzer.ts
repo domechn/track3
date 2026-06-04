@@ -61,35 +61,22 @@ export class StockAnalyzer implements Analyzer {
   }
 
   async loadPortfolio(): Promise<WalletCoin[]> {
-    const brokerPriceMap = _(
-      await bluebird.map(this.brokers, async (broker) => ({
-        identity: broker.getIdentity(),
-        prices: await broker.fetchPositionsPrice(),
-      })),
-    )
-      .keyBy("identity")
-      .mapValues("prices")
-      .value();
-
     const coinLists = await bluebird.map(this.brokers, async (broker) => {
       const positions = await this.fetchPositions(broker);
-      const prices = brokerPriceMap[broker.getIdentity()] ?? {};
-      return _(positions)
-        .keys()
-        .filter((symbol) => positions[symbol] !== 0)
-        .map((symbol) => ({
-          symbol,
-          assetType: "stock" as const,
-          amount: positions[symbol],
-          wallet: broker.getIdentity(),
-          price: prices[symbol]
-            ? {
-                value: prices[symbol],
-                base: "usd" as const,
-              }
-            : undefined,
-        }))
-        .value();
+      return (
+        _(positions)
+          .keys()
+          .filter((symbol) => positions[symbol] !== 0)
+          // IBKR Flex statement prices can lag current market quotes.
+          // Leave price empty here so charts-refresh fetches the latest stock price.
+          .map((symbol) => ({
+            symbol,
+            assetType: "stock" as const,
+            amount: positions[symbol],
+            wallet: broker.getIdentity(),
+          }))
+          .value()
+      );
     });
 
     return _(coinLists).flatten().value();

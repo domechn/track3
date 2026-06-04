@@ -849,7 +849,7 @@ const App = ({
                             >
                               {row.change === null
                                 ? "-"
-                                : `${row.change > 0 ? "+" : ""}${currency.symbol}${prettyNumberToLocaleString(
+                                : `${row.change > 0 ? "+" : row.change < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(
                                     currencyWrapper(currency)(
                                       Math.abs(row.change),
                                     ),
