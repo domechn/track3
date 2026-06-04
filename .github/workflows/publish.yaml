@@ -51,7 +51,7 @@ jobs:
           rustup target add x86_64-apple-darwin
       - name: install frontend dependencies
         run: corepack yarn install --immutable
-      - uses: tauri-apps/tauri-action@v1
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}

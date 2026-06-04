@@ -38,7 +38,7 @@ From the observed unstaged upgrade pattern, the semantic change is the version b
    - do **not** change `productName`, `identifier`, bundle settings, or updater settings
    - avoid unrelated formatting churn when possible
 5. Review the resulting diff and confirm it only contains the expected version-sync changes.
-6. If validation is appropriate for the task, run the normal repo verification command(s), typically `yarn build`.
+6. If validation is appropriate for the task, run the normal repo verification command(s), typically `corepack yarn build`.
 
 ## Release Note Workflow
 

@@ -68,19 +68,19 @@ SQLite with versioned migrations in `src-tauri/migrations/` (v1→v5). Key table
 ## Build and Test
 
 ```bash
-yarn install          # Install frontend dependencies
-yarn dev              # Frontend dev (Vite)
-yarn tauri dev        # Desktop dev (starts Vite on port 1420 + Tauri)
-yarn build            # TypeScript compile + Vite production build (frontend only)
-yarn tauri build      # Build distributable desktop app
-yarn update-release   # Release metadata
+corepack yarn install          # Install frontend dependencies
+corepack yarn dev              # Frontend dev (Vite)
+corepack yarn tauri dev        # Desktop dev (starts Vite on port 1420 + Tauri)
+corepack yarn build            # TypeScript compile + Vite production build (frontend only)
+corepack yarn tauri build      # Build distributable desktop app
+corepack yarn update-release   # Release metadata
 ```
 
 No unit-test suite yet; validation is build/smoke-run based.
 
 ## Build Requirements
 
-- Node.js 24+, Yarn, Rust 1.94.1+
+- Node.js 24+, Yarn 4.x (via Corepack), Rust 1.94.1+
 - macOS: Xcode CLI tools
 - Linux: `libwebkit2gtk-4.0-dev`, `libappindicator3-dev`, and related system libs
 - Windows: MSVC toolchain
