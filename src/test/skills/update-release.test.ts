@@ -75,7 +75,7 @@ async function runUpdateScript({
   vi.doMock("node-fetch", () => ({ default: fetchMock }));
 
   // @ts-expect-error The script under test is a runtime-only ESM entrypoint.
-  await import("../scripts/update.mjs");
+  await import("../../../scripts/update.mjs");
 
   return {
     getLatestRelease,

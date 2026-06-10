@@ -61,6 +61,7 @@ SQLite with versioned migrations in `src-tauri/migrations/` (v1→v5). Key table
 - **Async:** Bluebird promises for parallel data fetching with progress callbacks
 - **Pro license:** JWT-based, unlocks additional EVM chain support
 - **Repo-local skill:** `.claude/skills/version-upgrade/SKILL.md` documents the standard Track3 version bump workflow
+- **Skill tests:** Keep skill-related Vitest files under `src/test/skills/`
 
 ## Build Requirements
 

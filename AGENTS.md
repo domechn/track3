@@ -93,6 +93,7 @@ No unit-test suite yet; validation is build/smoke-run based.
 - Wallet/exchange identities are md5-hashed (`src/middlelayers/wallet.ts`).
 - Keep HTTP calls in data fetchers on `@tauri-apps/plugin-http` wrapper (`src/middlelayers/datafetch/utils/http.ts`), not browser fetch.
 - Cache fetch-heavy paths via `CacheCenter` (`src/middlelayers/datafetch/utils/cache.ts`) with explicit TTL seconds.
+- Skill-related Vitest files live under `src/test/skills/`.
 
 ## Integration Points
 
