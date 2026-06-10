@@ -107,6 +107,16 @@ export function renderInvestmentShareHtml(input) {
         gap: 22px;
       }
 
+      .hero > *,
+      .grid > *,
+      .metrics > *,
+      .content-grid > *,
+      .highlights-list > *,
+      .allocation-list > *,
+      .hero-meta > * {
+        min-width: 0;
+      }
+
       .hero-card,
       .panel,
       .metric-card,
@@ -145,6 +155,8 @@ export function renderInvestmentShareHtml(input) {
         font-size: clamp(42px, 7vw, 72px);
         line-height: 0.94;
         letter-spacing: -0.05em;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .subtitle {
@@ -153,6 +165,8 @@ export function renderInvestmentShareHtml(input) {
         color: var(--muted);
         font-size: 17px;
         line-height: 1.65;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .hero-meta {
@@ -174,6 +188,9 @@ export function renderInvestmentShareHtml(input) {
         background: rgba(255, 255, 255, 0.6);
         color: var(--text);
         font: inherit;
+        text-align: center;
+        white-space: normal;
+        overflow-wrap: anywhere;
       }
 
       .privacy-button {
@@ -213,13 +230,17 @@ export function renderInvestmentShareHtml(input) {
         margin-top: 12px;
         font-size: clamp(32px, 5vw, 58px);
         font-weight: 700;
-        line-height: 0.94;
+        line-height: 1.02;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .score-note {
         margin-top: 16px;
         color: rgba(247, 245, 239, 0.82);
         line-height: 1.7;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .grid {
@@ -246,6 +267,9 @@ export function renderInvestmentShareHtml(input) {
         font-size: clamp(24px, 3vw, 34px);
         font-weight: 700;
         letter-spacing: -0.04em;
+        line-height: 1.08;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .metric-value[data-tone="positive"] {
@@ -291,18 +315,25 @@ export function renderInvestmentShareHtml(input) {
       .allocation-header strong {
         display: block;
         font-size: 15px;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .highlight-value {
         margin-top: 10px;
         font-size: 24px;
         font-weight: 700;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .highlight-detail {
         margin-top: 8px;
         color: var(--muted);
         font-size: 14px;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .allocation-header {
@@ -310,6 +341,7 @@ export function renderInvestmentShareHtml(input) {
         align-items: baseline;
         justify-content: space-between;
         gap: 12px;
+        flex-wrap: wrap;
       }
 
       .allocation-meta {
@@ -317,6 +349,11 @@ export function renderInvestmentShareHtml(input) {
         gap: 10px;
         color: var(--muted);
         font-size: 14px;
+        min-width: 0;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .allocation-track {
@@ -339,6 +376,8 @@ export function renderInvestmentShareHtml(input) {
         margin: 14px 0 0;
         color: var(--muted);
         line-height: 1.7;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .footer {

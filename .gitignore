@@ -29,3 +29,4 @@ dist-ssr
 track3-ios/
 .docs/
 .yarn/
+.agents/skills/investment-report/output/
