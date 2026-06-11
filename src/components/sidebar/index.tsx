@@ -37,16 +37,29 @@ function NavItem({
   return (
     <Link
       to={to}
+      aria-current={match ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200",
-        "hover:bg-accent/60",
-        match
-          ? "bg-accent/80 text-accent-foreground"
-          : "text-muted-foreground",
-        collapsed && "justify-center px-0"
+        "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200",
+        "hover:bg-accent/60 hover:text-foreground",
+        match ? "bg-accent/80 text-foreground" : "text-muted-foreground",
+        collapsed && "justify-center px-0",
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      <span
+        aria-hidden
+        className={cn(
+          "absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-all duration-200",
+          match ? "opacity-100" : "opacity-0 group-hover:opacity-40",
+        )}
+      />
+      <Icon
+        className={cn(
+          "h-4 w-4 shrink-0 transition-colors",
+          match
+            ? "text-primary"
+            : "text-muted-foreground group-hover:text-foreground",
+        )}
+      />
       {!collapsed && (
         <span className="overflow-hidden whitespace-nowrap text-ellipsis">
           {label}
@@ -75,7 +88,9 @@ export default function Sidebar({
       <div className="flex items-center gap-2 px-3 h-12 border-b border-[var(--glass-border)] overflow-hidden">
         {!collapsed && (
           <div className="flex items-center gap-2 overflow-hidden">
-            <span className="font-bold text-lg tracking-tight whitespace-nowrap">Track3</span>
+            <span className="font-bold text-lg tracking-tight whitespace-nowrap">
+              Track3
+            </span>
             {isProUser && (
               <span className="text-xs font-semibold bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded">
                 PRO

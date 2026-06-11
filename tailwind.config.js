@@ -16,6 +16,27 @@ module.exports = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: [
+          "Outfit Variable",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
+        mono: [
+          "JetBrains Mono Variable",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Consolas",
+          "monospace",
+        ],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

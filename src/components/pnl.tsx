@@ -123,14 +123,14 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">Last PNL</div>
               <div
-                className={`text-xl font-semibold ${getPNLTextColor(
+                className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
                   pnlTableData.todayPNL?.value,
                 )}`}
               >
                 {formatPNLPercentage(pnlTableData.todayPNL?.value)}
               </div>
               <p
-                className={`text-xs ${getPNLTextColor(
+                className={`text-xs tabular-nums ${getPNLTextColor(
                   pnlTableData.todayPNL?.value,
                 )}`}
               >
@@ -143,14 +143,14 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">7T PNL</div>
               <div
-                className={`text-xl font-semibold ${getPNLTextColor(
+                className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
                   pnlTableData.sevenTPnl?.value,
                 )}`}
               >
                 {formatPNLPercentage(pnlTableData.sevenTPnl?.value)}
               </div>
               <p
-                className={`text-xs ${getPNLTextColor(
+                className={`text-xs tabular-nums ${getPNLTextColor(
                   pnlTableData.sevenTPnl?.value,
                 )}`}
               >
@@ -163,14 +163,14 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">30T PNL</div>
               <div
-                className={`text-xl font-semibold ${getPNLTextColor(
+                className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
                   pnlTableData.thirtyPNL?.value,
                 )}`}
               >
                 {formatPNLPercentage(pnlTableData.thirtyPNL?.value)}
               </div>
               <p
-                className={`text-xs ${getPNLTextColor(
+                className={`text-xs tabular-nums ${getPNLTextColor(
                   pnlTableData.thirtyPNL?.value,
                 )}`}
               >

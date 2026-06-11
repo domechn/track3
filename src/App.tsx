@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import React from "react";
 import { ThemeProvider } from "@/components/common/theme";
 import { themeLocalStorageKey } from "./middlelayers/configuration";
-import { renderRightClickMenu } from './utils/hook'
+import { renderRightClickMenu } from "./utils/hook";
 
 export const ChartResizeContext = React.createContext<{
   needResize: number;
@@ -18,12 +18,12 @@ function App() {
       event.preventDefault();
       document.getElementById("app-main-content")?.focus();
     },
-    []
+    [],
   );
 
   return (
     <ThemeProvider defaultTheme="light" storageKey={themeLocalStorageKey}>
-      <div className="bg-gradient-to-br from-background via-background to-accent/20 min-h-screen" onContextMenu={renderRightClickMenu}>
+      <div className="min-h-dvh" onContextMenu={renderRightClickMenu}>
         <a
           href="#app-main-content"
           onClick={focusMainContent}

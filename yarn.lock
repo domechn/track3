@@ -622,6 +622,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fontsource-variable/jetbrains-mono@npm:^5.2.8":
+  version: 5.2.8
+  resolution: "@fontsource-variable/jetbrains-mono@npm:5.2.8"
+  checksum: 10c0/574e5463b802cfdd6ec8dd16724d2fd5ee38204815729c9dca0f457a417f0a4d32e6ec4ed2dfa0e5a5de5a9b0deaeb9f3c0b49b332763ed40172de43d6b1502f
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/outfit@npm:^5.2.8":
+  version: 5.2.8
+  resolution: "@fontsource-variable/outfit@npm:5.2.8"
+  checksum: 10c0/0d8e3cf0153780d794c28bde93384ed22691a95c5e743489c3c43d4e4ec88d1c6e6a0684bc890bbbb04fb292e1505785636c60b3748e835375617e2af2e6c230
+  languageName: node
+  linkType: hard
+
 "@isaacs/fs-minipass@npm:^4.0.0":
   version: 4.0.1
   resolution: "@isaacs/fs-minipass@npm:4.0.1"
@@ -5436,6 +5450,8 @@ __metadata:
   resolution: "track3@workspace:."
   dependencies:
     "@actions/github": "npm:^9.1.0"
+    "@fontsource-variable/jetbrains-mono": "npm:^5.2.8"
+    "@fontsource-variable/outfit": "npm:^5.2.8"
     "@radix-ui/react-alert-dialog": "npm:^1.1.7"
     "@radix-ui/react-checkbox": "npm:^1.3.1"
     "@radix-ui/react-collapsible": "npm:^1.1.4"

@@ -541,16 +541,16 @@ const App = ({
           </div>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col">
-          <div className="text-xl font-semibold">
+          <div className="text-2xl font-semibold font-mono tabular-nums tracking-tight">
             {totalValueShower.formatTotalValue()}
           </div>
           <p className="text-xs text-muted-foreground mb-2">
             <span
-              className={changePercentageColorClass(
+              className={`tabular-nums ${changePercentageColorClass(
                 totalValueShower,
                 totalValue,
                 firstTotalValue,
-              )}
+              )}`}
             >
               {changedValueOrPercentage}
             </span>{" "}

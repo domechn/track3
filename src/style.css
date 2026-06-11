@@ -37,7 +37,8 @@
     --glass-blur: 12px;
     --glass-bg: rgba(255, 255, 255, 0.6);
     --glass-border: rgba(255, 255, 255, 0.3);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+    /* shadows tinted with the slate palette hue instead of pure black */
+    --glass-shadow: 0 10px 34px -8px rgba(15, 23, 42, 0.12);
     --sidebar-width: 200px;
     --sidebar-collapsed-width: 52px;
   }
@@ -73,7 +74,7 @@
 
     --glass-bg: rgba(15, 23, 42, 0.5);
     --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --glass-shadow: 0 12px 36px -8px rgba(2, 6, 23, 0.5);
   }
 }
 
@@ -81,10 +82,39 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
-    @apply bg-background text-foreground;
-    background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--background)) 60%, hsl(var(--accent) / 0.3) 100%);
-    min-height: 100vh;
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100dvh;
+    background-color: hsl(var(--background));
+    /* layered ambient mesh + a faint grain to break digital flatness */
+    background-image:
+      radial-gradient(
+        58% 48% at 10% -2%,
+        hsl(var(--primary) / 0.06) 0%,
+        transparent 62%
+      ),
+      radial-gradient(
+        52% 44% at 102% 6%,
+        hsl(var(--ring) / 0.05) 0%,
+        transparent 58%
+      ),
+      radial-gradient(
+        72% 64% at 92% 104%,
+        hsl(var(--accent) / 0.55) 0%,
+        transparent 64%
+      ),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='160'%20height='160'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.8'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'%20opacity='0.035'/%3E%3C/svg%3E");
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+    background-attachment: fixed, fixed, fixed, fixed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 }
 
