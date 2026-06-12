@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchStockPrices } from "./price";
 import { sendHttpRequest } from "./http";
 import { listAllCurrencyRates } from "../../configuration";
+import { getClientID } from "../../../utils/app";
 
 vi.mock("./http", () => ({
   sendHttpRequest: vi.fn(),
@@ -9,38 +10,26 @@ vi.mock("./http", () => ({
 
 vi.mock("../../configuration", () => ({
   listAllCurrencyRates: vi.fn(),
+  PRO_API_ENDPOINT: "https://track3-pro.test",
+}));
+
+vi.mock("../../../utils/app", () => ({
+  getClientID: vi.fn(),
 }));
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(getClientID).mockResolvedValue("test-client-id");
 });
 
 describe("fetchStockPrices", () => {
-  it("uses Yahoo chart responses that do not require quote crumb cookies", async () => {
+  it("fetches stock prices from the pro API endpoint", async () => {
     vi.mocked(sendHttpRequest)
       .mockResolvedValueOnce({
-        chart: {
-          result: [
-            {
-              meta: {
-                symbol: "AAPL",
-                regularMarketPrice: 189.23,
-              },
-            },
-          ],
-        },
+        data: { symbol: "AAPL", price: 189.23, currency: "USD" },
       })
       .mockResolvedValueOnce({
-        chart: {
-          result: [
-            {
-              meta: {
-                symbol: "MSFT",
-                previousClose: 410.5,
-              },
-            },
-          ],
-        },
+        data: { symbol: "MSFT", price: 410.5, currency: "USD" },
       });
 
     await expect(fetchStockPrices(["aapl", "MSFT", "AAPL"])).resolves.toEqual({
@@ -50,26 +39,19 @@ describe("fetchStockPrices", () => {
 
     expect(sendHttpRequest).toHaveBeenCalledTimes(2);
     expect(sendHttpRequest).toHaveBeenCalledWith(
-      "GET",
-      expect.stringContaining("/v8/finance/chart/AAPL"),
+      "POST",
+      expect.stringContaining("/api/stock/price"),
       10000,
+      expect.objectContaining({ "x-track3-client-id": "test-client-id" }),
+      { symbol: "AAPL" },
     );
   });
 
-  it("rejects when a Yahoo request fails", async () => {
+  it("rejects when a price request fails", async () => {
     vi.mocked(sendHttpRequest)
       .mockRejectedValueOnce(new Error("rate limited"))
       .mockResolvedValueOnce({
-        chart: {
-          result: [
-            {
-              meta: {
-                symbol: "MSFT",
-                regularMarketPrice: 412.88,
-              },
-            },
-          ],
-        },
+        data: { symbol: "MSFT", price: 412.88, currency: "USD" },
       });
 
     await expect(fetchStockPrices(["AAPL", "MSFT"])).rejects.toThrow(
@@ -82,30 +64,10 @@ describe("fetchStockPrices", () => {
   it("converts non-USD prices to USD using local currency rates", async () => {
     vi.mocked(sendHttpRequest)
       .mockResolvedValueOnce({
-        chart: {
-          result: [
-            {
-              meta: {
-                symbol: "1211.HK",
-                currency: "HKD",
-                regularMarketPrice: 97,
-              },
-            },
-          ],
-        },
+        data: { symbol: "1211.HK", price: 97, currency: "HKD" },
       })
       .mockResolvedValueOnce({
-        chart: {
-          result: [
-            {
-              meta: {
-                symbol: "AAPL",
-                currency: "USD",
-                regularMarketPrice: 200,
-              },
-            },
-          ],
-        },
+        data: { symbol: "AAPL", price: 200, currency: "USD" },
       });
     vi.mocked(listAllCurrencyRates).mockResolvedValue([
       { currency: "USD", alias: "US dollar", symbol: "$", rate: 1 },
@@ -121,30 +83,10 @@ describe("fetchStockPrices", () => {
   it("skips symbols whose currency has no local rate", async () => {
     vi.mocked(sendHttpRequest)
       .mockResolvedValueOnce({
-        chart: {
-          result: [
-            {
-              meta: {
-                symbol: "1211.HK",
-                currency: "HKD",
-                regularMarketPrice: 97,
-              },
-            },
-          ],
-        },
+        data: { symbol: "1211.HK", price: 97, currency: "HKD" },
       })
       .mockResolvedValueOnce({
-        chart: {
-          result: [
-            {
-              meta: {
-                symbol: "AAPL",
-                currency: "USD",
-                regularMarketPrice: 200,
-              },
-            },
-          ],
-        },
+        data: { symbol: "AAPL", price: 200, currency: "USD" },
       });
     vi.mocked(listAllCurrencyRates).mockResolvedValue([
       { currency: "USD", alias: "US dollar", symbol: "$", rate: 1 },
@@ -157,17 +99,7 @@ describe("fetchStockPrices", () => {
 
   it("does not fetch currency rates when all prices are USD", async () => {
     vi.mocked(sendHttpRequest).mockResolvedValueOnce({
-      chart: {
-        result: [
-          {
-            meta: {
-              symbol: "AAPL",
-              currency: "USD",
-              regularMarketPrice: 200,
-            },
-          },
-        ],
-      },
+      data: { symbol: "AAPL", price: 200, currency: "USD" },
     });
 
     await expect(fetchStockPrices(["AAPL"])).resolves.toEqual({
@@ -176,19 +108,9 @@ describe("fetchStockPrices", () => {
     expect(listAllCurrencyRates).not.toHaveBeenCalled();
   });
 
-  it("anchors the USD cash symbol to 1 without querying Yahoo", async () => {
+  it("anchors the USD cash symbol to 1 without querying the endpoint", async () => {
     vi.mocked(sendHttpRequest).mockResolvedValueOnce({
-      chart: {
-        result: [
-          {
-            meta: {
-              symbol: "AAPL",
-              currency: "USD",
-              regularMarketPrice: 200,
-            },
-          },
-        ],
-      },
+      data: { symbol: "AAPL", price: 200, currency: "USD" },
     });
 
     await expect(fetchStockPrices(["USD", "AAPL"])).resolves.toEqual({
@@ -197,9 +119,11 @@ describe("fetchStockPrices", () => {
     });
     expect(sendHttpRequest).toHaveBeenCalledTimes(1);
     expect(sendHttpRequest).not.toHaveBeenCalledWith(
-      "GET",
-      expect.stringContaining("/v8/finance/chart/USD"),
+      "POST",
+      expect.stringContaining("/api/stock/price"),
       expect.anything(),
+      expect.anything(),
+      { symbol: "USD" },
     );
   });
 });
