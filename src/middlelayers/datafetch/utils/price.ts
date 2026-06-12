@@ -1,20 +1,7 @@
 import { sendHttpRequest } from "./http";
 import _ from "lodash";
-import { listAllCurrencyRates } from "../../configuration";
-
-type YahooChartResponse = {
-  chart?: {
-    result?: {
-      meta?: {
-        symbol?: string;
-        currency?: string;
-        regularMarketPrice?: number;
-        previousClose?: number;
-        chartPreviousClose?: number;
-      };
-    }[];
-  };
-};
+import { listAllCurrencyRates, PRO_API_ENDPOINT } from "../../configuration";
+import { getClientID } from "../../../utils/app";
 
 const YAHOO_REQUEST_DELAY_MS = 1000;
 
@@ -25,19 +12,30 @@ function sleep(ms: number): Promise<void> {
 async function fetchStockPriceEntry(
   symbol: string,
 ): Promise<readonly [string, number, string] | undefined> {
-  const resp = await sendHttpRequest<YahooChartResponse>(
-    "GET",
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+  const resp = await sendHttpRequest<{
+    data: { symbol: string; price: number; currency: string } | null;
+  }>(
+    "POST",
+    PRO_API_ENDPOINT + "/api/stock/price",
     10000,
+    {
+      "x-track3-client-id": await getClientID(),
+    },
+    {
+      symbol,
+    },
   );
-  const meta = resp.chart?.result?.[0]?.meta;
-  const price =
-    meta?.regularMarketPrice ?? meta?.previousClose ?? meta?.chartPreviousClose;
-  if (!meta?.symbol || price === undefined || !Number.isFinite(price)) {
+  const data = resp.data;
+  if (
+    !data ||
+    !data.symbol ||
+    data.price === undefined ||
+    !Number.isFinite(data.price)
+  ) {
     return;
   }
-  const currency = (meta.currency ?? "USD").trim().toUpperCase() || "USD";
-  return [meta.symbol.toUpperCase(), price, currency] as const;
+  const currency = (data.currency ?? "USD").trim().toUpperCase() || "USD";
+  return [data.symbol.toUpperCase(), data.price, currency] as const;
 }
 
 export async function fetchStockPrices(
