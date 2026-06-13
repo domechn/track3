@@ -3,17 +3,11 @@ import _ from "lodash";
 import { listAllCurrencyRates, PRO_API_ENDPOINT } from "../../configuration";
 import { getClientID } from "../../../utils/app";
 
-const YAHOO_REQUEST_DELAY_MS = 1000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchStockPriceEntry(
-  symbol: string,
-): Promise<readonly [string, number, string] | undefined> {
+async function fetchStockPriceEntries(
+  symbols: string[],
+): Promise<Array<readonly [string, number, string]>> {
   const resp = await sendHttpRequest<{
-    data: { symbol: string; price: number; currency: string } | null;
+    data: { [symbol: string]: { price: number; currency: string } };
   }>(
     "POST",
     PRO_API_ENDPOINT + "/api/stock/price",
@@ -22,20 +16,20 @@ async function fetchStockPriceEntry(
       "x-track3-client-id": await getClientID(),
     },
     {
-      symbol,
+      symbols,
     },
   );
-  const data = resp.data;
-  if (
-    !data ||
-    !data.symbol ||
-    data.price === undefined ||
-    !Number.isFinite(data.price)
-  ) {
-    return;
+
+  const data = resp.data ?? {};
+  const entries: Array<readonly [string, number, string]> = [];
+  for (const [symbol, entry] of Object.entries(data)) {
+    if (!entry || entry.price === undefined || !Number.isFinite(entry.price)) {
+      continue;
+    }
+    const currency = (entry.currency ?? "USD").trim().toUpperCase() || "USD";
+    entries.push([symbol.toUpperCase(), entry.price, currency] as const);
   }
-  const currency = (data.currency ?? "USD").trim().toUpperCase() || "USD";
-  return [data.symbol.toUpperCase(), data.price, currency] as const;
+  return entries;
 }
 
 export async function fetchStockPrices(
@@ -51,22 +45,15 @@ export async function fetchStockPrices(
   }
 
   // "USD" represents a cash balance (e.g. IBKR cash position), not a tradable
-  // security. It is always worth 1 USD, so anchor it instead of querying Yahoo,
-  // which would otherwise return the US Dollar Index value.
+  // security. It is always worth 1 USD, so anchor it instead of querying the
+  // price endpoint, which would otherwise return the US Dollar Index value.
   const hasUsdCash = normalizedSymbols.includes("USD");
   const fetchableSymbols = normalizedSymbols.filter((s) => s !== "USD");
 
-  const entries: Array<readonly [string, number, string]> = [];
-  for (const [index, symbol] of fetchableSymbols.entries()) {
-    const entry = await fetchStockPriceEntry(symbol);
-    if (entry) {
-      entries.push(entry);
-    }
-
-    if (index < fetchableSymbols.length - 1) {
-      await sleep(YAHOO_REQUEST_DELAY_MS);
-    }
-  }
+  const entries =
+    fetchableSymbols.length > 0
+      ? await fetchStockPriceEntries(fetchableSymbols)
+      : [];
 
   const prices = await convertEntriesToUsd(entries);
   if (hasUsdCash) {
