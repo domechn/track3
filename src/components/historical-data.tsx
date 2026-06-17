@@ -787,8 +787,8 @@ const App = ({
                 </div>
               </div>
 
-              <div className="relative min-h-[300px]">
-                <ScrollArea className="w-full max-h-[calc(100vh-400px)] rounded-lg border border-border/40 bg-background/20">
+              <div className="relative">
+                <ScrollArea className="w-full rounded-lg border border-border/40 bg-background/20">
                   <Table>
                     <TableHeader>
                       <TableRow>
