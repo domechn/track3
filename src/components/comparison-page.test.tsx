@@ -126,6 +126,28 @@ describe("Comparison page", () => {
     expect(toggle).toHaveAccessibleName(/show values/i);
   });
 
+  it("renders the value visibility icon with theme-aware current color", async () => {
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      { id: 1, date: "2024-04-16" },
+      { id: 2, date: "2024-04-15" },
+    ] as never);
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+
+    render(
+      <Comparison currency={usdCurrency} quoteColor="green-up-red-down" />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    const toggle = screen.getByRole("button", { name: /hide values/i });
+    const icon = toggle.querySelector("svg");
+
+    expect(icon).toBeInTheDocument();
+    expect(icon).toHaveClass("text-current");
+  });
+
   it("uses date picker buttons for the base and head dates instead of select comboboxes", async () => {
     vi.mocked(queryAllDataDates).mockResolvedValue([
       { id: 1, date: "2024-04-16" },

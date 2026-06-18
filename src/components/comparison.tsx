@@ -3,8 +3,6 @@ import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import _ from "lodash";
 import bluebird from "bluebird";
-import ViewIcon from "@/assets/icons/view-icon.png";
-import HideIcon from "@/assets/icons/hide-icon.png";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -28,7 +26,7 @@ import {
   resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
-import { CalendarIcon } from "@radix-ui/react-icons";
+import { CalendarIcon, EyeClosedIcon, EyeOpenIcon } from "@radix-ui/react-icons";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { isSameDay } from "date-fns";
@@ -452,16 +450,21 @@ const App = ({
                     onClick={onViewOrHideClick}
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-9 sm:w-9"
                     aria-label={shouldMaskValue ? "show values" : "hide values"}
                     aria-pressed={shouldMaskValue}
                   >
-                    <img
-                      src={shouldMaskValue ? HideIcon : ViewIcon}
-                      alt="view-or-hide"
-                      width={22}
-                      height={22}
-                    />
+                    {shouldMaskValue ? (
+                      <EyeClosedIcon
+                        className="h-[22px] w-[22px] text-current"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <EyeOpenIcon
+                        className="h-[22px] w-[22px] text-current"
+                        aria-hidden="true"
+                      />
+                    )}
                   </Button>
                   <div className="flex items-center gap-2">
                     <ComparisonDatePicker
