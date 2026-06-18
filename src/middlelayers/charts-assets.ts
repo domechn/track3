@@ -263,6 +263,7 @@ export async function queryAllDataDates(): Promise<
   {
     id: string;
     date: string;
+    createdAt: string;
   }[]
 > {
   const records = await ASSET_HANDLER.listAllUUIDWithCreatedAt();
@@ -271,6 +272,7 @@ export async function queryAllDataDates(): Promise<
     .map((record) => ({
       id: record.uuid,
       date: timeToDateStr(new Date(record.createdAt).getTime()),
+      createdAt: record.createdAt,
     }))
     .value();
 }
