@@ -47,6 +47,7 @@ import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.useRealTimers();
 });
 
@@ -123,5 +124,82 @@ describe("Comparison page", () => {
 
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(toggle).toHaveAccessibleName(/show values/i);
+  });
+
+  it("uses date picker buttons for the base and head dates instead of select comboboxes", async () => {
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      { id: 1, date: "2024-04-16" },
+      { id: 2, date: "2024-04-15" },
+    ] as never);
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+
+    render(
+      <Comparison currency={usdCurrency} quoteColor="green-up-red-down" />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("button", { name: /choose base date/i }),
+    ).toHaveTextContent("2024-04-15");
+    expect(
+      screen.getByRole("button", { name: /choose head date/i }),
+    ).toHaveTextContent("2024-04-16");
+    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+  });
+
+  it("shows and selects individual snapshots when a date has multiple snapshots", async () => {
+    const user = userEvent.setup();
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      {
+        id: "latest-snapshot",
+        date: "2024-04-16",
+        createdAt: "2024-04-16T16:30:00",
+      },
+      {
+        id: "older-same-day-snapshot",
+        date: "2024-04-16",
+        createdAt: "2024-04-16T10:30:00",
+      },
+      {
+        id: "previous-day-snapshot",
+        date: "2024-04-15",
+        createdAt: "2024-04-15T09:00:00",
+      },
+    ] as never);
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+
+    render(
+      <Comparison currency={usdCurrency} quoteColor="green-up-red-down" />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    expect(queryCoinDataByUUID).toHaveBeenCalledWith("latest-snapshot");
+    expect(queryCoinDataByUUID).toHaveBeenCalledWith(
+      "older-same-day-snapshot",
+    );
+    expect(screen.getByRole("button", { name: /choose base date/i }))
+      .toHaveTextContent("2024-04-16 10:30:00");
+
+    vi.mocked(queryCoinDataByUUID).mockClear();
+
+    await user.click(screen.getByRole("button", { name: /choose head date/i }));
+
+    expect(screen.getByText("2 snapshots on 2024-04-16")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /select 2024-04-16 10:30:00 snapshot/i,
+      }),
+    );
+
+    expect(queryCoinDataByUUID).toHaveBeenCalledWith(
+      "older-same-day-snapshot",
+    );
   });
 });

@@ -16,15 +16,6 @@ import { getImageApiPath } from "@/utils/app";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { downloadCoinLogos } from "@/middlelayers/data";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 import { positiveNegativeColor } from "@/utils/color";
 import { StaggerContainer, FadeUp } from "./motion";
 import { Card, CardContent } from "./ui/card";
@@ -37,6 +28,10 @@ import {
   resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
+import { CalendarIcon } from "@radix-ui/react-icons";
+import { Calendar } from "./ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { isSameDay } from "date-fns";
 
 type MetricRow = {
   base: number;
@@ -57,6 +52,9 @@ type QuickCompareType = "7D" | "1M" | "1Y" | "YTD" | "ALL";
 type DateOption = {
   label: string;
   value: string;
+  createdAt?: string;
+  snapshotLabel: string;
+  displayLabel: string;
 };
 
 const App = ({
@@ -91,11 +89,11 @@ const App = ({
   }, [baseId, headId]);
 
   const baseDate = useMemo(() => {
-    return _.find(dateOptions, { value: baseId })?.label;
+    return _.find(dateOptions, { value: baseId })?.displayLabel;
   }, [dateOptions, baseId]);
 
   const headDate = useMemo(() => {
-    return _.find(dateOptions, { value: headId })?.label;
+    return _.find(dateOptions, { value: headId })?.displayLabel;
   }, [dateOptions, headId]);
 
   useEffect(() => {
@@ -108,12 +106,29 @@ const App = ({
         return;
       }
 
-      const options = _(data)
-        .map((d) => ({
-          label: d.date,
-          value: `${d.id}`,
-        }))
-        .value();
+      const rawOptions = data.map((d) => ({
+        label: d.date,
+        value: `${d.id}`,
+        createdAt: d.createdAt,
+      }));
+      const dateCounts = _.countBy(rawOptions, "label");
+      const dateIndexes: Record<string, number> = {};
+      const options = rawOptions.map((option) => {
+        dateIndexes[option.label] = (dateIndexes[option.label] || 0) + 1;
+        const hasMultipleSnapshots = dateCounts[option.label] > 1;
+        const snapshotLabel = formatSnapshotLabel(
+          option.createdAt,
+          dateIndexes[option.label],
+        );
+
+        return {
+          ...option,
+          snapshotLabel,
+          displayLabel: hasMultipleSnapshots
+            ? `${option.label} ${snapshotLabel}`
+            : option.label,
+        };
+      });
 
       setDateOptions(options);
       if (options.length === 0) {
@@ -311,15 +326,15 @@ const App = ({
     }
   }
 
-  function onBaseSelectChange(id: string) {
-    onSelectChange(id, "base");
+  function onBaseDateChange(id: string) {
+    onDateChange(id, "base");
   }
 
-  function onHeadSelectChange(id: string) {
-    onSelectChange(id, "head");
+  function onHeadDateChange(id: string) {
+    onDateChange(id, "head");
   }
 
-  function onSelectChange(id: string, type: "base" | "head") {
+  function onDateChange(id: string, type: "base" | "head") {
     setCurrentQuickCompare(null);
     if (type === "base") {
       setBaseId(id);
@@ -449,37 +464,19 @@ const App = ({
                     />
                   </Button>
                   <div className="flex items-center gap-2">
-                    <Select onValueChange={onBaseSelectChange} value={baseId}>
-                      <SelectTrigger className="w-[150px]">
-                        <SelectValue placeholder="Base Date" />
-                      </SelectTrigger>
-                      <SelectContent className="overflow-y-auto max-h-[20rem]">
-                        <SelectGroup>
-                          <SelectLabel>Base Dates</SelectLabel>
-                          {dateOptions.map((d) => (
-                            <SelectItem key={d.value} value={d.value}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    <ComparisonDatePicker
+                      label="Base Date"
+                      value={baseId}
+                      dateOptions={dateOptions}
+                      onChange={onBaseDateChange}
+                    />
                     <span className="text-muted-foreground text-sm">vs</span>
-                    <Select onValueChange={onHeadSelectChange} value={headId}>
-                      <SelectTrigger className="w-[150px]">
-                        <SelectValue placeholder="Head Date" />
-                      </SelectTrigger>
-                      <SelectContent className="overflow-y-auto max-h-[20rem]">
-                        <SelectGroup>
-                          <SelectLabel>Head Dates</SelectLabel>
-                          {dateOptions.map((d) => (
-                            <SelectItem key={d.value} value={d.value}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    <ComparisonDatePicker
+                      label="Head Date"
+                      value={headId}
+                      dateOptions={dateOptions}
+                      onChange={onHeadDateChange}
+                    />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -604,6 +601,163 @@ const App = ({
     </div>
   );
 };
+
+function ComparisonDatePicker({
+  label,
+  value,
+  dateOptions,
+  onChange,
+}: {
+  label: "Base Date" | "Head Date";
+  value: string;
+  dateOptions: DateOption[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeDateLabel, setActiveDateLabel] = useState<string | undefined>();
+  const selectedOption = useMemo(
+    () => _.find(dateOptions, { value }),
+    [dateOptions, value],
+  );
+  const selectedDate = selectedOption
+    ? dateOptionToDate(selectedOption)
+    : undefined;
+  const optionsByDate = useMemo(
+    () => _.groupBy(dateOptions, "label"),
+    [dateOptions],
+  );
+  const selectableDates = useMemo(
+    () => dateOptions.map(dateOptionToDate),
+    [dateOptions],
+  );
+  const multipleSnapshotDates = useMemo(
+    () =>
+      Object.values(optionsByDate)
+        .filter((options) => options.length > 1)
+        .map((options) => dateOptionToDate(options[0])),
+    [optionsByDate],
+  );
+  const activeDateOptions = activeDateLabel
+    ? optionsByDate[activeDateLabel] || []
+    : [];
+  const calendarSelectedDate =
+    activeDateOptions.length > 0
+      ? dateOptionToDate(activeDateOptions[0])
+      : selectedDate;
+
+  useEffect(() => {
+    if (open) {
+      setActiveDateLabel(selectedOption?.label);
+    }
+  }, [open, selectedOption?.label]);
+
+  function onDateSelect(date?: Date) {
+    if (!date) {
+      return;
+    }
+
+    const dateSnapshots = dateOptions.filter((option) =>
+      isSameDay(dateOptionToDate(option), date),
+    );
+    if (dateSnapshots.length === 0) {
+      return;
+    }
+
+    if (dateSnapshots.length > 1) {
+      setActiveDateLabel(dateSnapshots[0].label);
+      return;
+    }
+
+    onChange(dateSnapshots[0].value);
+    setOpen(false);
+  }
+
+  function onSnapshotSelect(option: DateOption) {
+    onChange(option.value);
+    setOpen(false);
+  }
+
+  function isDayDisabled(day: Date) {
+    return !selectableDates.some((date) => isSameDay(date, day));
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-[150px] justify-start gap-2 px-3 font-normal"
+          aria-label={`Choose ${label.toLowerCase()}`}
+          disabled={dateOptions.length === 0}
+        >
+          <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">
+            {selectedOption?.displayLabel || label}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={calendarSelectedDate}
+          onSelect={onDateSelect}
+          defaultMonth={calendarSelectedDate}
+          disabled={isDayDisabled}
+          modifiers={{ multipleSnapshots: multipleSnapshotDates }}
+          modifiersClassNames={{
+            multipleSnapshots: "font-semibold underline underline-offset-4",
+          }}
+          initialFocus
+        />
+        {activeDateOptions.length > 1 && (
+          <div className="border-t px-3 py-3">
+            <div className="mb-2 text-xs text-muted-foreground">
+              {activeDateOptions.length} snapshots on {activeDateLabel}
+            </div>
+            <div
+              className="grid gap-1"
+              role="group"
+              aria-label={`${label} snapshots on ${activeDateLabel}`}
+            >
+              {activeDateOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  variant={option.value === value ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 justify-start px-2 text-xs font-normal"
+                  aria-label={`Select ${option.displayLabel} snapshot`}
+                  onClick={() => onSnapshotSelect(option)}
+                >
+                  <span>{option.snapshotLabel}</span>
+                  {option.value === value && (
+                    <span className="ml-auto text-[11px] text-muted-foreground">
+                      Selected
+                    </span>
+                  )}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function dateOptionToDate(option: DateOption): Date {
+  return new Date(parseDateToTS(option.label));
+}
+
+function formatSnapshotLabel(createdAt: string | undefined, index: number) {
+  if (!createdAt) {
+    return `Snapshot ${index}`;
+  }
+
+  const time = createdAt.match(/[T\s](\d{2}:\d{2}(?::\d{2})?)/)?.[1];
+  return time || `Snapshot ${index}`;
+}
 
 function CoinCard({
   coin,
