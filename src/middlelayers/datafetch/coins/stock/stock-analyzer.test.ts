@@ -61,4 +61,23 @@ describe("StockAnalyzer", () => {
     ]);
     expect(mockBroker.fetchPositionsPrice).not.toHaveBeenCalled();
   });
+
+  it("lists broker identities for data source fallback handling", () => {
+    const analyzer = new StockAnalyzer({
+      stockConfig: {
+        brokers: [
+          {
+            name: "ibkr",
+            initParams: {
+              token: "token-1",
+              queryId: "query-1",
+            },
+            active: true,
+          },
+        ],
+      },
+    });
+
+    expect(analyzer.getWalletIdentities()).toEqual(["ibkr:query-1"]);
+  });
 });

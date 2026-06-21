@@ -1,5 +1,9 @@
-import { useContext } from "react";
-import { refreshAllData } from "../middlelayers/charts";
+import { useContext, useState } from "react";
+import {
+  refreshAllData,
+  type FailedPortfolioSource,
+  type RefreshAllDataResult,
+} from "../middlelayers/charts";
 import { trackEventWithClientID } from "../utils/app";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "./ui/button";
@@ -7,6 +11,16 @@ import { UpdateIcon } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
 import { updateAllCurrencyRates } from "@/middlelayers/configuration";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 const retries = 3;
 const retryInterval = 3000; // 3s
@@ -19,17 +33,21 @@ const App = ({
   afterRefresh?: (success: boolean) => unknown;
 }) => {
   const { toast } = useToast();
+  const [failureDialogOpen, setFailureDialogOpen] = useState(false);
+  const [failedSources, setFailedSources] = useState<FailedPortfolioSource[]>(
+    [],
+  );
 
   const {
     setButtonLoading: setRefreshLoading,
     setProgress: setRefreshProgress,
   } = useContext(RefreshButtonLoadingContext);
 
-  const retry = async (
-    fn: () => Promise<unknown>,
+  const retry = async <T,>(
+    fn: () => Promise<T>,
     times: number,
     interval: number,
-  ): Promise<unknown> => {
+  ): Promise<T> => {
     try {
       const res = await fn();
       return res;
@@ -55,10 +73,12 @@ const App = ({
     setRefreshProgress(0);
   }
 
-  const handleButtonClick = () => {
+  const runRefresh = (useLastKnownDataForFailedSources = false) => {
     setRefreshLoading(true);
+    setFailureDialogOpen(false);
 
     let refreshError: Error | undefined;
+    let refreshResult: RefreshAllDataResult | undefined;
 
     updateAllCurrencyRates()
       .catch(() => {
@@ -68,15 +88,19 @@ const App = ({
         retry(
           async () => {
             clearProgress();
-            return refreshAllData(addProgress);
+            return refreshAllData(addProgress, {
+              useLastKnownDataForFailedSources,
+            });
           },
           retries,
           retryInterval,
         ),
       )
-      .then(() => {
-        // clean cache after all analyzers finished successfully
-        getMemoryCacheInstance("data-fetch").clearCache();
+      .then((result) => {
+        refreshResult = result;
+        if (!result.requiresDataSourceAction) {
+          getMemoryCacheInstance("data-fetch").clearCache();
+        }
       })
       .catch((err) => {
         refreshError = err;
@@ -94,17 +118,33 @@ const App = ({
           trackProps = {
             errorMessage: description,
           };
+        } else if (refreshResult?.requiresDataSourceAction) {
+          setFailedSources(refreshResult.failedSources);
+          setFailureDialogOpen(true);
+          trackProps = {
+            failedSources: refreshResult.failedSources
+              .map((source) => source.analyzerName)
+              .join(","),
+          };
         } else {
           toast({
-            description: "Refresh successfully!",
+            description: refreshResult?.usedLastKnownData
+              ? "Refresh completed with last data for unavailable sources."
+              : "Refresh successfully!",
           });
         }
         trackEventWithClientID("data_refreshed", trackProps);
 
         if (afterRefresh) {
-          afterRefresh(!refreshError);
+          afterRefresh(
+            !refreshError && !refreshResult?.requiresDataSourceAction,
+          );
         }
       });
+  };
+
+  const handleButtonClick = () => {
+    runRefresh(false);
   };
 
   return (
@@ -119,6 +159,49 @@ const App = ({
         />
         <p className="hidden sm:inline-block">Refresh</p>
       </Button>
+      <AlertDialog open={failureDialogOpen} onOpenChange={setFailureDialogOpen}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Some data sources failed to load
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The following data sources are currently unavailable. You can
+              retry all, or continue using the last known data for these
+              sources.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-2 space-y-3">
+            {failedSources.map((source) => (
+              <div
+                key={source.analyzerName}
+                className="rounded-md border px-4 py-3"
+              >
+                <div className="text-sm font-semibold">
+                  {source.analyzerName}
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground break-all leading-relaxed">
+                  {source.error}
+                </div>
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => runRefresh(true)}
+              className="gap-1"
+            >
+              Use Last Data
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => runRefresh(false)}
+              className="gap-1"
+            >
+              Retry All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -46,7 +46,11 @@ vi.mock("@/components/ui/use-toast", () => ({
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(updateAllCurrencyRates).mockResolvedValue(undefined as never);
-  vi.mocked(refreshAllData).mockResolvedValue(undefined as never);
+  vi.mocked(refreshAllData).mockResolvedValue({
+    failedSources: [],
+    requiresDataSourceAction: false,
+    usedLastKnownData: false,
+  } as never);
   vi.mocked(getMemoryCacheInstance).mockReturnValue({
     clearCache: vi.fn(),
   } as never);
@@ -61,7 +65,11 @@ describe("RefreshData — currency rates refresh ordering", () => {
     });
     vi.mocked(refreshAllData).mockImplementation(async () => {
       callOrder.push("refreshAllData");
-      return undefined as never;
+      return {
+        failedSources: [],
+        requiresDataSourceAction: false,
+        usedLastKnownData: false,
+      } as never;
     });
 
     const user = userEvent.setup();
@@ -98,6 +106,106 @@ describe("RefreshData — currency rates refresh ordering", () => {
 
     await waitFor(() => {
       expect(afterRefresh).toHaveBeenCalledWith(true);
+    });
+  });
+
+  it("asks the user whether to retry or use last data when a data source fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(refreshAllData).mockResolvedValueOnce({
+      failedSources: [
+        {
+          analyzerName: "Stock Analyzer",
+          walletIdentities: ["ibkr:query-1"],
+          error: "IBKR maintenance",
+        },
+      ],
+      requiresDataSourceAction: true,
+      usedLastKnownData: false,
+    } as never);
+
+    render(<RefreshData loading={false} />);
+
+    await user.click(screen.getByRole("button"));
+
+    expect(
+      await screen.findByText("Some data sources failed to load"),
+    ).toBeTruthy();
+    expect(screen.getByText(/Stock Analyzer/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry All" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Last Data" })).toBeTruthy();
+  });
+
+  it("retries the whole refresh from the data source failure dialog", async () => {
+    const user = userEvent.setup();
+    vi.mocked(refreshAllData)
+      .mockResolvedValueOnce({
+        failedSources: [
+          {
+            analyzerName: "Stock Analyzer",
+            walletIdentities: ["ibkr:query-1"],
+            error: "IBKR maintenance",
+          },
+        ],
+        requiresDataSourceAction: true,
+        usedLastKnownData: false,
+      } as never)
+      .mockResolvedValueOnce({
+        failedSources: [],
+        requiresDataSourceAction: false,
+        usedLastKnownData: false,
+      } as never);
+
+    render(<RefreshData loading={false} />);
+
+    await user.click(screen.getByRole("button"));
+    await user.click(await screen.findByRole("button", { name: "Retry All" }));
+
+    await waitFor(() => {
+      expect(refreshAllData).toHaveBeenCalledTimes(2);
+    });
+    expect(refreshAllData).toHaveBeenLastCalledWith(expect.any(Function), {
+      useLastKnownDataForFailedSources: false,
+    });
+  });
+
+  it("reruns refresh with last-known data enabled from the data source failure dialog", async () => {
+    const user = userEvent.setup();
+    vi.mocked(refreshAllData)
+      .mockResolvedValueOnce({
+        failedSources: [
+          {
+            analyzerName: "Stock Analyzer",
+            walletIdentities: ["ibkr:query-1"],
+            error: "IBKR maintenance",
+          },
+        ],
+        requiresDataSourceAction: true,
+        usedLastKnownData: false,
+      } as never)
+      .mockResolvedValueOnce({
+        failedSources: [
+          {
+            analyzerName: "Stock Analyzer",
+            walletIdentities: ["ibkr:query-1"],
+            error: "IBKR maintenance",
+          },
+        ],
+        requiresDataSourceAction: false,
+        usedLastKnownData: true,
+      } as never);
+
+    render(<RefreshData loading={false} />);
+
+    await user.click(screen.getByRole("button"));
+    await user.click(
+      await screen.findByRole("button", { name: "Use Last Data" }),
+    );
+
+    await waitFor(() => {
+      expect(refreshAllData).toHaveBeenCalledTimes(2);
+    });
+    expect(refreshAllData).toHaveBeenLastCalledWith(expect.any(Function), {
+      useLastKnownDataForFailedSources: true,
     });
   });
 });

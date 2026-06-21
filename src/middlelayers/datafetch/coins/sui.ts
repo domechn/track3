@@ -2,7 +2,7 @@ import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import _ from "lodash";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
-import bluebird from "bluebird";
+import { asyncMap } from "../utils/async";
 
 export class SUIAnalyzer implements Analyzer {
   private readonly config: Pick<TokenConfig, "sui">;
@@ -32,10 +32,10 @@ export class SUIAnalyzer implements Analyzer {
 
   // returns a map of address to balance, key is symbol, value is amount
   private async query(address: string): Promise<WalletCoin[]> {
-    const positions = await bluebird.map(
-      [this.queryHolding, this.queryDefiPositions],
-      async (fn) => fn(this.endpoint, address),
-    );
+    const positions = await Promise.all([
+      this.queryHolding(this.endpoint, address),
+      this.queryDefiPositions(this.endpoint, address),
+    ]);
     return _(positions)
       .flatten()
       .map((p) => ({
@@ -121,10 +121,11 @@ export class SUIAnalyzer implements Analyzer {
     const addresses = getAddressList(this.config.sui);
 
     try {
-      const coinLists = await bluebird.map(
+      const coinLists = await asyncMap(
         addresses,
         async (address) => this.query(address),
-        { concurrency: 2 },
+        2,
+        0,
       );
       return _(coinLists).flatten().value();
     } catch (e) {

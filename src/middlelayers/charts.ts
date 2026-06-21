@@ -5,6 +5,13 @@ export {
   fixSymbolDataIfNeeded,
 } from "./charts-refresh";
 
+export type {
+  RefreshAllDataOptions,
+  RefreshAllDataResult,
+} from "./charts-refresh";
+
+export type { FailedPortfolioSource } from "./data";
+
 export {
   listAllowedSymbols,
   queryAssetMaxAmountBySymbol,

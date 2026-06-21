@@ -9,6 +9,7 @@ import {
   WalletCoinUSD,
 } from "./types";
 import { loadPortfolios, queryCoinPrices, queryStableCoins } from "./data";
+import type { FailedPortfolioSource, LoadPortfoliosOptions } from "./data";
 import {
   getConfiguration,
   getBlacklistCoins,
@@ -33,15 +34,37 @@ export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
   ASSET_HANDLER.listAssets(size),
 );
 
-export async function refreshAllData(addProgress: AddProgressFunc) {
+export type RefreshAllDataOptions = LoadPortfoliosOptions;
+
+export type RefreshAllDataResult = {
+  failedSources: FailedPortfolioSource[];
+  requiresDataSourceAction: boolean;
+  usedLastKnownData: boolean;
+};
+
+type QueryCoinsDataResult = RefreshAllDataResult & {
+  coins: WalletCoinUSD[];
+};
+
+export async function refreshAllData(
+  addProgress: AddProgressFunc,
+  options: RefreshAllDataOptions = {},
+): Promise<RefreshAllDataResult> {
   const lastAssets = _(await ASSET_HANDLER.listAssets(1))
     .flatten()
     .value();
   // will add 90 percent in query coins data
-  const coins = await queryCoinsData(lastAssets, addProgress);
+  const queryResult = await queryCoinsData(lastAssets, addProgress, options);
+  if (queryResult.requiresDataSourceAction) {
+    return {
+      failedSources: queryResult.failedSources,
+      requiresDataSourceAction: true,
+      usedLastKnownData: false,
+    };
+  }
 
   // todo: add db transaction
-  const uid = await ASSET_HANDLER.saveCoinsToDatabase(coins);
+  const uid = await ASSET_HANDLER.saveCoinsToDatabase(queryResult.coins);
   addProgress(5);
 
   // calculate transactions and save
@@ -52,6 +75,12 @@ export async function refreshAllData(addProgress: AddProgressFunc) {
     generateTransactions(uid, lastAssets, newAssets),
   );
   addProgress(5);
+
+  return {
+    failedSources: queryResult.failedSources,
+    requiresDataSourceAction: false,
+    usedLastKnownData: queryResult.usedLastKnownData,
+  };
 }
 
 function generateTransactions(
@@ -476,7 +505,8 @@ async function queryCoinsDataByWalletCoins(
 async function queryCoinsData(
   lastAssets: AssetModel[],
   addProgress: AddProgressFunc,
-): Promise<WalletCoinUSD[]> {
+  options: RefreshAllDataOptions = {},
+): Promise<QueryCoinsDataResult> {
   addProgress(1);
   const config = await getConfiguration();
   if (!config) {
@@ -487,18 +517,40 @@ async function queryCoinsData(
   const userProInfo = await isProVersion();
   addProgress(2);
   // will add 70 percent progress in load portfolios
-  const assets = await loadPortfolios(
+  const portfolioResult = await loadPortfolios(
     config,
     lastAssets,
     addProgress,
     userProInfo,
+    options,
   );
 
-  return queryCoinsDataByWalletCoins(
-    assets,
+  if (
+    portfolioResult.failedSources.length > 0 &&
+    !options.useLastKnownDataForFailedSources
+  ) {
+    return {
+      coins: [],
+      failedSources: portfolioResult.failedSources,
+      requiresDataSourceAction: true,
+      usedLastKnownData: false,
+    };
+  }
+
+  const coins = await queryCoinsDataByWalletCoins(
+    portfolioResult.coins,
     config,
     lastAssets,
     userProInfo,
     addProgress,
   );
+
+  return {
+    coins,
+    failedSources: portfolioResult.failedSources,
+    requiresDataSourceAction: false,
+    usedLastKnownData:
+      portfolioResult.failedSources.length > 0 &&
+      !!options.useLastKnownDataForFailedSources,
+  };
 }

@@ -33,6 +33,10 @@ export class StockAnalyzer implements Analyzer {
     return "Stock Analyzer";
   }
 
+  getWalletIdentities(): string[] {
+    return this.brokers.map((broker) => broker.getIdentity());
+  }
+
   async preLoad(): Promise<void> {}
 
   async postLoad(): Promise<void> {}
