@@ -86,6 +86,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { useTranslation } from "@/i18n";
 
 interface UpdatePriceDialogProps {
   open: boolean;
@@ -104,11 +105,12 @@ export const UpdatePriceDialog = ({
   onSave,
   currency,
 }: UpdatePriceDialogProps) => {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Update Buy/Sell Price</DialogTitle>
+          <DialogTitle>{t("coin.updatePrice")}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <Input
@@ -120,7 +122,7 @@ export const UpdatePriceDialog = ({
               }
               if (+e.target.value < 0) {
                 toast({
-                  description: "Invalid price",
+                  description: t("coin.invalidPrice"),
                   variant: "destructive",
                 });
                 return;
@@ -136,7 +138,7 @@ export const UpdatePriceDialog = ({
         </div>
         <DialogFooter>
           <Button type="submit" onClick={onSave}>
-            Save
+            {t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -159,11 +161,12 @@ export const UpdateTransactionTypeDialog = ({
   setUpdateTxnTypeValue,
   onSave,
 }: UpdateTransactionTypeDialogProps) => {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[250px]">
         <DialogHeader>
-          <DialogTitle>Update Txn Type</DialogTitle>
+          <DialogTitle>{t("coin.updateTxnType")}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <Select
@@ -171,21 +174,21 @@ export const UpdateTransactionTypeDialog = ({
             value={updateTxnTypeValue}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Transaction Type" />
+              <SelectValue placeholder={t("coin.txnTypePlaceholder")} />
             </SelectTrigger>
             <SelectContent className="overflow-y-auto max-h-[20rem]">
               <SelectGroup>
-                <SelectItem value="sell">sell</SelectItem>
-                <SelectItem value="buy">buy</SelectItem>
-                <SelectItem value="withdraw">withdraw</SelectItem>
-                <SelectItem value="deposit">deposit</SelectItem>
+                <SelectItem value="sell">{t("coin.txnType.sell")}</SelectItem>
+                <SelectItem value="buy">{t("coin.txnType.buy")}</SelectItem>
+                <SelectItem value="withdraw">{t("coin.txnType.withdraw")}</SelectItem>
+                <SelectItem value="deposit">{t("coin.txnType.deposit")}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
         </div>
         <DialogFooter>
           <Button type="submit" onClick={onSave}>
-            Save
+            {t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -203,6 +206,7 @@ const App = ({
   const { symbol } = useParams() as { symbol: string };
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const pageSize = 20;
   const LOAD_COUNT = 3; // loadSymbolData, CoinsAmountAndValueChange, WalletAssetsPercentage
   const assetType = parseAssetTypeSearchParam(searchParams.get("assetType"));
@@ -474,14 +478,14 @@ const App = ({
   function onUpdatePriceDialogSaveClick() {
     if (!symbol) {
       toast({
-        description: "Invalid symbol",
+        description: t("coin.invalidSymbol"),
         variant: "destructive",
       });
       return;
     }
     if (updatePriceValue < 0) {
       toast({
-        description: "Invalid price",
+        description: t("coin.invalidPrice"),
         variant: "destructive",
       });
       return;
@@ -489,7 +493,7 @@ const App = ({
     const txnIndex = txnIndexMap.get(updateTxnId) ?? -1;
     if (txnIndex === -1) {
       toast({
-        description: "Invalid action",
+        description: t("coin.invalidAction"),
         variant: "destructive",
       });
       return;
@@ -511,14 +515,14 @@ const App = ({
   function onUpdateTxnTypeDialogSaveClick() {
     if (!symbol) {
       toast({
-        description: "Invalid symbol",
+        description: t("coin.invalidSymbol"),
         variant: "destructive",
       });
       return;
     }
     if (!updateTxnTypeValue) {
       toast({
-        description: "Invalid txnType",
+        description: t("coin.invalidTxnType"),
         variant: "destructive",
       });
       return;
@@ -526,7 +530,7 @@ const App = ({
     const txnIndex = txnIndexMap.get(updateTxnId) ?? -1;
     if (txnIndex === -1) {
       toast({
-        description: "Invalid action",
+        description: t("coin.invalidAction"),
         variant: "destructive",
       });
       return;
@@ -585,7 +589,7 @@ const App = ({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            History
+            {t("coin.history")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -613,12 +617,12 @@ const App = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Amount</TableHead>
-                <TableHead className="w-[120px]">Type</TableHead>
-                <TableHead className="w-[300px]">Buy/Sell Price</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead className="text-right">Wallet</TableHead>
+                <TableHead>{t("coin.col.amount")}</TableHead>
+                <TableHead className="w-[120px]">{t("coin.col.type")}</TableHead>
+                <TableHead className="w-[300px]">{t("coin.col.price")}</TableHead>
+                <TableHead>{t("coin.col.value")}</TableHead>
+                <TableHead>{t("coin.col.time")}</TableHead>
+                <TableHead className="text-right">{t("coin.col.wallet")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -695,7 +699,7 @@ const App = ({
           {!tableHasData && (
             <div className="flex items-center justify-center">
               <div className="text-lg text-muted-foreground m-auto">
-                No Historical Data For Selected Dates
+                {t("coin.noData")}
               </div>
             </div>
           )}
@@ -729,7 +733,7 @@ const App = ({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Symbol
+                    {t("coin.symbol")}
                   </CardTitle>
                   <svg
                     viewBox="0 0 1024 1024"
@@ -782,7 +786,7 @@ const App = ({
                         <PopoverContent className="w-[100%] p-1">
                           <Command>
                             <CommandInput
-                              placeholder="Search coin..."
+                              placeholder={t("coin.searchPlaceholder")}
                               className="h-9"
                               value={coinKeyword}
                               onValueChange={(val) => {
@@ -791,7 +795,7 @@ const App = ({
                               }}
                             />
                             <CommandList>
-                              <CommandEmpty>No coin found.</CommandEmpty>
+                              <CommandEmpty>{t("coin.noCoinFound")}</CommandEmpty>
                               <CommandGroup>
                                 {visibleAllowSymbols.map((s) => (
                                   <CommandItem
@@ -824,10 +828,8 @@ const App = ({
                                       setCoinListLimit((prev) => prev + 200)
                                     }
                                   >
-                                    Show More (
-                                    {filteredAllowSymbols.length -
-                                      coinListLimit}
-                                    )
+                                    {t("coin.showMoreN")
+                                      .replace("{n}", String(filteredAllowSymbols.length - coinListLimit))}
                                   </Button>
                                 </div>
                               ) : null}
@@ -838,7 +840,7 @@ const App = ({
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                    <div>rank:</div>
+                    <div>{t("coin.rankLabel")}</div>
                     <div>{rank}</div>
                   </div>
                 </CardContent>
@@ -848,7 +850,7 @@ const App = ({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
-                    Breakeven Price
+                    {t("coin.breakeven")}
                   </CardTitle>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -868,7 +870,7 @@ const App = ({
                     {breakEvenPriceStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                    <div>last price:</div>
+                    <div>{t("coin.lastPrice")}</div>
                     <div>{lastPriceStr}</div>
                   </div>
                 </CardContent>
@@ -878,7 +880,7 @@ const App = ({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Positions
+                    {t("coin.positions")}
                   </CardTitle>
                   <svg
                     className="h-4 w-4 text-muted-foreground"
@@ -901,7 +903,7 @@ const App = ({
                     {positionsStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                    <div>max positions:</div>
+                    <div>{t("coin.maxPositions")}</div>
                     <div>{maxPositionsStr}</div>
                   </div>
                 </CardContent>
@@ -911,7 +913,7 @@ const App = ({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Profit
+                    {t("coin.profit")}
                   </CardTitle>
                   <svg
                     viewBox="0 0 1024 1024"
@@ -932,7 +934,7 @@ const App = ({
                     {profitStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                    <div>profit rate:</div>
+                    <div>{t("coin.profitRate")}</div>
                     <div>{profitRate}%</div>
                   </div>
                 </CardContent>
@@ -942,7 +944,7 @@ const App = ({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Cost Price
+                    {t("coin.costPrice")}
                   </CardTitle>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -962,7 +964,7 @@ const App = ({
                     {costPriceStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                    <div>buy amount:</div>
+                    <div>{t("coin.buyAmount")}</div>
                     <div>{buyAmountStr}</div>
                   </div>
                 </CardContent>
@@ -973,7 +975,7 @@ const App = ({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Sell Price
+                    {t("coin.sellPrice")}
                   </CardTitle>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -993,7 +995,7 @@ const App = ({
                     {sellPriceStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
-                    <div>sell amount:</div>
+                    <div>{t("coin.sellAmount")}</div>
                     <div>{sellAmountStr}</div>
                   </div>
                 </CardContent>

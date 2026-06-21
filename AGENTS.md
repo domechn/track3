@@ -63,7 +63,7 @@ SQLite with versioned migrations in `src-tauri/migrations/` (v1→v5). Key table
 - **Caching:** Memory + localStorage with TTL in `datafetch/utils/`
 - **Async:** Bluebird promises for parallel data fetching with progress callbacks
 - **Pro license:** JWT-based, unlocks additional EVM chain support
-- **Repo-local skill:** `.claude/skills/version-upgrade/SKILL.md` documents the standard Track3 version bump workflow
+- **Repo-local skill:** `.agents/skills/version-upgrade/SKILL.md` documents the standard Track3 version bump workflow
 
 ## Build and Test
 
@@ -94,6 +94,80 @@ No unit-test suite yet; validation is build/smoke-run based.
 - Keep HTTP calls in data fetchers on `@tauri-apps/plugin-http` wrapper (`src/middlelayers/datafetch/utils/http.ts`), not browser fetch.
 - Cache fetch-heavy paths via `CacheCenter` (`src/middlelayers/datafetch/utils/cache.ts`) with explicit TTL seconds.
 - Skill-related Vitest files live under `src/test/skills/`.
+
+## Internationalization (i18n)
+
+Track3 supports **English** and **Simplified Chinese** through a lightweight in-house i18n system. There is no external i18n library — the implementation lives in `src/i18n/`.
+
+### Module layout
+
+- `src/i18n/index.tsx` — `I18nProvider`, `useTranslation()` hook, `Locale` type, `SUPPORTED_LOCALES`, `LOCALE_LABELS`, `localeLocalStorageKey` constant.
+- `src/i18n/locales/en.json` — English strings.
+- `src/i18n/locales/zh.json` — Chinese strings.
+
+Both locale files MUST have identical key sets. The provider falls back to English when a key is missing in the active locale, and to the key string itself when neither locale has it.
+
+### Provider
+
+`I18nProvider` is mounted at the very top of `App` in `src/App.tsx`, wrapping `ThemeProvider`. `useTranslation()` returns a fallback `{ locale: "en", setLocale: noop, t: passthroughT }` when no provider is mounted (used in unit tests that do not wrap with the provider — the passthrough returns the English string for known keys).
+
+### Hook API
+
+```tsx
+const { t, locale, setLocale } = useTranslation();
+t("nav.overview");                  // plain key
+t("key.with.{placeholder}", "");    // key + optional fallback
+// Template values are applied with String.prototype.replace, e.g.:
+t("history.showing")
+  .replace("{start}", String(loadedRangeStart))
+  .replace("{end}", String(loadedRangeEnd));
+```
+
+`setLocale(next)` validates against `SUPPORTED_LOCALES`, updates React state, and persists to `localStorage` under `localeLocalStorageKey` (`"track3-ui-locale"`).
+
+### Locale detection
+
+`detectInitialLocale()` (in `src/i18n/index.tsx`) runs at provider mount:
+
+1. Read `localStorage[localeLocalStorageKey]`; if present and supported, use it.
+2. Otherwise inspect `navigator.language`; return `"zh"` when it starts with `"zh"`, else `"en"`.
+3. Final fallback: `"en"`.
+
+`document.documentElement.lang` is synced to the active locale on change.
+
+### Settings integration
+
+The user-facing language switcher lives in the **Appearance** tab of Settings (`src/components/appearance.tsx`):
+
+- A new `Card` block (third in the top row) shows the currently selected language.
+- A new `Card` section at the bottom of the page renders a `RadioGroup` over `SUPPORTED_LOCALES` with `LOCALE_LABELS` as labels.
+- Selecting an option calls `setLocale(locale)` immediately — no `Update Preferences` button is required because language is not persisted through `middlelayers/configuration.ts`.
+- Layout and existing theme/quote-color controls are unchanged.
+
+### i18n rules (apply to any new or modified copy)
+
+1. **Copy only.** Translate only user-facing text. Do not change layout, spacing, colors, or behavior when adding translations.
+2. **Skip numbers, amounts, dates, ticker symbols, file paths, and config IDs.** These are formatted by utilities (`prettyNumberToLocaleString`, `date-fns`, etc.) and never go through `t()`.
+3. **Use the existing key catalog.** Add new keys in a hierarchical, feature-prefixed form (e.g. `feature.section.label`) rather than generic names. Use lowercase dot-separated paths, never nested objects.
+4. **Keep `en.json` and `zh.json` in lock-step.** Every key in one must exist in the other. CI/visual QA catches parity breaks because the provider falls back to English silently.
+5. **String interpolation goes through `.replace("{name}", value)`.** Do not split a phrase across multiple `t()` calls or concatenate translated fragments.
+6. **Render-time keys are OK, but key sets are static.** Keys are looked up at call time, so `t("section.title")` with a dynamic suffix is fine; do not change the JSON shape to support pluralization — keep keys flat.
+7. **For dialog/destructive actions, the button label still translates.** The component primitives (`AlertDialogCancel`, `AlertDialogAction`, `Button`) accept a `children` prop, so pass `t("common.cancel")`, `t("common.delete")`, etc. There is no special handling for destructive vs. confirmatory buttons.
+8. **Toast descriptions and alert dialog descriptions are translatable.** `useToast({ description: t("...") })` and `<AlertDialogDescription>{t("...")}</AlertDialogDescription>` are the standard patterns.
+9. **Developer-only error strings (e.g. `throw new Error("...")`) are not translated.** They are surfaced to logs/devtools, not the UI.
+10. **Asset type labels (e.g. `"stock"`, `"crypto"`) are protocol values, not i18n strings.** They come from `AssetType` and must remain stable across locales.
+
+### Testing
+
+- Unit tests render components without wrapping in `I18nProvider`. The `passthroughT` fallback keeps the existing assertions (which check for English strings) green. Do not change those assertions to translated values; instead, add new keys when adding new copy.
+- For new tests that need a specific locale, wrap with `<I18nProvider>` and either rely on the initial-locale detection or mock `localStorage`.
+
+### Adding a new language
+
+1. Append the locale code to `SUPPORTED_LOCALES` and `LOCALE_LABELS` in `src/i18n/index.tsx`.
+2. Update `detectInitialLocale()` with a detection rule for the new language.
+3. Add `src/i18n/locales/<code>.json` containing every key from `en.json` translated.
+4. Update the Appearance tab if you want to surface a custom label.
 
 ## Integration Points
 

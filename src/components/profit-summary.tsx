@@ -24,6 +24,7 @@ import {
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import PNLChart from "@/components/pnl-chart";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 
 type SummaryType = "month" | "year";
@@ -74,6 +75,7 @@ const App = ({
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
   const [clickedMonth, setClickedMonth] = useState<number | null>(null);
+  const { t } = useTranslation();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
   const monthlyCacheRef = useRef<
@@ -359,12 +361,12 @@ const App = ({
         <div id="month-detail" className="space-y-2">
           <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
             <div className="text-xs text-muted-foreground">
-              Daily PnL in{" "}
-              {getMonthAbbreviation(clickedMonthDateRange.start.getMonth() + 1)}{" "}
-              {clickedMonthDateRange.start.getFullYear()}
+              {t("profitSummary.dailyPnlIn")
+                .replace("{month}", getMonthAbbreviation(clickedMonthDateRange.start.getMonth() + 1))
+                .replace("{year}", String(clickedMonthDateRange.start.getFullYear()))}
             </div>
             <Button type="button" variant="outline" size="sm" onClick={onMonthDetailClick}>
-              Back
+              {t("common.back")}
             </Button>
           </div>
           <PNLChart
@@ -434,7 +436,7 @@ const App = ({
       <CardHeader className="space-y-2 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Profit Summary
+            {t("profitSummary.title")}
           </CardTitle>
           <div className="flex items-center gap-2">
             {summaryType === "month" && (
@@ -445,11 +447,11 @@ const App = ({
                 }}
               >
                 <SelectTrigger className="h-8 w-[110px] text-sm font-medium border-border/40">
-                  <SelectValue placeholder="Select Year" />
+                  <SelectValue placeholder={t("profitSummary.selectYear")} />
                 </SelectTrigger>
                 <SelectContent className="overflow-y-auto max-h-[20rem]">
                   <SelectGroup>
-                    <SelectLabel>Years</SelectLabel>
+                    <SelectLabel>{t("profitSummary.years")}</SelectLabel>
                     {availableYears.map((s) => (
                       <SelectItem key={s} value={"" + s}>
                         {s}
@@ -460,18 +462,18 @@ const App = ({
               </Select>
             )}
             <ButtonGroup value={summaryType} onValueChange={onSummaryTypeChange}>
-              <ButtonGroupItem value="month">M</ButtonGroupItem>
-              <ButtonGroupItem value="year">Y</ButtonGroupItem>
+              <ButtonGroupItem value="month">{t("profitSummary.month")}</ButtonGroupItem>
+              <ButtonGroupItem value="year">{t("profitSummary.year")}</ButtonGroupItem>
             </ButtonGroup>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>Periods {visibleSummaryStats.total}</span>
-          <span>Up {visibleSummaryStats.up}</span>
-          <span>Down {visibleSummaryStats.down}</span>
-          <span>Flat {visibleSummaryStats.flat}</span>
+          <span>{t("profitSummary.periods").replace("{n}", String(visibleSummaryStats.total))}</span>
+          <span>{t("profitSummary.up").replace("{n}", String(visibleSummaryStats.up))}</span>
+          <span>{t("profitSummary.down").replace("{n}", String(visibleSummaryStats.down))}</span>
+          <span>{t("profitSummary.flat").replace("{n}", String(visibleSummaryStats.flat))}</span>
         </div>
         {summaryType === "month" ? renderMonthSummary() : renderYearSummary()}
       </CardContent>

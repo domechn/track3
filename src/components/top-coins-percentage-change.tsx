@@ -22,6 +22,7 @@ import {
   glassTooltip,
 } from "@/utils/chart-theme";
 import { formatAssetLabel } from "@/utils/assets";
+import { useTranslation } from "@/i18n";
 
 const prefix = "tcpc";
 const chartNameKey = "Change of Top Coins";
@@ -78,6 +79,7 @@ function getWholeKey(key: string): string {
 }
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
+  const { t } = useTranslation();
   const wsize = useWindowSize();
 
   const { needResize } = useContext(ChartResizeContext);
@@ -249,7 +251,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Change of Top Coins {getLabel()} Percentage
+            {t("topCoinsPercentage.title").replace("{type}", getLabel())}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -260,8 +262,8 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                 onTypeSelectChange(getWholeKey(val))
               }
             >
-              <ButtonGroupItem value="value">Value</ButtonGroupItem>
-              <ButtonGroupItem value="price">Price</ButtonGroupItem>
+              <ButtonGroupItem value="value">{t("topCoinsPercentage.valueTab")}</ButtonGroupItem>
+              <ButtonGroupItem value="price">{t("topCoinsPercentage.priceTab")}</ButtonGroupItem>
             </ButtonGroup>
           </div>
           <div

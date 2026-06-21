@@ -21,6 +21,7 @@ import { CaretSortIcon } from "@radix-ui/react-icons";
 import AssetsPercentageChange from "./assets-percentage-change";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/i18n";
 
 const MAIN_COMPONENT_COUNT = 4;
 
@@ -33,6 +34,7 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const [isShowMore, setIsShowMore] = useState<boolean>(false);
   const [pageLoading, setPageLoading] = useState(true);
   const loadedCountRef = useRef(0);
@@ -57,7 +59,7 @@ const App = ({
   return (
     <OverviewLoadingContext.Provider value={loadingContextValue}>
       <div className="relative min-h-[400px]" aria-busy={pageLoading}>
-        <h1 className="sr-only">Overview</h1>
+        <h1 className="sr-only">{t("overview.h1")}</h1>
         <Collapsible open={isShowMore} onOpenChange={setIsShowMore}>
           <StaggerContainer className="space-y-3">
             <div className="grid gap-5 grid-cols-2">
@@ -95,7 +97,7 @@ const App = ({
               variant="ghost"
               className="text-muted-foreground hover:text-foreground border-t border-border/40 rounded-none hover:bg-muted/50"
             >
-              Show {isShowMore ? "Less" : "More"}
+              {isShowMore ? t("common.showLess") : t("common.showMore")}
               <CaretSortIcon className="ml-1 h-4 w-4" />
             </Button>
           </CollapsibleTrigger>
@@ -125,9 +127,11 @@ const App = ({
                 <div className="h-full w-1/2 animate-pulse rounded-full bg-primary/70 motion-reduce:animate-none" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium">Loading overview data</p>
+                <p className="text-sm font-medium">
+                  {t("loading.overview")}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Updating your portfolio cards for the selected date range.
+                  {t("loading.overviewDesc")}
                 </p>
               </div>
             </div>

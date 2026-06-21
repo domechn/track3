@@ -36,6 +36,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/i18n";
 
 type SortMode = "changeValue" | "changePercentage" | "absChange";
 type PageSize = "20" | "50" | "100";
@@ -78,6 +79,7 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const loadGenRef = useRef(0);
+  const { t } = useTranslation();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const [walletAssetsChange, setWalletAssetsChange] =
     useState<WalletAssetsChangeData>([]);
@@ -119,11 +121,11 @@ const App = ({
       walletAssetsChange.map((item) => ({
         ...item,
         walletTypeText:
-          !item.walletType || item.walletType === "null" ? "Unknown" : item.walletType,
+          !item.walletType || item.walletType === "null" ? t("common.unknown") : item.walletType,
         walletAliasText:
           item.walletAlias ??
           insertEllipsis(
-            !item.wallet || item.wallet === "null" ? "Unknown" : item.wallet,
+            !item.wallet || item.wallet === "null" ? t("common.unknown") : item.wallet,
             32
           ),
       })),
@@ -195,24 +197,28 @@ const App = ({
       <CardHeader className="space-y-2 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Value Changes
+            {t("walletValueChanges.title")}
           </CardTitle>
           <div className="text-xs text-muted-foreground">
-            Total {rows.length} wallets | Up {summary.up} | Down {summary.down} | Flat {summary.flat}
+            {t("walletValueChanges.totalLabel")
+              .replace("{n}", String(rows.length))
+              .replace("{up}", String(summary.up))
+              .replace("{down}", String(summary.down))
+              .replace("{flat}", String(summary.flat))}
           </div>
         </div>
         <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search wallet type / alias / address"
+            placeholder={t("walletValueChanges.searchPlaceholder")}
             className="md:w-[320px]"
           />
           <div className="flex flex-wrap gap-2">
             <ButtonGroup value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-              <ButtonGroupItem value="changeValue">By Value</ButtonGroupItem>
-              <ButtonGroupItem value="changePercentage">By %</ButtonGroupItem>
-              <ButtonGroupItem value="absChange">By Volatility</ButtonGroupItem>
+              <ButtonGroupItem value="changeValue">{t("walletValueChanges.sortByValue")}</ButtonGroupItem>
+              <ButtonGroupItem value="changePercentage">{t("walletValueChanges.sortByPercent")}</ButtonGroupItem>
+              <ButtonGroupItem value="absChange">{t("walletValueChanges.sortByVolatility")}</ButtonGroupItem>
             </ButtonGroup>
             <ButtonGroup value={pageSize} onValueChange={(v) => setPageSize(v as PageSize)}>
               <ButtonGroupItem value="20">20</ButtonGroupItem>
@@ -227,10 +233,10 @@ const App = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Wallet Type</TableHead>
-                <TableHead>Wallet Alias</TableHead>
-                <TableHead className="text-right">Percentage</TableHead>
-                <TableHead className="text-right">Value</TableHead>
+                <TableHead className="w-[200px]">{t("walletValueChanges.col.type")}</TableHead>
+                <TableHead>{t("walletValueChanges.col.alias")}</TableHead>
+                <TableHead className="text-right">{t("walletValueChanges.col.percentage")}</TableHead>
+                <TableHead className="text-right">{t("walletValueChanges.col.value")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -243,7 +249,7 @@ const App = ({
                     <TableCell className="py-1.5">
                       <div className="flex items-center gap-1.5 text-sm">
                         {row.walletTypeText === "Unknown" ? (
-                          <span>Unknown</span>
+                          <span>{t("common.unknown")}</span>
                         ) : (
                           <>
                             <img
@@ -292,14 +298,17 @@ const App = ({
 
         {sortedRows.length === 0 && (
           <div className="flex items-center justify-center text-lg text-muted-foreground py-6">
-            No Available Data For Selected Dates
+            {t("walletValueChanges.noData")}
           </div>
         )}
 
         {sortedRows.length > 0 && (
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div>
-              Showing {loadedRangeStart}-{loadedRangeEnd} / {sortedRows.length}
+              {t("walletValueChanges.showing")
+                .replace("{start}", String(loadedRangeStart))
+                .replace("{end}", String(loadedRangeEnd))
+                .replace("{total}", String(sortedRows.length))}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -308,7 +317,7 @@ const App = ({
                 disabled={safePage === 0}
                 onClick={() => setDataPage((prev) => Math.max(0, prev - 1))}
               >
-                Prev
+                {t("walletValueChanges.prev")}
               </Button>
               <span>
                 {safePage + 1} / {pageCount}
@@ -321,7 +330,7 @@ const App = ({
                   setDataPage((prev) => Math.min(pageCount - 1, prev + 1))
                 }
               >
-                Next
+                {t("walletValueChanges.next")}
               </Button>
             </div>
           </div>

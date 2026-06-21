@@ -32,6 +32,7 @@ import {
   glassTooltip,
 } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/i18n";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -174,6 +175,7 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const lineColor = chartColors[0].main;
+  const { t } = useTranslation();
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
 
@@ -484,7 +486,7 @@ const App = ({
       >
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Total Value In {totalValueShower.currencyName()}
+            {t("totalValue.title").replace("{currency}", totalValueShower.currencyName())}
           </CardTitle>
           <div className="flex space-x-2">
             <Button
@@ -492,7 +494,7 @@ const App = ({
               variant="ghost"
               size="icon"
               className="h-11 w-11 text-muted-foreground sm:h-8 sm:w-8"
-              aria-label="Show percentage change in chart"
+              aria-label={t("totalValue.showPercentage")}
               onClick={() => setShowPercentageInChart(!showPercentageInChart)}
             >
               <svg
@@ -517,7 +519,7 @@ const App = ({
               variant="ghost"
               size="icon"
               className="h-11 w-11 text-muted-foreground sm:h-8 sm:w-8"
-              aria-label="Switch total value base currency"
+              aria-label={t("totalValue.switchBase")}
               onClick={() => setBtcAsBase(!btcAsBase)}
             >
               <svg
@@ -554,7 +556,7 @@ const App = ({
             >
               {changedValueOrPercentage}
             </span>{" "}
-            from {firstDate}
+            {t("totalValue.from").replace("{date}", firstDate)}
           </p>
           <div className="min-h-[120px] flex-1">
             <Line options={options as any} data={lineDataMemo} />

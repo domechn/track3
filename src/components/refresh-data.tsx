@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { useTranslation } from "@/i18n";
 
 const retries = 3;
 const retryInterval = 3000; // 3s
@@ -33,6 +34,7 @@ const App = ({
   afterRefresh?: (success: boolean) => unknown;
 }) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [failureDialogOpen, setFailureDialogOpen] = useState(false);
   const [failedSources, setFailedSources] = useState<FailedPortfolioSource[]>(
     [],
@@ -57,7 +59,7 @@ const App = ({
       }
       await new Promise((resolve) => setTimeout(resolve, interval));
       toast({
-        description: `${(error as Error).message || error}, Retrying... ${
+        description: `${(error as Error).message || error}, ${t("refresh.retry")}${
           retries - times + 1
         }`,
       });
@@ -129,8 +131,8 @@ const App = ({
         } else {
           toast({
             description: refreshResult?.usedLastKnownData
-              ? "Refresh completed with last data for unavailable sources."
-              : "Refresh successfully!",
+              ? t("refresh.partial")
+              : t("refresh.success"),
           });
         }
         trackEventWithClientID("data_refreshed", trackProps);
@@ -157,18 +159,16 @@ const App = ({
         <UpdateIcon
           className={`mr-2 h-4 w-4 ${refreshLoading && "animate-spin"}`}
         />
-        <p className="hidden sm:inline-block">Refresh</p>
+        <p className="hidden sm:inline-block">{t("common.refresh")}</p>
       </Button>
       <AlertDialog open={failureDialogOpen} onOpenChange={setFailureDialogOpen}>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Some data sources failed to load
+              {t("refresh.failureTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              The following data sources are currently unavailable. You can
-              retry all, or continue using the last known data for these
-              sources.
+              {t("refresh.failureDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-2 space-y-3">
@@ -191,13 +191,13 @@ const App = ({
               onClick={() => runRefresh(true)}
               className="gap-1"
             >
-              Use Last Data
+              {t("refresh.lastData")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => runRefresh(false)}
               className="gap-1"
             >
-              Retry All
+              {t("refresh.retryAll")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

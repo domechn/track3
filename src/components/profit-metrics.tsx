@@ -25,6 +25,7 @@ import {
 import { useWindowSize } from "@/utils/hook";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/i18n";
 
 const App = ({
   dateRange,
@@ -64,6 +65,7 @@ const App = ({
     dateAndValues: [] as { date: Date; value: number }[],
   });
   const [isATHTimesModalOpen, setIsATHTimesModalOpen] = useState(false);
+  const { t } = useTranslation();
   const wsize = useWindowSize();
   const { reportLoaded } = useContext(OverviewLoadingContext);
 
@@ -206,7 +208,7 @@ const App = ({
       <Dialog open={isATHTimesModalOpen} onOpenChange={setIsATHTimesModalOpen}>
         <DialogContent className="min-w-[80%]">
           <DialogHeader>
-            <DialogTitle>ATH Reached Details</DialogTitle>
+            <DialogTitle>{t("profitMetrics.dialogTitle")}</DialogTitle>
           </DialogHeader>
           <ScrollArea
             className="w-full"
@@ -217,9 +219,9 @@ const App = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Value</TableHead>
+                  <TableHead>{t("profitMetrics.time")}</TableHead>
+                  <TableHead>{t("profitMetrics.date")}</TableHead>
+                  <TableHead>{t("profitMetrics.value")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -252,7 +254,7 @@ const App = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-              Maximum continuous profit time
+              {t("profitMetrics.maxContProfit")}
             </div>
             <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
               {timeToDateStr(maxProfileDateRange.start)} ~{" "}
@@ -262,7 +264,7 @@ const App = ({
           </div>
           <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-              Maximum continuous lost time
+              {t("profitMetrics.maxContLoss")}
             </div>
             <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
               {timeToDateStr(maxLostDateRange.start)} ~{" "}
@@ -272,7 +274,7 @@ const App = ({
           </div>
           <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-              Maximum profit time
+              {t("profitMetrics.maxProfit")}
             </div>
             <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
               {maxSingleDayProfitData.value < 0 ? (
@@ -294,7 +296,7 @@ const App = ({
           </div>
           <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-              Maximum lost time
+              {t("profitMetrics.maxLoss")}
             </div>
             <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
               {maxSingleDayLostData.value > 0 ? (
@@ -317,7 +319,7 @@ const App = ({
           </div>
           <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-              Maximum drawdown percentage
+              {t("profitMetrics.maxDrawdown")}
             </div>
             <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
               <span
@@ -330,7 +332,7 @@ const App = ({
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-              ATH reached times
+              {t("profitMetrics.athReached")}
             </div>
             <button
               type="button"
@@ -350,7 +352,7 @@ const App = ({
     <Card>
       <CardHeader className="space-y-0 pb-2">
         <CardTitle className="text-xs font-medium text-muted-foreground">
-          Profit Metrics
+          {t("profitMetrics.title")}
         </CardTitle>
       </CardHeader>
       <CardContent>

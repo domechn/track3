@@ -27,6 +27,7 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import AssetLabel from "./common/asset-label";
 import { formatAssetLabel } from "@/utils/assets";
+import { useTranslation } from "@/i18n";
 
 const chartName = "wallet-assets-percentage";
 
@@ -61,6 +62,7 @@ const App = ({
   const size = useWindowSize();
   const chartRef = useRef<ChartJSOrUndefined<"pie", string[], unknown>>(null);
   const loadGenRef = useRef(0);
+  const { t } = useTranslation();
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
 
@@ -216,34 +218,34 @@ const App = ({
           {symbol ? (
             <>
               <AssetLabel asset={{ symbol, assetType }} />
-              <span>Wallet Allocation</span>
+              <span>{t("walletAllocation.title")}</span>
             </>
           ) : (
-            "Wallet Allocation"
+            t("walletAllocation.title")
           )}
         </CardTitle>
         <ButtonGroup
           value={topLimit}
           onValueChange={(v) => setTopLimit(v as TopLimit)}
         >
-          <ButtonGroupItem value="8">Top 8</ButtonGroupItem>
-          <ButtonGroupItem value="12">Top 12</ButtonGroupItem>
-          <ButtonGroupItem value="20">Top 20</ButtonGroupItem>
-          <ButtonGroupItem value="all">All</ButtonGroupItem>
+          <ButtonGroupItem value="8">{t("walletAllocation.top8")}</ButtonGroupItem>
+          <ButtonGroupItem value="12">{t("walletAllocation.top12")}</ButtonGroupItem>
+          <ButtonGroupItem value="20">{t("walletAllocation.top20")}</ButtonGroupItem>
+          <ButtonGroupItem value="all">{t("walletAllocation.all")}</ButtonGroupItem>
         </ButtonGroup>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
           <div>
-            Wallets:{" "}
+            {t("walletAllocation.wallets")}:{" "}
             <span className="text-foreground">{positiveWallets.length}</span>
           </div>
           <div>
-            Showing:{" "}
+            {t("walletAllocation.showing")}:{" "}
             <span className="text-foreground">{chartItems.length}</span>
           </div>
           <div>
-            Total Value:{" "}
+            {t("walletAllocation.totalValue")}:{" "}
             <span className="text-foreground">
               {currency.symbol}
               {prettyNumberToLocaleString(
@@ -252,9 +254,9 @@ const App = ({
             </span>
           </div>
           <div>
-            Top Wallet:{" "}
+            {t("walletAllocation.topWallet")}:{" "}
             <span className="text-foreground">
-              {topWallet ? getWalletDisplayName(topWallet) : "-"}
+              {topWallet ? getWalletDisplayName(topWallet) : t("common.dash")}
             </span>
           </div>
         </div>
@@ -267,7 +269,7 @@ const App = ({
             <Pie ref={chartRef} options={options as any} data={chartData} />
           ) : (
             <div className="text-lg text-muted-foreground m-auto">
-              No Available Data For Selected Dates
+              {t("walletAllocation.noData")}
             </div>
           )}
         </div>

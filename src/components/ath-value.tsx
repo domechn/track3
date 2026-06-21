@@ -13,6 +13,7 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { timeToDateStr } from "@/utils/date";
 import { positiveNegativeTextClass } from "@/utils/color";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/i18n";
 
 const App = ({
   dateRange,
@@ -23,6 +24,7 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const [maxTotalValueData, setMaxTotalValueData] = useState<MaxTotalValueData>(
     {
       uuid: "",
@@ -88,7 +90,7 @@ const App = ({
     <Card>
       <CardHeader className="space-y-0 pb-2">
         <CardTitle className="text-xs font-medium text-muted-foreground">
-          All Time High
+          {t("ath.title")}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -96,7 +98,7 @@ const App = ({
           <div className="space-y-3">
             <div className="space-y-1 pb-2 border-b border-border/40">
               <div className="text-[11px] text-muted-foreground">
-                Current Total Value
+                {t("ath.currentValue")}
               </div>
               <div
                 className="text-sm md:text-base font-semibold tabular-nums whitespace-nowrap overflow-x-auto leading-snug"
@@ -106,7 +108,9 @@ const App = ({
               </div>
             </div>
             <div className="space-y-1 pb-2 border-b border-border/40">
-              <div className="text-[11px] text-muted-foreground">ATH Total Value</div>
+              <div className="text-[11px] text-muted-foreground">
+                {t("ath.athValue")}
+              </div>
               <div
                 className="text-sm md:text-base font-semibold tabular-nums whitespace-nowrap overflow-x-auto leading-snug"
                 title={athTotalValueText}
@@ -115,13 +119,17 @@ const App = ({
               </div>
             </div>
             <div className="space-y-1 pb-2 border-b border-border/40">
-              <div className="text-[11px] text-muted-foreground">ATH Date</div>
+              <div className="text-[11px] text-muted-foreground">
+                {t("ath.athDate")}
+              </div>
               <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
                 {timeToDateStr(maxTotalValueData.date)}
               </div>
             </div>
             <div className="space-y-1">
-              <div className="text-[11px] text-muted-foreground">% from ATH</div>
+              <div className="text-[11px] text-muted-foreground">
+                {t("ath.fromAth")}
+              </div>
               <div
                 className={`text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto ${positiveNegativeTextClass(
                   percentageFromATH,
