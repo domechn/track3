@@ -64,6 +64,7 @@ import {
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { ChartResizeContext } from "@/App";
+import { useTranslation } from "@/i18n";
 
 ChartJS.register(
   ...registerables,
@@ -109,6 +110,7 @@ function TopBar({
 }) {
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
+  const { t } = useTranslation();
 
   return (
     <div className="sticky top-0 z-10 glass-subtle border-b relative">
@@ -153,8 +155,8 @@ function TopBar({
               <TooltipContent>
                 <p>
                   {lastRefreshAt
-                    ? "Last Refresh At: " + lastRefreshAt
-                    : "Never Refresh Before"}
+                    ? t("index.topBar.lastRefreshAt", { time: lastRefreshAt })
+                    : t("index.topBar.neverRefreshBefore")}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -201,6 +203,7 @@ function Layout({
   onRefreshSuccess,
 }: LayoutProps) {
   const sidebarWidth = sidebarCollapsed ? 52 : 200;
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen">
@@ -231,8 +234,8 @@ function Layout({
             <Outlet />
             {initializing && (
               <PageLoadingOverlay
-                title="Loading portfolio data"
-                description="Preparing your latest balances, date range, and overview cards."
+                title={t("index.layout.loadingTitle")}
+                description={t("index.layout.loadingDescription")}
               />
             )}
           </div>
@@ -284,6 +287,8 @@ function AppRoutes({
   onDataChanged,
   handleConfigurationSave,
 }: AppRoutesProps) {
+  const { t } = useTranslation();
+
   return (
     <Routes>
       <Route
@@ -418,7 +423,7 @@ function AppRoutes({
             </AnimatedPage>
           }
         />
-        <Route path="*" element={<div>not found</div>} />
+        <Route path="*" element={<div>{t("index.notFound")}</div>} />
       </Route>
     </Routes>
   );

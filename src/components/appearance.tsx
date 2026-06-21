@@ -12,12 +12,14 @@ import {
 import { QuoteColor } from "@/middlelayers/types";
 import { reloadApp } from "@/utils/app";
 import { Theme, useTheme } from "./common/theme";
+import { useTranslation } from "@/i18n";
 
 const App = ({
   onQuoteColorChange,
 }: {
   onQuoteColorChange?: (val: QuoteColor) => void;
 }) => {
+  const { t } = useTranslation();
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
   const [selectedTheme, setSelectedTheme] = useState<Theme>("light");
   const currentTheme = useTheme();
@@ -51,9 +53,9 @@ const App = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium">Appearance</h3>
+        <h3 className="text-lg font-medium">{t("appearance.title")}</h3>
         <p className="text-sm text-muted-foreground">
-          Customize theme and quote color preferences.
+          {t("appearance.subtitle")}
         </p>
       </div>
 
@@ -61,30 +63,30 @@ const App = ({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Current Theme
+              {t("appearance.currentTheme")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold capitalize">{selectedTheme}</div>
             <p className="text-xs text-muted-foreground">
-              Restart is triggered after applying a new theme
+              {t("appearance.themeNote")}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Quote Color
+              {t("appearance.quoteColor")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">
               {quoteColor === "green-up-red-down"
-                ? "Green Up / Red Down"
-                : "Red Up / Green Down"}
+                ? t("appearance.quoteColorGreenUp")
+                : t("appearance.quoteColorRedUp")}
             </div>
             <p className="text-xs text-muted-foreground">
-              Controls rising and falling price colors
+              {t("appearance.quoteColorNote")}
             </p>
           </CardContent>
         </Card>
@@ -93,7 +95,7 @@ const App = ({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Theme
+            {t("appearance.themeCardTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -120,7 +122,9 @@ const App = ({
                   </div>
                 </div>
               </div>
-              <span className="block w-full p-2 text-center text-sm">Light</span>
+              <span className="block w-full p-2 text-center text-sm">
+                {t("appearance.themeLight")}
+              </span>
             </Label>
 
             <Label htmlFor="dark" className="cursor-pointer">
@@ -141,11 +145,13 @@ const App = ({
                   </div>
                 </div>
               </div>
-              <span className="block w-full p-2 text-center text-sm">Dark</span>
+              <span className="block w-full p-2 text-center text-sm">
+                {t("appearance.themeDark")}
+              </span>
             </Label>
           </RadioGroup>
           <Button onClick={() => handleThemeValueChange(selectedTheme)}>
-            Update Preferences
+            {t("appearance.themeUpdateButton")}
           </Button>
         </CardContent>
       </Card>
@@ -153,7 +159,7 @@ const App = ({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Quote Color
+            {t("appearance.quoteColor")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -162,7 +168,7 @@ const App = ({
               <RadioGroupItem value="green-up-red-down" id="green-up-red-down" />
               <Label htmlFor="green-up-red-down">
                 <div className="flex items-center gap-2 text-sm">
-                  <span>Green Up / Red Down</span>
+                  <span>{t("appearance.quoteColorGreenUp")}</span>
                   <ArrowTopRightIcon className="w-4 h-4 text-green-600" />
                   <ArrowBottomRightIcon className="w-4 h-4 text-red-600" />
                 </div>
@@ -172,7 +178,7 @@ const App = ({
               <RadioGroupItem value="red-up-green-down" id="red-up-green-down" />
               <Label htmlFor="red-up-green-down">
                 <div className="flex items-center gap-2 text-sm">
-                  <span>Red Up / Green Down</span>
+                  <span>{t("appearance.quoteColorRedUp")}</span>
                   <ArrowTopRightIcon className="w-4 h-4 text-red-600" />
                   <ArrowBottomRightIcon className="w-4 h-4 text-green-600" />
                 </div>

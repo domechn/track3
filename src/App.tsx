@@ -5,6 +5,7 @@ import React from "react";
 import { ThemeProvider } from "@/components/common/theme";
 import { themeLocalStorageKey } from "./middlelayers/configuration";
 import { renderRightClickMenu } from "./utils/hook";
+import { I18nProvider } from "./i18n";
 
 export const ChartResizeContext = React.createContext<{
   needResize: number;
@@ -22,24 +23,26 @@ function App() {
   );
 
   return (
-    <ThemeProvider defaultTheme="light" storageKey={themeLocalStorageKey}>
-      <div className="min-h-dvh" onContextMenu={renderRightClickMenu}>
-        <a
-          href="#app-main-content"
-          onClick={focusMainContent}
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          Skip to main content
-        </a>
-        <Toaster />
-        <AutoUpdater />
-        <div id="app-main-content" tabIndex={-1}>
-          <ChartResizeContext.Provider value={{ needResize, setNeedResize }}>
-            <IndexApp />
-          </ChartResizeContext.Provider>
+    <I18nProvider>
+      <ThemeProvider defaultTheme="light" storageKey={themeLocalStorageKey}>
+        <div className="min-h-dvh" onContextMenu={renderRightClickMenu}>
+          <a
+            href="#app-main-content"
+            onClick={focusMainContent}
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            Skip to main content
+          </a>
+          <Toaster />
+          <AutoUpdater />
+          <div id="app-main-content" tabIndex={-1}>
+            <ChartResizeContext.Provider value={{ needResize, setNeedResize }}>
+              <IndexApp />
+            </ChartResizeContext.Provider>
+          </div>
         </div>
-      </div>
-    </ThemeProvider>
+      </ThemeProvider>
+    </I18nProvider>
   );
 }
 

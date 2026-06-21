@@ -1,3 +1,4 @@
+import { useTranslation } from "@/i18n";
 import {
   CurrencyRateDetail,
   QuoteColor,
@@ -77,6 +78,7 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const loadGenRef = useRef(0);
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const [walletAssetsChange, setWalletAssetsChange] =

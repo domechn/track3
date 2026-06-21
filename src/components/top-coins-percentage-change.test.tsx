@@ -1,5 +1,7 @@
 import React from "react";
-import { render, waitFor } from "@testing-library/react";
+import { renderI18n as render } from "@/test/setup";
+
+import { waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Line } from "react-chartjs-2";
 import TopCoinsPercentageChange from "@/components/top-coins-percentage-change";

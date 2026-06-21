@@ -1,4 +1,5 @@
 import { TDateRange, TopCoinsRankData } from "@/middlelayers/types";
+import { useTranslation } from "@/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import _ from "lodash";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -22,7 +23,8 @@ import {
 
 const PAGE_SIZE = 20;
 
-const App = ({ dateRange }: { dateRange: TDateRange }) => {
+const App = ({ dateRange }: {
+  dateRange: TDateRange }) => {
   const [topCoinsRankData, setTopCoinsRankData] = useState({
     timestamps: [],
     coins: [],

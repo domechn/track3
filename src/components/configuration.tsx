@@ -83,6 +83,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useTranslation } from "@/i18n";
 
 const initialConfiguration: GlobalConfig = {
   configs: {
@@ -144,12 +145,6 @@ const defaultOtherConfig = {
 
 const supportCoins = SUPPORT_CONS;
 
-const cexOptions = CEX_OPTIONS;
-
-const stockBrokerOptions = STOCK_BROKER_OPTIONS;
-
-const walletOptions = WALLET_OPTIONS;
-
 const querySizeOptions = [
   {
     value: "10",
@@ -168,6 +163,53 @@ const querySizeOptions = [
 const defaultBaseCurrency = "USD";
 const CONFIG_LIST_PAGE_SIZE = 30;
 
+function useCexOptions() {
+  const { t } = useTranslation();
+  return useMemo(
+    () =>
+      CEX_OPTIONS.map((o) => ({
+        ...o,
+        // keep brand names; translate only the type category labels
+        label: o.label,
+      })),
+    [t],
+  );
+}
+
+function useWalletOptions() {
+  const { t } = useTranslation();
+  return useMemo(
+    () =>
+      WALLET_OPTIONS.map((o) => {
+        const key = `config.walletOption.${o.value}` as
+          | "config.walletOption.btc"
+          | "config.walletOption.erc20"
+          | "config.walletOption.sol"
+          | "config.walletOption.doge"
+          | "config.walletOption.trc20"
+          | "config.walletOption.ton"
+          | "config.walletOption.sui";
+        return {
+          ...o,
+          label: t(key),
+        };
+      }),
+    [t],
+  );
+}
+
+function useStockBrokerOptions() {
+  return useMemo(
+    () =>
+      STOCK_BROKER_OPTIONS.map((o) => ({
+        ...o,
+        // brand name, do not translate
+        label: o.label,
+      })),
+    [],
+  );
+}
+
 const App = ({
   onConfigurationSave,
   initialPreferCurrency,
@@ -176,6 +218,10 @@ const App = ({
   initialPreferCurrency?: string;
 }) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const cexOptions = useCexOptions();
+  const walletOptions = useWalletOptions();
+  const stockBrokerOptions = useStockBrokerOptions();
   const warmStartPreferCurrency =
     initialPreferCurrency || getCachedPreferCurrency();
   const [groupUSD, setGroupUSD] = useState(true);
@@ -442,7 +488,9 @@ const App = ({
         .then((c) => setPreferCurrency(c.currency))
         .catch((e) => {
           toast({
-            description: "get prefer currency failed:" + (e.message || e),
+            description: t("config.form.error.getCurrencyFailed", {
+              message: e.message || e,
+            }),
             variant: "destructive",
           });
         })
@@ -513,7 +561,9 @@ const App = ({
       })
       .catch((e) => {
         toast({
-          description: "get configuration failed:" + (e.message || e),
+          description: t("config.form.error.getConfigFailed", {
+            message: e.message || e,
+          }),
           variant: "destructive",
         });
       });
@@ -699,7 +749,9 @@ const App = ({
       buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
-        description: "Failed to fetch balances: " + (e.message || e),
+        description: t("config.form.error.failedToFetchBalances", {
+          message: e.message || e,
+        }),
         variant: "destructive",
       });
       setQuickLookOpen(false);
@@ -751,7 +803,7 @@ const App = ({
       }
 
       if (!ana) {
-        throw new Error("Unsupported wallet type");
+        throw new Error(t("config.form.error.unsupportedWallet"));
       }
 
       const coins = await ana.loadPortfolio();
@@ -763,7 +815,9 @@ const App = ({
       buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
-        description: "Failed to fetch balances: " + (e.message || e),
+        description: t("config.form.error.failedToFetchBalances", {
+          message: e.message || e,
+        }),
         variant: "destructive",
       });
       setQuickLookOpen(false);
@@ -810,7 +864,9 @@ const App = ({
       buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
-        description: "Failed to fetch positions: " + (e.message || e),
+        description: t("config.form.error.failedToFetchPositions", {
+          message: e.message || e,
+        }),
         variant: "destructive",
       });
       setQuickLookOpen(false);
@@ -834,8 +890,12 @@ const App = ({
       >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Quick Look - {quickLookTitle}</DialogTitle>
-            <DialogDescription>Current asset balances</DialogDescription>
+            <DialogTitle>
+              {t("config.dialog.quickLookTitle", { title: quickLookTitle })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("config.dialog.quickLookDescription")}
+            </DialogDescription>
           </DialogHeader>
           <div className="max-h-[400px] overflow-y-auto">
             {quickLookLoading ? (
@@ -844,13 +904,13 @@ const App = ({
               </div>
             ) : quickLookData.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
-                No assets found
+                {t("config.dialog.noAssets")}
               </div>
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 text-sm font-medium text-muted-foreground px-2">
-                  <span>Symbol</span>
-                  <span className="text-right">Amount</span>
+                  <span>{t("common.symbol")}</span>
+                  <span className="text-right">{t("common.amount")}</span>
                 </div>
                 {quickLookData.map((item, idx) => (
                   <div
@@ -895,7 +955,7 @@ const App = ({
     if (exs.length === 0) {
       return (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No exchange found. Add your first CEX API key to start tracking.
+          {t("config.exchangeTable.empty")}
         </div>
       );
     }
@@ -904,11 +964,21 @@ const App = ({
       <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[170px]">Exchange</TableHead>
-            <TableHead className="w-[170px]">Alias</TableHead>
-            <TableHead className="w-[220px]">API Key</TableHead>
-            <TableHead className="w-[120px]">Status</TableHead>
-            <TableHead className="w-[84px] text-right">Actions</TableHead>
+            <TableHead className="w-[170px]">
+              {t("config.exchangeTable.exchange")}
+            </TableHead>
+            <TableHead className="w-[170px]">
+              {t("config.exchangeTable.alias")}
+            </TableHead>
+            <TableHead className="w-[220px]">
+              {t("config.exchangeTable.apiKey")}
+            </TableHead>
+            <TableHead className="w-[120px]">
+              {t("config.exchangeTable.status")}
+            </TableHead>
+            <TableHead className="w-[84px] text-right">
+              {t("config.exchangeTable.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -945,7 +1015,7 @@ const App = ({
                     }
                   />
                   <span className="text-xs text-muted-foreground">
-                    {ex.active ? "Active" : "Inactive"}
+                    {ex.active ? t("common.active") : t("common.inactive")}
                   </span>
                 </div>
               </TableCell>
@@ -957,7 +1027,7 @@ const App = ({
                       variant="ghost"
                       className="h-7 w-7"
                       onClick={() => handleQuickLookExchange(ex)}
-                      title="Quick look"
+                      title={t("common.quickLook")}
                     >
                       <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
                     </Button>
@@ -967,7 +1037,7 @@ const App = ({
                     variant="ghost"
                     className="h-7 w-7"
                     onClick={() => handleRemoveExchange(ex.type, ex.apiKey)}
-                    title="Delete"
+                    title={t("common.delete")}
                   >
                     <TrashIcon className="h-4 w-4 text-muted-foreground" />
                   </Button>
@@ -992,7 +1062,7 @@ const App = ({
     if (brokers.length === 0) {
       return (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No stock broker found.
+          {t("config.stockBrokerTable.empty")}
         </div>
       );
     }
@@ -1001,12 +1071,24 @@ const App = ({
       <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[170px]">Broker</TableHead>
-            <TableHead className="w-[170px]">Alias</TableHead>
-            <TableHead className="w-[180px]">Query ID</TableHead>
-            <TableHead className="w-[180px]">Token</TableHead>
-            <TableHead className="w-[120px]">Status</TableHead>
-            <TableHead className="w-[84px] text-right">Actions</TableHead>
+            <TableHead className="w-[170px]">
+              {t("config.stockBrokerTable.broker")}
+            </TableHead>
+            <TableHead className="w-[170px]">
+              {t("config.stockBrokerTable.alias")}
+            </TableHead>
+            <TableHead className="w-[180px]">
+              {t("config.stockBrokerTable.queryId")}
+            </TableHead>
+            <TableHead className="w-[180px]">
+              {t("config.stockBrokerTable.token")}
+            </TableHead>
+            <TableHead className="w-[120px]">
+              {t("config.stockBrokerTable.status")}
+            </TableHead>
+            <TableHead className="w-[84px] text-right">
+              {t("config.exchangeTable.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1046,7 +1128,7 @@ const App = ({
                     }
                   />
                   <span className="text-xs text-muted-foreground">
-                    {broker.active ? "Active" : "Inactive"}
+                    {broker.active ? t("common.active") : t("common.inactive")}
                   </span>
                 </div>
               </TableCell>
@@ -1058,7 +1140,7 @@ const App = ({
                       variant="ghost"
                       className="h-7 w-7"
                       onClick={() => handleQuickLookStockBroker(broker)}
-                      title="Quick look"
+                      title={t("common.quickLook")}
                     >
                       <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
                     </Button>
@@ -1070,7 +1152,7 @@ const App = ({
                     onClick={() =>
                       handleRemoveStockBroker(broker.type, broker.queryId)
                     }
-                    title="Delete"
+                    title={t("common.delete")}
                   >
                     <TrashIcon className="h-4 w-4 text-muted-foreground" />
                   </Button>
@@ -1089,7 +1171,7 @@ const App = ({
     if (ws.length === 0) {
       return (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No wallet found. Add your first wallet address to start tracking.
+          {t("config.walletTable.empty")}
         </div>
       );
     }
@@ -1098,11 +1180,21 @@ const App = ({
       <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[140px]">Wallet</TableHead>
-            <TableHead className="w-[170px]">Alias</TableHead>
-            <TableHead className="w-[320px]">Address</TableHead>
-            <TableHead className="w-[120px]">Status</TableHead>
-            <TableHead className="w-[84px] text-right">Actions</TableHead>
+            <TableHead className="w-[140px]">
+              {t("config.walletTable.wallet")}
+            </TableHead>
+            <TableHead className="w-[170px]">
+              {t("config.walletTable.alias")}
+            </TableHead>
+            <TableHead className="w-[320px]">
+              {t("config.walletTable.address")}
+            </TableHead>
+            <TableHead className="w-[120px]">
+              {t("config.exchangeTable.status")}
+            </TableHead>
+            <TableHead className="w-[84px] text-right">
+              {t("config.exchangeTable.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1136,7 +1228,7 @@ const App = ({
                     }
                   />
                   <span className="text-xs text-muted-foreground">
-                    {w.active ? "Active" : "Inactive"}
+                    {w.active ? t("common.active") : t("common.inactive")}
                   </span>
                 </div>
               </TableCell>
@@ -1148,7 +1240,7 @@ const App = ({
                       variant="ghost"
                       className="h-7 w-7"
                       onClick={() => handleQuickLookWallet(w)}
-                      title="Quick look"
+                      title={t("common.quickLook")}
                     >
                       <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
                     </Button>
@@ -1158,7 +1250,7 @@ const App = ({
                     variant="ghost"
                     className="h-7 w-7"
                     onClick={() => handleRemoveWallet(w.type, w.address)}
-                    title="Delete"
+                    title={t("common.delete")}
                   >
                     <TrashIcon className="h-4 w-4 text-muted-foreground" />
                   </Button>
@@ -1278,7 +1370,7 @@ const App = ({
     if (vals.length === 0) {
       return (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No custom symbol yet.
+          {t("config.othersTable.empty")}
         </div>
       );
     }
@@ -1287,10 +1379,12 @@ const App = ({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Alias</TableHead>
-            <TableHead>Symbol</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead>{t("config.exchangeTable.alias")}</TableHead>
+            <TableHead>{t("common.symbol")}</TableHead>
+            <TableHead>{t("config.othersTable.amount")}</TableHead>
+            <TableHead className="text-right">
+              {t("config.exchangeTable.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1305,7 +1399,7 @@ const App = ({
                   <Input
                     type="text"
                     name="alias"
-                    placeholder="Main wallet"
+                    placeholder={t("config.othersTable.aliasPlaceholder")}
                     value={o.alias ?? ""}
                     autoComplete="off"
                     onChange={(e) =>
@@ -1317,7 +1411,7 @@ const App = ({
                   <Input
                     type="text"
                     name="symbol"
-                    placeholder="BTC"
+                    placeholder={t("config.othersTable.symbolPlaceholder")}
                     value={o.symbol}
                     autoComplete="off"
                     onChange={(e) =>
@@ -1330,7 +1424,7 @@ const App = ({
                     type="text"
                     inputMode="decimal"
                     name="amount"
-                    placeholder="0"
+                    placeholder={t("config.othersTable.amountPlaceholder")}
                     value={otherAmountDraftMap[globalIdx] ?? `${o.amount}`}
                     onChange={(e) =>
                       handleOtherAmountInputChange(globalIdx, e.target.value)
@@ -1349,7 +1443,7 @@ const App = ({
                     variant="ghost"
                     className="h-7 w-7"
                     onClick={() => handleRemoveOther(globalIdx)}
-                    title="Delete"
+                    title={t("common.delete")}
                   >
                     <TrashIcon className="h-4 w-4 text-muted-foreground" />
                   </Button>
@@ -1570,7 +1664,7 @@ const App = ({
       !addStockBrokerConfig.queryId
     ) {
       toast({
-        description: "Broker type, token and query id are required",
+        description: t("config.form.error.requiredBroker"),
         variant: "destructive",
       });
       return;
@@ -1581,7 +1675,7 @@ const App = ({
       .then((valid) => {
         if (!valid) {
           toast({
-            description: "Invalid stock broker configuration",
+            description: t("config.form.error.invalidBroker"),
             variant: "destructive",
           });
           return;
@@ -1608,7 +1702,7 @@ const App = ({
       !addExchangeConfig.secret
     ) {
       toast({
-        description: "Exchange type, api key and secret is required",
+        description: t("config.form.error.required"),
         variant: "destructive",
       });
       return;
@@ -1616,7 +1710,7 @@ const App = ({
 
     if (addExchangeConfig.type === "okex" && !addExchangeConfig.password) {
       toast({
-        description: "Password is required for okex",
+        description: t("config.form.error.passwordRequiredOkex"),
         variant: "destructive",
       });
       return;
@@ -1624,7 +1718,7 @@ const App = ({
 
     if (addExchangeConfig.type === "bitget" && !addExchangeConfig.passphrase) {
       toast({
-        description: "Passphrase is required for bitget",
+        description: t("config.form.error.passphraseRequiredBitget"),
         variant: "destructive",
       });
       return;
@@ -1636,7 +1730,7 @@ const App = ({
       .then((valid) => {
         if (!valid) {
           toast({
-            description: "Invalid api key or secret",
+            description: t("config.form.error.invalidExchange"),
             variant: "destructive",
           });
           return;
@@ -1662,7 +1756,7 @@ const App = ({
   }): Promise<boolean> {
     const { type, address } = cfg;
     if (!supportCoins.includes(type)) {
-      throw new Error("Unsupported wallet type");
+      throw new Error(t("config.form.error.unsupportedWallet"));
     }
 
     let ana: Analyzer | null;
@@ -1719,7 +1813,7 @@ const App = ({
     }
 
     if (!ana) {
-      throw new Error("Unsupported wallet type");
+      throw new Error(t("config.form.error.unsupportedWallet"));
     }
 
     return ana.verifyConfigs();
@@ -1744,20 +1838,20 @@ const App = ({
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
             <PlusIcon className="h-4 w-4 mr-1" />
-            Add Exchange
+            {t("config.form.button.addExchange")}
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Add Exchange Configuration</DialogTitle>
+            <DialogTitle>{t("config.form.exchange.title")}</DialogTitle>
             <DialogDescription>
-              Add exchange api key and secret here. Click save when you're done.
+              {t("config.form.exchange.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right">
-                Type
+                {t("config.form.label.type")}
               </Label>
               <Select
                 onValueChange={(e) =>
@@ -1769,11 +1863,11 @@ const App = ({
                 value={addExchangeConfig?.type ?? ""}
               >
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select CEX" />
+                  <SelectValue placeholder={t("config.form.exchange.typePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectLabel>Cex</SelectLabel>
+                    <SelectLabel>{t("config.form.select.cex")}</SelectLabel>
                     {cexOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         <img
@@ -1789,7 +1883,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="alias" className="text-right">
-                Alias
+                {t("config.form.label.alias")}
               </Label>
               <Input
                 id="alias"
@@ -1806,7 +1900,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="apiKey" className="text-right">
-                Api Key
+                {t("config.form.label.apiKey")}
               </Label>
               <Input
                 id="apiKey"
@@ -1823,7 +1917,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="apiSecret" className="text-right">
-                Api Secret
+                {t("config.form.label.apiSecret")}
               </Label>
               <Input
                 id="apiSecret"
@@ -1841,7 +1935,7 @@ const App = ({
             {addExchangeConfig?.type === "okex" && (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="password" className="text-right">
-                  Password
+                  {t("config.form.label.password")}
                 </Label>
                 <Input
                   id="password"
@@ -1860,7 +1954,7 @@ const App = ({
             {addExchangeConfig?.type === "bitget" && (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="passphrase" className="text-right">
-                  Passphrase
+                  {t("config.form.label.passphrase")}
                 </Label>
                 <Input
                   id="passphrase"
@@ -1886,7 +1980,7 @@ const App = ({
               {saveCexConfigLoading && (
                 <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Save changes
+              {t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1903,20 +1997,20 @@ const App = ({
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
             <PlusIcon className="h-4 w-4 mr-1" />
-            Add Stock Broker
+            {t("config.form.button.addStockBroker")}
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Add Stock Broker</DialogTitle>
+            <DialogTitle>{t("config.form.stockBroker.title")}</DialogTitle>
             <DialogDescription>
-              Add broker credentials here. Click save when you're done.
+              {t("config.form.stockBroker.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="stockBrokerType" className="text-right">
-                Type
+                {t("config.form.label.type")}
               </Label>
               <Select
                 onValueChange={(e) =>
@@ -1928,11 +2022,11 @@ const App = ({
                 value={addStockBrokerConfig?.type ?? ""}
               >
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select Broker" />
+                  <SelectValue placeholder={t("config.form.stockBroker.typePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectLabel>Broker</SelectLabel>
+                    <SelectLabel>{t("config.form.select.broker")}</SelectLabel>
                     {stockBrokerOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         {o.label}
@@ -1944,7 +2038,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="stockBrokerAlias" className="text-right">
-                Alias
+                {t("config.form.label.alias")}
               </Label>
               <Input
                 id="stockBrokerAlias"
@@ -1961,7 +2055,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="stockBrokerToken" className="text-right">
-                Token
+                {t("config.form.label.token")}
               </Label>
               <Input
                 id="stockBrokerToken"
@@ -1978,7 +2072,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="stockBrokerQueryId" className="text-right">
-                Query ID
+                {t("config.form.label.queryId")}
               </Label>
               <Input
                 id="stockBrokerQueryId"
@@ -2003,7 +2097,7 @@ const App = ({
               {saveStockBrokerConfigLoading && (
                 <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Save changes
+              {t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2016,7 +2110,7 @@ const App = ({
     if (!addWalletConfig || !addWalletConfig.type || !addWalletConfig.address) {
       // alert
       toast({
-        description: "Wallet type and address is required",
+        description: t("config.form.error.requiredWallet"),
         variant: "destructive",
       });
       return;
@@ -2026,7 +2120,9 @@ const App = ({
       .then((valid) => {
         if (!valid) {
           toast({
-            description: `Invalid ${addWalletConfig.type.toUpperCase()} address`,
+            description: t("config.form.error.invalidAddressForType", {
+              type: addWalletConfig.type.toUpperCase(),
+            }),
             variant: "destructive",
           });
           return;
@@ -2054,20 +2150,20 @@ const App = ({
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
             <PlusIcon className="h-4 w-4 mr-1" />
-            Add Wallet
+            {t("config.form.button.addWallet")}
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Add Wallet Configuration</DialogTitle>
+            <DialogTitle>{t("config.form.wallet.title")}</DialogTitle>
             <DialogDescription>
-              Add wallet address here. Click save when you're done.
+              {t("config.form.wallet.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right">
-                Type
+                {t("config.form.label.type")}
               </Label>
               <Select
                 onValueChange={(e) =>
@@ -2079,11 +2175,11 @@ const App = ({
                 value={addWalletConfig?.type ?? ""}
               >
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select Wallet" />
+                  <SelectValue placeholder={t("config.form.wallet.typePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectLabel>Wallet Type</SelectLabel>
+                    <SelectLabel>{t("config.form.select.wallet")}</SelectLabel>
                     {walletOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         <img
@@ -2099,7 +2195,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="alias" className="text-right">
-                Alias
+                {t("config.form.label.alias")}
               </Label>
               <Input
                 id="alias"
@@ -2116,7 +2212,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="address" className="text-right">
-                Address
+                {t("config.form.label.address")}
               </Label>
               <Input
                 id="address"
@@ -2141,7 +2237,7 @@ const App = ({
               {saveWalletConfigLoading && (
                 <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Save changes
+              {t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2154,7 +2250,7 @@ const App = ({
     if (!addOtherConfig || !addOtherConfig.symbol) {
       // alert
       toast({
-        description: "Symbol is required",
+        description: t("config.form.error.requiredSymbol"),
         variant: "destructive",
       });
       return;
@@ -2175,20 +2271,20 @@ const App = ({
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
             <PlusIcon className="h-4 w-4 mr-1" />
-            Add Symbol
+            {t("config.form.button.addSymbol")}
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Add Other Configuration</DialogTitle>
+            <DialogTitle>{t("config.form.other.title")}</DialogTitle>
             <DialogDescription>
-              Add extra symbol and amount here. Click save when you're done.
+              {t("config.form.other.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="alias" className="text-right">
-                Alias
+                {t("config.form.label.alias")}
               </Label>
               <Input
                 id="alias"
@@ -2205,7 +2301,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="symbol" className="text-right">
-                Symbol
+                {t("config.form.label.symbol")}
               </Label>
               <Input
                 id="symbol"
@@ -2222,7 +2318,7 @@ const App = ({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">
-                Amount
+                {t("config.form.label.amount")}
               </Label>
               <Input
                 id="amount"
@@ -2242,7 +2338,7 @@ const App = ({
           </div>
           <DialogFooter>
             <Button type="submit" onClick={onAddOtherFormSubmit}>
-              Save changes
+              {t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2254,69 +2350,67 @@ const App = ({
     <div className="space-y-6">
       {renderQuickLookDialog()}
       <div>
-        <h3 className="text-lg font-medium">Configuration</h3>
-        <p className="text-sm text-muted-foreground">
-          Manage exchanges, wallets, custom symbols, and global preferences.
-        </p>
+        <h3 className="text-lg font-medium">{t("config.title")}</h3>
+        <p className="text-sm text-muted-foreground">{t("config.subtitle")}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Exchanges
+              {t("config.card.exchanges")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">{exchanges.length}</div>
             <p className="text-xs text-muted-foreground">
-              {activeExchangeCount} active
+              {t("config.card.activeSuffix", { count: activeExchangeCount })}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Stock Brokers
+              {t("config.card.stockBrokers")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">{stockBrokers.length}</div>
             <p className="text-xs text-muted-foreground">
-              {activeStockBrokerCount} active
+              {t("config.card.activeSuffix", { count: activeStockBrokerCount })}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Wallets
+              {t("config.card.wallets")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">{wallets.length}</div>
             <p className="text-xs text-muted-foreground">
-              {activeWalletCount} active
+              {t("config.card.activeSuffix", { count: activeWalletCount })}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Custom Symbols
+              {t("config.card.others")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">{others.length}</div>
             <p className="text-xs text-muted-foreground">
-              Manual balance entries
+              {t("config.card.manualBalance")}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Base Currency
+              {t("config.card.baseCurrency")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -2327,8 +2421,8 @@ const App = ({
             )}
             <p className="text-xs text-muted-foreground">
               {preferCurrencyLoading
-                ? "Loading base currency..."
-                : "Current quote base"}
+                ? t("config.card.loadingBaseCurrency")
+                : t("config.card.currentBaseQuote")}
             </p>
           </CardContent>
         </Card>
@@ -2337,7 +2431,7 @@ const App = ({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            General
+            {t("config.general.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -2348,7 +2442,7 @@ const App = ({
               onCheckedChange={(v) => onGroupUSDSelectChange(!!v)}
             />
             <Label htmlFor="groupUSD" className="text-sm">
-              Group stable coins into USDT (USDC, TUSD, DAI...)
+              {t("config.general.groupUSD")}
             </Label>
           </div>
           <div className="flex items-center space-x-2">
@@ -2358,21 +2452,21 @@ const App = ({
               onCheckedChange={(v) => onHideInactiveSelectChange(!!v)}
             />
             <Label htmlFor="hideInactive" className="text-sm">
-              Hide inactive exchanges, brokers, and wallets
+              {t("config.general.hideInactive")}
             </Label>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <div className="text-sm font-medium text-muted-foreground">
-                Count of Results
+                {t("config.general.querySize")}
               </div>
               <Select onValueChange={onQuerySizeChanged} value={querySize + ""}>
                 <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Query size" />
+                  <SelectValue placeholder={t("config.general.querySizeLabel")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectLabel>Size</SelectLabel>
+                    <SelectLabel>{t("config.form.select.size")}</SelectLabel>
                     {querySizeOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         {o.label}
@@ -2384,7 +2478,7 @@ const App = ({
             </div>
             <div className="space-y-2">
               <div className="text-sm font-medium text-muted-foreground">
-                Base Currency
+                {t("config.general.baseCurrency")}
               </div>
               <div className="flex items-center gap-2">
                 {preferCurrencyLoading ? (
@@ -2395,11 +2489,13 @@ const App = ({
                     value={preferCurrency}
                   >
                     <SelectTrigger className="w-[280px]">
-                      <SelectValue placeholder="Prefer currency" />
+                      <SelectValue placeholder={t("config.general.preferCurrency")} />
                     </SelectTrigger>
                     <SelectContent className="overflow-y-auto max-h-[20rem]">
                       <SelectGroup>
-                        <SelectLabel>Prefer Currency</SelectLabel>
+                        <SelectLabel>
+                          {t("config.form.select.preferCurrency")}
+                        </SelectLabel>
                         {preferCurrencyOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
                             {o.label}
@@ -2452,10 +2548,13 @@ const App = ({
           <div className="flex items-center justify-between gap-4">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Stock Brokers
+                {t("config.card.stockBrokers")}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                {visibleStockBrokers.length} shown / {stockBrokers.length} total
+                {t("config.othersTable.shownTotal", {
+                  shown: visibleStockBrokers.length,
+                  total: stockBrokers.length,
+                })}
               </p>
             </div>
             {renderAddStockBrokerForm()}
@@ -2500,10 +2599,13 @@ const App = ({
           <div className="flex items-center justify-between gap-4">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Exchanges
+                {t("config.card.exchanges")}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                {visibleExchanges.length} shown / {exchanges.length} total
+                {t("config.othersTable.shownTotal", {
+                  shown: visibleExchanges.length,
+                  total: exchanges.length,
+                })}
               </p>
             </div>
             {renderAddExchangeForm()}
@@ -2546,10 +2648,13 @@ const App = ({
           <div className="flex items-center justify-between gap-4">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Wallets
+                {t("config.card.wallets")}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                {visibleWallets.length} shown / {wallets.length} total
+                {t("config.othersTable.shownTotal", {
+                  shown: visibleWallets.length,
+                  total: wallets.length,
+                })}
               </p>
             </div>
             {renderAddWalletForm()}
@@ -2592,10 +2697,10 @@ const App = ({
           <div className="flex items-center justify-between gap-4">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Others
+                {t("config.othersTable.title")}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Add manual holdings not covered by APIs
+                {t("config.othersTable.subtitle")}
               </p>
             </div>
             {renderAddOtherForm()}

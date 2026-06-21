@@ -1,4 +1,5 @@
 import { ChartResizeContext } from "@/App";
+import { useTranslation } from "@/i18n";
 import {
   queryPNLChartValue,
   resizeChart,

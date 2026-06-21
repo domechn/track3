@@ -1,5 +1,7 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderI18n as render } from "@/test/setup";
+
+import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Summary from "@/components/summary";
 import WalletAnalytics from "@/components/wallet-analytics";

@@ -1,4 +1,5 @@
 import { Pie } from "react-chartjs-2";
+import { useTranslation } from "@/i18n";
 import { useWindowSize } from "@/utils/hook";
 import {
   CurrencyRateDetail,

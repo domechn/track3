@@ -1,4 +1,5 @@
 import { Line } from "react-chartjs-2";
+import { useTranslation } from "@/i18n";
 import { useWindowSize } from "@/utils/hook";
 import { timeToDateStr } from "@/utils/date";
 import { TDateRange, TopCoinsPercentageChangeData } from "@/middlelayers/types";
@@ -77,8 +78,10 @@ function getWholeKey(key: string): string {
   return prefix + _(key).upperFirst();
 }
 
-const App = ({ dateRange }: { dateRange: TDateRange }) => {
+const App = ({ dateRange }: {
+  dateRange: TDateRange }) => {
   const wsize = useWindowSize();
+
 
   const { needResize } = useContext(ChartResizeContext);
   const [topCoinsPercentageChangeData, setTopCoinsPercentageChangeData] =

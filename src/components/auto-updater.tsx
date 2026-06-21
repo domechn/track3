@@ -3,11 +3,13 @@ import { check } from "@tauri-apps/plugin-updater";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { reloadApp } from "@/utils/app";
+import { useTranslation } from "@/i18n";
 
 const maxInt = 2147483647;
 
 const App = () => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   useEffect(() => {
     autoInstallLatestVersion();
   }, []);
@@ -19,15 +21,15 @@ const App = () => {
     }
     await update.downloadAndInstall();
     toast({
-      title: "🔥 New version available!",
+      title: t("autoUpdater.title"),
       duration: maxInt,
       action: (
         <ToastAction
-          altText={"reload"}
+          altText={t("autoUpdater.action")}
           onClick={reloadApp}
           className="bg-primary text-primary-foreground shadow hover:bg-primary/90"
         >
-          Reload
+          {t("autoUpdater.action")}
         </ToastAction>
       ),
     });

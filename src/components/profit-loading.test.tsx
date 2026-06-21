@@ -1,5 +1,7 @@
 import React from "react";
-import { render, waitFor } from "@testing-library/react";
+import { renderI18n as render } from "@/test/setup";
+
+import { waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import Profit from "@/components/profit";

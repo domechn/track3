@@ -1,3 +1,4 @@
+import { useTranslation } from "@/i18n";
 import {
   CurrencyRateDetail,
   QuoteColor,
@@ -35,6 +36,7 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const [maxSingleDayProfitData, setMaxSingleDayProfitData] = useState({
     timestamp: 0,
     value: 0,

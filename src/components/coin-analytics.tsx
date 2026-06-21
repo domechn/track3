@@ -1,3 +1,4 @@
+import { useTranslation } from "@/i18n";
 import {
   calculateTotalProfit,
   listAllowedSymbols,
@@ -200,6 +201,7 @@ const App = ({
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
 }) => {
+  const { t } = useTranslation();
   const { symbol } = useParams() as { symbol: string };
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();

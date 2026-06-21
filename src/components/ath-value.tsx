@@ -13,6 +13,7 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { timeToDateStr } from "@/utils/date";
 import { positiveNegativeTextClass } from "@/utils/color";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation, useLocaleTag } from "@/i18n";
 
 const App = ({
   dateRange,
@@ -23,6 +24,8 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
+  const localeTag = useLocaleTag();
   const [maxTotalValueData, setMaxTotalValueData] = useState<MaxTotalValueData>(
     {
       uuid: "",
@@ -57,80 +60,59 @@ const App = ({
     }
   }
 
-  const percentageFromATH = useMemo(() => {
-    if (maxTotalValueData.totalValue === 0) {
-      return 0;
-    }
-    return (
-      ((totalValueData.totalValue - maxTotalValueData.totalValue) /
-        maxTotalValueData.totalValue) *
-      100
-    );
-  }, [totalValueData, maxTotalValueData]);
-  const currentTotalValueText = useMemo(
-    () =>
-      currency.symbol +
-      prettyNumberToLocaleString(
-        currencyWrapper(currency)(totalValueData.totalValue)
-      ),
-    [currency, totalValueData]
-  );
-  const athTotalValueText = useMemo(
-    () =>
-      currency.symbol +
-      prettyNumberToLocaleString(
-        currencyWrapper(currency)(maxTotalValueData.totalValue)
-      ),
-    [currency, maxTotalValueData]
-  );
+  const changeValue = maxTotalValueData.totalValue - totalValueData.totalValue;
+  const changePercentage = maxTotalValueData.totalValue
+    ? (changeValue / maxTotalValueData.totalValue) * 100
+    : 0;
 
   return (
-    <Card>
-      <CardHeader className="space-y-0 pb-2">
-        <CardTitle className="text-xs font-medium text-muted-foreground">
-          All Time High
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {t("ath.title")}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="mt-2">
-          <div className="space-y-3">
-            <div className="space-y-1 pb-2 border-b border-border/40">
-              <div className="text-[11px] text-muted-foreground">
-                Current Total Value
-              </div>
-              <div
-                className="text-sm md:text-base font-semibold tabular-nums whitespace-nowrap overflow-x-auto leading-snug"
-                title={currentTotalValueText}
-              >
-                {currentTotalValueText}
-              </div>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-xs text-muted-foreground">{t("ath.value")}</div>
+            <div className="text-xl font-semibold font-mono tabular-nums">
+              {currency.symbol}
+              {prettyNumberToLocaleString(
+                currencyWrapper(currency)(maxTotalValueData.totalValue),
+              )}
             </div>
-            <div className="space-y-1 pb-2 border-b border-border/40">
-              <div className="text-[11px] text-muted-foreground">ATH Total Value</div>
-              <div
-                className="text-sm md:text-base font-semibold tabular-nums whitespace-nowrap overflow-x-auto leading-snug"
-                title={athTotalValueText}
-              >
-                {athTotalValueText}
-              </div>
+            <div className="text-xs text-muted-foreground">
+              {maxTotalValueData.date
+                ? timeToDateStr(
+                    new Date(maxTotalValueData.date).getTime(),
+                    false,
+                    localeTag,
+                  )
+                : t("ath.noData")}
             </div>
-            <div className="space-y-1 pb-2 border-b border-border/40">
-              <div className="text-[11px] text-muted-foreground">ATH Date</div>
-              <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
-                {timeToDateStr(maxTotalValueData.date)}
-              </div>
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">{t("ath.current")}</div>
+            <div className="text-xl font-semibold font-mono tabular-nums">
+              {currency.symbol}
+              {prettyNumberToLocaleString(
+                currencyWrapper(currency)(totalValueData.totalValue),
+              )}
             </div>
-            <div className="space-y-1">
-              <div className="text-[11px] text-muted-foreground">% from ATH</div>
-              <div
-                className={`text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto ${positiveNegativeTextClass(
-                  percentageFromATH,
-                  quoteColor,
-                  700
-                )}`}
-              >
-                {percentageFromATH.toFixed(2)}%
-              </div>
+            <div
+              className={`text-xs tabular-nums ${positiveNegativeTextClass(
+                changeValue,
+                quoteColor,
+              )}`}
+            >
+              {changeValue > 0 ? "-" : changeValue < 0 ? "+" : ""}
+              {currency.symbol}
+              {prettyNumberToLocaleString(
+                currencyWrapper(currency)(Math.abs(changeValue)),
+              )}{" "}
+              ({changePercentage >= 0 ? "+" : ""}
+              {prettyNumberToLocaleString(changePercentage)}%)
             </div>
           </div>
         </div>

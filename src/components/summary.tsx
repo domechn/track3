@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import PageLoadingOverlay from "./page-loading-overlay";
 import { useLayoutEffect } from "react";
+import { useTranslation } from "@/i18n";
+
 const SUMMARY_COMPONENT_COUNT = 4;
 
 const App = ({
@@ -23,6 +25,7 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const [pageLoading, setPageLoading] = useState(true);
   const loadedCountRef = useRef(0);
   const rangeKey = useMemo(
@@ -55,7 +58,7 @@ const App = ({
   return (
     <OverviewLoadingContext.Provider value={overviewLoadingContext}>
       <div className="relative min-h-[400px]" aria-busy={pageLoading}>
-        <h1 className="sr-only">Summary</h1>
+        <h1 className="sr-only">{t("summary.title")}</h1>
         <StaggerContainer className="space-y-3">
           {hasValidRange && (
             <>
@@ -92,7 +95,7 @@ const App = ({
             <FadeUp>
               <div className="rounded-xl border bg-card text-card-foreground shadow glass px-4 py-10 text-center">
                 <div className="text-lg text-muted-foreground">
-                  Historical data is required to view summary metrics.
+                  {t("summary.noData")}
                 </div>
               </div>
             </FadeUp>
@@ -100,8 +103,8 @@ const App = ({
         </StaggerContainer>
         {pageLoading && (
           <PageLoadingOverlay
-            title="Loading summary data"
-            description="Refreshing all-time-high and profit summary metrics across the full available history."
+            title={t("summary.loadingTitle")}
+            description={t("pageLoading.description")}
           />
         )}
       </div>

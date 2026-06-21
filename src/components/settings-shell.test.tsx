@@ -1,4 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { renderI18n as render } from "@/test/setup";
+
+import { screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import SettingsShell from "@/components/settings";

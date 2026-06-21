@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/i18n";
 import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,

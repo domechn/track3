@@ -1,3 +1,4 @@
+import { useTranslation } from "@/i18n";
 import {
   AssetReference,
   AssetsPercentageChangeData,
@@ -26,7 +27,9 @@ import { formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
 
 const chartName = "Coins Percentage Overview";
 
-const App = ({ dateRange }: { dateRange: TDateRange }) => {
+const App = ({ dateRange }: {
+  dateRange: TDateRange }) => {
+  const { t } = useTranslation();
   const wsize = useWindowSize();
   const [topN, setTopN] = useState<AssetReference[]>([]);
   const { needResize } = useContext(ChartResizeContext);

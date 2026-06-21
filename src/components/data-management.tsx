@@ -40,9 +40,11 @@ import {
 } from "./ui/tooltip";
 import { cn } from "@/lib/utils";
 import "@/components/common/scrollbar/index.css";
+import { useTranslation } from "@/i18n";
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [exportConfiguration, setExportConfiguration] = useState(false);
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
     useState(false);
@@ -79,7 +81,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function onExportDataClick() {
     const exported = await exportHistoricalData(exportConfiguration);
     if (exported) {
-      toast({ description: "Export data successfully" });
+      toast({ description: t("data.exportSuccess") });
     }
   }
 
@@ -100,7 +102,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function importData(cr: UniqueIndexConflictResolver) {
     if (!exportData) {
       toast({
-        description: "No data to import",
+        description: t("data.importNoData"),
         variant: "destructive",
       });
       return;
@@ -110,7 +112,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         if (!imported) {
           return;
         }
-        toast({ description: "Import data successfully" });
+        toast({ description: t("data.importSuccess") });
         if (onDataImported) {
           onDataImported();
         }
@@ -150,7 +152,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     setBlacklist((prev) =>
       prev.filter((s) => s.toUpperCase() !== symbol.toUpperCase()),
     );
-    toast({ description: `"${symbol}" removed from blacklist` });
+    toast({ description: t("data.blacklistRemoved", { symbol }) });
   }
 
   return (
@@ -161,41 +163,40 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Conflicts Found</DialogTitle>
+            <DialogTitle>{t("data.conflictsTitle")}</DialogTitle>
             <DialogDescription>
-              Imported records overlap with existing history. Choose how to
-              resolve duplicated entries.
+              {t("data.conflictsDescription")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => importData("REPLACE")}>Overwrite</Button>
+            <Button onClick={() => importData("REPLACE")}>
+              {t("common.overwrite")}
+            </Button>
             <Button onClick={() => importData("IGNORE")} variant="outline">
-              Ignore
+              {t("common.ignore")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <div>
-        <h3 className="text-lg font-medium">Data Center</h3>
-        <p className="text-sm text-muted-foreground">
-          Import, export and backup your local data safely.
-        </p>
+        <h3 className="text-lg font-medium">{t("data.title")}</h3>
+        <p className="text-sm text-muted-foreground">{t("data.subtitle")}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Import Data
+              {t("data.importCardTitle")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Load exported file and merge with current records.
+              {t("data.importCardDescription")}
             </p>
             <Button onClick={onImportDataClick} size="sm">
-              Import
+              {t("data.importButton")}
             </Button>
           </CardContent>
         </Card>
@@ -203,7 +204,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Export Data
+              {t("data.exportCardTitle")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -214,17 +215,17 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
                 onCheckedChange={(v) => setExportConfiguration(!!v)}
               />
               <Label htmlFor="exportConfigurationCheckbox" className="text-sm">
-                Include configuration
+                {t("data.exportConfiguration")}
               </Label>
             </div>
             <div className="flex items-center space-x-2">
               <Checkbox id="exportDataCheckbox" checked={true} disabled />
               <Label htmlFor="exportDataCheckbox" className="text-sm">
-                Include historical data
+                {t("data.exportHistorical")}
               </Label>
             </div>
             <Button onClick={onExportDataClick} size="sm">
-              Export
+              {t("common.export")}
             </Button>
           </CardContent>
         </Card>
@@ -233,7 +234,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Auto Backup
+            {t("data.backupCardTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -246,21 +247,24 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
                 <TooltipContent>
                   <div className="space-y-1 text-xs">
                     <div>
-                      Last Backup At:{" "}
-                      {lastBackupAt ? timeToDateStr(lastBackupAt, true) : "N/A"}
+                      {t("data.backupLastBackupAt", {
+                        time: lastBackupAt
+                          ? timeToDateStr(lastBackupAt, true)
+                          : t("common.na"),
+                      })}
                     </div>
                     <div>
-                      Last Import At:{" "}
-                      {lastImportAt ? timeToDateStr(lastImportAt, true) : "N/A"}
+                      {t("data.backupLastImportAt", {
+                        time: lastImportAt
+                          ? timeToDateStr(lastImportAt, true)
+                          : t("common.na"),
+                      })}
                     </div>
                   </div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <span>
-              Data is automatically backed up every 24h or after refresh when a
-              backup folder is configured.
-            </span>
+            <span>{t("data.backupNote")}</span>
           </div>
 
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
@@ -274,14 +278,14 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </div>
             <div className="flex items-center gap-2">
               <Button onClick={onChooseAutoBackupFolderButtonClick} size="sm">
-                Choose Folder
+                {t("data.backupChooseFolder")}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onClearAutoBackupFolderButtonClick}
               >
-                Clear
+                {t("data.backupClear")}
               </Button>
             </div>
           </div>
@@ -291,17 +295,16 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Token Blacklist
+            {t("data.blacklistCardTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Blacklisted tokens are excluded from all portfolio queries and data
-            refresh operations.
+            {t("data.blacklistDescription")}
           </p>
           {blacklist.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No blacklisted tokens
+              {t("data.blacklistEmpty")}
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">

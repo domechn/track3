@@ -1,5 +1,7 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { renderI18n as render } from "@/test/setup";
+
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Overview from "@/components/overview";
 import { ChartResizeContext } from "@/App";
@@ -109,7 +111,7 @@ describe("Overview card alignment", () => {
     renderOverview();
 
     const totalValueCard = screen
-      .getByText("Total Value In USD")
+      .getByText(/Total Value in USD/i)
       .closest(".rounded-xl");
     const pnlCard = screen.getByText("PNL Analysis").closest(".rounded-xl");
 

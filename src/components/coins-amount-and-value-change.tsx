@@ -1,4 +1,5 @@
 import _ from "lodash";
+import { useTranslation } from "@/i18n";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timeToDateStr } from "@/utils/date";

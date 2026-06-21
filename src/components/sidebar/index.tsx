@@ -9,16 +9,27 @@ import {
   GearIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  GlobeIcon,
+  CheckIcon,
 } from "@radix-ui/react-icons";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useTranslation } from "@/i18n";
+import { useMemo } from "react";
 
-const navItems = [
-  { to: "/overview", label: "Overview", icon: DashboardIcon },
-  { to: "/summary", label: "Summary", icon: BarChartIcon },
-  { to: "/wallets", label: "Wallets", icon: BackpackIcon },
-  { to: "/comparison", label: "Comparison", icon: MixIcon },
-  { to: "/history", label: "History", icon: ClockIcon },
-  { to: "/settings", label: "Settings", icon: GearIcon },
-];
+function useNavItems() {
+  const { t } = useTranslation();
+  return useMemo(
+    () => [
+      { to: "/overview", label: t("nav.overview"), icon: DashboardIcon },
+      { to: "/summary", label: t("nav.summary"), icon: BarChartIcon },
+      { to: "/wallets", label: t("nav.wallets"), icon: BackpackIcon },
+      { to: "/comparison", label: t("nav.comparison"), icon: MixIcon },
+      { to: "/history", label: t("nav.history"), icon: ClockIcon },
+      { to: "/settings", label: t("nav.settings"), icon: GearIcon },
+    ],
+    [t],
+  );
+}
 
 function NavItem({
   to,
@@ -69,6 +80,55 @@ function NavItem({
   );
 }
 
+function LanguageSwitcher({ collapsed }: { collapsed: boolean }) {
+  const { locale, setLocale, availableLocales, t } = useTranslation();
+  const current = availableLocales.find((l) => l.value === locale);
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        aria-label={t("sidebar.language.switchLabel")}
+        className={cn(
+          "flex items-center gap-2 rounded-lg py-2 text-muted-foreground transition-colors",
+          "hover:text-foreground hover:bg-accent/60 outline-none",
+          collapsed ? "w-full justify-center px-0" : "w-full px-2.5",
+        )}
+      >
+        <GlobeIcon className="h-4 w-4 shrink-0" aria-hidden />
+        {!collapsed && (
+          <span className="text-sm font-medium truncate">
+            {current?.label ?? locale}
+          </span>
+        )}
+      </PopoverTrigger>
+      <PopoverContent side="right" align="end" className="min-w-[10rem] p-1">
+        <div role="menu" aria-label={t("sidebar.language.switchLabel")}>
+          {availableLocales.map((l) => {
+            const isActive = l.value === locale;
+            return (
+              <button
+                key={l.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={isActive}
+                onClick={() => setLocale(l.value)}
+                className={cn(
+                  "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                  "hover:bg-accent/60 hover:text-foreground",
+                  isActive && "bg-accent/40 font-semibold text-foreground",
+                )}
+              >
+                <span>{l.label}</span>
+                {isActive && <CheckIcon className="h-3.5 w-3.5" aria-hidden />}
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function Sidebar({
   collapsed,
   onToggle,
@@ -78,6 +138,8 @@ export default function Sidebar({
   onToggle: () => void;
   isProUser: boolean;
 }) {
+  const { t } = useTranslation();
+  const navItems = useNavItems();
   const sidebarWidth = collapsed ? 52 : 200;
 
   return (
@@ -89,18 +151,18 @@ export default function Sidebar({
         {!collapsed && (
           <div className="flex items-center gap-2 overflow-hidden">
             <span className="font-bold text-lg tracking-tight whitespace-nowrap">
-              Track3
+              {t("app.name")}
             </span>
             {isProUser && (
               <span className="text-xs font-semibold bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded">
-                PRO
+                {t("app.proBadge")}
               </span>
             )}
           </div>
         )}
         {collapsed && isProUser && (
           <span className="text-[10px] font-semibold bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-1 py-0.5 rounded mx-auto">
-            P
+            {t("sidebar.proShort")}
           </span>
         )}
       </div>
@@ -111,9 +173,13 @@ export default function Sidebar({
         ))}
       </nav>
 
-      <div className="p-2 border-t border-[var(--glass-border)]">
+      <div className="p-2 border-t border-[var(--glass-border)] space-y-1">
+        <LanguageSwitcher collapsed={collapsed} />
         <button
           onClick={onToggle}
+          aria-label={
+            collapsed ? t("sidebar.toggle.expand") : t("sidebar.toggle.collapse")
+          }
           className="flex items-center justify-center w-full rounded-lg py-2 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
         >
           {collapsed ? (

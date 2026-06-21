@@ -1,4 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderI18n as render } from "@/test/setup";
+
+import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Configuration from "@/components/configuration";
 import {

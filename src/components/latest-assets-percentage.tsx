@@ -1,4 +1,5 @@
 import { Doughnut } from "react-chartjs-2";
+import { useTranslation } from "@/i18n";
 import {
   CurrencyRateDetail,
   LatestAssetsPercentageData,
@@ -53,6 +54,7 @@ const App = ({
 }) => {
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
+  const { t } = useTranslation();
   const [dataPage, setDataPage] = useState<number>(0);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
@@ -277,7 +279,7 @@ const App = ({
                       symbol: d.coin,
                       assetType: d.assetType,
                     })}
-                    aria-label={`Open ${formatAssetLabel({ symbol: d.coin, assetType: d.assetType })} details`}
+                    aria-label={t("overview.openAssetDetails", { symbol: formatAssetLabel({ symbol: d.coin, assetType: d.assetType }) })}
                     className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <img

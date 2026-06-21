@@ -1,4 +1,5 @@
 import { calculateTotalProfit } from "@/middlelayers/charts";
+import { useTranslation } from "@/i18n";
 import {
   CurrencyRateDetail,
   QuoteColor,

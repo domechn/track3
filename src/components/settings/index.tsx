@@ -13,29 +13,37 @@ import {
   ArchiveIcon,
   InfoCircledIcon,
 } from "@radix-ui/react-icons";
+import { useTranslation } from "@/i18n";
+import { useMemo } from "react";
 
-const settingsTabs = [
-  {
-    title: "Configuration",
-    href: "/settings/configuration",
-    icon: GearIcon,
-  },
-  {
-    title: "Appearance",
-    href: "/settings/appearance",
-    icon: SunIcon,
-  },
-  {
-    title: "Data",
-    href: "/settings/data",
-    icon: ArchiveIcon,
-  },
-  {
-    title: "System",
-    href: "/settings/systemInfo",
-    icon: InfoCircledIcon,
-  },
-];
+function useSettingsTabs() {
+  const { t } = useTranslation();
+  return useMemo(
+    () => [
+      {
+        title: t("settings.tabs.configuration"),
+        href: "/settings/configuration",
+        icon: GearIcon,
+      },
+      {
+        title: t("settings.tabs.appearance"),
+        href: "/settings/appearance",
+        icon: SunIcon,
+      },
+      {
+        title: t("settings.tabs.data"),
+        href: "/settings/data",
+        icon: ArchiveIcon,
+      },
+      {
+        title: t("settings.tabs.system"),
+        href: "/settings/systemInfo",
+        icon: InfoCircledIcon,
+      },
+    ],
+    [t],
+  );
+}
 
 function TabLink({
   to,
@@ -68,12 +76,14 @@ function TabLink({
 
 const App = () => {
   const lo = useLocation();
+  const { t } = useTranslation();
+  const settingsTabs = useSettingsTabs();
 
   return (
     <div className="space-y-5">
-      <h1 className="sr-only">Settings</h1>
+      <h1 className="sr-only">{t("settings.title")}</h1>
       <nav
-        aria-label="Settings sections"
+        aria-label={t("settings.ariaLabel")}
         className="flex flex-wrap items-center gap-1 glass rounded-xl px-2 py-1.5"
       >
         {settingsTabs.map((tab) => (
