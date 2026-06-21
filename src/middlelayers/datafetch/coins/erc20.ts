@@ -3,7 +3,6 @@ import _ from "lodash";
 import { asyncMap } from "../utils/async";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
-import bluebird from "bluebird";
 import { getClientID } from "@/utils/app";
 import { PRO_API_ENDPOINT } from "@/middlelayers/configuration";
 
@@ -13,16 +12,11 @@ type QueryAssetResp = {
 
 interface ERC20Querier {
   query(addresses: string[]): Promise<WalletCoin[]>;
-
-  clean(): void;
 }
 
 class ERC20RPCQuery implements ERC20Querier {
   private readonly queryUrl: string;
   private readonly mainSymbol: "ETH" | "BNB";
-
-  // add cache in one times query to avoid retry error
-  private cache: { [k: string]: WalletCoin[] } = {};
 
   constructor(mainSymbol: "ETH" | "BNB") {
     this.mainSymbol = mainSymbol;
@@ -45,11 +39,6 @@ class ERC20RPCQuery implements ERC20Querier {
   async query(addresses: string[]): Promise<WalletCoin[]> {
     if (addresses.length === 0) {
       return [];
-    }
-    const cacheKey = addresses.join(",");
-
-    if (this.cache[cacheKey]) {
-      return this.cache[cacheKey];
     }
 
     const jsonReq = _(addresses)
@@ -77,7 +66,7 @@ class ERC20RPCQuery implements ERC20Querier {
       );
     }
 
-    const res = _(results)
+    return _(results)
       .map((r, idx) => ({
         wallet: addresses[idx],
         symbol: this.mainSymbol,
@@ -86,13 +75,6 @@ class ERC20RPCQuery implements ERC20Querier {
         chain: this.getChain(),
       }))
       .value();
-
-    this.cache[cacheKey] = res;
-    return res;
-  }
-
-  clean(): void {
-    this.cache = {};
   }
 }
 
@@ -122,19 +104,23 @@ export class ERC20NormalAnalyzer implements Analyzer {
     if (addresses.length === 0) {
       return [];
     }
-    const coins = await bluebird.map(this.queries, async (q) =>
-      q.query(addresses),
+    const coins = await asyncMap(
+      [addresses],
+      async (addrs) => {
+        const results = await Promise.all(
+          this.queries.map((q) => q.query(addrs)),
+        );
+        return _(results).flatten().value();
+      },
+      1,
+      0,
     );
-    return _(coins).flatten().value();
+    return coins[0];
   }
 
   async preLoad(): Promise<void> {}
 
-  async postLoad(): Promise<void> {
-    for (const q of this.queries) {
-      q.clean();
-    }
-  }
+  async postLoad(): Promise<void> {}
 
   async verifyConfigs(): Promise<boolean> {
     const regex = /^(0x)?[0-9a-fA-F]{40}$/;

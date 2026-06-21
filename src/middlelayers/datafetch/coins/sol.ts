@@ -2,7 +2,7 @@ import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import _ from "lodash";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
-import bluebird from "bluebird";
+import { asyncMap } from "../utils/async";
 
 export class SOLAnalyzer implements Analyzer {
   private readonly config: Pick<TokenConfig, "sol">;
@@ -34,26 +34,22 @@ export class SOLAnalyzer implements Analyzer {
     if (addresses.length === 0) {
       return [];
     }
-    const balances = await bluebird.map(
+    const perAddress = await asyncMap(
       addresses,
-      async (address) => this.queryBalances(address),
-      {
-        concurrency: 2,
+      async (address) => {
+        const balances = await this.queryBalances(address);
+        const earnings = await this.queryEarnings(address);
+        return { address, balances, earnings };
       },
+      2,
+      0,
     );
 
-    const earnings = await bluebird.map(
-      addresses,
-      async (address) => this.queryEarnings(address),
-      {
-        concurrency: 2,
-      },
-    );
-    const flatEarnings = _(earnings).flatten().value();
+    const flatBalances = _(perAddress).map("balances").flatten().value();
+    const flatEarnings = _(perAddress).map("earnings").flatten().value();
 
     // loop balances, and find if there is a earning with the same ca and address, if there is, remove the balance and add the earning value to it
-    const newBalances = _(balances)
-      .flatten()
+    const newBalances = _(flatBalances)
       .map((b) => {
         const earning = _(flatEarnings).find(
           (e) => e.ca === b.ca && e.address === b.address,
@@ -119,7 +115,7 @@ export class SOLAnalyzer implements Analyzer {
     }
     // split to chunks of 100
     const chunks = _(cas).chunk(100).value();
-    const tokens = await bluebird.map(
+    const tokens = await asyncMap(
       chunks,
       async (chunk) => {
         const url = `${this.endpoint}/ultra/v1/search?query=${chunk.join(",")}`;
@@ -139,9 +135,8 @@ export class SOLAnalyzer implements Analyzer {
           }))
           .value();
       },
-      {
-        concurrency: 2,
-      },
+      2,
+      0,
     );
     return _(tokens)
       .flatten()
@@ -153,9 +148,7 @@ export class SOLAnalyzer implements Analyzer {
       .value();
   }
 
-  private async queryEarnings(
-    address: string,
-  ): Promise<
+  private async queryEarnings(address: string): Promise<
     {
       address: string;
       ca: string;

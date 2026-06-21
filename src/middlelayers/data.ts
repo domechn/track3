@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import bluebird from "bluebird";
 import {
+  Analyzer,
   CexConfig,
   GlobalConfig,
   TokenConfig,
@@ -73,24 +74,102 @@ export async function downloadCoinLogos(
   return invoke("download_coins_logos", { coins });
 }
 
+export type FailedPortfolioSource = {
+  analyzerName: string;
+  walletIdentities: string[];
+  error: string;
+};
+
+export type LoadPortfoliosOptions = {
+  useLastKnownDataForFailedSources?: boolean;
+};
+
+export type LoadPortfoliosResult = {
+  coins: WalletCoin[];
+  failedSources: FailedPortfolioSource[];
+};
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function getFailedWalletIdentities(
+  failedSources: FailedPortfolioSource[],
+): string[] {
+  return _(failedSources)
+    .flatMap((source) => source.walletIdentities)
+    .uniq()
+    .value();
+}
+
+function isFailedWallet(
+  wallet: string | undefined,
+  failedWalletIdentities: string[],
+): boolean {
+  if (!wallet) {
+    return false;
+  }
+  return failedWalletIdentities.some((identity) =>
+    isSameWallet(identity, wallet),
+  );
+}
+
+function assetModelToLastKnownWalletCoin(asset: AssetModel): WalletCoin {
+  return {
+    symbol: asset.symbol,
+    assetType: getAssetType(asset),
+    amount: asset.amount,
+    price: {
+      base: "usd",
+      value: asset.price,
+    },
+    wallet: addMD5PrefixToWallet(asset.wallet || ""),
+  };
+}
+
 export async function loadPortfolios(
   config: GlobalConfig,
   lastAssets: AssetModel[],
   addProgress: AddProgressFunc,
   userInfo: UserLicenseInfo,
-): Promise<WalletCoin[]> {
+  options: LoadPortfoliosOptions = {},
+): Promise<LoadPortfoliosResult> {
   // all coins currently owned ( amount > 0 )
-  const currentCoins = await loadPortfoliosByConfig(
+  const { coins: currentCoins, failedSources } = await loadPortfoliosByConfig(
     config,
     addProgress,
     userInfo,
   );
 
+  if (failedSources.length > 0 && !options.useLastKnownDataForFailedSources) {
+    return {
+      coins: currentCoins,
+      failedSources,
+    };
+  }
+
+  const failedWalletIdentities = getFailedWalletIdentities(failedSources);
+  const lastKnownCoins = options.useLastKnownDataForFailedSources
+    ? _(lastAssets)
+        .flatten()
+        .filter((asset) => isFailedWallet(asset.wallet, failedWalletIdentities))
+        .map(assetModelToLastKnownWalletCoin)
+        .value()
+    : [];
+  const currentCoinsWithFallback = [...currentCoins, ...lastKnownCoins];
+
   // need to list coins owned before but not now ( amount = 0 )
   const beforeCoins: WalletCoin[] = _(lastAssets)
     .flatten()
     .map((s) => {
-      const found = _(currentCoins).find(
+      if (isFailedWallet(s.wallet, failedWalletIdentities)) {
+        return;
+      }
+
+      const found = _(currentCoinsWithFallback).find(
         (c) =>
           c.symbol === s.symbol &&
           getAssetType(c) === getAssetType(s) &&
@@ -103,7 +182,8 @@ export async function loadPortfolios(
       return {
         symbol: s.symbol,
         assetType: getAssetType(s),
-        price: _(currentCoins).find((c) => c.symbol === s.symbol)?.price ?? {
+        price: _(currentCoinsWithFallback).find((c) => c.symbol === s.symbol)
+          ?.price ?? {
           base: "usd",
           value: s.price,
         },
@@ -114,7 +194,10 @@ export async function loadPortfolios(
     })
     .compact()
     .value();
-  return [...currentCoins, ...beforeCoins];
+  return {
+    coins: [...currentCoinsWithFallback, ...beforeCoins],
+    failedSources,
+  };
 }
 
 // progress percent is 70
@@ -122,7 +205,7 @@ async function loadPortfoliosByConfig(
   config: GlobalConfig,
   addProgress: AddProgressFunc,
   userInfo: UserLicenseInfo,
-): Promise<WalletCoin[]> {
+): Promise<LoadPortfoliosResult> {
   const progressPercent = 70;
   let anas: (
     | typeof ERC20NormalAnalyzer
@@ -166,10 +249,11 @@ async function loadPortfoliosByConfig(
     console.debug("not pro license, fallback to normal analyzers");
   }
   const perProgressPer = progressPercent / anas.length;
+  const failedSources: FailedPortfolioSource[] = [];
   const coinLists = await bluebird.map(
     anas,
     async (ana) => {
-      const a = new ana(config, userInfo.license!);
+      const a = new ana(config, userInfo.license!) as Analyzer;
       const anaName = a.getAnalyzeName();
       console.log("loading portfolio from ", anaName);
       try {
@@ -181,7 +265,13 @@ async function loadPortfoliosByConfig(
         return portfolio;
       } catch (e) {
         console.error("failed to load portfolio from ", anaName, e);
-        throw new Error("failed to load portfolio from " + anaName);
+        failedSources.push({
+          analyzerName: anaName,
+          walletIdentities: a.getWalletIdentities?.() ?? [],
+          error: getErrorMessage(e),
+        });
+        addProgress(perProgressPer);
+        return [];
       }
     },
     {
@@ -189,7 +279,10 @@ async function loadPortfoliosByConfig(
     },
   );
   const assets = combineCoinLists(coinLists);
-  return assets;
+  return {
+    coins: assets,
+    failedSources,
+  };
 }
 
 export async function exportHistoricalData(
