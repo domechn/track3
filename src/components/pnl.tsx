@@ -14,6 +14,7 @@ import PNLChart from "@/components/pnl-chart";
 import { ChartResizeContext } from "@/App";
 import { positiveNegativeTextClass } from "@/utils/color";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/i18n";
 
 const chartName = "PNL of Asset";
 
@@ -26,6 +27,7 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
 
@@ -112,7 +114,7 @@ const App = ({
       <Card className="flex h-full flex-col">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            PNL Analysis
+            {t("pnl.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col">
@@ -121,7 +123,7 @@ const App = ({
               className="flex min-h-[88px] flex-col items-center justify-center border-b border-border/50 pb-3 sm:min-h-0 sm:border-b-0 sm:border-r sm:pb-0"
               title={formatTimestampData(pnlTableData.todayPNL?.timestamp)}
             >
-              <div className="text-xs text-muted-foreground">Last PNL</div>
+              <div className="text-xs text-muted-foreground">{t("pnl.last")}</div>
               <div
                 className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
                   pnlTableData.todayPNL?.value,
@@ -141,7 +143,7 @@ const App = ({
               className="flex min-h-[88px] flex-col items-center justify-center border-b border-border/50 pb-3 sm:min-h-0 sm:border-b-0 sm:border-r sm:pb-0"
               title={formatTimestampData(pnlTableData.sevenTPnl?.timestamp)}
             >
-              <div className="text-xs text-muted-foreground">7T PNL</div>
+              <div className="text-xs text-muted-foreground">{t("pnl.7T")}</div>
               <div
                 className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
                   pnlTableData.sevenTPnl?.value,
@@ -161,7 +163,7 @@ const App = ({
               className="flex min-h-[88px] flex-col items-center justify-center"
               title={formatTimestampData(pnlTableData.thirtyPNL?.timestamp)}
             >
-              <div className="text-xs text-muted-foreground">30T PNL</div>
+              <div className="text-xs text-muted-foreground">{t("pnl.30T")}</div>
               <div
                 className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
                   pnlTableData.thirtyPNL?.value,

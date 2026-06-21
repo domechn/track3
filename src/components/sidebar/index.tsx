@@ -10,14 +10,15 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@radix-ui/react-icons";
+import { useTranslation } from "@/i18n";
 
 const navItems = [
-  { to: "/overview", label: "Overview", icon: DashboardIcon },
-  { to: "/summary", label: "Summary", icon: BarChartIcon },
-  { to: "/wallets", label: "Wallets", icon: BackpackIcon },
-  { to: "/comparison", label: "Comparison", icon: MixIcon },
-  { to: "/history", label: "History", icon: ClockIcon },
-  { to: "/settings", label: "Settings", icon: GearIcon },
+  { to: "/overview", labelKey: "nav.overview", icon: DashboardIcon },
+  { to: "/summary", labelKey: "nav.summary", icon: BarChartIcon },
+  { to: "/wallets", labelKey: "nav.wallets", icon: BackpackIcon },
+  { to: "/comparison", labelKey: "nav.comparison", icon: MixIcon },
+  { to: "/history", labelKey: "nav.history", icon: ClockIcon },
+  { to: "/settings", labelKey: "nav.settings", icon: GearIcon },
 ];
 
 function NavItem({
@@ -78,6 +79,7 @@ export default function Sidebar({
   onToggle: () => void;
   isProUser: boolean;
 }) {
+  const { t } = useTranslation();
   const sidebarWidth = collapsed ? 52 : 200;
 
   return (
@@ -89,11 +91,11 @@ export default function Sidebar({
         {!collapsed && (
           <div className="flex items-center gap-2 overflow-hidden">
             <span className="font-bold text-lg tracking-tight whitespace-nowrap">
-              Track3
+              {t("app.brand")}
             </span>
             {isProUser && (
               <span className="text-xs font-semibold bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded">
-                PRO
+                {t("app.proBadge")}
               </span>
             )}
           </div>
@@ -107,7 +109,13 @@ export default function Sidebar({
 
       <nav className="flex-1 flex flex-col gap-0.5 p-2 overflow-y-auto overflow-x-hidden">
         {navItems.map((item) => (
-          <NavItem key={item.to} {...item} collapsed={collapsed} />
+          <NavItem
+            key={item.to}
+            to={item.to}
+            label={t(item.labelKey)}
+            icon={item.icon}
+            collapsed={collapsed}
+          />
         ))}
       </nav>
 

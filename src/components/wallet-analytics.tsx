@@ -9,6 +9,7 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
+import { useTranslation } from "@/i18n";
 
 const App = ({
   currency,
@@ -19,6 +20,7 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const LOAD_COUNT = 2;
   const [pageLoading, setPageLoading] = useState(true);
   const loadedCountRef = useRef(0);
@@ -42,7 +44,7 @@ const App = ({
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
       <div className="relative min-h-[400px]" aria-busy={pageLoading}>
-        <h1 className="sr-only">Wallets</h1>
+        <h1 className="sr-only">{t("wallets.h1")}</h1>
         <StaggerContainer className="space-y-3">
           <FadeUp>
             <WalletAssetsPercentage currency={currency} dateRange={dateRange} />
@@ -57,8 +59,8 @@ const App = ({
         </StaggerContainer>
         {pageLoading && (
           <PageLoadingOverlay
-            title="Loading wallet analytics"
-            description="Refreshing wallet allocation and wallet performance cards."
+            title={t("loading.wallets")}
+            description={t("loading.walletsDesc")}
           />
         )}
       </div>

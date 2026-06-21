@@ -23,6 +23,7 @@ import Autoplay from "embla-carousel-autoplay";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
+import { useTranslation } from "@/i18n";
 
 const App = ({
   currency,
@@ -31,6 +32,7 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [realtimeAssetValues, setRealtimeAssetValues] = useState<Asset[]>([]);
@@ -118,7 +120,7 @@ const App = ({
     return (
       <div className="space-y-3">
         <div className="text-sm text-muted-foreground">
-          RealTime Total Value
+          {t("realtime.title")}
         </div>
         <div className="flex space-x-1 items-center justify-end">
           <div className="text-xl font-semibold">

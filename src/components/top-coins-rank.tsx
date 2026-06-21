@@ -19,10 +19,12 @@ import {
   resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
+import { useTranslation } from "@/i18n";
 
 const PAGE_SIZE = 20;
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
+  const { t } = useTranslation();
   const [topCoinsRankData, setTopCoinsRankData] = useState({
     timestamps: [],
     coins: [],
@@ -145,7 +147,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Top Coins Rank
+            {t("topCoinsRank.title")}
           </CardTitle>
         </CardHeader>
         <CardContent>

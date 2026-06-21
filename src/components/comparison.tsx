@@ -30,6 +30,7 @@ import { CalendarIcon, EyeClosedIcon, EyeOpenIcon } from "@radix-ui/react-icons"
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { isSameDay } from "date-fns";
+import { useTranslation } from "@/i18n";
 
 type MetricRow = {
   base: number;
@@ -62,6 +63,7 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const [pageLoading, setPageLoading] = useState(true);
   const loadGenRef = useRef(0);
 
@@ -438,7 +440,7 @@ const App = ({
 
   return (
     <div className="relative min-h-[400px]" aria-busy={pageLoading}>
-      <h1 className="sr-only">Comparison</h1>
+      <h1 className="sr-only">{t("comparison.h1")}</h1>
       <StaggerContainer className="space-y-3">
         <FadeUp>
           <Card>
@@ -468,14 +470,14 @@ const App = ({
                   </Button>
                   <div className="flex items-center gap-2">
                     <ComparisonDatePicker
-                      label="Base Date"
+                      label={t("comparison.baseDate")}
                       value={baseId}
                       dateOptions={dateOptions}
                       onChange={onBaseDateChange}
                     />
                     <span className="text-muted-foreground text-sm">vs</span>
                     <ComparisonDatePicker
-                      label="Head Date"
+                      label={t("comparison.headDate")}
                       value={headId}
                       dateOptions={dateOptions}
                       onChange={onHeadDateChange}
@@ -483,18 +485,18 @@ const App = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm">Quick</span>
+                  <span className="text-muted-foreground text-sm">{t("comparison.quick")}</span>
                   <ButtonGroup
                     value={currentQuickCompare || ""}
                     onValueChange={(val: string) =>
                       onQuickCompareButtonClick(val as QuickCompareType)
                     }
                   >
-                    <ButtonGroupItem value="7D">7D</ButtonGroupItem>
-                    <ButtonGroupItem value="1M">1M</ButtonGroupItem>
-                    <ButtonGroupItem value="1Y">1Y</ButtonGroupItem>
-                    <ButtonGroupItem value="YTD">YTD</ButtonGroupItem>
-                    <ButtonGroupItem value="ALL">ALL</ButtonGroupItem>
+                    <ButtonGroupItem value="7D">{t("comparison.7D")}</ButtonGroupItem>
+                    <ButtonGroupItem value="1M">{t("comparison.1M")}</ButtonGroupItem>
+                    <ButtonGroupItem value="1Y">{t("comparison.1Y")}</ButtonGroupItem>
+                    <ButtonGroupItem value="YTD">{t("comparison.ytd")}</ButtonGroupItem>
+                    <ButtonGroupItem value="ALL">{t("comparison.all")}</ButtonGroupItem>
                   </ButtonGroup>
                 </div>
               </div>
@@ -507,7 +509,7 @@ const App = ({
             <Card>
               <CardContent className="pt-5">
                 <div className="text-lg text-muted-foreground text-center py-8">
-                  No Data
+                  {t("common.noData")}
                 </div>
               </CardContent>
             </Card>
@@ -520,7 +522,7 @@ const App = ({
               <Card>
                 <CardContent className="pt-5 pb-4">
                   <p className="text-sm font-medium text-muted-foreground mb-3">
-                    Total Value
+                    {t("comparison.totalValue")}
                   </p>
                   <div className="grid grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-center gap-2">
                     <div className="min-w-0">
@@ -535,7 +537,7 @@ const App = ({
                       </p>
                     </div>
                     <div className="text-center min-w-0">
-                      <p className="text-xs text-muted-foreground">Change</p>
+                      <p className="text-xs text-muted-foreground">{t("common.changeLabel")}</p>
                       <p
                         className={`text-sm font-semibold tabular-nums truncate ${changeClass(totalValue.changePercent)}`}
                       >
@@ -597,8 +599,8 @@ const App = ({
       </StaggerContainer>
       {pageLoading && (
         <PageLoadingOverlay
-          title="Loading comparison data"
-          description="Refreshing base and comparison snapshots for the selected dates."
+          title={t("loading.comparison")}
+          description={t("loading.comparisonDesc")}
         />
       )}
     </div>
@@ -611,11 +613,12 @@ function ComparisonDatePicker({
   dateOptions,
   onChange,
 }: {
-  label: "Base Date" | "Head Date";
+  label: string;
   value: string;
   dateOptions: DateOption[];
   onChange: (value: string) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [activeDateLabel, setActiveDateLabel] = useState<string | undefined>();
   const selectedOption = useMemo(
@@ -716,12 +719,14 @@ function ComparisonDatePicker({
         {activeDateOptions.length > 1 && (
           <div className="border-t px-3 py-3">
             <div className="mb-2 text-xs text-muted-foreground">
-              {activeDateOptions.length} snapshots on {activeDateLabel}
+              {t("comparison.snapshots")
+                .replace("{count}", String(activeDateOptions.length))
+                .replace("{date}", activeDateLabel || "")}
             </div>
             <div
               className="grid gap-1"
               role="group"
-              aria-label={`${label} snapshots on ${activeDateLabel}`}
+              aria-label={t("comparison.snapshotsAria").replace("{label}", label).replace("{date}", activeDateLabel || "")}
             >
               {activeDateOptions.map((option) => (
                 <Button
@@ -736,7 +741,7 @@ function ComparisonDatePicker({
                   <span>{option.snapshotLabel}</span>
                   {option.value === value && (
                     <span className="ml-auto text-[11px] text-muted-foreground">
-                      Selected
+                      {t("comparison.selected")}
                     </span>
                   )}
                 </Button>
@@ -784,14 +789,15 @@ function CoinCard({
   ) => string;
   changeClass: (percent: number) => string;
 }) {
+  const { t } = useTranslation();
   const metrics: {
     label: string;
     type: "amount" | "price" | "value";
     row: MetricRow;
   }[] = [
-    { label: "Amount", type: "amount", row: coin.amount },
-    { label: "Price", type: "price", row: coin.price },
-    { label: "Value", type: "value", row: coin.value },
+    { label: t("common.amountLabel"), type: "amount", row: coin.amount },
+    { label: t("common.priceLabel"), type: "price", row: coin.price },
+    { label: t("common.valueLabel"), type: "value", row: coin.value },
   ];
 
   return (
@@ -807,12 +813,12 @@ function CoinCard({
         </div>
 
         <div className="grid grid-cols-[56px_minmax(0,1fr)_96px_minmax(0,1fr)] mb-1 gap-2">
-          <span className="text-xs text-muted-foreground">Metric</span>
+          <span className="text-xs text-muted-foreground">{t("common.metricLabel")}</span>
           <span className="text-xs text-muted-foreground truncate">
             {baseDate}
           </span>
           <span className="text-xs text-muted-foreground text-center">
-            Change
+            {t("common.changeLabel")}
           </span>
           <span className="text-xs text-muted-foreground text-right truncate">
             {headDate}

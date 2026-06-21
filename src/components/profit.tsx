@@ -20,6 +20,7 @@ import { positiveNegativeColor } from "@/utils/color";
 import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/i18n";
 import AssetLabel from "@/components/common/asset-label";
 import {
   buildAssetDetailsPath,
@@ -61,6 +62,7 @@ const App = ({
   dateRange: TDateRange;
   quoteColor: QuoteColor;
 }) => {
+  const { t } = useTranslation();
   const [profit, setProfit] = useState(0);
   // note: undefined means infinite
   const [profitPercentage, setProfitPercentage] = useState<
@@ -258,7 +260,7 @@ const App = ({
       <CardHeader className="space-y-2 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Profit
+            {t("profit.title")}
           </CardTitle>
           <div className="text-xs text-muted-foreground">
             Total {coinsProfit.length} coins | Up {positiveCount} | Down{" "}
@@ -292,7 +294,7 @@ const App = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground font-medium">
-              Top Profit
+              {t("profit.topProfit")}
             </div>
             <Table>
               <TableBody>{renderRows(topProfitData)}</TableBody>
@@ -300,7 +302,7 @@ const App = ({
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground font-medium">
-              Top Loss
+              {t("profit.topLoss")}
             </div>
             <Table>
               <TableBody>{renderRows(topLossData)}</TableBody>
@@ -309,7 +311,7 @@ const App = ({
         </div>
         {coinsProfit.length === 0 && (
           <div className="flex items-center justify-center text-lg text-muted-foreground py-6">
-            No Available Data For Selected Dates
+            {t("profit.noData")}
           </div>
         )}
       </CardContent>

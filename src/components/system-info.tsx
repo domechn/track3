@@ -30,6 +30,7 @@ import {
 } from "./ui/alert-dialog";
 import { getVersion, trackEventWithClientID } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useTranslation } from "@/i18n";
 
 type SubscriptionInfo = {
   planType: "monthly" | "yearly" | null;
@@ -45,6 +46,7 @@ const App = ({
   onProStatusChange: (active: boolean) => void;
 }) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [version, setVersion] = useState<string>("0.1.0");
   const [activeLicense, setActiveLicense] = useState<string | undefined>();
   const [inputLicense, setInputLicense] = useState<string | undefined>();
@@ -111,7 +113,7 @@ const App = ({
     const inactiveRes =
       await LicenseCenter.getInstance().inactiveLicense(license);
     if (!inactiveRes.success) {
-      throw new Error(inactiveRes.error ?? "Inactive device failed");
+      throw new Error(inactiveRes.error ?? t("system.inactiveFailed"));
     }
     await cleanLicense();
     clearLicenseCache();
@@ -122,11 +124,11 @@ const App = ({
   async function activeDevice(license: string) {
     const validRes = await LicenseCenter.getInstance().validateLicense(license);
     if (!validRes.isValid) {
-      throw new Error("Invalid License Key");
+      throw new Error(t("system.invalidLicenseKey"));
     }
     const activeRes = await LicenseCenter.getInstance().activeLicense(license);
     if (!activeRes.success) {
-      throw new Error(activeRes.error ?? "Active License Failed");
+      throw new Error(activeRes.error ?? t("system.activeLicenseFailed"));
     }
     await saveLicense(license);
     clearLicenseCache();
@@ -142,7 +144,7 @@ const App = ({
       .then(() => {
         setActiveLicense(inputLicense);
         toast({
-          description: "License key saved",
+          description: t("system.licenseSaved"),
         });
       })
       .catch((err) => {
@@ -166,7 +168,7 @@ const App = ({
         setActiveLicense(undefined);
         setInputLicense(undefined);
         toast({
-          description: "Device is inactived",
+          description: t("system.deviceInactivated"),
         });
       })
       .catch((err) => {
@@ -207,7 +209,7 @@ const App = ({
     });
     toast({
       description:
-        "Subscription is not supported yet. Please wait for future updates.",
+        t("system.subNotSupported"),
     });
   }
 
@@ -242,7 +244,7 @@ const App = ({
     } catch (err) {
       toast({
         description:
-          err instanceof Error ? err.message : "Failed to open customer portal",
+          err instanceof Error ? err.message : t("system.openPortalFailed"),
         variant: "destructive",
       });
     } finally {
@@ -255,7 +257,7 @@ const App = ({
   }
 
   function formatPeriodEnd(dateStr: string | null): string {
-    if (!dateStr) return "N/A";
+    if (!dateStr) return t("system.legacyLabel");
     return new Date(dateStr).toLocaleDateString(undefined, {
       year: "numeric",
       month: "long",
@@ -266,15 +268,15 @@ const App = ({
   function subscriptionStatusLabel(status: string | null): string {
     switch (status) {
       case "active":
-        return "Active";
+        return t("system.statusActive");
       case "past_due":
-        return "Past Due";
+        return t("system.statusPastDue");
       case "canceled":
-        return "Canceled";
+        return t("system.statusCanceled");
       case "incomplete":
-        return "Incomplete";
+        return t("system.statusIncomplete");
       default:
-        return "Legacy";
+        return t("system.legacyLabel");
     }
   }
 
@@ -286,7 +288,7 @@ const App = ({
   }
 
   function formatPlanPrice(plan: SubscriptionPlan | null): string {
-    if (!plan) return "Loading...";
+    if (!plan) return t("system.loadingPlan");
     return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency: plan.currency.toUpperCase(),
@@ -308,7 +310,7 @@ const App = ({
       ((annualMonthlyCost - yearlyPlan.unitAmountCents) / annualMonthlyCost) *
         100,
     );
-    return `Save ${discount}%`;
+    return t("system.saveDiscount").replace("{n}", String(discount));
   }
 
   const isSubscribed =
@@ -320,9 +322,9 @@ const App = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium">System Info</h3>
+        <h3 className="text-lg font-medium">{t("system.title")}</h3>
         <p className="text-sm text-muted-foreground">
-          View app version and manage Pro license state.
+          {t("system.subtitle")}
         </p>
       </div>
 
@@ -330,34 +332,34 @@ const App = ({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              App Version
+              {t("system.appVersion")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">{version}</div>
             <p className="text-xs text-muted-foreground">
-              Current installed build
+              {t("system.appVersionNote")}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pro Status
+              {t("system.proStatus")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">
-              {activeLicense ? "Pro" : "Free"}
+              {activeLicense ? t("system.pro") : t("system.free")}
             </div>
             <p className="text-xs text-muted-foreground">
               {subInfoLoading
-                ? "Loading..."
+                ? t("common.loading")
                 : activeLicense
                   ? subscriptionInfo
-                    ? `${subscriptionStatusLabel(subscriptionInfo.status)}${subscriptionInfo.planType ? ` — ${subscriptionInfo.planType === "monthly" ? "Monthly" : "Yearly"}` : ""}`
-                    : "License activated"
-                  : "Subscribe to unlock Pro features"}
+                    ? `${subscriptionStatusLabel(subscriptionInfo.status)}${subscriptionInfo.planType ? ` — ${subscriptionInfo.planType === "monthly" ? t("system.monthly") : t("system.yearly")}` : ""}`
+                    : t("system.proStatus.legacy")
+                  : t("system.proStatus.subPrompt")}
             </p>
           </CardContent>
         </Card>
@@ -368,28 +370,28 @@ const App = ({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Subscription
+              {t("system.subscription")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Plan</span>
+                <span className="text-muted-foreground">{t("system.planLabel")}</span>
                 <p className="font-medium">
                   {subscriptionInfo.planType === "monthly"
-                    ? "Monthly"
-                    : "Yearly"}
+                    ? t("system.monthly")
+                    : t("system.yearly")}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Status</span>
+                <span className="text-muted-foreground">{t("system.statusLabel")}</span>
                 <p className="font-medium">
                   {subscriptionStatusLabel(subscriptionInfo.status)}
                 </p>
               </div>
               <div>
                 <span className="text-muted-foreground">
-                  {subscriptionInfo.cancelAtPeriodEnd ? "Expires" : "Renews"}
+                  {subscriptionInfo.cancelAtPeriodEnd ? t("system.expires") : t("system.renews")}
                 </span>
                 <p className="font-medium">
                   {formatPeriodEnd(subscriptionInfo.currentPeriodEnd)}
@@ -402,10 +404,7 @@ const App = ({
                 onClick={onManageSubscription}
                 disabled={portalLoading}
               >
-                {portalLoading && (
-                  <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Manage Subscription
+                {t("system.manageSub")}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -416,21 +415,21 @@ const App = ({
                     {inactiveLicenseLoading && (
                       <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    Inactivate
+                    {t("system.inactivate")}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Inactivate this device?</AlertDialogTitle>
+                    <AlertDialogTitle>{t("system.inactivateTitle")}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Current license binding on this device will be removed.
+                      {t("system.inactivateDescLegacy")}
                       This does not cancel your Stripe subscription.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                     <AlertDialogAction onClick={onInactiveLicenseClick}>
-                      Confirm
+                      {t("common.confirm")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -445,13 +444,12 @@ const App = ({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pro License
+              {t("system.proLicense")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              You are using a legacy license. It will continue to work
-              indefinitely.
+              {t("system.legacyNote")}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Input
@@ -460,7 +458,7 @@ const App = ({
                 value={inputLicense ?? ""}
                 type={showLicense ? "text" : "password"}
                 onChange={(e) => setInputLicense(e.target.value)}
-                placeholder="License Key"
+                placeholder={t("system.licensePlaceholder")}
                 className="w-full max-w-[520px]"
                 disabled={!!activeLicense}
               />
@@ -487,20 +485,20 @@ const App = ({
                     {inactiveLicenseLoading && (
                       <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    Inactivate
+                    {t("system.inactivate")}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Inactivate this device?</AlertDialogTitle>
+                    <AlertDialogTitle>{t("system.inactivateTitle")}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Current license binding on this device will be removed.
+                      {t("system.inactivateDescLegacy")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                     <AlertDialogAction onClick={onInactiveLicenseClick}>
-                      Confirm
+                      {t("common.confirm")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -515,23 +513,22 @@ const App = ({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Upgrade to Pro
+              {t("system.upgrade")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Subscribe to unlock real-time portfolio tracking, expanded chain
-              support, and premium data providers.
+              {t("system.upgradeDesc")}
             </p>
             <Button variant="outline" onClick={onViewBenefits}>
-              View Pro Benefits
+              {t("system.viewBenefits")}
             </Button>
             <div className="grid items-stretch gap-4 sm:grid-cols-2">
               <div
                 className="flex h-full flex-col gap-3 rounded-lg border p-4"
                 data-testid="monthly-plan-card"
               >
-                <div className="text-sm font-medium">Monthly</div>
+                <div className="text-sm font-medium">{t("system.monthly")}</div>
                 <div className="text-2xl font-bold">
                   {formatPlanPrice(monthlyPlan)}
                   <span className="text-sm font-normal text-muted-foreground">
@@ -544,7 +541,7 @@ const App = ({
                     onClick={() => onSubscribe("monthly")}
                     disabled={!monthlyPlan}
                   >
-                    Subscribe Monthly
+                    {t("system.subMonthly")}
                   </Button>
                 </div>
               </div>
@@ -559,7 +556,7 @@ const App = ({
                     </span>
                   </div>
                 )}
-                <div className="text-sm font-medium">Yearly</div>
+                <div className="text-sm font-medium">{t("system.yearly")}</div>
                 <div className="text-2xl font-bold">
                   {formatPlanPrice(yearlyPlan)}
                   <span className="text-sm font-normal text-muted-foreground">
@@ -572,7 +569,7 @@ const App = ({
                     onClick={() => onSubscribe("yearly")}
                     disabled={!yearlyPlan}
                   >
-                    Subscribe Yearly
+                    {t("system.subYearly")}
                   </Button>
                 </div>
               </div>
@@ -589,14 +586,14 @@ const App = ({
             onClick={() => setShowLegacyInput(!showLegacyInput)}
           >
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-              Enter existing license key
+              {t("system.legacyInputTitle")}
               <span className="text-xs">{showLegacyInput ? "▲" : "▼"}</span>
             </CardTitle>
           </CardHeader>
           {showLegacyInput && (
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Already have a license key? Enter it below.
+                {t("system.legacyInputDesc")}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Input
@@ -605,7 +602,7 @@ const App = ({
                   value={inputLicense ?? ""}
                   type={showLicense ? "text" : "password"}
                   onChange={(e) => setInputLicense(e.target.value)}
-                  placeholder="License Key"
+                  placeholder={t("system.licensePlaceholder")}
                   className="w-full max-w-[520px]"
                   disabled={!!activeLicense}
                 />
@@ -626,11 +623,7 @@ const App = ({
                 <Button
                   onClick={onSaveLicenseClick}
                   disabled={saveLicenseLoading}
-                >
-                  {saveLicenseLoading && (
-                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Activate
+                >{t("system.activate")}
                 </Button>
               </div>
             </CardContent>

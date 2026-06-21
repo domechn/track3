@@ -75,6 +75,7 @@ import {
 } from "./ui/alert-dialog";
 import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
+import { useTranslation } from "@/i18n";
 
 type HistoricalListRow = {
   id: string;
@@ -113,6 +114,7 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [data, setData] = useState([] as HistoricalData[]);
   const [selectedDataId, setSelectedDataId] = useState<string | null>(null);
@@ -315,10 +317,10 @@ const App = ({
       })()
         .then((rhd) => {
           toast({
-            description: "Record deleted",
+            description: t("history.deleted"),
             action: (
               <ToastAction
-                altText="Restore deleted historical data"
+                altText={t("history.undoDelete")}
                 onClick={() =>
                   onDeletionUndoClick({
                     uuid,
@@ -326,7 +328,7 @@ const App = ({
                   })
                 }
               >
-                Undo
+                {t("common.undo")}
               </ToastAction>
             ),
           });
@@ -360,10 +362,10 @@ const App = ({
       })()
         .then((rhd) => {
           toast({
-            description: "Record deleted",
+            description: t("history.deleted"),
             action: (
               <ToastAction
-                altText="Restore deleted historical record"
+                altText={t("history.undoDeleteRecord")}
                 onClick={() =>
                   onDeletionUndoClick({
                     id,
@@ -371,7 +373,7 @@ const App = ({
                   })
                 }
               >
-                Undo
+                {t("common.undo")}
               </ToastAction>
             ),
           });
@@ -423,7 +425,7 @@ const App = ({
 
   return (
     <div aria-busy={pageLoading}>
-      <h1 className="sr-only">Historical Data</h1>
+      <h1 className="sr-only">{t("history.h1")}</h1>
       <StaggerContainer className="space-y-4">
         <Dialog
           open={isModalOpen}
@@ -436,9 +438,9 @@ const App = ({
         >
           <DialogContent className="min-w-[80%]">
             <DialogHeader>
-              <DialogTitle>Historical Data Detail</DialogTitle>
+              <DialogTitle>{t("history.detailTitle")}</DialogTitle>
               <DialogDescription className="sr-only">
-                Review assets in the selected historical snapshot.
+                {t("history.detailDescription")}
               </DialogDescription>
               {selectedData ? (
                 <p className="text-xs text-muted-foreground">
@@ -457,28 +459,28 @@ const App = ({
             <div className="grid gap-2 md:grid-cols-3">
               <div className="rounded-lg border border-border/40 bg-background/30 p-3">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Assets
+                  {t("history.assets")}
                 </p>
                 <p className="text-xl font-semibold">{rankData.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Value greater than $1
+                  {t("history.assetsNote")}
                 </p>
               </div>
               <div className="rounded-lg border border-border/40 bg-background/30 p-3">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Visible Rows
+                  {t("history.visibleRows")}
                 </p>
                 <p className="text-xl font-semibold">
                   {Math.min(detailLimit, filteredRankDataCount)} /{" "}
                   {filteredRankDataCount}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Increment by {DETAIL_PAGE_SIZE}
+                  {t("history.incrementBy").replace("{n}", String(DETAIL_PAGE_SIZE))}
                 </p>
               </div>
               <div className="rounded-lg border border-border/40 bg-background/30 p-3">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Filter
+                  {t("history.filter")}
                 </p>
                 <Input
                   value={detailSearch}
@@ -486,7 +488,7 @@ const App = ({
                     setDetailSearch(e.target.value);
                     setDetailLimit(DETAIL_PAGE_SIZE);
                   }}
-                  placeholder="Search symbol, e.g. BTC"
+                  placeholder={t("common.searchSymbolPlaceholder")}
                   className="mt-1 h-8 text-sm"
                 />
               </div>
@@ -495,14 +497,14 @@ const App = ({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="h-[42px]">Rank</TableHead>
-                    <TableHead className="h-[42px]">Asset</TableHead>
-                    <TableHead className="h-[42px] text-right">Price</TableHead>
+                    <TableHead className="h-[42px]">{t("history.rank")}</TableHead>
+                    <TableHead className="h-[42px]">{t("history.asset")}</TableHead>
+                    <TableHead className="h-[42px] text-right">{t("common.priceLabel")}</TableHead>
                     <TableHead className="h-[42px] text-right">
-                      Amount
+                      {t("common.amountLabel")}
                     </TableHead>
-                    <TableHead className="h-[42px] text-right">Value</TableHead>
-                    <TableHead className="h-[42px]">Action</TableHead>
+                    <TableHead className="h-[42px] text-right">{t("common.valueLabel")}</TableHead>
+                    <TableHead className="h-[42px]">{t("history.action")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -512,7 +514,7 @@ const App = ({
                         className="py-6 text-center text-sm text-muted-foreground"
                         colSpan={6}
                       >
-                        No assets matched current filter
+                        {t("history.noMatch")}
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -578,15 +580,14 @@ const App = ({
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>
-                                  Are you absolutely sure?
+                                  {t("history.deleteDialogTitle")}
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Deleting this asset may affect income and
-                                  trend calculations. Confirm to continue.
+                                  {t("history.deleteDialogDesc")}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() =>
                                     onHistoricalDataDetailDeleteAndBlacklistClick(
@@ -595,7 +596,7 @@ const App = ({
                                     )
                                   }
                                 >
-                                  Delete & Blacklist
+                                  {t("history.deleteBlacklist")}
                                 </AlertDialogAction>
                                 <AlertDialogAction
                                   onClick={() =>
@@ -604,7 +605,7 @@ const App = ({
                                     )
                                   }
                                 >
-                                  Delete
+                                  {t("common.delete")}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -629,11 +630,12 @@ const App = ({
                 }}
               >
                 {detailLimit >= filteredRankDataCount
-                  ? "Show Less"
-                  : `Show More (${Math.min(
-                      DETAIL_PAGE_SIZE,
-                      filteredRankDataCount - detailLimit,
-                    )})`}
+                  ? t("common.showLess")
+                  : t("history.showMoreCount")
+                      .replace("{n}", String(Math.min(
+                        DETAIL_PAGE_SIZE,
+                        filteredRankDataCount - detailLimit,
+                      )))}
               </Button>
             ) : null}
           </DialogContent>
@@ -644,20 +646,20 @@ const App = ({
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Records
+                  {t("history.totalRecords")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-xl font-semibold">{dataRows.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Historical snapshots stored
+                  {t("history.snapshotsStored")}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Page Status
+                  {t("history.pageStatus")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -667,14 +669,14 @@ const App = ({
                     : `${dataPage + 1} / ${totalPages}`}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Showing {loadedRangeStart}-{loadedRangeEnd}
+                  {t("history.showing").replace("{start}", String(loadedRangeStart)).replace("{end}", String(loadedRangeEnd))}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Latest Snapshot
+                  {t("history.latestSnapshot")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -691,7 +693,7 @@ const App = ({
                         new Date(latestRow.createdAt).getTime(),
                         true,
                       )
-                    : "No data"}
+                    : t("history.noDataLabel")}
                 </p>
               </CardContent>
             </Card>
@@ -702,24 +704,24 @@ const App = ({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                History Records
+                {t("history.recordsCardTitle")}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Click a row to view detailed holdings
+                {t("history.recordsCardSubtitle")}
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                 <div>
                   {pageLoading
-                    ? "Loading..."
-                    : `Total ${dataRows.length} records`}
+                    ? t("common.loading")
+                    : t("history.totalRecordsLabel").replace("{n}", String(dataRows.length))}
                   {dataRows.length
-                    ? ` · Showing ${loadedRangeStart}-${loadedRangeEnd}`
+                    ? ` · ${t("history.showing").replace("{start}", String(loadedRangeStart)).replace("{end}", String(loadedRangeEnd))}`
                     : ""}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Rows</span>
+                  <span className="text-xs text-muted-foreground">{t("history.rowsLabel")}</span>
                   <Select
                     value={String(pageSize)}
                     onValueChange={(value) => {
@@ -743,7 +745,7 @@ const App = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label="Previous page"
+                    aria-label={t("history.prevPage")}
                     className="h-11 w-11 px-0 sm:h-8 sm:w-8"
                     onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
                     disabled={dataPage <= 0}
@@ -757,7 +759,7 @@ const App = ({
                     }}
                   >
                     <SelectTrigger className="h-8 w-[120px] text-sm">
-                      <SelectValue placeholder="Select Page" />
+                      <SelectValue placeholder={t("history.selectPage")} />
                     </SelectTrigger>
                     <SelectContent className="overflow-y-auto max-h-[20rem]">
                       <SelectGroup>
@@ -775,7 +777,7 @@ const App = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label="Next page"
+                    aria-label={t("history.nextPage")}
                     className="h-11 w-11 px-0 sm:h-8 sm:w-8"
                     onClick={() =>
                       setDataPage(Math.min(dataPage + 1, maxDataPage))
@@ -792,15 +794,15 @@ const App = ({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="h-[42px]">Date</TableHead>
+                        <TableHead className="h-[42px]">{t("profitMetrics.date")}</TableHead>
                         <TableHead className="h-[42px] text-right">
-                          Total
+                          {t("history.total")}
                         </TableHead>
                         <TableHead className="h-[42px] text-right">
-                          Change
+                          {t("history.change")}
                         </TableHead>
-                        <TableHead className="h-[42px]">Assets</TableHead>
-                        <TableHead className="h-[42px]">Opt</TableHead>
+                        <TableHead className="h-[42px]">{t("history.assetsCol")}</TableHead>
+                        <TableHead className="h-[42px]">{t("history.opt")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -868,7 +870,7 @@ const App = ({
                                   imageHeight={18}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                  {row.assets.length} assets
+                                  {t("history.assetCount").replace("{n}", String(row.assets.length))}
                                 </span>
                               </div>
                             </TableCell>
@@ -895,23 +897,22 @@ const App = ({
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>
-                                        Delete latest record?
+                                        {t("history.deleteLatestTitle")}
                                       </AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        The latest snapshot will be removed. You
-                                        can restore it immediately via Undo.
+                                        {t("history.deleteLatestDesc")}
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>
-                                        Cancel
+                                        {t("common.cancel")}
                                       </AlertDialogCancel>
                                       <AlertDialogAction
                                         onClick={() =>
                                           onHistoricalDataDeleteClick(row.id)
                                         }
                                       >
-                                        Confirm
+                                        {t("common.confirm")}
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
@@ -927,15 +928,15 @@ const App = ({
 
                 {pageLoading && (
                   <PageLoadingOverlay
-                    title="Loading historical data"
-                    description="Refreshing stored snapshots and historical totals for the selected range."
+                    title={t("loading.history")}
+                    description={t("loading.historyDesc")}
                   />
                 )}
 
                 {emptyState ? (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <p className="text-lg text-muted-foreground">
-                      No historical records
+                      {t("history.noRecords")}
                     </p>
                   </div>
                 ) : null}

@@ -23,10 +23,12 @@ import {
   glassTooltip,
 } from "@/utils/chart-theme";
 import { formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
+import { useTranslation } from "@/i18n";
 
 const chartName = "Coins Percentage Overview";
 
 const App = ({ dateRange }: { dateRange: TDateRange }) => {
+  const { t } = useTranslation();
   const wsize = useWindowSize();
   const [topN, setTopN] = useState<AssetReference[]>([]);
   const { needResize } = useContext(ChartResizeContext);
@@ -175,7 +177,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       };
     });
     const othersDatasets = {
-      label: "Others",
+      label: t("common.others"),
       data: preparedData.othersData,
       borderColor: "rgba(148,163,184,0.5)",
       backgroundColor: "rgba(148,163,184,0.15)",
@@ -196,7 +198,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {chartName}
+            {t("assetsPercentage.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">

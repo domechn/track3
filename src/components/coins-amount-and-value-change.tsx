@@ -26,6 +26,7 @@ import {
 } from "@/utils/chart-theme";
 import AssetLabel from "./common/asset-label";
 import { formatAssetLabel } from "@/utils/assets";
+import { useTranslation } from "@/i18n";
 
 const chartName = "Trend of Coin";
 
@@ -40,6 +41,7 @@ const App = ({
   symbol: string;
   assetType?: AssetType;
 }) => {
+  const { t } = useTranslation();
   const wsize = useWindowSize();
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
@@ -183,7 +185,7 @@ const App = ({
         .value(),
       datasets: [
         {
-          label: `Value`,
+          label: t("common.valueLabel"),
           data: _(current.values)
             .map((v) => currencyWrapper(currency)(v))
             .value(),
@@ -196,7 +198,7 @@ const App = ({
           yAxisID: "y1",
         },
         {
-          label: "Amount",
+          label: t("common.amountLabel"),
           data: current.amounts,
           borderColor: chartColors[5].main,
           backgroundColor: chartColors[5].bg,
@@ -215,7 +217,7 @@ const App = ({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted-foreground">
-            <span>Trend of</span>
+            <span>{t("coinTrend.title")}</span>
             <AssetLabel asset={{ symbol, assetType }} />
           </CardTitle>
         </CardHeader>
@@ -254,7 +256,7 @@ const App = ({
               />
             ) : (
               <div className="text-lg text-muted-foreground m-auto">
-                No Available Data For Selected Dates
+                {t("latestAssets.noData")}
               </div>
             )}
           </div>

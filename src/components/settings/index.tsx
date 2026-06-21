@@ -13,25 +13,26 @@ import {
   ArchiveIcon,
   InfoCircledIcon,
 } from "@radix-ui/react-icons";
+import { useTranslation } from "@/i18n";
 
 const settingsTabs = [
   {
-    title: "Configuration",
+    titleKey: "settings.tab.configuration",
     href: "/settings/configuration",
     icon: GearIcon,
   },
   {
-    title: "Appearance",
+    titleKey: "settings.tab.appearance",
     href: "/settings/appearance",
     icon: SunIcon,
   },
   {
-    title: "Data",
+    titleKey: "settings.tab.data",
     href: "/settings/data",
     icon: ArchiveIcon,
   },
   {
-    title: "System",
+    titleKey: "settings.tab.system",
     href: "/settings/systemInfo",
     icon: InfoCircledIcon,
   },
@@ -67,17 +68,23 @@ function TabLink({
 }
 
 const App = () => {
+  const { t } = useTranslation();
   const lo = useLocation();
 
   return (
     <div className="space-y-5">
-      <h1 className="sr-only">Settings</h1>
+      <h1 className="sr-only">{t("settings.title")}</h1>
       <nav
-        aria-label="Settings sections"
+        aria-label={t("settings.sectionsAriaLabel")}
         className="flex flex-wrap items-center gap-1 glass rounded-xl px-2 py-1.5"
       >
         {settingsTabs.map((tab) => (
-          <TabLink key={tab.href} to={tab.href} title={tab.title} icon={tab.icon} />
+          <TabLink
+            key={tab.href}
+            to={tab.href}
+            title={t(tab.titleKey)}
+            icon={tab.icon}
+          />
         ))}
       </nav>
       <div className="w-full">

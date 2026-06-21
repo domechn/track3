@@ -64,6 +64,7 @@ import {
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { ChartResizeContext } from "@/App";
+import { useTranslation } from "@/i18n";
 
 ChartJS.register(
   ...registerables,
@@ -107,6 +108,7 @@ function TopBar({
   lastRefreshAt?: string;
   onRefreshSuccess: () => void;
 }) {
+  const { t } = useTranslation();
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
 
@@ -153,8 +155,8 @@ function TopBar({
               <TooltipContent>
                 <p>
                   {lastRefreshAt
-                    ? "Last Refresh At: " + lastRefreshAt
-                    : "Never Refresh Before"}
+                    ? t("topbar.lastRefreshAt") + lastRefreshAt
+                    : t("topbar.neverRefreshBefore")}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -200,6 +202,7 @@ function Layout({
   lastRefreshAt,
   onRefreshSuccess,
 }: LayoutProps) {
+  const { t } = useTranslation();
   const sidebarWidth = sidebarCollapsed ? 52 : 200;
 
   return (
@@ -231,8 +234,8 @@ function Layout({
             <Outlet />
             {initializing && (
               <PageLoadingOverlay
-                title="Loading portfolio data"
-                description="Preparing your latest balances, date range, and overview cards."
+                title={t("loading.portfolio")}
+                description={t("loading.portfolioDesc")}
               />
             )}
           </div>

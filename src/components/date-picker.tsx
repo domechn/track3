@@ -6,6 +6,7 @@ import { CalendarIcon } from "@radix-ui/react-icons";
 import { endOfDay, isSameDay, startOfDay } from "date-fns";
 import { useMemo, useState } from "react";
 import _ from "lodash";
+import { useTranslation } from "@/i18n";
 
 const App = ({
   availableDates,
@@ -17,6 +18,7 @@ const App = ({
   value: DateRange | undefined;
   onDateChange: (selectedTimes: number, date?: DateRange) => void;
 }) => {
+  const { t } = useTranslation();
   const [calendarOpen, setCalendarOpen] = useState<boolean>(false);
   const [date, setDate] = useState<DateRange | undefined>(value);
   // whether need to use start or end of selected dates
@@ -100,38 +102,38 @@ const App = ({
           />
           <div className="px-3 py-5 space-y-2">
             <div className="text-muted-foreground text-sm">
-              Predefined times
+              {t("datePicker.predefined")}
             </div>
             <div className="text-xs">
               <div
                 className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(10)}
               >
-                Last 10 Times
+                {t("datePicker.last10")}
               </div>
               <div
                 className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(30)}
               >
-                Last 30 Times
+                {t("datePicker.last30")}
               </div>
               <div
                 className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(50)}
               >
-                Last 50 Times
+                {t("datePicker.last50")}
               </div>
               <div
                 className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(100)}
               >
-                Last 100 Times
+                {t("datePicker.last100")}
               </div>
               <div
                 className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
                 onClick={() => handlePredefinedTimesClick(-1)}
               >
-                All
+                {t("datePicker.all")}
               </div>
             </div>
           </div>
@@ -142,18 +144,22 @@ const App = ({
             className="col-span-1"
             onClick={() => setCalendarOpen(false)}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <div className="flex space-x-1 col-span-2 justify-end items-center text-xs">
-            <div className="text-muted-foreground">Selected:</div>
-            <div>{selectTimes} times</div>
+            <div className="text-muted-foreground">
+              {t("datePicker.selected")}
+            </div>
+            <div>
+              {selectTimes} {t("common.times")}
+            </div>
           </div>
           <Button
             className="col-start-4 col-span-1"
             disabled={selectTimes === 0}
             onClick={handleSubmitClick}
           >
-            Submit
+            {t("common.submit")}
           </Button>
         </div>
       </PopoverContent>

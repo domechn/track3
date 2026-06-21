@@ -41,6 +41,7 @@ import {
   resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
+import { useTranslation } from "@/i18n";
 
 const chartName = "Percentage of Assets";
 
@@ -51,6 +52,7 @@ const App = ({
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
 }) => {
+  const { t } = useTranslation();
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const [dataPage, setDataPage] = useState<number>(0);
@@ -232,13 +234,13 @@ const App = ({
       <>
         <div className="flex w-[100%] h-[40px] justify-between items-center">
           <div className="text-sm font-medium text-muted-foreground ml-2">
-            Token Holding
+            {t("latestAssets.tokenHolding")}
           </div>
           <div className="flex space-x-2 py-3 items-center">
             <Button
               variant="outline"
               size="sm"
-              aria-label="Previous token holdings page"
+              aria-label={t("latestAssets.previousPage")}
               className="h-11 min-w-[44px] px-3 sm:h-8 sm:min-w-[32px]"
               onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
               disabled={dataPage <= 0}
@@ -251,7 +253,7 @@ const App = ({
             <Button
               variant="outline"
               size="sm"
-              aria-label="Next token holdings page"
+              aria-label={t("latestAssets.nextPage")}
               className="h-11 min-w-[44px] px-3 sm:h-8 sm:min-w-[32px]"
               onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
               disabled={dataPage >= maxDataPage}
