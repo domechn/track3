@@ -42,6 +42,7 @@ import {
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 const chartName = "Percentage of Assets";
 
@@ -71,6 +72,7 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
   useEffect(() => {
     let active = true;
@@ -89,7 +91,7 @@ const App = ({
     return () => {
       active = false;
     };
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

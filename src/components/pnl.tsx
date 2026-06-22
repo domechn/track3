@@ -15,6 +15,7 @@ import { ChartResizeContext } from "@/App";
 import { positiveNegativeTextClass } from "@/utils/color";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 const chartName = "PNL of Asset";
 
@@ -37,6 +38,7 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
   useEffect(() => {
     let active = true;
@@ -49,7 +51,7 @@ const App = ({
     return () => {
       active = false;
     };
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

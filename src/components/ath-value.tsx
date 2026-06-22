@@ -6,7 +6,7 @@ import {
   TotalValueData,
 } from "@/middlelayers/types";
 import _ from "lodash";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState, useRef} from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { queryMaxTotalValue, queryTotalValue } from "@/middlelayers/charts";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
@@ -14,6 +14,7 @@ import { timeToDateStr } from "@/utils/date";
 import { positiveNegativeTextClass } from "@/utils/color";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 const App = ({
   dateRange,
@@ -41,21 +42,29 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end]
   );
+  const dataChangedVersion = useDataChangedVersion();
 
+  const loadGenRef = useRef(0);
   useEffect(() => {
-    loadData(dateRange);
-  }, [rangeKey]);
+    const gen = ++loadGenRef.current;
+    loadData(dateRange, gen);
+  }, [rangeKey, dataChangedVersion]);
 
-  async function loadData(dt: TDateRange) {
+  async function loadData(dt: TDateRange, gen: number) {
     try {
       const [mtv, tv] = await Promise.all([
         queryMaxTotalValue(dt),
         queryTotalValue(dt),
       ]);
+      if (gen !== loadGenRef.current) {
+        return;
+      }
       setMaxTotalValueData(mtv);
       setTotalValueData(tv);
     } finally {
-      reportLoaded();
+      if (gen === loadGenRef.current) {
+        reportLoaded();
+      }
     }
   }
 

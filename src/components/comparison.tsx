@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import _ from "lodash";
@@ -78,6 +79,7 @@ const App = ({
 
   const [shouldMaskValue, setShouldMaskValue] = useState<boolean>(false);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+  const dataChangedVersion = useDataChangedVersion();
   const downloadedLogosRef = useRef<Set<string>>(new Set());
   const appCacheDirRef = useRef<string>("");
 
@@ -138,8 +140,22 @@ const App = ({
         return;
       }
 
-      setHeadId(options[0].value);
-      setBaseId(options[1]?.value || options[0].value);
+      // Seed the initial selection on first load. On subsequent
+      // refreshes the user may have picked a specific base/head pair,
+      // so we keep their selection rather than snapping to the new
+      // latest snapshot.
+      setBaseId((prev) => {
+        if (prev && _(options).some((o) => o.value === prev)) {
+          return prev;
+        }
+        return options[1]?.value || options[0].value;
+      });
+      setHeadId((prev) => {
+        if (prev && _(options).some((o) => o.value === prev)) {
+          return prev;
+        }
+        return options[0].value;
+      });
     })().catch(() => {
       if (!cancelled && gen === loadGenRef.current) {
         setDateOptions([]);
@@ -152,7 +168,7 @@ const App = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dataChangedVersion]);
 
   useEffect(() => {
     if (!baseId || !headId) {
@@ -182,7 +198,7 @@ const App = ({
     return () => {
       cancelled = true;
     };
-  }, [baseId, headId]);
+  }, [baseId, headId, dataChangedVersion]);
 
   const coinComparisons = useMemo((): CoinComparison[] => {
     const baseMap = _.keyBy(baseData, (asset) => getAssetLogoKey(asset));

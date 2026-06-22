@@ -18,6 +18,7 @@ import {
 import { AssetType } from "@/middlelayers/datafetch/types";
 import _ from "lodash";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -219,6 +220,7 @@ const App = ({
       `${symbol}-${assetType}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [symbol, assetType, dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;
@@ -265,14 +267,15 @@ const App = ({
   const [coinListLimit, setCoinListLimit] = useState(200);
 
   useEffect(() => {
-    loadAllowedSymbols();
-  }, []);
+    const gen = loadGenRef.current;
+    loadAllowedSymbols(gen);
+  }, [dataChangedVersion]);
 
   useEffect(() => {
     setPageLoading(true);
     loadedCountRef.current = 0;
     loadGenRef.current += 1;
-  }, [queryKey]);
+  }, [queryKey, dataChangedVersion]);
 
   useEffect(() => {
     loadSymbolData(symbol, dateRange, assetType);
@@ -280,7 +283,7 @@ const App = ({
 
     const timer = setTimeout(() => setPageLoading(false), 8000);
     return () => clearTimeout(timer);
-  }, [queryKey]);
+  }, [queryKey, dataChangedVersion]);
 
   useEffect(() => {
     if (!coinSelectOpen) {
@@ -470,8 +473,11 @@ const App = ({
     reportLoaded();
   }
 
-  async function loadAllowedSymbols() {
+  async function loadAllowedSymbols(gen: number) {
     const ss = await listAllowedSymbols();
+    if (gen !== loadGenRef.current) {
+      return;
+    }
     setAllowSymbols(ss);
   }
 

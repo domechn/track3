@@ -33,6 +33,7 @@ import {
 } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -197,6 +198,7 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
   const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
   const firstTotalValue = useMemo(
@@ -249,7 +251,7 @@ const App = ({
           reportLoaded();
         }
       });
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 

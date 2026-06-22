@@ -10,7 +10,7 @@ import {
 import { AssetType } from "@/middlelayers/datafetch/types";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState, useRef} from "react";
 import {
   queryCoinsAmountChange,
   resizeChart,
@@ -27,6 +27,7 @@ import {
 import AssetLabel from "./common/asset-label";
 import { formatAssetLabel } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 const chartName = "Trend of Coin";
 
@@ -58,20 +59,27 @@ const App = ({
     () => !_(coinsAmountAndValueChangeData.timestamps).isEmpty(),
     [coinsAmountAndValueChangeData],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
+  const loadGenRef = useRef(0);
   useEffect(() => {
-    loadData(symbol, dateRange, assetType).then(() => {
+    const gen = ++loadGenRef.current;
+    loadData(symbol, dateRange, assetType, gen).then(() => {
+      if (gen !== loadGenRef.current) {
+        return;
+      }
       resizeChartWithDelay(chartName);
       reportLoaded();
     });
-  }, [dateRange, symbol, assetType]);
+  }, [dateRange, symbol, assetType, dataChangedVersion]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
   async function loadData(
     symbol: string,
     dateRange: TDateRange,
-    selectedAssetType?: AssetType,
+    selectedAssetType: AssetType | undefined,
+    gen: number,
   ) {
     const cac = await queryCoinsAmountChange(
       symbol,

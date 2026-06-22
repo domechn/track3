@@ -12,6 +12,7 @@ import {
   prettyNumberToLocaleString,
 } from "@/utils/currency";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import { insertEllipsis } from "@/utils/string";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
@@ -69,6 +70,7 @@ const App = ({
   const [walletAssetsPercentage, setWalletAssetsPercentage] =
     useState<WalletAssetsPercentageData>([]);
   const [topLimit, setTopLimit] = useState<TopLimit>("12");
+  const dataChangedVersion = useDataChangedVersion();
 
   useEffect(() => {
     let mounted = true;
@@ -91,7 +93,7 @@ const App = ({
     return () => {
       mounted = false;
     };
-  }, [dateRange, reportLoaded, symbol, assetType]);
+  }, [dateRange, reportLoaded, symbol, assetType, dataChangedVersion]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
