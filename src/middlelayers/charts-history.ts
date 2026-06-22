@@ -8,6 +8,7 @@ import {
   TransactionModel,
 } from "./types";
 import { ASSET_HANDLER } from "./entities/assets";
+import { selectFromDatabaseWithSql } from "./database";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 
 // return dates which has data
@@ -127,6 +128,32 @@ export async function queryRestoreHistoricalData(
     assets,
     transactions,
   };
+}
+
+// Compact fingerprint of persisted historical data, used to detect whether
+// the in-page data is still in sync with the database after a background
+// auto import / auto backup.
+//
+// We use MAX(createdAt) on assets_v2 — NOT MAX(id):
+//   * assets_v2.id is INTEGER PRIMARY KEY AUTOINCREMENT, which is a
+//     per-database counter. The same logical snapshot inserted on two
+//     different devices gets different ids, so id-based fingerprints
+//     would flap on every import.
+//   * assets_v2.createdAt is the snapshot timestamp. Manual refresh
+//     writes createdAt = now (see saveCoinsToDatabase), and import from
+//     a backup preserves the original createdAt from the imported model
+//     (see saveAssetsInternal). So MAX(createdAt) is the latest
+//     snapshot time, device-independent for identical data, and bumps
+//     exactly when a new snapshot lands.
+//
+// SQLite stores DATETIME as ISO-8601 TEXT, so lexicographic comparison
+// matches chronological order and string equality is a safe fingerprint.
+export async function getDataFingerprint(): Promise<string> {
+  const result = await selectFromDatabaseWithSql<{ maxCreatedAt: string }>(
+    "SELECT MAX(createdAt) as maxCreatedAt FROM assets_v2",
+    [],
+  );
+  return result[0]?.maxCreatedAt ?? "";
 }
 
 async function deleteAssetByUUID(uuid: string): Promise<void> {

@@ -86,6 +86,8 @@
   "datePicker.selected": "已选：",
   "autoUpdater.title": "🔥 有新版本可用！",
   "autoUpdater.reload": "重新加载",
+  "autoBackup.indicator.title": "正在备份数据",
+  "autoBackup.indicator.description": "数据在后台自动备份中。",
   "refresh.retry": "重试中... ",
   "refresh.lastData": "使用上次数据",
   "refresh.retryAll": "全部重试",
