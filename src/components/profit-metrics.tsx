@@ -5,7 +5,7 @@ import {
   TotalValuesData,
 } from "@/middlelayers/types";
 import _ from "lodash";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState, useRef} from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { daysBetweenDates, timeToDateStr } from "@/utils/date";
@@ -26,6 +26,7 @@ import { useWindowSize } from "@/utils/hook";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 const App = ({
   dateRange,
@@ -73,17 +74,25 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end]
   );
+  const dataChangedVersion = useDataChangedVersion();
 
+  const loadGenRef = useRef(0);
   useEffect(() => {
-    loadData(dateRange);
-  }, [rangeKey]);
+    const gen = ++loadGenRef.current;
+    loadData(dateRange, gen);
+  }, [rangeKey, dataChangedVersion]);
 
-  async function loadData(dt: TDateRange) {
+  async function loadData(dt: TDateRange, gen: number) {
     try {
       const values = await queryTotalValues(dt);
+      if (gen !== loadGenRef.current) {
+        return;
+      }
       handleTotalValues(values);
     } finally {
-      reportLoaded();
+      if (gen === loadGenRef.current) {
+        reportLoaded();
+      }
     }
   }
 

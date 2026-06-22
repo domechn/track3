@@ -9,6 +9,7 @@ import ProfitMetrics from "./profit-metrics";
 import Profit from "./profit";
 import { StaggerContainer, FadeUp } from "./motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import PageLoadingOverlay from "./page-loading-overlay";
 import { useLayoutEffect } from "react";
@@ -31,6 +32,7 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end]
   );
+  const dataChangedVersion = useDataChangedVersion();
   const hasValidRange = useMemo(
     () =>
       dateRange.start.getTime() > new Date("1970-01-01").getTime() &&
@@ -40,7 +42,7 @@ const App = ({
   useLayoutEffect(() => {
     setPageLoading(hasValidRange);
     loadedCountRef.current = 0;
-  }, [rangeKey, hasValidRange]);
+  }, [rangeKey, hasValidRange, dataChangedVersion]);
 
   const reportLoaded = useCallback(() => {
     if (!hasValidRange) {

@@ -9,6 +9,7 @@ import { getMonthAbbreviation, listAllFirstAndLastDays } from "@/utils/date";
 import bluebird from "bluebird";
 import _ from "lodash";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { cn } from "@/lib/utils";
 import { positiveNegativeColor } from "@/utils/color";
@@ -101,6 +102,7 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end]
   );
+  const dataChangedVersion = useDataChangedVersion();
 
   useEffect(() => {
     if (summaryType !== "month") {
@@ -114,7 +116,7 @@ const App = ({
         }
       }
     );
-  }, [rangeKey, selectedYear, summaryType]);
+  }, [rangeKey, selectedYear, summaryType, dataChangedVersion]);
 
   const availableYears = useMemo(
     () =>
@@ -136,7 +138,7 @@ const App = ({
         setClickedMonth(null);
       }
     });
-  }, [availableYears, summaryType, rangeKey]);
+  }, [availableYears, summaryType, rangeKey, dataChangedVersion]);
 
   const monthlyProfitsMap = useMemo(() => {
     return _(monthlyProfits)
@@ -158,7 +160,7 @@ const App = ({
     end: Date,
     gen: number
   ) {
-    const cacheKey = `${start.getTime()}-${end.getTime()}-${selectedYear}`;
+    const cacheKey = `${start.getTime()}-${end.getTime()}-${selectedYear}-${dataChangedVersion}`;
     const cached = monthlyCacheRef.current.get(cacheKey);
     if (cached) {
       if (gen === loadGenRef.current) {
@@ -212,7 +214,7 @@ const App = ({
   }
 
   async function loadYearlyProfits(years: number[], gen: number) {
-    const cacheKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}-${years.join(",")}`;
+    const cacheKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}-${years.join(",")}-${dataChangedVersion}`;
     const cached = yearlyCacheRef.current.get(cacheKey);
     if (cached) {
       if (gen === loadGenRef.current) {

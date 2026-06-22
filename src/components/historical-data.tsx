@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
@@ -130,14 +131,25 @@ const App = ({
   const [pageSize, setPageSize] = useState(20);
 
   const loadGenRef = useRef(0);
+  // Set right before calling `afterDataChanged` from a local mutation
+  // (delete/undo) so the next dataChangedVersion bump skips the loading
+  // overlay. The local state is already correct, so the overlay flash
+  // is just visual noise. `loadAllData` still runs in the background to
+  // keep the cache fresh.
+  const skipNextLoadingRef = useRef(false);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
   useEffect(() => {
+    if (skipNextLoadingRef.current) {
+      skipNextLoadingRef.current = false;
+      return;
+    }
     setPageLoading(true);
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
 
   const dataRows = useMemo<HistoricalListRow[]>(() => {
     return data.map((item, idx) => ({
@@ -229,7 +241,7 @@ const App = ({
         setPageLoading(false);
       }
     }
-  }, [rangeKey]);
+  }, [rangeKey, dateRange, dataChangedVersion]);
 
   useEffect(() => {
     loadAllData();
@@ -300,6 +312,9 @@ const App = ({
         setIsModalOpen(false);
 
         if (afterDataChanged) {
+          // The local list is missing the deleted row(s); the re-fetch
+          // will repopulate it. Skip the loading overlay to avoid a flash.
+          skipNextLoadingRef.current = true;
           afterDataChanged("undoDeletion", rhd.uuid, rhd.id);
         }
       });
@@ -334,6 +349,10 @@ const App = ({
           });
           setData((prev) => prev.filter((record) => record.id !== uuid));
           if (afterDataChanged) {
+            // Local list is already correct; skip the next loading
+            // overlay that the dataChangedVersion bump would otherwise
+            // flash.
+            skipNextLoadingRef.current = true;
             afterDataChanged("delete", uuid, undefined);
           }
           setSelectedDataId(null);
@@ -378,6 +397,10 @@ const App = ({
             ),
           });
           if (afterDataChanged) {
+            // Local list is already correct; skip the next loading
+            // overlay that the dataChangedVersion bump would otherwise
+            // flash.
+            skipNextLoadingRef.current = true;
             afterDataChanged("delete", undefined, id);
           }
 

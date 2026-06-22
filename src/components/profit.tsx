@@ -29,6 +29,7 @@ import {
   resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 function getToneClass(value: number, quoteColor: QuoteColor) {
   if (value === 0) {
@@ -85,6 +86,7 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
   useEffect(() => {
     const gen = ++loadGenRef.current;
@@ -105,7 +107,7 @@ const App = ({
           reportLoaded();
         }
       });
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
 
   useEffect(() => {
     const gen = loadGenRef.current;

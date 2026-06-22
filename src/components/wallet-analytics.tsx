@@ -7,6 +7,7 @@ import {
 } from "@/middlelayers/types";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
 import { useTranslation } from "@/i18n";
@@ -28,11 +29,12 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.end, dateRange.start]
   );
+  const dataChangedVersion = useDataChangedVersion();
 
   useLayoutEffect(() => {
     loadedCountRef.current = 0;
     setPageLoading(true);
-  }, [queryKey]);
+  }, [queryKey, dataChangedVersion]);
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;

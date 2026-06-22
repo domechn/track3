@@ -20,6 +20,7 @@ import {
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 const PAGE_SIZE = 20;
 
@@ -37,13 +38,19 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
+  const loadGenRef = useRef(0);
   useEffect(() => {
-    loadData(dateRange);
-  }, [rangeKey]);
+    const gen = ++loadGenRef.current;
+    loadData(dateRange, gen);
+  }, [rangeKey, dataChangedVersion]);
 
-  async function loadData(dr: TDateRange) {
+  async function loadData(dr: TDateRange, gen: number) {
     const tcr = await queryTopCoinsRank(dr);
+    if (gen !== loadGenRef.current) {
+      return;
+    }
     setTopCoinsRankData(tcr);
   }
 
@@ -109,7 +116,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   useEffect(() => {
     setPage(0);
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
 
   useEffect(() => {
     setPage((prev) => Math.min(prev, maxPage));

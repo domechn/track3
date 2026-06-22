@@ -11,6 +11,7 @@ import {
   TDateRange,
 } from "../middlelayers/types";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import {
   Collapsible,
   CollapsibleContent,
@@ -42,10 +43,11 @@ const App = ({
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
   useLayoutEffect(() => {
     setPageLoading(true);
     loadedCountRef.current = 0;
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
 
   const reportLoaded = useCallback(() => {
     loadedCountRef.current += 1;

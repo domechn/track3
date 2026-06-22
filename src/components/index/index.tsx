@@ -70,6 +70,7 @@ import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { ChartResizeContext } from "@/App";
 import { useTranslation } from "@/i18n";
+import { DataChangedContext } from "@/contexts/data-changed";
 
 ChartJS.register(
   ...registerables,
@@ -451,6 +452,7 @@ const App = () => {
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
   const [initializing, setInitializing] = useState(true);
+  const [dataChangedVersion, setDataChangedVersion] = useState(0);
   const [autoBackupStatus, setAutoBackupStatus] = useState<
     "idle" | "running"
   >("idle");
@@ -591,6 +593,10 @@ const App = () => {
   function onDataChanged() {
     const currentHash = window.location.hash || "";
     const isSettingsRoute = currentHash.startsWith("#/settings");
+    // Bump the data-changed version first so any consumer that subscribes
+    // through DataChangedContext sees a new value during this same tick,
+    // even when the settings route skips loadAllData() below.
+    setDataChangedVersion((v) => v + 1);
     if (!isSettingsRoute) {
       loadAllData();
     }
@@ -709,8 +715,9 @@ const App = () => {
   return (
     <div>
       <AutoBackupIndicator status={autoBackupStatus} />
-      <HashRouter>
-        <AppRoutes
+      <DataChangedContext.Provider value={dataChangedVersion}>
+        <HashRouter>
+          <AppRoutes
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={handleSidebarToggle}
           initializing={initializing}
@@ -729,7 +736,8 @@ const App = () => {
           onDataChanged={onDataChanged}
           handleConfigurationSave={handleConfigurationSave}
         />
-      </HashRouter>
+        </HashRouter>
+      </DataChangedContext.Provider>
     </div>
   );
 };

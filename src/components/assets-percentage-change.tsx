@@ -5,7 +5,7 @@ import {
 } from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useWindowSize } from "@/utils/hook";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { ChartResizeContext } from "@/App";
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/utils/chart-theme";
 import { formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 const chartName = "Coins Percentage Overview";
 
@@ -40,17 +41,26 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end]
   );
+  const dataChangedVersion = useDataChangedVersion();
 
+  const loadGenRef = useRef(0);
   useEffect(() => {
-    loadData(dateRange).then(() => {
+    const gen = ++loadGenRef.current;
+    loadData(dateRange, gen).then(() => {
+      if (gen !== loadGenRef.current) {
+        return;
+      }
       resizeChartWithDelay(chartName);
     });
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
   useEffect(() => resizeChart(chartName), [needResize]);
 
-  async function loadData(dr: TDateRange) {
+  async function loadData(dr: TDateRange, gen: number) {
     const topN = await queryTopNAssets(dr, 6);
     const data = await queryAssetsPercentageChange(dr);
+    if (gen !== loadGenRef.current) {
+      return;
+    }
 
     setTopN(topN);
     setAssetsPercentageChangeData(data);

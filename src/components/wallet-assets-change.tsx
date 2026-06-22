@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { getWalletLogo } from "@/lib/utils";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -87,6 +88,7 @@ const App = ({
   const [sortMode, setSortMode] = useState<SortMode>("changeValue");
   const [pageSize, setPageSize] = useState<PageSize>("50");
   const [dataPage, setDataPage] = useState(0);
+  const dataChangedVersion = useDataChangedVersion();
 
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
@@ -110,7 +112,7 @@ const App = ({
     return () => {
       mounted = false;
     };
-  }, [dateRange, reportLoaded]);
+  }, [dateRange, reportLoaded, dataChangedVersion]);
 
   useEffect(() => {
     setDataPage(0);

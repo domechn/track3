@@ -23,6 +23,7 @@ import {
 } from "@/utils/chart-theme";
 import { formatAssetLabel } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
 
 const prefix = "tcpc";
 const chartNameKey = "Change of Top Coins";
@@ -103,17 +104,26 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
+  const dataChangedVersion = useDataChangedVersion();
 
+  const loadGenRef = useRef(0);
   useEffect(() => {
-    loadData(dateRange).then(() => {
+    const gen = ++loadGenRef.current;
+    loadData(dateRange, gen).then(() => {
+      if (gen !== loadGenRef.current) {
+        return;
+      }
       resizeChartWithDelay(chartNameKey);
     });
-  }, [rangeKey]);
+  }, [rangeKey, dataChangedVersion]);
 
   useEffect(() => resizeChart(chartNameKey), [needResize]);
 
-  async function loadData(dr: TDateRange) {
+  async function loadData(dr: TDateRange, gen: number) {
     const tcpcd = await queryTopCoinsPercentageChangeData(dr);
+    if (gen !== loadGenRef.current) {
+      return;
+    }
     setTopCoinsPercentageChangeData(tcpcd);
   }
 
