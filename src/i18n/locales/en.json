@@ -86,6 +86,8 @@
   "datePicker.selected": "Selected:",
   "autoUpdater.title": "🔥 New version available!",
   "autoUpdater.reload": "Reload",
+  "autoBackup.indicator.title": "Backing up data",
+  "autoBackup.indicator.description": "Your data is being automatically backed up in the background.",
   "refresh.retry": "Retrying... ",
   "refresh.lastData": "Use Last Data",
   "refresh.retryAll": "Retry All",

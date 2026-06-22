@@ -30,12 +30,17 @@ import RealTimeTotalValue from "../realtime-total-value";
 import Sidebar from "../sidebar";
 import { AnimatedPage } from "../motion";
 import PageLoadingOverlay from "../page-loading-overlay";
+import AutoBackupIndicator from "../auto-backup-indicator";
 import "./index.css";
 import { Route, Routes, HashRouter, Outlet, Navigate } from "react-router-dom";
 
 import { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getAvailableDates, queryLastRefreshAt } from "@/middlelayers/charts";
+import {
+  getAvailableDates,
+  queryLastRefreshAt,
+  getDataFingerprint,
+} from "@/middlelayers/charts";
 import {
   queryPreferCurrency,
   getLicenseIfIsPro,
@@ -446,6 +451,11 @@ const App = () => {
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
   const [initializing, setInitializing] = useState(true);
+  const [autoBackupStatus, setAutoBackupStatus] = useState<
+    "idle" | "running"
+  >("idle");
+  // Single mount guard reused by both boot and background effects.
+  const activeRef = useRef(true);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarResizeTimerRef = useRef<number | null>(null);
@@ -470,17 +480,15 @@ const App = () => {
         }
       }),
     ])
-      .then(() =>
-        handleAutoBackup().then(({ imported }) => {
-          if (imported) {
-            clearAllCache();
-          }
-        }),
-      )
       .then(() => loadAllData(active))
       .finally(() => {
         if (active) {
           setInitializing(false);
+          // Defer to the next tick so the boot overlay clears first;
+          // auto backup is intentionally off the critical path.
+          window.setTimeout(() => {
+            void runAutoBackupInBackground();
+          }, 0);
         }
       });
 
@@ -511,18 +519,56 @@ const App = () => {
     getQuoteColor().then((c) => setQuoteColor(c));
   }
 
-  async function handleAutoBackup(): Promise<{
-    imported: boolean;
-    backuped: boolean;
-  }> {
-    const imported = await autoImportHistoricalData();
-    // todo: reload page if res of autoImportHistoricalData is true ( there is new data imported successfully )
-    const backuped = await autoBackupHistoricalData();
-
-    return {
-      imported,
-      backuped,
+  // Track unmount so the background backup never setState's a torn-down
+  // component. activeRef is shared between boot + background effects.
+  useEffect(() => {
+    return () => {
+      activeRef.current = false;
     };
+  }, []);
+
+  // Run auto import + auto backup in the background after the initial
+  // render. The page-loading overlay has already cleared by the time we
+  // get here, so this work no longer blocks "Loading portfolio data".
+  //
+  // Data-refresh policy: snapshot a fingerprint before import, then
+  // compare after. Only refresh page data when the persisted state
+  // actually changed — the no-op case (autoBackup returning false,
+  // autoImport short-circuiting on already-current backup) must not
+  // force a re-render of the user-facing data.
+  async function runAutoBackupInBackground() {
+    if (!activeRef.current) return;
+    setAutoBackupStatus("running");
+
+    try {
+      const preFingerprint = await getDataFingerprint();
+      const imported = await autoImportHistoricalData();
+      if (!activeRef.current) return;
+
+      if (imported) {
+        const postFingerprint = await getDataFingerprint();
+        if (postFingerprint !== preFingerprint) {
+          // Data changed: refresh the page promptly so the user
+          // sees the imported data without reloading manually.
+          clearAllCache();
+          await loadAllData(activeRef.current);
+        }
+      }
+    } catch (e) {
+      console.error("auto import failed", e);
+    }
+
+    try {
+      // Backup writes to disk only; the in-memory data is unchanged so
+      // no page refresh is needed.
+      await autoBackupHistoricalData();
+    } catch (e) {
+      console.error("auto backup failed", e);
+    } finally {
+      if (activeRef.current) {
+        setAutoBackupStatus("idle");
+      }
+    }
   }
 
   async function handleQuerySizeWhenConfigurationChange() {
@@ -662,6 +708,7 @@ const App = () => {
 
   return (
     <div>
+      <AutoBackupIndicator status={autoBackupStatus} />
       <HashRouter>
         <AppRoutes
           sidebarCollapsed={sidebarCollapsed}

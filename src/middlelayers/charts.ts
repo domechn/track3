@@ -45,6 +45,7 @@ export {
   deleteHistoricalDataDetailById,
   restoreHistoricalData,
   queryRestoreHistoricalData,
+  getDataFingerprint,
 } from "./charts-history";
 
 export {
