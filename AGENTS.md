@@ -65,6 +65,16 @@ SQLite with versioned migrations in `src-tauri/migrations/` (v1→v5). Key table
 - **Pro license:** JWT-based, unlocks additional EVM chain support
 - **Repo-local skill:** `.agents/skills/version-upgrade/SKILL.md` documents the standard Track3 version bump workflow
 
+## Development Methodology
+
+This project follows **Test-Driven Development (TDD)**. All new features and bug fixes must be written in this order:
+
+1. **Write a failing test** first that defines the expected behavior.
+2. **Write the minimal implementation** to make the test pass.
+3. **Refactor** the code while keeping tests green.
+
+Tests live alongside the code they test (co-located `*.test.tsx` / `*.test.ts` files under `src/`). Use Vitest as the test runner.
+
 ## Build and Test
 
 ```bash
@@ -76,7 +86,7 @@ corepack yarn tauri build      # Build distributable desktop app
 corepack yarn update-release   # Release metadata
 ```
 
-No unit-test suite yet; validation is build/smoke-run based.
+Tests run via Vitest (`corepack yarn vitest`). All new code must include co-located tests.
 
 ## Build Requirements
 
@@ -115,8 +125,8 @@ Both locale files MUST have identical key sets. The provider falls back to Engli
 
 ```tsx
 const { t, locale, setLocale } = useTranslation();
-t("nav.overview");                  // plain key
-t("key.with.{placeholder}", "");    // key + optional fallback
+t("nav.overview"); // plain key
+t("key.with.{placeholder}", ""); // key + optional fallback
 // Template values are applied with String.prototype.replace, e.g.:
 t("history.showing")
   .replace("{start}", String(loadedRangeStart))
