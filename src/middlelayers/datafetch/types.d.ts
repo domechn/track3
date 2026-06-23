@@ -71,6 +71,14 @@ export type Addresses = {
   )[];
 };
 
+// Optional attachment that points a manual "Others" entry at an existing
+// configured CEX or chain wallet. When set, OthersAnalyzer emits the asset
+// under the same `wallet` identity the matching analyzer uses, so
+// combineCoinLists merges it into that CEX/wallet's row of holdings.
+export type OtherAttachment =
+  | { kind: "cex"; type: string; identity: string }
+  | { kind: "wallet"; type: string; identity: string };
+
 export type TokenConfig = {
   // evm address
   erc20: Addresses;
@@ -86,6 +94,8 @@ export type TokenConfig = {
     alias?: string;
     symbol: string;
     amount: number;
+    // when set, the asset is merged into the matching CEX/wallet
+    attachTo?: OtherAttachment;
   }[];
 };
 

@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/use-toast";
 import {
   Analyzer,
   GlobalConfig,
+  OtherAttachment,
   StockConfig,
   TokenConfig,
 } from "@/middlelayers/datafetch/types";
@@ -40,6 +41,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,6 +55,8 @@ import { StockAnalyzer } from "@/middlelayers/datafetch/coins/stock/stock-analyz
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  Link2Icon,
+  LinkBreak2Icon,
   MagnifyingGlassIcon,
   PlusIcon,
   ReloadIcon,
@@ -69,6 +78,12 @@ import bluebird from "bluebird";
 import { Switch } from "./ui/switch";
 import { SUIAnalyzer } from "@/middlelayers/datafetch/coins/sui";
 import { resolveAssetLogoSrc } from "@/utils/assets";
+import {
+  maskSensitive,
+  truncateAddress,
+  encodedAttachTo,
+  parseAttachTo,
+} from "@/utils/attach-to";
 import {
   CEX_OPTIONS,
   STOCK_BROKER_OPTIONS,
@@ -195,6 +210,8 @@ const App = ({
     useState(false);
   const [addWalletDialogOpen, setAddWalletDialogOpen] = useState(false);
   const [addOtherDialogOpen, setAddOtherDialogOpen] = useState(false);
+  const [attachModalOpen, setAttachModalOpen] = useState(false);
+  const [attachModalTargetIdx, setAttachModalTargetIdx] = useState(-1);
 
   const [saveCexConfigLoading, setSaveCexConfigLoading] = useState(false);
   const [saveStockBrokerConfigLoading, setSaveStockBrokerConfigLoading] =
@@ -253,6 +270,7 @@ const App = ({
         alias?: string;
         symbol: string;
         amount: number;
+        attachTo?: OtherAttachment;
       }
     | undefined
   >(undefined);
@@ -296,6 +314,7 @@ const App = ({
       alias?: string;
       symbol: string;
       amount: number;
+      attachTo?: OtherAttachment;
     }[]
   >([]);
   const [otherAmountDraftMap, setOtherAmountDraftMap] = useState<
@@ -376,6 +395,38 @@ const App = ({
   const pagedOthersStartIndex = useMemo(
     () => othersPage * CONFIG_LIST_PAGE_SIZE,
     [othersPage],
+  );
+
+  // Options used by the "Attach to" Selects in the Others configuration.
+  // Each option encodes its target as `<kind>:<type>:<identity>` so the
+  // onChange handler can decode it back into an OtherAttachment.
+  const cexAttachOptions = useMemo(
+    () =>
+      _(exchanges)
+        .map((ex) => {
+          const identity = ex.apiKey;
+          const label = ex.alias || `${ex.type}-${maskSensitive(identity)}`;
+          return {
+            value: `cex:${ex.type}:${identity}`,
+            label,
+          };
+        })
+        .value(),
+    [exchanges],
+  );
+  const walletAttachOptions = useMemo(
+    () =>
+      _(wallets)
+        .map((w) => {
+          const label =
+            w.alias || `${w.type.toUpperCase()}-${truncateAddress(w.address)}`;
+          return {
+            value: `wallet:${w.type}:${w.address}`,
+            label,
+          };
+        })
+        .value(),
+    [wallets],
   );
 
   const activeExchangeCount = useMemo(
@@ -638,16 +689,6 @@ const App = ({
     };
   }
 
-  function maskSensitive(val: string) {
-    if (!val) {
-      return "-";
-    }
-    if (val.length <= 8) {
-      return val;
-    }
-    return `${val.slice(0, 4)}...${val.slice(-4)}`;
-  }
-
   async function buildLogoMap(
     coins: { symbol: string }[],
   ): Promise<{ [x: string]: string }> {
@@ -821,6 +862,172 @@ const App = ({
     }
   }
 
+  // Helper: resolve a human-readable label for an OtherAttachment (used by
+  // tooltip in the attach link icon).
+  function getAttachDisplayLabel(a: OtherAttachment): string {
+    if (a.kind === "cex") {
+      const ex = exchanges.find(
+        (e) => e.type === a.type && e.apiKey === a.identity,
+      );
+      if (ex) {
+        const typeLabel =
+          cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type;
+        const name = ex.alias || maskSensitive(ex.apiKey);
+        return `${typeLabel} ${name}`;
+      }
+    }
+    if (a.kind === "wallet") {
+      const w = wallets.find(
+        (w) => w.type === a.type && w.address === a.identity,
+      );
+      if (w) {
+        const name = w.alias || truncateAddress(w.address);
+        return `${w.type.toUpperCase()} ${name}`;
+      }
+    }
+    return `${a.kind}:${a.type}`;
+  }
+
+  // Modal that lets the user pick a CEX or wallet to attach to a manual
+  // holding. Rendered per-row via attachModalTargetIdx.
+  function renderAttachModal() {
+    if (attachModalTargetIdx < 0) return null;
+    const current = others[attachModalTargetIdx];
+    const currentEncoded = current?.attachTo
+      ? encodedAttachTo(current.attachTo)
+      : "";
+
+    const selectOption = (encoded: string) => {
+      handleOthersChange(attachModalTargetIdx, "attachTo", encoded);
+      setAttachModalOpen(false);
+      setAttachModalTargetIdx(-1);
+    };
+
+    return (
+      <Dialog
+        open={attachModalOpen}
+        onOpenChange={(open) => {
+          setAttachModalOpen(open);
+          if (!open) setAttachModalTargetIdx(-1);
+        }}
+      >
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle>{t("config.others.attachTo")}</DialogTitle>
+            <DialogDescription>
+              {t("config.others.attachToModalDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[360px] overflow-y-auto space-y-1 py-2">
+            {/* None / detach */}
+            <div
+              role="button"
+              tabIndex={0}
+              className={
+                "flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors " +
+                (!currentEncoded
+                  ? "bg-accent text-accent-foreground"
+                  : "hover:bg-muted")
+              }
+              onClick={() => selectOption("")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") selectOption("");
+              }}
+            >
+              <LinkBreak2Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm">{t("config.others.attachToNone")}</span>
+            </div>
+
+            {/* Exchanges */}
+            {cexAttachOptions.length > 0 && (
+              <>
+                <div className="px-3 pt-3 pb-1 text-xs font-medium text-muted-foreground">
+                  {t("config.others.attachToGroupExchanges")}
+                </div>
+                {cexAttachOptions.map((opt) => {
+                  const ex = exchanges.find(
+                    (e) => `cex:${e.type}:${e.apiKey}` === opt.value,
+                  );
+                  return (
+                    <div
+                      key={opt.value}
+                      role="button"
+                      tabIndex={0}
+                      className={
+                        "flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors " +
+                        (currentEncoded === opt.value
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-muted")
+                      }
+                      onClick={() => selectOption(opt.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ")
+                          selectOption(opt.value);
+                      }}
+                    >
+                      <img
+                        className="w-[20px] h-[20px] rounded-full shrink-0"
+                        src={getWalletLogo(ex?.type ?? "")}
+                        alt={ex?.type ?? ""}
+                      />
+                      <span className="text-sm truncate">{opt.label}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Wallets */}
+            {walletAttachOptions.length > 0 && (
+              <>
+                <div className="px-3 pt-3 pb-1 text-xs font-medium text-muted-foreground">
+                  {t("config.others.attachToGroupWallets")}
+                </div>
+                {walletAttachOptions.map((opt) => {
+                  const w = wallets.find(
+                    (wal) => `wallet:${wal.type}:${wal.address}` === opt.value,
+                  );
+                  return (
+                    <div
+                      key={opt.value}
+                      role="button"
+                      tabIndex={0}
+                      className={
+                        "flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors " +
+                        (currentEncoded === opt.value
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-muted")
+                      }
+                      onClick={() => selectOption(opt.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ")
+                          selectOption(opt.value);
+                      }}
+                    >
+                      <img
+                        className="w-[20px] h-[20px] rounded-full shrink-0"
+                        src={getWalletLogo(w?.type ?? "")}
+                        alt={w?.type ?? ""}
+                      />
+                      <span className="text-sm truncate">{opt.label}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {cexAttachOptions.length === 0 &&
+              walletAttachOptions.length === 0 && (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  {t("config.others.noAttachTargets")}
+                </div>
+              )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   function renderQuickLookDialog() {
     return (
       <Dialog
@@ -837,7 +1044,9 @@ const App = ({
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Quick Look - {quickLookTitle}</DialogTitle>
-            <DialogDescription>{t("config.currentAssetBalances")}</DialogDescription>
+            <DialogDescription>
+              {t("config.currentAssetBalances")}
+            </DialogDescription>
           </DialogHeader>
           <div className="max-h-[400px] overflow-y-auto">
             {quickLookLoading ? (
@@ -852,7 +1061,9 @@ const App = ({
               <div className="space-y-2">
                 <div className="grid grid-cols-2 text-sm font-medium text-muted-foreground px-2">
                   <span>{t("config.balanceSymbol")}</span>
-                  <span className="text-right">{t("config.balanceAmount")}</span>
+                  <span className="text-right">
+                    {t("config.balanceAmount")}
+                  </span>
                 </div>
                 {quickLookData.map((item, idx) => (
                   <div
@@ -910,7 +1121,9 @@ const App = ({
             <TableHead className="w-[170px]">{t("config.alias")}</TableHead>
             <TableHead className="w-[220px]">{t("config.apiKey")}</TableHead>
             <TableHead className="w-[120px]">{t("config.status")}</TableHead>
-            <TableHead className="w-[84px] text-right">{t("config.actions")}</TableHead>
+            <TableHead className="w-[84px] text-right">
+              {t("config.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1008,7 +1221,9 @@ const App = ({
             <TableHead className="w-[180px]">{t("config.queryId")}</TableHead>
             <TableHead className="w-[180px]">{t("config.token")}</TableHead>
             <TableHead className="w-[120px]">{t("config.status")}</TableHead>
-            <TableHead className="w-[84px] text-right">{t("config.actions")}</TableHead>
+            <TableHead className="w-[84px] text-right">
+              {t("config.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1104,7 +1319,9 @@ const App = ({
             <TableHead className="w-[170px]">{t("config.alias")}</TableHead>
             <TableHead className="w-[320px]">{t("config.address")}</TableHead>
             <TableHead className="w-[120px]">{t("config.status")}</TableHead>
-            <TableHead className="w-[84px] text-right">{t("config.actions")}</TableHead>
+            <TableHead className="w-[84px] text-right">
+              {t("config.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1190,7 +1407,7 @@ const App = ({
 
   function handleOthersChange(
     idx: number,
-    key: "alias" | "symbol" | "amount",
+    key: "alias" | "symbol" | "amount" | "attachTo",
     val: string,
   ) {
     setOthers((prev) =>
@@ -1203,6 +1420,15 @@ const App = ({
           return {
             ...item,
             amount: Number.isNaN(parsed) ? 0 : parsed,
+          };
+        }
+        if (key === "attachTo") {
+          // val is the encoded "<kind>:<type>:<identity>" from the Select.
+          // Empty string clears the attachment.
+          const parsed = val ? parseAttachTo(val) : undefined;
+          return {
+            ...item,
+            attachTo: parsed,
           };
         }
         return {
@@ -1274,7 +1500,12 @@ const App = ({
   }
 
   function renderOthersForm(
-    vals: { alias?: string; symbol: string; amount: number }[],
+    vals: {
+      alias?: string;
+      symbol: string;
+      amount: number;
+      attachTo?: OtherAttachment;
+    }[],
     startIndex = 0,
   ) {
     if (vals.length === 0) {
@@ -1292,7 +1523,9 @@ const App = ({
             <TableHead>{t("config.alias")}</TableHead>
             <TableHead>{t("config.symbol")}</TableHead>
             <TableHead>{t("config.amount")}</TableHead>
-            <TableHead className="text-right">{t("config.actions")}</TableHead>
+            <TableHead className="w-[84px] text-right">
+              {t("config.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1346,15 +1579,53 @@ const App = ({
                   />
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7"
-                    onClick={() => handleRemoveOther(globalIdx)}
-                    title={t("common.delete")}
-                  >
-                    <TrashIcon className="h-4 w-4 text-muted-foreground" />
-                  </Button>
+                  <div className="inline-flex items-center justify-end gap-1">
+                    {o.attachTo ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setAttachModalTargetIdx(globalIdx);
+                              setAttachModalOpen(true);
+                            }}
+                          >
+                            <Link2Icon className="h-4 w-4 text-primary" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>
+                            {t("config.others.attachedTo")}{" "}
+                            {getAttachDisplayLabel(o.attachTo)}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          setAttachModalTargetIdx(globalIdx);
+                          setAttachModalOpen(true);
+                        }}
+                        title={t("config.others.attachTo")}
+                      >
+                        <Link2Icon className="h-4 w-4 text-muted-foreground/50 hover:text-muted-foreground" />
+                      </Button>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={() => handleRemoveOther(globalIdx)}
+                      title={t("common.delete")}
+                    >
+                      <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             );
@@ -1843,8 +2114,8 @@ const App = ({
             {addExchangeConfig?.type === "okex" && (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="password" className="text-right">
-                {t("config.formPassword")}
-              </Label>
+                  {t("config.formPassword")}
+                </Label>
                 <Input
                   id="password"
                   value={addExchangeConfig?.password ?? ""}
@@ -1862,8 +2133,8 @@ const App = ({
             {addExchangeConfig?.type === "bitget" && (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="passphrase" className="text-right">
-                {t("config.formPassphrase")}
-              </Label>
+                  {t("config.formPassphrase")}
+                </Label>
                 <Input
                   id="passphrase"
                   value={addExchangeConfig?.passphrase ?? ""}
@@ -1917,7 +2188,8 @@ const App = ({
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="stockBrokerType" className="text-right">{t("config.formType")}
+              <Label htmlFor="stockBrokerType" className="text-right">
+                {t("config.formType")}
               </Label>
               <Select
                 onValueChange={(e) =>
@@ -1944,7 +2216,8 @@ const App = ({
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="stockBrokerAlias" className="text-right">{t("config.formAlias")}
+              <Label htmlFor="stockBrokerAlias" className="text-right">
+                {t("config.formAlias")}
               </Label>
               <Input
                 id="stockBrokerAlias"
@@ -1960,7 +2233,8 @@ const App = ({
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="stockBrokerToken" className="text-right">{t("config.formToken")}
+              <Label htmlFor="stockBrokerToken" className="text-right">
+                {t("config.formToken")}
               </Label>
               <Input
                 id="stockBrokerToken"
@@ -2181,7 +2455,7 @@ const App = ({
           <DialogHeader>
             <DialogTitle>{t("config.addOther")}</DialogTitle>
             <DialogDescription>
-              Add extra symbol and amount here. Click save when you're done.
+              {t("config.addOtherDialogDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -2250,394 +2524,407 @@ const App = ({
   }
 
   return (
-    <div className="space-y-6">
-      {renderQuickLookDialog()}
-      <div>
-        <h3 className="text-lg font-medium">{t("config.title")}</h3>
-        <p className="text-sm text-muted-foreground">
-          {t("config.subtitle")}
-        </p>
-      </div>
+    <TooltipProvider>
+      <div className="space-y-6">
+        {renderQuickLookDialog()}
+        {renderAttachModal()}
+        <div>
+          <h3 className="text-lg font-medium">{t("config.title")}</h3>
+          <p className="text-sm text-muted-foreground">
+            {t("config.subtitle")}
+          </p>
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 {t("config.exchanges")}
               </CardTitle>
             </CardHeader>
-          <CardContent>
-            <div className="text-xl font-semibold">{exchanges.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {activeExchangeCount} active
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardContent>
+              <div className="text-xl font-semibold">{exchanges.length}</div>
+              <p className="text-xs text-muted-foreground">
+                {activeExchangeCount} active
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 {t("config.stockBrokers")}
               </CardTitle>
             </CardHeader>
-          <CardContent>
-            <div className="text-xl font-semibold">{stockBrokers.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {activeStockBrokerCount} active
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardContent>
+              <div className="text-xl font-semibold">{stockBrokers.length}</div>
+              <p className="text-xs text-muted-foreground">
+                {activeStockBrokerCount} active
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 {t("config.wallets")}
               </CardTitle>
             </CardHeader>
-          <CardContent>
-            <div className="text-xl font-semibold">{wallets.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {t("config.activeCount").replace("{n}", String(activeWalletCount))}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardContent>
+              <div className="text-xl font-semibold">{wallets.length}</div>
+              <p className="text-xs text-muted-foreground">
+                {t("config.activeCount").replace(
+                  "{n}",
+                  String(activeWalletCount),
+                )}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 {t("config.customSymbols")}
               </CardTitle>
             </CardHeader>
-          <CardContent>
-            <div className="text-xl font-semibold">{others.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {t("config.manualBalanceDesc")}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardContent>
+              <div className="text-xl font-semibold">{others.length}</div>
+              <p className="text-xs text-muted-foreground">
+                {t("config.manualBalanceDesc")}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 {t("config.baseCurrency")}
               </CardTitle>
             </CardHeader>
-          <CardContent>
-            {preferCurrencyLoading ? (
-              <Skeleton className="h-7 w-20" />
-            ) : (
-              <div className="text-xl font-semibold">{preferCurrency}</div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {preferCurrencyLoading
-                ? "Loading base currency..."
-                : t("config.currentQuoteBase")}
-            </p>
+            <CardContent>
+              {preferCurrencyLoading ? (
+                <Skeleton className="h-7 w-20" />
+              ) : (
+                <div className="text-xl font-semibold">{preferCurrency}</div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {preferCurrencyLoading
+                  ? "Loading base currency..."
+                  : t("config.currentQuoteBase")}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("config.general")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="groupUSD"
+                checked={groupUSD}
+                onCheckedChange={(v) => onGroupUSDSelectChange(!!v)}
+              />
+              <Label htmlFor="groupUSD" className="text-sm">
+                Group stable coins into USDT (USDC, TUSD, DAI...)
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hideInactive"
+                checked={hideInactive}
+                onCheckedChange={(v) => onHideInactiveSelectChange(!!v)}
+              />
+              <Label htmlFor="hideInactive" className="text-sm">
+                Hide inactive exchanges, brokers, and wallets
+              </Label>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">
+                  {t("config.countOfResults")}
+                </div>
+                <Select
+                  onValueChange={onQuerySizeChanged}
+                  value={querySize + ""}
+                >
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder={t("config.querySize")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>{t("config.size")}</SelectLabel>
+                      {querySizeOptions.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground">
+                  {t("config.baseCurrency")}
+                </div>
+                <div className="flex items-center gap-2">
+                  {preferCurrencyLoading ? (
+                    <Skeleton className="h-10 w-[280px]" />
+                  ) : (
+                    <Select
+                      onValueChange={onPreferCurrencyChanged}
+                      value={preferCurrency}
+                    >
+                      <SelectTrigger className="w-[280px]">
+                        <SelectValue placeholder={t("config.preferCurrency")} />
+                      </SelectTrigger>
+                      <SelectContent className="overflow-y-auto max-h-[20rem]">
+                        <SelectGroup>
+                          <SelectLabel>
+                            {t("config.preferCurrencyLabel")}
+                          </SelectLabel>
+                          {preferCurrencyOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={onUpdateCurrencyRatesClick}
+                    disabled={preferCurrencyLoading || refreshCurrencyLoading}
+                  >
+                    <UpdateIcon
+                      className={`h-4 w-4 ${
+                        refreshCurrencyLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                  </Button>
+                </div>
+                <p className="min-h-4 text-xs text-muted-foreground">
+                  <span
+                    className={`block transition-opacity duration-250 ${
+                      !preferCurrencyLoading &&
+                      preferredCurrencyDetail &&
+                      preferCurrency !== defaultBaseCurrency
+                        ? "opacity-100"
+                        : "opacity-0"
+                    }`}
+                  >
+                    {!preferCurrencyLoading &&
+                    preferredCurrencyDetail &&
+                    preferCurrency !== defaultBaseCurrency
+                      ? `1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
+                          preferredCurrencyDetail.rate,
+                        )} ${preferredCurrencyDetail.currency}`
+                      : "\u00A0"}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("config.stockBrokers")}
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {t("config.brokerShownTotal")
+                    .replace("{shown}", String(visibleStockBrokers.length))
+                    .replace("{total}", String(stockBrokers.length))}
+                </p>
+              </div>
+              {renderAddStockBrokerForm()}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {renderStockBrokerForm(pagedVisibleStockBrokers)}
+            {visibleStockBrokers.length > CONFIG_LIST_PAGE_SIZE ? (
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setStockBrokerPage((prev) => Math.max(prev - 1, 0))
+                  }
+                  disabled={stockBrokerPage <= 0}
+                >
+                  <ChevronLeftIcon />
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {stockBrokerPage + 1} / {stockBrokerPageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setStockBrokerPage((prev) =>
+                      Math.min(prev + 1, stockBrokerPageCount - 1),
+                    )
+                  }
+                  disabled={stockBrokerPage >= stockBrokerPageCount - 1}
+                >
+                  <ChevronRightIcon />
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("config.exchanges")}
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {t("config.exchangeShownTotal")
+                    .replace("{shown}", String(visibleExchanges.length))
+                    .replace("{total}", String(exchanges.length))}
+                </p>
+              </div>
+              {renderAddExchangeForm()}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {renderExchangeForm(pagedVisibleExchanges)}
+            {visibleExchanges.length > CONFIG_LIST_PAGE_SIZE ? (
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setExchangePage((prev) => Math.max(prev - 1, 0))
+                  }
+                  disabled={exchangePage <= 0}
+                >
+                  <ChevronLeftIcon />
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {exchangePage + 1} / {exchangePageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setExchangePage((prev) =>
+                      Math.min(prev + 1, exchangePageCount - 1),
+                    )
+                  }
+                  disabled={exchangePage >= exchangePageCount - 1}
+                >
+                  <ChevronRightIcon />
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("config.wallet")}
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {t("config.walletShownTotal")
+                    .replace("{shown}", String(visibleWallets.length))
+                    .replace("{total}", String(wallets.length))}
+                </p>
+              </div>
+              {renderAddWalletForm()}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {renderWalletForm(pagedVisibleWallets)}
+            {visibleWallets.length > CONFIG_LIST_PAGE_SIZE ? (
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setWalletPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={walletPage <= 0}
+                >
+                  <ChevronLeftIcon />
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {walletPage + 1} / {walletPageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setWalletPage((prev) =>
+                      Math.min(prev + 1, walletPageCount - 1),
+                    )
+                  }
+                  disabled={walletPage >= walletPageCount - 1}
+                >
+                  <ChevronRightIcon />
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("config.others")}
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {t("config.addOtherDesc")}
+                </p>
+              </div>
+              {renderAddOtherForm()}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {renderOthersForm(pagedOthers, pagedOthersStartIndex)}
+            {others.length > CONFIG_LIST_PAGE_SIZE ? (
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOthersPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={othersPage <= 0}
+                >
+                  <ChevronLeftIcon />
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {othersPage + 1} / {othersPageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setOthersPage((prev) =>
+                      Math.min(prev + 1, othersPageCount - 1),
+                    )
+                  }
+                  disabled={othersPage >= othersPageCount - 1}
+                >
+                  <ChevronRightIcon />
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t("config.general")}
-            </CardTitle>
-          </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="groupUSD"
-              checked={groupUSD}
-              onCheckedChange={(v) => onGroupUSDSelectChange(!!v)}
-            />
-            <Label htmlFor="groupUSD" className="text-sm">
-              Group stable coins into USDT (USDC, TUSD, DAI...)
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hideInactive"
-              checked={hideInactive}
-              onCheckedChange={(v) => onHideInactiveSelectChange(!!v)}
-            />
-            <Label htmlFor="hideInactive" className="text-sm">
-              Hide inactive exchanges, brokers, and wallets
-            </Label>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <div className="text-sm font-medium text-muted-foreground">
-                {t("config.countOfResults")}
-              </div>
-              <Select onValueChange={onQuerySizeChanged} value={querySize + ""}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder={t("config.querySize")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>{t("config.size")}</SelectLabel>
-                    {querySizeOptions.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm font-medium text-muted-foreground">
-                {t("config.baseCurrency")}
-              </div>
-              <div className="flex items-center gap-2">
-                {preferCurrencyLoading ? (
-                  <Skeleton className="h-10 w-[280px]" />
-                ) : (
-                  <Select
-                    onValueChange={onPreferCurrencyChanged}
-                    value={preferCurrency}
-                  >
-                    <SelectTrigger className="w-[280px]">
-                      <SelectValue placeholder={t("config.preferCurrency")} />
-                    </SelectTrigger>
-                    <SelectContent className="overflow-y-auto max-h-[20rem]">
-                      <SelectGroup>
-                        <SelectLabel>{t("config.preferCurrencyLabel")}</SelectLabel>
-                        {preferCurrencyOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={onUpdateCurrencyRatesClick}
-                  disabled={preferCurrencyLoading || refreshCurrencyLoading}
-                >
-                  <UpdateIcon
-                    className={`h-4 w-4 ${
-                      refreshCurrencyLoading ? "animate-spin" : ""
-                    }`}
-                  />
-                </Button>
-              </div>
-              <p className="min-h-4 text-xs text-muted-foreground">
-                <span
-                  className={`block transition-opacity duration-250 ${
-                    !preferCurrencyLoading &&
-                    preferredCurrencyDetail &&
-                    preferCurrency !== defaultBaseCurrency
-                      ? "opacity-100"
-                      : "opacity-0"
-                  }`}
-                >
-                  {!preferCurrencyLoading &&
-                  preferredCurrencyDetail &&
-                  preferCurrency !== defaultBaseCurrency
-                    ? `1 ${defaultBaseCurrency} = ${prettyPriceNumberToLocaleString(
-                        preferredCurrencyDetail.rate,
-                      )} ${preferredCurrencyDetail.currency}`
-                    : "\u00A0"}
-                </span>
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t("config.stockBrokers")}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {t("config.brokerShownTotal")
-                  .replace("{shown}", String(visibleStockBrokers.length))
-                  .replace("{total}", String(stockBrokers.length))}
-              </p>
-            </div>
-            {renderAddStockBrokerForm()}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {renderStockBrokerForm(pagedVisibleStockBrokers)}
-          {visibleStockBrokers.length > CONFIG_LIST_PAGE_SIZE ? (
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setStockBrokerPage((prev) => Math.max(prev - 1, 0))
-                }
-                disabled={stockBrokerPage <= 0}
-              >
-                <ChevronLeftIcon />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {stockBrokerPage + 1} / {stockBrokerPageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setStockBrokerPage((prev) =>
-                    Math.min(prev + 1, stockBrokerPageCount - 1),
-                  )
-                }
-                disabled={stockBrokerPage >= stockBrokerPageCount - 1}
-              >
-                <ChevronRightIcon />
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t("config.exchanges")}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {t("config.exchangeShownTotal")
-                  .replace("{shown}", String(visibleExchanges.length))
-                  .replace("{total}", String(exchanges.length))}
-              </p>
-            </div>
-            {renderAddExchangeForm()}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {renderExchangeForm(pagedVisibleExchanges)}
-          {visibleExchanges.length > CONFIG_LIST_PAGE_SIZE ? (
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setExchangePage((prev) => Math.max(prev - 1, 0))}
-                disabled={exchangePage <= 0}
-              >
-                <ChevronLeftIcon />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {exchangePage + 1} / {exchangePageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setExchangePage((prev) =>
-                    Math.min(prev + 1, exchangePageCount - 1),
-                  )
-                }
-                disabled={exchangePage >= exchangePageCount - 1}
-              >
-                <ChevronRightIcon />
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t("config.wallet")}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {t("config.walletShownTotal")
-                  .replace("{shown}", String(visibleWallets.length))
-                  .replace("{total}", String(wallets.length))}
-              </p>
-            </div>
-            {renderAddWalletForm()}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {renderWalletForm(pagedVisibleWallets)}
-          {visibleWallets.length > CONFIG_LIST_PAGE_SIZE ? (
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setWalletPage((prev) => Math.max(prev - 1, 0))}
-                disabled={walletPage <= 0}
-              >
-                <ChevronLeftIcon />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {walletPage + 1} / {walletPageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setWalletPage((prev) =>
-                    Math.min(prev + 1, walletPageCount - 1),
-                  )
-                }
-                disabled={walletPage >= walletPageCount - 1}
-              >
-                <ChevronRightIcon />
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t("config.others")}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {t("config.addOtherDesc")}
-              </p>
-            </div>
-            {renderAddOtherForm()}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {renderOthersForm(pagedOthers, pagedOthersStartIndex)}
-          {others.length > CONFIG_LIST_PAGE_SIZE ? (
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setOthersPage((prev) => Math.max(prev - 1, 0))}
-                disabled={othersPage <= 0}
-              >
-                <ChevronLeftIcon />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {othersPage + 1} / {othersPageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setOthersPage((prev) =>
-                    Math.min(prev + 1, othersPageCount - 1),
-                  )
-                }
-                disabled={othersPage >= othersPageCount - 1}
-              >
-                <ChevronRightIcon />
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-    </div>
+    </TooltipProvider>
   );
 };
 

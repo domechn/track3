@@ -420,5 +420,14 @@
   "comparison.1M": "1 月",
   "comparison.1Y": "1 年",
   "comparison.ytd": "今年",
-  "comparison.all": "全部"
+  "comparison.all": "全部",
+  "config.addOtherDialogDesc": "在此添加额外的币种与数量，完成后点击保存。",
+  "config.others.attachTo": "挂载到",
+  "config.others.attachToNone": "不挂载",
+  "config.others.attachToHint": "设置后该资产会计入对应钱包/CEX 的总额，与 API 余额合并求和。",
+  "config.others.attachToGroupExchanges": "交易所",
+  "config.others.attachToGroupWallets": "链上钱包",
+  "config.others.attachToModalDesc": "选择交易所或钱包来关联该资产，余额将与 API 数据合并。",
+  "config.others.attachedTo": "已挂载到",
+  "config.others.noAttachTargets": "暂无已配置的交易所或钱包。"
 }

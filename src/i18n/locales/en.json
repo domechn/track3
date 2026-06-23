@@ -420,5 +420,14 @@
   "comparison.1M": "1M",
   "comparison.1Y": "1Y",
   "comparison.ytd": "YTD",
-  "comparison.all": "ALL"
+  "comparison.all": "ALL",
+  "config.addOtherDialogDesc": "Add extra symbol and amount here. Click save when you're done.",
+  "config.others.attachTo": "Attach to",
+  "config.others.attachToNone": "None",
+  "config.others.attachToHint": "When set, this asset is added to the selected wallet's total. Amounts are merged with API balances.",
+  "config.others.attachToGroupExchanges": "Exchanges",
+  "config.others.attachToGroupWallets": "Wallets",
+  "config.others.attachToModalDesc": "Select an exchange or wallet to link this holding. Balances will be merged with the API.",
+  "config.others.attachedTo": "Attached to",
+  "config.others.noAttachTargets": "No exchanges or wallets configured yet."
 }
