@@ -253,7 +253,20 @@ async function loadPortfoliosByConfig(
   const coinLists = await bluebird.map(
     anas,
     async (ana) => {
-      const a = new ana(config, userInfo.license!) as Analyzer;
+      // Some analyzers (pro license variants) take the pro license as the
+      // second constructor argument; OthersAnalyzer and the basic chain/CEX
+      // analyzers do not. We dispatch on the class reference itself.
+      const licenseClasses = [ERC20ProAnalyzer, TRC20ProUserAnalyzer];
+      const a = (
+        licenseClasses.includes(ana as never)
+          ? new (ana as unknown as new (
+              cfg: GlobalConfig,
+              license: string,
+            ) => Analyzer)(config, userInfo.license!)
+          : new (ana as unknown as new (cfg: GlobalConfig) => Analyzer)(
+              config,
+            )
+      ) as Analyzer;
       const anaName = a.getAnalyzeName();
       console.log("loading portfolio from ", anaName);
       try {
