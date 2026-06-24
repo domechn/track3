@@ -236,9 +236,7 @@ const App = ({
     if (!selectedTileKey) return;
     const handleDocClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      const popover = document.querySelector(
-        '[data-testid="treemap-popover"]',
-      );
+      const popover = document.querySelector('[data-testid="treemap-popover"]');
       const tile = document.querySelector(
         `[data-tile-key="${selectedItem?.wallet.wallet}"]`,
       );
@@ -588,9 +586,7 @@ const App = ({
                   const ariaLabel = formatTileLabel(item, name);
                   const tileKey = `${item.wallet.wallet}-${item.wallet.walletType ?? "none"}`;
 
-                  const handleClick = (
-                    e: React.MouseEvent<HTMLDivElement>,
-                  ) => {
+                  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
                     // clicking the same tile again closes the popover
                     if (selectedTileKey === tileKey) {
                       setSelectedTileKey(null);
@@ -631,7 +627,9 @@ const App = ({
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          handleClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+                          handleClick(
+                            e as unknown as React.MouseEvent<HTMLDivElement>,
+                          );
                         }
                       }}
                     >
