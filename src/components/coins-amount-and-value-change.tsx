@@ -10,7 +10,7 @@ import {
 import { AssetType } from "@/middlelayers/datafetch/types";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useContext, useEffect, useMemo, useState, useRef} from "react";
+import { useContext, useEffect, useMemo, useState, useRef } from "react";
 import {
   queryCoinsAmountChange,
   resizeChart,
@@ -224,7 +224,7 @@ const App = ({
     <div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted-foreground">
+          <CardTitle className="flex flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground">
             <span>{t("coinTrend.title")}</span>
             <AssetLabel asset={{ symbol, assetType }} />
           </CardTitle>

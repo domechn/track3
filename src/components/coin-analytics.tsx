@@ -266,8 +266,13 @@ const App = ({
   const [coinKeyword, setCoinKeyword] = useState("");
   const [coinListLimit, setCoinListLimit] = useState(200);
 
+  const allowSymbolGenRef = useRef(0);
   useEffect(() => {
-    const gen = loadGenRef.current;
+    // Increment first so the captured gen is current when the async
+    // listAllowedSymbols() resolves — this ref is independent of the
+    // symbol-load generation below, which is bumped by a sibling effect
+    // that runs after this one.
+    const gen = ++allowSymbolGenRef.current;
     loadAllowedSymbols(gen);
   }, [dataChangedVersion]);
 
@@ -475,7 +480,7 @@ const App = ({
 
   async function loadAllowedSymbols(gen: number) {
     const ss = await listAllowedSymbols();
-    if (gen !== loadGenRef.current) {
+    if (gen !== allowSymbolGenRef.current) {
       return;
     }
     setAllowSymbols(ss);
