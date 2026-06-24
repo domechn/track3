@@ -129,6 +129,10 @@ const StockBrokerSection = memo(function StockBrokerSection({
                         <SelectLabel>{t("config.broker")}</SelectLabel>
                         {stockBrokerOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
+                            <img
+                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
+                              src={getWalletLogo(o.value)}
+                            />
                             {o.label}
                           </SelectItem>
                         ))}
