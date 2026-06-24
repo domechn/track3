@@ -14,7 +14,6 @@ import {
 } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import _ from "lodash";
 import { Line } from "react-chartjs-2";
 import {
   queryAssetChange,
@@ -326,17 +325,15 @@ const App = ({
         : currencyWrapper(currency)(baseData.usdValue)) || 0.0000000001;
 
     if (btcAsBase) {
-      return _(assetChangeData.data)
+      return assetChangeData.data
         .map((d) => (d.btcPrice ? d.usdValue / d.btcPrice : 0))
         .map((d) =>
           showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d,
-        )
-        .value();
+        );
     }
-    return _(assetChangeData.data)
+    return assetChangeData.data
       .map((d) => currencyWrapper(currency)(d.usdValue))
-      .map((d) => (showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d))
-      .value();
+      .map((d) => (showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d));
   }, [assetChangeData, btcAsBase, currency, showPercentageInChart]);
 
   function changePercentageColorClass(

@@ -1,5 +1,4 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
-import _ from "lodash";
 import { asyncMap } from "../utils/async";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
@@ -25,9 +24,7 @@ export class BTCAnalyzer implements Analyzer {
   async verifyConfigs(): Promise<boolean> {
     const regex = /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/;
 
-    const valid = _(getAddressList(this.config.btc)).every((address) =>
-      regex.test(address),
-    );
+    const valid = getAddressList(this.config.btc).every((address) => regex.test(address));
     return valid;
   }
 
@@ -60,14 +57,12 @@ export class BTCAnalyzer implements Analyzer {
       1,
       1000,
     );
-    return _(coinLists)
-      .map((c) => ({
-        ...c,
-        chain: "bitcoin",
-        assetType: "crypto" as const,
-        symbol: "BTC",
-      }))
-      .value();
+    return coinLists.map((c) => ({
+      ...c,
+      chain: "bitcoin",
+      assetType: "crypto" as const,
+      symbol: "BTC",
+    }));
   }
 }
 
@@ -79,7 +74,7 @@ class Blockchain implements BTCQuerier {
       "GET",
       this.queryUrl + address,
     );
-    const amount = _(balance).toNumber() / 1e8;
+    const amount = Number(balance) / 1e8;
     return amount;
   }
 }

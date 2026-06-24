@@ -16,7 +16,6 @@ import {
   TransactionType,
 } from "@/middlelayers/types";
 import { AssetType } from "@/middlelayers/datafetch/types";
-import _ from "lodash";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
@@ -313,12 +312,12 @@ const App = ({
     // init wallet alias map
     const wa = new WalletAnalyzer(async () => []);
     wa.listWalletAliases(
-      _(transactions).map("wallet").compact().uniq().value(),
+      Array.from(new Set(transactions.map((t) => t.wallet).filter((w): w is string => !!w))),
     ).then((res) => {
       const wam: { [k: string]: string | undefined } = {};
-      _(res).forEach((k, v) => {
-        wam[v] = k?.alias ? `${k?.alias} (${k.type})` : k?.wallet;
-      });
+      for (const [v, k] of Object.entries(res)) {
+        wam[v] = k?.alias ? `${k.alias} (${k.type})` : k?.wallet;
+      }
       setWalletAliasMap(wam);
     });
   }, [transactions]);
@@ -339,7 +338,7 @@ const App = ({
         ? "∞"
         : currency.symbol +
           prettyPriceNumberToLocaleString(
-            currencyWrapper(currency)(_.max([breakevenPrice, 0]) || 0),
+            currencyWrapper(currency)(Math.max(breakevenPrice, 0) || 0),
           ),
     [currency, breakevenPrice],
   );
@@ -463,7 +462,7 @@ const App = ({
     setMaxPosition(ama);
     setLogo(lp);
 
-    const detail = _(tp.coins).find(
+    const detail = tp.coins.find(
       (c) => c.symbol === s && c.assetType === selectedAssetType,
     );
     if (detail) {
@@ -568,7 +567,7 @@ const App = ({
     }, [historicalData]);
 
     const tableHasData = useMemo(
-      () => !_(historicalData).isEmpty(),
+      () => Object.keys(historicalData).length > 0,
       [historicalData],
     );
 

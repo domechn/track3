@@ -1,9 +1,8 @@
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
-import _ from 'lodash'
 import qs from 'qs'
 import { sendHttpRequest } from '../../utils/http'
-import { addToBalanceMap, netAssetFromBalanceFields } from './balance-utils'
+import { addToBalanceMap, mergeBalances, netAssetFromBalanceFields } from './balance-utils'
 
 type SpotAccountInfoResp = {
 	accountType?: string
@@ -92,12 +91,12 @@ export class MexcExchange implements Exchanger {
 			this.fetchOptionalBalance("futures", () => this.fetchFuturesBalance()),
 		])
 
-		return _({})
-			.mergeWith(spotBalance, (a: number, b: number) => (a || 0) + (b || 0))
-			.mergeWith(marginBalance, (a: number, b: number) => (a || 0) + (b || 0))
-			.mergeWith(isolatedMarginBalance, (a: number, b: number) => (a || 0) + (b || 0))
-			.mergeWith(futuresBalance, (a: number, b: number) => (a || 0) + (b || 0))
-			.value()
+		return mergeBalances([
+			spotBalance,
+			marginBalance,
+			isolatedMarginBalance,
+			futuresBalance,
+		])
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
@@ -105,15 +104,11 @@ export class MexcExchange implements Exchanger {
 		const tickers = Array.isArray(resp) ? resp : [resp]
 		const suffix = "USDT"
 
-		return _(tickers)
-			.filter(ticker => ticker.symbol.endsWith(suffix))
-			.map(ticker => ({
-				symbol: ticker.symbol.replace(suffix, ""),
-				price: toNumberish(ticker.price),
-			}))
-			.keyBy("symbol")
-			.mapValues("price")
-			.value()
+		return Object.fromEntries(
+			tickers
+				.filter((ticker) => ticker.symbol.endsWith(suffix))
+				.map((ticker) => [ticker.symbol.replace(suffix, ""), toNumberish(ticker.price)]),
+		)
 	}
 
 	async verifyConfig(): Promise<boolean> {
@@ -132,7 +127,7 @@ export class MexcExchange implements Exchanger {
 		}
 		const balances: { [k: string]: number } = {}
 
-		_(resp.balances).forEach(balance => {
+		resp.balances.forEach(balance => {
 			addToBalanceMap(
 				balances,
 				balance.asset.toUpperCase(),
@@ -162,7 +157,8 @@ export class MexcExchange implements Exchanger {
 		}
 
 		const balances: { [k: string]: number } = {}
-		_(resp.data ?? []).forEach(asset => {
+		const assets = resp.data ?? []
+		assets.forEach((asset: any) => {
 			const amount = toNumberish(asset.equity)
 			const fallbackAmount = toNumberish(asset.availableBalance) + toNumberish(asset.frozenBalance) + toNumberish(asset.unrealized)
 			addToBalanceMap(balances, asset.currency.toUpperCase(), amount || fallbackAmount)
@@ -174,7 +170,7 @@ export class MexcExchange implements Exchanger {
 	private parseMarginEntries(entries: MarginBalanceEntry[]): { [k: string]: number } {
 		const balances: { [k: string]: number } = {}
 
-		_(entries).forEach(entry => {
+		entries.forEach(entry => {
 			this.addMarginAssetBalance(balances, entry.baseAsset)
 			this.addMarginAssetBalance(balances, entry.quoteAsset)
 		})
@@ -263,12 +259,10 @@ export class MexcExchange implements Exchanger {
 
 	private buildSortedQuery(params: Record<string, string | number>): string {
 		return qs.stringify(
-			_(params)
-				.pickBy(v => v !== undefined && v !== null && v !== "")
-				.value(),
-			{
-				sort: this.alphabeticalSort,
-			}
+			Object.fromEntries(
+				Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+			),
+			{ sort: this.alphabeticalSort },
 		)
 	}
 

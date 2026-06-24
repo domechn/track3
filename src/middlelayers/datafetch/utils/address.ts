@@ -1,18 +1,15 @@
-import _ from 'lodash'
 import { Addresses } from '../types'
 
 export function getAddressList(addr: Addresses): string[] {
-	const ass = addr.addresses || []
-	return _(ass)
-		.map(as => {
-			if (_(as).isString()) {
-				return as as string
+	return (addr.addresses ?? [])
+		.map((as) => {
+			if (typeof as === "string") {
+				return as
 			}
-			const asp = (as as { address: string, alias?: string, active?: boolean })
-			if (asp.active === false) {
+			if (as.active === false) {
 				return
 			}
-
-			return asp.address
-		}).compact().value()
+			return as.address
+		})
+		.filter((s): s is string => Boolean(s))
 }

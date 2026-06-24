@@ -5,7 +5,6 @@ import { ConfigurationModel, CurrencyRateDetail } from "./types";
 import yaml from "yaml";
 import { CURRENCY_RATE_HANDLER } from "./entities/currency";
 import { ASSET_HANDLER } from "./entities/assets";
-import _ from "lodash";
 import { DateRange } from "react-day-picker";
 import { Theme } from "@/components/common/theme";
 
@@ -85,7 +84,7 @@ export async function getConfiguration(): Promise<GlobalConfig | undefined> {
 
 export async function saveConfiguration(cfg: GlobalConfig) {
   const exchangesData = yaml.stringify({ exchanges: cfg.exchanges });
-  const walletsData = yaml.stringify(_.pick(cfg, walletKeys));
+  const walletsData = yaml.stringify(Object.fromEntries(walletKeys.filter(k => k in cfg).map(k => [k, cfg[k]])));
   const generalData = yaml.stringify({
     configs: cfg.configs,
     others: cfg.others,
@@ -192,8 +191,8 @@ export async function getInitialQueryDateRange(): Promise<{
   const size = await queryQuerySize();
 
   const days = await ASSET_HANDLER.getHasDataCreatedAtDates(size);
-  const from = _(days).min();
-  const to = _(days).max();
+  const from = new Date(Math.min(...days.map((d) => d.getTime())));
+  const to = new Date(Math.max(...days.map((d) => d.getTime())));
 
   return {
     size,
@@ -296,11 +295,11 @@ export async function saveStableCoins(stableCoins: string[]) {
 
 // blacklist
 function normalizeBlacklistSymbols(symbols: string[]): string[] {
-  return _(symbols)
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean)
-    .uniq()
-    .value();
+  return Array.from(
+    new Set(
+      symbols.map((s) => s.trim().toUpperCase()).filter((s) => s.length > 0),
+    ),
+  );
 }
 
 export async function getBlacklistCoins(): Promise<string[]> {

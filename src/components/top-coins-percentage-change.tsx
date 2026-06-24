@@ -1,5 +1,4 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import _ from "lodash";
 import bluebird from "bluebird";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -164,7 +163,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: path,
       };
     });
-    return _.assign({}, ...kvs);
+    return Object.assign({}, ...kvs);
   }
 
   const rows = useMemo<RowData[]>(() => {
@@ -180,15 +179,15 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
           priceEnd: pricePath[pricePath.length - 1] ?? 0,
           valuePath,
           pricePath,
-          valueMin: _.min(valuePath) ?? 0,
-          valueMax: _.max(valuePath) ?? 0,
-          priceMin: _.min(pricePath) ?? 0,
-          priceMax: _.max(pricePath) ?? 0,
+          valueMin: Math.min(...valuePath) ?? 0,
+          valueMax: Math.max(...valuePath) ?? 0,
+          priceMin: Math.min(...pricePath) ?? 0,
+          priceMax: Math.max(...pricePath) ?? 0,
         };
       })
       .filter((r): r is RowData => r !== null);
     const key = sortBy === "value" ? "valueEnd" : "priceEnd";
-    return _(mapped).sortBy((r) => -r[key]).value();
+    return mapped.sort((a, b) => b[key] - a[key]);
   }, [data, sortBy]);
 
   const isValueActive = sortBy === "value";

@@ -5,7 +5,6 @@ import {
   TokenConfig,
   WalletCoin,
 } from "../types";
-import _ from "lodash";
 
 // Static map from chain analyzer type to the `chain` value the matching
 // analyzer emits. Used only as informational metadata on the merged entry.
@@ -48,7 +47,7 @@ export class OthersAnalyzer implements Analyzer {
     attachTo: OtherAttachment,
   ): { wallet: string; chain: string } | null {
     if (attachTo.kind === "cex") {
-      const ex = _(this.fullConfig.exchanges).find(
+      const ex = (this.fullConfig.exchanges ?? []).find(
         (e) =>
           e.name === attachTo.type &&
           e.initParams.apiKey === attachTo.identity,
@@ -70,7 +69,7 @@ export class OthersAnalyzer implements Analyzer {
     if (!chain || !chain.addresses) {
       return null;
     }
-    const found = _(chain.addresses).some((a) => {
+    const found = (chain.addresses ?? []).some((a) => {
       if (typeof a === "string") {
         return a === attachTo.identity;
       }
@@ -87,7 +86,7 @@ export class OthersAnalyzer implements Analyzer {
   }
 
   async loadPortfolio(): Promise<WalletCoin[]> {
-    return _(this.config.others)
+    return (this.config.others ?? [])
       .map((o) => {
         const attached = o.attachTo
           ? this.resolveAttachTo(o.attachTo)
@@ -99,19 +98,20 @@ export class OthersAnalyzer implements Analyzer {
           wallet: attached?.wallet ?? OthersAnalyzer.wallet,
           chain: attached?.chain ?? "unknown",
         };
-      })
-      .value();
+      });
   }
 
   // Expose attached wallet identities so the data-source fallback can
   // treat failed CEX/wallet analyzers the same as if these entries were
   // loaded from the matching analyzer.
   getWalletIdentities(): string[] {
-    return _(this.config.others)
-      .map((o) => (o.attachTo ? this.resolveAttachTo(o.attachTo) : null))
-      .compact()
-      .map((a) => a.wallet)
-      .uniq()
-      .value();
+    return Array.from(
+      new Set(
+        this.config.others
+          .map((o) => (o.attachTo ? this.resolveAttachTo(o.attachTo) : null))
+          .filter((a): a is NonNullable<typeof a> => a !== null)
+          .map((a) => a.wallet),
+      ),
+    );
   }
 }

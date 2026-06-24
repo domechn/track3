@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { Analyzer, CexConfig, WalletCoin } from "../../types";
 import bluebird from "bluebird";
 import { OtherCexExchanges } from "./others";
@@ -39,7 +38,7 @@ export class CexAnalyzer implements Analyzer {
   constructor(config: CexConfig) {
     this.config = config;
 
-    this.exchanges = _(_(config).get("exchanges", []))
+    this.exchanges = (config.exchanges ?? [])
       .map((exCfg) => {
         console.log("loading exchange", exCfg.name);
         if (exCfg.active === false) {
@@ -118,8 +117,7 @@ export class CexAnalyzer implements Analyzer {
             );
         }
       })
-      .compact()
-      .value();
+      .filter((ex): ex is Exchanger => !!ex);
   }
 
   getAnalyzeName(): string {
@@ -153,28 +151,19 @@ export class CexAnalyzer implements Analyzer {
       return await ex.verifyConfig();
     });
 
-    return _(verifyResults).every();
+    return verifyResults.every(Boolean);
   }
 
   async loadPortfolio(): Promise<WalletCoin[]> {
     // key is exchange name, value is prices
-    const cacheCoinPrices = _(
-      await bluebird.map(
-        _(this.exchanges)
-          .uniqBy((ex) => ex.getExchangeName())
-          .value(),
-        async (ex) => {
-          const pricesMap = await ex.fetchCoinsPrice();
-          return {
-            exChangeName: ex.getExchangeName(),
-            pricesMap,
-          };
-        },
-      ),
-    )
-      .keyBy("exChangeName")
-      .mapValues("pricesMap")
-      .value();
+    const uniqueExchanges = Array.from(
+      new Map(this.exchanges.map((ex) => [ex.getExchangeName(), ex])).values(),
+    );
+    const priceEntries = await bluebird.map(uniqueExchanges, async (ex) => [
+      ex.getExchangeName(),
+      await ex.fetchCoinsPrice(),
+    ]);
+    const cacheCoinPrices = Object.fromEntries(priceEntries);
 
     const getPrice = (
       ex: string,
@@ -205,18 +194,16 @@ export class CexAnalyzer implements Analyzer {
 
       // filter all keys are capital
       const coins = filterCoinsInPortfolio(ex.getIdentity(), portfolio);
-      return _(coins)
-        .map(
+      return coins.map(
           (c) =>
             ({
               ...c,
               price: getPrice(ex.getExchangeName(), c.symbol),
             }) as WalletCoin,
-        )
-        .value();
+        );
     });
 
-    return _(coinLists).flatten().value();
+    return coinLists.flat();
   }
 
   public listExchangeIdentities(): {
@@ -224,13 +211,11 @@ export class CexAnalyzer implements Analyzer {
     identity: string;
     alias?: string;
   }[] {
-    return _(this.exchanges)
-      .map((ex) => ({
+    return this.exchanges.map((ex) => ({
         exchangeName: ex.getExchangeName(),
         identity: ex.getIdentity(),
         alias: ex.getAlias(),
-      }))
-      .value();
+      }));
   }
 }
 
@@ -238,8 +223,7 @@ export function filterCoinsInPortfolio(
   wallet: string,
   portfolio: { [k: string]: number },
 ): WalletCoin[] {
-  return _(portfolio)
-    .keys()
+  return Object.keys(portfolio)
     .filter((k) => portfolio[k] > 0) // amount > 0
     .filter((k) => !!coinSymbolHandler(k))
     .map(
@@ -250,8 +234,7 @@ export function filterCoinsInPortfolio(
           amount: portfolio[k],
           wallet,
         }) as WalletCoin,
-    )
-    .value();
+    );
 }
 
 function coinSymbolHandler(name: string): string | undefined {

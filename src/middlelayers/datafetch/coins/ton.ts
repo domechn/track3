@@ -1,5 +1,4 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
-import _ from "lodash";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
 import { asyncMap } from "../utils/async";
@@ -24,9 +23,7 @@ export class TonAnalyzer implements Analyzer {
   async verifyConfigs(): Promise<boolean> {
     const regex = /^(E|U)[1-9A-Za-z-]{47}$/;
 
-    const valid = _(getAddressList(this.config.ton)).every((address) =>
-      regex.test(address),
-    );
+    const valid = getAddressList(this.config.ton).every((address) => regex.test(address));
     return valid;
   }
 
@@ -53,13 +50,11 @@ export class TonAnalyzer implements Analyzer {
       1,
       1000,
     );
-    return _(coinLists)
-      .map((c) => ({
-        ...c,
-        symbol: "TON",
-        assetType: "crypto" as const,
-        chain: "ton",
-      }))
-      .value();
+    return coinLists.map((c) => ({
+      ...c,
+      symbol: "TON",
+      assetType: "crypto" as const,
+      chain: "ton",
+    }));
   }
 }

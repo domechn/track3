@@ -2,9 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import bluebird from "bluebird";
 import {
   Analyzer,
-  CexConfig,
   GlobalConfig,
-  TokenConfig,
   WalletCoin,
 } from "./datafetch/types";
 import { BTCAnalyzer } from "./datafetch/coins/btc";
@@ -14,7 +12,6 @@ import { OthersAnalyzer } from "./datafetch/coins/others";
 import { SOLAnalyzer } from "./datafetch/coins/sol";
 import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from "./datafetch/coins/erc20";
 import { CexAnalyzer } from "./datafetch/coins/cex/cex";
-import _ from "lodash";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { AddProgressFunc, AssetModel, UserLicenseInfo } from "./types";
 import { ASSET_HANDLER } from "./entities/assets";
@@ -99,10 +96,9 @@ function getErrorMessage(error: unknown): string {
 function getFailedWalletIdentities(
   failedSources: FailedPortfolioSource[],
 ): string[] {
-  return _(failedSources)
-    .flatMap((source) => source.walletIdentities)
-    .uniq()
-    .value();
+  return Array.from(
+    new Set(failedSources.flatMap((source) => source.walletIdentities)),
+  );
 }
 
 function isFailedWallet(
@@ -153,23 +149,22 @@ export async function loadPortfolios(
 
   const failedWalletIdentities = getFailedWalletIdentities(failedSources);
   const lastKnownCoins = options.useLastKnownDataForFailedSources
-    ? _(lastAssets)
-        .flatten()
+    ? lastAssets
+        .flat()
         .filter((asset) => isFailedWallet(asset.wallet, failedWalletIdentities))
         .map(assetModelToLastKnownWalletCoin)
-        .value()
     : [];
   const currentCoinsWithFallback = [...currentCoins, ...lastKnownCoins];
 
   // need to list coins owned before but not now ( amount = 0 )
-  const beforeCoins: WalletCoin[] = _(lastAssets)
-    .flatten()
+  const beforeCoins: WalletCoin[] = lastAssets
+    .flat()
     .map((s) => {
       if (isFailedWallet(s.wallet, failedWalletIdentities)) {
-        return;
+        return null;
       }
 
-      const found = _(currentCoinsWithFallback).find(
+      const found = currentCoinsWithFallback.find(
         (c) =>
           c.symbol === s.symbol &&
           getAssetType(c) === getAssetType(s) &&
@@ -177,12 +172,12 @@ export async function loadPortfolios(
       );
       if (found) {
         // todo check price
-        return;
+        return null;
       }
       return {
         symbol: s.symbol,
         assetType: getAssetType(s),
-        price: _(currentCoinsWithFallback).find((c) => c.symbol === s.symbol)
+        price: currentCoinsWithFallback.find((c) => c.symbol === s.symbol)
           ?.price ?? {
           base: "usd",
           value: s.price,
@@ -190,10 +185,9 @@ export async function loadPortfolios(
         amount: 0,
         value: 0,
         wallet: addMD5PrefixToWallet(s.wallet || ""),
-      };
+      } as WalletCoin | null;
     })
-    .compact()
-    .value();
+    .filter((c): c is WalletCoin => c !== null);
   return {
     coins: [...currentCoinsWithFallback, ...beforeCoins],
     failedSources,
@@ -207,66 +201,41 @@ async function loadPortfoliosByConfig(
   userInfo: UserLicenseInfo,
 ): Promise<LoadPortfoliosResult> {
   const progressPercent = 70;
-  let anas: (
-    | typeof ERC20NormalAnalyzer
-    | typeof ERC20ProAnalyzer
-    | typeof CexAnalyzer
-    | typeof SOLAnalyzer
-    | typeof OthersAnalyzer
-    | typeof BTCAnalyzer
-    | typeof DOGEAnalyzer
-    | typeof TRC20ProUserAnalyzer
-    | typeof TonAnalyzer
-    | typeof SUIAnalyzer
-    | typeof StockAnalyzer
-  )[] = [
-    ERC20NormalAnalyzer,
+  const erc20Ana = userInfo.isPro ? ERC20ProAnalyzer : ERC20NormalAnalyzer;
+  if (userInfo.isPro) {
+    console.debug("pro license, use pro analyzers");
+  } else {
+    console.debug("not pro license, fallback to normal analyzers");
+  }
+  const anas = [
+    erc20Ana,
     CexAnalyzer,
     SOLAnalyzer,
     OthersAnalyzer,
     BTCAnalyzer,
     DOGEAnalyzer,
+    ...(userInfo.isPro ? [TRC20ProUserAnalyzer as typeof TRC20ProUserAnalyzer] : []),
     TonAnalyzer,
     SUIAnalyzer,
     StockAnalyzer,
   ];
-  if (userInfo.isPro) {
-    console.debug("pro license, use pro analyzers");
-    anas = [
-      ERC20ProAnalyzer,
-      CexAnalyzer,
-      SOLAnalyzer,
-      OthersAnalyzer,
-      BTCAnalyzer,
-      DOGEAnalyzer,
-      TRC20ProUserAnalyzer,
-      TonAnalyzer,
-      SUIAnalyzer,
-      StockAnalyzer,
-    ];
-    // anas = [SOLAnalyzer]
-  } else {
-    console.debug("not pro license, fallback to normal analyzers");
-  }
   const perProgressPer = progressPercent / anas.length;
   const failedSources: FailedPortfolioSource[] = [];
   const coinLists = await bluebird.map(
     anas,
     async (ana) => {
-      // Some analyzers (pro license variants) take the pro license as the
-      // second constructor argument; OthersAnalyzer and the basic chain/CEX
-      // analyzers do not. We dispatch on the class reference itself.
-      const licenseClasses = [ERC20ProAnalyzer, TRC20ProUserAnalyzer];
-      const a = (
-        licenseClasses.includes(ana as never)
-          ? new (ana as unknown as new (
-              cfg: GlobalConfig,
-              license: string,
-            ) => Analyzer)(config, userInfo.license!)
-          : new (ana as unknown as new (cfg: GlobalConfig) => Analyzer)(
-              config,
-            )
-      ) as Analyzer;
+      // Pro license variants (ERC20ProAnalyzer, TRC20ProUserAnalyzer)
+      // take the pro license as the second constructor argument; the other
+      // analyzers do not. The pro list only contains the pro variants, so
+      // the presence of the license is keyed on userInfo.isPro.
+      const a = userInfo.isPro
+        ? new (ana as unknown as new (
+            cfg: GlobalConfig,
+            license: string,
+          ) => Analyzer)(config, userInfo.license!)
+        : new (ana as unknown as new (cfg: GlobalConfig) => Analyzer)(
+            config,
+          );
       const anaName = a.getAnalyzeName();
       console.log("loading portfolio from ", anaName);
       try {
@@ -328,17 +297,12 @@ export async function checkIfDuplicatedHistoricalData(
 
   const allUUIDs = await ASSET_HANDLER.listAllUUIDs();
 
-  const importUUIDs = _(ed.historicalData)
-    .map((d) => d.assets)
-    .flatten()
-    .map((a) => a.uuid)
-    .uniq()
-    .value();
+  const importUUIDs = Array.from(
+    new Set(ed.historicalData.flatMap((d) => d.assets).map((a) => a.uuid)),
+  );
 
   // check if there is duplicated uuid
-  const i = _.intersection(allUUIDs, importUUIDs);
-
-  return i && i.length > 0;
+  return allUUIDs.filter(x => importUUIDs.includes(x)).length > 0;
 }
 
 // readHistoricalDataFromFile from file
@@ -355,7 +319,7 @@ export async function readHistoricalDataFromFile(): Promise<
       },
     ],
   });
-  if (!selected || !_(selected).isString()) {
+  if (!selected || typeof selected !== "string") {
     return;
   }
   return DATA_MANAGER.readHistoricalData(selected as string);
@@ -442,12 +406,10 @@ export async function autoImportHistoricalData(): Promise<boolean> {
 
     await DATA_MANAGER.importHistoricalData("IGNORE", ed, (datas) => {
       // only import data that is after last auto import at
-      return _(datas)
-        .filter((d) => {
+      return datas.filter((d) => {
           const createdAt = new Date(d.createdAt);
           return createdAt.getTime() > aia.getTime();
-        })
-        .value();
+        });
     });
   } catch (e) {
     console.error("failed to auto import", e);

@@ -1,5 +1,4 @@
 import { sendHttpRequest } from "./http";
-import _ from "lodash";
 import { listAllCurrencyRates, PRO_API_ENDPOINT } from "../../configuration";
 import { getClientID } from "../../../utils/app";
 
@@ -35,11 +34,11 @@ async function fetchStockPriceEntries(
 export async function fetchStockPrices(
   symbols: string[],
 ): Promise<{ [symbol: string]: number }> {
-  const normalizedSymbols = _(symbols)
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean)
-    .uniq()
-    .value();
+  const normalizedSymbols = [...new Set(
+    symbols
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean)
+  )];
   if (normalizedSymbols.length === 0) {
     return {};
   }
@@ -67,16 +66,12 @@ async function convertEntriesToUsd(
 ): Promise<{ [symbol: string]: number }> {
   const hasNonUsd = entries.some(([, , currency]) => currency !== "USD");
   if (!hasNonUsd) {
-    return _(entries)
-      .map(([symbol, price]) => [symbol, price] as const)
-      .fromPairs()
-      .value();
+    return Object.fromEntries(entries.map(([symbol, price]) => [symbol, price]));
   }
 
-  const rateMap = _(await listAllCurrencyRates())
-    .keyBy((rate) => rate.currency.toUpperCase())
-    .mapValues("rate")
-    .value();
+  const rateMap = Object.fromEntries(
+    (await listAllCurrencyRates()).map((rate) => [rate.currency.toUpperCase(), rate.rate]),
+  );
   rateMap.USD = 1;
 
   const usdEntries: Array<readonly [string, number]> = [];
@@ -91,5 +86,5 @@ async function convertEntriesToUsd(
     usdEntries.push([symbol, price / rate] as const);
   }
 
-  return _(usdEntries).fromPairs().value();
+  return Object.fromEntries(usdEntries);
 }

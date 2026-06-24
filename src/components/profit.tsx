@@ -13,7 +13,6 @@ import {
 import { calculateTotalProfit } from "@/middlelayers/charts";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
-import _ from "lodash";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
 import { positiveNegativeColor } from "@/utils/color";
@@ -97,7 +96,7 @@ const App = ({
           return;
         }
 
-        const sortedCoins = _(res.coins).sortBy("value").value();
+        const sortedCoins = res.coins.sort((a, b) => a.value - b.value);
         setProfit(res.total);
         setProfitPercentage(res.percentage);
         setCoinsProfit(sortedCoins);
@@ -111,9 +110,13 @@ const App = ({
 
   useEffect(() => {
     const gen = loadGenRef.current;
-    const assets = _(coinsProfit.slice(0, 5).concat(coinsProfit.slice(-5)))
-      .uniqBy((coin) => getAssetLogoKey(coin))
-      .value();
+    const seen = new Set();
+    const assets = [...coinsProfit.slice(0, 5), ...coinsProfit.slice(-5)].filter((coin) => {
+      const key = getAssetLogoKey(coin);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     if (assets.length === 0) {
       return;
@@ -128,11 +131,11 @@ const App = ({
   }, [coinsProfit]);
 
   const topProfitData = useMemo(
-    () => _(coinsProfit).takeRight(5).reverse().value(),
+    () => coinsProfit.slice(-5).reverse(),
     [coinsProfit],
   );
   const topLossData = useMemo(
-    () => _(coinsProfit).take(5).value(),
+    () => coinsProfit.slice(0, 5),
     [coinsProfit],
   );
 
@@ -200,7 +203,7 @@ const App = ({
       {} as { [x: string]: string },
     );
 
-    return _.assign({}, ...kvs, cachedMap);
+    return Object.assign({}, ...kvs, cachedMap);
   }
 
   const renderRows = (

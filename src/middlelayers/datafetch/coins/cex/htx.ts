@@ -1,8 +1,7 @@
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
-import _ from 'lodash'
-import { addToBalanceMap } from './balance-utils'
+import { addToBalanceMap, mergeBalances } from './balance-utils'
 
 type AccountResp = {
 	status: string
@@ -121,18 +120,16 @@ export class HtxExchange implements Exchanger {
 			})
 		])
 
-		return _({})
-			.mergeWith(spotBalance, (a: number, b: number) => (a || 0) + (b || 0))
-			.mergeWith(earnBalance, (a: number, b: number) => (a || 0) + (b || 0))
-			.mergeWith(futuresBalance, (a: number, b: number) => (a || 0) + (b || 0))
-			.mergeWith(crossMarginBalance, (a: number, b: number) => (a || 0) + (b || 0))
-			.value()
+		return mergeBalances([
+			spotBalance,
+			earnBalance,
+			futuresBalance,
+			crossMarginBalance,
+		])
 	}
 
 	private async fetchCrossMarginBalance(accounts: AccountResp['data']): Promise<{ [k: string]: number }> {
-		const crossMarginAccounts = _(accounts)
-			.filter(a => (a.type === "super-margin" || a.type === "cross-margin") && a.state === "working")
-			.value()
+		const crossMarginAccounts = accounts.filter(a => (a.type === "super-margin" || a.type === "cross-margin") && a.state === "working")
 
 		if (crossMarginAccounts.length === 0) {
 			return {}
@@ -148,7 +145,7 @@ export class HtxExchange implements Exchanger {
 			}
 
 			const grouped: { [k: string]: { trade: number, frozen: number, loan: number, interest: number } } = {}
-			_(resp.data.list).forEach(item => {
+			resp.data.list.forEach(item => {
 				if (!includedTypes.has(item.type)) {
 					return
 				}
@@ -168,7 +165,7 @@ export class HtxExchange implements Exchanger {
 				}
 			})
 
-			_(grouped).forEach((component, symbol) => {
+			Object.entries(grouped).forEach(([symbol, component]) => {
 				const loan = component.loan > 0 ? component.loan : -component.loan
 				const interest = component.interest > 0 ? component.interest : -component.interest
 				const net = component.trade + component.frozen - loan - interest
@@ -188,7 +185,7 @@ export class HtxExchange implements Exchanger {
 	}
 
 	private async fetchSpotBalance(accounts: AccountResp['data']): Promise<{ [k: string]: number }> {
-		const spotAccount = _(accounts).find(a => a.type === "spot" && a.state === "working")
+		const spotAccount = accounts.find(a => a.type === "spot" && a.state === "working")
 		if (!spotAccount) {
 			return {}
 		}
@@ -199,12 +196,8 @@ export class HtxExchange implements Exchanger {
 		}
 
 		const balances: { [k: string]: number } = {}
-		_(resp.data.list).forEach(item => {
-			const symbol = item.currency.toUpperCase()
-			const amount = parseFloat(item.balance) || 0
-			if (amount > 0) {
-				balances[symbol] = (balances[symbol] || 0) + amount
-			}
+		resp.data.list.forEach(item => {
+			addToBalanceMap(balances, item.currency.toUpperCase(), parseFloat(item.balance) || 0)
 		})
 
 		return balances
@@ -212,9 +205,9 @@ export class HtxExchange implements Exchanger {
 
 	private async fetchEarnBalance(accounts: AccountResp['data']): Promise<{ [k: string]: number }> {
 		// "deposit-earning" is the earn account type in HTX
-		const earnAccounts = _(accounts).filter(a =>
-			(a.type === "deposit-earning" || a.type === "investment") && a.state === "working"
-		).value()
+		const earnAccounts = accounts.filter(
+			(a) => (a.type === "deposit-earning" || a.type === "investment") && a.state === "working",
+		)
 
 		if (earnAccounts.length === 0) {
 			return {}
@@ -226,12 +219,8 @@ export class HtxExchange implements Exchanger {
 			if (resp.status !== "ok") {
 				continue
 			}
-			_(resp.data.list).forEach(item => {
-				const symbol = item.currency.toUpperCase()
-				const amount = parseFloat(item.balance) || 0
-				if (amount > 0) {
-					balances[symbol] = (balances[symbol] || 0) + amount
-				}
+			resp.data.list.forEach(item => {
+				addToBalanceMap(balances, item.currency.toUpperCase(), parseFloat(item.balance) || 0)
 			})
 		}
 
@@ -254,11 +243,11 @@ export class HtxExchange implements Exchanger {
 			})
 		])
 
-		return _({})
-			.mergeWith(usdtIsolated, (a: number, b: number) => (a || 0) + (b || 0))
-			.mergeWith(usdtCross, (a: number, b: number) => (a || 0) + (b || 0))
-			.mergeWith(coinSwap, (a: number, b: number) => (a || 0) + (b || 0))
-			.value()
+		const merged: { [k: string]: number } = {};
+		for (const [k, v] of Object.entries(usdtIsolated)) merged[k] = (merged[k] || 0) + v;
+		for (const [k, v] of Object.entries(usdtCross)) merged[k] = (merged[k] || 0) + v;
+		for (const [k, v] of Object.entries(coinSwap)) merged[k] = (merged[k] || 0) + v;
+		return merged
 	}
 
 	// USDT-margined isolated swap balance → report as USDT
@@ -269,7 +258,7 @@ export class HtxExchange implements Exchanger {
 		}
 
 		let totalUsdt = 0
-		_(resp.data).forEach(item => {
+		resp.data.forEach(item => {
 			totalUsdt += item.margin_balance || 0
 		})
 
@@ -285,7 +274,7 @@ export class HtxExchange implements Exchanger {
 		}
 
 		let totalUsdt = 0
-		_(resp.data).forEach(item => {
+		resp.data.forEach(item => {
 			totalUsdt += item.margin_balance || 0
 		})
 
@@ -301,12 +290,8 @@ export class HtxExchange implements Exchanger {
 		}
 
 		const balances: { [k: string]: number } = {}
-		_(resp.data).forEach(item => {
-			const symbol = item.symbol.toUpperCase()
-			const amount = item.margin_balance || 0
-			if (amount > 0) {
-				balances[symbol] = (balances[symbol] || 0) + amount
-			}
+		resp.data.forEach(item => {
+			addToBalanceMap(balances, item.symbol.toUpperCase(), item.margin_balance || 0)
 		})
 
 		return balances
@@ -319,17 +304,11 @@ export class HtxExchange implements Exchanger {
 		}
 
 		const suffix = "usdt"
-		const allPricesMap = _(resp.data)
-			.filter(p => p.symbol.endsWith(suffix))
-			.map(p => ({
-				symbol: p.symbol.slice(0, -suffix.length).toUpperCase(),
-				price: p.close
-			}))
-			.keyBy("symbol")
-			.mapValues("price")
-			.value()
-
-		return allPricesMap
+		return Object.fromEntries(
+			resp.data
+				.filter((p) => p.symbol.endsWith(suffix))
+				.map((p) => [p.symbol.slice(0, -suffix.length).toUpperCase(), p.close]),
+		)
 	}
 
 	async verifyConfig(): Promise<boolean> {

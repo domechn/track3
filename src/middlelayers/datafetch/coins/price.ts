@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { getClientID } from '@/utils/app'
 import { sendHttpRequest } from '../utils/http'
-import _ from 'lodash'
 import { PRO_API_ENDPOINT } from '@/middlelayers/configuration'
 
 export interface CoinPriceQuerier {
@@ -37,7 +36,7 @@ export class ProCoinPriceQuery implements CoinPriceQuerier {
 			coins
 		})
 
-		if (_.size(resp.data) === 0) {
+		if (Object.keys(resp.data).length === 0) {
 			throw new Error("failed to fetch coin prices")
 		}
 

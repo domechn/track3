@@ -1,5 +1,4 @@
 import { Exchanger } from './cex'
-import _ from 'lodash'
 
 export class OtherCexExchanges implements Exchanger {
 	constructor(exchangeName: string, initParams: {

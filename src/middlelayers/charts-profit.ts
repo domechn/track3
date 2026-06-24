@@ -1,6 +1,6 @@
-import _ from "lodash";
 import {
   AssetAction,
+  AssetModel,
   TDateRange,
   Transaction,
   TransactionModel,
@@ -46,7 +46,7 @@ export async function queryTransactionsBySymbolAndDateRange(
     dateRange.end,
     symbol,
   );
-  return _(filterByAssetType(_(models).flatten().value(), assetType))
+  return filterByAssetType(models.flat(), assetType)
     .map((m) => ({
       id: m.id,
       assetID: m.assetID,
@@ -58,8 +58,7 @@ export async function queryTransactionsBySymbolAndDateRange(
       price: m.price,
       txnType: m.txnType,
       txnCreatedAt: m.txnCreatedAt,
-    }))
-    .value();
+    }));
 }
 
 // calculate total profit from transactions
@@ -77,7 +76,6 @@ export async function calculateTotalProfit(
     return c;
   }
 
-  // const allAssets = await ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end)
   const latestAssets = filterByAssetType(
     await ASSET_HANDLER.listAssetsMaxCreatedAt(
       dateRange.start,
@@ -87,23 +85,27 @@ export async function calculateTotalProfit(
     assetType,
   );
   // group latestAssets by symbol, can sum amount and value
-  const dateRangeAssets = _(latestAssets)
-    .groupBy((asset) => getAssetIdentity(asset))
-    .map((assets) => {
-      const first = _(assets).first();
-      const allAmount = _(assets).sumBy("amount");
-      const allValue = _(assets).sumBy("value");
-      return {
-        symbol: first?.symbol ?? "",
-        assetType: getAssetType(first),
-        price: allAmount === 0 ? 0 : allValue / allAmount,
-        amount: allAmount,
-        value: allValue,
-        // all createdAt are same, so just get the first one
-        createdAt: first?.createdAt,
-      };
-    })
-    .value();
+  const dateRangeAssets = Array.from(
+    latestAssets.reduce((map, asset) => {
+      const key = getAssetIdentity(asset);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(asset);
+      return map;
+    }, new Map<string, AssetModel[]>())
+  ).map(([_, assets]) => {
+    const first = assets[0];
+    const allAmount = assets.reduce((s, a) => s + a.amount, 0);
+    const allValue = assets.reduce((s, a) => s + a.value, 0);
+    return {
+      symbol: first?.symbol ?? "",
+      assetType: getAssetType(first),
+      price: allAmount === 0 ? 0 : allValue / allAmount,
+      amount: allAmount,
+      value: allValue,
+      // all createdAt are same, so just get the first one
+      createdAt: first?.createdAt,
+    };
+  });
   const earliestAssets = filterByAssetType(
     await ASSET_HANDLER.listAssetsMinCreatedAt(
       dateRange.start,
@@ -114,39 +116,37 @@ export async function calculateTotalProfit(
   );
 
   const allTransactions = filterByAssetType(
-    _(
-      await TRANSACTION_HANDLER.listTransactionsByDateRange(
-        dateRange.start,
-        dateRange.end,
-        symbol,
-      ),
-    )
-      .flatten()
-      .value(),
+    (await TRANSACTION_HANDLER.listTransactionsByDateRange(
+      dateRange.start,
+      dateRange.end,
+      symbol,
+    )).flat(),
     assetType,
   );
   // todo: handle if one asset has multiple transactions
-  const allTransactionsAssetIdMap = _(allTransactions)
-    .groupBy("assetID")
-    .mapValues((t) => t[0])
-    .value();
+  const allTransactionsAssetIdMap = Object.fromEntries(
+    allTransactions.map((t) => [t.assetID, t]),
+  );
 
-  const dateRangeEarliestAssets = _(earliestAssets)
-    .groupBy((asset) => getAssetIdentity(asset))
-    .map((assets) => {
-      const bsAssets = _(assets)
-        .filter((a) => {
-          const txn = allTransactionsAssetIdMap[a.id];
-          return !txn || isTransactionBuyOrSell(txn);
-        })
-        .value();
-      const allAmount = _(bsAssets).sumBy("amount");
-      const allValue = _(bsAssets)
-        .map(
-          (a) => (allTransactionsAssetIdMap[a.id]?.price ?? a.price) * a.amount,
-        )
-        .sum();
-      const first = _(assets).first();
+  const dateRangeEarliestAssets = Array.from(
+    earliestAssets.reduce((map, asset) => {
+      const key = getAssetIdentity(asset);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(asset);
+      return map;
+    }, new Map<string, AssetModel[]>())
+  ).map(([_, assets]) => {
+    const bsAssets = assets.filter((a) => {
+      const txn = allTransactionsAssetIdMap[a.id];
+      return !txn || isTransactionBuyOrSell(txn);
+    });
+    const allAmount = bsAssets.reduce((s, a) => s + a.amount, 0);
+    const allValue = bsAssets
+      .map(
+        (a) => (allTransactionsAssetIdMap[a.id]?.price ?? a.price) * a.amount,
+      )
+      .reduce((s, v) => s + v, 0);
+      const first = assets[0];
       return {
         symbol: first?.symbol ?? "",
         assetType: getAssetType(first),
@@ -156,78 +156,79 @@ export async function calculateTotalProfit(
         // all createdAt are same, so just get the first one
         createdAt: first?.createdAt,
       };
-    })
-    .value();
+    });
 
-  const groupedTransactions = _(allTransactions)
-    .groupBy((txn) => getAssetIdentity(txn))
-    .map((txns) => {
-      const first = _(txns).first();
-      const symbolTxns = _(txns)
-        .sortBy("txnCreatedAt")
-        .map((txn) => {
-          if (!isTransactionBuyOrSell(txn)) {
-            return;
-          }
+  const groupedTransactions = Array.from(
+    allTransactions.reduce((map, txn) => {
+      const key = getAssetIdentity(txn);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(txn);
+      return map;
+    }, new Map<string, TransactionModel[]>())
+  ).map(([_, txns]) => {
+    const first = txns[0];
+    const symbolTxns = txns
+      .slice()
+      .sort((a, b) => a.txnCreatedAt.localeCompare(b.txnCreatedAt))
+      .map((txn) => {
+        if (!isTransactionBuyOrSell(txn)) {
+          return;
+        }
 
-          return transformTransactionModelToAssetAction(txn);
-        })
-        .compact()
-        .value();
-      return {
-        symbol: first?.symbol ?? "",
-        assetType: getAssetType(first),
-        latest: _(dateRangeAssets).find(
-          (a) =>
-            a.symbol === first?.symbol && a.assetType === getAssetType(first),
-        ),
-        actions: symbolTxns,
-      };
-    })
-    .value();
-  const coins = _(groupedTransactions)
+        return transformTransactionModelToAssetAction(txn);
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x);
+    return {
+      symbol: first?.symbol ?? "",
+      assetType: getAssetType(first),
+      latest: dateRangeAssets.find(
+        (a) =>
+          a.symbol === first?.symbol && a.assetType === getAssetType(first),
+      ),
+      actions: symbolTxns,
+    };
+  });
+  const coins = groupedTransactions
     .map((d) => {
       if (!d.latest) {
         return;
       }
       const beforeBuyAmount =
-        _(dateRangeEarliestAssets).find(
+        dateRangeEarliestAssets.find(
           (a) => a.symbol === d.symbol && a.assetType === d.assetType,
         )?.amount ?? 0;
 
       const beforeCost =
-        _(dateRangeEarliestAssets).find(
+        dateRangeEarliestAssets.find(
           (a) => a.symbol === d.symbol && a.assetType === d.assetType,
         )?.value ?? 0;
-      const beforeCreatedAt = _(dateRangeEarliestAssets).find(
+      const beforeCreatedAt = dateRangeEarliestAssets.find(
         (a) => a.symbol === d.symbol && a.assetType === d.assetType,
       )?.createdAt;
       const beforeSellAmount = 0;
       const beforeSell = 0;
       // filter out transactions before the first buy
-      const afterActions = _(d.actions)
-        .filter(
-          (a) => beforeCreatedAt === undefined || a.changedAt > beforeCreatedAt,
-        )
-        .value();
+      const afterActions = d.actions.filter(
+        (a) => beforeCreatedAt === undefined || a.changedAt > beforeCreatedAt,
+      );
 
       const buyAmount =
-        _(afterActions)
+        afterActions
           .filter((a) => a.amount > 0)
-          .sumBy((a) => a.amount) + beforeBuyAmount;
+          .reduce((s, a) => s + a.amount, 0) + beforeBuyAmount;
 
       const sellAmount =
-        _(afterActions)
+        afterActions
           .filter((a) => a.amount < 0)
-          .sumBy((a) => -a.amount) + beforeSellAmount;
+          .reduce((s, a) => s + (-a.amount), 0) + beforeSellAmount;
       const cost =
-        _(afterActions)
+        afterActions
           .filter((a) => a.amount > 0)
-          .sumBy((a) => a.amount * a.price) + beforeCost;
+          .reduce((s, a) => s + a.amount * a.price, 0) + beforeCost;
       const sell =
-        _(afterActions)
+        afterActions
           .filter((a) => a.amount < 0)
-          .sumBy((a) => -a.amount * a.price) + beforeSell;
+          .reduce((s, a) => s + (-a.amount * a.price), 0) + beforeSell;
       const costAvgPrice = buyAmount === 0 ? 0 : cost / buyAmount;
       const sellAvgPrice = sellAmount === 0 ? 0 : sell / sellAmount;
 
@@ -254,15 +255,18 @@ export async function calculateTotalProfit(
         percentage,
       };
     })
-    .compact()
-    .value();
+    .filter((x): x is NonNullable<typeof x> => !!x);
 
-  const total = _(coins).sumBy((c) => c.value);
-  const totalRealSpent = _(coins).sumBy((c) => c.realSpentValue);
+  const total = coins.reduce((s, c) => s + c.value, 0);
+  const totalRealSpent = coins.reduce((s, c) => s + c.realSpentValue, 0);
 
-  const lrd = _(latestAssets).maxBy((a) =>
-    new Date(a.createdAt).getTime(),
-  )?.createdAt;
+  let lrdAsset: AssetModel | undefined;
+  for (const a of latestAssets) {
+    if (!lrdAsset || new Date(a.createdAt).getTime() > new Date(lrdAsset.createdAt).getTime()) {
+      lrdAsset = a;
+    }
+  }
+  const lrd = lrdAsset?.createdAt;
 
   const resp = {
     total,

@@ -5,7 +5,6 @@ import {
   TDateRange,
   TotalValueData,
 } from "@/middlelayers/types";
-import _ from "lodash";
 import { useContext, useEffect, useMemo, useState, useRef} from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { queryMaxTotalValue, queryTotalValue } from "@/middlelayers/charts";

@@ -31,10 +31,6 @@ const App = ({
   const currentTheme = useTheme();
 
   useEffect(() => {
-    setSelectedLocale(locale);
-  }, [locale]);
-
-  useEffect(() => {
     loadGeneralSettings();
   }, []);
 

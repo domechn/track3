@@ -1,9 +1,8 @@
-import _ from 'lodash'
 
 const pad = (n: number) => n < 10 ? `0${n}` : '' + n
 
 export const timeToDateStr = (timestamp: number | Date, showTime = false) => {
-	const date = _(timestamp).isDate() ? timestamp as Date : new Date(timestamp)
+	const date = timestamp instanceof Date ? timestamp as Date : new Date(timestamp)
 
 	const dateStr = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
 	if (!showTime) {

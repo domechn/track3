@@ -1,5 +1,4 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
-import _ from "lodash";
 import { asyncMap } from "../utils/async";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
@@ -41,14 +40,12 @@ class ERC20RPCQuery implements ERC20Querier {
       return [];
     }
 
-    const jsonReq = _(addresses)
-      .map((addr, idx) => ({
-        id: idx,
-        jsonrpc: "2.0",
-        params: [addr, "latest"],
-        method: "eth_getBalance",
-      }))
-      .value();
+    const jsonReq = addresses.map((addr, idx) => ({
+      id: idx,
+      jsonrpc: "2.0",
+      params: [addr, "latest"],
+      method: "eth_getBalance",
+    }));
     const results = await sendHttpRequest<QueryAssetResp[]>(
       "POST",
       this.queryUrl,
@@ -66,15 +63,13 @@ class ERC20RPCQuery implements ERC20Querier {
       );
     }
 
-    return _(results)
-      .map((r, idx) => ({
-        wallet: addresses[idx],
-        symbol: this.mainSymbol,
-        assetType: "crypto" as const,
-        amount: parseInt(r.result) / 1e18,
-        chain: this.getChain(),
-      }))
-      .value();
+    return results.map((r, idx) => ({
+      wallet: addresses[idx],
+      symbol: this.mainSymbol,
+      assetType: "crypto" as const,
+      amount: parseInt(r.result) / 1e18,
+      chain: this.getChain(),
+    }));
   }
 }
 
@@ -110,7 +105,7 @@ export class ERC20NormalAnalyzer implements Analyzer {
         const results = await Promise.all(
           this.queries.map((q) => q.query(addrs)),
         );
-        return _(results).flatten().value();
+        return results.flat();
       },
       1,
       0,
@@ -125,9 +120,7 @@ export class ERC20NormalAnalyzer implements Analyzer {
   async verifyConfigs(): Promise<boolean> {
     const regex = /^(0x)?[0-9a-fA-F]{40}$/;
 
-    const valid = _(getAddressList(this.config.erc20)).every((address) =>
-      regex.test(address),
-    );
+    const valid = getAddressList(this.config.erc20).every((address) => regex.test(address));
     return valid;
   }
 
@@ -206,26 +199,21 @@ export class ERC20ProAnalyzer extends ERC20NormalAnalyzer {
       1000,
     );
 
-    return _(resp[0].data)
-      .map((d) =>
-        _(d.assets)
-          .map((a) => ({
-            symbol: a.symbol,
-            assetType: "crypto" as const,
-            amount: a.amount,
-            price: a.price
-              ? {
-                  value: a.price,
-                  base: "usd" as "usd",
-                }
-              : undefined,
-            wallet: d.wallet,
-            chain: a.chain,
-          }))
-          .value(),
-      )
-      .flatten()
-      .value();
+    return resp[0].data.flatMap((d) =>
+      d.assets.map((a) => ({
+        symbol: a.symbol,
+        assetType: "crypto" as const,
+        amount: a.amount,
+        price: a.price
+          ? {
+              value: a.price,
+              base: "usd" as "usd",
+            }
+          : undefined,
+        wallet: d.wallet,
+        chain: a.chain,
+      })),
+    );
   }
 
   async loadProPortfolioWithRetry(

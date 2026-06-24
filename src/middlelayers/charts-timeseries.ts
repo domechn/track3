@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { generateRandomColors } from "../utils/color";
 import {
   AssetChangeData,
@@ -30,32 +29,31 @@ export async function queryPNLChartValue(
     dateRange.end,
   );
 
-  const reversedData = _(data).reverse().value();
+  const reversedData = data.slice().reverse();
   const step =
     reversedData.length > maxSize
       ? Math.floor(reversedData.length / maxSize)
       : 0;
 
-  return _(reversedData)
+  return reversedData
     .filter((_d, idx, arr) => {
       if (step === 0) return true;
       return idx === 0 || idx === arr.length - 1 || idx % step === 0;
     })
     .map((rs) => ({
-      totalValue: _(rs).sumBy("value"),
+      totalValue: rs.reduce((s, r) => s + r.value, 0),
       timestamp: new Date(rs[0]?.createdAt).getTime(),
-    }))
-    .value();
+    }));
 }
 
 export async function queryPNLTableValue(): Promise<PNLTableDate> {
-  const pnlData = _(await ASSET_HANDLER.listSymbolGroupedAssets(35))
+  const pnlData = (await ASSET_HANDLER.listSymbolGroupedAssets(35))
+    .slice()
     .reverse()
     .map((rs) => ({
-      totalValue: _(rs).sumBy("value"),
+      totalValue: rs.reduce((s, r) => s + r.value, 0),
       timestamp: new Date(rs[0]?.createdAt).getTime(),
-    }))
-    .value();
+    }));
 
   const getPNL = (days: number) => {
     if (pnlData.length < days + 1) {
@@ -71,7 +69,7 @@ export async function queryPNLTableValue(): Promise<PNLTableDate> {
   };
 
   return {
-    latestTotalValue: _(pnlData).last()?.totalValue,
+    latestTotalValue: pnlData[pnlData.length - 1]?.totalValue,
     todayPNL: getPNL(1),
     sevenTPnl: getPNL(8),
     thirtyPNL: getPNL(31),
@@ -88,21 +86,21 @@ export async function queryTopNAssets(
     dateRange.end,
   );
 
-  return _(assets)
-    .flatten()
-    .groupBy((asset) => getAssetIdentity(asset))
-    .map((group) => ({
-      symbol: group[0].symbol,
-      assetType: getAssetType(group[0]),
-      totalValue: _(group).sumBy("value"),
-    }))
-    .orderBy(["totalValue", "symbol"], ["desc", "asc"])
-    .take(n)
+  const groupedBySymbol = new Map<string, { symbol: string; assetType: AssetType; totalValue: number }>();
+  for (const asset of assets.flat()) {
+    const key = getAssetIdentity(asset);
+    if (!groupedBySymbol.has(key)) {
+      groupedBySymbol.set(key, { symbol: asset.symbol, assetType: getAssetType(asset), totalValue: 0 });
+    }
+    groupedBySymbol.get(key)!.totalValue += asset.value;
+  }
+  return Array.from(groupedBySymbol.values())
+    .sort((a, b) => b.totalValue - a.totalValue || a.symbol.localeCompare(b.symbol))
+    .slice(0, n)
     .map((asset) => ({
       symbol: asset.symbol,
       assetType: asset.assetType,
-    }))
-    .value();
+    }));
 }
 
 // return top 10 and other coins' percentage change during the date range
@@ -113,7 +111,7 @@ export async function queryAssetsPercentageChange(
     dataRange.start,
     dataRange.end,
   );
-  const reservedAssets = _(assets).reverse().value();
+  const reservedAssets = assets.slice().reverse();
   const getPercentages = (
     asts: AssetModel[],
   ): {
@@ -124,42 +122,37 @@ export async function queryAssetsPercentageChange(
       percentage: number;
     }[];
   } => {
-    const total = _(asts).sumBy("value");
+    const total = asts.reduce((s, a) => s + a.value, 0);
     // get top 10 coins and their percentage change
     if (total === 0) {
       return {
         timestamp: new Date(asts[0]?.createdAt).getTime(),
-        data: _(asts)
+        data: asts
           .map((a) => ({
             symbol: a.symbol,
             assetType: getAssetType(a),
             percentage: 0,
-          }))
-          .value(),
+          })),
       };
     }
 
     return {
       timestamp: new Date(asts[0]?.createdAt).getTime(),
-      data: _(asts)
-        .map((a) => ({
+      data: asts.map((a) => ({
           symbol: a.symbol,
           assetType: getAssetType(a),
           percentage: (a.value / total) * 100,
-        }))
-        .value(),
+        })),
     };
   };
 
-  const data = _(reservedAssets)
-    .map((asts) => getPercentages(asts))
-    .value();
-  return _(data)
+  const data = reservedAssets
+    .map((asts) => getPercentages(asts));
+  return data
     .map((d) => ({
       timestamp: d.timestamp,
       percentages: d.data,
-    }))
-    .value();
+    }));
 }
 
 export async function queryTopCoinsRank(
@@ -171,18 +164,17 @@ export async function queryTopCoinsRank(
     dateRange.end,
   );
 
-  const reservedAssets = _(assets).reverse().value();
+  const reservedAssets = assets.slice().reverse();
 
   const step =
     reservedAssets.length > maxSize
       ? Math.floor(reservedAssets.length / maxSize)
       : 0;
-  const filteredReservedAssets = _(reservedAssets)
+  const filteredReservedAssets = reservedAssets
     .filter((_d, idx, arr) => {
       if (step === 0) return true;
       return idx === 0 || idx === arr.length - 1 || idx % step === 0;
-    })
-    .value();
+    });
   const timestamps = filteredReservedAssets.map((item) =>
     new Date(item[0]?.createdAt).getTime(),
   );
@@ -193,7 +185,7 @@ export async function queryTopCoinsRank(
   });
   filteredReservedAssets.forEach((ass) => {
     const timestamp = new Date(ass[0]?.createdAt).getTime();
-    const rankedAssets = _(ass).orderBy("value", "desc").take(10).value();
+    const rankedAssets = ass.slice().sort((a, b) => b.value - a.value).slice(0, 10);
     rankedAssets.forEach((asset, idx) => {
       coinRankMap.get(getAssetIdentity(asset))?.set(timestamp, idx + 1);
     });
@@ -202,7 +194,7 @@ export async function queryTopCoinsRank(
 
   return {
     timestamps,
-    coins: _(coins)
+    coins: coins
       .map((coin, idx) => ({
         coin: coin.symbol,
         assetType: coin.assetType,
@@ -211,8 +203,7 @@ export async function queryTopCoinsRank(
           timestamp,
           rank: coinRankMap.get(getAssetIdentity(coin))?.get(timestamp),
         })),
-      }))
-      .value(),
+      })),
   };
 }
 
@@ -225,18 +216,17 @@ export async function queryTopCoinsPercentageChangeData(
     dateRange.end,
   );
 
-  const reservedAssets = _(assets).reverse().value();
+  const reservedAssets = assets.slice().reverse();
 
   const step =
     reservedAssets.length > maxSize
       ? Math.floor(reservedAssets.length / maxSize)
       : 0;
-  const filteredReservedAssets = _(reservedAssets)
+  const filteredReservedAssets = reservedAssets
     .filter((_d, idx, arr) => {
       if (step === 0) return true;
       return idx === 0 || idx === arr.length - 1 || idx % step === 0;
-    })
-    .value();
+    });
   const timestamps = filteredReservedAssets.map((item) =>
     new Date(item[0]?.createdAt).getTime(),
   );
@@ -254,7 +244,7 @@ export async function queryTopCoinsPercentageChangeData(
 
   return {
     timestamps,
-    coins: _(coins)
+    coins: coins
       .map((coin, idx) => ({
         coin: coin.symbol,
         assetType: coin.assetType,
@@ -277,25 +267,24 @@ export async function queryTopCoinsPercentageChangeData(
               100,
           }));
         })(),
-      }))
-      .value(),
+      })),
   };
 }
 
 function getCoins(assets: AssetModel[][], size = 10): AssetReference[] {
   // only take top 10 coins in each item
-  return _(assets)
-    .map((as) =>
-      _(as)
-        .sortBy("value")
-        .reverse()
-        .take(size > 0 ? size : _(as).size())
-        .value(),
-    )
-    .flatten()
-    .uniqBy((asset) => getAssetIdentity(asset))
-    .map((asset) => toAssetReference(asset))
-    .value();
+  const unique = new Map<string, AssetReference>();
+  for (const as of assets) {
+    const sorted = as.slice().sort((a, b) => b.value - a.value);
+    const top = sorted.slice(0, size > 0 ? size : sorted.length);
+    for (const asset of top) {
+      const key = getAssetIdentity(asset);
+      if (!unique.has(key)) {
+        unique.set(key, toAssetReference(asset));
+      }
+    }
+  }
+  return Array.from(unique.values());
 }
 
 export async function queryAssetChange(
@@ -307,30 +296,25 @@ export async function queryAssetChange(
     dateRange.end,
   );
 
-  const reversedAssets = _(assets).reverse().value();
+  const reversedAssets = assets.slice().reverse();
   const step =
     reversedAssets.length > maxSize
       ? Math.floor(reversedAssets.length / maxSize)
       : 0;
-  const reservedAssets = _(reversedAssets)
+  const reservedAssets = reversedAssets
     .filter((_d, idx, arr) => {
       if (step === 0) return true;
       return idx === 0 || idx === arr.length - 1 || idx % step === 0;
-    })
-    .value();
+    });
 
   return {
-    timestamps: _(reservedAssets)
-      .flatten()
-      .map((t) => new Date(t.createdAt).getTime())
-      .uniq()
-      .value(),
-    data: _(reservedAssets)
-      .map((ass) => ({
-        usdValue: _(ass).sumBy("value"),
-        btcPrice: _(ass).find((a) => a.symbol === "BTC")?.price,
-      }))
-      .value(),
+    timestamps: Array.from(new Set(
+      reservedAssets.flat().map((t) => new Date(t.createdAt).getTime())
+    )),
+    data: reservedAssets.map((ass) => ({
+        usdValue: ass.reduce((s, a) => s + a.value, 0),
+        btcPrice: ass.find((a) => a.symbol === "BTC")?.price,
+      })),
   };
 }
 
@@ -345,14 +329,13 @@ export async function queryCoinsAmountChange(
     dateRange.start,
     dateRange.end,
   );
-  const filteredAssets = _(assets)
+  const filteredAssets = assets
     .map((models) => filterByAssetType(models, assetType))
-    .filter((models) => models.length > 0)
-    .value();
+    .filter((models) => models.length > 0);
   if (filteredAssets.length === 0) {
     return;
   }
-  const reservedAssets = _(filteredAssets).reverse().value();
+  const reservedAssets = filteredAssets.slice().reverse();
 
   const getAmountsAndTimestamps = (
     models: AssetModel[][],
@@ -361,30 +344,28 @@ export async function queryCoinsAmountChange(
     value: number;
     timestamp: number;
   }[] => {
-    return _(models)
+    return models
       .map((assets) => {
         return {
-          amount: _(assets).sumBy("amount"),
-          value: _(assets).sumBy("value"),
+          amount: assets.reduce((s, a) => s + a.amount, 0),
+          value: assets.reduce((s, a) => s + a.value, 0),
           timestamp: new Date(assets[0].createdAt).getTime(),
         };
-      })
-      .value();
+      });
   };
 
   const aat = getAmountsAndTimestamps(reservedAssets);
   const step = aat.length > maxSize ? Math.floor(aat.length / maxSize) : 0;
-  const reservedAat = _(aat)
+  const reservedAat = aat
     .filter((_d, idx, arr) => {
       if (step === 0) return true;
       return idx === 0 || idx === arr.length - 1 || idx % step === 0;
-    })
-    .value();
+    });
 
   return {
     coin: symbol,
-    amounts: _(reservedAat).map("amount").value(),
-    values: _(reservedAat).map("value").value(),
-    timestamps: _(reservedAat).map("timestamp").value(),
+    amounts: reservedAat.map((a) => a.amount),
+    values: reservedAat.map((a) => a.value),
+    timestamps: reservedAat.map((a) => a.timestamp),
   };
 }

@@ -1,4 +1,3 @@
-import _ from "lodash";
 import {
   AssetModel,
   HistoricalData,
@@ -15,7 +14,7 @@ import { TRANSACTION_HANDLER } from "./entities/transactions";
 export async function getAvailableDates(): Promise<Date[]> {
   const dates = await ASSET_HANDLER.getHasDataCreatedAtDates();
   // return asc sort
-  return _(dates).reverse().value();
+  return dates.slice().reverse();
 }
 
 // gather: if true, group asset models by same symbol
@@ -41,31 +40,34 @@ export async function queryHistoricalData(
     : gather
       ? await ASSET_HANDLER.listSymbolGroupedAssets(size)
       : await ASSET_HANDLER.listAssets(size);
-  const uuids = _(assetModels)
-    .flatMap((m) => _(m).map("uuid").value())
-    .compact()
-    .uniq()
-    .value();
+  const uuids = Array.from(
+    new Set(
+      assetModels.flatMap((m) => m.map((a) => a.uuid)).filter((u): u is string => !!u),
+    ),
+  );
   const transactionModels = includeTransactions
     ? await TRANSACTION_HANDLER.listTransactionsByUUIDs(uuids)
     : [];
-  const transactionsByUUID: Record<string, TransactionModel[]> =
-    includeTransactions ? _.groupBy(transactionModels, "uuid") : {};
+  const transactionsByUUID: Record<string, TransactionModel[]> = includeTransactions
+    ? transactionModels.reduce<Record<string, TransactionModel[]>>((acc, t) => {
+        (acc[t.uuid] ??= []).push(t)
+        return acc
+      }, {})
+    : {};
 
   const assetsModelsToHistoricalData = (ams: AssetModel[]): HistoricalData => {
-    const uuid = _(ams).first()!.uuid;
+    const first = ams[0];
+    const uuid = first.uuid;
     return {
       id: uuid,
-      createdAt: _(ams).first()!.createdAt,
+      createdAt: first.createdAt,
       assets: ams,
       transactions: includeTransactions ? (transactionsByUUID[uuid] ?? []) : [],
-      total: _(ams).sumBy("value"),
+      total: ams.reduce((s, a) => s + a.value, 0),
     };
   };
 
-  return _(assetModels)
-    .map((m) => assetsModelsToHistoricalData(m))
-    .value();
+  return assetModels.map(assetsModelsToHistoricalData);
 }
 
 // return all total values order by timestamp asc
@@ -77,28 +79,26 @@ export async function queryTotalValues(
     dateRange.end,
   );
 
-  return _(data)
-    .map((rs) => ({
-      totalValue: rs.totalValue,
-      timestamp: new Date(rs.createdAt).getTime(),
-    }))
-    .value();
+  return data.map((rs) => ({
+    totalValue: rs.totalValue,
+    timestamp: new Date(rs.createdAt).getTime(),
+  }));
 }
 
 // delete batch records by uuid
 export async function deleteHistoricalDataByUUID(uuid: string): Promise<void> {
-  await deleteAssetByUUID(uuid);
+  await ASSET_HANDLER.deleteAssetsByUUID(uuid);
   // !also delete assets related transactions
-  await deleteTransactionsByUUID(uuid);
+  await TRANSACTION_HANDLER.deleteTransactionsByUUID(uuid);
 }
 
 // delete single record by id
 export async function deleteHistoricalDataDetailById(
   id: number,
 ): Promise<void> {
-  await deleteAssetByID(id);
+  await ASSET_HANDLER.deleteAssetByID(id);
   // !also delete assets related transactions
-  await deleteTransactionsByAssetID(id);
+  await TRANSACTION_HANDLER.deleteTransactionsByAssetID(id);
 }
 
 export async function restoreHistoricalData(
@@ -116,7 +116,7 @@ export async function queryRestoreHistoricalData(
 ): Promise<RestoreHistoricalData> {
   // if id is number => it's asset id
   // if id is string => it's asset uuid
-  const isUUID = _(id).isString();
+  const isUUID = typeof id === "string";
   const assets = isUUID
     ? await ASSET_HANDLER.listAssetsByUUIDs([id as string])
     : await ASSET_HANDLER.listAssetsByIDs([id as number]);
@@ -156,18 +156,4 @@ export async function getDataFingerprint(): Promise<string> {
   return result[0]?.maxCreatedAt ?? "";
 }
 
-async function deleteAssetByUUID(uuid: string): Promise<void> {
-  return ASSET_HANDLER.deleteAssetsByUUID(uuid);
-}
 
-async function deleteAssetByID(id: number): Promise<void> {
-  return ASSET_HANDLER.deleteAssetByID(id);
-}
-
-async function deleteTransactionsByUUID(uuid: string): Promise<void> {
-  return TRANSACTION_HANDLER.deleteTransactionsByUUID(uuid);
-}
-
-async function deleteTransactionsByAssetID(id: number): Promise<void> {
-  return TRANSACTION_HANDLER.deleteTransactionsByAssetID(id);
-}

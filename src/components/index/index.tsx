@@ -46,9 +46,8 @@ import {
   getLicenseIfIsPro,
   getInitialQueryDateRange,
   getQuoteColor,
+  getDefaultCurrencyRate,
 } from "@/middlelayers/configuration";
-import { getDefaultCurrencyRate } from "@/middlelayers/configuration";
-import _ from "lodash";
 import Configuration from "@/components/configuration";
 import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
@@ -509,8 +508,8 @@ const App = () => {
 
   const maxDateRange = useMemo(
     () => ({
-      start: _(availableDates).first() ?? parseISO("1970-01-01"),
-      end: _(availableDates).last() ?? parseISO("1970-01-01"),
+      start: availableDates[0] ?? parseISO("1970-01-01"),
+      end: availableDates[availableDates.length - 1] ?? parseISO("1970-01-01"),
     }),
     [availableDates],
   );

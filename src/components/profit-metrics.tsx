@@ -4,7 +4,6 @@ import {
   TDateRange,
   TotalValuesData,
 } from "@/middlelayers/types";
-import _ from "lodash";
 import { useContext, useEffect, useMemo, useState, useRef} from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
@@ -97,15 +96,13 @@ const App = ({
   }
 
   function handleTotalValues(values: TotalValuesData) {
-    const diffs = _(values)
-      .map((v, idx) => ({
+    const diffs = values.map((v, idx) => ({
         timestamp: v.timestamp,
         diff: values[idx - 1] ? v.totalValue - values[idx - 1].totalValue : 0,
-      }))
-      .value();
+      }));
 
-    const maxProfit = _(diffs).maxBy("diff") || { diff: 0, timestamp: 0 };
-    const maxLost = _(diffs).minBy("diff") || { diff: 0, timestamp: 0 };
+    const maxProfit = diffs.reduce((a, b) => a.diff > b.diff ? a : b) || { diff: 0, timestamp: 0 };
+    const maxLost = diffs.reduce((a, b) => a.diff < b.diff ? a : b) || { diff: 0, timestamp: 0 };
 
     const pos = longestContinuousSubarray(diffs);
     const nag = longestContinuousSubarray(diffs, false);
@@ -168,7 +165,7 @@ const App = ({
 
     setAthTimes({
       times: athTimes,
-      dateAndValues: _(athTimeAndValues).reverse().value(),
+      dateAndValues: athTimeAndValues.slice().reverse(),
     });
   }
 
@@ -234,8 +231,7 @@ const App = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {_(athTimes.dateAndValues)
-                  .map((v, idx) => (
+                {athTimes.dateAndValues.map((v, idx) => (
                     <TableRow key={"ath-reached-details-" + idx}>
                       <TableCell>{idx + 1}</TableCell>
                       <TableCell>{timeToDateStr(v.date)}</TableCell>
@@ -246,8 +242,7 @@ const App = ({
                           )}
                       </TableCell>
                     </TableRow>
-                  ))
-                  .value()}
+                  ))}
               </TableBody>
             </Table>
           </ScrollArea>

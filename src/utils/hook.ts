@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cleanTotalProfitCache } from '@/middlelayers/charts'
 import { Menu, MenuItem } from '@tauri-apps/api/menu'
 
@@ -60,25 +60,6 @@ function ensureWindowSizeListener() {
 	}
 }
 
-export const useBeforeRender = (callback: () => unknown, deps: any) => {
-	const [isRun, setIsRun] = useState(false)
-
-	if (!isRun) {
-		callback()
-		setIsRun(true)
-	}
-
-	useEffect(() => () => setIsRun(false), deps)
-}
-
-export const useComponentWillMount = (cb: () => unknown) => {
-	const willMount = useRef(true)
-
-	if (willMount.current) cb()
-
-	willMount.current = false
-}
-
 export const useWindowSize = () => {
 	const [windowSize, setWindowSize] = useState<WindowSizeState>(cachedWindowSize)
 
@@ -97,7 +78,7 @@ export const useWindowSize = () => {
 	return windowSize
 }
 
-export function handleReloadClick() {
+function handleReloadClick() {
 	const now = Date.now()
 	if (softRefreshLocked || now - lastSoftRefreshAt < 1200) {
 		return

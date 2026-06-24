@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { isSameWallet } from "../lib/utils";
 import {
   AddProgressFunc,
@@ -50,9 +49,7 @@ export async function refreshAllData(
   addProgress: AddProgressFunc,
   options: RefreshAllDataOptions = {},
 ): Promise<RefreshAllDataResult> {
-  const lastAssets = _(await ASSET_HANDLER.listAssets(1))
-    .flatten()
-    .value();
+  const lastAssets = (await ASSET_HANDLER.listAssets(1)).flat();
   // will add 90 percent in query coins data
   const queryResult = await queryCoinsData(lastAssets, addProgress, options);
   if (queryResult.requiresDataSourceAction) {
@@ -68,9 +65,7 @@ export async function refreshAllData(
   addProgress(5);
 
   // calculate transactions and save
-  const newAssets = _(await ASSET_HANDLER.listAssets(1))
-    .flatten()
-    .value();
+  const newAssets = (await ASSET_HANDLER.listAssets(1)).flat();
   await TRANSACTION_HANDLER.saveTransactions(
     generateTransactions(uid, lastAssets, newAssets),
   );
@@ -99,7 +94,7 @@ function generateTransactions(
     afterAssetMap.set(getAssetKey(asset), asset);
   });
 
-  const updatedTxns = _(after)
+  const updatedTxns = after
     .map((a) => {
       const l = beforeAssetMap.get(getAssetKey(a));
       if (!l) {
@@ -117,10 +112,10 @@ function generateTransactions(
             createdAt: a.createdAt,
           } as TransactionModel;
         }
-        return;
+        return undefined as unknown as TransactionModel;
       }
       if (a.amount === l.amount) {
-        return;
+        return undefined as unknown as TransactionModel;
       }
       return {
         uuid: uid,
@@ -134,13 +129,12 @@ function generateTransactions(
         txnCreatedAt: a.createdAt,
       } as TransactionModel;
     })
-    .compact()
-    .value();
-  const removedTxns = _(before)
+    .filter((x): x is TransactionModel => !!x);
+  const removedTxns = before
     .filter((la) => !afterAssetMap.has(getAssetKey(la)))
     .map((la) => {
       if (la.amount === 0) {
-        return;
+        return undefined as unknown as TransactionModel;
       }
       return {
         uuid: uid,
@@ -154,8 +148,7 @@ function generateTransactions(
         txnCreatedAt: la.createdAt,
       } as TransactionModel;
     })
-    .compact()
-    .value();
+    .filter((x): x is TransactionModel => !!x);
 
   return [...updatedTxns, ...removedTxns];
 }
@@ -165,7 +158,6 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
   const cache = getMemoryCacheInstance(
     CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY,
   );
-  // const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY)
   const cacheKey = "real-time-assets";
   const c = cache.getCache<Asset[]>(cacheKey);
   if (c) {
@@ -184,26 +176,23 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
   }
   // check if pro user
   const userProInfo = await isProVersion();
-  const lastAssets = _(await ASSET_HANDLER.listAssets(1))
-    .flatten()
-    .value();
+  const lastAssets = (await ASSET_HANDLER.listAssets(1)).flat();
 
   const walletCoins = await queryCoinsDataByWalletCoins(
-    _(assets)
+    assets
       .map((a) => ({
         symbol: a.symbol,
         assetType: getAssetType(a),
         amount: a.amount,
         // wallet here dose not matter
         wallet: a.wallet ?? OthersAnalyzer.wallet,
-      }))
-      .value(),
+      })),
     config,
     lastAssets,
     userProInfo,
   );
 
-  const assetRes = _(walletCoins)
+  const assetRes = walletCoins
     .map((t) => {
       const ast = {
         symbol: t.symbol,
@@ -214,7 +203,7 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
       };
       // check if there are assets without price, if exits, use the last price
       // sometimes coin price is provided by erc20 provider or cex, so it may not be existed in coin price query service ( coingecko )
-      const lastAst = _(assets).find(
+      const lastAst = assets.find(
         (a) => a.symbol === t.symbol && getAssetType(a) === getAssetType(t),
       );
       if (lastAst && ast.amount !== lastAst.amount) {
@@ -223,92 +212,11 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
         ast.price = lastAst.price;
       }
       return ast;
-    })
-    .value();
+    });
 
   // 15 min ttl
   cache.setCache(cacheKey, assetRes, 15 * 60);
   return assetRes;
-}
-
-export async function fixSymbolDataIfNeeded(symbol: string) {
-  // get max createdAt from assets_v2
-  const maxCreatedAt = await ASSET_HANDLER.getLatestCreatedAt();
-  if (!maxCreatedAt) {
-    console.debug("there is no assets_v2 data");
-    return;
-  }
-  // get max createdAt from assets_v2 for this symbol
-  const symbolMaxCreatedAt = await ASSET_HANDLER.getLatestCreatedAt(symbol);
-  if (!symbolMaxCreatedAt) {
-    console.debug("there is no assets_v2 data for symbol", symbol);
-    return;
-  }
-
-  // if they are the same, return
-  if (maxCreatedAt === symbolMaxCreatedAt) {
-    console.debug(
-      "maxCreatedAt and symbolMaxCreatedAt are the same, no need to fix",
-    );
-    return;
-  }
-
-  // if symbol amount is 0, return
-  const symbolModels = await ASSET_HANDLER.listAssetsMaxCreatedAt(
-    undefined,
-    undefined,
-    symbol,
-  );
-  const symbolAmount = _(symbolModels).sumBy("amount");
-  if (symbolAmount === 0) {
-    console.debug("symbol amount is 0, no need to fix");
-    return;
-  }
-
-  const symbolCreatedAt = _(symbolModels).first()?.createdAt;
-  if (!symbolCreatedAt) {
-    console.debug("symbol createdAt is not found, no need to fix");
-    return;
-  }
-
-  const nextOtherSymbolModels = await ASSET_HANDLER.listAssetsAfterCreatedAt(
-    new Date(symbolCreatedAt).getTime() + 1000,
-    1,
-    "asc",
-  );
-
-  const nextCreatedAt = _(nextOtherSymbolModels).first()?.createdAt;
-  const nextUUID = _(nextOtherSymbolModels).first()?.uuid;
-  if (!nextCreatedAt || !nextUUID) {
-    console.debug("next createdAt or uuid is not found, no need to fix");
-    return;
-  }
-  console.info(`there is some issue with ${symbol} data, need to fix`);
-
-  // if they are different, find the next createdAt for this symbol
-  // insert the createdAt and amount, value, price for this symbol into assets_v2
-  // then insert a transaction, type is sell all of this coin
-  console.debug("next createdAt is", nextCreatedAt);
-  const needAddedModels = _(symbolModels)
-    .map((m) => ({
-      ...m,
-      id: 0,
-      uuid: nextUUID,
-      createdAt: nextCreatedAt,
-      amount: 0,
-      value: 0,
-    }))
-    .value();
-
-  const savedModels = await ASSET_HANDLER.saveAssets(needAddedModels);
-
-  // no need to save transactions for now since all transactions are already saved
-  const needAddedTransactions = generateTransactions(
-    nextUUID,
-    symbolModels,
-    savedModels,
-  );
-  await TRANSACTION_HANDLER.saveTransactions(needAddedTransactions);
 }
 
 async function queryCoinsDataByWalletCoins(
@@ -318,39 +226,32 @@ async function queryCoinsDataByWalletCoins(
   userProInfo: UserLicenseInfo,
   addProgress?: AddProgressFunc,
 ): Promise<WalletCoinUSD[]> {
-  const needPriceAssets = _(assets)
-    .filter((a) => !a.price)
-    .value();
-  const cryptoPriceSymbols = _(needPriceAssets)
-    .filter((a) => getAssetType(a) === "crypto")
-    .map("symbol")
-    .push("USDT")
-    .push("BTC")
-    .uniq()
-    .compact()
-    .value();
-  const stockPriceSymbols = _(needPriceAssets)
-    .filter((a) => getAssetType(a) === "stock")
-    .map("symbol")
-    .uniq()
-    .compact()
-    .value();
+  const needPriceAssets = assets.filter((a) => !a.price);
+  const cryptoPriceSymbols = Array.from(new Set(
+    needPriceAssets
+      .filter((a) => getAssetType(a) === "crypto")
+      .map((a) => a.symbol)
+      .concat(["USDT", "BTC"])
+  )).filter((x): x is string => !!x);
+  const stockPriceSymbols = Array.from(new Set(
+    needPriceAssets
+      .filter((a) => getAssetType(a) === "stock")
+      .map((a) => a.symbol)
+  )).filter((x): x is string => !!x);
   const [cryptoPriceMap, stockPriceMap] = await Promise.all([
     cryptoPriceSymbols.length > 0
       ? queryCoinPrices(cryptoPriceSymbols, userProInfo)
       : Promise.resolve({}),
     fetchStockPrices(stockPriceSymbols),
   ]);
-  const typedCryptoPriceMap = _(cryptoPriceMap)
-    .mapKeys((_price, symbol) =>
-      getAssetIdentity({ symbol, assetType: "crypto" }),
-    )
-    .value();
-  const typedStockPriceMap = _(stockPriceMap)
-    .mapKeys((_price, symbol) =>
-      getAssetIdentity({ symbol, assetType: "stock" }),
-    )
-    .value();
+  const typedCryptoPriceMap: Record<string, number> = {};
+  for (const symbol of Object.keys(cryptoPriceMap)) {
+    typedCryptoPriceMap[getAssetIdentity({ symbol, assetType: "crypto" })] = cryptoPriceMap[symbol];
+  }
+  const typedStockPriceMap: Record<string, number> = {};
+  for (const symbol of Object.keys(stockPriceMap)) {
+    typedStockPriceMap[getAssetIdentity({ symbol, assetType: "stock" })] = stockPriceMap[symbol];
+  }
   const priceMap = {
     ...cryptoPriceMap,
     ...stockPriceMap,
@@ -361,54 +262,51 @@ async function queryCoinsDataByWalletCoins(
     addProgress(10);
   }
 
-  let latestAssets = _.clone(assets);
+  let latestAssets = [...assets];
 
   const stableCoins = await queryStableCoins();
 
-  const upperCaseStableCoins = _(stableCoins)
-    .map((c) => c.toUpperCase())
-    .value();
+  const upperCaseStableCoins = stableCoins.map((c) => c.toUpperCase());
 
   // save stable coins to configuration
   await saveStableCoins(upperCaseStableCoins);
 
-  const groupUSD: boolean = _(config).get(["configs", "groupUSD"]) || false;
+  const groupUSD: boolean = (config as any)?.configs?.groupUSD || false;
   if (groupUSD) {
-    _(assets)
-      .groupBy("wallet")
-      .forEach((coins, wallet) => {
-        const cryptoCoins = _(coins)
-          .filter((c) => getAssetType(c) === "crypto")
-          .value();
-        const nonCryptoCoins = _(coins)
-          .filter((c) => getAssetType(c) !== "crypto")
-          .value();
-        // not case sensitive
-        const usdAmount = _(cryptoCoins)
-          .filter((c) => upperCaseStableCoins.includes(c.symbol.toUpperCase()))
-          .map((c) => c.amount)
-          .sum();
-        const removedUSDCoins = _(cryptoCoins)
-          .filter((c) => !upperCaseStableCoins.includes(c.symbol.toUpperCase()))
-          .concat(nonCryptoCoins)
-          .value();
-        latestAssets = _(latestAssets)
-          .filter((a) => a.wallet !== wallet)
-          .concat(removedUSDCoins)
-          .value();
-        if (usdAmount > 0) {
-          latestAssets.push({
-            symbol: "USDT",
-            assetType: "crypto",
-            amount: usdAmount,
-            wallet,
-          });
-        }
-      });
+    Object.values(
+      assets.reduce((map, coin) => {
+        const w = coin.wallet ?? "";
+        if (!map[w]) map[w] = [];
+        map[w].push(coin);
+        return map;
+      }, {} as Record<string, WalletCoin[]>)
+    ).forEach((coins) => {
+      const wallet = coins[0]?.wallet ?? "";
+      const cryptoCoins = coins.filter((c) => getAssetType(c) === "crypto");
+      const nonCryptoCoins = coins.filter((c) => getAssetType(c) !== "crypto");
+      // not case sensitive
+      const usdAmount = cryptoCoins
+        .filter((c) => upperCaseStableCoins.includes(c.symbol.toUpperCase()))
+        .reduce((s, c) => s + c.amount, 0);
+      const removedUSDCoins = cryptoCoins
+        .filter((c) => !upperCaseStableCoins.includes(c.symbol.toUpperCase()))
+        .concat(nonCryptoCoins);
+      latestAssets = latestAssets
+        .filter((a) => a.wallet !== wallet)
+        .concat(removedUSDCoins);
+      if (usdAmount > 0) {
+        latestAssets.push({
+          symbol: "USDT",
+          assetType: "crypto",
+          amount: usdAmount,
+          wallet,
+        });
+      }
+    });
   }
 
   // add btc value if not exist
-  const btcData = _(assets).find(
+  const btcData = assets.find(
     (c) => c.symbol === "BTC" && getAssetType(c) === "crypto",
   );
   if (!btcData) {
@@ -427,7 +325,7 @@ async function queryCoinsDataByWalletCoins(
   // 2.3 If last time was not 0, this time is 0 or < 1, then save it
   // 2.4 If last time was not 0, this time > 1, then save it
   // 3. BTC always save regardless
-  const filteredTotals = _(totals)
+  const filteredTotals = totals
     .filter((t) => {
       // 3. BTC always save regardless
       if (t.symbol === "BTC") {
@@ -439,7 +337,7 @@ async function queryCoinsDataByWalletCoins(
 
       // Handle wallet comparison: lastAssets contains MD5 hashed wallet (no prefix)
       // Current wallet might have "md5:" prefix, so we need to normalize it
-      const lastAsset = _(lastAssets).find(
+      const lastAsset = lastAssets.find(
         (a) =>
           a.symbol === t.symbol &&
           getAssetType(a) === getAssetType(t) &&
@@ -482,17 +380,14 @@ async function queryCoinsDataByWalletCoins(
       // If USD value < 1, consider it sold out, set amount and value to 0
       usdValue: t.usdValue >= 1 ? t.usdValue : 0,
       amount: t.usdValue >= 1 ? t.amount : 0,
-    }))
-    .value();
+    }));
 
   if (addProgress) {
     addProgress(5);
   }
   const blacklist = await getBlacklistCoins();
   if (blacklist.length > 0) {
-    const blacklistedSymbols = _(blacklist)
-      .map((s) => s.toUpperCase())
-      .value();
+    const blacklistedSymbols = blacklist.map((s) => s.toUpperCase());
     return filteredTotals.filter(
       (t) => !blacklistedSymbols.includes(t.symbol.toUpperCase()),
     );

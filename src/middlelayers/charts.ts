@@ -2,7 +2,6 @@ export {
   WALLET_ANALYZER,
   refreshAllData,
   queryRealTimeAssetsValue,
-  fixSymbolDataIfNeeded,
 } from "./charts-refresh";
 
 export type {

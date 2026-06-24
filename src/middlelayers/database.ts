@@ -1,4 +1,3 @@
-import _ from "lodash"
 import Database from "@tauri-apps/plugin-sql"
 import { UniqueIndexConflictResolver } from './types'
 
@@ -24,14 +23,14 @@ async function saveToDatabase<T extends object>(db: Database, table: string, mod
 		return models
 	}
 
-	const filteredModes = _(models).map(m => _(m).omitBy(v => _(v).isUndefined()).value()).value()
+	const filteredModes = models.map(m => Object.fromEntries(Object.entries(m).filter(([,v]) => v !== undefined)))
 
 	const first = filteredModes[0]
 	const keys = Object.keys(first)
 	const valuesArrayStr = new Array(filteredModes.length).fill(`(${keys.map(() => '?').join(',')})`).join(',')
 	const insertSql = `INSERT OR ${conflictResolver} INTO ${table} (${keys.join(',')}) VALUES ${valuesArrayStr} RETURNING *`
 	
-	const values = _(filteredModes).map(m => _(keys).map(k => _(m).get(k)).value()).flatten().value()
+	const values = filteredModes.flatMap(m => keys.map(k => m[k]))
 	
 	const result = await db.select<T[]>(insertSql, values)
 	return result
@@ -43,14 +42,19 @@ export async function selectFromDatabase<T extends object>(table: string, where:
 	const db = await getDatabase()
 
 	// omit kv in where whose value is undefined
-	const filteredWhere = _(where).omitBy(v => _(v).isUndefined()).value()
+	const filteredWhere = Object.fromEntries(Object.entries(where).filter(([,v]) => v !== undefined))
 
-	const whereStr = _(filteredWhere).map((v, k) => `${k}=?`).join(' AND ')
-	const values = _(filteredWhere).map(v => v).value()
+	const whereStr = Object.keys(filteredWhere)
+		.map((k) => `${k}=?`)
+		.join(' AND ')
+	const values = Object.values(filteredWhere)
 
 
 	const limitStr = limit > 0 ? `LIMIT ${limit}` : ''
-	const orderByStr = !_(orderBy).isEmpty() ? `ORDER BY ${_(orderBy).map((v, k) => `${k} ${v}`).join(',')}` : ''
+	const orderByEntries = orderBy ? Object.entries(orderBy).filter(([, v]) => v) : []
+	const orderByStr = orderByEntries.length > 0
+		? `ORDER BY ${orderByEntries.map(([k, v]) => `${k} ${v}`).join(',')}`
+		: ''
 	const sql = `SELECT * FROM ${table} WHERE 1=1 ${whereStr ? "AND " + whereStr : ''} ${plainWhere ? "AND " + plainWhere : ''} ${orderByStr} ${limitStr}`
 
 	return db.select<T[]>(sql, [...values, ...(plainWhereValues ?? [])])
@@ -64,14 +68,14 @@ export async function selectFromDatabaseWithSql<T extends object>(sql: string, v
 export async function deleteFromDatabase<T extends object>(table: string, where: Partial<T>, allowFullDelete = false) {
 	const db = await getDatabase()
 
-	const filteredWhere = _(where).omitBy(v => _(v).isUndefined()).value()
-	const whereKeys = _(filteredWhere).keys().value()
+	const filteredWhere = Object.fromEntries(Object.entries(where).filter(([,v]) => v !== undefined))
+	const whereKeys = Object.keys(filteredWhere)
 	if (!allowFullDelete && whereKeys.length === 0) {
 		throw new Error("Delete without where is not allowed")
 	}
 
-	const whereStr = _(whereKeys).map(k => `${k}=?`).join(' AND ')
-	const values = _(filteredWhere).map(v => v).value()
+	const whereStr = whereKeys.map((k) => `${k}=?`).join(' AND ')
+	const values = Object.values(filteredWhere)
 
 
 	const sql = `DELETE FROM ${table} WHERE ${whereStr}`

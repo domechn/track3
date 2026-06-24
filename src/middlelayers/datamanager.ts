@@ -6,7 +6,6 @@ import {
   UniqueIndexConflictResolver,
 } from "./types";
 import { queryHistoricalData } from "./charts";
-import _ from "lodash";
 import {
   exportConfigurationString,
   importRawConfiguration,
@@ -102,7 +101,7 @@ class DataManagement implements DataManager {
       "value",
       "price",
     ];
-    return assets.every((asset) => requiredKeys.every((k) => _(asset).has(k)));
+    return assets.every((asset) => requiredKeys.every((k) => k in asset));
   }
 
   private validateHistoricalDataTransactions(
@@ -121,7 +120,7 @@ class DataManagement implements DataManager {
       "updatedAt",
     ];
     return transactions.every((transaction) =>
-      requiredKeys.every((k) => _(transaction).has(k)),
+      requiredKeys.every((k) => k in transaction),
     );
   }
 
@@ -130,11 +129,8 @@ class DataManagement implements DataManager {
     historicalData: PartlyHistoricalData,
     conflictResolver: UniqueIndexConflictResolver,
   ) {
-    const assets = _(historicalData).map("assets").flatten().value();
-    const transactions = _(historicalData)
-      .map("transactions")
-      .flatten()
-      .value();
+    const assets = historicalData.flatMap((d) => d.assets);
+    const transactions = historicalData.flatMap((d) => d.transactions);
 
     if (assets.length === 0) {
       throw new Error("no data need to be imported: errorCode 003");
@@ -189,7 +185,7 @@ class DataManagement implements DataManager {
 
     if (
       !historicalData ||
-      !_(historicalData).isArray() ||
+      !Array.isArray(historicalData) ||
       historicalData.length === 0
     ) {
       throw new Error("invalid data: errorCode 001");
