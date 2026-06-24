@@ -6,7 +6,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useWindowSize } from "@/utils/hook";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Line } from "react-chartjs-2";
+import { Bar } from "react-chartjs-2";
 import { ChartResizeContext } from "@/App";
 import {
   queryAssetsPercentageChange,
@@ -15,10 +15,8 @@ import {
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
 import { timeToDateStr } from "@/utils/date";
-import _ from "lodash";
 import {
   chartColors,
-  createGradientFill,
   glassScaleOptions,
   glassTooltip,
 } from "@/utils/chart-theme";
@@ -66,79 +64,122 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     setAssetsPercentageChangeData(data);
   }
 
-  const options = useMemo(() => ({
-    maintainAspectRatio: false,
-    responsive: true,
-    hover: {
-      mode: "index",
-      intersect: false,
-    },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: false,
+  // Current share per asset + "Other", sorted desc, for the legend strip.
+  // Computed off the most recent entry; falls back to [] if the series is empty.
+  const legendRows = useMemo(() => {
+    const lastEntry =
+      assetsPercentageChangeData[assetsPercentageChangeData.length - 1];
+    if (!lastEntry) {
+      return [] as {
+        label: string;
+        current: number;
+        color: string;
+        key: string;
+      }[];
+    }
+    const topNSet = new Set(topN.map((a) => getAssetLogoKey(a)));
+    const topNCurrent: {
+      label: string;
+      current: number;
+      color: string;
+      key: string;
+    }[] = [];
+    let othersCurrent = 0;
+    lastEntry.percentages.forEach((item) => {
+      const key = getAssetLogoKey(item);
+      if (topNSet.has(key)) {
+        const idx = topN.findIndex((a) => getAssetLogoKey(a) === key);
+        const color = chartColors[idx % chartColors.length].main;
+        topNCurrent.push({
+          label: formatAssetLabel(item),
+          current: item.percentage,
+          color,
+          key,
+        });
+      } else {
+        othersCurrent += item.percentage;
+      }
+    });
+    const othersRow = {
+      label: t("common.others"),
+      current: othersCurrent,
+      color: "rgba(148,163,184,0.5)",
+      key: "others",
+    };
+    return [...topNCurrent, othersRow].sort((a, b) => b.current - a.current);
+  }, [assetsPercentageChangeData, topN, t]);
+
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      responsive: true,
+      hover: {
+        mode: "index" as const,
+        intersect: false,
+      },
+      interaction: {
+        mode: "index" as const,
+        intersect: false,
+      },
+      plugins: {
         // text is set for resizing
-        text: chartName,
-      },
-      datalabels: {
-        display: false,
-      },
-      legend: {
-        display: true,
-      },
-      tooltip: {
-        ...glassTooltip,
-        itemSort: (a: any, b: any) => b.parsed.y - a.parsed.y,
-        callbacks: {
-          label: (context: {
-            dataset: { label: string; yAxisID: string };
-            parsed: { y: number };
-          }) => {
-            const v = context.parsed.y.toLocaleString();
-            const vs = context.dataset.yAxisID === "y1" ? "$" + v : v;
-            return " " + context.dataset.label + ": " + vs;
+        title: { display: false, text: chartName },
+        datalabels: { display: false },
+        legend: { display: false },
+        tooltip: {
+          ...glassTooltip,
+          itemSort: (a: any, b: any) => b.parsed.y - a.parsed.y,
+          callbacks: {
+            title: (items: { label: string }[]) => {
+              const label = items[0]?.label;
+              return label ? label : "";
+            },
+            label: (context: {
+              dataset: { label: string };
+              parsed: { y: number };
+            }) => {
+              return (
+                " " +
+                context.dataset.label +
+                ": " +
+                context.parsed.y.toFixed(1) +
+                "%"
+              );
+            },
           },
         },
       },
-    },
-    scales: {
-      x: {
-        title: {
-          display: false,
+      scales: {
+        x: {
+          stacked: true,
+          title: { display: false },
+          ticks: {
+            ...glassScaleOptions.ticks,
+            autoSkip: true,
+            maxTicksLimit: 6,
+          },
+          grid: { display: false },
         },
-        ticks: {
-          ...glassScaleOptions.ticks,
-          autoSkip: true,
-        },
-        grid: {
-          display: false,
-        },
-      },
-      y: {
-        stacked: true,
-        beginAtZero: true,
-        reverse: true,
-        max: 100,
-        title: {
-          display: false,
-        },
-        ticks: {
-          ...glassScaleOptions.ticks,
-          precision: 0,
-          stepSize: 25,
-          callback: function (value: number) {
-            return 100 - value + "%";
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          min: 0,
+          max: 100,
+          title: { display: false },
+          ticks: {
+            ...glassScaleOptions.ticks,
+            precision: 0,
+            stepSize: 25,
+            callback: (value: number) => value + "%",
+          },
+          grid: {
+            ...glassScaleOptions.grid,
           },
         },
-        grid: {
-          ...glassScaleOptions.grid,
-        },
       },
-    },
-  }), []);
+    }),
+    []
+  );
 
   const preparedData = useMemo(() => {
     const topNSet = new Set(topN.map((asset) => getAssetLogoKey(asset)));
@@ -163,7 +204,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
       topN.forEach((asset, idx) => {
         topNData[idx].push(
-          percentageByAsset.get(getAssetLogoKey(asset)) ?? 0,
+          percentageByAsset.get(getAssetLogoKey(asset)) ?? 0
         );
       });
       othersData.push(others);
@@ -172,36 +213,35 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     return { labels, topNData, othersData };
   }, [assetsPercentageChangeData, topN]);
 
-  const lineDataMemo = useMemo(() => {
+  const barDataMemo = useMemo(() => {
+    const datasetOpts = {
+      stack: "composition",
+      categoryPercentage: 0.9,
+      barPercentage: 0.95,
+      borderColor: "rgba(9,9,11,0.6)",
+      borderWidth: 0.5,
+    };
     const topNDatasets = topN.map((asset, idx) => {
       const color = chartColors[idx % chartColors.length];
       return {
+        ...datasetOpts,
         label: formatAssetLabel(asset),
         data: preparedData.topNData[idx],
-        borderColor: color.main,
-        backgroundColor: color.bg,
-        fill: true,
-        borderWidth: 1.5,
-        tension: 0.4,
-        pointRadius: 0,
+        backgroundColor: color.main,
       };
     });
-    const othersDatasets = {
+    const othersDataset = {
+      ...datasetOpts,
       label: t("common.others"),
       data: preparedData.othersData,
-      borderColor: "rgba(148,163,184,0.5)",
-      backgroundColor: "rgba(148,163,184,0.15)",
-      fill: true,
-      borderWidth: 1.5,
-      tension: 0.4,
-      pointRadius: 0,
+      backgroundColor: "rgba(148,163,184,0.5)",
     };
 
     return {
       labels: preparedData.labels,
-      datasets: [...topNDatasets, othersDatasets],
+      datasets: [...topNDatasets, othersDataset],
     };
-  }, [preparedData, topN]);
+  }, [preparedData, topN, t]);
 
   return (
     <div>
@@ -213,39 +253,35 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         </CardHeader>
         <CardContent className="space-y-2">
           <div
+            data-testid="assets-percentage-legend"
+            className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs"
+          >
+            {legendRows.map((row) => (
+              <div
+                key={row.key}
+                data-testid="assets-percentage-legend-item"
+                data-asset={row.label}
+                className="flex items-center gap-1.5"
+              >
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{ background: row.color }}
+                  aria-hidden
+                />
+                <span className="text-muted-foreground">{row.label}</span>
+                <span className="font-mono text-foreground/80">
+                  {row.current.toFixed(1)}%
+                </span>
+              </div>
+            ))}
+          </div>
+          <div
             className="flex items-center justify-center"
             style={{
               height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
-            <Line
-              options={options as any}
-              data={lineDataMemo}
-              plugins={[
-                {
-                  id: "stackedGradientFill",
-                  beforeDraw(chart: any) {
-                    const { ctx, chartArea } = chart;
-                    if (!chartArea) return;
-                    chart.data.datasets.forEach((ds: any, idx: number) => {
-                      if (ds.fill) {
-                        const color =
-                          idx < topN.length
-                            ? chartColors[idx % chartColors.length].main
-                            : "rgba(148,163,184,1)";
-                        ds.backgroundColor = createGradientFill(
-                          ctx,
-                          chartArea,
-                          color,
-                          0.35,
-                          0.08
-                        );
-                      }
-                    });
-                  },
-                },
-              ]}
-            />
+            <Bar options={options as any} data={barDataMemo} />
           </div>
         </CardContent>
       </Card>
