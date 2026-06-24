@@ -709,6 +709,10 @@ const App = ({
                     aggregatedWallets={aggregatedWallets}
                     currency={currency}
                     displayAmount={displayAmount}
+                    onPointerLeave={() => {
+                      setSelectedTileKey(null);
+                      setSelectedItem(null);
+                    }}
                     t={t}
                     style={{
                       position: "fixed",
