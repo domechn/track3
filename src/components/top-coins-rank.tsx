@@ -1,6 +1,5 @@
 import { TDateRange, TopCoinsRankData } from "@/middlelayers/types";
 import { useEffect, useMemo, useRef, useState } from "react";
-import _ from "lodash";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { queryTopCoinsRank } from "@/middlelayers/charts";
@@ -80,7 +79,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: path,
       };
     });
-    return _.assign({}, ...kvs);
+    return Object.assign({}, ...kvs);
   }
 
   const rankRows = useMemo(() => {

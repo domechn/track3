@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { getConfiguration } from "./configuration";
 import { CexAnalyzer } from "./datafetch/coins/cex/cex";
 import { StockAnalyzer } from "./datafetch/coins/stock/stock-analyzer";
@@ -31,9 +30,7 @@ export class WalletAnalyzer {
   ): Promise<{
     [k: string]: { wallet: string; alias: string; type: string } | undefined;
   }> {
-    const unknownAliasWallets = _(walletMd5s)
-      .filter((w) => !_(this.walletAliases).has(w))
-      .value();
+    const unknownAliasWallets = walletMd5s.filter((w) => !(w in this.walletAliases));
 
     if (unknownAliasWallets.length === 0) {
       return this.walletAliases;
@@ -54,7 +51,7 @@ export class WalletAnalyzer {
 
     // cex exchanges
     const cexAna = new CexAnalyzer(config);
-    _(cexAna.listExchangeIdentities()).forEach((x) => {
+    cexAna.listExchangeIdentities().forEach((x) => {
       aliases.push({
         walletType: x.exchangeName,
         // need md5 here, because when we store it in database, it is md5 hashed
@@ -65,7 +62,7 @@ export class WalletAnalyzer {
     });
 
     const stockAna = new StockAnalyzer(config);
-    _(stockAna.listBrokerIdentities()).forEach((x) => {
+    stockAna.listBrokerIdentities().forEach((x) => {
       aliases.push({
         walletType: x.brokerName,
         walletMd5: md5(x.identity),
@@ -75,11 +72,11 @@ export class WalletAnalyzer {
     });
 
     const handleWeb3Wallet = (addrs: Addresses, walletType: string) => {
-      _(addrs.addresses).forEach((x) => {
-        const alias = _(x).isString()
+      (addrs.addresses ?? []).forEach((x) => {
+        const alias = typeof x === "string"
           ? undefined
           : (x as { alias: string; address: string }).alias;
-        const address = _(x).isString()
+        const address = typeof x === "string"
           ? (x as string)
           : (x as { alias: string; address: string }).address;
 
@@ -92,12 +89,12 @@ export class WalletAnalyzer {
       });
     };
 
-    _(SUPPORT_CONS).forEach((c) => {
-      handleWeb3Wallet(_(config).get(c), c.toUpperCase());
+    SUPPORT_CONS.forEach((c) => {
+      handleWeb3Wallet(config[c as keyof typeof config] as Addresses, c.toUpperCase());
     });
 
     const others = "others";
-    const Others = _(others).upperFirst();
+    const Others = others.charAt(0).toUpperCase() + others.slice(1);
 
     // Others
     aliases.push({
@@ -109,9 +106,9 @@ export class WalletAnalyzer {
 
     const newAliases: {
       [k: string]: { wallet: string; alias: string; type: string } | undefined;
-    } = _(unknownAliasWallets)
+    } = unknownAliasWallets
       .map((w) => {
-        const alias = _(aliases).find((x) => x.walletMd5 === w);
+        const alias = aliases.find((x) => x.walletMd5 === w);
         return {
           [w]: alias
             ? {
@@ -137,18 +134,17 @@ export class WalletAnalyzer {
   loadWalletTotalAssetsValue(
     models: AssetModel[],
   ): { wallet: string; total: number; amount: number }[] {
-    return _(models)
-      .groupBy("wallet")
-      .map((walletAssets, wallet) => {
-        const total = _(walletAssets).sumBy("value");
-        const amount = _(walletAssets).sumBy("amount");
-        return {
-          wallet,
-          total,
-          amount,
-        };
-      })
-      .value();
+    const grouped: { [k: string]: AssetModel[] } = {};
+    for (const m of models) {
+      const w = m.wallet || "";
+      if (!grouped[w]) grouped[w] = [];
+      grouped[w].push(m);
+    }
+    return Object.entries(grouped).map(([wallet, walletAssets]) => {
+      const total = walletAssets.reduce((s, a) => s + a.value, 0);
+      const amount = walletAssets.reduce((s, a) => s + a.amount, 0);
+      return { wallet, total, amount };
+    });
   }
 
   // if symbol is not provided, return all wallet assets
@@ -158,25 +154,25 @@ export class WalletAnalyzer {
     assetType?: AssetType,
   ): Promise<WalletAssetsPercentageData> {
     const assetModels = (await this.queryAssets(1))[0];
-    const assets = _(assetModels)
-      .filter(
-        (a) =>
-          (!symbol || a.symbol === symbol) &&
-          (!assetType || getAssetType(a) === assetType),
-      )
-      .value();
+    const assets = assetModels.filter(
+      (a) =>
+        (!symbol || a.symbol === symbol) &&
+        (!assetType || getAssetType(a) === assetType),
+    );
     // check if there is wallet column
-    const hasWallet = _(assets).find((a) => !!a.wallet);
+    const hasWallet = assets.find((a) => !!a.wallet);
     if (!assets || !hasWallet) {
       return [];
     }
     const walletAssets = this.loadWalletTotalAssetsValue(assets);
-    const total = _(walletAssets).sumBy("total") || 0.0001;
-    const wallets = _(walletAssets).map("wallet").uniq().compact().value();
+    const total = walletAssets.reduce((acc, wa) => acc + wa.total, 0) || 0.0001;
+    const wallets = Array.from(
+      new Set(walletAssets.map((wa) => wa.wallet).filter((w): w is string => !!w)),
+    );
     const backgroundColors = generateRandomColors(wallets.length);
     const walletAliases = await this.listWalletAliases(wallets);
 
-    return _(walletAssets)
+    return walletAssets
       .map((wa, idx) => ({
         wallet: walletAliases[wa.wallet]?.wallet ?? wa.wallet,
         walletType: walletAliases[wa.wallet]?.type,
@@ -186,9 +182,7 @@ export class WalletAnalyzer {
         value: wa.total,
         amount: wa.amount,
       }))
-      .sortBy("percentage")
-      .reverse()
-      .value();
+      .sort((a, b) => b.percentage - a.percentage);
   }
 
   public async queryWalletAssetsChange(): Promise<WalletAssetsChangeData> {
@@ -196,25 +190,19 @@ export class WalletAnalyzer {
     const latestAssets = assets[0];
     const previousAssets = assets[1];
 
-    const latestWalletAssets = _(this.loadWalletTotalAssetsValue(latestAssets))
-      .mapKeys("wallet")
-      .mapValues("total")
-      .value();
-    const previousWalletAssets = _(
-      this.loadWalletTotalAssetsValue(previousAssets),
-    )
-      .mapKeys("wallet")
-      .mapValues("total")
-      .value();
+    const latestWalletAssets = Object.fromEntries(
+      this.loadWalletTotalAssetsValue(latestAssets).map((wa) => [wa.wallet, wa.total]),
+    );
+    const previousWalletAssets = Object.fromEntries(
+      this.loadWalletTotalAssetsValue(previousAssets).map((wa) => [wa.wallet, wa.total]),
+    );
 
     const walletAliases = await this.listWalletAliases(
-      _(latestWalletAssets).keys().uniq().compact().value(),
+      Object.keys(latestWalletAssets),
     );
     const res: WalletAssetsChangeData = [];
     // calculate change
-    _(latestWalletAssets)
-      .keys()
-      .forEach((wallet) => {
+    Object.keys(latestWalletAssets).forEach((wallet) => {
         const latest = latestWalletAssets[wallet];
         const previous = previousWalletAssets[wallet];
 
@@ -237,6 +225,6 @@ export class WalletAnalyzer {
           changeValue: latest - previous,
         });
       });
-    return _(res).sortBy("changeValue").reverse().value();
+    return res.sort((a, b) => b.changeValue - a.changeValue);
   }
 }

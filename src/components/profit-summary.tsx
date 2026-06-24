@@ -7,7 +7,6 @@ import {
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { getMonthAbbreviation, listAllFirstAndLastDays } from "@/utils/date";
 import bluebird from "bluebird";
-import _ from "lodash";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -120,10 +119,7 @@ const App = ({
 
   const availableYears = useMemo(
     () =>
-      _(listAllFirstAndLastDays(dateRange.start, dateRange.end))
-        .map((d) => d.firstDay.getFullYear())
-        .uniq()
-        .value(),
+      [...new Set(listAllFirstAndLastDays(dateRange.start, dateRange.end).map((d) => d.firstDay.getFullYear()))],
     [rangeKey]
   );
 
@@ -141,18 +137,16 @@ const App = ({
   }, [availableYears, summaryType, rangeKey, dataChangedVersion]);
 
   const monthlyProfitsMap = useMemo(() => {
-    return _(monthlyProfits)
-      .mapKeys(
-        (p) =>
-          p.monthFirstDate.getFullYear() + "-" + p.monthFirstDate.getMonth()
-      )
-      .value();
+    return Object.fromEntries(
+      monthlyProfits.map((p) => [
+        p.monthFirstDate.getFullYear() + "-" + p.monthFirstDate.getMonth(),
+        p,
+      ]),
+    );
   }, [monthlyProfits]);
 
   const yearlyProfitsMap = useMemo(() => {
-    return _(yearlyProfits)
-      .mapKeys((p) => p.year)
-      .value();
+    return Object.fromEntries(yearlyProfits.map((p) => [p.year, p]));
   }, [yearlyProfits]);
 
   async function loadMonthlyProfitsInSelectedYear(
@@ -174,9 +168,7 @@ const App = ({
       const dates = listAllFirstAndLastDays(start, end);
 
       const profits = await bluebird.map(
-        _(dates)
-          .filter((d) => d.firstDay.getFullYear() === selectedYear)
-          .value(),
+        dates.filter((d) => d.firstDay.getFullYear() === selectedYear),
         async (date) => {
           const { total, lastRecordDate } = await calculateTotalProfit({
             start: date.firstDay,
@@ -191,7 +183,7 @@ const App = ({
           });
 
           const lrd = lastRecordDate
-            ? _.isString(lastRecordDate)
+            ? typeof lastRecordDate === "string"
               ? new Date(lastRecordDate)
               : lastRecordDate
             : undefined;
@@ -292,7 +284,7 @@ const App = ({
   }, [clickedMonth, dateRange.end, dateRange.start, selectedYear]);
 
   const monthCards = useMemo(() => {
-    return _.range(0, 12)
+    return Array.from({length: 12}, (_, i) => i)
       .map((month) => {
         if (
           selectedYear === new Date().getFullYear() &&
@@ -322,12 +314,10 @@ const App = ({
   }, [monthlyProfitsMap, selectedYear]);
 
   const yearCards = useMemo(() => {
-    return _(availableYears)
-      .map((year) => ({
+    return availableYears.map((year) => ({
         year,
         total: yearlyProfitsMap[year]?.total ?? 0,
-      }))
-      .value();
+      }));
   }, [availableYears, yearlyProfitsMap]);
 
   const visibleSummaryStats = useMemo(() => {

@@ -1,6 +1,6 @@
 export type AssetType = "crypto" | "stock";
 
-export type Coin = {
+export type WalletCoin = {
   symbol: string;
   assetType: AssetType;
   // price in usd
@@ -9,9 +9,8 @@ export type Coin = {
     base: "usd" | "usdt";
   };
   amount: number;
+  wallet: string;
 };
-
-export type WalletCoin = Coin & { wallet: string };
 
 export interface Analyzer {
   getAnalyzeName(): string;
@@ -101,11 +100,6 @@ export type TokenConfig = {
 
 export type CoinModel = WalletCoin & {
   value: number;
-};
-
-export type CoinQueryDetail = {
-  model: CoinModel;
-  date: Date;
 };
 
 export type CurrencyRate = {

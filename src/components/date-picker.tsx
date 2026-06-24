@@ -5,7 +5,6 @@ import { Calendar } from "./ui/calendar";
 import { CalendarIcon } from "@radix-ui/react-icons";
 import { endOfDay, isSameDay, startOfDay } from "date-fns";
 import { useMemo, useState } from "react";
-import _ from "lodash";
 import { useTranslation } from "@/i18n";
 
 const App = ({
@@ -41,9 +40,7 @@ const App = ({
     if (!from || !to) {
       return 0;
     }
-    const times = _(availableDates)
-      .filter((d) => d >= from && d <= to)
-      .value().length;
+    const times = availableDates.filter((d) => d >= from && d <= to).length;
     return times;
   }, [availableDates, selectDates]);
 

@@ -14,7 +14,6 @@ import { positiveNegativeColor } from "@/utils/color";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { glassScaleOptions, glassTooltip } from "@/utils/chart-theme";
 import { timeToDateStr } from "@/utils/date";
-import _ from "lodash";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import { useDataChangedVersion } from "@/contexts/data-changed";
@@ -158,21 +157,19 @@ const App = ({
   };
 
   function formatPositiveLineData() {
-    return _(pnlChartData)
+    return pnlChartData
       .map((x, idx) => x.totalValue - (pnlChartData[idx - 1]?.totalValue || 0))
       .map(currencyWrapper(currency))
       .map((x) => (x < 0 ? undefined : x))
-      .drop(1)
-      .value();
+      .slice(1);
   }
 
   function formatNegativeLineData() {
-    return _(pnlChartData)
+    return pnlChartData
       .map((x, idx) => x.totalValue - (pnlChartData[idx - 1]?.totalValue || 0))
       .map(currencyWrapper(currency))
       .map((x) => (x >= 0 ? undefined : x))
-      .drop(1)
-      .value();
+      .slice(1);
   }
 
   function pnlBackgroundColor(val: "positive" | "negative"): string {
@@ -182,11 +179,10 @@ const App = ({
 
   function lineData() {
     return {
-      labels: _(pnlChartData)
+      labels: pnlChartData
         // !remove the first element, because it is the comparison of the first and second element
-        .tail()
-        .map((x) => timeToDateStr(x.timestamp))
-        .value(),
+        .slice(1)
+        .map((x) => timeToDateStr(x.timestamp)),
       // two datasets for different colors
       datasets: [
         {

@@ -1,4 +1,3 @@
-import _ from 'lodash'
 import { CurrencyRate } from '../types'
 import { sendHttpRequest } from '../utils/http'
 import { getClientID } from '../../../utils/app'
@@ -36,18 +35,11 @@ export class ExchangeRate implements CurrencyRateQuerier {
 		// convert rates' base into usd
 		if (base !== usd) {
 
-			usdBasedRates = _(resp.rates).map((v, k) => {
-				return [k, v / usdRate]
-			})
-				.fromPairs()
-				.value()
+			usdBasedRates = Object.fromEntries(
+			Object.entries(resp.rates).map(([k, v]) => [k, v / usdRate]),
+		)
 		}
 
-		return _(usdBasedRates).map((v, k) => {
-			return {
-				currency: k,
-				rate: v
-			}
-		}).value()
+		return Object.entries(usdBasedRates).map(([currency, rate]) => ({ currency, rate }))
 	}
 }

@@ -20,21 +20,6 @@ export type AddProgressFunc = (progress: number) => void;
 
 // asset_prices table
 // to record the cost price or sell price of each coins, can be updated by users
-export type AssetPriceModel = {
-  id: number;
-  uuid: string;
-  // id in assets_v2 table
-  assetID: number;
-  symbol: string;
-  // when value > 0, it means cost price
-  // when value < 0, it means sell price
-  price: number;
-
-  // createdAt in assets_v2 table
-  assetCreatedAt: string;
-  updatedAt: string;
-};
-
 export type TransactionType = "buy" | "sell" | "deposit" | "withdraw";
 
 export type TransactionModel = {
@@ -52,19 +37,6 @@ export type TransactionModel = {
   txnCreatedAt: string;
   createdAt: string;
   updatedAt: string;
-};
-
-export type CloudAssetModel = {
-  id: string;
-
-  owner: CloudUser;
-
-  uuid: string;
-
-  // json stringify from ExportAssetModel[]
-  records: string;
-
-  createdAt: number;
 };
 
 export type AssetAction = {
@@ -101,11 +73,6 @@ export type Asset = {
 };
 
 export type AssetReference = Pick<Asset, "symbol" | "assetType">;
-
-export type CloudUser = {
-  id: string;
-  publicKey: string;
-};
 
 export type ConfigurationModel = {
   id: number;

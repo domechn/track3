@@ -17,7 +17,6 @@ import {
 } from "@/middlelayers/types";
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
-import _ from "lodash";
 
 import { useToast } from "@/components/ui/use-toast";
 import { timeToDateStr } from "@/utils/date";
@@ -271,10 +270,9 @@ const App = ({
       return [];
     }
 
-    return _(selectedData.assets)
+    return selectedData.assets
       .filter((asset) => asset.value > 1)
-      .sortBy("value")
-      .reverse()
+      .sort((a, b) => b.value - a.value)
       .map((asset, idx) => ({
         id: idx,
         assetId: asset.id,
@@ -284,8 +282,7 @@ const App = ({
         assetType: asset.assetType,
         value: asset.value,
         price: asset.price,
-      }))
-      .value();
+      }));
   }, [selectedData]);
 
   const visibleRankData = useMemo(() => {
@@ -786,7 +783,7 @@ const App = ({
                     </SelectTrigger>
                     <SelectContent className="overflow-y-auto max-h-[20rem]">
                       <SelectGroup>
-                        {_.range(maxDataPage + 1).map((pageIdx) => (
+                        {Array.from({length: maxDataPage + 1}, (_, i) => i).map((pageIdx) => (
                           <SelectItem
                             key={"historical-idx-" + pageIdx}
                             value={String(pageIdx)}
@@ -831,12 +828,10 @@ const App = ({
                     <TableBody>
                       {pagedRows.map((row, idx) => {
                         const isLatest = dataPage === 0 && idx === 0;
-                        const topAssets = _(row.assets)
+                        const topAssets = row.assets
                           .filter((asset) => asset.value > 0)
-                          .sortBy("value")
-                          .reverse()
-                          .take(7)
-                          .value();
+                          .sort((a, b) => b.value - a.value)
+                          .slice(0, 7);
 
                         return (
                           <TableRow

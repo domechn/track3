@@ -1,4 +1,3 @@
-import _ from 'lodash'
 import bluebird from 'bluebird'
 import { getMemoryCacheInstance } from './cache'
 
@@ -7,7 +6,7 @@ export async function asyncMap<K, V>(items: K[], fn: (item: K) => Promise<V>, co
 	const cc = getMemoryCacheInstance("data-fetch")
 	return bluebird.map(items, async item => {
 		let cacheKey: string
-		if (_(item).isString()) {
+		if (typeof item === "string") {
 			cacheKey = item as string
 		} else {
 			cacheKey = JSON.stringify(item)

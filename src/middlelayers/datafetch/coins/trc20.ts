@@ -1,5 +1,4 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
-import _ from "lodash";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
 import { getClientID } from "@/utils/app";
@@ -30,9 +29,7 @@ export class TRC20ProUserAnalyzer implements Analyzer {
   async verifyConfigs(): Promise<boolean> {
     const regex = /^(T|TLa|TM)[1-9A-HJ-NP-Za-km-z]{33}$/;
 
-    const valid = _(getAddressList(this.config.trc20)).every((address) =>
-      regex.test(address),
-    );
+    const valid = getAddressList(this.config.trc20).every((address) => regex.test(address));
     return valid;
   }
 
@@ -101,25 +98,20 @@ export class TRC20ProUserAnalyzer implements Analyzer {
       1000,
     );
 
-    return _(resp[0].data)
-      .map((d) =>
-        _(d.assets)
-          .map((a) => ({
-            symbol: a.symbol,
-            assetType: "crypto" as const,
-            amount: a.amount,
-            price: a.price
-              ? {
-                  value: a.price,
-                  base: "usd" as "usd",
-                }
-              : undefined,
-            wallet: d.wallet,
-            chain: "tron",
-          }))
-          .value(),
-      )
-      .flatten()
-      .value();
+    return resp[0].data.flatMap((d) =>
+      d.assets.map((a) => ({
+        symbol: a.symbol,
+        assetType: "crypto" as const,
+        amount: a.amount,
+        price: a.price
+          ? {
+              value: a.price,
+              base: "usd" as "usd",
+            }
+          : undefined,
+        wallet: d.wallet,
+        chain: "tron",
+      })),
+    );
   }
 }

@@ -1,4 +1,3 @@
-import _ from "lodash";
 import bluebird from "bluebird";
 import { Analyzer, StockConfig, WalletCoin } from "../../types";
 import { getMemoryCacheInstance } from "../../utils/cache";
@@ -9,7 +8,7 @@ export class StockAnalyzer implements Analyzer {
   private readonly brokers: StockBroker[];
 
   constructor(config: { stockConfig?: StockConfig }) {
-    this.brokers = _((config.stockConfig ?? { brokers: [] }).brokers)
+    this.brokers = ((config.stockConfig ?? { brokers: [] }).brokers)
       .map((brokerConfig) => {
         if (brokerConfig.active === false) {
           return;
@@ -25,8 +24,7 @@ export class StockAnalyzer implements Analyzer {
             throw new Error(`unsupported stock broker ${brokerConfig.name}`);
         }
       })
-      .compact()
-      .value();
+      .filter((b): b is IbkrBroker => b !== undefined);
   }
 
   getAnalyzeName(): string {
@@ -45,7 +43,7 @@ export class StockAnalyzer implements Analyzer {
     const verifyResults = await bluebird.map(this.brokers, (broker) =>
       broker.verifyConfig(),
     );
-    return _(verifyResults).every();
+    return verifyResults.every(Boolean);
   }
 
   async fetchPositions(
@@ -67,9 +65,7 @@ export class StockAnalyzer implements Analyzer {
   async loadPortfolio(): Promise<WalletCoin[]> {
     const coinLists = await bluebird.map(this.brokers, async (broker) => {
       const positions = await this.fetchPositions(broker);
-      return (
-        _(positions)
-          .keys()
+      return Object.keys(positions)
           .filter((symbol) => positions[symbol] !== 0)
           // IBKR Flex statement prices can lag current market quotes.
           // Leave price empty here so charts-refresh fetches the latest stock price.
@@ -78,12 +74,10 @@ export class StockAnalyzer implements Analyzer {
             assetType: "stock" as const,
             amount: positions[symbol],
             wallet: broker.getIdentity(),
-          }))
-          .value()
-      );
+          }));
     });
 
-    return _(coinLists).flatten().value();
+    return coinLists.flat();
   }
 
   public listBrokerIdentities(): {
@@ -91,12 +85,10 @@ export class StockAnalyzer implements Analyzer {
     identity: string;
     alias?: string;
   }[] {
-    return _(this.brokers)
-      .map((broker) => ({
+    return this.brokers.map((broker) => ({
         brokerName: broker.getBrokerName(),
         identity: broker.getIdentity(),
         alias: broker.getAlias(),
-      }))
-      .value();
+      }));
   }
 }

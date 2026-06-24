@@ -2727,13 +2727,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/lodash@npm:^4.14.194":
-  version: 4.14.202
-  resolution: "@types/lodash@npm:4.14.202"
-  checksum: 10c0/6064d43c8f454170841bd67c8266cc9069d9e570a72ca63f06bceb484cb4a3ee60c9c1f305c1b9e3a87826049fd41124b8ef265c4dd08b00f6766609c7fe9973
-  languageName: node
-  linkType: hard
-
 "@types/md5@npm:^2.3.2":
   version: 2.3.5
   resolution: "@types/md5@npm:2.3.5"
@@ -4188,13 +4181,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash@npm:^4.18.1":
-  version: 4.18.1
-  resolution: "lodash@npm:4.18.1"
-  checksum: 10c0/757228fc68805c59789e82185135cf85f05d0b2d3d54631d680ca79ec21944ec8314d4533639a14b8bcfbd97a517e78960933041a5af17ecb693ec6eecb99a27
-  languageName: node
-  linkType: hard
-
 "loose-envify@npm:^1.0.0, loose-envify@npm:^1.1.0":
   version: 1.4.0
   resolution: "loose-envify@npm:1.4.0"
@@ -5501,7 +5487,6 @@ __metadata:
     "@types/color-diff": "npm:^1.2.1"
     "@types/crypto-js": "npm:^4.2.1"
     "@types/d3-hierarchy": "npm:^3"
-    "@types/lodash": "npm:^4.14.194"
     "@types/md5": "npm:^2.3.2"
     "@types/node": "npm:^24.0.0"
     "@types/qs": "npm:^6.9.15"
@@ -5526,7 +5511,6 @@ __metadata:
     framer-motion: "npm:^11.0.0"
     jose: "npm:^6.0.11"
     jsdom: "npm:^29.0.2"
-    lodash: "npm:^4.18.1"
     md5: "npm:^2.3.0"
     node-fetch: "npm:^3.3.1"
     postcss: "npm:^8.5.10"

@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { Line } from "react-chartjs-2";
 import { useWindowSize } from "@/utils/hook";
 import { timeToDateStr } from "@/utils/date";
@@ -56,7 +55,7 @@ const App = ({
     });
 
   const chartHasData = useMemo(
-    () => !_(coinsAmountAndValueChangeData.timestamps).isEmpty(),
+    () => coinsAmountAndValueChangeData.timestamps.length > 0,
     [coinsAmountAndValueChangeData],
   );
   const dataChangedVersion = useDataChangedVersion();
@@ -188,15 +187,11 @@ const App = ({
       };
     }
     return {
-      labels: _(current.timestamps)
-        .map((x) => timeToDateStr(x))
-        .value(),
+      labels: current.timestamps.map((x) => timeToDateStr(x)),
       datasets: [
         {
           label: t("common.valueLabel"),
-          data: _(current.values)
-            .map((v) => currencyWrapper(currency)(v))
-            .value(),
+          data: current.values.map((v) => currencyWrapper(currency)(v)),
           borderColor: chartColors[0].main,
           backgroundColor: chartColors[0].bg,
           borderWidth: 2,

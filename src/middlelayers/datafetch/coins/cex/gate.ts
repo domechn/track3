@@ -1,9 +1,8 @@
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
-import _ from 'lodash'
 import bluebird from 'bluebird'
-import { addToBalanceMap, netAssetFromBalanceFields, toNumber } from './balance-utils'
+import { addToBalanceMap, mergeBalances, netAssetFromBalanceFields, toNumber } from './balance-utils'
 
 type PortfolioAccountResp = {
 	user_id: number,
@@ -132,7 +131,7 @@ export class GateExchange implements Exchanger {
 			this.fetchMarginBalance(),
 			this.functionOthersBalance(),
 		], (v) => v)
-		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
+		return mergeBalances(resp)
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
@@ -143,26 +142,28 @@ export class GateExchange implements Exchanger {
 		}[]>("GET", this.endpoint + "/api/v4/spot/tickers")
 
 		const suffix = "_USDT"
-
-		const allPricesMap = _(allPrices).filter(p => p.currency_pair.endsWith(suffix)).map(p => ({
-			symbol: p.currency_pair.replace(suffix, ""),
-			price: parseFloat(p.last)
-		})).keyBy("symbol").mapValues("price").value()
-
-		return allPricesMap
+		return Object.fromEntries(
+			allPrices
+				.filter((p) => p.currency_pair.endsWith(suffix))
+				.map((p) => [p.currency_pair.replace(suffix, ""), parseFloat(p.last)]),
+		)
 	}
 
 	private async fetchSpotBalance(): Promise<{ [k: string]: number }> {
 		const path = "/spot/accounts"
 		const resp = await this.fetch<SpotAccountResp>("GET", path, "")
-		return _(resp).keyBy("currency").mapValues(v => parseFloat(v.available) + parseFloat(v.locked)).value()
+		return Object.fromEntries(
+			resp.map((v) => [v.currency, parseFloat(v.available) + parseFloat(v.locked)]),
+		)
 	}
 
 	private async fetchEarnBalance(): Promise<{ [k: string]: number }> {
 		const path = "/earn/uni/lends"
 		const resp = await this.fetch<EarnAccountResp>("GET", path, "")
 
-		return _(resp).keyBy("currency").mapValues(v => toNumber(v.amount)).value()
+		return Object.fromEntries(
+			resp.map((v) => [v.currency, toNumber(v.amount)]),
+		)
 	}
 
 	private async fetchFixedTermBalance(): Promise<{ [k: string]: number }> {
@@ -180,7 +181,7 @@ export class GateExchange implements Exchanger {
 				}
 
 				const orders = resp.data?.list ?? []
-				_(orders).forEach((order) => {
+				orders.forEach((order) => {
 					addToBalanceMap(balances, order.asset, toNumber(order.principal))
 				})
 
@@ -204,7 +205,7 @@ export class GateExchange implements Exchanger {
 			
 			const balances: { [k: string]: number } = {}
 
-			_(resp).forEach((asset) => {
+			resp.forEach((asset) => {
 				const coins = asset.mortgage_coin.split(",").map(v => v.trim()).filter(Boolean)
 				if (coins.length !== 1) {
 					console.warn("Skip multi-coin Gate staking asset", asset.mortgage_coin)
@@ -237,7 +238,9 @@ export class GateExchange implements Exchanger {
 		const path = "/portfolio/accounts"
 		try {
 			const resp = await this.fetch<PortfolioAccountResp>("GET", path, "")
-			return _(resp.balances).mapValues(v => parseFloat(v.available)).value()
+			return Object.fromEntries(
+				Object.entries(resp.balances).map(([k, v]) => [k, parseFloat(v.available)]),
+			)
 
 		} catch (e) {
 			if (e instanceof Error && e.message.includes("Please open the portfolio account")) {
@@ -264,7 +267,7 @@ export class GateExchange implements Exchanger {
 				addToBalanceMap(balances, leg.currency, net)
 			}
 
-			_(resp).forEach((account) => {
+			resp.forEach((account) => {
 				mergeLeg(account.base)
 				mergeLeg(account.quote)
 			})
@@ -281,7 +284,11 @@ export class GateExchange implements Exchanger {
 		const path = "/wallet/total_balance"
 		const resp = await this.fetch<TotalBalanceResp>("GET", path, "")
 
-		return _(resp.details).pickBy((v, k) => ["futures", "options", "payment", "quant"].includes(k)).mapKeys(v => v.currency).mapValues(v => parseFloat(v.amount)).value()
+		return Object.fromEntries(
+			Object.entries(resp.details)
+				.filter(([k]) => ["futures", "options", "payment", "quant"].includes(k))
+				.map(([, v]) => [v.currency, parseFloat(v.amount)]),
+		)
 	}
 
 	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {
@@ -297,8 +304,7 @@ export class GateExchange implements Exchanger {
 	}
 
 	private buildQueryParam(params: { [k: string]: string | number | undefined }): string {
-		return _(params)
-			.toPairs()
+		return Object.entries(params)
 			.filter(([, value]) => value !== undefined)
 			.map(([key, value]) => `${key}=${value!.toString()}`)
 			.join("&")

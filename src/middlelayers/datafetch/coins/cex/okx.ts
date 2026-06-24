@@ -1,10 +1,9 @@
 import CryptoJS from 'crypto-js'
 import { Exchanger } from './cex'
 import { sendHttpRequest } from '../../utils/http'
-import _ from 'lodash'
 import bluebird from 'bluebird'
 import { getMemoryCacheInstance } from '../../utils/cache'
-import { addToBalanceMap, toNumber, toNumberOptional } from './balance-utils'
+import { addToBalanceMap, mergeBalances, toNumber, toNumberOptional } from './balance-utils'
 
 type AccountBalanceResp = {
 	data: {
@@ -96,9 +95,8 @@ export class OkxExchange implements Exchanger {
 			this.fetchStakingDefiBalance(),
 			this.fetchDualInvestmentBalance(),
 		], (v) => v)
-		const merge = (arrs: { [k: string]: number }[]) => _(arrs).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
-		const balance: { [k: string]: number } = merge([sb, ssb, fb, sdb, dib])
-		_(esb).forEach((v, k) => {
+		const balance: { [k: string]: number } = mergeBalances([sb, ssb, fb, sdb, dib])
+		Object.entries(esb).forEach(([k, v]) => {
 			const bv = balance[k] || 0
 
 			// if in funding balance, means it is redeemed, no need to cal in eth balance
@@ -107,7 +105,7 @@ export class OkxExchange implements Exchanger {
 			}
 		})
 
-		return merge([balance, esb])
+		return mergeBalances([balance, esb])
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
@@ -120,12 +118,11 @@ export class OkxExchange implements Exchanger {
 		}>("GET", `${this.endpoint}${this.apiPrefix}/market/tickers?instType=SPOT`)
 
 		const suffix = "-USDT"
-		const allPricesMap = _(allPrices.data).filter(p => p.instId.endsWith(suffix)).map(p => ({
-			symbol: p.instId.replace(suffix, ""),
-			price: parseFloat(p.last)
-		})).keyBy("symbol").mapValues("price").value()
-
-		return allPricesMap
+		return Object.fromEntries(
+			allPrices.data
+				.filter((p) => p.instId.endsWith(suffix))
+				.map((p) => [p.instId.replace(suffix, ""), parseFloat(p.last)]),
+		)
 	}
 
 	async verifyConfig(): Promise<boolean> {
@@ -156,7 +153,7 @@ export class OkxExchange implements Exchanger {
 		}
 
 		const balances: { [k: string]: number } = {}
-		_(resp.data).flatMap(d => d.details).forEach(detail => {
+		resp.data.flatMap(d => d.details).forEach(detail => {
 			const amount = parseNetAsset(detail)
 			addToBalanceMap(balances, detail.ccy, amount)
 		})
@@ -168,16 +165,16 @@ export class OkxExchange implements Exchanger {
 		const path = "/finance/savings/balance"
 		const resp = await this.fetch<SavingBalanceResp>("GET", path, "")
 
-		return _(resp.data).keyBy("ccy").mapValues("amt").mapValues(v => parseFloat(v)).value()
+		return Object.fromEntries(resp.data.map((v) => [v.ccy, parseFloat(v.amt)]))
 	}
 
 	private async fetchFundingBalance(): Promise<{ [k: string]: number }> {
 		const path = "/asset/balances"
 		const resp = await this.fetch<FundingBalanceResp>("GET", path, "")
 
-		const allBalances = _(resp.data).flatMap(d => d).keyBy("ccy").mapValues("bal").value()
-
-		return _(allBalances).mapValues(v => parseFloat(v)).value()
+		return Object.fromEntries(
+			resp.data.flat().map((d) => [d.ccy, parseFloat(d.bal)]),
+		)
 	}
 
 	// this function will return the amount of BETH which get by ETH Staking
@@ -186,7 +183,7 @@ export class OkxExchange implements Exchanger {
 		const path = "/finance/staking-defi/eth/balance"
 		const resp = await this.fetch<ETHStakingBalanceResp>("GET", path, "")
 
-		return _(resp.data).keyBy("ccy").mapValues("amt").mapValues(v => parseFloat(v)).value()
+		return Object.fromEntries(resp.data.map((v) => [v.ccy, parseFloat(v.amt)]))
 	}
 
 	// key is productId
@@ -200,7 +197,9 @@ export class OkxExchange implements Exchanger {
 		const path = "/finance/staking-defi/offers"
 		const resp = await this.fetch<{ data: { ccy: string, productId: string, fastRedemptionDailyLimit: string }[] }>("GET", path, "")
 
-		const limits = _(resp.data).keyBy("productId").mapValues("fastRedemptionDailyLimit").mapValues(limit => parseFloat(limit) || 0).value()
+		const limits = Object.fromEntries(
+			resp.data.map((v) => [v.productId, parseFloat(v.fastRedemptionDailyLimit) || 0]),
+		)
 
 		cache.setCache(cacheKey, limits)
 		return limits
@@ -213,16 +212,16 @@ export class OkxExchange implements Exchanger {
 		const res: { [k: string]: number } = {}
 		const maxInstantRedeem = await this.fetchStakingDefiFastRedemptionDailyLimits()
 
-		_(resp.data).forEach(d => {
+		resp.data.forEach(d => {
 			// 2 is redeeming, the instant redeem amount will be in funding wallet instantly
-			let sum = _(d.investData).map("amt").map(parseFloat).sum()
+			let sum = d.investData.reduce((acc, v) => acc + parseFloat(v.amt), 0)
 			if (d.state === '2') {
 				const limit = maxInstantRedeem[d.productId]
 				if (limit !== undefined) {
 					sum = Math.max(0, sum - limit)
 				}
 			}
-			res[d.ccy] = (res[d.ccy] || 0) + sum
+			addToBalanceMap(res, d.ccy, sum)
 		})
 
 		return res
@@ -230,16 +229,14 @@ export class OkxExchange implements Exchanger {
 
 	private async fetchDualInvestmentBalance(): Promise<{ [k: string]: number }> {
 		const res: { [k: string]: number } = {}
-		// const activeStates = ["initial", "live", "pending_settle", "pending_redeem"] as const
 
 		const orders = await this.fetchDualInvestmentOrdersByState("live")
-		_(orders).forEach(order => {
+		orders.forEach(order => {
 			const amount = parseFloat(order.notionalSz) || 0
-			if (!order.notionalCcy || amount <= 0) {
+			if (!order.notionalCcy) {
 				return
 			}
-
-			res[order.notionalCcy] = (res[order.notionalCcy] || 0) + amount
+			addToBalanceMap(res, order.notionalCcy, amount)
 		})
 
 		return res
@@ -263,7 +260,7 @@ export class OkxExchange implements Exchanger {
 				break
 			}
 
-			endId = _(resp.data).last()?.ordId
+			endId = resp.data.at(-1)?.ordId
 			if (!endId) {
 				break
 			}
@@ -297,7 +294,7 @@ export class OkxExchange implements Exchanger {
 
 	private buildQueryParam(params: { [k: string]: string | undefined }): string {
 		const searchParams = new URLSearchParams()
-		_(params).forEach((value, key) => {
+		Object.entries(params).forEach(([key, value]) => {
 			if (value !== undefined && value !== '') {
 				searchParams.append(key, value)
 			}

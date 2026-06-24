@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { TransactionModel, UniqueIndexConflictResolver } from "../types";
 import {
   deleteFromDatabase,
@@ -19,6 +18,16 @@ export interface TransactionHandlerImpl {
     models: TransactionModel[],
     conflictResolver: UniqueIndexConflictResolver,
   ): Promise<TransactionModel[]>;
+}
+
+function groupTransactionModelsByUuid(models: TransactionModel[]): TransactionModel[][] {
+  const map = new Map<string, TransactionModel[]>();
+  for (const m of models) {
+    const uuid = m.uuid;
+    if (!map.has(uuid)) map.set(uuid, []);
+    map.get(uuid)!.push(m);
+  }
+  return Array.from(map.values());
 }
 
 class TransactionHandler implements TransactionHandlerImpl {
@@ -111,10 +120,7 @@ class TransactionHandler implements TransactionHandlerImpl {
       sql,
       [],
     );
-    return _(this.normalizeTransactionModels(assets))
-      .groupBy("uuid")
-      .values()
-      .value();
+    return groupTransactionModelsByUuid(this.normalizeTransactionModels(assets));
   }
 
   async saveTransactions(models: TransactionModel[]) {
@@ -134,15 +140,13 @@ class TransactionHandler implements TransactionHandlerImpl {
   ): Promise<TransactionModel[]> {
     // split models to chunks to avoid too large sql
     const chunkSize = 1000;
-    const chunks = _.chunk(models, chunkSize);
     const res = [];
 
-    for (const chunk of chunks) {
+    for (let i = 0; i < models.length; i += chunkSize) {
+      const chunk = models.slice(i, i + chunkSize);
       const resModels = await saveModelsToDatabase<TransactionDatabaseModel>(
         this.transactionTableName,
-        _(chunk)
-          .map((m) => this.toDatabaseModel(m))
-          .value(),
+        chunk.map((m) => this.toDatabaseModel(m)),
         conflictResolver,
       );
 
@@ -162,10 +166,9 @@ class TransactionHandler implements TransactionHandlerImpl {
   private normalizeTransactionModels(
     models: TransactionDatabaseModel[],
   ): TransactionModel[] {
-    return _(models)
+    return models
       .map((model) => this.normalizeTransactionModel(model))
-      .compact()
-      .value();
+      .filter((x): x is TransactionModel => !!x);
   }
 
   private normalizeTransactionModel(

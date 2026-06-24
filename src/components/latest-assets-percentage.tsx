@@ -5,7 +5,6 @@ import {
   TDateRange,
 } from "@/middlelayers/types";
 import { Card, CardContent } from "./ui/card";
-import _ from "lodash";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
@@ -98,13 +97,12 @@ const App = ({
   useEffect(() => {
     // download coin logos
     downloadCoinLogos(
-      _(latestAssetsPercentageData)
+      latestAssetsPercentageData
         .filter((d) => shouldDownloadCryptoLogo(d))
         .map((d) => ({
           symbol: d.coin,
           price: d.value / (d.amount || 1),
-        }))
-        .value(),
+        })),
     );
 
     // set logo map
@@ -145,7 +143,7 @@ const App = ({
       return { [getAssetLogoKey(assetRef)]: path };
     });
 
-    return _.assign({}, ...kvs);
+    return Object.assign({}, ...kvs);
   }
 
   const options = {
@@ -188,22 +186,21 @@ const App = ({
     if (d.length <= count) {
       return d;
     }
-    const top = _(d).sortBy("percentage").reverse().take(count).value();
-    const other = _(d).sortBy("percentage").reverse().drop(count).value();
+    const sorted = d.sort((a, b) => b.percentage - a.percentage);
+    const top = sorted.slice(0, count);
+    const other = sorted.slice(count);
 
-    return _([
+    return [
       ...top,
       other
         ? {
             coin: "Other",
-            percentage: _(other).map("percentage").sum(),
-            value: _(other).map("value").sum(),
+            percentage: other.reduce((acc, o) => acc + o.percentage, 0),
+            value: other.reduce((acc, o) => acc + o.value, 0),
             chartColor: other[0]?.chartColor ?? "#4B5563",
           }
         : null,
-    ])
-      .compact()
-      .value();
+    ].filter((x): x is NonNullable<typeof x> => !!x);
   }
 
   function lineData() {

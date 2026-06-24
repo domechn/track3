@@ -1,5 +1,4 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
-import _ from "lodash";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
 import { asyncMap } from "../utils/async";
@@ -24,9 +23,7 @@ export class SUIAnalyzer implements Analyzer {
   async verifyConfigs(): Promise<boolean> {
     const regex = /^0[xX][a-fA-F0-9]{64}$/;
 
-    const valid = _(getAddressList(this.config.sui)).every((address) =>
-      regex.test(address),
-    );
+    const valid = getAddressList(this.config.sui).every((address) => regex.test(address));
     return valid;
   }
 
@@ -36,20 +33,17 @@ export class SUIAnalyzer implements Analyzer {
       this.queryHolding(this.endpoint, address),
       this.queryDefiPositions(this.endpoint, address),
     ]);
-    return _(positions)
-      .flatten()
-      .map((p) => ({
-        symbol: p.symbol,
-        assetType: "crypto" as const,
-        amount: p.amount,
-        price: {
-          value: p.price,
-          base: "usd" as "usd",
-        },
-        wallet: address,
-        chain: "sui",
-      }))
-      .value();
+    return positions.flat().map((p) => ({
+      symbol: p.symbol,
+      assetType: "crypto" as const,
+      amount: p.amount,
+      price: {
+        value: p.price,
+        base: "usd" as "usd",
+      },
+      wallet: address,
+      chain: "sui",
+    }));
   }
 
   // price is in usd
@@ -72,18 +66,15 @@ export class SUIAnalyzer implements Analyzer {
       }[];
     }>("GET", `${ep}/address/${address}/positions`, 20000);
 
-    return _(resp.data)
-      .map((d) => d.current)
-      .flatten()
-      .map((c) => c.tokens)
-      .flatten()
+    return resp.data
+      .flatMap((d) => d.current)
+      .flatMap((c) => c.tokens)
       .map((t) => ({
         symbol: t.token.symbol,
         amount: t.amount,
         price: t.token.price,
       }))
-      .filter((t) => t.amount > 0 && t.price > 0)
-      .value();
+      .filter((t) => t.amount > 0 && t.price > 0);
   }
 
   // price is in usd
@@ -106,15 +97,14 @@ export class SUIAnalyzer implements Analyzer {
       }[];
     }>("GET", `${ep}/address/${address}/holding`, 20000);
 
-    return _(resp.data)
+    return resp.data
       .filter((d) => !d.is_spam && !!d.last_24h_price?.price)
       .map((v) => ({
         symbol: v.symbol,
         amount: parseFloat(v.amount) || 0,
         price: v.rate,
       }))
-      .filter((v) => v.amount > 0 && v.price > 0)
-      .value();
+      .filter((v) => v.amount > 0 && v.price > 0);
   }
 
   async loadPortfolio(): Promise<WalletCoin[]> {
@@ -127,7 +117,7 @@ export class SUIAnalyzer implements Analyzer {
         2,
         0,
       );
-      return _(coinLists).flatten().value();
+      return coinLists.flat();
     } catch (e) {
       console.error(e);
     }

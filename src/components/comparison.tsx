@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
-import _ from "lodash";
 import bluebird from "bluebird";
 import {
   currencyWrapper,
@@ -91,11 +90,11 @@ const App = ({
   }, [baseId, headId]);
 
   const baseDate = useMemo(() => {
-    return _.find(dateOptions, { value: baseId })?.displayLabel;
+    return dateOptions.find(item => item.value === baseId)?.displayLabel;
   }, [dateOptions, baseId]);
 
   const headDate = useMemo(() => {
-    return _.find(dateOptions, { value: headId })?.displayLabel;
+    return dateOptions.find(item => item.value === headId)?.displayLabel;
   }, [dateOptions, headId]);
 
   useEffect(() => {
@@ -113,7 +112,7 @@ const App = ({
         value: `${d.id}`,
         createdAt: d.createdAt,
       }));
-      const dateCounts = _.countBy(rawOptions, "label");
+      const dateCounts = rawOptions.reduce((acc, opt) => { acc[opt.label] = (acc[opt.label] || 0) + 1; return acc; }, {} as Record<string, number>);
       const dateIndexes: Record<string, number> = {};
       const options = rawOptions.map((option) => {
         dateIndexes[option.label] = (dateIndexes[option.label] || 0) + 1;
@@ -145,13 +144,13 @@ const App = ({
       // so we keep their selection rather than snapping to the new
       // latest snapshot.
       setBaseId((prev) => {
-        if (prev && _(options).some((o) => o.value === prev)) {
+        if (prev && options.some((o) => o.value === prev)) {
           return prev;
         }
         return options[1]?.value || options[0].value;
       });
       setHeadId((prev) => {
-        if (prev && _(options).some((o) => o.value === prev)) {
+        if (prev && options.some((o) => o.value === prev)) {
           return prev;
         }
         return options[0].value;
@@ -201,16 +200,17 @@ const App = ({
   }, [baseId, headId, dataChangedVersion]);
 
   const coinComparisons = useMemo((): CoinComparison[] => {
-    const baseMap = _.keyBy(baseData, (asset) => getAssetLogoKey(asset));
-    const headMap = _.keyBy(headData, (asset) => getAssetLogoKey(asset));
-    const assetKeys = _([...baseData, ...headData])
-      .map((asset) => getAssetLogoKey(asset))
-      .uniq()
-      .value();
+    const buildMap = (items: typeof baseData) =>
+      new Map(items.map((asset) => [getAssetLogoKey(asset), asset]));
+    const baseMap = buildMap(baseData);
+    const headMap = buildMap(headData);
+    const assetKeys = Array.from(
+      new Set([...baseData, ...headData].map((asset) => getAssetLogoKey(asset))),
+    );
 
     return assetKeys.map((assetKey) => {
-      const baseItem = baseMap[assetKey];
-      const headItem = headMap[assetKey];
+      const baseItem = baseMap.get(assetKey);
+      const headItem = headMap.get(assetKey);
       const ref = headItem ?? baseItem;
 
       const makeRow = (baseVal: number, headVal: number): MetricRow => ({
@@ -230,8 +230,8 @@ const App = ({
   }, [baseData, headData]);
 
   const totalValue = useMemo(() => {
-    const baseTotal = _(baseData).sumBy("value");
-    const headTotal = _(headData).sumBy("value");
+    const baseTotal = baseData.reduce((sum, d) => sum + d.value, 0);
+    const headTotal = headData.reduce((sum, d) => sum + d.value, 0);
     return {
       base: baseTotal,
       head: headTotal,
@@ -243,10 +243,9 @@ const App = ({
 
   const symbolsForLogos = useMemo(
     () =>
-      _(coinComparisons)
+      coinComparisons
         .filter((coin) => shouldDownloadCryptoLogo(coin))
-        .uniqBy((coin) => getAssetLogoKey(coin))
-        .value(),
+        .filter((coin, idx, arr) => arr.findIndex(c => getAssetLogoKey(c) === getAssetLogoKey(coin)) === idx),
     [coinComparisons],
   );
 
@@ -284,7 +283,7 @@ const App = ({
       if (cancelled) {
         return;
       }
-      setLogoMap((prev) => ({ ...prev, ..._.assign({}, ...kvs) }));
+      setLogoMap((prev) => ({ ...prev, ...Object.assign({}, ...kvs) }));
     })();
 
     return () => {
@@ -306,13 +305,12 @@ const App = ({
         ? new Date(parseDateToTS(latestDate.label) - days * 24 * 60 * 60 * 1000)
         : new Date(0);
 
-    const closestDate = _(dateOptions)
+    const closestDate = dateOptions
       .map((d) => ({
         ...d,
         diff: Math.abs(parseDateToTS(d.label) - targetBaseDate.getTime()),
       }))
-      .sortBy("diff")
-      .first();
+      .sort((a, b) => a.diff - b.diff)[0];
 
     if (closestDate) {
       setBaseId(closestDate.value);
@@ -365,7 +363,7 @@ const App = ({
 
   async function loadDataByUUID(uuid: string): Promise<Asset[]> {
     const data = await queryCoinDataByUUID(uuid);
-    return _(data).sortBy("value").reverse().value();
+    return [...data].sort((a, b) => b.value - a.value);
   }
 
   function prettyNumber(
@@ -638,14 +636,14 @@ function ComparisonDatePicker({
   const [open, setOpen] = useState(false);
   const [activeDateLabel, setActiveDateLabel] = useState<string | undefined>();
   const selectedOption = useMemo(
-    () => _.find(dateOptions, { value }),
+    () => dateOptions.find(item => item.value === value),
     [dateOptions, value],
   );
   const selectedDate = selectedOption
     ? dateOptionToDate(selectedOption)
     : undefined;
   const optionsByDate = useMemo(
-    () => _.groupBy(dateOptions, "label"),
+    () => dateOptions.reduce((acc, opt) => { (acc[opt.label] = acc[opt.label] || []).push(opt); return acc; }, {} as Record<string, typeof dateOptions>),
     [dateOptions],
   );
   const selectableDates = useMemo(

@@ -1,5 +1,4 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
-import _ from "lodash";
 import { asyncMap } from "../utils/async";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
@@ -29,9 +28,7 @@ export class DOGEAnalyzer implements Analyzer {
   async verifyConfigs(): Promise<boolean> {
     const regex = /^D{1}[5-9A-HJ-NP-U]{1}[1-9A-HJ-NP-Za-km-z]{32}$/;
 
-    const valid = _(getAddressList(this.config.doge)).every((address) =>
-      regex.test(address),
-    );
+    const valid = getAddressList(this.config.doge).every((address) => regex.test(address));
     return valid;
   }
 
@@ -60,14 +57,12 @@ export class DOGEAnalyzer implements Analyzer {
       1,
       1000,
     );
-    return _(coinLists)
-      .map((c) => ({
-        ...c,
-        chain: "dogecoin",
-        assetType: "crypto" as const,
-        symbol: "DOGE",
-      }))
-      .value();
+    return coinLists.map((c) => ({
+      ...c,
+      chain: "dogecoin",
+      assetType: "crypto" as const,
+      symbol: "DOGE",
+    }));
   }
 }
 
@@ -79,7 +74,7 @@ class BlockCypher implements DogeQuerier {
       "GET",
       this.queryUrl + address,
     );
-    const amount = _(resp.final_balance).toNumber() / 1e8;
+    const amount = Number(resp.final_balance) / 1e8;
     return amount;
   }
 }

@@ -2,7 +2,6 @@ import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import qs from 'qs'
 import { sendHttpRequest } from '../../utils/http'
-import _ from 'lodash'
 import bluebird from 'bluebird'
 
 type AccountBalanceResp = {
@@ -45,13 +44,13 @@ export class KrakenExchange implements Exchanger {
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
 		const resp = await bluebird.map([this.fetchBalance()], (v) => v)
-		return _(resp).reduce((acc, v) => _.mergeWith(acc, v, (a, b) => (a || 0) + (b || 0)), {})
+		return resp.reduce((acc, v) => { for (const [k, val] of Object.entries(v)) acc[k] = (acc[k] || 0) + val; return acc; }, {})
 	}
 
 	private async fetchBalance(): Promise<{ [k: string]: number }> {
 		const path = "/private/BalanceEx"
 		const resp = await this.fetch<AccountBalanceResp>("POST", path)
-		if (!_(resp.error).isEmpty()) {
+		if (resp.error && resp.error.length > 0) {
 			throw new Error(resp.error!.join(","))
 		}
 
@@ -59,7 +58,7 @@ export class KrakenExchange implements Exchanger {
 
 		// .F/.M is flexible earn, .B is locked earn
 		const earnSuffixes = [".F", ".B", ".M"]
-		_(resp.result ?? {}).forEach((v, k) => {
+		Object.entries(resp.result ?? {}).forEach(([k, v]) => {
 			let symbol = k
 			// SOL.F/xxx.F is in earn
 			for (const earnSuffix of earnSuffixes) {
@@ -90,7 +89,7 @@ export class KrakenExchange implements Exchanger {
 			}
 		}>("GET", this.endpoint + this.apiPrefix + "/public/Ticker")
 
-		if (!_(allPrices.error).isEmpty()) {
+		if (allPrices.error && allPrices.error.length > 0) {
 			console.error(allPrices.error)
 			return {}
 		}
@@ -98,7 +97,15 @@ export class KrakenExchange implements Exchanger {
 		const getPrice = (a: string[], b: string[]) => (parseFloat(a[0]) + parseFloat(b[0])) / 2
 		const suffix = "USDT"
 
-		return _(allPrices.result).pickBy((v, k) => k.endsWith(suffix) && v.a.length === 3 && v.b.length === 3).mapKeys((_v, k) => k.replace(suffix, "")).mapValues(v => getPrice(v.a, v.b)).pickBy(v => !!v).value()
+		return Object.fromEntries(
+			Object.entries(allPrices.result ?? {})
+				.filter(([k, v]) => k.endsWith(suffix) && v.a.length === 3 && v.b.length === 3)
+				.map(([k, v]) => {
+					const price = getPrice(v.a, v.b)
+					return [k.replace(suffix, ""), price] as const
+				})
+				.filter(([, price]) => !!price),
+		)
 	}
 
 	async verifyConfig(): Promise<boolean> {

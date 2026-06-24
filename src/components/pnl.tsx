@@ -6,7 +6,6 @@ import {
 } from "@/middlelayers/types";
 import { timeToDateStr } from "@/utils/date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import _ from "lodash";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { queryPNLTableValue, resizeChart } from "@/middlelayers/charts";

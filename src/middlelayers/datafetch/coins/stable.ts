@@ -1,7 +1,6 @@
 import { PRO_API_ENDPOINT } from '@/middlelayers/configuration'
 import { sendHttpRequest } from '../utils/http'
 import { getClientID } from '@/utils/app'
-import _ from 'lodash'
 
 export interface StableCoinsQuerier {
 	listAllStableCoins(): Promise<string[]>
@@ -23,6 +22,6 @@ export class RemoteStableCoinsQuery implements StableCoinsQuerier {
 		}>("GET", this.queryUrl, 10000, {
 			"x-track3-client-id": await getClientID(),
 		})
-		return _(resp.data).map(d => d.symbol).value()
+		return resp.data.map(d => d.symbol)
 	}
 }

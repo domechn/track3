@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { listAllCurrencyRates } from "../../../configuration";
 import { sendHttpTextRequest } from "../../utils/http";
 import { StockBroker, applyMarketSuffix } from "./stock-broker";
@@ -36,9 +35,7 @@ function firstTagText(
 function parseIbkrFlexCashPosition(
   doc: Document,
 ): IbkrFlexPosition | undefined {
-  const totalStartingCash = _(
-    Array.from(doc.getElementsByTagName("CashReportCurrency")),
-  )
+  const totalStartingCash = Array.from(doc.getElementsByTagName("CashReportCurrency"))
     .filter(
       (reportCurrency) =>
         reportCurrency.getAttribute("currency") === "BASE_SUMMARY",
@@ -47,7 +44,7 @@ function parseIbkrFlexCashPosition(
       parseFloat(reportCurrency.getAttribute("endingCash") ?? "NaN"),
     )
     .filter((value) => Number.isFinite(value) && value !== 0)
-    .sum();
+    .reduce((sum, v) => sum + v, 0);
 
   if (!Number.isFinite(totalStartingCash) || totalStartingCash === 0) {
     return;
@@ -65,7 +62,7 @@ function parseIbkrFlexCashPosition(
 export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, "text/xml");
-  const stockPositions = _(Array.from(doc.getElementsByTagName("OpenPosition")))
+  const stockPositions = Array.from(doc.getElementsByTagName("OpenPosition"))
     .map((position) => {
       const assetCategory = (
         position.getAttribute("assetCategory") ??
@@ -115,8 +112,7 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
         market,
       };
     })
-    .compact()
-    .value();
+    .filter((p): p is IbkrFlexPosition => p !== undefined);
   const cashPosition = parseIbkrFlexCashPosition(doc);
   console.log("Parsed IBKR Flex positions", cashPosition);
 
@@ -255,19 +251,17 @@ export class IbkrBroker implements StockBroker {
 
   async fetchPositions(): Promise<{ [symbol: string]: number }> {
     const positions = parseIbkrFlexOpenPositions(await this.fetchFlexXml());
-    return _(positions)
-      .mapKeys((pos) => applyMarketSuffix(pos.symbol, pos.market, pos.currency))
-      .mapValues("amount")
-      .value();
+    return Object.fromEntries(
+      positions.map((pos) => [applyMarketSuffix(pos.symbol, pos.market, pos.currency), pos.amount]),
+    );
   }
 
   async fetchPositionsPrice(): Promise<{ [symbol: string]: number }> {
     const positions = parseIbkrFlexOpenPositions(await this.fetchFlexXml());
     const priceBySymbol = await this.convertPositionPricesToUsd(positions);
-    return _(priceBySymbol)
-      .mapKeys((pos) => applyMarketSuffix(pos.symbol, pos.market, pos.currency))
-      .mapValues("price")
-      .value();
+    return Object.fromEntries(
+      priceBySymbol.map((pos) => [applyMarketSuffix(pos.symbol, pos.market, pos.currency), pos.price]),
+    );
   }
 
   async verifyConfig(): Promise<boolean> {
@@ -331,20 +325,17 @@ export class IbkrBroker implements StockBroker {
   private async convertPositionPricesToUsd(
     positions: IbkrFlexPosition[],
   ): Promise<IbkrFlexPosition[]> {
-    const nonUsdCurrencies = _(positions)
-      .map((position) => position.currency)
-      .filter((currency) => currency !== "USD")
-      .uniq()
-      .value();
+    const nonUsdCurrencies = Array.from(
+      new Set(positions.map((p) => p.currency).filter((c) => c !== "USD")),
+    );
 
     if (nonUsdCurrencies.length === 0) {
       return positions;
     }
 
-    const rateMap = _(await listAllCurrencyRates())
-      .keyBy((rate) => rate.currency.toUpperCase())
-      .mapValues("rate")
-      .value();
+    const rateMap = Object.fromEntries(
+      (await listAllCurrencyRates()).map((rate) => [rate.currency.toUpperCase(), rate.rate]),
+    );
     rateMap.USD = 1;
 
     return positions.map((position) => {

@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { generateRandomColors } from "../utils/color";
 import {
   Asset,
@@ -20,11 +19,10 @@ import { filterByAssetType, toAssetReference } from "./charts-shared";
 // returns sort by latest value desc
 export async function listAllowedSymbols(): Promise<AssetReference[]> {
   const groupedAssets = await ASSET_HANDLER.listSymbolGroupedAssets(1);
-  return _(groupedAssets[0] ?? [])
+  return (groupedAssets[0] ?? [])
     .filter((asset) => asset.amount !== 0)
-    .orderBy(["value", "symbol"], ["desc", "asc"])
-    .map((asset) => toAssetReference(asset))
-    .value();
+    .sort((a, b) => b.value - a.value || a.symbol.localeCompare(b.symbol))
+    .map((asset) => toAssetReference(asset));
 }
 
 export async function queryAssetMaxAmountBySymbol(
@@ -40,13 +38,11 @@ export async function queryAssetMaxAmountBySymbol(
       )
     : await ASSET_HANDLER.listAssetsBySymbol(symbol);
 
-  return (
-    _(groupedAssets)
-      .map((models) => filterByAssetType(models, assetType))
-      .filter((models) => models.length > 0)
-      .map((models) => _(models).sumBy("amount"))
-      .max() ?? 0
-  );
+  const amounts = groupedAssets
+    .map((models) => filterByAssetType(models, assetType))
+    .filter((models) => models.length > 0)
+    .map((models) => models.reduce((s, m) => s + m.amount, 0));
+  return amounts.length > 0 ? Math.max(...amounts) : 0;
 }
 
 export async function queryLastAssetsBySymbol(
@@ -64,7 +60,7 @@ export async function queryLastAssetsBySymbol(
   }
   const models = await ASSET_HANDLER.listAssetsBySymbol(symbol, 1);
   return convertAssetModelsToAsset(
-    filterByAssetType(_(models).flatten().value(), assetType),
+    filterByAssetType(models.flat(), assetType),
   );
 }
 
@@ -75,7 +71,7 @@ function convertAssetModelsToAsset(models: AssetModel[]): Asset | undefined {
   }
 
   const first = models[0];
-  const total = _(models).reduce(
+  const total = models.reduce(
     (acc, cur) => ({
       amount: acc.amount + cur.amount,
       value: acc.value + cur.value,
@@ -116,7 +112,7 @@ export async function queryTotalValue(
       dateRange.start,
       dateRange.end,
     );
-    const latest = _(results).last();
+    const latest = results[results.length - 1];
     return {
       totalValue: latest?.totalValue || 0,
     };
@@ -132,7 +128,7 @@ export async function queryTotalValue(
 
   const latest = results[0];
 
-  const latestTotal = _(latest).sumBy("value") || 0;
+  const latestTotal = latest.reduce((s, a) => s + a.value, 0) || 0;
 
   return {
     totalValue: latestTotal,
@@ -174,10 +170,8 @@ export async function queryLatestAssets(): Promise<Asset[]> {
   }
 
   const blacklist = await getBlacklistCoins();
-  const blacklistedSymbols = _(blacklist)
-    .map((s) => s.toUpperCase())
-    .value();
-  return _(assets[0])
+  const blacklistedSymbols = blacklist.map((s) => s.toUpperCase());
+  return assets[0]
     .filter((a) => a.amount !== 0)
     .filter((a) => !blacklistedSymbols.includes(a.symbol.toUpperCase()))
     .map((a) => ({
@@ -186,8 +180,7 @@ export async function queryLatestAssets(): Promise<Asset[]> {
       amount: a.amount,
       value: a.value,
       price: a.value / a.amount,
-    }))
-    .value();
+    }));
 }
 
 export async function queryLatestAssetsPercentage(
@@ -205,18 +198,15 @@ export async function queryLatestAssetsPercentage(
 
   // ignore coins whose amount is 0 and blacklisted symbols
   const blacklist = await getBlacklistCoins();
-  const blacklistedSymbols = _(blacklist)
-    .map((s) => s.toUpperCase())
-    .value();
-  const latest = _(assets[0])
+  const blacklistedSymbols = blacklist.map((s) => s.toUpperCase());
+  const latest = assets[0]
     .filter(
       (a) =>
         a.amount !== 0 && !blacklistedSymbols.includes(a.symbol.toUpperCase()),
-    )
-    .value();
-  const backgroundColors = generateRandomColors(_(latest).size());
+    );
+  const backgroundColors = generateRandomColors(latest.length);
 
-  const total = _(latest).sumBy("value") + 10 ** -21; // avoid total is 0
+  const total = latest.reduce((s, a) => s + a.value, 0) + 10 ** -21; // avoid total is 0
 
   const res: {
     coin: string;
@@ -224,38 +214,34 @@ export async function queryLatestAssetsPercentage(
     percentage: number;
     amount: number;
     value: number;
-  }[] = _(latest)
+  }[] = latest
     .map((t) => ({
       coin: t.symbol,
       assetType: getAssetType(t),
       amount: t.amount,
       value: t.value,
       percentage: (t.value / total) * 100,
-    }))
-    .value();
+    }));
 
-  return _(res)
-    .sortBy("percentage")
-    .reverse()
+  return res
+    .sort((a, b) => b.percentage - a.percentage)
     .map((v, idx) => ({
       ...v,
       chartColor: `rgba(${backgroundColors[idx].R}, ${backgroundColors[idx].G}, ${backgroundColors[idx].B}, 1)`,
-    }))
-    .value();
+    }));
 }
 
 export async function queryCoinDataByUUID(uuid: string): Promise<Asset[]> {
   const models = await ASSET_HANDLER.listSymbolGroupedAssetsByUUID(uuid);
 
-  const res: Asset[] = _(models)
+  const res: Asset[] = models
     .map((m) => ({
       symbol: m.symbol,
       assetType: getAssetType(m),
       amount: m.amount,
       value: m.value,
       price: m.price,
-    }))
-    .value();
+    }));
   return res;
 }
 
@@ -268,11 +254,10 @@ export async function queryAllDataDates(): Promise<
 > {
   const records = await ASSET_HANDLER.listAllUUIDWithCreatedAt();
 
-  return _(records)
+  return records
     .map((record) => ({
       id: record.uuid,
       date: timeToDateStr(new Date(record.createdAt).getTime()),
       createdAt: record.createdAt,
-    }))
-    .value();
+    }));
 }

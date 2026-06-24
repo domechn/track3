@@ -91,24 +91,20 @@ export class CacheCenter {
 	// ttl is second
 	public setCache<T>(key: string, value: T, ttl = 0) {
 		const vu = ttl > 0 ? Date.now() + ttl * 1000 : 0
-		this.getCacheProvider().set(key, {
+		this.provider.set(key, {
 			validUntil: vu,
 			data: value
 		})
 	}
 
-	private getCacheProvider() {
-		return this.provider
-	}
-
 	public getCache<T>(key: string): T | undefined {
-		const cv = this.getCacheProvider().get(key)
+		const cv = this.provider.get(key)
 
 		if (!cv) {
 			return
 		}
 		if (cv.validUntil && cv.validUntil < Date.now()) {
-			this.getCacheProvider().delete(key)
+			this.provider.delete(key)
 			return
 		}
 
@@ -118,6 +114,6 @@ export class CacheCenter {
 	public clearCache() {
 		console.debug("clear cache")
 
-		this.getCacheProvider().clear()
+		this.provider.clear()
 	}
 }

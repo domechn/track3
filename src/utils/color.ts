@@ -1,4 +1,3 @@
-import _ from 'lodash'
 import { diff, rgb_to_lab } from 'color-diff'
 import { QuoteColor } from '@/middlelayers/types'
 
@@ -31,20 +30,20 @@ const niceColors = [
 ]
 
 function generateRandomColor(): { R: number; G: number; B: number } {
-	let r = _.random(0, 255)
-	let g = _.random(0, 255)
-	let b = _.random(0, 255)
+	let r = Math.floor(Math.random() * 256)
+	let g = Math.floor(Math.random() * 256)
+	let b = Math.floor(Math.random() * 256)
 	// Check the color's brightness
 	let brightness = Math.sqrt(0.299 * r ** 2 + 0.587 * g ** 2 + 0.114 * b ** 2)
 	// Limit the brightness range
 	if (brightness < 130) {
-		brightness = _.random(130, 255)
+		brightness = Math.floor(Math.random() * 126 + 130)
 	}
 	// Check for clashing colors
 	if (r > 200 && g > 200 && b > 200) {
-		r = _.random(0, 200)
-		g = _.random(0, 200)
-		b = _.random(0, 200)
+		r = Math.floor(Math.random() * 201)
+		g = Math.floor(Math.random() * 201)
+		b = Math.floor(Math.random() * 201)
 	}
 	return {
 		R: r,

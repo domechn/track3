@@ -1,5 +1,4 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import _ from "lodash";
 
 export function getCurrentUA() {
   const userAgent = window.navigator.userAgent;
@@ -14,12 +13,11 @@ export async function sendHttpRequest<T>(
   json = {},
   formData = {},
 ): Promise<T> {
-  // const client = await getClient()
   const hs: { [k: string]: string } = {
     "user-agent": getCurrentUA(),
     ...headers,
   };
-  if (!_(json).isEmpty()) {
+  if (Object.keys(json).length > 0) {
     hs["content-type"] = "application/json";
   }
   const payload: RequestInit = {
@@ -27,12 +25,12 @@ export async function sendHttpRequest<T>(
     headers: hs,
     connectTimeout: timeout,
   } as any;
-  if (!_(json).isEmpty()) {
+  if (Object.keys(json).length > 0) {
     payload.body = JSON.stringify(json);
   }
-  if (!_(formData).isEmpty()) {
+  if (Object.keys(formData).length > 0) {
     const fd = new URLSearchParams();
-    _(formData).forEach((v, k) => {
+    (Object.entries(formData) as [string, string][]).forEach(([k, v]) => {
       fd.append(k, v);
     });
     payload.body = fd;
@@ -59,7 +57,7 @@ export async function sendHttpTextRequest(
     "user-agent": getCurrentUA(),
     ...headers,
   };
-  if (!_(json).isEmpty()) {
+  if (Object.keys(json).length > 0) {
     hs["content-type"] = "application/json";
   }
   const payload: RequestInit = {
@@ -67,12 +65,12 @@ export async function sendHttpTextRequest(
     headers: hs,
     connectTimeout: timeout,
   } as any;
-  if (!_(json).isEmpty()) {
+  if (Object.keys(json).length > 0) {
     payload.body = JSON.stringify(json);
   }
-  if (!_(formData).isEmpty()) {
+  if (Object.keys(formData).length > 0) {
     const fd = new URLSearchParams();
-    _(formData).forEach((v, k) => {
+    (Object.entries(formData) as [string, string][]).forEach(([k, v]) => {
       fd.append(k, v);
     });
     payload.body = fd;

@@ -1,6 +1,5 @@
 import { WalletCoinUSD } from "@/middlelayers/types";
 import { AssetType, WalletCoin } from "../types";
-import _ from "lodash";
 
 export function getAssetType(asset?: { assetType?: AssetType }): AssetType {
   return asset?.assetType ?? "crypto";
@@ -15,30 +14,26 @@ export function getAssetIdentity(asset?: {
 }
 
 export function combineCoinLists(coinLists: WalletCoin[][]): WalletCoin[] {
-  return _(coinLists)
-    .flatten()
-    .groupBy((c) => `${c.wallet}:${getAssetType(c)}`)
-    .map((group) =>
-      _(group)
-        .groupBy("symbol")
-        .map((group, symbol) => {
-          const first = _(group).first()!;
-          const amount = _(group).sumBy("amount");
-          const price = _(group).find((g) => !!g.price)?.price;
-          return {
-            symbol,
-            amount,
-            price,
-            wallet: first.wallet,
-            assetType: getAssetType(first),
-          };
-        })
-        .value(),
+  const flat = coinLists.flat();
+  const grouped = flat.reduce((wallets, coin) => {
+    const key = `${coin.wallet}:${getAssetType(coin)}`;
+    (wallets[key] ??= []).push(coin);
+    return wallets;
+  }, {} as Record<string, WalletCoin[]>);
+  return Object.values(grouped).flatMap((group) =>
+    Object.values(
+      group.reduce((symbols, coin) => {
+        const key = coin.symbol;
+        if (!symbols[key]) {
+          symbols[key] = { ...coin, amount: 0 };
+        }
+        symbols[key].amount += coin.amount;
+        if (coin.price) symbols[key].price = coin.price;
+        return symbols;
+      }, {} as Record<string, WalletCoin>)
     )
-    .flatten()
-    .value();
+  );
 }
-
 export function calculateTotalValue(
   coinList: WalletCoin[],
   priceMap: { [k: string]: number },
@@ -56,14 +51,12 @@ export function calculateTotalValue(
     }
     return w.price.value;
   };
-  return _(coinList)
-    .map((c) => ({
+  return coinList.map((c) => ({
       symbol: c.symbol,
       amount: +c.amount,
       assetType: getAssetType(c),
       price: getPriceFromWalletCoin(c),
       usdValue: c.amount * getPriceFromWalletCoin(c),
       wallet: c.wallet,
-    }))
-    .value();
+    }));
 }

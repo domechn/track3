@@ -126,5 +126,3 @@ export function useTranslation(): I18nContextValue {
   return ctx;
 }
 
-// re-export for convenience; some code may want to import the type
-export type { I18nContextValue as I18nContext };

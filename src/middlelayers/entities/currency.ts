@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { saveModelsToDatabase, selectFromDatabase } from "../database";
 import { ExchangeRate } from "../datafetch/currencies";
 import { CurrencyRateDetail, CurrencyRateModel } from "../types";
@@ -22,7 +21,7 @@ class CurrencyRateHandler {
       rows = await this.updateAllCurrencyRates();
     }
 
-    return _(rows).sortBy("priority").value();
+    return rows.sort((a, b) => a.priority - b.priority);
   }
 
   getDefaultCurrencyRate(): CurrencyRateDetail {

@@ -1,4 +1,3 @@
-import _ from "lodash";
 import {
   deleteFromDatabase,
   saveModelsToDatabase,
@@ -26,6 +25,16 @@ export interface AssetHandlerImpl {
     models: AssetModel[],
     conflictResolver: UniqueIndexConflictResolver,
   ): Promise<AssetModel[]>;
+}
+
+function groupAssetsByUuid(models: AssetModel[]): AssetModel[][] {
+  const map = new Map<string, AssetModel[]>();
+  for (const m of models) {
+    const uuid = m.uuid;
+    if (!map.has(uuid)) map.set(uuid, []);
+    map.get(uuid)!.push(m);
+  }
+  return Array.from(map.values());
 }
 
 class AssetHandler implements AssetHandlerImpl {
@@ -69,10 +78,7 @@ class AssetHandler implements AssetHandlerImpl {
     const sql = `SELECT t1.* FROM ${this.assetTableName} t1 JOIN (SELECT uuid, asset_type, symbol, MAX(createdAt) as maxCreatedAt FROM ${this.assetTableName} WHERE ${conditions} GROUP BY asset_type, symbol) t2 ON t1.symbol = t2.symbol and t1.asset_type = t2.asset_type and t1.uuid = t2.uuid`;
     const results = await selectFromDatabaseWithSql<AssetDatabaseModel>(
       sql,
-      _([start, end])
-        .compact()
-        .map((d) => d.toISOString())
-        .value(),
+      [start, end].filter((d): d is Date => d != null).map((d) => d.toISOString()),
     );
     return this.normalizeAssetModels(results);
   }
@@ -86,10 +92,7 @@ class AssetHandler implements AssetHandlerImpl {
     const sql = `SELECT t1.* FROM ${this.assetTableName} t1 JOIN (SELECT uuid, asset_type, symbol, MIN(createdAt) as maxCreatedAt FROM ${this.assetTableName} WHERE ${conditions} GROUP BY asset_type, symbol) t2 ON t1.symbol = t2.symbol and t1.asset_type = t2.asset_type and t1.uuid = t2.uuid`;
     const results = await selectFromDatabaseWithSql<AssetDatabaseModel>(
       sql,
-      _([start, end])
-        .compact()
-        .map((d) => d.toISOString())
-        .value(),
+      [start, end].filter((d): d is Date => d != null).map((d) => d.toISOString()),
     );
     return this.normalizeAssetModels(results);
   }
@@ -114,10 +117,7 @@ class AssetHandler implements AssetHandlerImpl {
       totalValue: number;
     }>(
       sql,
-      _([start, end])
-        .compact()
-        .map((d) => d.toISOString())
-        .value(),
+      [start, end].filter((d): d is Date => d != null).map((d) => d.toISOString()),
     );
 
     return results[0];
@@ -143,10 +143,7 @@ class AssetHandler implements AssetHandlerImpl {
       totalValue: number;
     }>(
       sql,
-      _([start, end])
-        .compact()
-        .map((d) => d.toISOString())
-        .value(),
+      [start, end].filter((d): d is Date => d != null).map((d) => d.toISOString()),
     );
 
     return results || [];
@@ -169,10 +166,7 @@ class AssetHandler implements AssetHandlerImpl {
       totalValue: number;
     }>(
       sql,
-      _([start, end])
-        .compact()
-        .map((d) => d.toISOString())
-        .value(),
+      [start, end].filter(Boolean).map((d) => d!.toISOString()),
     );
     return results || [];
   }
@@ -199,9 +193,7 @@ class AssetHandler implements AssetHandlerImpl {
     const sql = `SELECT distinct(symbol) FROM ${this.assetTableName}`;
     const models = await selectFromDatabaseWithSql<{ symbol: string }>(sql, []);
 
-    return _(models)
-      .map((m) => m.symbol)
-      .value();
+    return models.map((m) => m.symbol);
   }
 
   async listSymbolGroupedAssetsByUUID(uuid: string): Promise<AssetModel[]> {
@@ -235,9 +227,7 @@ class AssetHandler implements AssetHandlerImpl {
     const sql = `SELECT distinct(uuid) FROM ${this.assetTableName}`;
     const models = await selectFromDatabaseWithSql<{ uuid: string }>(sql, []);
 
-    return _(models)
-      .map((m) => m.uuid)
-      .value();
+    return models.map((m) => m.uuid);
   }
 
   // list assets without grouping
@@ -262,10 +252,10 @@ class AssetHandler implements AssetHandlerImpl {
     order = "desc",
   ): Promise<AssetModel[]> {
     let createdAtStr = new Date(0).toISOString();
-    if (_(createdAt).isNumber()) {
-      createdAtStr = new Date(createdAt as number).toISOString();
-    } else if (_(createdAt).isString()) {
-      createdAtStr = createdAt as string;
+    if (typeof createdAt === "number") {
+      createdAtStr = new Date(createdAt).toISOString();
+    } else if (typeof createdAt === "string") {
+      createdAtStr = createdAt;
     }
 
     const results = await selectFromDatabase<AssetDatabaseModel>(
@@ -302,10 +292,7 @@ class AssetHandler implements AssetHandlerImpl {
     const sql = `SELECT sum(amount) as amount FROM ${this.assetTableName} WHERE symbol = ? ${start ? "AND createdAt >= ?" : ""} ${end ? "AND createdAt <= ?" : ""} GROUP BY uuid ORDER BY amount DESC LIMIT 1`;
     const models = await selectFromDatabaseWithSql<AssetDatabaseModel>(sql, [
       symbol,
-      ..._([start, end])
-        .compact()
-        .map((d) => d.toISOString())
-        .value(),
+      ...[start, end].filter((d): d is Date => d != null).map((d) => d.toISOString()),
     ]);
 
     return this.normalizeAssetModel(models[0])?.amount || 0;
@@ -341,27 +328,25 @@ class AssetHandler implements AssetHandlerImpl {
   ): Promise<AssetModel[]> {
     // split models to chunks to avoid too large sql
     const chunkSize = 1000;
-    const chunks = _.chunk(models, chunkSize);
     const res = [];
 
-    for (const chunk of chunks) {
+    for (let i = 0; i < models.length; i += chunkSize) {
+      const chunk = models.slice(i, i + chunkSize);
       const resModels = await saveModelsToDatabase<AssetDatabaseModel>(
         this.assetTableName,
-        _(chunk)
-          .map(
-            (m) =>
-              ({
-                uuid: m.uuid,
-                createdAt: m.createdAt,
-                asset_type: getAssetType(m),
-                symbol: m.symbol,
-                amount: m.amount,
-                value: m.value,
-                price: m.price,
-                wallet: m.wallet,
-              }) as AssetDatabaseModel,
-          )
-          .value(),
+        chunk.map(
+          (m) =>
+            ({
+              uuid: m.uuid,
+              createdAt: m.createdAt,
+              asset_type: getAssetType(m),
+              symbol: m.symbol,
+              amount: m.amount,
+              value: m.value,
+              price: m.price,
+              wallet: m.wallet,
+            }) as AssetDatabaseModel,
+        ),
         conflictResolver,
       );
 
@@ -373,7 +358,7 @@ class AssetHandler implements AssetHandlerImpl {
   // Save all coins to database, including those with value < 1 or amount = 0
   // This ensures we record the sell-out behavior properly
   async saveCoinsToDatabase(coinInUSDs: WalletCoinUSD[]): Promise<string> {
-    const coins = _(coinInUSDs)
+    const coins = coinInUSDs
       .map((t) => ({
         wallet: t.wallet,
         symbol: t.symbol,
@@ -384,8 +369,7 @@ class AssetHandler implements AssetHandlerImpl {
           base: "usd" as any,
           value: t.price,
         },
-      }))
-      .value(); // Remove the filter to save all records
+      })); // Remove the filter to save all records
 
     const now = new Date().toISOString();
     // generate uuid v4
@@ -405,7 +389,7 @@ class AssetHandler implements AssetHandlerImpl {
     };
 
     const getDBModel = (models: CoinModel[]) => {
-      return _(models)
+      return models
         .map((m) => {
           // !hotfix for wallet is already md5 hashed
           const md5Wallet = normalizeWalletToMD5(m.wallet);
@@ -419,8 +403,7 @@ class AssetHandler implements AssetHandlerImpl {
             price: getPrice(m),
             wallet: md5Wallet,
           } as AssetModel;
-        })
-        .value();
+        });
     };
     const models = getDBModel(coins);
 
@@ -441,10 +424,11 @@ class AssetHandler implements AssetHandlerImpl {
       size && size > 0 ? "DESC LIMIT " + size : "ASC LIMIT 1"
     } ) ) ORDER BY createdAt DESC;`;
     const assets = await selectFromDatabaseWithSql<AssetDatabaseModel>(sql, []);
-    return _(this.normalizeAssetModels(assets))
-      .groupBy("uuid")
-      .values()
-      .value();
+        const grouped = this.normalizeAssetModels(assets).reduce((acc, m) => {
+      (acc[m.uuid] ??= []).push(m);
+      return acc;
+    }, {} as Record<string, AssetModel[]>);
+    return Object.values(grouped);
   }
 
   private async queryAssetsByDateRange(
@@ -459,10 +443,11 @@ class AssetHandler implements AssetHandlerImpl {
       : "";
     const sql = `SELECT * FROM ${this.assetTableName} WHERE 1 = 1 ${symbolSql} ${gteCreatedSql} ${lteCreatedSql} ORDER BY createdAt DESC;`;
     const assets = await selectFromDatabaseWithSql<AssetDatabaseModel>(sql, []);
-    return _(this.normalizeAssetModels(assets))
-      .groupBy("uuid")
-      .values()
-      .value();
+        const grouped = this.normalizeAssetModels(assets).reduce((acc, m) => {
+      (acc[m.uuid] ??= []).push(m);
+      return acc;
+    }, {} as Record<string, AssetModel[]>);
+    return Object.values(grouped);
   }
 
   // group assets by symbol
@@ -470,28 +455,32 @@ class AssetHandler implements AssetHandlerImpl {
     // sum by symbol
     const res: AssetModel[][] = [];
 
-    _(models).forEach((ms) => res.push(this.groupAssetModels(ms)));
+    models.forEach((ms) => res.push(this.groupAssetModels(ms)));
     return res;
   }
 
   // group assets by symbol
   private groupAssetModels(models: AssetModel[]): AssetModel[] {
-    return _(models)
-      .groupBy((a) => `${getAssetType(a)}:${a.symbol}`)
-      .values()
-      .map((assets) => ({
-        ..._(assets).first()!,
-        amount: _(assets).sumBy("amount"),
-        value: _(assets).sumBy("value"),
-      }))
-      .value();
+    const grouped = new Map<string, AssetModel[]>();
+    for (const a of models) {
+      const key = `${getAssetType(a)}:${a.symbol}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(a);
+    }
+    return Array.from(grouped.values()).map((assets) => {
+      const first = assets[0];
+      return {
+        ...first,
+        amount: assets.reduce((s, a) => s + a.amount, 0),
+        value: assets.reduce((s, a) => s + a.value, 0),
+      };
+    });
   }
 
   private normalizeAssetModels(models: AssetDatabaseModel[]): AssetModel[] {
-    return _(models)
+    return models
       .map((model) => this.normalizeAssetModel(model))
-      .compact()
-      .value();
+      .filter((x): x is AssetModel => !!x);
   }
 
   private normalizeAssetModel(
@@ -523,10 +512,10 @@ class AssetHandler implements AssetHandlerImpl {
       value: number;
     }>(sql, []);
 
-    return _(models)
-      .orderBy(["createdAt", "value"], ["desc", "desc"])
-      .map((m) => m.symbol)
-      .value();
+    return models
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.value - a.value)
+      .map((m) => m.symbol);
   }
 
   async listAllUUIDWithCreatedAt(): Promise<
@@ -546,9 +535,8 @@ class AssetHandler implements AssetHandlerImpl {
       [],
     );
 
-    return _(models)
-      .map((m) => new Date(m.createdAt))
-      .value();
+    return models
+      .map((m) => new Date(m.createdAt));
   }
 }
 

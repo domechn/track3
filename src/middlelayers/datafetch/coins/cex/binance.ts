@@ -1,5 +1,4 @@
 import { Exchanger } from './cex'
-import _ from 'lodash'
 import { invoke } from "@tauri-apps/api/core"
 import { sendHttpRequest } from '../../utils/http'
 
@@ -44,13 +43,11 @@ export class BinanceExchange implements Exchanger {
 		}[]>("GET", "https://api.binance.com/api/v3/ticker/price")
 
 		const suffix = "USDT"
-
-		const allPricesMap = _(allPrices).filter(p=>p.symbol.endsWith(suffix)).map(p =>({
-			symbol: p.symbol.replace(suffix, ""),
-			price: parseFloat(p.price)
-		})).keyBy("symbol").mapValues("price").value()
-
-		return allPricesMap
+		return Object.fromEntries(
+			allPrices
+				.filter((p) => p.symbol.endsWith(suffix))
+				.map((p) => [p.symbol.replace(suffix, ""), parseFloat(p.price)]),
+		)
 	}
 
 	async verifyConfig(): Promise<boolean> {

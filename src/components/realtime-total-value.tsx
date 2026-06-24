@@ -9,7 +9,6 @@ import {
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
-import _ from "lodash";
 import { useMemo, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { LightningBoltIcon } from "@radix-ui/react-icons";
@@ -41,12 +40,12 @@ const App = ({
   );
 
   const realtimeTotalValue = useMemo(
-    () => _(realtimeAssetValues).sumBy("value"),
+    () => realtimeAssetValues.reduce((s, a) => s + a.value, 0),
     [realtimeAssetValues]
   );
 
   const lastRefreshTotalValue = useMemo(
-    () => _(lastRefreshAssetValues).sumBy("value"),
+    () => lastRefreshAssetValues.reduce((s, a) => s + a.value, 0),
     [lastRefreshAssetValues]
   );
 
@@ -71,7 +70,7 @@ const App = ({
     setLoading(true);
     try {
       const rts = await queryRealTimeAssetsValue();
-      setRealtimeAssetValues(_(rts).sortBy("value").reverse().value());
+      setRealtimeAssetValues(rts.sort((a, b) => b.value - a.value));
 
       // Load logo map
       const logos = await getLogoMap(rts);
@@ -88,12 +87,9 @@ const App = ({
 
   async function getLogoMap(d: Asset[]) {
     const acd = await getAppCacheDir();
-    const kvs = await bluebird.map(_(d).map("symbol").value(), async (s) => {
-      const path = await getImageApiPath(acd, s);
-      return { [s]: path };
-    });
-
-    return _.assign({}, ...kvs);
+    return Object.fromEntries(
+      await bluebird.map(d, async (s) => [s.symbol, await getImageApiPath(acd, s.symbol)]),
+    );
   }
 
   function RealtimeView() {
@@ -102,10 +98,7 @@ const App = ({
     }, [lastRefreshAssetValues]);
 
     const priceChangePercentageMap = useMemo(() => {
-      return _(realtimeAssetValues)
-        .map((a) => [a.symbol, getPriceChangePercentage(a)])
-        .fromPairs()
-        .value();
+      return Object.fromEntries(realtimeAssetValues.map((a) => [a.symbol, getPriceChangePercentage(a)]));
     }, [realtimeAssetValues, basePriceMap]);
 
     function getPriceChangePercentage(asset: Asset) {

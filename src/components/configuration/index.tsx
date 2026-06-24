@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { memo, useEffect, useMemo, useState } from "react";
 import {
   getCachedPreferCurrency,
@@ -196,17 +195,15 @@ const App = ({
   // ---- Derived state ----
   const preferCurrencyOptions: SelectOption[] = useMemo(
     () =>
-      _(currencies)
-        .map((c) => ({
+      currencies.map((c) => ({
           value: c.currency,
           label: `${c.currency} - ${c.alias}`,
-        }))
-        .value(),
+        })),
     [currencies],
   );
 
   const preferredCurrencyDetail = useMemo(
-    () => _(currencies).find((c) => c.currency === preferCurrency),
+    () => currencies.find((c) => c.currency === preferCurrency),
     [currencies, preferCurrency],
   );
 
@@ -261,30 +258,26 @@ const App = ({
   // Attach-to options
   const cexAttachOptions = useMemo(
     () =>
-      _(exchanges)
-        .map((ex) => {
+      exchanges.map((ex) => {
           const identity = ex.apiKey;
           const label = ex.alias || `${ex.type}-${maskSensitive(identity)}`;
           return {
             value: `cex:${ex.type}:${identity}`,
             label,
           };
-        })
-        .value(),
+        }),
     [exchanges],
   );
   const walletAttachOptions = useMemo(
     () =>
-      _(wallets)
-        .map((w) => {
+      wallets.map((w) => {
           const label =
             w.alias || `${w.type.toUpperCase()}-${truncateAddress(w.address)}`;
           return {
             value: `wallet:${w.type}:${w.address}`,
             label,
           };
-        })
-        .value(),
+        }),
     [wallets],
   );
 
@@ -382,8 +375,7 @@ const App = ({
         setHideInactive(!!globalConfig.configs.hideInactive);
 
         setExchanges(
-          _(globalConfig.exchanges)
-            .map((ex) => ({
+          (globalConfig.exchanges || []).map((ex) => ({
               type: ex.name,
               alias: ex.alias,
               apiKey: ex.initParams.apiKey,
@@ -391,29 +383,27 @@ const App = ({
               password: ex.initParams.password,
               passphrase: ex.initParams.passphrase,
               active: ex.active ?? true,
-            }))
-            .value(),
+            })),
         );
 
         setStockBrokers(
-          _(globalConfig.stockConfig?.brokers ?? [])
-            .map((broker) => ({
+          ((globalConfig.stockConfig?.brokers ?? [])).map((broker) => ({
               type: broker.name,
               alias: broker.alias,
               token: broker.initParams.token,
               queryId: broker.initParams.queryId,
               active: broker.active ?? true,
-            }))
-            .value(),
+            })),
         );
 
         setWallets(
-          _(globalConfig)
-            .pick(supportCoins)
-            .map((v: any, k: string) =>
-              _(v.addresses)
-                .map((a) => {
-                  if (_(a).isString()) {
+          Object.keys(globalConfig)
+            .filter(k => supportCoins.includes(k))
+            .flatMap((k: string) => {
+              const v = (globalConfig as any)[k];
+              const addresses = v?.addresses || [];
+              return addresses.map((a: any) => {
+                  if (typeof a === "string") {
                     return { type: k, address: a, active: true };
                   }
                   const na = a as {
@@ -427,11 +417,8 @@ const App = ({
                     alias: na.alias,
                     active: na.active ?? true,
                   };
-                })
-                .value(),
-            )
-            .flatten()
-            .value(),
+                });
+            })
         );
 
         setOthers(globalConfig.others);
@@ -475,8 +462,7 @@ const App = ({
   }
 
   function convertFormDataToConfigurationData(): GlobalConfig {
-    const exchangesData = _(exchanges)
-      .map((ex) => ({
+    const exchangesData = exchanges.map((ex) => ({
         name: ex.type,
         alias: ex.alias,
         initParams: {
@@ -486,12 +472,10 @@ const App = ({
           passphrase: ex.type !== "bitget" ? undefined : ex.passphrase,
         },
         active: ex.active,
-      }))
-      .value();
+      }));
 
     const stockBrokerData: StockConfig = {
-      brokers: _(stockBrokers)
-        .map((broker) => ({
+      brokers: stockBrokers.map((broker) => ({
           name: broker.type,
           alias: broker.alias,
           initParams: {
@@ -499,31 +483,26 @@ const App = ({
             queryId: broker.queryId,
           },
           active: broker.active,
-        }))
-        .value(),
+        })),
     };
 
-    const walletData = _(wallets)
-      .groupBy("type")
-      .mapValues((ws) => ({
-        addresses: _(ws)
-          .map((w) => ({
-            alias: w.alias,
-            address: w.address,
-            active: w.active,
-          }))
-          .value(),
-      }))
-      .value() as any as TokenConfig;
+    const walletData = wallets.reduce<Record<string, { addresses: Array<{ alias?: string; address: string; active?: boolean }> }>>((acc, w) => {
+      if (!acc[w.type]) {
+        acc[w.type] = { addresses: [] }
+      }
+      acc[w.type].addresses.push({
+        alias: w.alias,
+        address: w.address,
+        active: w.active,
+      })
+      return acc
+    }, {}) as any as TokenConfig;
 
     return {
       configs: { groupUSD, hideInactive },
       exchanges: exchangesData,
       stockConfig: stockBrokerData,
-      ..._(supportCoins)
-        .mapKeys((c) => c)
-        .mapValues(() => ({ addresses: [] }))
-        .value(),
+      ...Object.fromEntries(supportCoins.map((c) => [c, { addresses: [] }])),
       ...walletData,
       others,
     };
@@ -537,7 +516,7 @@ const App = ({
       const path = await getImageApiPath(acd, coin.symbol);
       return { [coin.symbol]: path };
     });
-    return _.assign({}, ...kvs);
+    return Object.assign({}, ...kvs);
   }
 
   // ---- QuickLook handlers ----
@@ -780,25 +759,25 @@ const App = ({
   }
 
   function handleRemoveExchange(exchangeType: string, exchangeApiKey: string) {
-    const idx = _(exchanges).findIndex(
+    const idx = exchanges.findIndex(
       (ex) => ex.type === exchangeType && ex.apiKey === exchangeApiKey,
     );
     if (idx < 0) {
       throw new Error(`cannot find exchange ${exchangeType}/${exchangeApiKey}`);
     }
-    setExchanges(_.filter(exchanges, (_, i) => i !== idx));
+    setExchanges(exchanges.filter((_, i) => i !== idx));
     markFormChanged();
   }
 
   function handleActiveExchange(exchangeType: string, exchangeApiKey: string) {
-    const idx = _(exchanges).findIndex(
+    const idx = exchanges.findIndex(
       (ex) => ex.type === exchangeType && ex.apiKey === exchangeApiKey,
     );
     if (idx < 0) {
       throw new Error(`cannot find exchange ${exchangeType}/${exchangeApiKey}`);
     }
     setExchanges(
-      _.map(exchanges, (ex, i) => {
+      exchanges.map((ex, i) => {
         if (i === idx) return { ...ex, active: !ex.active };
         return ex;
       }),
@@ -883,25 +862,25 @@ const App = ({
   }
 
   function handleRemoveStockBroker(brokerType: string, queryId: string) {
-    const idx = _(stockBrokers).findIndex(
+    const idx = stockBrokers.findIndex(
       (broker) => broker.type === brokerType && broker.queryId === queryId,
     );
     if (idx < 0) {
       throw new Error(`cannot find stock broker ${brokerType}/${queryId}`);
     }
-    setStockBrokers(_.filter(stockBrokers, (_, i) => i !== idx));
+    setStockBrokers(stockBrokers.filter((_, i) => i !== idx));
     markFormChanged();
   }
 
   function handleActiveStockBroker(brokerType: string, queryId: string) {
-    const idx = _(stockBrokers).findIndex(
+    const idx = stockBrokers.findIndex(
       (broker) => broker.type === brokerType && broker.queryId === queryId,
     );
     if (idx < 0) {
       throw new Error(`cannot find stock broker ${brokerType}/${queryId}`);
     }
     setStockBrokers(
-      _.map(stockBrokers, (broker, i) => {
+      stockBrokers.map((broker, i) => {
         if (i === idx) return { ...broker, active: !broker.active };
         return broker;
       }),
@@ -970,25 +949,25 @@ const App = ({
   }
 
   function handleRemoveWallet(walletType: string, walletAddress: string) {
-    const idx = _(wallets).findIndex(
+    const idx = wallets.findIndex(
       (w) => w.type === walletType && w.address === walletAddress,
     );
     if (idx < 0) {
       throw new Error(`cannot find wallet ${walletType}/${walletAddress}`);
     }
-    setWallets(_.filter(wallets, (_, i) => i !== idx));
+    setWallets(wallets.filter((_, i) => i !== idx));
     markFormChanged();
   }
 
   function handleActiveWallet(walletType: string, walletAddress: string) {
-    const idx = _(wallets).findIndex(
+    const idx = wallets.findIndex(
       (w) => w.type === walletType && w.address === walletAddress,
     );
     if (idx < 0) {
       throw new Error(`cannot find wallet ${walletType}/${walletAddress}`);
     }
     setWallets(
-      _.map(wallets, (w, i) => {
+      wallets.map((w, i) => {
         if (i === idx) return { ...w, active: !w.active };
         return w;
       }),
@@ -1082,7 +1061,7 @@ const App = ({
   }
 
   function handleRemoveOther(idx: number) {
-    setOthers(_.filter(others, (_, i) => i !== idx));
+    setOthers(others.filter((_, i) => i !== idx));
     setOtherAmountDraftMap({});
     markFormChanged();
   }

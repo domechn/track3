@@ -1,8 +1,8 @@
 import { Exchanger } from "./cex";
 import CryptoJS from "crypto-js";
 import { sendHttpRequest } from "../../utils/http";
-import _ from "lodash";
 import qs from "qs";
+import { addToBalanceMap, mergeBalances } from "./balance-utils";
 
 type WalletBalanceResp = {
   retCode: number;
@@ -105,11 +105,7 @@ export class BybitExchange implements Exchanger {
     ]);
 
     // Merge wallet, contract, earn and advance earn (dual asset) balances
-    const merged = _(walletBalance)
-      .mergeWith(earnBalance, (a, b) => (a || 0) + (b || 0))
-      .mergeWith(advanceEarnBalance, (a, b) => (a || 0) + (b || 0))
-      .value();
-    return merged;
+    return mergeBalances([walletBalance, earnBalance, advanceEarnBalance]);
   }
 
   private async fetchWalletBalance(): Promise<{ [k: string]: number }> {
@@ -126,11 +122,9 @@ export class BybitExchange implements Exchanger {
 
     const balances: { [k: string]: number } = {};
 
-    _(resp.result.list).forEach((account) => {
-      _(account.coin).forEach((coin) => {
-        const symbol = coin.coin;
-        const balance = parseFloat(coin.equity ?? coin.walletBalance) || 0;
-        balances[symbol] = (balances[symbol] || 0) + balance;
+    resp.result.list.forEach((account) => {
+      account.coin.forEach((coin) => {
+        addToBalanceMap(balances, coin.coin, parseFloat(coin.equity ?? coin.walletBalance) || 0);
       });
     });
 
@@ -161,16 +155,12 @@ export class BybitExchange implements Exchanger {
     // Merge both results by coin
     const balances: { [k: string]: number } = {};
 
-    _(flexibleResp.result.list).forEach((position) => {
-      const coin = position.coin;
-      const amount = parseFloat(position.amount) || 0;
-      balances[coin] = (balances[coin] || 0) + amount;
+    flexibleResp.result.list.forEach((position) => {
+      addToBalanceMap(balances, position.coin, parseFloat(position.amount) || 0);
     });
 
-    _(onchainResp.result.list).forEach((position) => {
-      const coin = position.coin;
-      const amount = parseFloat(position.amount) || 0;
-      balances[coin] = (balances[coin] || 0) + amount;
+    onchainResp.result.list.forEach((position) => {
+      addToBalanceMap(balances, position.coin, parseFloat(position.amount) || 0);
     });
 
     return balances;
@@ -189,10 +179,8 @@ export class BybitExchange implements Exchanger {
 
     const balances: { [k: string]: number } = {};
 
-    _(resp.result.list).forEach((position) => {
-      const coin = position.investCoin;
-      const amount = parseFloat(position.amount) || 0;
-      balances[coin] = (balances[coin] || 0) + amount;
+    resp.result.list.forEach((position) => {
+      addToBalanceMap(balances, position.investCoin, parseFloat(position.amount) || 0);
     });
 
     return balances;
@@ -226,17 +214,11 @@ export class BybitExchange implements Exchanger {
     }
 
     const suffix = "USDT";
-    const allPricesMap = _(resp.result.list)
-      .filter((p) => p.symbol.endsWith(suffix))
-      .map((p) => ({
-        symbol: p.symbol.replace(suffix, ""),
-        price: parseFloat(p.lastPrice),
-      }))
-      .keyBy("symbol")
-      .mapValues("price")
-      .value();
-
-    return allPricesMap;
+    return Object.fromEntries(
+      resp.result.list
+        .filter((p) => p.symbol.endsWith(suffix))
+        .map((p) => [p.symbol.replace(suffix, ""), parseFloat(p.lastPrice)]),
+    );
   }
 
   async verifyConfig(): Promise<boolean> {

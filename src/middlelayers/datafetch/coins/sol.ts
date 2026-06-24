@@ -1,5 +1,4 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
-import _ from "lodash";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
 import { asyncMap } from "../utils/async";
@@ -24,9 +23,7 @@ export class SOLAnalyzer implements Analyzer {
   async verifyConfigs(): Promise<boolean> {
     const regex = /^[1-9A-HJ-NP-Za-km-z]{44}$/;
 
-    const valid = _(getAddressList(this.config.sol)).every((address) =>
-      regex.test(address),
-    );
+    const valid = getAddressList(this.config.sol).every((address) => regex.test(address));
     return valid;
   }
 
@@ -45,35 +42,31 @@ export class SOLAnalyzer implements Analyzer {
       0,
     );
 
-    const flatBalances = _(perAddress).map("balances").flatten().value();
-    const flatEarnings = _(perAddress).map("earnings").flatten().value();
+    const flatBalances = perAddress.flatMap((p) => p.balances);
+    const flatEarnings = perAddress.flatMap((p) => p.earnings);
 
     // loop balances, and find if there is a earning with the same ca and address, if there is, remove the balance and add the earning value to it
-    const newBalances = _(flatBalances)
-      .map((b) => {
-        const earning = _(flatEarnings).find(
-          (e) => e.ca === b.ca && e.address === b.address,
-        );
-        if (earning) {
-          return {
-            address: b.address,
-            ca: earning.underlyingCa,
-            amount: earning.underlyingAmount,
-          };
-        }
-        return b;
-      })
-      .value();
+    const newBalances = flatBalances.map((b) => {
+      const earning = flatEarnings.find(
+        (e) => e.ca === b.ca && e.address === b.address,
+      );
+      if (earning) {
+        return {
+          address: b.address,
+          ca: earning.underlyingCa,
+          amount: earning.underlyingAmount,
+        };
+      }
+      return b;
+    });
 
-    const cas = _(newBalances)
-      .map("ca")
-      .uniq()
-      .filter((s) => s !== "SOL")
-      .value();
+    const cas = Array.from(
+      new Set(newBalances.map((b) => b.ca)),
+    ).filter((s) => s !== "SOL");
 
     const tokens = await this.queryTokens(cas);
 
-    return _(newBalances)
+    return newBalances
       .map((b) => {
         if (b.ca === "SOL") {
           return {
@@ -86,7 +79,7 @@ export class SOLAnalyzer implements Analyzer {
         }
         const token = tokens[b.ca];
         if (!token) {
-          return;
+          return null;
         }
         return {
           symbol: token.symbol,
@@ -100,8 +93,7 @@ export class SOLAnalyzer implements Analyzer {
           chain: "sol",
         } as WalletCoin;
       })
-      .compact()
-      .value();
+      .filter((c): c is WalletCoin => c !== null);
   }
 
   private async queryTokens(cas: string[]): Promise<{
@@ -114,7 +106,10 @@ export class SOLAnalyzer implements Analyzer {
       return {};
     }
     // split to chunks of 100
-    const chunks = _(cas).chunk(100).value();
+    const chunks: string[][] = [];
+    for (let i = 0; i < cas.length; i += 100) {
+      chunks.push(cas.slice(i, i + 100));
+    }
     const tokens = await asyncMap(
       chunks,
       async (chunk) => {
@@ -127,25 +122,18 @@ export class SOLAnalyzer implements Analyzer {
             usdPrice: number;
           }[]
         >("GET", url, 5000);
-        return _(resp)
-          .map((v, k) => ({
-            ca: v.id,
-            symbol: v.symbol,
-            price: v.usdPrice || 0,
-          }))
-          .value();
+        return resp.map((v) => ({
+          ca: v.id,
+          symbol: v.symbol,
+          price: v.usdPrice || 0,
+        }));
       },
       2,
       0,
     );
-    return _(tokens)
-      .flatten()
-      .mapKeys("ca")
-      .mapValues((v) => ({
-        symbol: v.symbol,
-        price: v.price,
-      }))
-      .value();
+    return Object.fromEntries(
+      tokens.flat().map((v) => [v.ca, { symbol: v.symbol, price: v.price }]),
+    );
   }
 
   private async queryEarnings(address: string): Promise<
@@ -170,15 +158,14 @@ export class SOLAnalyzer implements Analyzer {
         underlyingAssets: string;
       }[]
     >("GET", url, 5000);
-    return _(resp)
+    return resp
       .map((v) => ({
         address,
         ca: v.token.address,
         underlyingCa: v.token.asset.address,
         underlyingAmount: +v.underlyingAssets / 10 ** v.token.asset.decimals,
       }))
-      .filter((c) => c.underlyingAmount > 0)
-      .value();
+      .filter((c) => c.underlyingAmount > 0);
   }
 
   private async queryBalances(
@@ -195,14 +182,13 @@ export class SOLAnalyzer implements Analyzer {
         }[];
       };
     }>("GET", url, 5000);
-    const tokens = _(resp.tokens)
-      .map((vs, k) => ({
+    const tokens = Object.entries(resp.tokens)
+      .map(([k, vs]) => ({
         address,
         ca: k,
-        amount: vs[0].uiAmount || 0,
+        amount: vs[0]?.uiAmount || 0,
       }))
-      .filter((c) => c.amount > 0)
-      .value();
+      .filter((c) => c.amount > 0);
 
     return [
       ...tokens,

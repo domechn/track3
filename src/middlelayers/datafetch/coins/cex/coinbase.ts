@@ -2,7 +2,7 @@ import { SignJWT, importPKCS8 } from 'jose'
 import CryptoJS from 'crypto-js'
 import { Exchanger } from './cex'
 import { sendHttpRequest } from '../../utils/http'
-import _ from 'lodash'
+import { addToBalanceMap } from './balance-utils'
 
 type PortfoliosResp = {
 	portfolios: {
@@ -105,9 +105,7 @@ export class CoinbaseExchange implements Exchanger {
 		const response = await this.fetchDefaultPortfolioBalances(portfolioUuid)
 
 		response.breakdown.spot_positions.forEach(position => {
-			if (position.total_balance_crypto > 0) {
-				balances[position.asset] = (balances[position.asset] || 0) + position.total_balance_crypto
-			}
+			addToBalanceMap(balances, position.asset, position.total_balance_crypto)
 		})
 	}
 
@@ -116,11 +114,7 @@ export class CoinbaseExchange implements Exchanger {
 
 		response.portfolio_balances.forEach(portfolioBalance => {
 			portfolioBalance.balances.forEach(asset => {
-				const quantity = parseFloat(asset.quantity)
-				if (quantity > 0) {
-					const assetName = asset.asset.asset_name
-					balances[assetName] = (balances[assetName] || 0) + quantity
-				}
+				addToBalanceMap(balances, asset.asset.asset_name, parseFloat(asset.quantity))
 			})
 		})
 	}
