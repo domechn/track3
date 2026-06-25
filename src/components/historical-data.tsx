@@ -700,7 +700,7 @@ const App = ({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xl font-semibold">
+                <p className="text-xl font-semibold tracking-tight">
                   {latestRow
                     ? `${currency.symbol}${prettyNumberToLocaleString(
                         currencyWrapper(currency)(latestRow.total),

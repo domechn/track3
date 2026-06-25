@@ -876,7 +876,7 @@ const App = ({
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
                     {breakEvenPriceStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
@@ -909,7 +909,7 @@ const App = ({
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
                     {positionsStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
@@ -940,7 +940,7 @@ const App = ({
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
                     {profitStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
@@ -970,7 +970,7 @@ const App = ({
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
                     {costPriceStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
@@ -1001,7 +1001,7 @@ const App = ({
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-semibold overflow-hidden whitespace-nowrap overflow-ellipsis">
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
                     {sellPriceStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">

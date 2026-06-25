@@ -126,7 +126,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">{t("pnl.last")}</div>
               <div
-                className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
+                className={`text-xl font-semibold font-mono tracking-tight tabular-nums ${getPNLTextColor(
                   pnlTableData.todayPNL?.value,
                 )}`}
               >
@@ -146,7 +146,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">{t("pnl.7T")}</div>
               <div
-                className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
+                className={`text-xl font-semibold font-mono tracking-tight tabular-nums ${getPNLTextColor(
                   pnlTableData.sevenTPnl?.value,
                 )}`}
               >
@@ -166,7 +166,7 @@ const App = ({
             >
               <div className="text-xs text-muted-foreground">{t("pnl.30T")}</div>
               <div
-                className={`text-xl font-semibold font-mono tabular-nums ${getPNLTextColor(
+                className={`text-xl font-semibold font-mono tracking-tight tabular-nums ${getPNLTextColor(
                   pnlTableData.thirtyPNL?.value,
                 )}`}
               >

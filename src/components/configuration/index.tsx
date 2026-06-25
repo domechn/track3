@@ -1157,7 +1157,7 @@ const App = ({
       />
 
       <div>
-        <h3 className="text-lg font-medium">{t("config.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t("config.title")}</h3>
         <p className="text-sm text-muted-foreground">{t("config.subtitle")}</p>
       </div>
 

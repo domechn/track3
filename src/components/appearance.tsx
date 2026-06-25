@@ -68,7 +68,7 @@ const App = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium">{t("appearance.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t("appearance.title")}</h3>
         <p className="text-sm text-muted-foreground">
           {t("appearance.subtitle")}
         </p>
@@ -212,7 +212,7 @@ const App = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-3 text-sm font-semibold">
+          <div className="mb-3 text-sm font-medium">
             {LOCALE_LABELS[selectedLocale]}
           </div>
           <RadioGroup

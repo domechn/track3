@@ -116,7 +116,7 @@ const App = ({
           {t("realtime.title")}
         </div>
         <div className="flex space-x-1 items-center justify-end">
-          <div className="text-xl font-semibold">
+          <div className="text-xl font-semibold tracking-tight">
             ≈{" "}
             {currency.symbol +
               prettyNumberToLocaleString(

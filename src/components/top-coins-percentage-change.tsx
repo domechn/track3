@@ -325,7 +325,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                       {isTop && showBadges ? (
                         <span
                           data-testid="tcpc-badge"
-                          className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-500"
+                          className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-emerald-500"
                         >
                           {t("topCoinsPercentage.topGainer")}
                         </span>
@@ -333,7 +333,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                       {isBot && showBadges ? (
                         <span
                           data-testid="tcpc-badge"
-                          className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-500"
+                          className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-rose-500"
                         >
                           {t("topCoinsPercentage.topLoser")}
                         </span>
@@ -343,9 +343,9 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                   <div
                     data-testid="tcpc-value"
                     data-active={valueIsActive}
-                    className={`font-mono tabular-nums text-right ${
+                    className={`font-mono tabular-nums tracking-tight text-right ${
                       valueIsActive
-                        ? `text-base font-bold ${valueClass}`
+                        ? `text-base font-semibold ${valueClass}`
                         : "text-[10px] text-muted-foreground/60"
                     }`}
                   >
@@ -354,9 +354,9 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                   <div
                     data-testid="tcpc-price"
                     data-active={priceIsActive}
-                    className={`font-mono tabular-nums text-right ${
+                    className={`font-mono tabular-nums tracking-tight text-right ${
                       priceIsActive
-                        ? `text-base font-bold ${priceClass}`
+                        ? `text-base font-semibold ${priceClass}`
                         : "text-[10px] text-muted-foreground/60"
                     }`}
                   >

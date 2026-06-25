@@ -180,7 +180,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       </Dialog>
 
       <div>
-        <h3 className="text-lg font-medium">{t("data.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t("data.title")}</h3>
         <p className="text-sm text-muted-foreground">
           {t("data.subtitle")}
         </p>

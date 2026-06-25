@@ -2,6 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Track3 Typography Hierarchy
+ * ----------------------------------------------------------------------------
+ * Source-of-truth levels for component copy. Match the size / weight /
+ * tracking combination below so that text with the same role stays consistent
+ * across the app. The body font is Outfit Variable (see tailwind.config.js);
+ * numerics usually pair with `font-mono tabular-nums` for aligned digits.
+ *
+ * L1  Page / settings title (h3)       text-lg font-medium tracking-tight
+ * L2  Dialog / alert title             text-lg font-semibold leading-none tracking-tight
+ * L3  CardTitle (semantic title)       font-semibold leading-none tracking-tight
+ * L4  Metric card label (CardTitle)    text-sm font-medium text-muted-foreground
+ * L5  Big metric value (display)       text-xl / text-2xl font-semibold tracking-tight
+ *     (often `font-mono tabular-nums` for currency / percentage digits)
+ * L6  Inline section header            text-sm font-medium (+ optional text-muted-foreground)
+ * L7  Body text                        text-sm font-normal
+ * L8  Caption / sub-text               text-xs font-normal text-muted-foreground
+ * L9  Badge / tag (small)              text-xs font-medium
+ * L10 Micro uppercase label            text-[9-11px] font-medium uppercase tracking-wider
+ *
+ * Variations are allowed case-by-case. Tracking widens (tracking-wider /
+ * tracking-widest) on uppercase micro labels and tightens (tracking-tight /
+ * tracking-tighter) on display-sized headers and numeric values.
+ */
+
 @layer base {
   :root {
     --background: 0 0% 100%;

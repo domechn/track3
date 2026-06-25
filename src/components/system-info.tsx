@@ -322,7 +322,7 @@ const App = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium">{t("system.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t("system.title")}</h3>
         <p className="text-sm text-muted-foreground">
           {t("system.subtitle")}
         </p>
@@ -529,7 +529,7 @@ const App = ({
                 data-testid="monthly-plan-card"
               >
                 <div className="text-sm font-medium">{t("system.monthly")}</div>
-                <div className="text-2xl font-bold">
+                <div className="text-2xl font-semibold tracking-tight">
                   {formatPlanPrice(monthlyPlan)}
                   <span className="text-sm font-normal text-muted-foreground">
                     /mo
@@ -557,7 +557,7 @@ const App = ({
                   </div>
                 )}
                 <div className="text-sm font-medium">{t("system.yearly")}</div>
-                <div className="text-2xl font-bold">
+                <div className="text-2xl font-semibold tracking-tight">
                   {formatPlanPrice(yearlyPlan)}
                   <span className="text-sm font-normal text-muted-foreground">
                     /yr

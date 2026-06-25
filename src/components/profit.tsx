@@ -274,7 +274,7 @@ const App = ({
         </div>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="space-y-1">
-            <div className={`text-xl font-semibold ${totalToneClass}`}>
+            <div className={`text-xl font-semibold tracking-tight ${totalToneClass}`}>
               {(profit < 0 ? "-" : "+") +
                 currency.symbol +
                 prettyNumberToLocaleString(
