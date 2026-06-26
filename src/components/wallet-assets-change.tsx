@@ -123,15 +123,19 @@ const App = ({
       walletAssetsChange.map((item) => ({
         ...item,
         walletTypeText:
-          !item.walletType || item.walletType === "null" ? t("common.unknown") : item.walletType,
+          !item.walletType || item.walletType === "null"
+            ? t("common.unknown")
+            : item.walletType,
         walletAliasText:
           item.walletAlias ??
           insertEllipsis(
-            !item.wallet || item.wallet === "null" ? t("common.unknown") : item.wallet,
-            32
+            !item.wallet || item.wallet === "null"
+              ? t("common.unknown")
+              : item.wallet,
+            32,
           ),
       })),
-    [walletAssetsChange]
+    [walletAssetsChange],
   );
 
   const filteredRows = useMemo(() => {
@@ -140,7 +144,8 @@ const App = ({
     }
 
     return rows.filter((row) => {
-      const haystack = `${row.walletTypeText} ${row.walletAliasText} ${row.wallet}`.toLowerCase();
+      const haystack =
+        `${row.walletTypeText} ${row.walletAliasText} ${row.wallet}`.toLowerCase();
       return haystack.includes(deferredSearch);
     });
   }, [deferredSearch, rows]);
@@ -164,7 +169,7 @@ const App = ({
   const parsedPageSize = Number(pageSize);
   const pageCount = useMemo(
     () => Math.max(1, Math.ceil(sortedRows.length / parsedPageSize)),
-    [parsedPageSize, sortedRows.length]
+    [parsedPageSize, sortedRows.length],
   );
 
   const safePage = Math.min(dataPage, pageCount - 1);
@@ -191,8 +196,13 @@ const App = ({
     return { up, down, flat };
   }, [rows]);
 
-  const loadedRangeStart = sortedRows.length ? safePage * parsedPageSize + 1 : 0;
-  const loadedRangeEnd = Math.min((safePage + 1) * parsedPageSize, sortedRows.length);
+  const loadedRangeStart = sortedRows.length
+    ? safePage * parsedPageSize + 1
+    : 0;
+  const loadedRangeEnd = Math.min(
+    (safePage + 1) * parsedPageSize,
+    sortedRows.length,
+  );
 
   return (
     <Card>
@@ -217,12 +227,24 @@ const App = ({
             className="md:w-[320px]"
           />
           <div className="flex flex-wrap gap-2">
-            <ButtonGroup value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-              <ButtonGroupItem value="changeValue">{t("walletValueChanges.sortByValue")}</ButtonGroupItem>
-              <ButtonGroupItem value="changePercentage">{t("walletValueChanges.sortByPercent")}</ButtonGroupItem>
-              <ButtonGroupItem value="absChange">{t("walletValueChanges.sortByVolatility")}</ButtonGroupItem>
+            <ButtonGroup
+              value={sortMode}
+              onValueChange={(v) => setSortMode(v as SortMode)}
+            >
+              <ButtonGroupItem value="changeValue">
+                {t("walletValueChanges.sortByValue")}
+              </ButtonGroupItem>
+              <ButtonGroupItem value="changePercentage">
+                {t("walletValueChanges.sortByPercent")}
+              </ButtonGroupItem>
+              <ButtonGroupItem value="absChange">
+                {t("walletValueChanges.sortByVolatility")}
+              </ButtonGroupItem>
             </ButtonGroup>
-            <ButtonGroup value={pageSize} onValueChange={(v) => setPageSize(v as PageSize)}>
+            <ButtonGroup
+              value={pageSize}
+              onValueChange={(v) => setPageSize(v as PageSize)}
+            >
               <ButtonGroupItem value="20">20</ButtonGroupItem>
               <ButtonGroupItem value="50">50</ButtonGroupItem>
               <ButtonGroupItem value="100">100</ButtonGroupItem>
@@ -235,19 +257,34 @@ const App = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">{t("walletValueChanges.col.type")}</TableHead>
+                <TableHead className="w-[200px]">
+                  {t("walletValueChanges.col.type")}
+                </TableHead>
                 <TableHead>{t("walletValueChanges.col.alias")}</TableHead>
-                <TableHead className="text-right">{t("walletValueChanges.col.percentage")}</TableHead>
-                <TableHead className="text-right">{t("walletValueChanges.col.value")}</TableHead>
+                <TableHead className="text-right">
+                  {t("walletValueChanges.col.percentage")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t("walletValueChanges.col.value")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageRows.map((row) => {
-                const detailUrl = getWalletDetailUrl(row.wallet, row.walletType);
-                const airdropUrl = getWalletAirdropUrl(row.wallet, row.walletType);
+                const detailUrl = getWalletDetailUrl(
+                  row.wallet,
+                  row.walletType,
+                );
+                const airdropUrl = getWalletAirdropUrl(
+                  row.wallet,
+                  row.walletType,
+                );
 
                 return (
-                  <TableRow key={`${row.wallet}-${row.walletType}`} className="h-[42px] group">
+                  <TableRow
+                    key={`${row.wallet}-${row.walletType}`}
+                    className="h-[42px] group"
+                  >
                     <TableCell className="py-1.5">
                       <div className="flex items-center gap-1.5 text-sm">
                         {row.walletTypeText === "Unknown" ? (
@@ -280,15 +317,25 @@ const App = ({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="py-1.5 text-sm">{row.walletAliasText}</TableCell>
-                    <TableCell className={`py-1.5 text-right text-sm ${getToneClass(row.changePercentage, quoteColor)}`}>
+                    <TableCell className="py-1.5 text-sm">
+                      {row.walletAliasText}
+                    </TableCell>
+                    <TableCell
+                      className={`py-1.5 text-right text-sm ${getToneClass(row.changePercentage, quoteColor)}`}
+                    >
                       {formatSignedNumber(row.changePercentage, "%")}
                     </TableCell>
-                    <TableCell className={`py-1.5 text-right text-sm ${getToneClass(row.changeValue, quoteColor)}`}>
-                      {row.changeValue < 0 ? "-" : row.changeValue > 0 ? "+" : ""}
+                    <TableCell
+                      className={`py-1.5 text-right text-sm ${getToneClass(row.changeValue, quoteColor)}`}
+                    >
+                      {row.changeValue < 0
+                        ? "-"
+                        : row.changeValue > 0
+                          ? "+"
+                          : ""}
                       {currency.symbol}
                       {prettyNumberToLocaleString(
-                        currencyWrapper(currency)(Math.abs(row.changeValue))
+                        currencyWrapper(currency)(Math.abs(row.changeValue)),
                       )}
                     </TableCell>
                   </TableRow>
