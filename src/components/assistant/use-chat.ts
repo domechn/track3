@@ -1,22 +1,37 @@
+/**
+ * Chat hook – drives the assistant UI.
+ *
+ * Uses the Pi Agent SDK (AgentSession) for the agent loop and tool
+ * execution. Track3 handles its own session persistence via sessions.ts.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { AIConfig, ChartSpec } from "@/middlelayers/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
+
 import {
+  allToolDefinitions,
   appendMessages,
   buildSessionPreview,
-  buildSystemPrompt,
+  createPiSession,
+  disposePiSession,
+  getPiSession,
   generateTitle,
   loadSession,
+  normalizeEndpoint,
   probeConnection,
   renameSession,
   rewriteMessages,
-  runSkill,
-  streamChatCompletion,
-  toOpenAITools,
+  setBaseCurrency,
   touchSession,
 } from "@/middlelayers/ai";
+
 import type { PersistedChatMessage } from "@/middlelayers/ai";
-import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
+
+// ---------------------------------------------------------------------------
+// Types – same shape as before
+// ---------------------------------------------------------------------------
 
 export type AssistantBlock =
   | { kind: "text"; text: string }
@@ -62,6 +77,10 @@ export function fromPersisted(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Hook options & result
+// ---------------------------------------------------------------------------
+
 export type UseChatOptions = {
   config: AIConfig;
   baseCurrency: CurrencyRateDetail;
@@ -83,33 +102,23 @@ export type UseChatResult = {
   clear: () => void;
 };
 
-function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
-  const out: ProviderMessage[] = [];
-  for (const m of messages) {
-    if (m.role === "user") {
-      out.push({ role: "user", content: m.content });
-      continue;
-    }
-    const text = m.blocks
-      .map((b) => {
-        if (b.kind === "text") return b.text;
-        return `[rendered chart: ${b.chart.type}]`;
-      })
-      .join("")
-      .trim();
-    if (text) {
-      out.push({ role: "assistant", content: text });
-    }
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** The assistant message that is currently being streamed always sits
+ *  at the last index of the messages array. All event handlers mutate
+ *  this slot (and append chart blocks) until agent_end. */
+function getAssistantIndex(messages: ChatMessage[]): number | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "assistant") return i;
   }
-  return out;
+  return null;
 }
 
-function trimMessages(messages: ProviderMessage[], maxCount: number): ProviderMessage[] {
-  if (maxCount <= 0 || messages.length <= maxCount) {
-    return messages;
-  }
-  return messages.slice(messages.length - maxCount);
-}
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
 
 export function useChat(options: UseChatOptions): UseChatResult {
   const { config, baseCurrency, contextSize = 8192, sessionId } = options;
@@ -118,324 +127,350 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [isHydrating, setIsHydrating] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
-  const messagesRef = useRef<ChatMessage[]>([]);
-  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTriedRef = useRef(false);
   const configRef = useRef(config);
+  const baseCurrencyRef = useRef(baseCurrency);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const sessionRef = useRef<AgentSession | null>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Keep refs in sync with options
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+  useEffect(() => {
+    baseCurrencyRef.current = baseCurrency;
+  }, [baseCurrency]);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
+  // -----------------------------------------------------------------------
+  // Session lifecycle – create/dispose on sessionId change
+  // -----------------------------------------------------------------------
   useEffect(() => {
-    configRef.current = config;
-  }, [config]);
-
-  const cancelPersistTimer = useCallback(() => {
-    if (persistTimerRef.current) {
-      clearTimeout(persistTimerRef.current);
-      persistTimerRef.current = null;
-    }
-  }, []);
-
-  const flushPersist = useCallback(
-    (override?: ChatMessage[]) => {
-      if (!sessionId) return;
-      const snapshot = override ?? messagesRef.current;
-      const sid = sessionId;
-      void rewriteMessages(sid, toPersisted(snapshot)).catch(() => {});
-      void touchSession(sid, {
-        messageCount: snapshot.length,
-        preview: buildSessionPreview(toPersisted(snapshot)),
-      }).catch(() => {});
-    },
-    [sessionId],
-  );
-
-  const schedulePersist = useCallback(() => {
-    if (!sessionId) return;
-    cancelPersistTimer();
-    persistTimerRef.current = setTimeout(() => {
-      persistTimerRef.current = null;
-      flushPersist();
-    }, 300);
-  }, [cancelPersistTimer, flushPersist, sessionId]);
-
-  // Hydrate from disk whenever the sessionId changes.
-  useEffect(() => {
-    let cancelled = false;
     if (!sessionId) {
+      // Clean up old session when id becomes null
+      if (sessionRef.current) {
+        unsubRef.current?.();
+        unsubRef.current = null;
+        sessionRef.current.dispose();
+        sessionRef.current = null;
+      }
       setMessages([]);
       setTitle("");
       titleTriedRef.current = false;
       setIsHydrating(false);
       return;
     }
-    setIsHydrating(true);
+
     const targetId = sessionId;
+    let cancelled = false;
+
     (async () => {
+      setIsHydrating(true);
+
+      // Load persisted messages
+      let persisted: ChatMessage[] = [];
       try {
         const session = await loadSession(targetId);
         if (cancelled) return;
         if (session) {
-          setMessages(fromPersisted(session.messages));
+          persisted = fromPersisted(session.messages);
+          setMessages(persisted);
           setTitle(session.title ?? "");
           titleTriedRef.current = (session.title ?? "").length > 0;
-        } else {
-          // Only clear messages if the user has not already started
-          // typing into this session while loadSession was in flight.
-          // Without this guard the hydration result would clobber any
-          // optimistic state set by send().
-          setMessages((prev) => (prev.length === 0 ? [] : prev));
-          setTitle((prev) => prev);
-          titleTriedRef.current = titleTriedRef.current;
         }
       } catch (err) {
         if (cancelled) return;
         console.error("failed to load chat session", err);
-      } finally {
-        if (!cancelled) {
-          setIsHydrating(false);
+      }
+
+      if (cancelled) return;
+
+      // Dispose previous session if any
+      if (sessionRef.current) {
+        unsubRef.current?.();
+        unsubRef.current = null;
+        sessionRef.current.dispose();
+        sessionRef.current = null;
+      }
+
+      // Update base currency for tools
+      setBaseCurrency(baseCurrencyRef.current);
+
+      // Create SDK session
+      try {
+        const session = await createPiSession(
+          targetId,
+          configRef.current,
+          baseCurrencyRef.current,
+          allToolDefinitions,
+        );
+        if (cancelled) {
+          session.dispose();
+          return;
         }
+        sessionRef.current = session;
+
+        // Subscribe to events
+        unsubRef.current = subscribeToEvents(session);
+
+        // Inject existing history so the SDK knows about it
+        await injectHistory(session, persisted);
+      } catch (err) {
+        if (cancelled) return;
+        console.error("failed to create pi session", err);
+      } finally {
+        if (!cancelled) setIsHydrating(false);
       }
     })();
+
     return () => {
       cancelled = true;
+      unsubRef.current?.();
+      unsubRef.current = null;
+      if (sessionRef.current) {
+        sessionRef.current.dispose();
+        sessionRef.current = null;
+      }
+      disposePiSession(targetId);
     };
   }, [sessionId]);
 
-  // Flush any pending writes when the hook unmounts or the session
-  // changes. Cancels any pending timer so we don't double-write.
-  useEffect(() => {
-    return () => {
-      cancelPersistTimer();
-      flushPersist();
-    };
-  }, [cancelPersistTimer, flushPersist, sessionId]);
+  // -----------------------------------------------------------------------
+  // Event subscription factory
+  // -----------------------------------------------------------------------
+  function subscribeToEvents(session: AgentSession): () => void {
+    let textBuffer = "";
 
-  const systemPrompt = useMemo(
-    () => buildSystemPrompt(baseCurrency),
-    [baseCurrency],
-  );
-
-  const stop = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setIsStreaming(false);
-    flushPersist();
-  }, [flushPersist]);
-
-  const clear = useCallback(() => {
-    stop();
-    setMessages([]);
-    setInput("");
-    titleTriedRef.current = false;
-  }, [stop]);
-
-  const consumeStream = useCallback(
-    async (
-      events: AsyncGenerator<StreamEvent>,
-      assistantIndex: number,
-      onAppend?: (snapshot: ChatMessage[]) => void,
-    ) => {
-      const dispatchToolCall = async (ev: {
-        kind: "tool_call";
-        id: string;
-        name: string;
-        args: unknown;
-      }) => {
-        const skillResult = await runSkill(
-          ev.name,
-          (ev.args as Record<string, unknown>) ?? {},
-          { baseCurrency },
-        );
-        if (skillResult.ok) {
-          const chart = skillResult.result.chart;
-          if (chart) {
-            let updated: ChatMessage[] = [];
-            setMessages((prev) => {
-              const next = prev.slice();
-              const target = { ...next[assistantIndex] };
-              if (target.role === "assistant") {
-                next[assistantIndex] = {
-                  ...target,
-                  blocks: [
-                    ...target.blocks,
-                    { kind: "chart", chart },
-                  ],
-                };
-              }
-              updated = next;
-              return next;
-            });
-            messagesRef.current = updated;
-          }
-        }
-      };
-
-      let lastIncrementalWrite = Date.now();
-      const maybeIncrementalWrite = (latest: ChatMessage[]) => {
-        const now = Date.now();
-        if (now - lastIncrementalWrite < 300) return;
-        lastIncrementalWrite = now;
-        if (onAppend) {
-          onAppend(latest);
-        }
-      };
-
-      for await (const ev of events) {
-        if (ev.kind === "text") {
-          const prev = messagesRef.current;
-          const target = prev[assistantIndex];
-          if (target && target.role === "assistant") {
+    return session.subscribe((event: AgentSessionEvent) => {
+      if (event.type === "message_update") {
+        const ae = event.assistantMessageEvent;
+        if (ae.type === "text_delta") {
+          textBuffer += ae.delta;
+          // Push the accumulated text into the assistant block
+          setMessages((prev) => {
+            const idx = getAssistantIndex(prev);
+            if (idx === null) return prev;
+            const next = prev.slice();
+            const target = { ...next[idx] };
+            if (target.role !== "assistant") return prev;
             const blocks = target.blocks.slice();
-            const last = blocks[blocks.length - 1];
-            if (last && last.kind === "text") {
-              blocks[blocks.length - 1] = {
-                kind: "text",
-                text: last.text + ev.delta,
-              };
+            // Replace or append the last text block
+            const lastBlock = blocks[blocks.length - 1];
+            if (lastBlock && lastBlock.kind === "text") {
+              blocks[blocks.length - 1] = { kind: "text", text: textBuffer };
             } else {
-              blocks.push({ kind: "text", text: ev.delta });
+              blocks.push({ kind: "text", text: textBuffer });
             }
-            const next = prev.slice();
-            next[assistantIndex] = { ...target, blocks };
-            messagesRef.current = next;
-            setMessages(next);
-          }
-          maybeIncrementalWrite(messagesRef.current);
-        } else if (ev.kind === "tool_call") {
-          await dispatchToolCall(ev);
-        } else if (ev.kind === "error") {
-          const prev = messagesRef.current;
-          const target = prev[assistantIndex];
-          if (target && target.role === "assistant") {
-            const blocks = target.blocks.slice();
-            blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
-            const next = prev.slice();
-            next[assistantIndex] = { ...target, blocks };
-            messagesRef.current = next;
-            setMessages(next);
-          }
-        } else if (ev.kind === "done") {
-          break;
+            next[idx] = { ...target, blocks };
+            return next;
+          });
         }
       }
-    },
-    [baseCurrency],
-  );
 
+      if (event.type === "turn_end") {
+        // Inject chart blocks from tool results
+        const results = event.toolResults ?? [];
+        for (const tr of results) {
+          const details = tr.details as
+            | { chart?: ChartSpec }
+            | undefined;
+          if (details?.chart) {
+            setMessages((prev) => {
+              const idx = getAssistantIndex(prev);
+              if (idx === null) return prev;
+              const next = prev.slice();
+              const target = { ...next[idx] };
+              if (target.role !== "assistant") return prev;
+              next[idx] = {
+                ...target,
+                blocks: [
+                  ...target.blocks,
+                  { kind: "chart" as const, chart: details.chart! },
+                ],
+              };
+              return next;
+            });
+          }
+        }
+      }
+
+      if (event.type === "agent_end") {
+        textBuffer = "";
+        setIsStreaming(false);
+        // Persist after agent completes
+        const snapshot = messagesRef.current;
+        if (snapshot.length > 0) {
+          void persistSession(
+            targetIdRef.current,
+            snapshot,
+          );
+        }
+        // Title generation
+        const tried = titleTriedRef.current;
+        if (!tried && snapshot.length >= 2) {
+          const firstUser =
+            snapshot[0]?.role === "user" ? snapshot[0].content : "";
+          const firstAssistant = snapshot[1]?.role === "assistant"
+            ? snapshot[1].blocks
+                .map((b) => (b.kind === "text" ? b.text : ""))
+                .join("")
+                .trim()
+            : "";
+          if (firstUser && firstAssistant) {
+            titleTriedRef.current = true;
+            void generateTitle(
+              configRef.current,
+              firstUser,
+              firstAssistant,
+            ).then((gen) => {
+              if (gen) {
+                void renameSession(targetIdRef.current, gen);
+                setTitle(gen);
+              }
+            });
+          }
+        }
+      }
+    });
+  }
+
+  // Keep a mutable ref for the target session id so the subscribe closure
+  // always reads the latest value.
+  const targetIdRef = useRef("");
+  useEffect(() => {
+    targetIdRef.current = sessionId ?? "";
+  }, [sessionId]);
+
+  // -----------------------------------------------------------------------
+  // History injection – replay existing messages into the SDK session
+  // -----------------------------------------------------------------------
+  async function injectHistory(
+    session: AgentSession,
+    existingMessages: ChatMessage[],
+  ): Promise<void> {
+    if (existingMessages.length === 0) return;
+    for (const msg of existingMessages) {
+      if (msg.role === "user") {
+        await session.sendCustomMessage(
+          {
+            customType: "track3-history",
+            content: msg.content,
+            display: true,
+            details: undefined,
+          },
+          { triggerTurn: false, deliverAs: "nextTurn" },
+        );
+      }
+      // We don't inject assistant messages – the LLM only needs user
+      // messages for context. The SDK reconstructs the conversation
+      // from custom messages and system prompt.
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Persistence
+  // -----------------------------------------------------------------------
+  async function persistSession(
+    sid: string,
+    snapshot: ChatMessage[],
+  ): Promise<void> {
+    try {
+      await rewriteMessages(sid, toPersisted(snapshot));
+      await touchSession(sid, {
+        messageCount: snapshot.length,
+        preview: buildSessionPreview(toPersisted(snapshot)),
+      });
+    } catch (err) {
+      console.error("failed to persist chat session", err);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // send
+  // -----------------------------------------------------------------------
   const send = useCallback(
     async (text?: string) => {
       const content = (text ?? input).trim();
       if (!content || isStreaming || !sessionId) return;
+
+      const session = sessionRef.current;
+      if (!session) return;
+
       setInput("");
-      const userMessage: ChatMessage = { role: "user", content };
-      const assistantMessage: ChatMessage = {
-        role: "assistant",
-        blocks: [],
-      };
-      const baseMessages = messagesRef.current;
-      const workingMessages: ChatMessage[] = [
-        ...baseMessages,
-        userMessage,
-        assistantMessage,
-      ];
-      messagesRef.current = workingMessages;
-      setMessages(workingMessages);
+
+      // Append user message + empty assistant block
+      const userBlock: ChatMessage = { role: "user", content };
+      const assistantBlock: ChatMessage = { role: "assistant", blocks: [] };
+
+      setMessages((prev) => [...prev, userBlock, assistantBlock]);
       setIsStreaming(true);
 
-      const controller = new AbortController();
-      abortRef.current = controller;
       try {
-        const history = flattenForProvider(workingMessages);
-        const trimmed = trimMessages(history, Math.max(2, Math.floor(contextSize / 256)));
-        const providerMessages: ProviderMessage[] = [
-          { role: "system", content: systemPrompt },
-          ...trimmed,
-        ];
-        const events = streamChatCompletion({
-          endpoint: config.endpoint,
-          apiKey: config.apiKey,
-          model: config.model,
-          messages: providerMessages,
-          tools: toOpenAITools(),
-          advanced: config.advanced,
-          signal: controller.signal,
+        await session.prompt(content, {
+          // Don't expand file-based prompt templates – Track3 has none
+          expandPromptTemplates: false,
         });
-        const assistantIndex = workingMessages.length - 1;
-        const sid = sessionId;
-        await consumeStream(events, assistantIndex, (snapshot) => {
-          messagesRef.current = snapshot;
-          void appendMessages(sid, toPersisted(snapshot)).catch(() => {});
+      } catch (err) {
+        // Append error text to the assistant block
+        const errMsg =
+          err instanceof Error ? err.message : "An unknown error occurred";
+        setMessages((prev) => {
+          const idx = getAssistantIndex(prev);
+          if (idx === null) return prev;
+          const next = prev.slice();
+          const target = { ...next[idx] };
+          if (target.role !== "assistant") return prev;
+          next[idx] = {
+            ...target,
+            blocks: [
+              ...target.blocks,
+              { kind: "text", text: `\n\n[error] ${errMsg}` },
+            ],
+          };
+          return next;
         });
-      } finally {
-        const finalMessages = messagesRef.current;
         setIsStreaming(false);
-        abortRef.current = null;
-        flushPersist(finalMessages);
-
-        const tried = titleTriedRef.current;
-        const currentTitle = title;
-        if (
-          !tried &&
-          currentTitle.length === 0 &&
-          finalMessages.length >= 2 &&
-          finalMessages[0]?.role === "user" &&
-          finalMessages[1]?.role === "assistant"
-        ) {
-          const firstUser = finalMessages[0].content;
-          const assistantBlocks = finalMessages[1].blocks;
-          const firstAssistant = assistantBlocks
-            .map((b) => (b.kind === "text" ? b.text : ""))
-            .join("")
-            .trim();
-          if (firstUser && firstAssistant) {
-            titleTriedRef.current = true;
-            const sid = sessionId;
-            (async () => {
-              try {
-                const generated = await generateTitle(
-                  configRef.current,
-                  firstUser,
-                  firstAssistant,
-                );
-                if (!generated) return;
-                await renameSession(sid, generated);
-                setTitle(generated);
-              } catch (err) {
-                console.error("failed to generate chat title", err);
-              }
-            })();
-          }
-        }
       }
     },
-    [
-      input,
-      isStreaming,
-      sessionId,
-      contextSize,
-      config,
-      systemPrompt,
-      consumeStream,
-      flushPersist,
-      title,
-    ],
+    [input, isStreaming, sessionId],
   );
 
+  // -----------------------------------------------------------------------
+  // stop
+  // -----------------------------------------------------------------------
+  const stop = useCallback(() => {
+    sessionRef.current?.abort().catch(() => {});
+    setIsStreaming(false);
+    // Persist current state
+    const snapshot = messagesRef.current;
+    if (snapshot.length > 0 && sessionId) {
+      void persistSession(sessionId, snapshot);
+    }
+  }, [sessionId]);
+
+  // -----------------------------------------------------------------------
+  // runQuickAction
+  // -----------------------------------------------------------------------
   const runQuickAction = useCallback(
-    async (key: string, prompt: string) => {
-      void key;
+    async (_key: string, prompt: string) => {
       await send(prompt);
     },
     [send],
   );
 
+  // -----------------------------------------------------------------------
+  // probe (test connection) – kept from old provider
+  // -----------------------------------------------------------------------
   const probe = useCallback(async () => {
+    if (!config.endpoint || !config.apiKey || !config.model) {
+      return "AI provider is not fully configured.";
+    }
     return probeConnection({
-      endpoint: config.endpoint,
+      endpoint: normalizeEndpoint(config.endpoint),
       apiKey: config.apiKey,
       model: config.model,
       messages: [{ role: "user", content: "ping" }],
@@ -443,18 +478,19 @@ export function useChat(options: UseChatOptions): UseChatResult {
     });
   }, [config]);
 
-  // Schedule a throttled persistence write whenever the message list
-  // changes. The throttling keeps disk IO light while streaming.
-  useEffect(() => {
-    if (!sessionId) return;
-    if (isStreaming) {
-      // While streaming, the incremental save runs from consumeStream;
-      // skip the throttled write to avoid a stampede.
-      return;
-    }
-    schedulePersist();
-  }, [messages, isStreaming, schedulePersist, sessionId]);
+  // -----------------------------------------------------------------------
+  // clear
+  // -----------------------------------------------------------------------
+  const clear = useCallback(() => {
+    stop();
+    setMessages([]);
+    setInput("");
+    titleTriedRef.current = false;
+  }, [stop]);
 
+  // -----------------------------------------------------------------------
+  // Return
+  // -----------------------------------------------------------------------
   return {
     messages,
     input,

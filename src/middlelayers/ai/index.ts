@@ -1,7 +1,13 @@
-// Public API for the AI module. Importing this module also registers
-// every skill via the side-effect import in ./skills.
-import "./skills";
+/**
+ * Public API for the AI module.
+ *
+ * Exports new Pi Agent SDK integration (pi-agent.ts) alongside the
+ * existing session-persistence API. The old provider/tools/prompt
+ * exports are retained for backward compat but deprecated.
+ */
 
+// Old exports – retained for backward compat (will be removed in a
+// future pass once use-chat.ts fully migrates).
 export {
   streamChatCompletion,
   probeConnection,
@@ -57,3 +63,17 @@ export type {
   SkillContext,
   GetAssetType,
 } from "./skills/types";
+
+// -----------------------------------------------------------------------
+// NEW Pi Agent SDK exports
+// -----------------------------------------------------------------------
+export {
+  createPiSession,
+  disposePiSession,
+  getPiSession,
+  setBaseCurrency,
+  getBaseCurrency,
+} from "./pi-agent";
+export type { ChartToolDetails } from "./pi-agent";
+
+export { allToolDefinitions } from "./skills";

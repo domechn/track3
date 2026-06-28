@@ -1,13 +1,37 @@
-// Side-effect import: registers every AI skill with the central
-// registry. Consumers should import this module before reading the
-// skill list.
-import "./portfolio-summary";
-import "./portfolio-history";
-import "./asset-history";
-import "./compare-snapshots";
-import "./recent-transactions";
-import "./market-price";
-import "./health-score";
+/**
+ * Skill index.
+ *
+ * Exports all ToolDefinitions for registration with the Pi Agent SDK.
+ * Each tool is defined via defineTool() with JSON Schema parameters
+ * (typebox-independent).
+ */
 
-export { listSkills, toOpenAITools, runSkill } from "../tools";
-export type { Skill, SkillArgs, ToolResult, SkillContext } from "./types";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+
+import portfolioSummaryDef from "./portfolio-summary";
+import portfolioHistoryDef from "./portfolio-history";
+import assetHistoryDef from "./asset-history";
+import compareSnapshotsDef from "./compare-snapshots";
+import recentTransactionsDef from "./recent-transactions";
+import marketPriceDef from "./market-price";
+import healthScoreDef from "./health-score";
+
+/** All tool definitions wired into the AgentSession. */
+export const allToolDefinitions: ToolDefinition[] = [
+  portfolioSummaryDef,
+  portfolioHistoryDef,
+  assetHistoryDef,
+  compareSnapshotsDef,
+  recentTransactionsDef,
+  marketPriceDef,
+  healthScoreDef,
+];
+
+// Re-export types for backward compat (used by tools.ts / prompt.ts)
+export type {
+  Skill,
+  SkillArgs,
+  ToolResult,
+  SkillContext,
+  GetAssetType,
+} from "./types";
