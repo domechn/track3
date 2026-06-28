@@ -1,16 +1,14 @@
 /**
  * Public API for the AI module.
  *
- * Exports the Pi Agent SDK integration (pi-agent.ts), session persistence,
- * and the minimal provider utilities still used by the Settings page and
- * the use-chat probe function.
+ * Exports the Pi Agent SDK integration (pi-agent.ts), session metadata
+ * management (sessions.ts), and minimal provider utilities.
  */
 
 // -----------------------------------------------------------------------
-// Session persistence – still used by use-chat.ts
+// Session metadata – stored in SQLite
 // -----------------------------------------------------------------------
 export {
-  appendMessages,
   buildSessionPreview,
   createSession,
   deleteSession,
@@ -18,17 +16,11 @@ export {
   listSessions,
   loadSession,
   renameSession,
-  rewriteMessages,
   togglePin,
   touchSession,
 } from "./sessions";
 
-export type {
-  ChatSession,
-  ChatSessionMeta,
-  PersistedBlock,
-  PersistedChatMessage,
-} from "./sessions";
+export type { ChatSessionMeta } from "./sessions";
 
 // -----------------------------------------------------------------------
 // Provider utilities – probe + normalizeEndpoint still needed
@@ -43,6 +35,9 @@ export {
   createPiSession,
   disposePiSession,
   getPiSession,
+  saveSdkSession,
+  loadSdkSession,
+  deleteSdkSession,
   setBaseCurrency,
   getBaseCurrency,
   sObj,

@@ -1,23 +1,23 @@
-import { invoke } from "@tauri-apps/api/core";
-import { appDataDir } from "@tauri-apps/api/path";
-import {
-  exists,
-  mkdir,
-  readTextFile,
-  removeFile,
-  writeTextFile,
-} from "@tauri-apps/plugin-fs";
-import { v4 as uuidv4 } from "uuid";
+/**
+ * Session metadata management.
+ *
+ * Session metadata (title, pin, timestamps, preview) is stored in SQLite.
+ * Message content persistence is handled by the Pi Agent SDK layer
+ * (pi-agent.ts -> saveSdkSession / loadSdkSession via Tauri encrypted fs).
+ *
+ * Removed from this file: rewriteMessages, appendMessages, and the
+ * encrypted-JSON-file message persistence that preceded the SDK session
+ * migration.
+ */
 
+import { v4 as uuidv4 } from "uuid";
 import {
   deleteFromDatabase,
   saveModelsToDatabase,
   selectFromDatabase,
 } from "@/middlelayers/database";
-import type { AIConfig } from "@/middlelayers/types";
 
 const SESSIONS_TABLE = "chat_sessions";
-const FILE_VERSION = 1;
 const PREVIEW_LIMIT = 30;
 const LLM_PROMPT_CHAR_LIMIT = 400;
 
@@ -30,34 +30,6 @@ export type ChatSessionMeta = {
   messageCount: number;
   preview: string;
 };
-
-export type PersistedBlock =
-  | { kind: "text"; text: string }
-  | { kind: "chart"; chart: unknown };
-
-export type PersistedChatMessage =
-  | { role: "user"; content: string }
-  | { role: "assistant"; blocks: PersistedBlock[] };
-
-export type ChatSession = ChatSessionMeta & {
-  messages: PersistedChatMessage[];
-};
-
-async function resolveSessionDir(): Promise<string> {
-  const base = await appDataDir();
-  return `${base.replace(/\/+$/, "")}/ai/sessions`;
-}
-
-async function ensureSessionDir(): Promise<string> {
-  const dir = await resolveSessionDir();
-  await mkdir(dir, { recursive: true });
-  return dir;
-}
-
-async function fullPathFor(sessionId: string): Promise<string> {
-  const dir = await ensureSessionDir();
-  return `${dir}/${sessionId}.json.ent`;
-}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -90,10 +62,7 @@ function normalizeMeta(row: Record<string, unknown>): ChatSessionMeta {
 
 export async function listSessions(): Promise<ChatSessionMeta[]> {
   const rows = await selectFromDatabase<Record<string, unknown>>(
-    SESSIONS_TABLE,
-    {},
-    0,
-    { pinned: "desc", updatedAt: "desc" },
+    SESSIONS_TABLE, {}, 0, { pinned: "desc", updatedAt: "desc" },
   );
   return rows.map(normalizeMeta);
 }
@@ -101,13 +70,8 @@ export async function listSessions(): Promise<ChatSessionMeta[]> {
 export async function createSession(): Promise<ChatSessionMeta> {
   const now = nowIso();
   const meta: ChatSessionMeta = {
-    id: uuidv4(),
-    title: "",
-    createdAt: now,
-    updatedAt: now,
-    pinned: 0,
-    messageCount: 0,
-    preview: "",
+    id: uuidv4(), title: "", createdAt: now, updatedAt: now,
+    pinned: 0, messageCount: 0, preview: "",
   };
   await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [meta]);
   return meta;
@@ -115,36 +79,11 @@ export async function createSession(): Promise<ChatSessionMeta> {
 
 export async function loadSession(
   id: string,
-): Promise<ChatSession | null> {
+): Promise<ChatSessionMeta | null> {
   const rows = await selectFromDatabase<Record<string, unknown>>(
-    SESSIONS_TABLE,
-    { id },
+    SESSIONS_TABLE, { id },
   );
-  const metaRow = rows[0];
-  if (!metaRow) {
-    return null;
-  }
-  const meta = normalizeMeta(metaRow);
-  const path = await fullPathFor(id);
-  if (!(await exists(path))) {
-    return null;
-  }
-  const encrypted = await readTextFile(path);
-  const decrypted = await invoke<string>("decrypt", { data: encrypted });
-  let parsed: { version: number; messages: PersistedChatMessage[] };
-  try {
-    parsed = JSON.parse(decrypted);
-  } catch (err) {
-    throw new Error(
-      `chat session payload is not valid JSON: ${(err as Error).message}`,
-    );
-  }
-  if (parsed.version !== FILE_VERSION) {
-    throw new Error(
-      `unsupported chat session version: ${String(parsed.version)}`,
-    );
-  }
-  return { ...meta, messages: parsed.messages ?? [] };
+  return rows[0] ? normalizeMeta(rows[0]) : null;
 }
 
 export async function touchSession(
@@ -152,109 +91,39 @@ export async function touchSession(
   patch: { messageCount: number; preview: string },
 ): Promise<void> {
   const rows = await selectFromDatabase<Record<string, unknown>>(
-    SESSIONS_TABLE,
-    { id },
+    SESSIONS_TABLE, { id },
   );
-  const metaRow = rows[0];
-  if (!metaRow) {
-    return;
-  }
-  const meta = normalizeMeta(metaRow);
-  const next: ChatSessionMeta = {
-    ...meta,
+  if (!rows[0]) return;
+  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [{
+    ...normalizeMeta(rows[0]),
     messageCount: patch.messageCount,
     preview: patch.preview,
     updatedAt: nowIso(),
-  };
-  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [next]);
+  }]);
 }
 
 export async function renameSession(id: string, title: string): Promise<void> {
   const rows = await selectFromDatabase<Record<string, unknown>>(
-    SESSIONS_TABLE,
-    { id },
+    SESSIONS_TABLE, { id },
   );
-  const metaRow = rows[0];
-  if (!metaRow) {
-    return;
-  }
-  const meta = normalizeMeta(metaRow);
-  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [
-    { ...meta, title, updatedAt: nowIso() },
-  ]);
+  if (!rows[0]) return;
+  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [{
+    ...normalizeMeta(rows[0]), title, updatedAt: nowIso(),
+  }]);
 }
 
 export async function togglePin(id: string, pinned: 0 | 1): Promise<void> {
   const rows = await selectFromDatabase<Record<string, unknown>>(
-    SESSIONS_TABLE,
-    { id },
+    SESSIONS_TABLE, { id },
   );
-  const metaRow = rows[0];
-  if (!metaRow) {
-    return;
-  }
-  const meta = normalizeMeta(metaRow);
-  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [
-    { ...meta, pinned, updatedAt: nowIso() },
-  ]);
+  if (!rows[0]) return;
+  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [{
+    ...normalizeMeta(rows[0]), pinned, updatedAt: nowIso(),
+  }]);
 }
 
 export async function deleteSession(id: string): Promise<void> {
   await deleteFromDatabase<ChatSessionMeta>(SESSIONS_TABLE, { id });
-  try {
-    const path = await fullPathFor(id);
-    if (await exists(path)) {
-      await removeFile(path);
-    }
-  } catch {
-    // ignore: missing files are not a failure mode for delete
-  }
-}
-
-async function readSessionMessages(
-  id: string,
-): Promise<PersistedChatMessage[]> {
-  const path = await fullPathFor(id);
-  if (!(await exists(path))) {
-    return [];
-  }
-  const encrypted = await readTextFile(path);
-  const decrypted = await invoke<string>("decrypt", { data: encrypted });
-  try {
-    const parsed = JSON.parse(decrypted);
-    if (parsed && parsed.version === FILE_VERSION && Array.isArray(parsed.messages)) {
-      return parsed.messages as PersistedChatMessage[];
-    }
-    return [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeSessionMessages(
-  id: string,
-  messages: PersistedChatMessage[],
-): Promise<void> {
-  const dir = await ensureSessionDir();
-  const path = `${dir}/${id}.json.ent`;
-  const payload = JSON.stringify({ version: FILE_VERSION, messages });
-  const encrypted = await invoke<string>("encrypt", { data: payload });
-  await writeTextFile(path, encrypted);
-}
-
-export async function rewriteMessages(
-  id: string,
-  messages: PersistedChatMessage[],
-): Promise<void> {
-  await writeSessionMessages(id, messages);
-}
-
-export async function appendMessages(
-  id: string,
-  messages: PersistedChatMessage[],
-): Promise<void> {
-  const existing = await readSessionMessages(id);
-  await writeSessionMessages(id, [...existing, ...messages]);
 }
 
 function trimForPreview(text: string): string {
@@ -263,32 +132,38 @@ function trimForPreview(text: string): string {
   return `${trimmed.slice(0, PREVIEW_LIMIT - 1)}…`;
 }
 
-export function buildSessionPreview(messages: PersistedChatMessage[]): string {
+export function buildSessionPreview(
+  messages: { role: string; content?: string }[],
+): string {
   const firstUser = messages.find((m) => m.role === "user");
-  if (!firstUser || firstUser.role !== "user") return "";
-  return trimForPreview(firstUser.content);
+  if (!firstUser) return "";
+  const content = typeof firstUser.content === "string" ? firstUser.content : "";
+  return trimForPreview(content);
 }
 
-function fallbackTitle(messages: PersistedChatMessage[]): string {
-  return buildSessionPreview(messages);
+function fallbackTitle(
+  firstUserMsg: string,
+  _firstAssistantMsg: string,
+): string {
+  return trimForPreview(firstUserMsg);
 }
 
 async function callTitleLLM(
-  config: AIConfig,
+  endpoint: string,
+  apiKey: string,
+  model: string,
   firstUserMsg: string,
   firstAssistantMsg: string,
 ): Promise<string | null> {
-  const endpoint = (config.endpoint ?? "").trim().replace(/\/+$/, "");
-  if (!endpoint) return null;
   const url = endpoint.endsWith("/chat/completions")
     ? endpoint
     : `${endpoint}/chat/completions`;
   const trimmedUser = firstUserMsg.slice(0, LLM_PROMPT_CHAR_LIMIT);
   const trimmedAssistant = firstAssistantMsg.slice(0, LLM_PROMPT_CHAR_LIMIT);
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
   const body = {
-    model: config.model,
+    model,
     messages: [
       {
         role: "system",
@@ -304,35 +179,30 @@ async function callTitleLLM(
   };
   try {
     const resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
+      method: "POST", headers, body: JSON.stringify(body),
     });
     if (!resp.ok) return null;
     const json: any = await resp.json();
-    const choice = json?.choices?.[0];
-    const content = choice?.message?.content;
+    const content = json?.choices?.[0]?.message?.content;
     if (typeof content !== "string") return null;
-    const cleaned = content
-      .trim()
-      .replace(/^["']+|["']+$/g, "")
-      .replace(/\.+$/, "");
-    if (cleaned.length === 0) return null;
-    return cleaned;
+    return content.trim().replace(/^["']+|["']+$/g, "").replace(/\.+$/, "");
   } catch {
     return null;
   }
 }
 
 export async function generateTitle(
-  config: AIConfig,
+  config: { endpoint: string; apiKey: string; model: string },
   firstUserMsg: string,
   firstAssistantMsg: string,
 ): Promise<string> {
-  const llmTitle = await callTitleLLM(config, firstUserMsg, firstAssistantMsg);
-  if (llmTitle) return llmTitle;
-  return fallbackTitle([
-    { role: "user", content: firstUserMsg },
-    { role: "assistant", blocks: [{ kind: "text", text: firstAssistantMsg }] },
-  ]);
+  const endpoint = (config.endpoint ?? "").trim().replace(/\/+$/, "");
+  if (endpoint && config.apiKey) {
+    const llmTitle = await callTitleLLM(
+      endpoint, config.apiKey, config.model,
+      firstUserMsg, firstAssistantMsg,
+    );
+    if (llmTitle) return llmTitle;
+  }
+  return fallbackTitle(firstUserMsg, firstAssistantMsg);
 }

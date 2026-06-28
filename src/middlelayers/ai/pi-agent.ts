@@ -2,11 +2,12 @@
  * Pi Agent SDK integration layer for Track3.
  *
  * Bridges Track3's chat infrastructure with the Pi Agent SDK
- * (@earendil-works/pi-coding-agent). Each Track3 chat session
- * owns one AgentSession, created/disposed on session switch.
+ * (@earendil-works/pi-coding-agent). Each Track3 chat session owns
+ * one AgentSession, created/disposed on session switch.
  *
- * Tools (skills) are registered as ToolDefinitions using defineTool()
- * and wired at session creation time via the `customTools` option.
+ * Session persistence uses Tauri's @tauri-apps/plugin-fs; the SDK's
+ * SessionManager stays in-memory since its Node.js fs dependencies
+ * are tree-shaken in the Vite bundle.
  */
 
 import {
@@ -16,48 +17,75 @@ import {
   ModelRegistry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentSession, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, ToolDefinition, SessionEntry } from "@earendil-works/pi-coding-agent";
+import { invoke } from "@tauri-apps/api/core";
+import { appDataDir } from "@tauri-apps/api/path";
+import { exists, mkdir, readTextFile, writeTextFile, remove } from "@tauri-apps/plugin-fs";
 import type { AIConfig, CurrencyRateDetail, ChartSpec } from "@/middlelayers/types";
 import { normalizeEndpoint } from "./provider";
 
 // ---------------------------------------------------------------------------
-// Shared state – base currency is captured when the session is created and
-// read by tool execute() functions at runtime.
+// Shared state
 // ---------------------------------------------------------------------------
 let _baseCurrency: CurrencyRateDetail = { currency: "USD", rate: 1, alias: "USD", symbol: "$" };
 
-export function getBaseCurrency(): CurrencyRateDetail {
-  return _baseCurrency;
-}
-
-export function setBaseCurrency(c: CurrencyRateDetail): void {
-  _baseCurrency = c;
-}
+export function getBaseCurrency(): CurrencyRateDetail { return _baseCurrency; }
+export function setBaseCurrency(c: CurrencyRateDetail): void { _baseCurrency = c; }
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+export type ChartToolDetails = { chart?: ChartSpec; data?: unknown };
 
-/** Pluggable detail payload for tool results that carry a chart. */
-export type ChartToolDetails = {
-  chart?: ChartSpec;
-};
+// ---------------------------------------------------------------------------
+// SDK session directory helpers
+// ---------------------------------------------------------------------------
+const SDK_SESSION_DIR = "ai/sdk-sessions";
 
-/**
- * Active SDK sessions keyed by Track3 session id.
- * We manage disposal explicitly; this map is a convenience for lookups.
- */
+async function ensureSdkDir(): Promise<string> {
+  const base = (await appDataDir()).replace(/\/+$/, "");
+  const dir = `${base}/${SDK_SESSION_DIR}`;
+  await mkdir(dir, { recursive: true });
+  return dir;
+}
+
+function sdkPathFor(sessionId: string): Promise<string> {
+  return ensureSdkDir().then((dir) => `${dir}/${sessionId}.sdk.json.ent`);
+}
+
+// ---------------------------------------------------------------------------
+// SDK session persistence via Tauri fs
+// ---------------------------------------------------------------------------
+export async function saveSdkSession(
+  sessionId: string,
+  entries: SessionEntry[],
+): Promise<void> {
+  const path = await sdkPathFor(sessionId);
+  const payload = JSON.stringify(entries);
+  const encrypted = await invoke<string>("encrypt", { data: payload });
+  await writeTextFile(path, encrypted);
+}
+
+export async function loadSdkSession(
+  sessionId: string,
+): Promise<SessionEntry[] | null> {
+  const path = await sdkPathFor(sessionId);
+  if (!(await exists(path))) return null;
+  const encrypted = await readTextFile(path);
+  const decrypted = await invoke<string>("decrypt", { data: encrypted });
+  return JSON.parse(decrypted) as SessionEntry[];
+}
+
+export async function deleteSdkSession(sessionId: string): Promise<void> {
+  const path = await sdkPathFor(sessionId);
+  try { try { if (await exists(path)) await remove(path); } catch {} /* ignore */ } catch { /* ignore */ }
+}
+
+// ---------------------------------------------------------------------------
+// Active sessions
+// ---------------------------------------------------------------------------
 const activeSessions = new Map<string, AgentSession>();
 
-/**
- * Create an AgentSession configured for a Track3 session.
- *
- * @param sessionId   Track3 chat session id (for scoping the SDK session)
- * @param config      User's AI provider config (endpoint, key, model)
- * @param baseCurrency Display currency for value conversions
- * @param toolDefs    Array of ToolDefinitions from the skills modules
- * @returns           The newly created AgentSession
- */
 export async function createPiSession(
   sessionId: string,
   config: AIConfig,
@@ -66,64 +94,45 @@ export async function createPiSession(
 ): Promise<AgentSession> {
   _baseCurrency = baseCurrency;
 
-  // 1. Auth storage (in-memory, not persisted to disk)
+  // 1. Auth storage
   const authStorage = AuthStorage.inMemory();
-  if (config.apiKey) {
-    authStorage.setRuntimeApiKey("track3-openai", config.apiKey);
-  }
+  if (config.apiKey) authStorage.setRuntimeApiKey("track3-openai", config.apiKey);
 
-  // 2. Model registry with one dynamic provider
+  // 2. Model registry
   const modelRegistry = ModelRegistry.create(authStorage);
-  const contextWindow = config.contextSize || 8192;
   modelRegistry.registerProvider("track3-openai", {
     baseUrl: normalizeEndpoint(config.endpoint),
     apiKey: config.apiKey,
     api: "openai-completions",
-    models: [
-      {
-        id: config.model,
-        name: config.model,
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow,
-        maxTokens: 4096,
-      },
-    ],
+    models: [{
+      id: config.model, name: config.model, reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: config.contextSize || 8192, maxTokens: 4096,
+    }],
   });
 
-  // 3. Minimal resource loader – no filesystem extensions/skills/themes
+  // 3. Resource loader
   const resourceLoader = new DefaultResourceLoader({
-    cwd: "/",
-    agentDir: "/tmp/track3-pi-agent",
-    noExtensions: true,
-    noSkills: true,
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
+    cwd: "/", agentDir: "/tmp/track3-pi-agent",
+    noExtensions: true, noSkills: true, noPromptTemplates: true,
+    noThemes: true, noContextFiles: true,
   });
   await resourceLoader.reload();
 
-  // 4. In-memory session manager (Track3 handles its own persistence)
+  // 4. In-memory session manager (persistence via Tauri fs, not Node fs)
   const sessionManager = SessionManager.inMemory();
 
   // 5. Create session
   const { session } = await createAgentSession({
-    modelRegistry,
-    authStorage,
-    resourceLoader,
-    sessionManager,
-    noTools: "all",
-    customTools: toolDefs,
+    modelRegistry, authStorage, resourceLoader, sessionManager,
+    noTools: "all", customTools: toolDefs,
   });
 
   activeSessions.set(sessionId, session);
   return session;
 }
 
-/**
- * Dispose an AgentSession and remove it from the active pool.
- */
 export function disposePiSession(sessionId: string): void {
   const session = activeSessions.get(sessionId);
   if (!session) return;
@@ -131,53 +140,31 @@ export function disposePiSession(sessionId: string): void {
   activeSessions.delete(sessionId);
 }
 
-/**
- * Retrieve an active session by Track3 session id.
- */
 export function getPiSession(sessionId: string): AgentSession | undefined {
   return activeSessions.get(sessionId);
 }
 
 // ---------------------------------------------------------------------------
-// Lightweight schema helpers – replaces TypeBox, creates plain JSON Schema
-// objects that the SDK treats correctly at runtime.
+// Lightweight schema helpers
 // ---------------------------------------------------------------------------
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Schema = Record<string, any>;
-
 export function sString(desc?: string): Schema {
   return { type: "string", ...(desc ? { description: desc } : {}) };
 }
-
 export function sNumber(desc?: string): Schema {
   return { type: "number", ...(desc ? { description: desc } : {}) };
 }
-
 export function sOptional(s: Schema): Schema {
   return { ...s, _optional: true };
 }
-
 export function sArray(items: Schema, desc?: string): Schema {
   return { type: "array", items, ...(desc ? { description: desc } : {}) };
 }
-
-export function sObj(
-  properties: Record<string, Schema>,
-  options?: { desc?: string },
-): Schema {
-  const required = Object.entries(properties)
-    .filter(([, v]) => !v._optional)
-    .map(([k]) => k);
-  const obj: Schema = {
-    type: "object",
-    properties,
-  };
+export function sObj(properties: Record<string, Schema>, options?: { desc?: string }): Schema {
+  const required = Object.entries(properties).filter(([, v]) => !v._optional).map(([k]) => k);
+  const obj: Schema = { type: "object", properties };
   if (required.length > 0) obj.required = required;
   if (options?.desc) obj.description = options.desc;
-  // Remove internal markers from the output
-  for (const v of Object.values(obj.properties)) {
-    delete (v as Schema)._optional;
-  }
+  for (const v of Object.values(obj.properties)) delete (v as Schema)._optional;
   return obj;
 }
