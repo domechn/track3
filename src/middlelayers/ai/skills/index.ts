@@ -2,8 +2,7 @@
  * Skill index.
  *
  * Exports all ToolDefinitions for registration with the Pi Agent SDK.
- * Each tool is defined via defineTool() with JSON Schema parameters
- * (typebox-independent).
+ * Each tool is defined via defineTool() with JSON Schema parameters.
  */
 
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
@@ -26,12 +25,3 @@ export const allToolDefinitions: ToolDefinition[] = [
   marketPriceDef,
   healthScoreDef,
 ];
-
-// Re-export types for backward compat (used by tools.ts / prompt.ts)
-export type {
-  Skill,
-  SkillArgs,
-  ToolResult,
-  SkillContext,
-  GetAssetType,
-} from "./types";

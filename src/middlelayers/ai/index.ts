@@ -1,30 +1,14 @@
 /**
  * Public API for the AI module.
  *
- * Exports new Pi Agent SDK integration (pi-agent.ts) alongside the
- * existing session-persistence API. The old provider/tools/prompt
- * exports are retained for backward compat but deprecated.
+ * Exports the Pi Agent SDK integration (pi-agent.ts), session persistence,
+ * and the minimal provider utilities still used by the Settings page and
+ * the use-chat probe function.
  */
 
-// Old exports – retained for backward compat (will be removed in a
-// future pass once use-chat.ts fully migrates).
-export {
-  streamChatCompletion,
-  probeConnection,
-  normalizeEndpoint,
-} from "./provider";
-
-export {
-  registerSkill,
-  getSkill,
-  listSkills,
-  clearSkillRegistry,
-  toOpenAITools,
-  runSkill,
-} from "./tools";
-
-export { buildSystemPrompt } from "./prompt";
-
+// -----------------------------------------------------------------------
+// Session persistence – still used by use-chat.ts
+// -----------------------------------------------------------------------
 export {
   appendMessages,
   buildSessionPreview,
@@ -46,26 +30,14 @@ export type {
   PersistedChatMessage,
 } from "./sessions";
 
-export type {
-  StreamEvent,
-  StreamRequest,
-  StreamOptions,
-  ChatRole,
-  ProviderMessage,
-  ProviderToolCall,
-  ProviderFunctionDef,
-} from "./types";
-
-export type {
-  Skill,
-  SkillArgs,
-  ToolResult,
-  SkillContext,
-  GetAssetType,
-} from "./skills/types";
+// -----------------------------------------------------------------------
+// Provider utilities – probe + normalizeEndpoint still needed
+// -----------------------------------------------------------------------
+export { probeConnection, normalizeEndpoint } from "./provider";
+export type { StreamRequest, ProviderMessage } from "./types";
 
 // -----------------------------------------------------------------------
-// NEW Pi Agent SDK exports
+// Pi Agent SDK integration
 // -----------------------------------------------------------------------
 export {
   createPiSession,
@@ -73,6 +45,11 @@ export {
   getPiSession,
   setBaseCurrency,
   getBaseCurrency,
+  sObj,
+  sString,
+  sNumber,
+  sOptional,
+  sArray,
 } from "./pi-agent";
 export type { ChartToolDetails } from "./pi-agent";
 
