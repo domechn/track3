@@ -1,7 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getDatabase } from "./database";
 import { GlobalConfig, StockConfig } from "./datafetch/types";
-import { ConfigurationModel, CurrencyRateDetail } from "./types";
+import {
+  AIAdvancedOptions,
+  AIConfig,
+  ConfigurationModel,
+  CurrencyRateDetail,
+} from "./types";
 import yaml from "yaml";
 import { CURRENCY_RATE_HANDLER } from "./entities/currency";
 import { ASSET_HANDLER } from "./entities/assets";
@@ -39,9 +44,112 @@ const clientInfoFixId = "998";
 const licenseFixId = "997";
 const stableCoinsId = "996";
 const blacklistCoinsId = "995";
+const aiConfigId = "999";
 const preferCurrencyLocalStorageKey = "track3-prefer-currency";
 
 export const themeLocalStorageKey = "track3-ui-theme";
+
+// Thrown by loadAIConfig / saveAIConfig when no AI configuration is persisted
+// yet. The chat page catches this and renders the "configure first" empty state.
+export class AIConfigMissingError extends Error {
+  constructor(message = "AI configuration is not set") {
+    super(message);
+    this.name = "AIConfigMissingError";
+  }
+}
+
+export const DEFAULT_AI_CONTEXT_SIZE = 8192;
+
+function validateAIConfig(cfg: AIConfig): void {
+  if (!cfg || typeof cfg !== "object") {
+    throw new AIConfigMissingError("AI configuration is not set");
+  }
+  if (!cfg.endpoint || !cfg.endpoint.trim()) {
+    throw new AIConfigMissingError("AI configuration is missing endpoint");
+  }
+  if (typeof cfg.apiKey !== "string") {
+    throw new AIConfigMissingError("AI configuration is missing apiKey");
+  }
+  if (!cfg.model || !cfg.model.trim()) {
+    throw new AIConfigMissingError("AI configuration is missing model");
+  }
+  if (
+    typeof cfg.contextSize !== "number" ||
+    !Number.isFinite(cfg.contextSize) ||
+    cfg.contextSize <= 0
+  ) {
+    throw new AIConfigMissingError("AI configuration is missing contextSize");
+  }
+}
+
+// loadAIConfig returns the persisted AI configuration. Throws
+// AIConfigMissingError when nothing has been saved yet so the UI can
+// branch on the empty state.
+export async function loadAIConfig(): Promise<AIConfig> {
+  const model = await getConfigurationById(aiConfigId);
+  if (!model || !model.data) {
+    throw new AIConfigMissingError();
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(model.data);
+  } catch (e) {
+    throw new AIConfigMissingError(
+      `AI configuration is not valid JSON: ${(e as Error).message}`,
+    );
+  }
+  const cfg = parsed as AIConfig;
+  validateAIConfig(cfg);
+  return cfg;
+}
+
+// saveAIConfig validates the input and persists it encrypted under the
+// aiConfigId slot. Throws AIConfigMissingError when a required field is
+// missing so the UI can surface the error consistently.
+export async function saveAIConfig(cfg: AIConfig): Promise<void> {
+  validateAIConfig(cfg);
+  const sanitized: AIConfig = {
+    endpoint: cfg.endpoint.trim().replace(/\/+$/, ""),
+    apiKey: cfg.apiKey,
+    model: cfg.model.trim(),
+    contextSize: Math.max(1, Math.floor(cfg.contextSize)),
+    advanced: cfg.advanced ? sanitizeAIAdvanced(cfg.advanced) : undefined,
+  };
+  await saveConfigurationById(aiConfigId, JSON.stringify(sanitized), true);
+}
+
+// cleanAIConfig removes the AI configuration slot.
+export async function cleanAIConfig(): Promise<void> {
+  return deleteConfigurationById(aiConfigId);
+}
+
+function sanitizeAIAdvanced(advanced: AIAdvancedOptions): AIAdvancedOptions {
+  const out: AIAdvancedOptions = {};
+  if (typeof advanced.temperature === "number") {
+    out.temperature = advanced.temperature;
+  }
+  if (typeof advanced.top_p === "number") {
+    out.top_p = advanced.top_p;
+  }
+  if (advanced.headers && typeof advanced.headers === "object") {
+    out.headers = Object.fromEntries(
+      Object.entries(advanced.headers).filter(
+        ([, v]) => typeof v === "string",
+      ),
+    );
+  }
+  if (advanced.extraBody && typeof advanced.extraBody === "object") {
+    out.extraBody = { ...advanced.extraBody };
+  }
+  if (
+    advanced.provider === "openai" ||
+    advanced.provider === "anthropic" ||
+    advanced.provider === "custom"
+  ) {
+    out.provider = advanced.provider;
+  }
+  return out;
+}
 
 export async function getConfiguration(): Promise<GlobalConfig | undefined> {
   const [exchangesModel, walletsModel, generalModel, stockConfig] =
