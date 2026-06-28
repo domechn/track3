@@ -4,9 +4,10 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIConfig, CurrencyRateDetail } from "@/middlelayers/types";
 
-// sendSpy is referenced from inside the hoisted vi.mock below; we declare
-// it via vi.hoisted so the factory closure can pick it up.
-const { sendSpy } = vi.hoisted(() => ({ sendSpy: vi.fn() }));
+const { sendSpy, mockUseChatSessions } = vi.hoisted(() => ({
+  sendSpy: vi.fn(),
+  mockUseChatSessions: vi.fn(),
+}));
 
 vi.mock("./use-chat", () => ({
   useChat: () => ({
@@ -22,10 +23,14 @@ vi.mock("./use-chat", () => ({
   }),
 }));
 
+vi.mock("./use-chat-sessions", () => ({
+  useChatSessions: mockUseChatSessions,
+}));
+
 vi.mock("@/middlelayers/configuration", async () => {
-  const actual = await vi.importActual<typeof import("@/middlelayers/configuration")>(
-    "@/middlelayers/configuration",
-  );
+  const actual = await vi.importActual<
+    typeof import("@/middlelayers/configuration")
+  >("@/middlelayers/configuration");
   return {
     ...actual,
     loadAIConfig: vi.fn(),
@@ -51,14 +56,29 @@ const config: AIConfig = {
   contextSize: 8192,
 };
 
+const defaultSession = {
+  id: "s1",
+  title: "Test Session",
+  createdAt: "2024-01-01T00:00:00.000Z",
+  updatedAt: "2024-01-01T00:00:00.000Z",
+  pinned: 0,
+  messageCount: 2,
+  preview: "Hello",
+};
+
 function renderAt(path: string, isPro: boolean) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route
-          path="*"
+          path="/assistant"
           element={<ChatPage isProUser={isPro} />}
         />
+        <Route
+          path="/assistant/:sessionId"
+          element={<ChatPage isProUser={isPro} />}
+        />
+        <Route path="*" element={<ChatPage isProUser={isPro} />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -66,8 +86,21 @@ function renderAt(path: string, isPro: boolean) {
 
 beforeEach(() => {
   sendSpy.mockReset();
+  mockUseChatSessions.mockReset();
   vi.mocked(loadAIConfig).mockReset();
   vi.mocked(queryPreferCurrency).mockReset();
+
+  // Default session list mock — one session.
+  mockUseChatSessions.mockReturnValue({
+    sessions: [{ ...defaultSession }],
+    isLoading: false,
+    refresh: vi.fn(),
+    createNew: vi
+      .fn()
+      .mockResolvedValue({ ...defaultSession, id: "new-session" }),
+    remove: vi.fn(),
+    pin: vi.fn(),
+  });
 });
 
 describe("ChatPage", () => {
@@ -76,18 +109,14 @@ describe("ChatPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("assistant-upgrade")).toBeTruthy();
     });
-    expect(
-      screen.getByText(/Assistant is a Pro feature/i),
-    ).toBeTruthy();
-    // Bullet text appears in both description + feature list; only check
-    // that at least one match exists.
+    expect(screen.getByText(/Assistant is a Pro feature/i)).toBeTruthy();
     expect(
       screen.getAllByText(/your own OpenAI-compatible endpoint/i).length,
     ).toBeGreaterThan(0);
     expect(screen.getByTestId("assistant-upgrade-cta")).toBeTruthy();
   });
 
-  it("renders the not-configured card with capability preview when AI is not configured", async () => {
+  it("renders the not-configured card when AI is not configured", async () => {
     vi.mocked(loadAIConfig).mockRejectedValue(
       new (await import("@/middlelayers/configuration")).AIConfigMissingError(),
     );
@@ -99,31 +128,45 @@ describe("ChatPage", () => {
     expect(screen.getByText(/Set up the Assistant/i)).toBeTruthy();
     expect(screen.getByText(/Portfolio summary/i)).toBeTruthy();
     expect(screen.getByText(/Health score/i)).toBeTruthy();
-    expect(screen.getByTestId("assistant-empty-cta").getAttribute("href")).toBe(
-      "/settings/assistant",
-    );
+    expect(
+      screen.getByTestId("assistant-empty-cta").getAttribute("href"),
+    ).toBe("/settings/assistant");
   });
 
-  it("renders the chat header and welcome panel when AI is configured", async () => {
+  it("renders the chat layout with sidebar and header when AI is configured", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue(config);
     vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
-    renderAt("/", true);
+    renderAt("/assistant/s1", true);
     await waitFor(() => {
-      expect(screen.getByTestId("chat-thread")).toBeTruthy();
+      expect(screen.getByTestId("chat-card")).toBeTruthy();
     });
-    expect(screen.getByTestId("chat-welcome")).toBeTruthy();
+    // Sidebar should be visible
+    expect(screen.getByTestId("session-sidebar")).toBeTruthy();
+    // Chat area should be visible
+    expect(screen.getByTestId("chat-thread")).toBeTruthy();
     expect(screen.getByTestId("chat-input")).toBeTruthy();
     expect(screen.getByTestId("chat-send")).toBeTruthy();
     expect(screen.getByText(/gpt-4o-mini/i)).toBeTruthy();
     expect(screen.getByText(/api\.example\.com/i)).toBeTruthy();
-    // Quick action row is hidden while chat is empty.
-    expect(screen.queryByTestId("quick-action-analysis")).toBeNull();
+    // Welcome panel renders when there are no messages
+    expect(screen.getByTestId("chat-welcome")).toBeTruthy();
+  });
+
+  it("fills the available viewport", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant/s1", true);
+    await waitFor(() => {
+      expect(screen.getByTestId("chat-card")).toBeTruthy();
+    });
+    const card = screen.getByTestId("chat-card");
+    expect(card.className).toContain("h-[calc(100vh-88px)]");
   });
 
   it("clicking a welcome example prompt invokes the chat send callback", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue(config);
     vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
-    renderAt("/", true);
+    renderAt("/assistant/s1", true);
     await waitFor(() => {
       expect(screen.getByTestId("chat-welcome")).toBeTruthy();
     });
@@ -133,21 +176,7 @@ describe("ChatPage", () => {
     expect(typeof sendSpy.mock.calls[0]?.[0]).toBe("string");
   });
 
-  it("fills the available viewport so the chat composer stays pinned at the bottom", async () => {
-    vi.mocked(loadAIConfig).mockResolvedValue(config);
-    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
-    renderAt("/", true);
-    await waitFor(() => {
-      expect(screen.getByTestId("chat-thread")).toBeTruthy();
-    });
-    // The card should size itself to the viewport minus the topbar + main
-    // padding so the composer (the last flex child) lands at the bottom
-    // of the page rather than floating with empty space beneath it.
-    const card = screen.getByTestId("chat-card");
-    expect(card.className).toContain("h-[calc(100vh-88px)]");
-  });
-
-  it("renders the error card with the failure reason when load fails", async () => {
+  it("renders the error card when load fails", async () => {
     vi.mocked(loadAIConfig).mockRejectedValue(new Error("network down"));
     vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
     renderAt("/", true);
@@ -156,5 +185,63 @@ describe("ChatPage", () => {
     });
     expect(screen.getByText(/Something went wrong/i)).toBeTruthy();
     expect(screen.getByText(/network down/i)).toBeTruthy();
+  });
+
+  it("shows empty session state when no sessions exist", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    mockUseChatSessions.mockReturnValue({
+      sessions: [],
+      isLoading: false,
+      refresh: vi.fn(),
+      createNew: vi
+        .fn()
+        .mockResolvedValue({ ...defaultSession, id: "new-session" }),
+      remove: vi.fn(),
+      pin: vi.fn(),
+    });
+    renderAt("/assistant", true);
+    await waitFor(() => {
+      expect(screen.getByTestId("session-empty-cta")).toBeTruthy();
+    });
+    // Click "New chat" from the empty state
+    await userEvent.click(screen.getByTestId("session-empty-cta"));
+    await waitFor(() => {
+      // The createNew mock was called
+      expect(
+        mockUseChatSessions.mock.results[0]?.value.createNew,
+      ).toHaveBeenCalled();
+    });
+  });
+
+  it("sidebar is visible in ready state", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant/s1", true);
+    await waitFor(() => {
+      expect(screen.getByTestId("session-sidebar")).toBeTruthy();
+    });
+    // The session item should be rendered
+    expect(screen.getByTestId("session-item-s1")).toBeTruthy();
+  });
+
+  it("session sidebar pin button calls togglePin", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    const pinFn = vi.fn();
+    mockUseChatSessions.mockReturnValue({
+      sessions: [{ ...defaultSession, pinned: 0 }],
+      isLoading: false,
+      refresh: vi.fn(),
+      createNew: vi.fn(),
+      remove: vi.fn(),
+      pin: pinFn,
+    });
+    renderAt("/assistant/s1", true);
+    await waitFor(() => {
+      expect(screen.getByTestId("session-pin-s1")).toBeTruthy();
+    });
+    await userEvent.click(screen.getByTestId("session-pin-s1"));
+    expect(pinFn).toHaveBeenCalledWith("s1", true);
   });
 });

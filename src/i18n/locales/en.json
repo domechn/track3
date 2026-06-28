@@ -508,5 +508,22 @@
   "settings.assistant.save": "Save",
   "settings.assistant.saved": "Assistant settings saved",
   "settings.assistant.invalidJson": "Advanced options must be valid JSON.",
-  "settings.assistant.notConfigured": "Assistant endpoint is not configured yet."
+  "settings.assistant.notConfigured": "Assistant endpoint is not configured yet.",
+  "ai.session.title": "Sessions",
+  "ai.session.newChat": "New chat",
+  "ai.session.empty": "No conversations yet. Start one to begin.",
+  "ai.session.pinned": "Pinned",
+  "ai.session.recent": "Recent",
+  "ai.session.untitled": "Untitled",
+  "ai.session.pin": "Pin",
+  "ai.session.unpin": "Unpin",
+  "ai.session.delete": "Delete",
+  "ai.session.confirmDeleteTitle": "Delete conversation?",
+  "ai.session.confirmDeleteBody": "This will permanently remove the conversation history.",
+  "ai.session.cancel": "Cancel",
+  "ai.session.loadError": "Could not load conversation.",
+  "ai.session.relative.justNow": "just now",
+  "ai.session.relative.minutesAgo": "{n}m ago",
+  "ai.session.relative.hoursAgo": "{n}h ago",
+  "ai.session.relative.daysAgo": "{n}d ago"
 }

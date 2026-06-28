@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -13,10 +13,13 @@ import {
   CheckIcon,
   ChevronRightIcon,
   GearIcon,
+  PlusIcon,
   RocketIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import { useChat } from "./use-chat";
+import { useChatSessions } from "./use-chat-sessions";
+import SessionSidebar from "./session-sidebar";
 import ChatThread from "./chat-thread";
 import ChatComposer from "./chat-composer";
 import QuickActions, {
@@ -36,8 +39,96 @@ type LoadState =
   | { status: "ready"; config: AIConfig; baseCurrency: CurrencyRateDetail }
   | { status: "error"; message: string };
 
+function EmptySession({ onCreateNew }: { onCreateNew: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+      <p className="text-center text-sm text-muted-foreground">
+        {t("ai.session.empty")}
+      </p>
+      <Button
+        onClick={onCreateNew}
+        className="gap-1.5"
+        data-testid="session-empty-cta"
+      >
+        <PlusIcon className="h-4 w-4" />
+        {t("ai.session.newChat")}
+      </Button>
+    </div>
+  );
+}
+
+function ChatCard({
+  config,
+  baseCurrency,
+  sessionId,
+}: {
+  config: AIConfig;
+  baseCurrency: CurrencyRateDetail;
+  sessionId: string;
+}) {
+  const chat = useChat({ config, baseCurrency, sessionId });
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <ChatHeader config={config} />
+      <ChatThread
+        messages={chat.messages}
+        isStreaming={chat.isStreaming}
+        onPickPrompt={(text) => void chat.send(text)}
+      />
+      {(chat.messages.length > 0 || chat.isStreaming) && (
+        <QuickActions
+          disabled={chat.isStreaming}
+          onRun={(key) => {
+            const k = key as keyof typeof QUICK_ACTION_KEYS;
+            void chat.runQuickAction(
+              k,
+              quickActionPrompt(QUICK_ACTION_KEYS[k]),
+            );
+          }}
+        />
+      )}
+      <ChatComposer
+        value={chat.input}
+        onChange={chat.setInput}
+        onSend={() => void chat.send()}
+        onStop={chat.stop}
+        isStreaming={chat.isStreaming}
+        disabled={false}
+      />
+    </div>
+  );
+}
+
 export default function ChatPage({ isProUser }: { isProUser: boolean }) {
+  const { sessionId: urlSessionId } = useParams();
+  const navigate = useNavigate();
+  const {
+    sessions,
+    isLoading: sessionsLoading,
+    createNew,
+    remove,
+    pin,
+  } = useChatSessions();
   const [state, setState] = useState<LoadState>({ status: "loading" });
+
+  // Redirect to the first session when sessions load and no URL sessionId.
+  useEffect(() => {
+    if (!sessionsLoading && !urlSessionId && sessions.length > 0) {
+      navigate(`/assistant/${sessions[0].id}`, { replace: true });
+    }
+  }, [sessionsLoading, urlSessionId, sessions, navigate]);
+
+  // If the URL sessionId doesn't exist in the list, redirect to /assistant.
+  useEffect(() => {
+    if (urlSessionId && !sessionsLoading && sessions.length > 0) {
+      const exists = sessions.some((s) => s.id === urlSessionId);
+      if (!exists) {
+        navigate("/assistant", { replace: true });
+      }
+    }
+  }, [urlSessionId, sessionsLoading, sessions, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +157,37 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
     };
   }, []);
 
+  const handleNew = useCallback(async () => {
+    const meta = await createNew();
+    navigate(`/assistant/${meta.id}`);
+  }, [createNew, navigate]);
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const wasActive = id === urlSessionId;
+      await remove(id);
+      if (wasActive) {
+        navigate("/assistant", { replace: true });
+      }
+    },
+    [remove, urlSessionId, navigate],
+  );
+
+  const handleSelect = useCallback(
+    (sid: string) => {
+      navigate(`/assistant/${sid}`);
+    },
+    [navigate],
+  );
+
+  const handlePin = useCallback(
+    async (id: string, pinned: boolean) => {
+      await pin(id, pinned);
+    },
+    [pin],
+  );
+
+  // Full-width Card for non-ready states.
   if (!isProUser) {
     return <UpgradeCard />;
   }
@@ -82,53 +204,38 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
     return <ErrorCard message={state.message} />;
   }
 
-  return (
-    <ReadyChat
+  // Ready state — two-column layout with sidebar.
+  const showEmpty = !urlSessionId && !sessionsLoading && sessions.length === 0;
+  const content = showEmpty ? (
+    <EmptySession onCreateNew={handleNew} />
+  ) : urlSessionId ? (
+    <ChatCard
       config={state.config}
       baseCurrency={state.baseCurrency}
+      sessionId={urlSessionId}
     />
+  ) : (
+    <LoadingCard />
   );
-}
-
-function ReadyChat({
-  config,
-  baseCurrency,
-}: {
-  config: AIConfig;
-  baseCurrency: CurrencyRateDetail;
-}) {
-  const { t } = useTranslation();
-  const chat = useChat({ config, baseCurrency });
 
   return (
-    <Card
+    <div
+      className="flex h-[calc(100vh-88px)] min-h-0 overflow-hidden rounded-lg border border-[var(--glass-border)] bg-card/60 backdrop-blur-sm"
       data-testid="chat-card"
-      className="flex h-[calc(100vh-88px)] min-h-0 flex-col overflow-hidden md:min-h-[560px]"
     >
-      <ChatHeader config={config} />
-      <ChatThread
-        messages={chat.messages}
-        isStreaming={chat.isStreaming}
-        onPickPrompt={(text) => void chat.send(text)}
+      <SessionSidebar
+        sessions={sessions}
+        activeId={urlSessionId ?? null}
+        isLoading={sessionsLoading}
+        onSelect={handleSelect}
+        onNew={handleNew}
+        onDelete={handleDelete}
+        onPin={handlePin}
       />
-      {chat.messages.length > 0 && (
-        <QuickActions
-          disabled={chat.isStreaming}
-          onRun={(key) => {
-            const k = key as keyof typeof QUICK_ACTION_KEYS;
-            void chat.runQuickAction(k, quickActionPrompt(QUICK_ACTION_KEYS[k]));
-          }}
-        />
-      )}
-      <ChatComposer
-        value={chat.input}
-        onChange={chat.setInput}
-        onSend={() => void chat.send()}
-        onStop={chat.stop}
-        isStreaming={chat.isStreaming}
-        disabled={false}
-      />
-    </Card>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {content}
+      </div>
+    </div>
   );
 }
 
@@ -345,7 +452,7 @@ function UpgradeCard() {
               >
                 <span
                   aria-hidden
-                  className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+                  className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
                 >
                   <CheckIcon className="h-2.5 w-2.5" />
                 </span>

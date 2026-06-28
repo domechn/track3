@@ -1,7 +1,7 @@
 {
   "name": "track3",
   "private": true,
-  "version": "0.7.1",
+  "version": "0.8.0",
   "type": "module",
   "packageManager": "yarn@4.9.2",
   "repository": {
@@ -21,6 +21,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.2",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource-variable/outfit": "^5.2.8",
     "@radix-ui/react-alert-dialog": "^1.1.7",

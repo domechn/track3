@@ -45,6 +45,8 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         fs::read_to_string(resource_dir.join("migrations/init/asset_prices_up.sql")).unwrap();
     let transactions =
         fs::read_to_string(resource_dir.join("migrations/init/transactions_up.sql")).unwrap();
+    let chat_sessions =
+        fs::read_to_string(resource_dir.join("migrations/init/chat_sessions_up.sql")).unwrap();
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async move {
@@ -55,6 +57,7 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         conn.execute(currency_rates_sync.as_str()).await.unwrap();
         conn.execute(asset_actions.as_str()).await.unwrap();
         conn.execute(transactions.as_str()).await.unwrap();
+        conn.execute(chat_sessions.as_str()).await.unwrap();
 
         // record current app version
         sqlx::query(
@@ -667,9 +670,49 @@ async fn column_exists(conn: &mut SqliteConnection, table_name: &str, column_nam
     count > 0
 }
 
+pub struct V7TV8 {
+    app_dir: String,
+    resource_dir: String,
+}
+
+impl Migration for V7TV8 {
+    fn new(app_dir: String, resource_dir: String) -> Self {
+        V7TV8 {
+            app_dir,
+            resource_dir,
+        }
+    }
+
+    fn need_to_run(&self, previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let res = compare_to(previous_version, "0.8.0", Cmp::Lt).unwrap();
+        println!("check if from v0.7 to v0.8 in rust, {:?}", res);
+        return Ok(res);
+    }
+
+    fn migrate(&self) {
+        let app_dir = Path::new(&self.app_dir);
+        let resource_dir = Path::new(&self.resource_dir);
+        println!("migrate from v0.7 to v0.8: chat sessions table");
+        let sqlite_path = get_sqlite_file_path(app_dir);
+        let chat_sessions_up = fs::read_to_string(
+            resource_dir.join("migrations/v07t08/chat_sessions_up.sql"),
+        )
+        .unwrap();
+
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move {
+            println!("migrate chat sessions table in tokio spawn");
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            conn.execute(chat_sessions_up.as_str()).await.unwrap();
+            conn.close().await.unwrap();
+            println!("migrate chat sessions table in tokio spawn done");
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{column_exists, get_sqlite_file_path, Migration, V6TV7, ASSETS_V2_TABLE_NAME, TRANSACTION_TABLE_NAME};
+    use super::{column_exists, get_sqlite_file_path, Migration, V6TV7, V7TV8, ASSETS_V2_TABLE_NAME, TRANSACTION_TABLE_NAME};
     use sqlx::{Connection, Executor, Row, SqliteConnection};
     use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
     use tokio::runtime::Runtime;
@@ -748,6 +791,60 @@ mod tests {
                 .map(|row| row.get::<String, _>(1))
                 .collect::<Vec<_>>();
             assert!(names.iter().any(|name| name == "unique_uuid_asset_type_symbol_wallet"));
+            conn.close().await.unwrap();
+        });
+
+        fs::remove_dir_all(app_dir).unwrap();
+        fs::remove_dir_all(resource_dir).unwrap();
+    }
+
+    #[test]
+    fn v7t8_creates_chat_sessions_table_and_index() {
+        let app_dir = make_temp_dir("v7t8-app");
+        let resource_dir = make_temp_dir("v7t8-resources");
+        let v07t08 = resource_dir.join("migrations/v07t08");
+        fs::create_dir_all(&v07t08).unwrap();
+        fs::write(
+            v07t08.join("chat_sessions_up.sql"),
+            "CREATE TABLE IF NOT EXISTS chat_sessions (\n  id TEXT NOT NULL PRIMARY KEY,\n  title TEXT NOT NULL DEFAULT '',\n  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  pinned INTEGER NOT NULL DEFAULT 0,\n  messageCount INTEGER NOT NULL DEFAULT 0,\n  preview TEXT NOT NULL DEFAULT ''\n);\nCREATE INDEX IF NOT EXISTS chat_sessions_pinned_updated_idx\n  ON chat_sessions (pinned DESC, updatedAt DESC);",
+        )
+        .unwrap();
+
+        let sqlite_path = get_sqlite_file_path(app_dir.as_path());
+        fs::File::create(&sqlite_path).unwrap();
+
+        let migration = V7TV8::new(
+            app_dir.to_string_lossy().to_string(),
+            resource_dir.to_string_lossy().to_string(),
+        );
+
+        migration.migrate();
+
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            let table_count: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='chat_sessions'",
+            )
+            .fetch_one(&mut conn)
+            .await
+            .unwrap();
+            assert_eq!(table_count, 1, "chat_sessions table should exist");
+
+            let indexes = sqlx::query("PRAGMA index_list('chat_sessions')")
+                .fetch_all(&mut conn)
+                .await
+                .unwrap();
+            let names = indexes
+                .into_iter()
+                .map(|row| row.get::<String, _>(1))
+                .collect::<Vec<_>>();
+            assert!(
+                names.iter().any(|n| n == "chat_sessions_pinned_updated_idx"),
+                "chat_sessions_pinned_updated_idx should exist, got {:?}",
+                names
+            );
+
             conn.close().await.unwrap();
         });
 

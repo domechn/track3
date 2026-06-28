@@ -394,6 +394,14 @@ function AppRoutes({
           }
         />
         <Route
+          path="assistant/:sessionId"
+          element={
+            <AnimatedPage>
+              <ChatPage isProUser={isProUser} />
+            </AnimatedPage>
+          }
+        />
+        <Route
           path="settings"
           element={
             <AnimatedPage>

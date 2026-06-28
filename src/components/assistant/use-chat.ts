@@ -1,13 +1,21 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AIConfig, ChartSpec } from "@/middlelayers/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import {
+  appendMessages,
+  buildSessionPreview,
   buildSystemPrompt,
+  generateTitle,
+  loadSession,
   probeConnection,
+  renameSession,
+  rewriteMessages,
   runSkill,
   streamChatCompletion,
   toOpenAITools,
+  touchSession,
 } from "@/middlelayers/ai";
+import type { PersistedChatMessage } from "@/middlelayers/ai";
 import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
 
 export type AssistantBlock =
@@ -18,10 +26,47 @@ export type ChatMessage =
   | { role: "user"; content: string }
   | { role: "assistant"; blocks: AssistantBlock[] };
 
+export function toPersisted(messages: ChatMessage[]): PersistedChatMessage[] {
+  return messages.map((m) => {
+    if (m.role === "user") {
+      return { role: "user" as const, content: m.content };
+    }
+    return {
+      role: "assistant" as const,
+      blocks: m.blocks.map((b) => {
+        if (b.kind === "text") {
+          return { kind: "text" as const, text: b.text };
+        }
+        return { kind: "chart" as const, chart: b.chart };
+      }),
+    };
+  });
+}
+
+export function fromPersisted(
+  messages: PersistedChatMessage[],
+): ChatMessage[] {
+  return messages.map((m) => {
+    if (m.role === "user") {
+      return { role: "user" as const, content: m.content };
+    }
+    const blocks: AssistantBlock[] = [];
+    for (const b of m.blocks) {
+      if (b.kind === "text") {
+        blocks.push({ kind: "text" as const, text: b.text });
+      } else if (b.kind === "chart") {
+        blocks.push({ kind: "chart" as const, chart: b.chart as ChartSpec });
+      }
+    }
+    return { role: "assistant" as const, blocks };
+  });
+}
+
 export type UseChatOptions = {
   config: AIConfig;
   baseCurrency: CurrencyRateDetail;
   contextSize?: number;
+  sessionId: string | null;
 };
 
 export type UseChatResult = {
@@ -29,6 +74,8 @@ export type UseChatResult = {
   input: string;
   setInput: (next: string) => void;
   isStreaming: boolean;
+  isHydrating: boolean;
+  title: string;
   send: (text?: string) => Promise<void>;
   stop: () => void;
   runQuickAction: (key: string, prompt: string) => Promise<void>;
@@ -36,10 +83,6 @@ export type UseChatResult = {
   clear: () => void;
 };
 
-// Convert a chat history into the flat provider message list. Assistant
-// text is joined; chart blocks become a short textual note so the model
-// at least sees that a chart was rendered (no charts are re-sent to the
-// model itself).
 function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
   const out: ProviderMessage[] = [];
   for (const m of messages) {
@@ -65,17 +108,111 @@ function trimMessages(messages: ProviderMessage[], maxCount: number): ProviderMe
   if (maxCount <= 0 || messages.length <= maxCount) {
     return messages;
   }
-  // Always keep the most recent N messages and drop older turns. The
-  // system prompt is prepended by the caller so we only trim turns.
   return messages.slice(messages.length - maxCount);
 }
 
 export function useChat(options: UseChatOptions): UseChatResult {
-  const { config, baseCurrency, contextSize = 8192 } = options;
+  const { config, baseCurrency, contextSize = 8192, sessionId } = options;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [title, setTitle] = useState<string>("");
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleTriedRef = useRef(false);
+  const configRef = useRef(config);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
+  const cancelPersistTimer = useCallback(() => {
+    if (persistTimerRef.current) {
+      clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+  }, []);
+
+  const flushPersist = useCallback(
+    (override?: ChatMessage[]) => {
+      if (!sessionId) return;
+      const snapshot = override ?? messagesRef.current;
+      const sid = sessionId;
+      void rewriteMessages(sid, toPersisted(snapshot)).catch(() => {});
+      void touchSession(sid, {
+        messageCount: snapshot.length,
+        preview: buildSessionPreview(toPersisted(snapshot)),
+      }).catch(() => {});
+    },
+    [sessionId],
+  );
+
+  const schedulePersist = useCallback(() => {
+    if (!sessionId) return;
+    cancelPersistTimer();
+    persistTimerRef.current = setTimeout(() => {
+      persistTimerRef.current = null;
+      flushPersist();
+    }, 300);
+  }, [cancelPersistTimer, flushPersist, sessionId]);
+
+  // Hydrate from disk whenever the sessionId changes.
+  useEffect(() => {
+    let cancelled = false;
+    if (!sessionId) {
+      setMessages([]);
+      setTitle("");
+      titleTriedRef.current = false;
+      setIsHydrating(false);
+      return;
+    }
+    setIsHydrating(true);
+    const targetId = sessionId;
+    (async () => {
+      try {
+        const session = await loadSession(targetId);
+        if (cancelled) return;
+        if (session) {
+          setMessages(fromPersisted(session.messages));
+          setTitle(session.title ?? "");
+          titleTriedRef.current = (session.title ?? "").length > 0;
+        } else {
+          // Only clear messages if the user has not already started
+          // typing into this session while loadSession was in flight.
+          // Without this guard the hydration result would clobber any
+          // optimistic state set by send().
+          setMessages((prev) => (prev.length === 0 ? [] : prev));
+          setTitle((prev) => prev);
+          titleTriedRef.current = titleTriedRef.current;
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error("failed to load chat session", err);
+      } finally {
+        if (!cancelled) {
+          setIsHydrating(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  // Flush any pending writes when the hook unmounts or the session
+  // changes. Cancels any pending timer so we don't double-write.
+  useEffect(() => {
+    return () => {
+      cancelPersistTimer();
+      flushPersist();
+    };
+  }, [cancelPersistTimer, flushPersist, sessionId]);
 
   const systemPrompt = useMemo(
     () => buildSystemPrompt(baseCurrency),
@@ -86,23 +223,22 @@ export function useChat(options: UseChatOptions): UseChatResult {
     abortRef.current?.abort();
     abortRef.current = null;
     setIsStreaming(false);
-  }, []);
+    flushPersist();
+  }, [flushPersist]);
 
   const clear = useCallback(() => {
     stop();
     setMessages([]);
     setInput("");
+    titleTriedRef.current = false;
   }, [stop]);
 
-  // Consume the provider stream and append events to the trailing
-  // assistant message. Any `tool_call` is dispatched against the skill
-  // registry and the resulting chart is appended as a block.
   const consumeStream = useCallback(
     async (
       events: AsyncGenerator<StreamEvent>,
       assistantIndex: number,
+      onAppend?: (snapshot: ChatMessage[]) => void,
     ) => {
-      let bufferText = "";
       const dispatchToolCall = async (ev: {
         kind: "tool_call";
         id: string;
@@ -117,6 +253,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         if (skillResult.ok) {
           const chart = skillResult.result.chart;
           if (chart) {
+            let updated: ChatMessage[] = [];
             setMessages((prev) => {
               const next = prev.slice();
               const target = { ...next[assistantIndex] };
@@ -129,19 +266,29 @@ export function useChat(options: UseChatOptions): UseChatResult {
                   ],
                 };
               }
+              updated = next;
               return next;
             });
+            messagesRef.current = updated;
           }
+        }
+      };
+
+      let lastIncrementalWrite = Date.now();
+      const maybeIncrementalWrite = (latest: ChatMessage[]) => {
+        const now = Date.now();
+        if (now - lastIncrementalWrite < 300) return;
+        lastIncrementalWrite = now;
+        if (onAppend) {
+          onAppend(latest);
         }
       };
 
       for await (const ev of events) {
         if (ev.kind === "text") {
-          bufferText += ev.delta;
-          setMessages((prev) => {
-            const next = prev.slice();
-            const target = { ...next[assistantIndex] };
-            if (target.role !== "assistant") return prev;
+          const prev = messagesRef.current;
+          const target = prev[assistantIndex];
+          if (target && target.role === "assistant") {
             const blocks = target.blocks.slice();
             const last = blocks[blocks.length - 1];
             if (last && last.kind === "text") {
@@ -152,26 +299,29 @@ export function useChat(options: UseChatOptions): UseChatResult {
             } else {
               blocks.push({ kind: "text", text: ev.delta });
             }
+            const next = prev.slice();
             next[assistantIndex] = { ...target, blocks };
-            return next;
-          });
+            messagesRef.current = next;
+            setMessages(next);
+          }
+          maybeIncrementalWrite(messagesRef.current);
         } else if (ev.kind === "tool_call") {
           await dispatchToolCall(ev);
         } else if (ev.kind === "error") {
-          setMessages((prev) => {
-            const next = prev.slice();
-            const target = { ...next[assistantIndex] };
-            if (target.role !== "assistant") return prev;
+          const prev = messagesRef.current;
+          const target = prev[assistantIndex];
+          if (target && target.role === "assistant") {
             const blocks = target.blocks.slice();
             blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
+            const next = prev.slice();
             next[assistantIndex] = { ...target, blocks };
-            return next;
-          });
+            messagesRef.current = next;
+            setMessages(next);
+          }
         } else if (ev.kind === "done") {
           break;
         }
       }
-      void bufferText;
     },
     [baseCurrency],
   );
@@ -179,21 +329,27 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const send = useCallback(
     async (text?: string) => {
       const content = (text ?? input).trim();
-      if (!content || isStreaming) return;
+      if (!content || isStreaming || !sessionId) return;
       setInput("");
       const userMessage: ChatMessage = { role: "user", content };
       const assistantMessage: ChatMessage = {
         role: "assistant",
         blocks: [],
       };
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      const baseMessages = messagesRef.current;
+      const workingMessages: ChatMessage[] = [
+        ...baseMessages,
+        userMessage,
+        assistantMessage,
+      ];
+      messagesRef.current = workingMessages;
+      setMessages(workingMessages);
       setIsStreaming(true);
 
       const controller = new AbortController();
       abortRef.current = controller;
-      const assistantIndex = -1; // placeholder; we re-resolve after the state update below
       try {
-        const history = flattenForProvider([...messages, userMessage]);
+        const history = flattenForProvider(workingMessages);
         const trimmed = trimMessages(history, Math.max(2, Math.floor(contextSize / 256)));
         const providerMessages: ProviderMessage[] = [
           { role: "system", content: systemPrompt },
@@ -208,22 +364,69 @@ export function useChat(options: UseChatOptions): UseChatResult {
           advanced: config.advanced,
           signal: controller.signal,
         });
-        // Resolve the assistant message index after the state update
-        // has applied; messages.length is captured at send time.
-        const idx = messages.length + 1; // user then assistant
-        await consumeStream(events, idx);
+        const assistantIndex = workingMessages.length - 1;
+        const sid = sessionId;
+        await consumeStream(events, assistantIndex, (snapshot) => {
+          messagesRef.current = snapshot;
+          void appendMessages(sid, toPersisted(snapshot)).catch(() => {});
+        });
       } finally {
+        const finalMessages = messagesRef.current;
         setIsStreaming(false);
         abortRef.current = null;
+        flushPersist(finalMessages);
+
+        const tried = titleTriedRef.current;
+        const currentTitle = title;
+        if (
+          !tried &&
+          currentTitle.length === 0 &&
+          finalMessages.length >= 2 &&
+          finalMessages[0]?.role === "user" &&
+          finalMessages[1]?.role === "assistant"
+        ) {
+          const firstUser = finalMessages[0].content;
+          const assistantBlocks = finalMessages[1].blocks;
+          const firstAssistant = assistantBlocks
+            .map((b) => (b.kind === "text" ? b.text : ""))
+            .join("")
+            .trim();
+          if (firstUser && firstAssistant) {
+            titleTriedRef.current = true;
+            const sid = sessionId;
+            (async () => {
+              try {
+                const generated = await generateTitle(
+                  configRef.current,
+                  firstUser,
+                  firstAssistant,
+                );
+                if (!generated) return;
+                await renameSession(sid, generated);
+                setTitle(generated);
+              } catch (err) {
+                console.error("failed to generate chat title", err);
+              }
+            })();
+          }
+        }
       }
-      void assistantIndex;
     },
-    [input, isStreaming, messages, config, systemPrompt, contextSize, consumeStream],
+    [
+      input,
+      isStreaming,
+      sessionId,
+      contextSize,
+      config,
+      systemPrompt,
+      consumeStream,
+      flushPersist,
+      title,
+    ],
   );
 
   const runQuickAction = useCallback(
     async (key: string, prompt: string) => {
-      // key is reserved for future per-action telemetry; ignored for now
       void key;
       await send(prompt);
     },
@@ -240,11 +443,25 @@ export function useChat(options: UseChatOptions): UseChatResult {
     });
   }, [config]);
 
+  // Schedule a throttled persistence write whenever the message list
+  // changes. The throttling keeps disk IO light while streaming.
+  useEffect(() => {
+    if (!sessionId) return;
+    if (isStreaming) {
+      // While streaming, the incremental save runs from consumeStream;
+      // skip the throttled write to avoid a stampede.
+      return;
+    }
+    schedulePersist();
+  }, [messages, isStreaming, schedulePersist, sessionId]);
+
   return {
     messages,
     input,
     setInput,
     isStreaming,
+    isHydrating,
+    title,
     send,
     stop,
     runQuickAction,

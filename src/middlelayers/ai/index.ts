@@ -19,6 +19,27 @@ export {
 
 export { buildSystemPrompt } from "./prompt";
 
+export {
+  appendMessages,
+  buildSessionPreview,
+  createSession,
+  deleteSession,
+  generateTitle,
+  listSessions,
+  loadSession,
+  renameSession,
+  rewriteMessages,
+  togglePin,
+  touchSession,
+} from "./sessions";
+
+export type {
+  ChatSession,
+  ChatSessionMeta,
+  PersistedBlock,
+  PersistedChatMessage,
+} from "./sessions";
+
 export type {
   StreamEvent,
   StreamRequest,

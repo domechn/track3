@@ -508,5 +508,22 @@
   "settings.assistant.save": "保存",
   "settings.assistant.saved": "助手设置已保存",
   "settings.assistant.invalidJson": "高级选项必须是合法的 JSON。",
-  "settings.assistant.notConfigured": "尚未配置助手端点。"
+  "settings.assistant.notConfigured": "尚未配置助手端点。",
+  "ai.session.title": "会话",
+  "ai.session.newChat": "新建对话",
+  "ai.session.empty": "暂无对话，新建一条开始吧",
+  "ai.session.pinned": "已置顶",
+  "ai.session.recent": "最近",
+  "ai.session.untitled": "未命名",
+  "ai.session.pin": "置顶",
+  "ai.session.unpin": "取消置顶",
+  "ai.session.delete": "删除",
+  "ai.session.confirmDeleteTitle": "删除对话？",
+  "ai.session.confirmDeleteBody": "将永久删除该对话的所有记录",
+  "ai.session.cancel": "取消",
+  "ai.session.loadError": "无法加载对话",
+  "ai.session.relative.justNow": "刚刚",
+  "ai.session.relative.minutesAgo": "{n} 分钟前",
+  "ai.session.relative.hoursAgo": "{n} 小时前",
+  "ai.session.relative.daysAgo": "{n} 天前"
 }
