@@ -332,12 +332,17 @@ const App = ({
       const headCount = MAX_TILES - 1;
       const head = sortedWallets.slice(0, headCount);
       const rest = sortedWallets.slice(headCount);
+      // Nothing left to fold into the aggregated "More" tile — skip it.
+      if (rest.length === 0) return head;
       const totalVal = sortedWallets.reduce((s, w) => s + w.value, 0);
       const restValue = rest.reduce((sum, w) => sum + w.value, 0);
       const restPercentage = rest.reduce((sum, w) => sum + w.percentage, 0);
       const restAmount = rest.reduce((sum, w) => sum + w.amount, 0);
       // inflate to minimum 1 % of total so the tile stays visible
       const minVisual = totalVal * 0.01;
+      // When the aggregated percentage rounds to 0.00% the tile would be
+      // a useless sliver — skip it so the treemap stays clean.
+      if (restPercentage < 0.005) return head;
       return [
         ...head,
         {
@@ -353,7 +358,7 @@ const App = ({
     }
 
     // No tail to aggregate — every wallet ≥1%
-    if (below.length === 0) return above;
+    if (below.length === 0) return above; // already ensures "More" tile is omitted when count is 0
 
     // Show all ≥1% tiles individually + one "Others" tile for the tail.
     // Inflate the aggregated tile to at least 1 % of total value so it stays
@@ -363,6 +368,11 @@ const App = ({
     const restPercentage = below.reduce((sum, w) => sum + w.percentage, 0);
     const restAmount = below.reduce((sum, w) => sum + w.amount, 0);
     const minVisual = totalVal * 0.01;
+    // When the aggregated percentage rounds to 0.00% the tile would be
+    // a useless sliver — skip it so the treemap stays clean.
+    if (restPercentage < 0.005) return above;
+    // below.length is guaranteed > 0 by the early return above, so the
+    // aggregated "More" tile always has a positive count here.
     return [
       ...above,
       {

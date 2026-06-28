@@ -266,6 +266,54 @@ describe("WalletAssetsPercentage treemap", () => {
     });
   });
 
+  it("does not render the More tile when every wallet is ≥1%", async () => {
+    // Every wallet is ≥1%, so the <1% tail is empty and the aggregated
+    // "More" tile (count = 0) should be omitted.
+    mocks.queryWalletAssetsPercentage.mockResolvedValue([
+      makeWallet("binance", 45, "Binance"),
+      makeWallet("okx", 25, "Okex"),
+      makeWallet("ibkr", 20, "IBKR"),
+      makeWallet("phantom", 10, "SOL"),
+    ]);
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("wallet-treemap-tile")).toHaveLength(4);
+    });
+
+    const aggregatedTile = screen
+      .getAllByTestId("wallet-treemap-tile")
+      .find((t) => t.getAttribute("data-tile-key") === "__others_aggregated__");
+    expect(aggregatedTile).toBeUndefined();
+  });
+
+  it("does not render the More tile when its aggregated percentage rounds to 0.00%", async () => {
+    // 2 wallets cover 100% of value; the remaining 7 wallets each hold 0%,
+    // so the aggregated "More" tile would show "+7" at 0.00% and should be
+    // dropped from the treemap.
+    mocks.queryWalletAssetsPercentage.mockResolvedValue([
+      makeWallet("binance", 95, "Binance"),
+      makeWallet("okx", 5, "Okex"),
+      makeWallet("w1", 0, "ERC20"),
+      makeWallet("w2", 0, "ERC20"),
+      makeWallet("w3", 0, "ERC20"),
+      makeWallet("w4", 0, "ERC20"),
+      makeWallet("w5", 0, "ERC20"),
+      makeWallet("w6", 0, "ERC20"),
+      makeWallet("w7", 0, "ERC20"),
+    ]);
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("wallet-treemap-tile")).toHaveLength(2);
+    });
+
+    const aggregatedTile = screen
+      .getAllByTestId("wallet-treemap-tile")
+      .find((t) => t.getAttribute("data-tile-key") === "__others_aggregated__");
+    expect(aggregatedTile).toBeUndefined();
+  });
+
   it("reports the stat row with total value, top share, and top-3 share", async () => {
     mocks.queryWalletAssetsPercentage.mockResolvedValue(MIXED_15);
     renderComponent();
