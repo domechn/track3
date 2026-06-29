@@ -80,7 +80,7 @@ describe("market_price skill", () => {
     expect(invoke).toHaveBeenCalledWith("query_coins_prices", {
       symbols: ["BTC", "MSFT"],
     });
-    expect(fetchStockPrices).toHaveBeenCalledWith(["AAPL"]);
+    expect(fetchStockPrices).toHaveBeenCalledWith(["AAPL", "MSFT"]);
     const data = result.data as any;
     expect(data.prices.BTC.type).toBe("crypto");
     expect(data.prices.AAPL.type).toBe("stock");
@@ -100,7 +100,6 @@ describe("market_price skill", () => {
     expect(data.prices.BTC.priceUsd).toBe(1000);
     expect(data.prices.BTC.price).toBe(500);
   });
-});
   it("deduplicates symbols and normalizes them to uppercase", async () => {
     vi.mocked(invoke).mockResolvedValue({ BTC: 60000 });
     const result = await skill.run(
@@ -146,3 +145,4 @@ describe("market_price skill", () => {
     expect(data.prices.AAPL.price).toBe(184);
   });
 
+});

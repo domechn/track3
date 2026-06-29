@@ -1,45 +1,23 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
-import { getVersion } from "@/utils/app";
+import { getCurrentContext } from "./functions/context";
 
 const skill: Skill = {
   name: "current_context",
   description:
-    "Return the current date, time, timezone, and app version. " +
-    "Use this to understand when 'now' is, or to answer questions " +
-    "about today's date, the current time, or the system timezone. " +
-    "Call this whenever you need temporal context that is not " +
-    "already provided in the system prompt.",
+    "Return the current date, time, and timezone. Use this to understand " +
+    "when 'now' is, to answer questions about today's date, or when computing " +
+    "date ranges. Call this whenever you need temporal context not already " +
+    "in the system prompt.",
   parameters: {
     type: "object",
     properties: {},
   },
   async run(_args, _ctx): Promise<ToolResult> {
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat(undefined, {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const timeFormatter = new Intl.DateTimeFormat(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
+    const ctx = getCurrentContext();
     return {
-      data: {
-        iso: now.toISOString(),
-        date: formatter.format(now),
-        time: timeFormatter.format(now),
-        timezone: tz,
-        unixTimestampMs: now.getTime(),
-        appVersion: await getVersion(),
-      },
-      text: `Current time: ${formatter.format(now)}, ${timeFormatter.format(now)} (${tz}).`,
+      data: ctx,
+      text: `Current time: ${ctx.date}, ${ctx.time} (${ctx.timezone}).`,
     };
   },
 };

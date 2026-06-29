@@ -38,12 +38,11 @@ describe("asset_history skill", () => {
 
     const result = await skill.run({ symbol: "btc" }, { baseCurrency });
     const data = result.data as any;
-    expect(data.series).toHaveLength(3);
+    expect(data.points).toHaveLength(3);
     expect(data.pnl.absoluteUsd).toBe(200);
     expect(data.pnl.percentage).toBe(20);
     expect(data.firstAmount).toBe(1);
     expect(data.lastAmount).toBe(1);
-    expect(result.chart?.type).toBe("line");
   });
 
   it("converts values into the base currency", async () => {
@@ -59,9 +58,8 @@ describe("asset_history skill", () => {
       { baseCurrency: { ...baseCurrency, currency: "EUR", rate: 0.5 } },
     );
     const data = result.data as any;
-    expect(data.series[1].value).toBe(100);
+    expect(data.points[1].value).toBe(100);
   });
-});
   it("filters by assetType stock", async () => {
     const groups = [
       [
@@ -74,8 +72,8 @@ describe("asset_history skill", () => {
     const result = await skill.run({ symbol: "AAPL", assetType: "stock" }, { baseCurrency });
     const data = result.data as any;
     expect(data.assetType).toBe("stock");
-    expect(data.series).toHaveLength(2);
-    expect(data.series[0].valueUsd).toBe(1500);
+    expect(data.points).toHaveLength(2);
+    expect(data.points[0].valueUsd).toBe(1500);
     expect(data.pnl.percentage).toBeCloseTo(6.67, 1);
   });
 
@@ -112,8 +110,9 @@ describe("asset_history skill", () => {
 
     const result = await skill.run({ symbol: "BTC" }, { baseCurrency });
     const data = result.data as any;
-    expect(data.series[0].valueUsd).toBe(1000);
-    expect(data.series[1].valueUsd).toBe(1100);
-    expect(data.series[2].valueUsd).toBe(1300);
+    expect(data.points[0].valueUsd).toBe(1000);
+    expect(data.points[1].valueUsd).toBe(1100);
+    expect(data.points[2].valueUsd).toBe(1300);
   });
 
+});

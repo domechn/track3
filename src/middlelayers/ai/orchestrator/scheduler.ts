@@ -9,6 +9,7 @@
 
 import { runSkill } from "../tools";
 import type { SkillContext } from "../skills/types";
+import { trace, traceError } from "../skills/functions/trace";
 import type {
   AnalysisPlan,
   OrchestratorEvent,
@@ -82,13 +83,12 @@ export async function* executePlan(
             description: task.description,
             result,
           };
-          if (result.text || result.chart) {
+          if (result.text) {
             yield {
               kind: "agent_result",
               taskId: task.id,
               skillName: task.skillName,
               text: result.text ?? "",
-              chart: result.chart,
             };
           }
         } else {
@@ -129,6 +129,7 @@ async function executeSingleTask(
   ctx: SkillContext,
   signal?: AbortSignal,
 ): Promise<SubTaskResult> {
+  trace("SCHEDULER: executeSingleTask", task.id, task.skillName, "depth:", task.dependsOn.length ? "depends-on:" + task.dependsOn.join(",") : "independent", "args:", JSON.stringify(task.args).slice(0, 200));
   try {
     const skillResult = await runSkill(
       task.skillName,
@@ -137,6 +138,7 @@ async function executeSingleTask(
     );
 
     if (!skillResult.ok) {
+      traceError("SCHEDULER: executeSingleTask failed", task.id + " " + task.skillName + " error: " + skillResult.error);
       return {
         id: task.id,
         skillName: task.skillName,
@@ -146,6 +148,7 @@ async function executeSingleTask(
       };
     }
 
+    trace("SCHEDULER: executeSingleTask ok", task.id, task.skillName, "text:", skillResult.result.text?.slice(0, 100));
     return {
       id: task.id,
       skillName: task.skillName,
@@ -153,9 +156,9 @@ async function executeSingleTask(
       description: task.description,
       data: skillResult.result.data,
       text: skillResult.result.text,
-      chart: skillResult.result.chart,
     };
   } catch (err: any) {
+    traceError("SCHEDULER: executeSingleTask threw", task.id + " " + task.skillName + " " + String(err));
     return {
       id: task.id,
       skillName: task.skillName,

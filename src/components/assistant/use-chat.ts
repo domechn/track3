@@ -1,6 +1,6 @@
 import {
   useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AIConfig, ChartSpec } from "@/middlelayers/types";
+import type { AIConfig } from "@/middlelayers/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import {
   orchestrateQuery,
@@ -30,10 +30,9 @@ export type AgentActivityBlock = {
 };
 
 export type AssistantBlock =
-  | { kind: "text"; text: string }
-  | { kind: "think"; text: string }
-  | { kind: "chart"; chart: ChartSpec }
-  | AgentActivityBlock;
+ | { kind: "text"; text: string }
+ | { kind: "think"; text: string }
+ | AgentActivityBlock;
 
 export type ChatMessage =
   | { role: "user"; content: string }
@@ -77,13 +76,12 @@ function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
       out.push({ role: "user", content: m.content });
       continue;
     }
-    const text = m.blocks
-      .map((b) => {
-        if (b.kind === "text") return b.text;
-        if (b.kind === "think") return "";
-        if (b.kind === "agent_activity") return "";
-        return `[rendered chart: ${b.chart.type}]`;
-      })
+   const text = m.blocks
+     .map((b) => {
+       if (b.kind === "text") return b.text;
+       if (b.kind === "think") return "";
+       if (b.kind === "agent_activity") return "";
+     })
       .join("")
       .trim();
     if (text) {
@@ -169,7 +167,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
 
   // Consume the provider stream and append events to the trailing
   // assistant message. Any `tool_call` is dispatched against the skill
-  // registry and the resulting chart is appended as a block.
+  // registry.
   const consumeStream = useCallback(
     async (
       events: AsyncGenerator<StreamEvent>,
@@ -215,26 +213,10 @@ export function useChat(options: UseChatOptions): UseChatResult {
           (ev.args as Record<string, unknown>) ?? {},
           { baseCurrency },
         );
-        let result: ToolResult | null = null;
-        if (skillResult.ok) {
-          result = skillResult.result;
-          const chart = result.chart;
-          if (chart) {
-            const next = messagesRef.current.slice();
-              const target = { ...next[assistantIndex] };
-              if (target.role === "assistant") {
-                next[assistantIndex] = {
-                  ...target,
-                  blocks: [
-                    ...target.blocks,
-                    { kind: "chart", chart },
-                  ],
-                };
-              }
-              messagesRef.current = next;
-              setMessages(next);
-          }
-        }
+       let result: ToolResult | null = null;
+       if (skillResult.ok) {
+         result = skillResult.result;
+       }
         return { id: ev.id, name: ev.name, args: ev.args, result };
       };
 
@@ -378,15 +360,12 @@ export function useChat(options: UseChatOptions): UseChatResult {
             upsertAgentActivityBlock(blocks, agentActivityMap);
             break;
           }
-          case "agent_result": {
-            if (ev.text) {
-              blocks.push({ kind: "text", text: `[${ev.skillName}] ${ev.text}` });
-            }
-            if (ev.chart) {
-              blocks.push({ kind: "chart", chart: ev.chart });
-            }
-            break;
-          }
+         case "agent_result": {
+           if (ev.text) {
+             blocks.push({ kind: "text", text: `[${ev.skillName}] ${ev.text}` });
+           }
+           break;
+         }
           case "synthesizing": {
             blocks.push({ kind: "think", text: "Synthesising results\u2026" });
             break;
@@ -406,23 +385,19 @@ export function useChat(options: UseChatOptions): UseChatResult {
             }
             break;
           }
-          case "text": {
-            const last = blocks[blocks.length - 1];
-            if (last?.kind === "text") {
-              blocks[blocks.length - 1] = {
-                kind: "text",
-                text: last.text + ev.delta,
-              };
-            } else {
-              blocks.push({ kind: "text", text: ev.delta });
-            }
-            break;
-          }
-          case "chart": {
-            blocks.push({ kind: "chart", chart: ev.chart });
-            break;
-          }
-          case "error": {
+         case "text": {
+           const last = blocks[blocks.length - 1];
+           if (last?.kind === "text") {
+             blocks[blocks.length - 1] = {
+               kind: "text",
+               text: last.text + ev.delta,
+             };
+           } else {
+             blocks.push({ kind: "text", text: ev.delta });
+           }
+           break;
+         }
+         case "error": {
             blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
             break;
           }
@@ -539,7 +514,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
             role: "tool",
             tool_call_id: tc.id,
             content: tc.result
-              ? (tc.result.text ?? JSON.stringify(tc.result.data))
+              ? (tc.result.text && tc.result.data
+                  ? tc.result.text + "\n\n\`\`\`json\n" + JSON.stringify(tc.result.data, null, 2).slice(0, 10000) + "\n\`\`\`"
+                  : (tc.result.text ?? JSON.stringify(tc.result.data)))
               : "Tool execution failed.",
           }));
 

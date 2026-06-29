@@ -8,12 +8,7 @@ import {
 } from "../tools";
 import skill from "./current-context";
 
-vi.mock("@/utils/app", () => ({
-  getVersion: vi.fn(),
-}));
 
-import { getVersion } from "@/utils/app";
-const mockedGetVersion = vi.mocked(getVersion);
 
 const baseCurrency = {
   currency: "USD",
@@ -24,7 +19,6 @@ const baseCurrency = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedGetVersion.mockResolvedValue("0.7.1");
   clearSkillRegistry();
   registerSkill(skill);
 });
@@ -50,9 +44,6 @@ describe("current_context skill", () => {
     expect(data.time).toBeTypeOf("string");
     expect(data.timezone).toBeTypeOf("string");
     expect(data.unixTimestampMs).toBeTypeOf("number");
-    expect(data.appVersion).toBe("0.7.1");
-    expect(mockedGetVersion).toHaveBeenCalledOnce();
-
     // Verify the timestamp is roughly now
     expect(data.unixTimestampMs as number).toBeGreaterThanOrEqual(before);
     expect(data.unixTimestampMs as number).toBeLessThanOrEqual(after);

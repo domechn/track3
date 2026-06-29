@@ -103,7 +103,7 @@ describe("useChat", () => {
     expect(assistant.blocks[0]?.text).toBe("Hello world");
   });
 
-  it("appends a chart block when a tool_call dispatches to a skill that returns a chart", async () => {
+  it("still runs the skill but does not append a chart block when a tool_call dispatches to a skill that returns a chart", async () => {
     let callCount = 0;
     vi.mocked(streamChatCompletion).mockImplementation(async function* () {
       callCount++;
@@ -123,11 +123,6 @@ describe("useChat", () => {
       ok: true,
       result: {
         data: { total: 1000 },
-        chart: {
-          type: "doughnut",
-          labels: ["BTC"],
-          datasets: [{ data: [1000] }],
-        },
       },
     });
 
@@ -140,11 +135,9 @@ describe("useChat", () => {
 
     const assistant = result.current.messages[1] as {
       role: "assistant";
-      blocks: { kind: string; chart?: { type: string } }[];
+      blocks: { kind: string }[];
     };
-    expect(assistant.blocks).toHaveLength(1);
-    expect(assistant.blocks[0]?.kind).toBe("chart");
-    expect(assistant.blocks[0]?.chart?.type).toBe("doughnut");
+    expect(assistant.blocks).toHaveLength(0);
   });
 
   it("emits an error block when the stream reports an error", async () => {

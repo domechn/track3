@@ -10,7 +10,6 @@
 // it lets the assistant refine its own answer before presenting it.
 
 import { callLlm } from "./llm";
-import type { ChartSpec } from "@/middlelayers/types";
 import type { AnalysisPlan, LlmCallParams, SubTaskResult } from "./types";
 
 // ── Prompt template ──

@@ -1,4 +1,4 @@
-import type { ChartSpec, CurrencyRateDetail } from "../../types";
+import type { CurrencyRateDetail } from "../../types";
 import type { AssetType } from "../../datafetch/types";
 
 export type SkillArgs = Record<string, unknown>;
@@ -6,10 +6,7 @@ export type SkillArgs = Record<string, unknown>;
 export type ToolResult = {
   // JSON-serializable payload returned to the model.
   data: unknown;
-  // Optional chart block the chat renderer can lift into the message.
-  chart?: ChartSpec;
   // Optional short text summary that the model can read after the tool runs.
-  // The data field is also sent back as the tool message content.
   text?: string;
 };
 
