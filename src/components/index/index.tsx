@@ -51,6 +51,8 @@ import {
 import Configuration from "@/components/configuration";
 import DataManagement from "@/components/data-management";
 import SystemInfo from "@/components/system-info";
+import ChatPage from "@/components/assistant/chat-page";
+import AssistantSettings from "@/components/settings/assistant";
 import React from "react";
 import { Progress } from "../ui/progress";
 import {
@@ -384,6 +386,22 @@ function AppRoutes({
           }
         />
         <Route
+          path="assistant"
+          element={
+            <AnimatedPage>
+              <ChatPage isProUser={isProUser} />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="assistant/:sessionId"
+          element={
+            <AnimatedPage>
+              <ChatPage isProUser={isProUser} />
+            </AnimatedPage>
+          }
+        />
+        <Route
           path="settings"
           element={
             <AnimatedPage>
@@ -417,6 +435,7 @@ function AppRoutes({
               />
             }
           />
+          <Route path="assistant" element={<AssistantSettings />} />
         </Route>
         <Route
           path="coins/:symbol"

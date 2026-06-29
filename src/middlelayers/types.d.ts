@@ -246,4 +246,38 @@ export type UserLicenseInfo = {
   license?: string;
 };
 
+// AI assistant configuration. Stored encrypted under the aiConfigId slot.
+export type AIProviderName = "openai" | "anthropic" | "custom";
+
+export type AIAdvancedOptions = {
+  temperature?: number;
+  top_p?: number;
+  headers?: Record<string, string>;
+  extraBody?: Record<string, unknown>;
+  provider?: AIProviderName;
+};
+
+export type AIConfig = {
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  contextSize: number;
+  advanced?: AIAdvancedOptions;
+};
+
+// Chart block returned by AI skills and rendered inline in chat messages.
+export type ChartSpec = {
+  type: "bar" | "line" | "doughnut" | "radar";
+  labels: string[];
+  datasets: Array<{
+    label?: string;
+    data: number[];
+    backgroundColor?: string | string[];
+    borderColor?: string | string[];
+    fill?: boolean;
+  }>;
+  title?: string;
+  caption?: string;
+};
+
 export type QuoteColor = "green-up-red-down" | "red-up-green-down";

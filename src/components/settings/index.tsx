@@ -12,8 +12,10 @@ import {
   SunIcon,
   ArchiveIcon,
   InfoCircledIcon,
+  RocketIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
+import AssistantSettings from "./assistant";
 
 const settingsTabs = [
   {
@@ -35,6 +37,11 @@ const settingsTabs = [
     titleKey: "settings.tab.system",
     href: "/settings/systemInfo",
     icon: InfoCircledIcon,
+  },
+  {
+    titleKey: "settings.tab.assistant",
+    href: "/settings/assistant",
+    icon: RocketIcon,
   },
 ];
 

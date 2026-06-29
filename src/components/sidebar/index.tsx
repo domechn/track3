@@ -7,6 +7,7 @@ import {
   MixIcon,
   ClockIcon,
   GearIcon,
+  RocketIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@radix-ui/react-icons";
@@ -81,6 +82,16 @@ export default function Sidebar({
 }) {
   const { t } = useTranslation();
   const sidebarWidth = collapsed ? 52 : 200;
+  // AI is Pro-only. Insert the entry right before Settings so it
+  // visually groups with the other navigation targets. Non-Pro users
+  // land on the upsell when they navigate to /ai directly.
+  const items = isProUser
+    ? [
+        ...navItems.slice(0, navItems.length - 1),
+        { to: "/assistant", labelKey: "nav.assistant", icon: RocketIcon },
+        navItems[navItems.length - 1],
+      ]
+    : navItems;
 
   return (
     <aside
@@ -108,7 +119,7 @@ export default function Sidebar({
       </div>
 
       <nav className="flex-1 flex flex-col gap-0.5 p-2 overflow-y-auto overflow-x-hidden">
-        {navItems.map((item) => (
+        {items.map((item) => (
           <NavItem
             key={item.to}
             to={item.to}
