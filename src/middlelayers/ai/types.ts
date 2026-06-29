@@ -3,12 +3,13 @@ import type { ChartSpec } from "../types";
 // Stream events yielded by the provider. The chat hook consumes these
 // and turns them into assistant blocks.
 export type StreamEvent =
+  | { kind: "think"; delta: string }
   | { kind: "text"; delta: string }
   | { kind: "tool_call"; id: string; name: string; args: unknown }
   | { kind: "tool_result"; id: string; name: string; content: string }
   | { kind: "chart"; chart: ChartSpec }
   | { kind: "error"; message: string }
-  | { kind: "done" };
+  | { kind: "done"; reason?: string };
 
 // OpenAI-compatible role types.
 export type ChatRole = "user" | "assistant" | "system" | "tool";

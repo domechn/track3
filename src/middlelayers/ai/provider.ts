@@ -276,6 +276,10 @@ export async function* streamChatCompletion(
         continue;
       }
       const delta = choice.delta ?? choice.message ?? {};
+      const thinkContent = delta?.reasoning_content;
+      if (typeof thinkContent === "string" && thinkContent.length > 0) {
+        yield { kind: "think", delta: thinkContent };
+      }
       const content = delta?.content;
       if (typeof content === "string" && content.length > 0) {
         yield { kind: "text", delta: content };
@@ -313,11 +317,11 @@ export async function* streamChatCompletion(
     };
   }
 
-  // Suppress unused warning while keeping the value available for callers
-  // that want to log finish_reason in the future.
-  void finishReason;
-
-  yield { kind: "done" };
+  if (finishReason) {
+    yield { kind: "done", reason: finishReason };
+  } else {
+    yield { kind: "done" };
+  }
 }
 
 async function safeReadText(resp: Response): Promise<string> {

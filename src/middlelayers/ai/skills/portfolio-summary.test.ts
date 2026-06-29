@@ -80,3 +80,46 @@ describe("portfolio_summary skill", () => {
     expect(data.topHoldings[0].valueInBase).toBe(900);
   });
 });
+  it("reports other value when holdings exceed topN", async () => {
+    const uuid = "uuid-other";
+    const assets = Array.from({ length: 15 }, (_, i) => ({
+      id: i + 1,
+      uuid,
+      createdAt: "2026-06-01T00:00:00.000Z",
+      assetType: "crypto" as const,
+      symbol: `COIN${i + 1}`,
+      amount: 1,
+      value: 100 * (i + 1),
+      price: 100 * (i + 1),
+    }));
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([
+      { uuid, createdAt: new Date("2026-06-01T00:00:00Z"), totalValue: 12000 },
+    ]);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue(assets as any);
+
+    const result = await skill.run({ topN: 5 }, { baseCurrency });
+    const data = result.data as any;
+    expect(data.topHoldings).toHaveLength(5);
+    expect(data.other.count).toBe(10);
+    expect(data.other.valueUsd).toBeGreaterThan(0);
+    expect(result.chart).toBeDefined();
+  });
+
+  it("clamps topN between 1 and 50", async () => {
+    const uuid = "uuid-clamp";
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([
+      { uuid, createdAt: new Date("2026-06-01T00:00:00Z"), totalValue: 1000 },
+    ]);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([
+      { id: 1, uuid, createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 1, value: 1000, price: 1000 },
+    ] as any);
+
+    const result = await skill.run({ topN: -5 }, { baseCurrency });
+    const data = result.data as any;
+    expect(data.topHoldings).toHaveLength(1);
+
+    const result2 = await skill.run({ topN: 100 }, { baseCurrency });
+    const data2 = result2.data as any;
+    expect(data2.topHoldings).toHaveLength(1);
+  });
+

@@ -49,3 +49,62 @@ describe("portfolio_history skill", () => {
     expect(data.points).toHaveLength(5);
   });
 });
+  it("filters by date range", async () => {
+    const records = [
+      { uuid: "u1", createdAt: new Date("2025-01-01T00:00:00Z"), totalValue: 1000 },
+      { uuid: "u2", createdAt: new Date("2025-06-01T00:00:00Z"), totalValue: 1100 },
+      { uuid: "u3", createdAt: new Date("2026-01-01T00:00:00Z"), totalValue: 1200 },
+      { uuid: "u4", createdAt: new Date("2026-06-01T00:00:00Z"), totalValue: 1300 },
+    ];
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockImplementation(
+      async (start?: Date, end?: Date) => {
+        let filtered = records;
+        if (start) filtered = filtered.filter((r) => r.createdAt >= start);
+        if (end) filtered = filtered.filter((r) => r.createdAt <= end);
+        return filtered.filter((r) => {
+          if (start && r.createdAt < start) return false;
+          if (end && r.createdAt > end) return false;
+          return true;
+        });
+      },
+    );
+
+    const result = await skill.run(
+      { from: "2025-06-01T00:00:00Z", to: "2026-01-01T00:00:00Z" },
+      { baseCurrency },
+    );
+    const data = result.data as any;
+    expect(data.points.length).toBeGreaterThanOrEqual(2);
+    expect(result.chart?.type).toBe("line");
+  });
+
+  it("handles invalid date arguments gracefully", async () => {
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([]);
+    const result = await skill.run(
+      { from: "not-a-date", to: "also-not-a-date" },
+      { baseCurrency },
+    );
+    expect((result.data as any).empty).toBe(true);
+  });
+
+  it("returns a chart only when there are data points", async () => {
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([]);
+    const result = await skill.run({}, { baseCurrency });
+    expect(result.chart).toBeUndefined();
+  });
+
+  it("converts values into the base currency rate", async () => {
+    const records = [
+      { uuid: "u1", createdAt: new Date("2026-01-01T00:00:00Z"), totalValue: 1000 },
+    ];
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue(records as any);
+
+    const result = await skill.run(
+      {},
+      { baseCurrency: { ...baseCurrency, currency: "EUR", rate: 0.85 } },
+    );
+    const data = result.data as any;
+    expect(data.points[0].value).toBe(850);
+    expect(data.summary.startValue).toBe(850);
+  });
+

@@ -15,13 +15,15 @@ Track3 is a privacy-focused desktop cryptocurrency portfolio tracker built with 
 
 1. **Components** (`src/components/`) — React UI. Uses shadcn/ui primitives in `ui/`, feature components at top level (overview, analytics, configuration, etc.)
 2. **Middlelayers** (`src/middlelayers/`) — Core business logic:
-   - `datafetch/coins/cex/` — CEX exchange integrations (Binance, OKX, Gate, Kraken, Bybit, Bitget, Coinbase)
-   - `datafetch/coins/` — Blockchain fetchers (BTC, ETH/ERC20, SOL, DOGE, TRC20, TON, SUI)
+   - `datafetch/coins/cex/` — CEX exchange integrations (Binance, OKX, Gate, Kraken, Bybit, Bitget, Coinbase, HTX, MEXC, plus catch-all `others.ts`)
+   - `datafetch/coins/` — Blockchain fetchers (BTC, ETH/ERC20, SOL, DOGE, TRC20, TON, SUI) plus `stable.ts` stablecoin mapper, `price.ts` price aggregation, and catch-all `others.ts`
+   - `datafetch/coins/stock/` — Stock asset data fetching (IBKR broker via `ibkr.ts`, `stock-analyzer.ts`)
    - `datafetch/utils/` — HTTP client, caching, async helpers
    - `database.ts` — SQLite abstraction layer
    - `configuration.ts` — Encrypted config management
    - `types.d.ts` — Core TypeScript type definitions
 3. **Utils** (`src/utils/`) — Pure utility functions
+4. **i18n** (`src/i18n/`) — Lightweight in-house i18n system (English + Simplified Chinese)
 
 Additional wiring:
 
@@ -40,11 +42,11 @@ Exposes Tauri commands to frontend via `invoke()`:
 - `encrypt` / `decrypt` — Config encryption via magic-crypt
 - `download_coins_logos` — Coin logo caching
 
-Key files: `main.rs` (entry + commands), `binance.rs`, `info.rs` (CoinGecko), `migration.rs` (DB versioning), `ent.rs` (encryption)
+Key files: `main.rs` (entry + commands), `binance.rs`, `info.rs` (CoinGecko), `migration.rs` (DB versioning), `ent.rs` (encryption), `lib.rs` (module declarations), `types.rs` (shared Rust structs)
 
 ### Database
 
-SQLite with versioned migrations in `src-tauri/migrations/` (v1→v5). Key tables: `assets_v2`, `asset_prices`, `configuration`, `currency_rates`.
+SQLite with versioned migrations in `src-tauri/migrations/` (`init`, `v01t02`, `v02t03`, `v03t04`, `v04t05`, `v06t07`, `v07t08`). Key tables: `assets_v2`, `asset_prices`, `configuration`, `currency_rates`, `transactions`, `chat_sessions`, `cloud_sync`.
 
 ## Code Style
 
@@ -58,7 +60,7 @@ SQLite with versioned migrations in `src-tauri/migrations/` (v1→v5). Key table
 
 - **Path alias:** `@/*` maps to `./src/*` (configured in tsconfig + vite)
 - **Hash-based routing:** Required for Tauri's `file://` protocol
-- **State management:** React Context API (no Redux)
+- **State management:** React Context API (no Redux); `use-chat.ts` for assistant state
 - **CEX Analyzer pattern:** Each exchange implements an `Analyzer` interface in `datafetch/coins/cex/`
 - **Caching:** Memory + localStorage with TTL in `datafetch/utils/`
 - **Async:** Bluebird promises for parallel data fetching with progress callbacks
@@ -82,11 +84,12 @@ corepack yarn install          # Install frontend dependencies
 corepack yarn dev              # Frontend dev (Vite)
 corepack yarn tauri dev        # Desktop dev (starts Vite on port 1420 + Tauri)
 corepack yarn build            # TypeScript compile + Vite production build (frontend only)
+corepack yarn preview          # Preview Vite production build
 corepack yarn tauri build      # Build distributable desktop app
 corepack yarn update-release   # Release metadata
 ```
 
-Tests run via Vitest (`corepack yarn vitest`). All new code must include co-located tests.
+Tests run via Vitest (`corepack yarn test` or `corepack yarn test:watch` for watch mode). All new code must include co-located tests.
 
 ## Build Requirements
 
@@ -185,6 +188,8 @@ The user-facing language switcher lives in the **Appearance** tab of Settings (`
 - Data persistence uses SQLite through `@tauri-apps/plugin-sql` in `src/middlelayers/database.ts`.
 - File import/export uses `@tauri-apps/plugin-fs` in `src/middlelayers/datamanager.ts`.
 - CI and release behavior are defined in `.github/workflows/`.
+- Stock data from Interactive Brokers (`@stoqey/ibkr` via `stock/ibkr.ts`).
+- Chat sessions are stored in the `chat_sessions` table and managed through `src/components/assistant/use-chat-sessions.ts`.
 
 ## Security
 

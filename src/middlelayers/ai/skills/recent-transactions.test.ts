@@ -86,3 +86,59 @@ describe("recent_transactions skill", () => {
     expect(data.totals.withdraw).toBe(200);
   });
 });
+  it("clamps limit to max of 100", async () => {
+    const txs = Array.from({ length: 150 }, (_, i) =>
+      makeTx({ id: i + 1, txnCreatedAt: `2026-0${i < 10 ? "1" : "2"}-01T00:00:00.000Z` }),
+    );
+    vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue(txs);
+    const result = await skill.run({ limit: 999 }, { baseCurrency });
+    expect((result.data as any).transactions).toHaveLength(100);
+  });
+
+  it("clamps limit to min of 1", async () => {
+    const txs = [makeTx({ id: 1 }), makeTx({ id: 2 })];
+    vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue(txs);
+    const result = await skill.run({ limit: -5 }, { baseCurrency });
+    expect((result.data as any).transactions).toHaveLength(1);
+  });
+
+  it("returns empty when filter matches no transactions", async () => {
+    const txs = [makeTx({ id: 1, symbol: "BTC" })];
+    vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue(txs);
+    const result = await skill.run(
+      { symbol: "DOGE", assetType: "crypto" },
+      { baseCurrency },
+    );
+    expect((result.data as any).empty).toBe(true);
+  });
+
+  it("handles stock asset type filter", async () => {
+    const txs = [
+      makeTx({ id: 1, symbol: "AAPL", assetType: "stock" }),
+      makeTx({ id: 2, symbol: "BTC", assetType: "crypto" }),
+    ];
+    vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue(txs);
+    const result = await skill.run(
+      { assetType: "stock" },
+      { baseCurrency },
+    );
+    const data = result.data as any;
+    expect(data.transactions).toHaveLength(1);
+    expect(data.transactions[0].symbol).toBe("AAPL");
+  });
+
+  it("computes buy/sell/deposit/withdraw totals correctly", async () => {
+    const txs = [
+      makeTx({ id: 1, txnType: "buy", amount: 1, price: 100 }),
+      makeTx({ id: 2, txnType: "buy", amount: 2, price: 50 }),
+      makeTx({ id: 3, txnType: "sell", amount: 1, price: 200 }),
+    ];
+    vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue(txs);
+    const result = await skill.run({ limit: 10 }, { baseCurrency });
+    const data = result.data as any;
+    expect(data.totals.buy).toBe(200);
+    expect(data.totals.sell).toBe(200);
+    expect(data.totals.deposit).toBe(0);
+    expect(data.totals.withdraw).toBe(0);
+  });
+

@@ -524,6 +524,11 @@
   "ai.session.loadError": "无法加载对话",
   "ai.session.relative.justNow": "刚刚",
   "ai.session.relative.minutesAgo": "{n} 分钟前",
-  "ai.session.relative.hoursAgo": "{n} 小时前",
-  "ai.session.relative.daysAgo": "{n} 天前"
+ "ai.session.relative.hoursAgo": "{n} 小时前",
+  "ai.session.show": "显示会话",
+  "ai.session.hide": "隐藏会话",
+ "ai.session.relative.daysAgo": "{n} 天前",
+  "assistant.chat.think.label": "思考",
+  "assistant.chat.think.collapse": "收起推理过程",
+  "assistant.chat.think.expand": "展开推理过程"
 }

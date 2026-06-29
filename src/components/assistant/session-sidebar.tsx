@@ -26,6 +26,7 @@ import type { ChatSessionMeta } from "@/middlelayers/ai";
 export type SessionSidebarProps = {
   sessions: ChatSessionMeta[];
   activeId: string | null;
+  processingId?: string | null;
   isLoading: boolean;
   onSelect: (id: string) => void;
   onNew: () => void;
@@ -47,6 +48,7 @@ function relativeTime(iso: string, t: (key: string) => string): string {
 export default function SessionSidebar({
   sessions,
   activeId,
+  processingId,
   isLoading,
   onSelect,
   onNew,
@@ -106,6 +108,7 @@ export default function SessionSidebar({
                     key={s.id}
                     session={s}
                     isActive={s.id === activeId}
+                    isProcessing={s.id === processingId}
                     onSelect={onSelect}
                     onDelete={onDelete}
                     onPin={onPin}
@@ -129,6 +132,7 @@ export default function SessionSidebar({
                     key={s.id}
                     session={s}
                     isActive={s.id === activeId}
+                    isProcessing={s.id === processingId}
                     onSelect={onSelect}
                     onDelete={onDelete}
                     onPin={onPin}
@@ -147,6 +151,7 @@ export default function SessionSidebar({
 function SessionItem({
   session,
   isActive,
+  isProcessing = false,
   onSelect,
   onDelete,
   onPin,
@@ -154,6 +159,7 @@ function SessionItem({
 }: {
   session: ChatSessionMeta;
   isActive: boolean;
+  isProcessing?: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onPin: (id: string, pinned: boolean) => void;
@@ -189,17 +195,26 @@ function SessionItem({
           }
         }}
         className={cn(
-          "group relative mx-2 cursor-pointer rounded-md px-3 py-2 text-left transition-colors",
+          "group relative mx-2 cursor-pointer rounded-md px-3 py-2 text-left transition-colors border-l-2",
           "hover:bg-accent/60",
-          isActive && "bg-accent",
+          isActive && "bg-accent border-primary",
+          !isActive && "border-transparent",
         )}
         data-testid={`session-item-${session.id}`}
         data-active={isActive ? "true" : undefined}
       >
-        <div className="flex items-start justify-between gap-1">
-          <span className="min-w-0 flex-1 truncate text-sm font-medium leading-snug text-foreground/90">
-            {session.title || t("ai.session.untitled")}
-          </span>
+        <div className="grid grid-cols-[1fr_auto] items-start gap-1">
+          <div className="flex min-w-0 items-center gap-2">
+            {isProcessing && (
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+            )}
+            <span className="truncate text-sm font-medium leading-snug text-foreground/90">
+              {session.title || t("ai.session.untitled")}
+            </span>
+          </div>
           {/* Hover actions */}
           <span className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:opacity-100">
             <button

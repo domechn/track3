@@ -59,15 +59,82 @@ export default function ChatThread({
   onPickPrompt?: (prompt: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const userScrolledAwayRef = useRef(false);
   const isEmpty = messages.length === 0 && !isStreaming;
 
+  // Set up scroll-position detection on the ScrollArea viewport once on mount.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // Defer to next frame so the DOM has settled after streaming updates.
+
+    // The ScrollArea's Viewport is the actual scrollable parent.
+    // Radix sets data-radix-scroll-area-viewport on the viewport element.
+    const viewport = el.parentElement?.closest(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement | null;
+    if (!viewport) return;
+
+    const onScroll = () => {
+      const threshold = 100;
+      const isAtBottom =
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
+        threshold;
+      userScrolledAwayRef.current = !isAtBottom;
+    };
+
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // When a new message turn starts (messages.length grows), always scroll
+  // to the bottom and reset the scroll-away lock.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const viewport = el.parentElement?.closest(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement | null;
+    if (!viewport) return;
+
+    userScrolledAwayRef.current = false;
     requestAnimationFrame(() => {
-      if (typeof el.scrollTo === "function") {
-        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      if (typeof viewport.scrollTo === "function") {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+      }
+    });
+  }, [messages.length]);
+
+  // During streaming, auto-scroll only if the user hasn't manually scrolled
+  // away from the bottom of the conversation. During the think-only phase
+  // (assistant has think blocks but no text blocks yet), skip auto-scroll
+  // so the thinking content stays visible.
+  useEffect(() => {
+    if (userScrolledAwayRef.current) return;
+
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const viewport = el.parentElement?.closest(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement | null;
+    if (!viewport) return;
+
+    // If the latest assistant message has think blocks but no text blocks
+    // yet, we're in the thinking phase — scrolling to the very bottom would
+    // push the think content above the visible area, making it unreadable.
+    const lastMsg = messages.at(-1);
+    if (
+      lastMsg?.role === "assistant" &&
+      lastMsg.blocks.some(b => b.kind === "think") &&
+      !lastMsg.blocks.some(b => b.kind === "text")
+    ) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      if (typeof viewport.scrollTo === "function") {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
       }
     });
   }, [messages, isStreaming]);
@@ -83,7 +150,7 @@ export default function ChatThread({
           <WelcomePanel onPickPrompt={onPickPrompt} />
         ) : (
           messages.map((m, i) => (
-            <MessageBubble key={i} message={m} />
+            <MessageBubble key={i} message={m} isStreaming={isStreaming} />
           ))
         )}
         {isStreaming && messages.at(-1)?.role !== "assistant" && (

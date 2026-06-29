@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AIConfig, ChartSpec } from "@/middlelayers/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import {
@@ -12,6 +12,7 @@ import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
 
 export type AssistantBlock =
   | { kind: "text"; text: string }
+  | { kind: "think"; text: string }
   | { kind: "chart"; chart: ChartSpec };
 
 export type ChatMessage =
@@ -21,9 +22,18 @@ export type ChatMessage =
 export type UseChatOptions = {
   config: AIConfig;
   baseCurrency: CurrencyRateDetail;
+  sessionId?: string | null;
   contextSize?: number;
+  initialMessages?: ChatMessage[];
+  onStreamComplete?: (messages: ChatMessage[]) => void;
+  onStreamingChange?: (streaming: boolean) => void;
 };
 
+
+// Stable reference for the default empty initialMessages array.
+// Using [] as a default in destructuring creates a new array on every render,
+// which would cause the initialMessages watcher effect to loop infinitely.
+const EMPTY_INITIAL_MSGS: ChatMessage[] = [];
 export type UseChatResult = {
   messages: ChatMessage[];
   input: string;
@@ -50,6 +60,7 @@ function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
     const text = m.blocks
       .map((b) => {
         if (b.kind === "text") return b.text;
+        if (b.kind === "think") return "";
         return `[rendered chart: ${b.chart.type}]`;
       })
       .join("")
@@ -71,11 +82,52 @@ function trimMessages(messages: ProviderMessage[], maxCount: number): ProviderMe
 }
 
 export function useChat(options: UseChatOptions): UseChatResult {
-  const { config, baseCurrency, contextSize = 8192 } = options;
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { config, baseCurrency, contextSize = 8192, initialMessages = EMPTY_INITIAL_MSGS, onStreamComplete, sessionId } = options;
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef<ChatMessage[]>(initialMessages);
+  const onStreamCompleteRef = useRef(onStreamComplete);
+  onStreamCompleteRef.current = onStreamComplete;
+  const onStreamingChangeRef = useRef(options.onStreamingChange);
+  onStreamingChangeRef.current = options.onStreamingChange;
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  // Notify parent when streaming state changes (used by the sidebar
+  // to show a processing indicator on the active session).
+  const prevStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    if (isStreaming !== prevStreamingRef.current) {
+      onStreamingChangeRef.current?.(isStreaming);
+      prevStreamingRef.current = isStreaming;
+    }
+  }, [isStreaming]);
+  // Reset chat state when initialMessages changes (session switch).
+  // useState only picks up the initial value once, so we need this effect
+  // to apply the new messages from the freshly loaded session.
+  const prevInitialMsgsRef = useRef(initialMessages);
+  useEffect(() => {
+    if (initialMessages !== prevInitialMsgsRef.current) {
+      setMessages(initialMessages);
+      setInput("");
+      prevInitialMsgsRef.current = initialMessages;
+    }
+  }, [initialMessages]);
+  // Abort any in-flight stream when sessionId changes (session switch).
+  // This prevents the old stream's completion callback from persisting
+  // data to the newly selected session.
+  const prevSessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    if (sessionId !== prevSessionIdRef.current) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setIsStreaming(false);
+      prevSessionIdRef.current = sessionId;
+    }
+  }, [sessionId]);
 
   const systemPrompt = useMemo(
     () => buildSystemPrompt(baseCurrency),
@@ -102,7 +154,34 @@ export function useChat(options: UseChatOptions): UseChatResult {
       events: AsyncGenerator<StreamEvent>,
       assistantIndex: number,
     ) => {
-      let bufferText = "";
+      // State machine for <think> tag parsing.  When the model bakes
+      // reasoning content into the text stream via <think>...</think>
+      // tags we split it into separate think/text blocks rather than
+      // relying on reasoning_content (which most models don't send).
+      const TAG_BUF = 12;
+      const TAG_OPEN = "<think>";
+      const TAG_CLOSE = "</think>";
+      let thinkState: "outside" | "inside" = "outside";
+      let pendingBuf = "";
+      let hasReasoningContent = false;
+
+      const addToBlock = (kind: "text" | "think", delta: string) => {
+        if (!delta) return;
+        const next = messagesRef.current.slice();
+          const target = { ...next[assistantIndex] };
+          if (target.role !== "assistant") return;
+          const blocks = target.blocks.slice();
+          const last = blocks[blocks.length - 1];
+          if (last && last.kind === kind) {
+            blocks[blocks.length - 1] = { ...last, text: last.text + delta };
+          } else {
+            blocks.push({ kind, text: delta });
+          }
+          next[assistantIndex] = { ...target, blocks };
+          messagesRef.current = next;
+          setMessages(next);
+      };
+
       const dispatchToolCall = async (ev: {
         kind: "tool_call";
         id: string;
@@ -117,8 +196,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         if (skillResult.ok) {
           const chart = skillResult.result.chart;
           if (chart) {
-            setMessages((prev) => {
-              const next = prev.slice();
+            const next = messagesRef.current.slice();
               const target = { ...next[assistantIndex] };
               if (target.role === "assistant") {
                 next[assistantIndex] = {
@@ -129,49 +207,96 @@ export function useChat(options: UseChatOptions): UseChatResult {
                   ],
                 };
               }
-              return next;
-            });
+              messagesRef.current = next;
+              setMessages(next);
           }
         }
       };
 
       for await (const ev of events) {
-        if (ev.kind === "text") {
-          bufferText += ev.delta;
-          setMessages((prev) => {
-            const next = prev.slice();
+        if (ev.kind === "think") {
+          hasReasoningContent = true;
+          const next = messagesRef.current.slice();
             const target = { ...next[assistantIndex] };
-            if (target.role !== "assistant") return prev;
+            if (target.role !== "assistant") return;
             const blocks = target.blocks.slice();
             const last = blocks[blocks.length - 1];
-            if (last && last.kind === "text") {
+            if (last && last.kind === "think") {
               blocks[blocks.length - 1] = {
-                kind: "text",
+                kind: "think",
                 text: last.text + ev.delta,
               };
             } else {
-              blocks.push({ kind: "text", text: ev.delta });
+              // Insert the think block before any text blocks
+              const textIdx = blocks.findIndex((b) => b.kind === "text");
+              if (textIdx >= 0) {
+                blocks.splice(textIdx, 0, { kind: "think", text: ev.delta });
+              } else {
+                blocks.push({ kind: "think", text: ev.delta });
+              }
             }
             next[assistantIndex] = { ...target, blocks };
-            return next;
-          });
+            messagesRef.current = next;
+            setMessages(next);
+        } else if (ev.kind === "text") {
+          if (hasReasoningContent) {
+            addToBlock("text", ev.delta);
+          } else {
+            pendingBuf += ev.delta;
+            while (true) {
+              if (thinkState === "outside") {
+                const lower = pendingBuf.toLowerCase();
+                const idx = lower.indexOf(TAG_OPEN);
+                if (idx < 0) {
+                  if (pendingBuf.length > TAG_BUF) {
+                    addToBlock("text", pendingBuf.slice(0, -TAG_BUF));
+                    pendingBuf = pendingBuf.slice(-TAG_BUF);
+                  }
+                  break;
+                }
+                if (idx > 0) {
+                  addToBlock("text", pendingBuf.slice(0, idx));
+                }
+                thinkState = "inside";
+                pendingBuf = pendingBuf.slice(idx + TAG_OPEN.length);
+              } else {
+                const lower = pendingBuf.toLowerCase();
+                const idx = lower.indexOf(TAG_CLOSE);
+                if (idx < 0) {
+                  if (pendingBuf.length > TAG_BUF) {
+                    addToBlock("think", pendingBuf.slice(0, -TAG_BUF));
+                    pendingBuf = pendingBuf.slice(-TAG_BUF);
+                  }
+                  break;
+                }
+                if (idx > 0) {
+                  addToBlock("think", pendingBuf.slice(0, idx));
+                }
+                thinkState = "outside";
+                pendingBuf = pendingBuf.slice(idx + TAG_CLOSE.length);
+              }
+            }
+          }
         } else if (ev.kind === "tool_call") {
           await dispatchToolCall(ev);
         } else if (ev.kind === "error") {
-          setMessages((prev) => {
-            const next = prev.slice();
+          const next = messagesRef.current.slice();
             const target = { ...next[assistantIndex] };
-            if (target.role !== "assistant") return prev;
+            if (target.role !== "assistant") return;
             const blocks = target.blocks.slice();
             blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
             next[assistantIndex] = { ...target, blocks };
-            return next;
-          });
+            messagesRef.current = next;
+            setMessages(next);
         } else if (ev.kind === "done") {
           break;
         }
       }
-      void bufferText;
+      // Flush any remaining buffer at end-of-stream
+      if (pendingBuf) {
+        addToBlock(thinkState === "outside" ? "text" : "think", pendingBuf);
+        pendingBuf = "";
+      }
     },
     [baseCurrency],
   );
@@ -186,12 +311,15 @@ export function useChat(options: UseChatOptions): UseChatResult {
         role: "assistant",
         blocks: [],
       };
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      setMessages((prev) => {
+        const next = [...prev, userMessage, assistantMessage];
+        messagesRef.current = next;
+        return next;
+      });
       setIsStreaming(true);
 
       const controller = new AbortController();
       abortRef.current = controller;
-      const assistantIndex = -1; // placeholder; we re-resolve after the state update below
       try {
         const history = flattenForProvider([...messages, userMessage]);
         const trimmed = trimMessages(history, Math.max(2, Math.floor(contextSize / 256)));
@@ -215,8 +343,13 @@ export function useChat(options: UseChatOptions): UseChatResult {
       } finally {
         setIsStreaming(false);
         abortRef.current = null;
+        // Only fire completion callback if the stream wasn't aborted
+        // (e.g., by stop() or session switch). Aborted streams should not
+        // persist partial data.
+        if (!controller.signal.aborted) {
+          onStreamCompleteRef.current?.(messagesRef.current);
+        }
       }
-      void assistantIndex;
     },
     [input, isStreaming, messages, config, systemPrompt, contextSize, consumeStream],
   );

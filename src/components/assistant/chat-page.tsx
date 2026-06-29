@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowRightIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  HamburgerMenuIcon,
   ChevronRightIcon,
   GearIcon,
   RocketIcon,
@@ -28,7 +30,20 @@ import {
   loadAIConfig,
   queryPreferCurrency,
 } from "@/middlelayers/configuration";
+import {
+  appendMessages,
+  buildSessionPreview,
+  generateTitle,
+  loadSession,
+  renameSession,
+  touchSession,
+} from "@/middlelayers/ai";
+import type { PersistedBlock, PersistedChatMessage } from "@/middlelayers/ai";
+import SessionSidebar from "./session-sidebar";
+import { useChatSessions } from "./use-chat-sessions";
 import type { AIConfig, CurrencyRateDetail } from "@/middlelayers/types";
+import type { ChatMessage, AssistantBlock } from "./use-chat";
+import type { ChartSpec } from "@/middlelayers/types";
 
 type LoadState =
   | { status: "loading" }
@@ -90,6 +105,34 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
   );
 }
 
+function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {
+  if (msg.role === "user") {
+    return { role: "user", content: msg.content };
+  }
+  return {
+    role: "assistant",
+    blocks: msg.blocks.map((b): AssistantBlock => {
+      if (b.kind === "text") return b;
+      return { kind: "chart", chart: b.chart as ChartSpec };
+    }),
+  };
+}
+
+function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
+  if (msg.role === "user") {
+    return { role: "user", content: msg.content };
+  }
+  return {
+    role: "assistant",
+    blocks: msg.blocks
+      .filter((b): b is Exclude<AssistantBlock, { kind: "think" }> => b.kind !== "think")
+      .map((b): PersistedBlock => {
+        if (b.kind === "text") return { kind: "text", text: b.text };
+        return { kind: "chart", chart: b.chart };
+      }),
+  };
+}
+
 function ReadyChat({
   config,
   baseCurrency,
@@ -98,14 +141,208 @@ function ReadyChat({
   baseCurrency: CurrencyRateDetail;
 }) {
   const { t } = useTranslation();
-  const chat = useChat({ config, baseCurrency });
+  const { sessionId } = useParams();
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
+  const { sessions, isLoading, refresh, createNew, remove, pin } =
+    useChatSessions();
+  const [initialMsgs, setInitialMsgs] = useState<ChatMessage[]>([]);
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (sessionId) {
+      // Clear messages immediately to avoid showing stale data
+      // from the previous session while the new one loads.
+      setInitialMsgs([]);
+      let cancelled = false;
+      (async () => {
+        const session = await loadSession(sessionId).catch(() => null);
+        if (cancelled) return;
+        if (session) {
+          setInitialMsgs(session.messages.map(persistedToRuntime));
+        } else {
+          // New or empty session — always reset so the previous session's
+          // messages don't leak into the new chat.
+          setInitialMsgs([]);
+        }
+        setLoadedSessionId(sessionId);
+      })();
+      return () => { cancelled = true; };
+    } else {
+      // No sessionId — render a fresh empty chat without creating a
+      // session.  A new session is created lazily when the user sends
+      // their first message (see handleStreamComplete).
+      setInitialMsgs([]);
+      setLoadedSessionId(null);
+    }
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The effect above loads session data and initializes initialMsgs.
+  // The useChat hook's initialMessages watcher picks up the new
+  // messages via reference comparison when loading completes.
+	  const handleStreamComplete = useCallback(
+	    async (newMessages: ChatMessage[]) => {
+      try {
+        if (newMessages.length < 2) return;
+        const exchange = [
+          newMessages[newMessages.length - 2],
+          newMessages[newMessages.length - 1],
+        ];
+        if (exchange.length < 2) return;
+        const persistedExchange = exchange.map(runtimeToPersisted);
+
+        let targetId = sessionId ?? undefined;
+        if (!targetId) {
+          // Lazy session creation on first message
+          const meta = await createNew();
+          targetId = meta.id;
+        }
+
+        await appendMessages(targetId, persistedExchange);
+        const allPersisted = newMessages.map(runtimeToPersisted);
+        const msgCount = newMessages.length;
+        await touchSession(targetId, {
+          messageCount: msgCount,
+          preview: buildSessionPreview(allPersisted),
+        });
+
+        // Auto-generate title after the first exchange in a new session
+        if (msgCount === 2) {
+          const firstUser = newMessages[0];
+          const firstAssistant = newMessages[1];
+          if (firstAssistant.role !== "assistant") return;
+          const userContent =
+            firstUser.role === "user" ? firstUser.content : "";
+          const assistantText = (firstAssistant as { role: "assistant"; blocks: AssistantBlock[] }).blocks
+            .filter((b: AssistantBlock): b is AssistantBlock & { kind: "text" } => b.kind === "text")
+            .map((b) => b.text)
+            .join("");
+          if (userContent) {
+            const title = await generateTitle(config, userContent, assistantText);
+            if (title) {
+              await renameSession(targetId, title);
+            }
+          }
+        }
+
+        if (!sessionId) {
+          navigate(`/assistant/${targetId}`, { replace: true });
+        }
+
+        await refresh();
+      } catch (err) {
+        // Log but don't throw — the streamed messages in React state
+        // are still visible in the UI; only the DB persistence failed.
+        console.error("Failed to persist chat exchange:", err);
+      }
+    },
+    [sessionId, navigate, refresh],
+  );
+
+	  // Hooks must be before the conditional early return so hook ordering
+	  // is consistent across renders.
+	  const handleToggleSidebar = useCallback(() => {
+	    setSidebarOpen((prev) => !prev);
+	  }, []);
+
+  const handleStreamingChange = useCallback(
+    (streaming: boolean) => {
+      setProcessingSessionId(streaming ? (sessionId ?? null) : null);
+    },
+    [sessionId],
+  );
+
+  const handleNewChat = useCallback(async () => {
+    const meta = await createNew();
+    navigate(`/assistant/${meta.id}`);
+  }, [createNew, navigate]);
+
+  const handleSelectSession = useCallback(
+    (id: string) => {
+      navigate(`/assistant/${id}`);
+    },
+   [navigate],
+ );
+
+  const handleDeleteSession = useCallback(
+    async (id: string) => {
+      await remove(id);
+      // If the deleted session is the currently active one, navigate
+      // back to the no-session state so the chat area resets to the
+      // welcome/empty panel instead of showing stale messages.
+      if (id === sessionId) {
+        navigate(`/assistant`, { replace: true });
+      }
+    },
+    [remove, sessionId, navigate],
+  );
+
+	  return (
+	    <div
+      className="flex h-[calc(100vh-88px)] overflow-hidden"
+      data-testid="chat-session-layout"
+    >
+      <div
+        className={`overflow-hidden transition-[width] duration-200 ease-in-out ${
+          sidebarOpen ? "w-[260px]" : "w-0"
+        }`}
+      >
+        <div className="w-[260px]">
+          <SessionSidebar
+            sessions={sessions}
+            activeId={sessionId ?? null}
+            isLoading={isLoading}
+        onSelect={handleSelectSession}
+        onNew={handleNewChat}
+        onDelete={handleDeleteSession}
+        onPin={pin}
+          processingId={processingSessionId}
+       />
+        </div>
+      </div>
+     <ChatContent
+       sessionId={sessionId ?? null}
+       config={config}
+       baseCurrency={baseCurrency}
+       initialMessages={initialMsgs}
+       onStreamComplete={handleStreamComplete}
+        onStreamingChange={handleStreamingChange}
+       sidebarOpen={sidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
+     />
+    </div>
+  );
+}
+
+function ChatContent({
+  config,
+  baseCurrency,
+  sessionId,
+  initialMessages,
+  onStreamComplete,
+  onStreamingChange,
+  sidebarOpen,
+  onToggleSidebar,
+}: {
+  config: AIConfig;
+  baseCurrency: CurrencyRateDetail;
+  sessionId?: string | null;
+  initialMessages: ChatMessage[];
+  onStreamComplete?: (messages: ChatMessage[]) => void;
+  onStreamingChange?: (streaming: boolean) => void;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+}) {
+  const { t } = useTranslation();
+  const chat = useChat({ config, baseCurrency, sessionId, initialMessages, onStreamComplete, onStreamingChange });
 
   return (
     <Card
       data-testid="chat-card"
-      className="flex h-[calc(100vh-88px)] min-h-0 flex-col overflow-hidden md:min-h-[560px]"
+      className="flex min-w-0 flex-1 flex-col overflow-hidden"
     >
-      <ChatHeader config={config} />
+      <ChatHeader config={config} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />
       <ChatThread
         messages={chat.messages}
         isStreaming={chat.isStreaming}
@@ -123,7 +360,7 @@ function ReadyChat({
       <ChatComposer
         value={chat.input}
         onChange={chat.setInput}
-        onSend={() => void chat.send()}
+          onSend={(text) => void (text ? chat.send(text) : chat.send())}
         onStop={chat.stop}
         isStreaming={chat.isStreaming}
         disabled={false}
@@ -132,11 +369,24 @@ function ReadyChat({
   );
 }
 
-function ChatHeader({ config }: { config: AIConfig }) {
+function ChatHeader({ config, sidebarOpen, onToggleSidebar }: { config: AIConfig; sidebarOpen: boolean; onToggleSidebar: () => void }) {
   const { t } = useTranslation();
   return (
     <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b border-[var(--glass-border)] bg-card/40 px-5 py-3">
       <div className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          title={sidebarOpen ? t("ai.session.hide") : t("ai.session.show")}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          data-testid="sidebar-toggle"
+        >
+          {sidebarOpen ? (
+            <ChevronLeftIcon className="h-4 w-4" />
+          ) : (
+            <HamburgerMenuIcon className="h-4 w-4" />
+          )}
+        </button>
         <span
           aria-hidden
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
