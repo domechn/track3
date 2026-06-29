@@ -5,14 +5,9 @@ import "./skills";
 export {
   streamChatCompletion,
   probeConnection,
-  normalizeEndpoint,
 } from "./provider";
 
 export {
-  registerSkill,
-  getSkill,
-  listSkills,
-  clearSkillRegistry,
   toOpenAITools,
   runSkill,
 } from "./tools";
@@ -26,7 +21,6 @@ export {
   listSessions,
   loadSession,
   renameSession,
-  rewriteMessages,
   appendMessages,
   togglePin,
   touchSession,
@@ -34,14 +28,16 @@ export {
   notifySessionUpdate,
 } from "./sessions";
 
+export {
+  orchestrateQuery,
+} from "./orchestrator";
+
 export type {
   ChatSession,
   ChatSessionMeta,
   PersistedBlock,
   PersistedChatMessage,
 } from "./sessions";
-
-
 
 export type {
   StreamEvent,
@@ -60,3 +56,12 @@ export type {
   SkillContext,
   GetAssetType,
 } from "./skills/types";
+
+export type {
+  OrchestratorEvent,
+  OrchestratorOptions,
+  AnalysisPlan,
+  SubTaskDefinition,
+  SubTaskResult,
+  SubTaskStatus,
+} from "./orchestrator/types";

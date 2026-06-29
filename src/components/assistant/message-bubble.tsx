@@ -127,6 +127,27 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
       </div>
     );
   }
+  if (block.kind === "agent_activity") {
+    const activities = block.activities;
+    if (activities.length === 0) return null;
+    return (
+      <div key={idx} className="space-y-1 px-1 py-2">
+        {activities.map((a) => (
+          <div key={a.taskId} className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className={`inline-block h-2 w-2 rounded-full ${
+              a.status === "completed" ? "bg-green-500" :
+              a.status === "failed" ? "bg-red-500" :
+              "bg-yellow-500 animate-pulse"
+            }`} />
+            <span className="flex-1 truncate">{a.description}</span>
+            {a.status === "completed" && a.resultPreview && (
+              <span className="text-[10px] text-muted-foreground/60 truncate max-w-[200px]">{a.resultPreview}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
   return <InlineChart key={idx} spec={block.chart} />;
 }
 

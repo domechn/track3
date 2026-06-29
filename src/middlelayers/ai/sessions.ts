@@ -257,13 +257,6 @@ async function writeSessionMessages(
   await writeTextFile(path, encrypted);
 }
 
-export async function rewriteMessages(
-  id: string,
-  messages: PersistedChatMessage[],
-): Promise<void> {
-  await writeSessionMessages(id, messages);
-}
-
 export async function appendMessages(
   id: string,
   messages: PersistedChatMessage[],
