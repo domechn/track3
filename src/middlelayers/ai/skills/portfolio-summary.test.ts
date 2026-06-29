@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { setBaseCurrency } from "../pi-agent";
 import skill from "./portfolio-summary";
 import { ASSET_HANDLER } from "../../entities/assets";
 
@@ -10,19 +9,23 @@ vi.mock("../../entities/assets", () => ({
   },
 }));
 
-const baseCurrency = { currency: "USD", rate: 1, alias: "USD", symbol: "$" };
+const baseCurrency = {
+  currency: "USD",
+  rate: 1,
+  alias: "USD",
+  symbol: "$",
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  setBaseCurrency(baseCurrency);
 });
 
 describe("portfolio_summary skill", () => {
   it("returns empty when there are no snapshots", async () => {
     vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([]);
-    const result = await skill.execute("test", {}, undefined, undefined, {} as any);
-    expect(result.details.data).toMatchObject({ empty: true });
-    expect(result.details.chart).toBeUndefined();
+    const result = await skill.run({}, { baseCurrency });
+    expect(result.data).toMatchObject({ empty: true });
+    expect(result.chart).toBeUndefined();
   });
 
   it("returns total value, top holdings, and a chart", async () => {
@@ -34,15 +37,16 @@ describe("portfolio_summary skill", () => {
       { id: 1, uuid, createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 0.5, value: 600, price: 1200 },
       { id: 2, uuid, createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "ETH", amount: 4, value: 400, price: 100 },
     ]);
-    const result = await skill.execute("test", { topN: 5 }, undefined, undefined, {} as any);
-    const data = result.details.data as any;
+
+    const result = await skill.run({ topN: 5 }, { baseCurrency });
+    const data = result.data as any;
     expect(data.totalValueUsd).toBe(1000);
     expect(data.totalValue).toBe(1000);
     expect(data.topHoldings).toHaveLength(2);
     expect(data.topHoldings[0]).toMatchObject({ symbol: "BTC", valueUsd: 600, percentage: 60 });
     expect(data.topHoldings[1]).toMatchObject({ symbol: "ETH", valueUsd: 400, percentage: 40 });
-    expect(result.details.chart?.type).toBe("doughnut");
-    expect(result.details.chart?.labels).toContain("60.00% BTC");
+    expect(result.chart?.type).toBe("doughnut");
+    expect(result.chart?.labels).toContain("60.00% BTC");
   });
 
   it("aggregates the same symbol across multiple wallets", async () => {
@@ -55,8 +59,8 @@ describe("portfolio_summary skill", () => {
       { id: 2, uuid, createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 0.2, value: 240, price: 1200, wallet: "w2" },
       { id: 3, uuid, createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "ETH", amount: 5, value: 540, price: 108 },
     ]);
-    const result = await skill.execute("test", {}, undefined, undefined, {} as any);
-    const data = result.details.data as any;
+    const result = await skill.run({}, { baseCurrency });
+    const data = result.data as any;
     expect(data.assetCount).toBe(2);
     const btc = data.topHoldings.find((h: any) => h.symbol === "BTC");
     expect(btc.valueUsd).toBe(360);
@@ -70,9 +74,8 @@ describe("portfolio_summary skill", () => {
     vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([
       { id: 1, uuid, createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 1, value: 1000, price: 1000 },
     ]);
-    setBaseCurrency({ currency: "EUR", rate: 0.9, alias: "EUR", symbol: "€" });
-    const result = await skill.execute("test", {}, undefined, undefined, {} as any);
-    const data = result.details.data as any;
+    const result = await skill.run({}, { baseCurrency: { ...baseCurrency, currency: "EUR", rate: 0.9 } });
+    const data = result.data as any;
     expect(data.totalValue).toBe(900);
     expect(data.topHoldings[0].valueInBase).toBe(900);
   });

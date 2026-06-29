@@ -1,13 +1,23 @@
-/**
- * Public API for the AI module.
- *
- * Exports the Pi Agent SDK integration (pi-agent.ts), session metadata
- * management (sessions.ts), and minimal provider utilities.
- */
+// Public API for the AI module. Importing this module also registers
+// every skill via the side-effect import in ./skills.
+import "./skills";
 
-// -----------------------------------------------------------------------
-// Session metadata – stored in SQLite
-// -----------------------------------------------------------------------
+export {
+  streamChatCompletion,
+  probeConnection,
+  normalizeEndpoint,
+} from "./provider";
+
+export {
+  registerSkill,
+  getSkill,
+  listSkills,
+  clearSkillRegistry,
+  toOpenAITools,
+  runSkill,
+} from "./tools";
+
+export { buildSystemPrompt } from "./prompt";
 export {
   buildSessionPreview,
   createSession,
@@ -16,36 +26,35 @@ export {
   listSessions,
   loadSession,
   renameSession,
+  rewriteMessages,
+  appendMessages,
   togglePin,
   touchSession,
 } from "./sessions";
 
-export type { ChatSessionMeta } from "./sessions";
+export type {
+  ChatSession,
+  ChatSessionMeta,
+  PersistedBlock,
+  PersistedChatMessage,
+} from "./sessions";
 
-// -----------------------------------------------------------------------
-// Provider utilities – probe + normalizeEndpoint still needed
-// -----------------------------------------------------------------------
-export { probeConnection, normalizeEndpoint } from "./provider";
-export type { StreamRequest, ProviderMessage } from "./types";
 
-// -----------------------------------------------------------------------
-// Pi Agent SDK integration
-// -----------------------------------------------------------------------
-export {
-  createPiSession,
-  disposePiSession,
-  getPiSession,
-  saveSdkSession,
-  loadSdkSession,
-  deleteSdkSession,
-  setBaseCurrency,
-  getBaseCurrency,
-  sObj,
-  sString,
-  sNumber,
-  sOptional,
-  sArray,
-} from "./pi-agent";
-export type { ChartToolDetails } from "./pi-agent";
 
-export { allToolDefinitions } from "./skills";
+export type {
+  StreamEvent,
+  StreamRequest,
+  StreamOptions,
+  ChatRole,
+  ProviderMessage,
+  ProviderToolCall,
+  ProviderFunctionDef,
+} from "./types";
+
+export type {
+  Skill,
+  SkillArgs,
+  ToolResult,
+  SkillContext,
+  GetAssetType,
+} from "./skills/types";

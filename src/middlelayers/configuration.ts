@@ -44,7 +44,7 @@ const clientInfoFixId = "998";
 const licenseFixId = "997";
 const stableCoinsId = "996";
 const blacklistCoinsId = "995";
-const aiConfigId = "999";
+const aiConfigId = "994";
 const preferCurrencyLocalStorageKey = "track3-prefer-currency";
 
 export const themeLocalStorageKey = "track3-ui-theme";
@@ -86,6 +86,26 @@ function validateAIConfig(cfg: AIConfig): void {
 // AIConfigMissingError when nothing has been saved yet so the UI can
 // branch on the empty state.
 export async function loadAIConfig(): Promise<AIConfig> {
+  // Migration: legacy AI config was stored at id "999", which conflicted
+  // with the Rust backend's VERSION_CONFIGURATION_ID (also 999).
+  // If the new id (994) is empty, read from 999 and migrate it forward.
+  // Only migrate if the data looks like valid AI config JSON (not the version string
+  // that prepare_required_data may have written to id=999).
+  const legacyModel = await getConfigurationById("999");
+  if (legacyModel && legacyModel.data) {
+    let isAIConfig = false;
+    try {
+      const parsed = JSON.parse(legacyModel.data);
+      isAIConfig = parsed && typeof parsed === "object" && typeof parsed.endpoint === "string";
+    } catch {
+      // not valid JSON — probably the app version string, skip migration
+    }
+    if (isAIConfig) {
+      await saveConfigurationById(aiConfigId, legacyModel.data, true);
+      await deleteConfigurationById("999");
+    }
+  }
+
   const model = await getConfigurationById(aiConfigId);
   if (!model || !model.data) {
     throw new AIConfigMissingError();

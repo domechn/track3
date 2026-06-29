@@ -17,7 +17,7 @@ vi.mock("./database", () => ({
   getDatabase: vi.fn(),
 }));
 
-const aiConfigId = "999";
+const aiConfigId = "994";
 
 function createConfigurationDb(rows: Map<string, string>) {
   return {

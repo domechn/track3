@@ -1,36 +1,15 @@
-/**
- * Chat hook – drives the assistant UI.
- *
- * Uses the Pi Agent SDK (AgentSession) for the agent loop and tool
- * execution. Session persistence is handled via pi-agent.ts (SDK session
- * entries saved through Tauri's fs plugin). Track3's SQLite metadata
- * (title, timestamps, preview) is still managed through sessions.ts.
- */
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { AIConfig, ChartSpec } from "@/middlelayers/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
-
 import {
-  allToolDefinitions,
-  buildSessionPreview,
-  createPiSession,
-  disposePiSession,
-  getPiSession,
-  generateTitle,
-  loadSession,
-  normalizeEndpoint,
+  buildSystemPrompt,
   probeConnection,
-  renameSession,
-  saveSdkSession,
-  setBaseCurrency,
-  touchSession,
+  runSkill,
+  streamChatCompletion,
+  toOpenAITools,
 } from "@/middlelayers/ai";
+import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
 
-// ---------------------------------------------------------------------------
-// Types – same shape as before
-// ---------------------------------------------------------------------------
 export type AssistantBlock =
   | { kind: "text"; text: string }
   | { kind: "chart"; chart: ChartSpec };
@@ -39,38 +18,10 @@ export type ChatMessage =
   | { role: "user"; content: string }
   | { role: "assistant"; blocks: AssistantBlock[] };
 
-export function toPersisted(messages: ChatMessage[]) {
-  return messages.map((m) => {
-    if (m.role === "user") return { role: "user" as const, content: m.content };
-    return {
-      role: "assistant" as const,
-      blocks: m.blocks.map((b) => {
-        if (b.kind === "text") return { kind: "text" as const, text: b.text };
-        return { kind: "chart" as const, chart: b.chart };
-      }),
-    };
-  });
-}
-
-export function fromPersisted(messages: any[]) {
-  return messages.map((m: any) => {
-    if (m.role === "user") return { role: "user" as const, content: m.content };
-    const blocks: AssistantBlock[] = (m.blocks ?? []).map((b: any) => {
-      if (b.kind === "text") return { kind: "text" as const, text: b.text };
-      return { kind: "chart" as const, chart: b.chart };
-    });
-    return { role: "assistant" as const, blocks };
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Hook options & result
-// ---------------------------------------------------------------------------
 export type UseChatOptions = {
   config: AIConfig;
   baseCurrency: CurrencyRateDetail;
   contextSize?: number;
-  sessionId: string | null;
 };
 
 export type UseChatResult = {
@@ -78,8 +29,6 @@ export type UseChatResult = {
   input: string;
   setInput: (next: string) => void;
   isStreaming: boolean;
-  isHydrating: boolean;
-  title: string;
   send: (text?: string) => Promise<void>;
   stop: () => void;
   runQuickAction: (key: string, prompt: string) => Promise<void>;
@@ -87,282 +36,219 @@ export type UseChatResult = {
   clear: () => void;
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function getAssistantIndex(messages: ChatMessage[]): number | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i]?.role === "assistant") return i;
+// Convert a chat history into the flat provider message list. Assistant
+// text is joined; chart blocks become a short textual note so the model
+// at least sees that a chart was rendered (no charts are re-sent to the
+// model itself).
+function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
+  const out: ProviderMessage[] = [];
+  for (const m of messages) {
+    if (m.role === "user") {
+      out.push({ role: "user", content: m.content });
+      continue;
+    }
+    const text = m.blocks
+      .map((b) => {
+        if (b.kind === "text") return b.text;
+        return `[rendered chart: ${b.chart.type}]`;
+      })
+      .join("")
+      .trim();
+    if (text) {
+      out.push({ role: "assistant", content: text });
+    }
   }
-  return null;
+  return out;
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
+function trimMessages(messages: ProviderMessage[], maxCount: number): ProviderMessage[] {
+  if (maxCount <= 0 || messages.length <= maxCount) {
+    return messages;
+  }
+  // Always keep the most recent N messages and drop older turns. The
+  // system prompt is prepended by the caller so we only trim turns.
+  return messages.slice(messages.length - maxCount);
+}
+
 export function useChat(options: UseChatOptions): UseChatResult {
-  const { config, baseCurrency, contextSize = 8192, sessionId } = options;
+  const { config, baseCurrency, contextSize = 8192 } = options;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [title, setTitle] = useState<string>("");
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isHydrating, setIsHydrating] = useState(false);
-  const titleTriedRef = useRef(false);
-  const configRef = useRef(config);
-  const baseCurrencyRef = useRef(baseCurrency);
-  const messagesRef = useRef<ChatMessage[]>([]);
-  const sessionRef = useRef<AgentSession | null>(null);
-  const unsubRef = useRef<(() => void) | null>(null);
-  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const targetIdRef = useRef("");
+  const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => { configRef.current = config; }, [config]);
-  useEffect(() => { baseCurrencyRef.current = baseCurrency; }, [baseCurrency]);
-  useEffect(() => { messagesRef.current = messages; }, [messages]);
-  useEffect(() => { targetIdRef.current = sessionId ?? ""; }, [sessionId]);
+  const systemPrompt = useMemo(
+    () => buildSystemPrompt(baseCurrency),
+    [baseCurrency],
+  );
 
-  // -----------------------------------------------------------------------
-  // Persist SDK session entries after agent completes
-  // -----------------------------------------------------------------------
-  async function persistSdkSession(sid: string, snapshot: ChatMessage[]) {
-    const session = sessionRef.current;
-    if (!session) return;
-    try {
-      // Save SDK session manager entries for LLM context persistence
-      const entries = session.sessionManager.getEntries();
-      await saveSdkSession(sid, entries);
-      // Update Track3 metadata (preview, message count)
-      await touchSession(sid, {
-        messageCount: snapshot.length,
-        preview: buildSessionPreview(toPersisted(snapshot)),
-      });
-    } catch (err) {
-      console.error("failed to persist sdk session", err);
-    }
-  }
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsStreaming(false);
+  }, []);
 
-  // -----------------------------------------------------------------------
-  // Session lifecycle – create/dispose on sessionId change
-  // -----------------------------------------------------------------------
-  useEffect(() => {
-    if (!sessionId) {
-      if (sessionRef.current) {
-        unsubRef.current?.(); unsubRef.current = null;
-        sessionRef.current.dispose(); sessionRef.current = null;
-      }
-      setMessages([]); setTitle(""); titleTriedRef.current = false; setIsHydrating(false);
-      return;
-    }
+  const clear = useCallback(() => {
+    stop();
+    setMessages([]);
+    setInput("");
+  }, [stop]);
 
-    const targetId = sessionId;
-    let cancelled = false;
-
-    (async () => {
-      setIsHydrating(true);
-      let persisted: ChatMessage[] = [];
-      try {
-        const session = await loadSession(targetId);
-        if (cancelled) return;
-        if (session) {
-          persisted = fromPersisted((session as any).messages ?? []);
-          setMessages(persisted);
-          setTitle((session as any).title ?? "");
-          titleTriedRef.current = !!((session as any).title ?? "");
-        }
-      } catch (err) {
-        if (cancelled) return;
-        console.error("failed to load chat session", err);
-      }
-      if (cancelled) return;
-
-      if (sessionRef.current) {
-        unsubRef.current?.(); unsubRef.current = null;
-        sessionRef.current.dispose(); sessionRef.current = null;
-      }
-
-      setBaseCurrency(baseCurrencyRef.current);
-
-      try {
-        const session = await createPiSession(
-          targetId, configRef.current, baseCurrencyRef.current, allToolDefinitions,
+  // Consume the provider stream and append events to the trailing
+  // assistant message. Any `tool_call` is dispatched against the skill
+  // registry and the resulting chart is appended as a block.
+  const consumeStream = useCallback(
+    async (
+      events: AsyncGenerator<StreamEvent>,
+      assistantIndex: number,
+    ) => {
+      let bufferText = "";
+      const dispatchToolCall = async (ev: {
+        kind: "tool_call";
+        id: string;
+        name: string;
+        args: unknown;
+      }) => {
+        const skillResult = await runSkill(
+          ev.name,
+          (ev.args as Record<string, unknown>) ?? {},
+          { baseCurrency },
         );
-        if (cancelled) { session.dispose(); return; }
-        sessionRef.current = session;
-        unsubRef.current = subscribeToEvents(session);
-        await injectHistory(session, persisted);
-      } catch (err) {
-        if (cancelled) return;
-        console.error("failed to create pi session", err);
-      } finally {
-        if (!cancelled) setIsHydrating(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      unsubRef.current?.(); unsubRef.current = null;
-      if (sessionRef.current) { sessionRef.current.dispose(); sessionRef.current = null; }
-      disposePiSession(targetId);
-    };
-  }, [sessionId]);
-
-  // -----------------------------------------------------------------------
-  // Event subscription factory
-  // -----------------------------------------------------------------------
-  function subscribeToEvents(session: AgentSession): () => void {
-    let textBuffer = "";
-    return session.subscribe((event: AgentSessionEvent) => {
-      if (event.type === "message_update") {
-        const ae = event.assistantMessageEvent;
-        if (ae.type === "text_delta") {
-          textBuffer += ae.delta;
-          setMessages((prev) => {
-            const idx = getAssistantIndex(prev);
-            if (idx === null) return prev;
-            const next = prev.slice();
-            const target = { ...next[idx] };
-            if (target.role !== "assistant") return prev;
-            const blocks = target.blocks.slice();
-            const last = blocks[blocks.length - 1];
-            if (last && last.kind === "text") {
-              blocks[blocks.length - 1] = { kind: "text", text: textBuffer };
-            } else {
-              blocks.push({ kind: "text", text: textBuffer });
-            }
-            next[idx] = { ...target, blocks };
-            return next;
-          });
-        }
-      }
-
-      if (event.type === "turn_end") {
-        const results = event.toolResults ?? [];
-        for (const tr of results) {
-          const details = tr.details as { chart?: ChartSpec } | undefined;
-          if (details?.chart) {
+        if (skillResult.ok) {
+          const chart = skillResult.result.chart;
+          if (chart) {
             setMessages((prev) => {
-              const idx = getAssistantIndex(prev);
-              if (idx === null) return prev;
               const next = prev.slice();
-              const target = { ...next[idx] };
-              if (target.role !== "assistant") return prev;
-              next[idx] = { ...target, blocks: [...target.blocks, { kind: "chart" as const, chart: details.chart! }] };
+              const target = { ...next[assistantIndex] };
+              if (target.role === "assistant") {
+                next[assistantIndex] = {
+                  ...target,
+                  blocks: [
+                    ...target.blocks,
+                    { kind: "chart", chart },
+                  ],
+                };
+              }
               return next;
             });
           }
         }
-      }
+      };
 
-      if (event.type === "agent_end") {
-        textBuffer = "";
-        setIsStreaming(false);
-        const snapshot = messagesRef.current;
-        if (snapshot.length > 0) void persistSdkSession(targetIdRef.current, snapshot);
-
-        const tried = titleTriedRef.current;
-        if (!tried && snapshot.length >= 2) {
-          const firstUser = snapshot[0]?.role === "user" ? snapshot[0].content : "";
-          const firstAssistant = snapshot[1]?.role === "assistant"
-            ? snapshot[1].blocks.map((b) => (b.kind === "text" ? b.text : "")).join("").trim()
-            : "";
-          if (firstUser && firstAssistant) {
-            titleTriedRef.current = true;
-            void generateTitle(configRef.current, firstUser, firstAssistant)
-              .then((gen) => { if (gen) { void renameSession(targetIdRef.current, gen); setTitle(gen); } });
-          }
+      for await (const ev of events) {
+        if (ev.kind === "text") {
+          bufferText += ev.delta;
+          setMessages((prev) => {
+            const next = prev.slice();
+            const target = { ...next[assistantIndex] };
+            if (target.role !== "assistant") return prev;
+            const blocks = target.blocks.slice();
+            const last = blocks[blocks.length - 1];
+            if (last && last.kind === "text") {
+              blocks[blocks.length - 1] = {
+                kind: "text",
+                text: last.text + ev.delta,
+              };
+            } else {
+              blocks.push({ kind: "text", text: ev.delta });
+            }
+            next[assistantIndex] = { ...target, blocks };
+            return next;
+          });
+        } else if (ev.kind === "tool_call") {
+          await dispatchToolCall(ev);
+        } else if (ev.kind === "error") {
+          setMessages((prev) => {
+            const next = prev.slice();
+            const target = { ...next[assistantIndex] };
+            if (target.role !== "assistant") return prev;
+            const blocks = target.blocks.slice();
+            blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
+            next[assistantIndex] = { ...target, blocks };
+            return next;
+          });
+        } else if (ev.kind === "done") {
+          break;
         }
       }
-    });
-  }
+      void bufferText;
+    },
+    [baseCurrency],
+  );
 
-  // -----------------------------------------------------------------------
-  // History injection – replay existing messages into the SDK session
-  // -----------------------------------------------------------------------
-  async function injectHistory(session: AgentSession, existingMessages: ChatMessage[]) {
-    if (existingMessages.length === 0) return;
-    for (const msg of existingMessages) {
-      if (msg.role === "user") {
-        await session.sendCustomMessage(
-          { customType: "track3-history", content: msg.content, display: true, details: undefined },
-          { triggerTurn: false, deliverAs: "nextTurn" },
-        );
+  const send = useCallback(
+    async (text?: string) => {
+      const content = (text ?? input).trim();
+      if (!content || isStreaming) return;
+      setInput("");
+      const userMessage: ChatMessage = { role: "user", content };
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        blocks: [],
+      };
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      setIsStreaming(true);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const assistantIndex = -1; // placeholder; we re-resolve after the state update below
+      try {
+        const history = flattenForProvider([...messages, userMessage]);
+        const trimmed = trimMessages(history, Math.max(2, Math.floor(contextSize / 256)));
+        const providerMessages: ProviderMessage[] = [
+          { role: "system", content: systemPrompt },
+          ...trimmed,
+        ];
+        const events = streamChatCompletion({
+          endpoint: config.endpoint,
+          apiKey: config.apiKey,
+          model: config.model,
+          messages: providerMessages,
+          tools: toOpenAITools(),
+          advanced: config.advanced,
+          signal: controller.signal,
+        });
+        // Resolve the assistant message index after the state update
+        // has applied; messages.length is captured at send time.
+        const idx = messages.length + 1; // user then assistant
+        await consumeStream(events, idx);
+      } finally {
+        setIsStreaming(false);
+        abortRef.current = null;
       }
-    }
-  }
+      void assistantIndex;
+    },
+    [input, isStreaming, messages, config, systemPrompt, contextSize, consumeStream],
+  );
 
-  // -----------------------------------------------------------------------
-  // send
-  // -----------------------------------------------------------------------
-  const send = useCallback(async (text?: string) => {
-    const content = (text ?? input).trim();
-    if (!content || isStreaming || !sessionId) return;
-    const session = sessionRef.current;
-    if (!session) return;
+  const runQuickAction = useCallback(
+    async (key: string, prompt: string) => {
+      // key is reserved for future per-action telemetry; ignored for now
+      void key;
+      await send(prompt);
+    },
+    [send],
+  );
 
-    setInput("");
-    const userBlock: ChatMessage = { role: "user", content };
-    const assistantBlock: ChatMessage = { role: "assistant", blocks: [] };
-    setMessages((prev) => [...prev, userBlock, assistantBlock]);
-    setIsStreaming(true);
-
-    try {
-      await session.prompt(content, { expandPromptTemplates: false });
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "An unknown error occurred";
-      setMessages((prev) => {
-        const idx = getAssistantIndex(prev);
-        if (idx === null) return prev;
-        const next = prev.slice();
-        const target = { ...next[idx] };
-        if (target.role !== "assistant") return prev;
-        next[idx] = { ...target, blocks: [...target.blocks, { kind: "text", text: `\n\n[error] ${errMsg}` }] };
-        return next;
-      });
-      setIsStreaming(false);
-    }
-  }, [input, isStreaming, sessionId]);
-
-  // -----------------------------------------------------------------------
-  // stop
-  // -----------------------------------------------------------------------
-  const stop = useCallback(() => {
-    sessionRef.current?.abort().catch(() => {});
-    setIsStreaming(false);
-    const snapshot = messagesRef.current;
-    if (snapshot.length > 0) {
-      const sid = targetIdRef.current;
-      if (sid) void persistSdkSession(sid, snapshot);
-    }
-  }, []);
-
-  // -----------------------------------------------------------------------
-  // runQuickAction
-  // -----------------------------------------------------------------------
-  const runQuickAction = useCallback(async (_key: string, prompt: string) => {
-    await send(prompt);
-  }, [send]);
-
-  // -----------------------------------------------------------------------
-  // probe
-  // -----------------------------------------------------------------------
   const probe = useCallback(async () => {
-    if (!config.endpoint || !config.apiKey || !config.model) return "AI provider is not fully configured.";
     return probeConnection({
-      endpoint: normalizeEndpoint(config.endpoint), apiKey: config.apiKey,
-      model: config.model, messages: [{ role: "user", content: "ping" }], advanced: config.advanced,
+      endpoint: config.endpoint,
+      apiKey: config.apiKey,
+      model: config.model,
+      messages: [{ role: "user", content: "ping" }],
+      advanced: config.advanced,
     });
   }, [config]);
 
-  // -----------------------------------------------------------------------
-  // clear
-  // -----------------------------------------------------------------------
-  const clear = useCallback(() => { stop(); setMessages([]); setInput(""); titleTriedRef.current = false; }, [stop]);
-
-  // -----------------------------------------------------------------------
-  // Return
-  // -----------------------------------------------------------------------
   return {
-    messages, input, setInput, isStreaming, isHydrating, title,
-    send, stop, runQuickAction, probe, clear,
+    messages,
+    input,
+    setInput,
+    isStreaming,
+    send,
+    stop,
+    runQuickAction,
+    probe,
+    clear,
   };
 }

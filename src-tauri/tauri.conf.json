@@ -41,7 +41,7 @@
   },
   "productName": "track3",
   "mainBinaryName": "track3",
-  "version": "0.8.0",
+  "version": "0.7.1",
   "identifier": "dev.track3.track3",
   "plugins": {
     "updater": {
