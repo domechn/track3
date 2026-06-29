@@ -22,6 +22,20 @@ const FILE_VERSION = 1;
 const PREVIEW_LIMIT = 30;
 const LLM_PROMPT_CHAR_LIMIT = 400;
 
+// Module-level event system for notifying components when a session's
+// messages have been updated by an orphaned background stream.
+const sessionUpdateListeners = new Map<string, Set<(sessionId: string) => void>>();
+
+export function onSessionUpdate(sessionId: string, callback: (sessionId: string) => void): () => void {
+  if (!sessionUpdateListeners.has(sessionId)) sessionUpdateListeners.set(sessionId, new Set());
+  sessionUpdateListeners.get(sessionId)!.add(callback);
+  return () => { sessionUpdateListeners.get(sessionId)?.delete(callback); };
+}
+
+export function notifySessionUpdate(sessionId: string): void {
+  for (const cb of sessionUpdateListeners.get(sessionId) ?? []) cb(sessionId);
+}
+
 export type ChatSessionMeta = {
   id: string;
   title: string;

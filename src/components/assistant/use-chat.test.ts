@@ -104,7 +104,13 @@ describe("useChat", () => {
   });
 
   it("appends a chart block when a tool_call dispatches to a skill that returns a chart", async () => {
+    let callCount = 0;
     vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      callCount++;
+      if (callCount > 1) {
+        yield { kind: "done" };
+        return;
+      }
       yield {
         kind: "tool_call",
         id: "call_1",
