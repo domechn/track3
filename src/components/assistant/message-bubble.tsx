@@ -145,7 +145,7 @@ export default function MessageBubble({
       )}
       <div
         className={cn(
-          "max-w-[min(880px,100%)] rounded-2xl px-4 py-3 shadow-sm",
+          "max-w-full rounded-2xl px-4 py-3 shadow-sm",
           isUser
             ? "bg-primary text-primary-foreground"
             : "border border-[var(--glass-border)] bg-card/80 backdrop-blur",

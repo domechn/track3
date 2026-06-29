@@ -88,3 +88,81 @@ describe("health_score skill", () => {
     expect(data.factors.activity).toBe(1);
   });
 });
+  it("handles empty position list gracefully", async () => {
+    const latest = {
+      uuid: "u",
+      createdAt: new Date("2026-06-01T00:00:00Z"),
+      totalValue: 0,
+    };
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([latest] as any);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([] as any);
+    vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([]);
+
+    const result = await skill.run({}, { baseCurrency });
+    const data = result.data as any;
+    expect(data.overall).toBeGreaterThanOrEqual(0);
+    expect(data.factors.diversification).toBe(0);
+    expect(data.factors.cashRatio).toBe(0);
+    expect(data.topPositions).toHaveLength(0);
+  });
+
+  it("computes 30-day return from the closest snapshot", async () => {
+    const now = new Date("2026-06-15T00:00:00Z");
+    const totals = [
+      { uuid: "a", createdAt: new Date("2026-01-01T00:00:00Z"), totalValue: 800 },
+      { uuid: "b", createdAt: new Date("2026-05-01T00:00:00Z"), totalValue: 1000 },
+      { uuid: "c", createdAt: now, totalValue: 1200 },
+    ];
+    // 30 days before = 2026-05-16. Closest is "b" at 2026-05-01.
+    // Return = (1200 - 1000) / 1000 = 0.2 => (0.2 + 0.5) / 1.0 = 0.7
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue(totals as any);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([
+      { id: 1, uuid: "c", createdAt: "2026-06-15T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 1, value: 1200, price: 1200 },
+    ] as any);
+    vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([]);
+
+    const result = await skill.run({}, { baseCurrency });
+    const data = result.data as any;
+    expect(data.factors.recentReturn).toBeCloseTo(0.7, 2);
+  });
+
+  it("uses default factor values when only one snapshot exists", async () => {
+    const latest = {
+      uuid: "u",
+      createdAt: new Date("2026-06-01T00:00:00Z"),
+      totalValue: 1000,
+    };
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([latest] as any);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([
+      { id: 1, uuid: "u", createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 0.5, value: 500, price: 1000 },
+      { id: 2, uuid: "u", createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "ETH", amount: 2, value: 300, price: 150 },
+      { id: 3, uuid: "u", createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "SOL", amount: 100, value: 200, price: 2 },
+    ] as any);
+    vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([]);
+
+    const result = await skill.run({}, { baseCurrency });
+    const data = result.data as any;
+    expect(data.factors.recentReturn).toBe(0.5);
+  });
+
+  it("converts values into the base currency", async () => {
+    const latest = {
+      uuid: "u",
+      createdAt: new Date("2026-06-01T00:00:00Z"),
+      totalValue: 1000,
+    };
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([latest] as any);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([
+      { id: 1, uuid: "u", createdAt: "2026-06-01T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 0.5, value: 500, price: 1000 },
+    ] as any);
+    vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([]);
+
+    const result = await skill.run(
+      {},
+      { baseCurrency: { ...baseCurrency, currency: "EUR", rate: 0.85 } },
+    );
+    const data = result.data as any;
+    expect(data.totals.value).toBe(425);
+    expect(data.topPositions[0].value).toBe(425);
+  });
+

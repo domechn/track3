@@ -1,10 +1,7 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
 import { ASSET_HANDLER } from "../../entities/assets";
-import { listAllCurrencyRates } from "../../configuration";
-import { selectFromDatabaseWithSql } from "../../database";
 import { chartColors } from "@/utils/chart-theme";
-import type { LatestAssetsPercentageData } from "../../types";
 
 const DEFAULT_TOP_N = 10;
 

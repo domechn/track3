@@ -43,18 +43,21 @@ pub fn init_sqlite_tables(app_version: String, app_dir: &Path, resource_dir: &Pa
         fs::read_to_string(resource_dir.join("migrations/init/currency_rates_up.sql")).unwrap();
     let asset_actions =
         fs::read_to_string(resource_dir.join("migrations/init/asset_prices_up.sql")).unwrap();
-    let transactions =
-        fs::read_to_string(resource_dir.join("migrations/init/transactions_up.sql")).unwrap();
+   let transactions =
+       fs::read_to_string(resource_dir.join("migrations/init/transactions_up.sql")).unwrap();
+    let chat_sessions =
+        fs::read_to_string(resource_dir.join("migrations/init/chat_sessions_up.sql")).unwrap();
 
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async move {
+   let rt = Runtime::new().unwrap();
+   rt.block_on(async move {
         println!("init sqlite tables in tokio spawn");
         let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
         conn.execute(configuration.as_str()).await.unwrap();
         conn.execute(assets_v2.as_str()).await.unwrap();
-        conn.execute(currency_rates_sync.as_str()).await.unwrap();
-        conn.execute(asset_actions.as_str()).await.unwrap();
-        conn.execute(transactions.as_str()).await.unwrap();
+       conn.execute(currency_rates_sync.as_str()).await.unwrap();
+       conn.execute(asset_actions.as_str()).await.unwrap();
+        conn.execute(chat_sessions.as_str()).await.unwrap();
+       conn.execute(transactions.as_str()).await.unwrap();
 
         // record current app version
         sqlx::query(
@@ -664,7 +667,47 @@ async fn column_exists(conn: &mut SqliteConnection, table_name: &str, column_nam
     .fetch_one(conn)
     .await
     .unwrap_or(0);
-    count > 0
+   count > 0
+}
+
+pub struct V7TV8 {
+    app_dir: String,
+    resource_dir: String,
+}
+
+impl Migration for V7TV8 {
+    fn new(app_dir: String, resource_dir: String) -> Self {
+        V7TV8 {
+            app_dir,
+            resource_dir,
+        }
+    }
+
+    fn need_to_run(&self, previous_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let res = compare_to(previous_version, "0.8.0", Cmp::Lt).unwrap();
+        println!("check if from v0.7 to v0.8 in rust, {:?}", res);
+        return Ok(res);
+    }
+
+    fn migrate(&self) {
+        let app_dir = Path::new(&self.app_dir);
+        let resource_dir = Path::new(&self.resource_dir);
+        println!("migrate chat sessions table support");
+        let sqlite_path = get_sqlite_file_path(app_dir);
+        let chat_sessions_up = fs::read_to_string(
+            resource_dir.join("migrations/v07t08/chat_sessions_up.sql"),
+        )
+        .unwrap();
+
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move {
+            println!("migrate chat sessions table in tokio spawn");
+            let mut conn = SqliteConnection::connect(&sqlite_path).await.unwrap();
+            conn.execute(chat_sessions_up.as_str()).await.unwrap();
+            conn.close().await.unwrap();
+            println!("migrate chat sessions table in tokio spawn done");
+        });
+    }
 }
 
 #[cfg(test)]

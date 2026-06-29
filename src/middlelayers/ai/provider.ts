@@ -317,11 +317,11 @@ export async function* streamChatCompletion(
     };
   }
 
-  // Suppress unused warning while keeping the value available for callers
-  // that want to log finish_reason in the future.
-  void finishReason;
-
-  yield { kind: "done" };
+  if (finishReason) {
+    yield { kind: "done", reason: finishReason };
+  } else {
+    yield { kind: "done" };
+  }
 }
 
 async function safeReadText(resp: Response): Promise<string> {

@@ -9,7 +9,7 @@ export type StreamEvent =
   | { kind: "tool_result"; id: string; name: string; content: string }
   | { kind: "chart"; chart: ChartSpec }
   | { kind: "error"; message: string }
-  | { kind: "done" };
+  | { kind: "done"; reason?: string };
 
 // OpenAI-compatible role types.
 export type ChatRole = "user" | "assistant" | "system" | "tool";

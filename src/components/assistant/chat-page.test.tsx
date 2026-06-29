@@ -22,6 +22,38 @@ vi.mock("./use-chat", () => ({
   }),
 }));
 
+vi.mock("./use-chat-sessions", () => ({
+  useChatSessions: () => ({
+    sessions: [],
+    isLoading: false,
+    refresh: vi.fn(),
+    createNew: vi.fn().mockResolvedValue({
+      id: "mock-session-id",
+      title: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      pinned: 0 as const,
+      messageCount: 0,
+      preview: "",
+    }),
+    remove: vi.fn(),
+    pin: vi.fn(),
+  }),
+}));
+
+vi.mock("@/middlelayers/ai", async () => {
+  const actual = await vi.importActual<typeof import("@/middlelayers/ai")>(
+    "@/middlelayers/ai",
+  );
+  return {
+    ...actual,
+    loadSession: vi.fn().mockResolvedValue(null),
+    appendMessages: vi.fn().mockResolvedValue(undefined),
+    touchSession: vi.fn().mockResolvedValue(undefined),
+    buildSessionPreview: vi.fn().mockReturnValue(""),
+  };
+});
+
 vi.mock("@/middlelayers/configuration", async () => {
   const actual = await vi.importActual<typeof import("@/middlelayers/configuration")>(
     "@/middlelayers/configuration",
@@ -51,18 +83,22 @@ const config: AIConfig = {
   contextSize: 8192,
 };
 
-function renderAt(path: string, isPro: boolean) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route
-          path="*"
-          element={<ChatPage isProUser={isPro} />}
-        />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
+ function renderAt(path: string, isPro: boolean) {
+   return render(
+     <MemoryRouter initialEntries={[path]}>
+       <Routes>
+         <Route
+           path="/assistant/:sessionId"
+           element={<ChatPage isProUser={isPro} />}
+         />
+         <Route
+           path="*"
+           element={<ChatPage isProUser={isPro} />}
+         />
+       </Routes>
+     </MemoryRouter>,
+   );
+ }
 
 beforeEach(() => {
   sendSpy.mockReset();
@@ -144,7 +180,8 @@ describe("ChatPage", () => {
     // padding so the composer (the last flex child) lands at the bottom
     // of the page rather than floating with empty space beneath it.
     const card = screen.getByTestId("chat-card");
-    expect(card.className).toContain("h-[calc(100vh-88px)]");
+    const layout = screen.getByTestId("chat-session-layout");
+    expect(layout.className).toContain("h-[calc(100vh-88px)]");
   });
 
   it("renders the error card with the failure reason when load fails", async () => {

@@ -11,9 +11,10 @@ const mocks = vi.hoisted(() => {
     invoke: vi.fn(),
     mkdir: vi.fn(),
     writeTextFile: vi.fn(),
-    readTextFile: vi.fn(),
-    removeFile: vi.fn(),
-    exists: vi.fn(),
+     readTextFile: vi.fn(),
+     remove: vi.fn(),
+     exists: vi.fn(),
+    fetch: vi.fn(),
     appDataDir: vi.fn(),
     selectFromDatabase: vi.fn(
       async (_table: string, where: any, _limit?: number, orderBy?: any) => {
@@ -67,12 +68,16 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: mocks.invoke,
 }));
 
+vi.mock("@tauri-apps/plugin-http", () => ({
+  fetch: mocks.fetch,
+}));
+
 vi.mock("@tauri-apps/plugin-fs", () => ({
   mkdir: mocks.mkdir,
   writeTextFile: mocks.writeTextFile,
   readTextFile: mocks.readTextFile,
-  removeFile: mocks.removeFile,
-  exists: mocks.exists,
+   remove: mocks.remove,
+   exists: mocks.exists,
 }));
 
 vi.mock("@tauri-apps/api/path", () => ({
@@ -105,10 +110,11 @@ beforeEach(() => {
   mocks.mkdir.mockReset();
   mocks.writeTextFile.mockReset();
   mocks.readTextFile.mockReset();
-  mocks.removeFile.mockReset();
+   mocks.remove.mockReset();
   mocks.exists.mockReset();
   mocks.appDataDir.mockReset();
   mocks.uuidV4.mockReset();
+  mocks.fetch.mockReset();
 
   mocks.appDataDir.mockResolvedValue("/appdata");
   mocks.mkdir.mockResolvedValue(undefined);
@@ -138,9 +144,9 @@ beforeEach(() => {
     }
     return v;
   });
-  mocks.removeFile.mockImplementation(async (path: string) => {
-    fsFileMap.delete(path);
-  });
+   mocks.remove.mockImplementation(async (path: string) => {
+     fsFileMap.delete(path);
+   });
   mocks.exists.mockImplementation(async (path: string) => fsFileMap.has(path));
 
   mocks.uuidV4.mockReturnValue("uuid-1");
@@ -383,27 +389,22 @@ describe("chat sessions middlelayer", () => {
       model: "gpt-4o-mini",
       contextSize: 1024,
     };
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async () => {
-      return new Response(
+    mocks.fetch.mockResolvedValue(
+      new Response(
         JSON.stringify({
           choices: [
             { message: { content: "Portfolio health snapshot" } },
           ],
         }),
         { status: 200, headers: { "content-type": "application/json" } },
-      );
-    }) as any;
-    try {
-      const title = await sessions.generateTitle(
-        config,
-        "How healthy is my portfolio?",
-        "Your portfolio is well diversified.",
-      );
-      expect(title).toBe("Portfolio health snapshot");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+      ) as any,
+    );
+    const title = await sessions.generateTitle(
+      config,
+      "How healthy is my portfolio?",
+      "Your portfolio is well diversified.",
+    );
+    expect(title).toBe("Portfolio health snapshot");
   });
 
   it("generateTitle falls back to a preview snippet on LLM failure", async () => {
@@ -414,21 +415,16 @@ describe("chat sessions middlelayer", () => {
       model: "gpt-4o-mini",
       contextSize: 1024,
     };
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async () => {
-      return new Response("boom", { status: 500 });
-    }) as any;
-    try {
-      const title = await sessions.generateTitle(
-        config,
-        "How healthy is my portfolio overall?",
-        "answer",
-      );
-      expect(title.length).toBeGreaterThan(0);
-      expect(title.length).toBeLessThanOrEqual(30);
-      expect(title.endsWith("…")).toBe(true);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    mocks.fetch.mockResolvedValue(
+      new Response("boom", { status: 500 }) as any,
+    );
+    const title = await sessions.generateTitle(
+      config,
+      "How healthy is my portfolio overall?",
+      "answer",
+    );
+    expect(title.length).toBeGreaterThan(0);
+    expect(title.length).toBeLessThanOrEqual(30);
+    expect(title.endsWith("…")).toBe(true);
   });
 });

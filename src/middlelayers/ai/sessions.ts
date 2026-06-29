@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { appDataDir } from "@tauri-apps/api/path";
+import { fetch } from "@tauri-apps/plugin-http";
 import {
   exists,
   mkdir,
@@ -314,9 +315,13 @@ async function callTitleLLM(
     const content = choice?.message?.content;
     if (typeof content !== "string") return null;
     const cleaned = content
+      // Strip <think> reasoning blocks that some models emit even for
+      // simple title generation prompts.
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
       .trim()
       .replace(/^["']+|["']+$/g, "")
-      .replace(/\.+$/, "");
+      .replace(/\.+$/, "")
+      .slice(0, 100);
     if (cleaned.length === 0) return null;
     return cleaned;
   } catch {
