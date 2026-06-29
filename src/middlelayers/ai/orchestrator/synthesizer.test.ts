@@ -32,7 +32,6 @@ describe("orchestrator.synthesizer", () => {
     const result = await synthesizeResults(baseParams, dummyPlan, []);
 
     expect(result.text).toContain("I wasn't able to gather any data");
-    expect(result.charts).toHaveLength(0);
   });
 
   it("uses LLM response as the synthesized text", async () => {
@@ -87,42 +86,4 @@ describe("orchestrator.synthesizer", () => {
 
     expect(output.text).toContain("Summary result A");
     expect(output.text).toContain("Health score result B");
-  });
-
-  it("collects charts from completed tasks", async () => {
-    mockCallLlm.mockResolvedValue({
-      content: "Analysis complete.",
-      ok: true,
-    });
-
-    const chart1 = { type: "doughnut" as const, labels: ["A", "B"], datasets: [], title: "Chart1" };
-    const chart2 = { type: "line" as const, labels: ["x"], datasets: [], title: "Chart2" };
-
-    const results: SubTaskResult[] = [
-      {
-        id: "t1",
-        skillName: "portfolio_summary",
-        status: "completed",
-        description: "test",
-        data: {},
-        text: "summary",
-        chart: chart1,
-      },
-      {
-        id: "t2",
-        skillName: "health_score",
-        status: "completed",
-        description: "test",
-        data: {},
-        text: "health",
-        chart: chart2,
-      },
-    ];
-
-    const output = await synthesizeResults(baseParams, dummyPlan, results);
-
-    expect(output.charts).toHaveLength(2);
-    expect(output.charts[0]?.title).toBe("Chart1");
-    expect(output.charts[1]?.title).toBe("Chart2");
-  });
-});
+  });});

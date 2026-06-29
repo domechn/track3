@@ -45,7 +45,6 @@ import SessionSidebar from "./session-sidebar";
 import { useChatSessions } from "./use-chat-sessions";
 import type { AIConfig, CurrencyRateDetail } from "@/middlelayers/types";
 import type { ChatMessage, AssistantBlock } from "./use-chat";
-import type { ChartSpec } from "@/middlelayers/types";
 
 type LoadState =
   | { status: "loading" }
@@ -113,10 +112,9 @@ function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {
   }
   return {
     role: "assistant",
-    blocks: msg.blocks.map((b): AssistantBlock => {
-      if (b.kind === "text") return b;
-      return { kind: "chart", chart: b.chart as ChartSpec };
-    }),
+    blocks: msg.blocks
+      .filter((b): b is { kind: "text"; text: string } => b.kind === "text")
+      .map((b): AssistantBlock => ({ kind: "text", text: b.text })),
   };
 }
 
@@ -127,11 +125,8 @@ function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
   return {
     role: "assistant",
     blocks: msg.blocks
-      .filter((b): b is Exclude<AssistantBlock, { kind: "think" } | { kind: "agent_activity" }> => b.kind !== "think" && b.kind !== "agent_activity")
-      .map((b): PersistedBlock => {
-        if (b.kind === "text") return { kind: "text", text: b.text };
-        return { kind: "chart", chart: b.chart };
-      }),
+      .filter((b): b is { kind: "text"; text: string } => b.kind === "text")
+      .map((b): PersistedBlock => ({ kind: "text", text: b.text })),
   };
 }
 
@@ -249,11 +244,18 @@ function ReadyChat({
         }
 
         await refresh();
-        // Notify any newly mounted component (e.g. after navigation away
-        // and back) that the session data has been persisted. The
-        // subscription effect in ReadyChat will bump sessionVersion,
-        // triggering a re-fetch of the session messages.
-        notifySessionUpdate(targetId);
+        // Only notify other component instances (e.g. after navigation
+        // away mid-stream) when the session already existed.  For fresh
+        // chats the navigation above already triggers a session reload
+        // via sessionId change, so the extra sessionVersion bump from
+        // notifySessionUpdate would cause a cascading re-render where
+        // the session loading effect runs twice, initialMsgs is
+        // overwritten, and the useChat initialMessages effect resets
+        // messages — a redundant cycle that grows worse with each
+        // additional message.
+        if (sessionId) {
+          notifySessionUpdate(targetId);
+        }
       } catch (err) {
         // Log but don't throw — the streamed messages in React state
         // are still visible in the UI; only the DB persistence failed.

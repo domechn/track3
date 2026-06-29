@@ -17,14 +17,6 @@ vi.mock("@/i18n", () => ({
   }),
 }));
 
-vi.mock("./inline-chart", () => ({
-  default: ({ spec }: { spec: any }) => (
-    <div data-testid="inline-chart" data-type={spec.type}>
-      {spec.title}
-    </div>
-  ),
-}));
-
 describe("MessageBubble", () => {
   it("renders a user message with PersonIcon", () => {
     const msg: ChatMessage = { role: "user", content: "Hello" };
@@ -63,27 +55,6 @@ describe("MessageBubble", () => {
     render(<MessageBubble message={msg} />);
     expect(screen.getByText("First part")).toBeTruthy();
     expect(screen.getByText("Second part")).toBeTruthy();
-  });
-
-  it("renders a chart block", () => {
-    const msg: ChatMessage = {
-      role: "assistant",
-      blocks: [
-        {
-          kind: "chart",
-          chart: {
-            type: "doughnut",
-            labels: ["A", "B"],
-            datasets: [{ data: [10, 20] }],
-            title: "Portfolio",
-          },
-        },
-      ],
-    };
-    render(<MessageBubble message={msg} />);
-    const chartEl = screen.getByTestId("inline-chart");
-    expect(chartEl).toBeTruthy();
-    expect(chartEl.getAttribute("data-type")).toBe("doughnut");
   });
 
   it("renders a ThinkBlock panel and allows toggle", async () => {

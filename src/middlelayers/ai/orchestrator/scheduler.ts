@@ -82,13 +82,12 @@ export async function* executePlan(
             description: task.description,
             result,
           };
-          if (result.text || result.chart) {
+          if (result.text) {
             yield {
               kind: "agent_result",
               taskId: task.id,
               skillName: task.skillName,
               text: result.text ?? "",
-              chart: result.chart,
             };
           }
         } else {
@@ -153,7 +152,6 @@ async function executeSingleTask(
       description: task.description,
       data: skillResult.result.data,
       text: skillResult.result.text,
-      chart: skillResult.result.chart,
     };
   } catch (err: any) {
     return {

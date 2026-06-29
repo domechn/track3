@@ -105,10 +105,6 @@ export async function* orchestrateQuery(
     return;
   }
 
-  // Emit charts from synthesis
-  for (const chart of synth.charts) {
-    yield { kind: "chart", chart };
-  }
 
   // ── 4. Optimize (self-critique loop) ──
   const optimize = shouldOptimize(plan);

@@ -1,11 +1,5 @@
-// Agent Orchestrator — core types
-//
-// Inspired by the Codex SQ/EQ protocol: submit tasks to a queue,
-// consume events from a stream. The orchestrator decomposes complex
-// queries into sub-tasks, schedules them with dependency awareness,
-// synthesises results, and optionally refines the final output.
-
-import type { ChartSpec } from "@/middlelayers/types";
+// Orchestrator core types.
+// See scheduler.ts and index.ts for the event-driven execution loop.
 
 // ── Sub-task lifecycle ──
 
@@ -39,7 +33,6 @@ export interface SubTaskResult {
   description: string;
   data?: unknown;
   text?: string;
-  chart?: ChartSpec;
   error?: string;
 }
 
@@ -84,11 +77,10 @@ export type OrchestratorEvent =
   | { kind: "agent_start"; taskId: string; skillName: string; description: string }
   | { kind: "agent_complete"; taskId: string; skillName: string; description: string; result: SubTaskResult }
   | { kind: "agent_error"; taskId: string; skillName: string; description: string; error: string }
-  | { kind: "agent_result"; taskId: string; skillName: string; text: string; chart?: ChartSpec }
+  | { kind: "agent_result"; taskId: string; skillName: string; text: string }
   | { kind: "synthesizing" }
   | { kind: "optimizing"; round: number; totalRounds: number }
   | { kind: "text"; delta: string }
-  | { kind: "chart"; chart: ChartSpec }
   | { kind: "error"; message: string }
   | { kind: "done" };
 

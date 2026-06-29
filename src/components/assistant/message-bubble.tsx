@@ -7,7 +7,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n";
 import MarkdownRenderer from "./markdown-renderer";
-import InlineChart from "./inline-chart";
 import type { AssistantBlock, ChatMessage } from "./use-chat";
 
 function stripThinkTags(s: string): string {
@@ -148,7 +147,6 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
       </div>
     );
   }
-  return <InlineChart key={idx} spec={block.chart} />;
 }
 
 export default function MessageBubble({

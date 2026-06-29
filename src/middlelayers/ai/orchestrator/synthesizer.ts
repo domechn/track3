@@ -10,7 +10,6 @@
 // shot instead of incrementally.
 
 import { callLlm } from "./llm";
-import type { ChartSpec } from "@/middlelayers/types";
 import type { AnalysisPlan, LlmCallParams, SubTaskResult } from "./types";
 
 // ── Prompt template ──
@@ -35,7 +34,6 @@ ${r.data ? `\nData: ${JSON.stringify(r.data, null, 2).slice(0, 3000)}` : ""}`,
     "- Synthesise the data below into a natural, helpful answer for the user.",
     "- Do NOT describe which tools you called or that results came from 'agents'. Just answer the question.",
     "- Be concise. Use short paragraphs or compact lists.",
-    "- If a chart was generated, the UI renders it — do not describe the chart unless you add insight.",
     "- If some data is missing or errors occurred, acknowledge it briefly.",
     "- Use the user's language (the query language).",
     "- If the data doesn't answer the query, say so plainly.",
@@ -52,7 +50,6 @@ ${r.data ? `\nData: ${JSON.stringify(r.data, null, 2).slice(0, 3000)}` : ""}`,
 
 export interface SynthesisOutput {
   text: string;
-  charts: ChartSpec[];
 }
 
 export async function synthesizeResults(
@@ -65,7 +62,6 @@ export async function synthesizeResults(
   if (completed.length === 0) {
     return {
       text: "I wasn't able to gather any data to answer your question. Please check your portfolio configuration.",
-      charts: [],
     };
   }
 
@@ -76,22 +72,14 @@ export async function synthesizeResults(
     messages: [{ role: "system", content: prompt }],
   });
 
-  // Collect all charts from the completed tasks
-  const charts: ChartSpec[] = [];
-  for (const r of completed) {
-    if (r.chart) {
-      charts.push(r.chart);
-    }
-  }
-
   if (!llmResult.ok || !llmResult.content) {
     // Fallback: concatenate agent summaries
     const text = completed
       .map((r) => r.text ?? "")
       .filter(Boolean)
       .join("\n\n");
-    return { text: text || "Analysis complete. See data above.", charts };
+    return { text: text || "Analysis complete. See data above." };
   }
 
-  return { text: llmResult.content, charts };
+  return { text: llmResult.content };
 }
