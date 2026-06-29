@@ -36,7 +36,7 @@ export default function InlineChart({ spec }: { spec: ChartSpec }) {
           {spec.title}
         </div>
       ) : null}
-      <div className="h-[240px] sm:h-[280px] lg:h-[320px]">
+      <div className="h-[240px] w-full sm:h-[280px] lg:h-[320px]">
         {spec.type === "bar" && <Bar options={options as any} data={data} />}
         {spec.type === "line" && (
           <Line options={options as any} data={data} />

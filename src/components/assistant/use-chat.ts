@@ -9,6 +9,7 @@ import {
   toOpenAITools,
 } from "@/middlelayers/ai";
 import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
+import type { ToolResult } from "@/middlelayers/ai/skills/types";
 
 export type AssistantBlock =
   | { kind: "text"; text: string }
@@ -156,9 +157,10 @@ export function useChat(options: UseChatOptions): UseChatResult {
     ) => {
       // State machine for <think> tag parsing.  When the model bakes
       // reasoning content into the text stream via <think>...</think>
-      // tags we split it into separate think/text blocks rather than
-      // relying on reasoning_content (which most models don't send).
-      const TAG_BUF = 12;
+  // tags we split it into separate think/text blocks rather than
+  // relying on reasoning_content (which most models don't send).
+  const toolCallResults: Array<{ id: string; name: string; args: unknown; result: ToolResult | null }> = [];
+  const TAG_BUF = 12;
       const TAG_OPEN = "<think>";
       const TAG_CLOSE = "</think>";
       let thinkState: "outside" | "inside" = "outside";
@@ -187,14 +189,16 @@ export function useChat(options: UseChatOptions): UseChatResult {
         id: string;
         name: string;
         args: unknown;
-      }) => {
+      }): Promise<{ id: string; name: string; args: unknown; result: ToolResult | null }> => {
         const skillResult = await runSkill(
           ev.name,
           (ev.args as Record<string, unknown>) ?? {},
           { baseCurrency },
         );
+        let result: ToolResult | null = null;
         if (skillResult.ok) {
-          const chart = skillResult.result.chart;
+          result = skillResult.result;
+          const chart = result.chart;
           if (chart) {
             const next = messagesRef.current.slice();
               const target = { ...next[assistantIndex] };
@@ -211,6 +215,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
               setMessages(next);
           }
         }
+        return { id: ev.id, name: ev.name, args: ev.args, result };
       };
 
       for await (const ev of events) {
@@ -278,7 +283,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
             }
           }
         } else if (ev.kind === "tool_call") {
-          await dispatchToolCall(ev);
+          toolCallResults.push(await dispatchToolCall(ev));
         } else if (ev.kind === "error") {
           const next = messagesRef.current.slice();
             const target = { ...next[assistantIndex] };
@@ -297,6 +302,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         addToBlock(thinkState === "outside" ? "text" : "think", pendingBuf);
         pendingBuf = "";
       }
+      return toolCallResults;
     },
     [baseCurrency],
   );
@@ -321,25 +327,64 @@ export function useChat(options: UseChatOptions): UseChatResult {
       const controller = new AbortController();
       abortRef.current = controller;
       try {
+        const idx = messages.length + 1; // user then assistant
         const history = flattenForProvider([...messages, userMessage]);
         const trimmed = trimMessages(history, Math.max(2, Math.floor(contextSize / 256)));
-        const providerMessages: ProviderMessage[] = [
+        let providerMessages: ProviderMessage[] = [
           { role: "system", content: systemPrompt },
           ...trimmed,
         ];
-        const events = streamChatCompletion({
-          endpoint: config.endpoint,
-          apiKey: config.apiKey,
-          model: config.model,
-          messages: providerMessages,
-          tools: toOpenAITools(),
-          advanced: config.advanced,
-          signal: controller.signal,
-        });
-        // Resolve the assistant message index after the state update
-        // has applied; messages.length is captured at send time.
-        const idx = messages.length + 1; // user then assistant
-        await consumeStream(events, idx);
+
+        // Multi-round tool calling: loop tool results back to the model so it
+        // can generate natural-language analysis from the returned data.
+        const MAX_ROUNDS = 5;
+        for (let round = 0; round < MAX_ROUNDS; round++) {
+          const events = streamChatCompletion({
+            endpoint: config.endpoint,
+            apiKey: config.apiKey,
+            model: config.model,
+            messages: providerMessages,
+            tools: toOpenAITools(),
+            advanced: config.advanced,
+            signal: controller.signal,
+          });
+
+          const toolCalls = (await consumeStream(events, idx)) ?? [];
+
+          if (toolCalls.length === 0) {
+            break;
+          }
+
+          // Build the assistant tool_calls message for the provider history
+          const assistantToolCallMsg: ProviderMessage = {
+            role: "assistant",
+            content: null,
+            tool_calls: toolCalls.map((tc) => ({
+              id: tc.id,
+              type: "function" as const,
+              function: {
+                name: tc.name,
+                arguments: JSON.stringify(tc.args),
+              },
+            })),
+          };
+
+          // Build tool result messages
+          const toolResultMessages: ProviderMessage[] = toolCalls.map((tc) => ({
+            role: "tool",
+            tool_call_id: tc.id,
+            content: tc.result
+              ? (tc.result.text ?? JSON.stringify(tc.result.data))
+              : "Tool execution failed.",
+          }));
+
+          // Extend provider messages for the next round
+          providerMessages = [
+            ...providerMessages,
+            assistantToolCallMsg,
+            ...toolResultMessages,
+          ];
+        }
       } finally {
         setIsStreaming(false);
         abortRef.current = null;

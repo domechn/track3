@@ -37,6 +37,8 @@ import {
   loadSession,
   renameSession,
   touchSession,
+  onSessionUpdate,
+  notifySessionUpdate,
 } from "@/middlelayers/ai";
 import type { PersistedBlock, PersistedChatMessage } from "@/middlelayers/ai";
 import SessionSidebar from "./session-sidebar";
@@ -149,12 +151,17 @@ function ReadyChat({
     useChatSessions();
   const [initialMsgs, setInitialMsgs] = useState<ChatMessage[]>([]);
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+  const [sessionVersion, setSessionVersion] = useState(0);
 
   useEffect(() => {
     if (sessionId) {
-      // Clear messages immediately to avoid showing stale data
-      // from the previous session while the new one loads.
-      setInitialMsgs([]);
+      // Only clear messages when switching to a different session.
+      // Avoid clearing on sessionVersion bumps (e.g. after stream
+      // completion persistence), which would reset the scroll position
+      // and cause an unwanted auto-scroll from top to bottom.
+      if (sessionId !== loadedSessionId) {
+        setInitialMsgs([]);
+      }
       let cancelled = false;
       (async () => {
         const session = await loadSession(sessionId).catch(() => null);
@@ -176,7 +183,18 @@ function ReadyChat({
       setInitialMsgs([]);
       setLoadedSessionId(null);
     }
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, sessionVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Subscribe to session update notifications from orphaned background
+  // streams (e.g. when the user navigated away mid-stream and an old
+  // send() completed after the new component mounted). Bump sessionVersion
+  // to trigger a re-fetch of the session data via the effect above.
+  useEffect(() => {
+    if (!sessionId) return;
+    return onSessionUpdate(sessionId, () => {
+      setSessionVersion(v => v + 1);
+    });
+  }, [sessionId]);
 
   // The effect above loads session data and initializes initialMsgs.
   // The useChat hook's initialMessages watcher picks up the new
@@ -231,6 +249,11 @@ function ReadyChat({
         }
 
         await refresh();
+        // Notify any newly mounted component (e.g. after navigation away
+        // and back) that the session data has been persisted. The
+        // subscription effect in ReadyChat will bump sessionVersion,
+        // triggering a re-fetch of the session messages.
+        notifySessionUpdate(targetId);
       } catch (err) {
         // Log but don't throw — the streamed messages in React state
         // are still visible in the UI; only the DB persistence failed.

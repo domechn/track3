@@ -6,6 +6,7 @@ import {
 } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n";
+import MarkdownRenderer from "./markdown-renderer";
 import InlineChart from "./inline-chart";
 import type { AssistantBlock, ChatMessage } from "./use-chat";
 
@@ -94,21 +95,36 @@ function ThinkBlock({ text, isStreaming, hasResponseStarted }: {
   );
 }
 
+/** Merge consecutive text blocks into one so markdown renders continuously
+ *  even when text was split by tool calls / chart blocks. */
+function mergeBlocks(blocks: AssistantBlock[]): AssistantBlock[] {
+  const merged: AssistantBlock[] = [];
+  let pendingText = "";
+  for (const b of blocks) {
+    if (b.kind === "text") {
+      pendingText = pendingText ? pendingText + "\n\n" + b.text : b.text;
+    } else {
+      if (pendingText) {
+        merged.push({ kind: "text", text: pendingText });
+        pendingText = "";
+      }
+      merged.push(b);
+    }
+  }
+  if (pendingText) merged.push({ kind: "text", text: pendingText });
+  return merged;
+}
+
 function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: boolean, hasResponseStarted?: boolean) {
   if (block.kind === "think") {
     return <ThinkBlock key={idx} text={block.text} isStreaming={isStreaming} hasResponseStarted={hasResponseStarted} />;
   }
   if (block.kind === "text") {
     if (!block.text) return null;
-    // Preserve newlines from streamed content while keeping typography rhythm.
-    // Strip any stray <think> tags that some models emit in the content.
     return (
-      <p
-        key={idx}
-        className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90"
-      >
-        {stripThinkTags(block.text)}
-      </p>
+      <div key={idx} className="markdown-content">
+        <MarkdownRenderer content={stripThinkTags(block.text)} />
+      </div>
     );
   }
   return <InlineChart key={idx} spec={block.chart} />;
@@ -145,7 +161,8 @@ export default function MessageBubble({
       )}
       <div
         className={cn(
-          "max-w-full rounded-2xl px-4 py-3 shadow-sm",
+          isUser ? "max-w-full" : "flex-1 min-w-0",
+          "rounded-2xl px-4 py-3 shadow-sm",
           isUser
             ? "bg-primary text-primary-foreground"
             : "border border-[var(--glass-border)] bg-card/80 backdrop-blur",
@@ -178,7 +195,7 @@ export default function MessageBubble({
                 {t("assistant.chat.thinking")}
               </p>
             ) : (
-              message.blocks.map((b, i) => renderAssistantBlock(b, i, isStreaming, hasResponseStarted))
+              mergeBlocks(message.blocks).map((b, i) => renderAssistantBlock(b, i, isStreaming, hasResponseStarted))
             )}
           </div>
         )}

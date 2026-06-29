@@ -30,6 +30,8 @@ export {
   appendMessages,
   togglePin,
   touchSession,
+  onSessionUpdate,
+  notifySessionUpdate,
 } from "./sessions";
 
 export type {
