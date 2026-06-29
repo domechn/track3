@@ -83,7 +83,7 @@ export default function ChatThread({
           <WelcomePanel onPickPrompt={onPickPrompt} />
         ) : (
           messages.map((m, i) => (
-            <MessageBubble key={i} message={m} />
+            <MessageBubble key={i} message={m} isStreaming={isStreaming} />
           ))
         )}
         {isStreaming && messages.at(-1)?.role !== "assistant" && (

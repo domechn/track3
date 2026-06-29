@@ -525,5 +525,8 @@
   "ai.session.relative.justNow": "just now",
   "ai.session.relative.minutesAgo": "{n}m ago",
   "ai.session.relative.hoursAgo": "{n}h ago",
-  "ai.session.relative.daysAgo": "{n}d ago"
+  "ai.session.relative.daysAgo": "{n}d ago",
+  "assistant.chat.think.label": "Thinking",
+  "assistant.chat.think.collapse": "Collapse reasoning",
+  "assistant.chat.think.expand": "Show reasoning"
 }

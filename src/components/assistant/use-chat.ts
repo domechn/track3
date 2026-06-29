@@ -12,6 +12,7 @@ import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
 
 export type AssistantBlock =
   | { kind: "text"; text: string }
+  | { kind: "think"; text: string }
   | { kind: "chart"; chart: ChartSpec };
 
 export type ChatMessage =
@@ -50,6 +51,7 @@ function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
     const text = m.blocks
       .map((b) => {
         if (b.kind === "text") return b.text;
+        if (b.kind === "think") return "";
         return `[rendered chart: ${b.chart.type}]`;
       })
       .join("")
@@ -136,7 +138,31 @@ export function useChat(options: UseChatOptions): UseChatResult {
       };
 
       for await (const ev of events) {
-        if (ev.kind === "text") {
+        if (ev.kind === "think") {
+          setMessages((prev) => {
+            const next = prev.slice();
+            const target = { ...next[assistantIndex] };
+            if (target.role !== "assistant") return prev;
+            const blocks = target.blocks.slice();
+            const last = blocks[blocks.length - 1];
+            if (last && last.kind === "think") {
+              blocks[blocks.length - 1] = {
+                kind: "think",
+                text: last.text + ev.delta,
+              };
+            } else {
+              // Insert the think block before any text blocks
+              const textIdx = blocks.findIndex((b) => b.kind === "text");
+              if (textIdx >= 0) {
+                blocks.splice(textIdx, 0, { kind: "think", text: ev.delta });
+              } else {
+                blocks.push({ kind: "think", text: ev.delta });
+              }
+            }
+            next[assistantIndex] = { ...target, blocks };
+            return next;
+          });
+        } else if (ev.kind === "text") {
           bufferText += ev.delta;
           setMessages((prev) => {
             const next = prev.slice();

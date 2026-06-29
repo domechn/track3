@@ -276,6 +276,10 @@ export async function* streamChatCompletion(
         continue;
       }
       const delta = choice.delta ?? choice.message ?? {};
+      const thinkContent = delta?.reasoning_content;
+      if (typeof thinkContent === "string" && thinkContent.length > 0) {
+        yield { kind: "think", delta: thinkContent };
+      }
       const content = delta?.content;
       if (typeof content === "string" && content.length > 0) {
         yield { kind: "text", delta: content };
