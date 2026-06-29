@@ -349,7 +349,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
             signal: controller.signal,
           });
 
-          const toolCalls = await consumeStream(events, idx);
+          const toolCalls = (await consumeStream(events, idx)) ?? [];
 
           if (toolCalls.length === 0) {
             break;
