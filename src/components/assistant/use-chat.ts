@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AIConfig, ChartSpec } from "@/middlelayers/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import {
+  orchestrateQuery,
   buildSystemPrompt,
   probeConnection,
   runSkill,
@@ -10,11 +12,28 @@ import {
 } from "@/middlelayers/ai";
 import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
 import type { ToolResult } from "@/middlelayers/ai/skills/types";
+import type { OrchestratorEvent } from "@/middlelayers/ai/orchestrator/types";
+
+// Agent-activity block rendered when the orchestrator decomposes a
+// complex query into multiple sub-tasks.
+export type AgentActivity = {
+  taskId: string;
+  skillName: string;
+  description: string;
+  status: "running" | "completed" | "failed";
+  resultPreview?: string;
+};
+
+export type AgentActivityBlock = {
+  kind: "agent_activity";
+  activities: AgentActivity[];
+};
 
 export type AssistantBlock =
   | { kind: "text"; text: string }
   | { kind: "think"; text: string }
-  | { kind: "chart"; chart: ChartSpec };
+  | { kind: "chart"; chart: ChartSpec }
+  | AgentActivityBlock;
 
 export type ChatMessage =
   | { role: "user"; content: string }
@@ -62,6 +81,7 @@ function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
       .map((b) => {
         if (b.kind === "text") return b.text;
         if (b.kind === "think") return "";
+        if (b.kind === "agent_activity") return "";
         return `[rendered chart: ${b.chart.type}]`;
       })
       .join("")
@@ -307,6 +327,120 @@ export function useChat(options: UseChatOptions): UseChatResult {
     [baseCurrency],
   );
 
+  // Consume orchestrator events and map them to assistant blocks.
+  // Returns true if the orchestrator produced any events (meaning it
+  // handled the query). Returns false if the orchestrator yielded
+  // nothing (simple query → fall back to normal tool-calling loop).
+  const consumeOrchestrator = useCallback(
+    async (
+      events: AsyncGenerator<OrchestratorEvent>,
+      assistantIndex: number,
+    ): Promise<boolean> => {
+      let yielded = false;
+      const agentActivityMap = new Map<string, AgentActivity>();
+
+      for await (const ev of events) {
+        yielded = true;
+        const next = messagesRef.current.slice();
+        const target = { ...next[assistantIndex] };
+        if (target.role !== "assistant") continue;
+        const blocks = target.blocks.slice();
+
+        switch (ev.kind) {
+          case "agent_start": {
+            agentActivityMap.set(ev.taskId, {
+              taskId: ev.taskId,
+              skillName: ev.skillName,
+              description: ev.description,
+              status: "running",
+            });
+            upsertAgentActivityBlock(blocks, agentActivityMap);
+            break;
+          }
+          case "agent_complete": {
+            agentActivityMap.set(ev.taskId, {
+              taskId: ev.taskId,
+              skillName: ev.skillName,
+              description: ev.description,
+              status: "completed",
+              resultPreview: (ev.result.text ?? "").slice(0, 120),
+            });
+            upsertAgentActivityBlock(blocks, agentActivityMap);
+            break;
+          }
+          case "agent_error": {
+            agentActivityMap.set(ev.taskId, {
+              taskId: ev.taskId,
+              skillName: ev.skillName,
+              description: ev.description,
+              status: "failed",
+            });
+            upsertAgentActivityBlock(blocks, agentActivityMap);
+            break;
+          }
+          case "agent_result": {
+            if (ev.text) {
+              blocks.push({ kind: "text", text: `[${ev.skillName}] ${ev.text}` });
+            }
+            if (ev.chart) {
+              blocks.push({ kind: "chart", chart: ev.chart });
+            }
+            break;
+          }
+          case "synthesizing": {
+            blocks.push({ kind: "think", text: "Synthesising results\u2026" });
+            break;
+          }
+          case "optimizing": {
+            const msg = `Refining answer (round ${ev.round}/${ev.totalRounds})\u2026`;
+            const thinkIdx = (() => {
+              for (let i = blocks.length - 1; i >= 0; i--) {
+                if (blocks[i]!.kind === "think") return i;
+              }
+              return -1;
+            })();
+            if (thinkIdx >= 0) {
+              blocks[thinkIdx] = { kind: "think", text: msg };
+            } else {
+              blocks.push({ kind: "think", text: msg });
+            }
+            break;
+          }
+          case "text": {
+            const last = blocks[blocks.length - 1];
+            if (last?.kind === "text") {
+              blocks[blocks.length - 1] = {
+                kind: "text",
+                text: last.text + ev.delta,
+              };
+            } else {
+              blocks.push({ kind: "text", text: ev.delta });
+            }
+            break;
+          }
+          case "chart": {
+            blocks.push({ kind: "chart", chart: ev.chart });
+            break;
+          }
+          case "error": {
+            blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
+            break;
+          }
+          case "done": {
+            break;
+          }
+        }
+
+        next[assistantIndex] = { ...target, blocks };
+        messagesRef.current = next;
+        setMessages(next);
+      }
+
+      return yielded;
+    },
+    [],
+  );
+
   const send = useCallback(
     async (text?: string) => {
       const content = (text ?? input).trim();
@@ -330,6 +464,37 @@ export function useChat(options: UseChatOptions): UseChatResult {
         const idx = messages.length + 1; // user then assistant
         const history = flattenForProvider([...messages, userMessage]);
         const trimmed = trimMessages(history, Math.max(2, Math.floor(contextSize / 256)));
+
+        // ── Try orchestration first ──
+        const historySnapshot = trimmed
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .slice(-4)
+          .map((m) => `${m.role}: ${(m.content ?? "").slice(0, 200)}`)
+          .join("\n");
+
+        const orchestratorEvents = orchestrateQuery(
+          {
+            endpoint: config.endpoint,
+            apiKey: config.apiKey,
+            model: config.model,
+            baseCurrency,
+            signal: controller.signal,
+          },
+          content,
+          historySnapshot,
+        );
+
+        const usedOrchestrator = await consumeOrchestrator(
+          orchestratorEvents,
+          idx,
+        );
+
+        // If the orchestrator handled it, we're done
+        if (usedOrchestrator) {
+          return;
+        }
+
+        // ── Fallback: normal tool-calling loop ──
         let providerMessages: ProviderMessage[] = [
           { role: "system", content: systemPrompt },
           ...trimmed,
@@ -396,7 +561,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         }
       }
     },
-    [input, isStreaming, messages, config, systemPrompt, contextSize, consumeStream],
+    [input, isStreaming, messages, config, systemPrompt, contextSize, consumeStream, consumeOrchestrator, baseCurrency],
   );
 
   const runQuickAction = useCallback(
@@ -429,4 +594,24 @@ export function useChat(options: UseChatOptions): UseChatResult {
     probe,
     clear,
   };
+}
+
+// ── Helpers ──
+
+function upsertAgentActivityBlock(
+  blocks: AssistantBlock[],
+  activities: Map<string, AgentActivity>,
+): void {
+  const idx = blocks.findIndex(
+    (b): b is AgentActivityBlock => b.kind === "agent_activity",
+  );
+  const activityBlock: AgentActivityBlock = {
+    kind: "agent_activity",
+    activities: Array.from(activities.values()),
+  };
+  if (idx >= 0) {
+    blocks[idx] = activityBlock;
+  } else {
+    blocks.push(activityBlock);
+  }
 }

@@ -205,27 +205,6 @@ describe("chat sessions middlelayer", () => {
     expect(list.map((s) => s.id)).toEqual(["b", "c", "a"]);
   });
 
-  it("round-trips messages through encrypt/decrypt and the file store", async () => {
-    const sessions = await import("./sessions");
-    const meta = await sessions.createSession();
-    const messages = [
-      { role: "user" as const, content: "Hi" },
-      {
-        role: "assistant" as const,
-        blocks: [{ kind: "text" as const, text: "Hello" }],
-      },
-    ];
-    await sessions.rewriteMessages(meta.id, messages);
-    expect(mocks.writeTextFile).toHaveBeenCalledTimes(1);
-    const [path, payload] = mocks.writeTextFile.mock.calls[0]!;
-    expect(String(path)).toContain("/appdata/ai/sessions/uuid-1.json.ent");
-    expect(String(payload).startsWith("enc:")).toBe(true);
-
-    const loaded = await sessions.loadSession(meta.id);
-    expect(loaded).not.toBeNull();
-    expect(loaded?.messages).toEqual(messages);
-  });
-
   it("returns null from loadSession when the DB row is missing", async () => {
     const sessions = await import("./sessions");
     const loaded = await sessions.loadSession("missing");

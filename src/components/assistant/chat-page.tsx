@@ -127,7 +127,7 @@ function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
   return {
     role: "assistant",
     blocks: msg.blocks
-      .filter((b): b is Exclude<AssistantBlock, { kind: "think" }> => b.kind !== "think")
+      .filter((b): b is Exclude<AssistantBlock, { kind: "think" } | { kind: "agent_activity" }> => b.kind !== "think" && b.kind !== "agent_activity")
       .map((b): PersistedBlock => {
         if (b.kind === "text") return { kind: "text", text: b.text };
         return { kind: "chart", chart: b.chart };
