@@ -1,5 +1,6 @@
 import type { ProviderFunctionDef } from "./types";
 import type { Skill, SkillArgs, ToolResult } from "./skills/types";
+import { trace, traceError } from "./skills/functions/trace";
 
 // SkillRegistry owns the lookup of every registered AI skill. Skills
 // register themselves at module load time via the side-effect import in
@@ -8,6 +9,7 @@ const registry = new Map<string, Skill>();
 
 export function registerSkill(skill: Skill): void {
   registry.set(skill.name, skill);
+  trace("registerSkill", skill.name, skill.description.slice(0, 60));
 }
 
 export function getSkill(name: string): Skill | undefined {
@@ -49,9 +51,12 @@ export async function runSkill(
     return { ok: false, error: `Unknown skill: ${name}` };
   }
   try {
+    trace("runSkill", name, "args:", JSON.stringify(args).slice(0, 200));
     const result = await skill.run(args ?? {}, ctx);
+    trace("runSkill", name, "-> ok, text:", result.text?.slice(0, 80));
     return { ok: true, result };
   } catch (err) {
+    traceError("runSkill " + name + " threw", err);
     return { ok: false, error: (err as Error).message ?? String(err) };
   }
 }

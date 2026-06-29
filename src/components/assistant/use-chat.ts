@@ -514,7 +514,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
             role: "tool",
             tool_call_id: tc.id,
             content: tc.result
-              ? (tc.result.text ?? JSON.stringify(tc.result.data))
+              ? (tc.result.text && tc.result.data
+                  ? tc.result.text + "\n\n\`\`\`json\n" + JSON.stringify(tc.result.data, null, 2).slice(0, 10000) + "\n\`\`\`"
+                  : (tc.result.text ?? JSON.stringify(tc.result.data)))
               : "Tool execution failed.",
           }));
 

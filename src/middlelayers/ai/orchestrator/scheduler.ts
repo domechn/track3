@@ -9,6 +9,7 @@
 
 import { runSkill } from "../tools";
 import type { SkillContext } from "../skills/types";
+import { trace, traceError } from "../skills/functions/trace";
 import type {
   AnalysisPlan,
   OrchestratorEvent,
@@ -128,6 +129,7 @@ async function executeSingleTask(
   ctx: SkillContext,
   signal?: AbortSignal,
 ): Promise<SubTaskResult> {
+  trace("SCHEDULER: executeSingleTask", task.id, task.skillName, "depth:", task.dependsOn.length ? "depends-on:" + task.dependsOn.join(",") : "independent", "args:", JSON.stringify(task.args).slice(0, 200));
   try {
     const skillResult = await runSkill(
       task.skillName,
@@ -136,6 +138,7 @@ async function executeSingleTask(
     );
 
     if (!skillResult.ok) {
+      traceError("SCHEDULER: executeSingleTask failed", task.id + " " + task.skillName + " error: " + skillResult.error);
       return {
         id: task.id,
         skillName: task.skillName,
@@ -145,6 +148,7 @@ async function executeSingleTask(
       };
     }
 
+    trace("SCHEDULER: executeSingleTask ok", task.id, task.skillName, "text:", skillResult.result.text?.slice(0, 100));
     return {
       id: task.id,
       skillName: task.skillName,
@@ -154,6 +158,7 @@ async function executeSingleTask(
       text: skillResult.result.text,
     };
   } catch (err: any) {
+    traceError("SCHEDULER: executeSingleTask threw", task.id + " " + task.skillName + " " + String(err));
     return {
       id: task.id,
       skillName: task.skillName,

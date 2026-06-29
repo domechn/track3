@@ -1,5 +1,6 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
+import { trace } from "./functions/trace";
 import { getTransactionsWithStats } from "./functions/transactions";
 
 const skill: Skill = {
@@ -25,6 +26,7 @@ const skill: Skill = {
     },
   },
   async run(args, ctx): Promise<ToolResult> {
+    trace("SKILL: transaction_stats called", "args:", JSON.stringify(args).slice(0, 200));
     const symbol =
       typeof args.symbol === "string" && args.symbol.trim()
         ? args.symbol.trim().toUpperCase()

@@ -4,6 +4,7 @@ import { TRANSACTION_HANDLER } from "../../../entities/transactions";
 import { getAssetType } from "../../../datafetch/utils/coins";
 import type { TransactionModel } from "../../../types";
 import type { AssetType } from "../../../datafetch/types";
+import { trace, traceError } from "./trace";
 
 // ── Types ──
 
@@ -29,8 +30,9 @@ export interface TransactionStats {
 export async function getTransactions(
   filters: TransactionFilters = {},
 ): Promise<TransactionModel[]> {
+  trace("getTransactions", JSON.stringify({...filters, limit: filters.limit}).slice(0, 300));
   const { symbol, assetType, from, to, limit, txnType } = filters;
-
+  try {
   // If we have a date range, use the date-range query; otherwise list all.
   let results: TransactionModel[];
   if (from || to) {
@@ -59,7 +61,13 @@ export async function getTransactions(
     );
 
   const clamped = Math.max(1, Math.min(1000, Math.floor(limit ?? 1000)));
-  return sorted.slice(0, clamped);
+  const result = sorted.slice(0, clamped);
+  trace("getTransactions", "->", result.length, "txns");
+  return result;
+  } catch (err) {
+    traceError("getTransactions failed", err);
+    throw err;
+  }
 }
 
 /** Aggregate transaction stats from the given transaction list. */

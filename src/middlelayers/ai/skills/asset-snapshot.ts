@@ -1,5 +1,6 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
+import { trace } from "./functions/trace";
 import {
   getLatestSnapshot,
   getAssetsBySnapshot,
@@ -25,13 +26,15 @@ const skill: Skill = {
     },
   },
   async run(args, ctx): Promise<ToolResult> {
+    trace("SKILL: asset_snapshot called", "args:", JSON.stringify(args).slice(0, 200));
     const date =
       typeof args.date === "string" && args.date
         ? new Date(args.date)
         : undefined;
     const snapshot = await getLatestSnapshot(date);
     if (!snapshot) {
-      return {
+      trace("SKILL: asset_snapshot -> no data");
+    return {
         data: { empty: true },
         text: "No portfolio snapshot available.",
       };

@@ -1,5 +1,6 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
+import { trace } from "./functions/trace";
 import { getTransactions, getTransactionStats } from "./functions/transactions";
 import { getAssetType } from "../../datafetch/utils/coins";
 
@@ -38,6 +39,7 @@ const skill: Skill = {
     },
   },
   async run(args, ctx): Promise<ToolResult> {
+    trace("SKILL: transaction_list called", "args:", JSON.stringify(args).slice(0, 200));
     const limit =
       typeof args.limit === "number" && Number.isFinite(args.limit)
         ? Math.max(1, Math.min(MAX_LIMIT, Math.floor(args.limit)))

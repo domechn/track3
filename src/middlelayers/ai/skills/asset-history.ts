@@ -1,5 +1,6 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
+import { trace } from "./functions/trace";
 import { getAssetHistory } from "./functions/assets";
 import type { AssetType } from "../../datafetch/types";
 
@@ -26,6 +27,7 @@ const skill: Skill = {
     required: ["symbol"],
   },
   async run(args, ctx): Promise<ToolResult> {
+    trace("SKILL: asset_history called", "args:", JSON.stringify(args).slice(0, 200));
     const symbol = String(args.symbol ?? "").trim().toUpperCase();
     if (!symbol) {
       return { data: { error: "symbol is required" }, text: "symbol is required." };

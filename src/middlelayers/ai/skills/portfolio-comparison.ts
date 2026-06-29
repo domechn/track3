@@ -1,5 +1,6 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
+import { trace } from "./functions/trace";
 import {
   getSnapshotSummaries,
   getAssetsBySnapshot,
@@ -35,6 +36,7 @@ const skill: Skill = {
     required: ["left", "right"],
   },
   async run(args, ctx): Promise<ToolResult> {
+    trace("SKILL: portfolio_comparison called", "args:", JSON.stringify(args).slice(0, 200));
     const left = await resolveSnapshot(
       args.left as Record<string, unknown> | undefined,
     );

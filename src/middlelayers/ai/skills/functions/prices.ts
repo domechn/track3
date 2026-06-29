@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetchStockPrices } from "../../../datafetch/utils/price";
 import { ASSET_HANDLER } from "../../../entities/assets";
+import { trace, traceError } from "./trace";
 
 export interface PriceEntry {
   priceUsd: number;
@@ -13,11 +14,13 @@ export type PriceMap = Record<string, PriceEntry>;
 
 /** Fetch crypto prices from CoinGecko (via Rust command). */
 export async function getCryptoPrices(symbols: string[]): Promise<Record<string, number>> {
+  trace("getCryptoPrices", symbols.join(","));
   if (symbols.length === 0) return {};
   try {
     const map = await invoke<Record<string, number>>("query_coins_prices", {
       symbols,
     });
+    trace("getCryptoPrices", "->", Object.keys(map).length, "prices from invoke");
     const result: Record<string, number> = {};
     for (const sym of symbols) {
       const usd = Number(map?.[sym] ?? map?.[sym.toUpperCase()] ?? 0);
@@ -31,9 +34,11 @@ export async function getCryptoPrices(symbols: string[]): Promise<Record<string,
 
 /** Fetch stock prices from broker endpoint. */
 export async function getStockPrices(symbols: string[]): Promise<Record<string, number>> {
+  trace("getStockPrices", symbols.join(","));
   if (symbols.length === 0) return {};
   try {
     const usdPrices = await fetchStockPrices(symbols);
+    trace("getStockPrices", "->", Object.keys(usdPrices).length, "prices from fetch");
     const result: Record<string, number> = {};
     for (const sym of symbols) {
       const usd = usdPrices[sym] ?? usdPrices[sym.toUpperCase()] ?? 0;
@@ -78,6 +83,7 @@ export async function getPrices(
   symbols: string[],
   type: "crypto" | "stock" | "auto" = "auto",
 ): Promise<PriceMap> {
+  trace("getPrices", "type:", type, "symbols:", symbols.join(","));
   if (symbols.length === 0) return {};
 
   const prices: PriceMap = {};
@@ -122,5 +128,6 @@ export async function getPrices(
     if (stock[sym]) prices[sym] = { priceUsd: stock[sym]!, type: "stock" };
   }
 
+  trace("getPrices", "->", Object.keys(prices).length, "resolved");
   return prices;
 }

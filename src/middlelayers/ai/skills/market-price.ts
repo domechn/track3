@@ -1,5 +1,6 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
+import { trace } from "./functions/trace";
 import { getPrices } from "./functions/prices";
 
 const skill: Skill = {
@@ -25,6 +26,7 @@ const skill: Skill = {
     required: ["symbols"],
   },
   async run(args, ctx): Promise<ToolResult> {
+    trace("SKILL: market_price called", "args:", JSON.stringify(args).slice(0, 200));
     const symbols = normalizeSymbols(args.symbols);
     if (symbols.length === 0) {
       return {
