@@ -161,7 +161,7 @@ export class MexcExchange implements Exchanger {
 		assets.forEach((asset: any) => {
 			const amount = toNumberish(asset.equity)
 			const fallbackAmount = toNumberish(asset.availableBalance) + toNumberish(asset.frozenBalance) + toNumberish(asset.unrealized)
-			addToBalanceMap(balances, asset.currency.toUpperCase(), amount || fallbackAmount)
+			addToBalanceMap(balances, asset.currency.toUpperCase(), Number.isFinite(amount) ? amount : fallbackAmount)
 		})
 
 		return balances
@@ -231,7 +231,7 @@ export class MexcExchange implements Exchanger {
 		const signedParams = {
 			...params,
 			recvWindow: this.recvWindow,
-			timestamp: Date.now(),
+			timestamp: Date.now().toString(),
 		}
 		const queryString = this.buildSortedQuery(signedParams)
 		const signature = CryptoJS.HmacSHA256(queryString, this.secret).toString(CryptoJS.enc.Hex)
@@ -267,7 +267,7 @@ export class MexcExchange implements Exchanger {
 	}
 
 	private alphabeticalSort(a: string, b: string): number {
-		return a.localeCompare(b)
+		return a < b ? -1 : a > b ? 1 : 0
 	}
 }
 

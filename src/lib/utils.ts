@@ -18,6 +18,18 @@ export function getWalletLogo(type: string) {
  * @param wallet - Wallet address (may or may not have "md5:" prefix)
  * @returns MD5 hashed wallet address without prefix
  */
+/**
+ * Compute SHA-256 hex digest of a string using the Web Crypto API.
+ * Available in all modern browsers and Tauri webviews.
+ */
+export async function sha256Hex(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export function normalizeWalletToMD5(wallet: string): string {
   const md5Prefix = "md5:"
   return wallet.startsWith(md5Prefix) ? wallet.substring(md5Prefix.length) : md5(wallet)

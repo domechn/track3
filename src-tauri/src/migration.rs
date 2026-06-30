@@ -609,6 +609,9 @@ impl Migration for V4TV5 {
 }
 
 pub struct V6TV7 {
+    // Note: V5TV6 was intentionally skipped during the v0.5 development cycle.
+    // The version numbering aligns with the migration file directory naming
+    // (migrations/v04t05 -> v06t07).
     app_dir: String,
     resource_dir: String,
 }

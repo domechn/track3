@@ -30,3 +30,6 @@ track3-ios/
 .docs/
 .yarn/
 .agents/skills/investment-report/output/
+src-tauri/target/
+.ent-key
+.env

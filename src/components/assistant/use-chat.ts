@@ -479,6 +479,17 @@ export function useChat(options: UseChatOptions): UseChatResult {
         // can generate natural-language analysis from the returned data.
         const MAX_ROUNDS = 5;
         for (let round = 0; round < MAX_ROUNDS; round++) {
+          // Token budget guard: estimate total characters from provider messages
+          // (roughly 1 token ≈ 4 chars). If the history has grown beyond the
+          // configured context size, stop making further tool calls to avoid
+          // exceeding the model's context window or incurring unbounded cost.
+          const charBudget = (contextSize ?? 8192) * 4;
+          const usedChars = providerMessages.reduce((sum, m) => {
+            const content = typeof m.content === "string" ? m.content : "";
+            return sum + content.length + (m.role ?? "").length + 100;
+          }, 0);
+          if (usedChars > charBudget) break;
+
           const events = streamChatCompletion({
             endpoint: config.endpoint,
             apiKey: config.apiKey,

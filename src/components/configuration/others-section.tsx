@@ -111,6 +111,7 @@ const OthersSection = memo(function OthersSection({
                         <TableCell>
                           <Input
                             type="text"
+                            maxLength={100}
                             name="alias"
                             placeholder={t("config.placeholder.alias")}
                             value={o.alias ?? ""}
@@ -123,6 +124,7 @@ const OthersSection = memo(function OthersSection({
                         <TableCell>
                           <Input
                             type="text"
+                            maxLength={50}
                             name="symbol"
                             placeholder={t("config.placeholder.symbol")}
                             value={o.symbol}

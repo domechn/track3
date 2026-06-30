@@ -3,7 +3,7 @@ import { ExchangeRate } from "../datafetch/currencies";
 import { CurrencyRateDetail, CurrencyRateModel } from "../types";
 
 class CurrencyRateHandler {
-  private readonly tableName = "currency_rates";
+  private readonly tableName = "currency_rates" as const;
 
   private readonly maxRateAgeMs = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -17,7 +17,7 @@ class CurrencyRateHandler {
         return Date.now() - new Date(r.updatedAt).getTime() > this.maxRateAgeMs;
       });
     if (isStale) {
-      console.log("currency rates missing or stale, updating...");
+      console.debug("currency rates missing or stale, updating...");
       rows = await this.updateAllCurrencyRates();
     }
 

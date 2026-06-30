@@ -112,8 +112,11 @@ export class KrakenExchange implements Exchanger {
 		return this.fetchTotalBalance().then(() => true).catch(() => false)
 	}
 
-	private async fetch<T>(method: "GET" | "POST", path: string, postData: {} = {}): Promise<T> {
-		const nonce = "" + Date.now()
+  private static nonceSeq: number = 0;
+
+  private async fetch<T>(method: "GET" | "POST", path: string, postData: {} = {}): Promise<T> {
+    KrakenExchange.nonceSeq++;
+    const nonce = `${Date.now()}${String(KrakenExchange.nonceSeq).padStart(4, "0")}`
 		const param = {
 			nonce,
 			...(postData || {})

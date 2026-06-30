@@ -73,12 +73,13 @@ export async function trackEventWithClientID(
     } as RequestInit & { connectTimeout: number });
 
     if (response.status > 299) {
-      throw new Error(
-        `Aptabase tracking failed with status ${response.status}: ${await response.text()}`,
-      );
+      // Consume body to free resources but don't echo it — response bodies
+      // can contain event payload details.
+      await response.text().catch(() => {});
+      throw new Error(`Aptabase tracking failed with status ${response.status}`);
     }
   } catch (e) {
-    console.error("track event failed", e);
+    console.debug("track event failed");
   }
 }
 
@@ -107,9 +108,6 @@ function getAptabaseEndpoint(appKey: string) {
 }
 
 function getAptabaseSessionId() {
-  aptabaseSessionId ??=
-    globalThis.crypto?.randomUUID?.() ??
-    `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
+  aptabaseSessionId ??= globalThis.crypto.randomUUID();
   return aptabaseSessionId;
 }

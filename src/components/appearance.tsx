@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowBottomRightIcon, ArrowTopRightIcon } from "@radix-ui/react-icons";
 import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
@@ -28,6 +28,7 @@ const App = ({
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
   const [selectedTheme, setSelectedTheme] = useState<Theme>("light");
   const [selectedLocale, setSelectedLocale] = useState<Locale>(locale);
+  const originalThemeRef = useRef<Theme>("light");
   const currentTheme = useTheme();
 
   useEffect(() => {
@@ -38,12 +39,15 @@ const App = ({
     const color = await getQuoteColor();
     setQuoteColor(color);
     setSelectedTheme(currentTheme.theme);
+    originalThemeRef.current = currentTheme.theme;
   }
 
   async function handleThemeValueChange(val: string) {
     const v = val as Theme;
+    if (v === originalThemeRef.current) return;
     await saveTheme(v);
     setSelectedTheme(v);
+    originalThemeRef.current = v;
     reloadApp();
   }
 

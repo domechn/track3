@@ -13,12 +13,12 @@ export async function getDatabase(): Promise<Database> {
 	return dbInstance
 }
 
-export async function saveModelsToDatabase<T extends object>(table: string, models: T[], conflictResolver: UniqueIndexConflictResolver = 'REPLACE') {
+export async function saveModelsToDatabase<T extends object>(table: TableName, models: T[], conflictResolver: UniqueIndexConflictResolver = 'REPLACE') {
 	const db = await getDatabase()
 	return saveToDatabase(db, table, models, conflictResolver)
 }
 
-async function saveToDatabase<T extends object>(db: Database, table: string, models: T[], conflictResolver: UniqueIndexConflictResolver) {
+async function saveToDatabase<T extends object>(db: Database, table: TableName, models: T[], conflictResolver: UniqueIndexConflictResolver) {
 	if (models.length === 0) {
 		return models
 	}
@@ -36,10 +36,23 @@ async function saveToDatabase<T extends object>(db: Database, table: string, mod
 	return result
 }
 
-export async function selectFromDatabase<T extends object>(table: string, where: Partial<T>, limit = 0, orderBy?: {
+export type TableName = "assets_v2" | "transactions" | "currency_rates" | "chat_sessions" | "configuration" | "asset_prices";
+
+/** Reject plainWhere strings that contain quote patterns usable for SQL injection. */
+function assertSafePlainWhere(plainWhere: string): void {
+	if (/[';]/.test(plainWhere)) {
+		throw new Error(`Unsafe plainWhere clause rejected: contains quote or semicolon characters`);
+	}
+}
+
+export async function selectFromDatabase<T extends object>(table: TableName, where: Partial<T>, limit = 0, orderBy?: {
 	[k in keyof T]?: 'asc' | 'desc'
-}, plainWhere?: string, plainWhereValues?: any[]): Promise<T[]> {
+}, plainWhere?: string, plainWhereValues?: ReadonlyArray<unknown>): Promise<T[]> {
 	const db = await getDatabase()
+
+	if (plainWhere) {
+		assertSafePlainWhere(plainWhere);
+	}
 
 	// omit kv in where whose value is undefined
 	const filteredWhere = Object.fromEntries(Object.entries(where).filter(([,v]) => v !== undefined))
@@ -60,12 +73,12 @@ export async function selectFromDatabase<T extends object>(table: string, where:
 	return db.select<T[]>(sql, [...values, ...(plainWhereValues ?? [])])
 }
 
-export async function selectFromDatabaseWithSql<T extends object>(sql: string, values: any[]): Promise<T[]> {
+export async function selectFromDatabaseWithSql<T extends object>(sql: string, values: ReadonlyArray<unknown>): Promise<T[]> {
 	const db = await getDatabase()
-	return db.select<T[]>(sql, values)
+	return db.select<T[]>(sql, values as unknown[])
 }
 
-export async function deleteFromDatabase<T extends object>(table: string, where: Partial<T>, allowFullDelete = false) {
+export async function deleteFromDatabase<T extends object>(table: TableName, where: Partial<T>, allowFullDelete = false) {
 	const db = await getDatabase()
 
 	const filteredWhere = Object.fromEntries(Object.entries(where).filter(([,v]) => v !== undefined))

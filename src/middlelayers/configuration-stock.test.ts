@@ -24,8 +24,8 @@ const stockConfigId = "20";
 
 function createConfigurationDb(rows: Map<string, string>) {
   return {
-    select: vi.fn(async (sql: string) => {
-      const id = sql.match(/id = (\d+)/)?.[1];
+    select: vi.fn(async (sql: string, values: unknown[]) => {
+      const id = String(values?.[0] ?? "");
       if (!id || !rows.has(id)) {
         return [];
       }
@@ -33,9 +33,9 @@ function createConfigurationDb(rows: Map<string, string>) {
     }),
     execute: vi.fn(async (sql: string, values: unknown[]) => {
       if (sql.startsWith("INSERT OR REPLACE")) {
-        const id = sql.match(/VALUES \((\d+), \?\)/)?.[1];
+        const id = String(values?.[0] ?? "");
         if (id) {
-          rows.set(id, String(values[0] ?? ""));
+          rows.set(id, String(values[1] ?? ""));
         }
       }
       return { rowsAffected: 1 };

@@ -16,7 +16,7 @@ function isDevEnv(): boolean {
   }
 }
 
-const isDev: boolean = isDevEnv();
+ const isDev = /* @__PURE__ */ isDevEnv();
 
 /** Log a trace message. No-op in production. */
 export function trace(...args: unknown[]): void {
@@ -30,13 +30,8 @@ export function traceWarn(...args: unknown[]): void {
   console.warn("[skill-trace:warn]", ...args);
 }
 
-/** Log an error trace message. Always logs errors to console.warn in production. */
+/** Log an error trace message. No-op in production — does NOT surface error details to the browser console. */
 export function traceError(msg: string, err?: unknown): void {
-  if (!isDev) {
-    if (err instanceof Error) {
-      console.warn("[skill-trace]", msg, err.message);
-    }
-    return;
-  }
+  if (!isDev) return;
   console.error("[skill-trace:error]", msg, err ?? "");
 }

@@ -42,14 +42,12 @@ impl Binance {
     }
 
     pub async fn query_balance(&self) -> Result<HashMap<String, f64>, Box<dyn std::error::Error>> {
-        let account: Account =
-            BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
-        let funding: Wallet =
-            BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
-        let futures: FuturesAccount =
-            BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
-        let margin: Margin =
-            BinanceApi::new(Some(self.api_key.clone()), Some(self.secret_key.clone()));
+        let api_key = Some(self.api_key.clone());
+        let secret_key = Some(self.secret_key.clone());
+        let account: Account = BinanceApi::new(api_key.clone(), secret_key.clone());
+        let funding: Wallet = BinanceApi::new(api_key.clone(), secret_key.clone());
+        let futures: FuturesAccount = BinanceApi::new(api_key.clone(), secret_key.clone());
+        let margin: Margin = BinanceApi::new(api_key, secret_key);
         let acc = account.get_account().await?;
         // spot
         let mut res = acc
