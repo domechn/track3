@@ -38,6 +38,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import { Input } from "@/components/ui/input";
+import { invoke } from "@tauri-apps/api/core";
+import { getDatabase } from "@/middlelayers/database";
 import { cn } from "@/lib/utils";
 import "@/components/common/scrollbar/index.css";
 import { useTranslation } from "@/i18n";
@@ -55,6 +58,38 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
   const [lastImportAt, setLastImportAt] = useState<Date>();
   const [blacklist, setBlacklist] = useState<string[]>([]);
+  const [encKeyInput, setEncKeyInput] = useState("");
+  const [encKeyConfirm, setEncKeyConfirm] = useState("");
+  const [encKeySaving, setEncKeySaving] = useState(false);
+  async function handleChangeEncryptionKey() {
+    if (!encKeyInput || encKeyInput !== encKeyConfirm) {
+      toast({ description: "Keys do not match or are empty", variant: "destructive" });
+      return;
+    }
+    if (encKeyInput.length < 8) {
+      toast({ description: "Encryption key must be at least 8 characters", variant: "destructive" });
+      return;
+    }
+    setEncKeySaving(true);
+    try {
+      const db = await getDatabase();
+      const rows = await db.select<{ id: string; data: string }[]>("SELECT id, data FROM configuration WHERE data LIKE '!ent:%'");
+      for (const row of rows) {
+        const plaintext = await invoke<string>("decrypt", { data: row.data });
+        const newEncrypted = await invoke<string>("encrypt_with_key", { plaintext, key: encKeyInput });
+        await db.execute("UPDATE configuration SET data = ? WHERE id = ?", [newEncrypted, row.id]);
+      }
+      await invoke("persist_encryption_key", { key: encKeyInput });
+      toast({ description: "Encryption key updated. Assets and transactions are unaffected." });
+      setEncKeyInput("");
+      setEncKeyConfirm("");
+    } catch (e) {
+      toast({ description: String(e), variant: "destructive" });
+    } finally {
+      setEncKeySaving(false);
+    }
+  }
+
 
   useEffect(() => {
     loadAutoBackupDirectory().then((isSet) => {
@@ -323,6 +358,40 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Encryption key */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Encryption Key
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Change the encryption key used to protect sensitive configuration
+            data (CEX keys, wallet addresses, chat sessions). Existing data
+            will be re-encrypted on save. Assets and transaction history
+            are never encrypted.
+          </p>
+          <Input
+            type="password"
+            placeholder="New encryption key (min 8 chars)"
+            value={encKeyInput}
+            onChange={(e) => setEncKeyInput(e.target.value)}
+            autoComplete="off"
+          />
+          <Input
+            type="password"
+            placeholder="Confirm new encryption key"
+            value={encKeyConfirm}
+            onChange={(e) => setEncKeyConfirm(e.target.value)}
+            autoComplete="off"
+          />
+          <Button onClick={handleChangeEncryptionKey} disabled={encKeySaving} size="sm">
+            {encKeySaving ? "Saving..." : "Update Encryption Key"}
+          </Button>
         </CardContent>
       </Card>
     </div>
