@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::sync::Mutex;
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use aes::Aes256;
 use aes_gcm_siv::aead::{Aead, KeyInit};
@@ -16,7 +16,7 @@ type LegacyAes256CbcDec = cbc::Decryptor<Aes256>;
 pub struct Ent {
     salt: String,
     ent_prefix: String,
-    key: OnceLock<String>,
+    key: Mutex<Option<String>>,
 }
 
 impl Ent {
@@ -27,20 +27,33 @@ impl Ent {
             ])
             .unwrap(),
             ent_prefix: String::from("!ent:"),
-            key: OnceLock::new(),
+            key: Mutex::new(None),
         }
     }
 
-    /// Set the encryption key. Can only be called once; returns an error if
-    /// already initialized. Must be called before any encrypt/decrypt operation.
+    /// Set the encryption key (first-time initialisation).  Returns an error
+    /// if the key has already been set.  Must be called before any
+    /// encrypt/decrypt operation.
     pub fn set_key(&self, key: String) -> Result<(), String> {
-        self.key.set(key).map_err(|_| "encryption key already initialized".to_string())
+        let mut lock = self.key.lock().map_err(|_| "lock error".to_string())?;
+        if lock.is_some() {
+            return Err("encryption key already initialized".to_string());
+        }
+        *lock = Some(key);
+        Ok(())
     }
 
-    fn get_key(&self) -> Result<&str, Box<dyn std::error::Error>> {
-        self.key.get().map(String::as_str).ok_or_else(|| {
-            "encryption key not set at startup. This is a critical bug — restart the application.".into()
-        })
+    /// Replace the encryption key and return the old value.  Any subsequent
+    /// encrypt/decrypt call uses the new key.  Returns an error when no key
+    /// has been set yet.
+    pub fn change_key(&self, new_key: String) -> Result<String, String> {
+        let mut lock = self.key.lock().map_err(|_| "lock error".to_string())?;
+        lock.replace(new_key).ok_or("encryption key not set".to_string())
+    }
+
+    fn get_key(&self) -> Result<String, Box<dyn std::error::Error>> {
+        let lock = self.key.lock().map_err(|_| Box::<dyn std::error::Error>::from("mutex poisoned"))?;
+        lock.clone().ok_or_else(|| Box::<dyn std::error::Error>::from("encryption key not set at startup. This is a critical bug — restart the application."))
     }
 
     fn get_key_hash(&self) -> Result<[u8; 32], Box<dyn std::error::Error>> {
@@ -91,8 +104,6 @@ impl Ent {
 
     /// Legacy AES-256-CBC decryption path (pre-v0.5.0 format with zero IV).
     /// Only active when the payload starts with `!ent:` but not `!ent:v2:`.
-    /// This path is inherently weaker than the v2 AES-GCM-SIV path.
-    /// TODO: migrate all legacy payloads to v2 format on read via the frontend.
     fn decrypt_legacy(&self, encrypted_data: String) -> Result<String, Box<dyn std::error::Error>> {
         if !self.is_ent(&encrypted_data) {
             return Err("not ent".into());
@@ -145,8 +156,6 @@ impl Ent {
         if encrypted_data.starts_with(ENT_V2_PREFIX) {
             return self.decrypt_v2(&encrypted_data);
         }
-
-        // Legacy backward-compatibility path for data encrypted before AES-GCM-SIV migration
         self.decrypt_legacy(encrypted_data)
     }
 

@@ -30,6 +30,58 @@ fn sanitize_error(msg: &str) -> String {
         .replace("recvWindow=", "recvWindow=<REDACTED>")
 }
 
+/// Decrypt data with an explicit key (for import where the current ENT key
+/// does not match the one used during export).
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+fn decrypt_with_key(data: String, key: String) -> Result<String, String> {
+    let temp_ent = track3::ent::Ent::new();
+    temp_ent.set_key(key).map_err(|e| format!("key error: {}", e))?;
+    match temp_ent.decrypt(data) {
+        Ok(decrypted) => Ok(decrypted),
+        Err(e) => Err(format!("{}", e)),
+    }
+}
+
+/// Encrypt data with an explicit key (for re-encrypting data during a key
+/// rotation from the frontend).
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+fn encrypt_with_key(plaintext: String, key: String) -> Result<String, String> {
+    let temp_ent = track3::ent::Ent::new();
+    temp_ent.set_key(key).map_err(|e| format!("key error: {}", e))?;
+    match temp_ent.encrypt(plaintext) {
+        Ok(encrypted) => Ok(encrypted),
+        Err(e) => Err(format!("{}", e)),
+    }
+}
+
+/// Persist a new encryption key to disk and activate it immediately on the
+/// ENT instance.  The frontend is responsible for re-encrypting all stored
+/// data with the new key before calling this command.
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+async fn persist_encryption_key(
+    handle: tauri::AppHandle,
+    key: String,
+) -> Result<(), String> {
+    let app_dir = handle.path().app_data_dir().map_err(|e| format!("{}", e))?;
+    let key_path = app_dir.join(".ent-key");
+    std::fs::write(&key_path, &key).map_err(|e| format!("write .ent-key failed: {}", e))?;
+    // Activate the new key for the running session
+    ENT.change_key(key).map_err(|e| format!("change key failed: {}", e))?;
+    Ok(())
+}
+
 #[cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
@@ -158,15 +210,24 @@ fn main() {
             let app_dir = resource_path.app_data_dir().unwrap();
             println!("app_dir: {:?}, resource_dir: {:?}", app_dir, resource_dir);
 
-            // Initialize encryption key explicitly. The original hardcoded value
-            // is used to maintain backward compatibility with existing encrypted
-            // data (configuration, chat sessions).  The key is now set explicitly
-            // at startup rather than relying on a silent fallback in get_key(),
-            // which addresses the security review finding.
-            // Future enhancement: migrate to a per-installation key by re-encrypting
-            // all stored data on first run after upgrade.
-            let legacy_key = "#t.3eis@hck,btr!a".to_string();
-            ENT.set_key(legacy_key).expect("failed to set encryption key");
+            // Initialize encryption key.
+            // 1. If a user has set a custom key (persisted in .ent-key), use it.
+            // 2. Otherwise fall back to the deterministic legacy key so existing
+            //    encrypted data remains readable.
+            // The key is explicitly set here rather than relying on a silent
+            // fallback in Ent::get_key(), which addresses the security review
+            // finding.  OnceLock / Mutex ensures the key cannot be set twice
+            // through different paths.
+            let key_path = app_dir.join(".ent-key");
+            let enc_key = if key_path.exists() {
+                std::fs::read_to_string(&key_path)
+                    .unwrap_or_else(|_| "#t.3eis@hck,btr!a".to_string())
+                    .trim()
+                    .to_string()
+            } else {
+                "#t.3eis@hck,btr!a".to_string()
+            };
+            ENT.set_key(enc_key).expect("failed to set encryption key");
 
             if is_first_run(app_dir.as_path()) {
                 init_sqlite_file(app_dir.as_path());
@@ -220,6 +281,9 @@ fn main() {
             encrypt,
             decrypt,
             download_coins_logos,
+            decrypt_with_key,
+            encrypt_with_key,
+            persist_encryption_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

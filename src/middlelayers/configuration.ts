@@ -253,7 +253,18 @@ export async function saveStockConfig(cfg: StockConfig) {
 export async function importRawConfiguration(data: string) {
   let raw = data;
   if (raw.startsWith(prefix)) {
-    raw = await invoke<string>("decrypt", { data: raw });
+    try {
+      raw = await invoke<string>("decrypt", { data: raw });
+    } catch {
+      // The data was encrypted with a different key — ask the user for
+      // the original export key so we can still import it.
+      const customKey = window.prompt?.(
+        "The imported configuration was encrypted with a different key.\n" +
+        "Please enter the encryption key that was used when exporting:",
+      );
+      if (!customKey) throw new Error("Import cancelled: no decryption key provided");
+      raw = await invoke<string>("decrypt_with_key", { data: raw, key: customKey });
+    }
   }
   const cfg = yaml.parse(raw) as GlobalConfig;
   await saveConfiguration(cfg);
