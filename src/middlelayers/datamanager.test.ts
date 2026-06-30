@@ -23,11 +23,13 @@ const mocks = vi.hoisted(() => ({
   queryHistoricalData: vi.fn(),
   readTextFile: vi.fn(),
   writeTextFile: vi.fn(),
+  stat: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/plugin-fs", () => ({
   readTextFile: mocks.readTextFile,
   writeTextFile: mocks.writeTextFile,
+  stat: mocks.stat,
 }));
 
 vi.mock("@/utils/app", () => ({
@@ -235,6 +237,7 @@ describe("DATA_MANAGER historical data import/export", () => {
 
   it("reads and parses exported data from a selected file", async () => {
     const data = makeExportData();
+  mocks.stat.mockResolvedValue({ size: 1024 });
     mocks.readTextFile.mockResolvedValue(JSON.stringify(data));
 
     await expect(

@@ -18,6 +18,16 @@ export async function callLlm(
   if (!endpoint) {
     return { content: "", ok: false, error: "Endpoint is empty" };
   }
+  // Validate URL scheme  only http(s) allowed
+  let parsed: URL;
+  try {
+    parsed = new URL(endpoint);
+  } catch {
+    return { content: "", ok: false, error: "Endpoint is not a valid URL" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { content: "", ok: false, error: "Endpoint must use http or https scheme" };
+  }
   const url = endpoint.endsWith("/chat/completions")
     ? endpoint
     : `${endpoint}/chat/completions`;

@@ -10,7 +10,7 @@ import {
   exportConfigurationString,
   importRawConfiguration,
 } from "./configuration";
-import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
+import { writeTextFile, readTextFile, stat } from "@tauri-apps/plugin-fs";
 import { ASSET_HANDLER, AssetHandlerImpl } from "./entities/assets";
 import { getClientID, getVersion } from "@/utils/app";
 import {
@@ -57,6 +57,11 @@ class DataManagement implements DataManager {
   }
 
   async readHistoricalData(filePath: string): Promise<ExportData> {
+    const MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+    const fileStat = await stat(filePath);
+    if (fileStat.size > MAX_SIZE_BYTES) {
+      throw new Error(`Import file too large (${Math.round(fileStat.size / 1024 / 1024)} MB). Maximum allowed: 100 MB.`);
+    }
     const contents = await readTextFile(filePath);
     return JSON.parse(contents) as ExportData;
   }

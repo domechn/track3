@@ -1,3 +1,4 @@
+use std::sync::OnceLock;
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use aes::Aes256;
 use aes_gcm_siv::aead::{Aead, KeyInit};
@@ -15,8 +16,7 @@ type LegacyAes256CbcDec = cbc::Decryptor<Aes256>;
 pub struct Ent {
     salt: String,
     ent_prefix: String,
-
-    key: Option<String>,
+    key: OnceLock<String>,
 }
 
 impl Ent {
@@ -27,25 +27,27 @@ impl Ent {
             ])
             .unwrap(),
             ent_prefix: String::from("!ent:"),
-            key: None,
+            key: OnceLock::new(),
         }
     }
 
-    pub fn set_key(&mut self, key: String) {
-        self.key = Some(key);
+    /// Set the encryption key. Can only be called once; returns an error if
+    /// already initialized. Must be called before any encrypt/decrypt operation.
+    pub fn set_key(&self, key: String) -> Result<(), String> {
+        self.key.set(key).map_err(|_| "encryption key already initialized".to_string())
     }
 
-    fn get_key(&self) -> String {
-        if let Some(key) = &self.key {
-            return key.clone();
-        }
-        return "#t.3eis@hck,btr!a".to_string();
+    fn get_key(&self) -> Result<&str, Box<dyn std::error::Error>> {
+        self.key.get().map(String::as_str).ok_or_else(|| {
+            "encryption key not set at startup. This is a critical bug — restart the application.".into()
+        })
     }
 
-    fn get_key_hash(&self) -> [u8; 32] {
+    fn get_key_hash(&self) -> Result<[u8; 32], Box<dyn std::error::Error>> {
+        let key = self.get_key()?;
         let mut hasher = Sha256::new();
-        hasher.update(self.get_key().as_bytes());
-        hasher.finalize().into()
+        hasher.update(key.as_bytes());
+        Ok(hasher.finalize().into())
     }
 
     fn get_nonce_bytes(&self) -> [u8; NONCE_LEN] {
@@ -54,7 +56,7 @@ impl Ent {
     }
 
     pub fn encrypt(&self, data: String) -> Result<String, Box<dyn std::error::Error>> {
-        let key = self.get_key_hash();
+        let key = self.get_key_hash()?;
         let cipher = Aes256GcmSiv::new_from_slice(&key)?;
         let nonce = self.get_nonce_bytes();
         let encrypted = cipher
@@ -78,7 +80,7 @@ impl Ent {
         }
 
         let (nonce, ciphertext) = payload.split_at(NONCE_LEN);
-        let key = self.get_key_hash();
+        let key = self.get_key_hash()?;
         let cipher = Aes256GcmSiv::new_from_slice(&key)?;
         let decrypted = cipher
             .decrypt(Nonce::from_slice(nonce), ciphertext)
@@ -87,6 +89,10 @@ impl Ent {
         Ok(String::from_utf8(decrypted)?)
     }
 
+    /// Legacy AES-256-CBC decryption path (pre-v0.5.0 format with zero IV).
+    /// Only active when the payload starts with `!ent:` but not `!ent:v2:`.
+    /// This path is inherently weaker than the v2 AES-GCM-SIV path.
+    /// TODO: migrate all legacy payloads to v2 format on read via the frontend.
     fn decrypt_legacy(&self, encrypted_data: String) -> Result<String, Box<dyn std::error::Error>> {
         if !self.is_ent(&encrypted_data) {
             return Err("not ent".into());
@@ -103,7 +109,7 @@ impl Ent {
         let iv: [u8; LEGACY_IV_LEN] = data.as_bytes()[..LEGACY_IV_LEN].try_into()?;
         let mut encrypted = STANDARD.decode(&data[LEGACY_IV_LEN..])?;
         let zero_iv = [0u8; LEGACY_IV_LEN];
-        let key = self.get_key_hash();
+        let key = self.get_key_hash()?;
         let cipher = LegacyAes256CbcDec::new_from_slices(&key, &zero_iv)?;
         let decrypted = cipher
             .decrypt_padded_mut::<Pkcs7>(&mut encrypted)
@@ -140,6 +146,7 @@ impl Ent {
             return self.decrypt_v2(&encrypted_data);
         }
 
+        // Legacy backward-compatibility path for data encrypted before AES-GCM-SIV migration
         self.decrypt_legacy(encrypted_data)
     }
 
@@ -157,6 +164,14 @@ mod tests {
 
     type LegacyAes256CbcEnc = cbc::Encryptor<Aes256>;
 
+    const TEST_KEY: &str = "test-key-for-unit-tests";
+
+    fn make_ent() -> super::Ent {
+        let ent = super::Ent::new();
+        ent.set_key(TEST_KEY.to_string()).unwrap();
+        ent
+    }
+
     fn legacy_encrypt(ent: &super::Ent, data: &str) -> String {
         let iv = "1234567890abcdef";
         let mut plaintext = String::from(iv);
@@ -164,7 +179,7 @@ mod tests {
         plaintext.push_str(ent.salt.as_str());
 
         let mut key_hasher = Sha256::new();
-        key_hasher.update(ent.get_key().as_bytes());
+        key_hasher.update(TEST_KEY.as_bytes());
         let key: [u8; 32] = key_hasher.finalize().into();
 
         let cipher = LegacyAes256CbcEnc::new_from_slices(&key, &[0u8; super::LEGACY_IV_LEN]).unwrap();
@@ -181,8 +196,7 @@ mod tests {
 
     #[test]
     fn test_encrypt_and_decrypt() {
-        use super::Ent;
-        let ent = Ent::new();
+        let ent = make_ent();
         let encrypted = ent.encrypt("hello".to_string()).unwrap();
         assert_eq!(ent.is_ent(encrypted.as_str()), true);
         assert!(encrypted.starts_with("!ent:v2:"));
@@ -193,8 +207,7 @@ mod tests {
 
     #[test]
     fn test_encrypt_and_decrypt_large_string() {
-        use super::Ent;
-        let ent = Ent::new();
+        let ent = make_ent();
         let encrypted = ent.encrypt("hello".repeat(10000).to_string()).unwrap();
         assert_eq!(ent.is_ent(encrypted.as_str()), true);
 
@@ -204,8 +217,7 @@ mod tests {
 
     #[test]
     fn test_decrypt_legacy_payload() {
-        use super::Ent;
-        let ent = Ent::new();
+        let ent = make_ent();
         let encrypted = legacy_encrypt(&ent, "hello");
 
         let decrypted = ent.decrypt(encrypted).unwrap();

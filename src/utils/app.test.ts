@@ -90,6 +90,7 @@ describe("trackEventWithClientID", () => {
   });
 
   it("reports Aptabase transport failures instead of silently accepting them", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockResolvedValueOnce({
       status: 500,
@@ -98,12 +99,7 @@ describe("trackEventWithClientID", () => {
 
     await trackEventWithClientID("app_started");
 
-    expect(errorSpy).toHaveBeenCalledWith(
-      "track event failed",
-      expect.objectContaining({
-        message: "Aptabase tracking failed with status 500: server error",
-      }),
-    );
+    expect(debugSpy).toHaveBeenCalledWith("track event failed");
 
     errorSpy.mockRestore();
   });

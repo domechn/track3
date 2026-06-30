@@ -6,8 +6,7 @@ export class OtherCexExchanges implements Exchanger {
 		secret: string
 		password?: string
 	}, alias?: string) {
-
-
+		console.warn(`[cex] Unknown exchange "${exchangeName}" — this exchange will be skipped. If "${exchangeName}" is a valid exchange, add its analyzer to the cex analyzer registry.`);
 	}
 
 	getExchangeName(): string {

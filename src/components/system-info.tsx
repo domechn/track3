@@ -139,6 +139,13 @@ const App = ({
     if (!inputLicense) {
       return;
     }
+    if (inputLicense.length > 10000) {
+      toast({
+        description: "License key is too long",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaveLicenseLoading(true);
     activeDevice(inputLicense)
       .then(() => {

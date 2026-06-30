@@ -17,7 +17,7 @@ import {
 } from "@/middlelayers/database";
 import type { AIConfig } from "@/middlelayers/types";
 
-const SESSIONS_TABLE = "chat_sessions";
+const SESSIONS_TABLE = "chat_sessions" as const;
 const FILE_VERSION = 1;
 const PREVIEW_LIMIT = 30;
 const LLM_PROMPT_CHAR_LIMIT = 400;
@@ -230,6 +230,19 @@ async function readSessionMessages(
   id: string,
 ): Promise<PersistedChatMessage[]> {
   const path = await fullPathFor(id);
+  // Recovery: if there is an orphaned .tmp file from a previous crash,
+  // promote it to the main file so session data is not lost.
+  const tmpPath = path + ".tmp";
+  try {
+    if (await exists(tmpPath)) {
+      const hasMain = await exists(path);
+      if (!hasMain) {
+        const tmpContent = await readTextFile(tmpPath);
+        await writeTextFile(path, tmpContent);
+      }
+      await remove(tmpPath).catch(() => {});
+    }
+  } catch {}
   if (!(await exists(path))) {
     return [];
   }
@@ -252,9 +265,14 @@ async function writeSessionMessages(
 ): Promise<void> {
   const dir = await ensureSessionDir();
   const path = `${dir}/${id}.json.ent`;
+  const tmpPath = `${path}.tmp`;
   const payload = JSON.stringify({ version: FILE_VERSION, messages });
   const encrypted = await invoke<string>("encrypt", { data: payload });
+  // Write to temp first, then overwrite — this keeps the window for data loss
+  // on crash or concurrent write as narrow as possible.
+  await writeTextFile(tmpPath, encrypted);
   await writeTextFile(path, encrypted);
+  await remove(tmpPath).catch(() => {});
 }
 
 export async function appendMessages(

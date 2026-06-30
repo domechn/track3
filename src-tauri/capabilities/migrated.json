@@ -16,7 +16,11 @@
     "fs:allow-appconfig-write-recursive",
     {
       "identifier": "fs:scope",
-      "allow": ["**"]
+      "allow": [
+        "$APPDATA/**",
+        "$APPCACHE/**",
+        "$APPCONFIG/**"
+      ]
     },
     "shell:allow-open",
     "dialog:allow-open",

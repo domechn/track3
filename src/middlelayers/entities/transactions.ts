@@ -31,7 +31,7 @@ function groupTransactionModelsByUuid(models: TransactionModel[]): TransactionMo
 }
 
 class TransactionHandler implements TransactionHandlerImpl {
-  private readonly transactionTableName = "transactions";
+  private readonly transactionTableName = "transactions" as const;
 
   async createOrUpdate(model: TransactionModel): Promise<void> {
     await saveModelsToDatabase(this.transactionTableName, [
@@ -107,19 +107,25 @@ class TransactionHandler implements TransactionHandlerImpl {
     end?: Date,
     symbol?: string,
   ): Promise<TransactionModel[][]> {
-    const symbolSql = symbol ? ` AND symbol = '${symbol}'` : "";
-    const lteCreatedSql = end
-      ? ` AND txnCreatedAt <= '${end.toISOString()}'`
-      : "";
-    const gteCreatedSql = start
-      ? ` AND txnCreatedAt >= '${start.toISOString()}'`
-      : "";
-    const sql = `SELECT * FROM ${this.transactionTableName} WHERE 1 = 1 ${symbolSql} ${gteCreatedSql} ${lteCreatedSql} ORDER BY txnCreatedAt DESC;`;
+    const conditions: string[] = [];
+    const values: string[] = [];
 
-    const assets = await selectFromDatabaseWithSql<TransactionDatabaseModel>(
-      sql,
-      [],
-    );
+    if (symbol) {
+      conditions.push("symbol = ?");
+      values.push(symbol);
+    }
+    if (start) {
+      conditions.push("txnCreatedAt >= ?");
+      values.push(start.toISOString());
+    }
+    if (end) {
+      conditions.push("txnCreatedAt <= ?");
+      values.push(end.toISOString());
+    }
+
+    const whereClause = conditions.length > 0 ? " WHERE " + conditions.join(" AND ") : "";
+    const sql = `SELECT * FROM ${this.transactionTableName}${whereClause} ORDER BY txnCreatedAt DESC;`;
+    const assets = await selectFromDatabaseWithSql<TransactionDatabaseModel>(sql, values);
     return groupTransactionModelsByUuid(this.normalizeTransactionModels(assets));
   }
 

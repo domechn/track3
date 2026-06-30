@@ -13,9 +13,10 @@ export interface PriceEntry {
 export type PriceMap = Record<string, PriceEntry>;
 
 /** Fetch crypto prices from CoinGecko (via Rust command). */
-export async function getCryptoPrices(symbols: string[]): Promise<Record<string, number>> {
+export async function getCryptoPrices(symbols: string[], signal?: AbortSignal): Promise<Record<string, number>> {
   trace("getCryptoPrices", symbols.join(","));
   if (symbols.length === 0) return {};
+  if (signal?.aborted) return {};
   try {
     const map = await invoke<Record<string, number>>("query_coins_prices", {
       symbols,
@@ -33,9 +34,10 @@ export async function getCryptoPrices(symbols: string[]): Promise<Record<string,
 }
 
 /** Fetch stock prices from broker endpoint. */
-export async function getStockPrices(symbols: string[]): Promise<Record<string, number>> {
+export async function getStockPrices(symbols: string[], signal?: AbortSignal): Promise<Record<string, number>> {
   trace("getStockPrices", symbols.join(","));
   if (symbols.length === 0) return {};
+  if (signal?.aborted) return {};
   try {
     const usdPrices = await fetchStockPrices(symbols);
     trace("getStockPrices", "->", Object.keys(usdPrices).length, "prices from fetch");
@@ -82,14 +84,16 @@ export async function knownStockSymbols(): Promise<Set<string>> {
 export async function getPrices(
   symbols: string[],
   type: "crypto" | "stock" | "auto" = "auto",
+  signal?: AbortSignal,
 ): Promise<PriceMap> {
   trace("getPrices", "type:", type, "symbols:", symbols.join(","));
   if (symbols.length === 0) return {};
+  if (signal?.aborted) return {};
 
   const prices: PriceMap = {};
 
   if (type === "crypto") {
-    const crypto = await getCryptoPrices(symbols);
+    const crypto = await getCryptoPrices(symbols, signal);
     for (const sym of symbols) {
       if (crypto[sym]) prices[sym] = { priceUsd: crypto[sym]!, type: "crypto" };
     }
@@ -97,7 +101,7 @@ export async function getPrices(
   }
 
   if (type === "stock") {
-    const stock = await getStockPrices(symbols);
+    const stock = await getStockPrices(symbols, signal);
     for (const sym of symbols) {
       if (stock[sym]) prices[sym] = { priceUsd: stock[sym]!, type: "stock" };
     }
@@ -115,7 +119,7 @@ export async function getPrices(
   );
 
   // Try crypto for known crypto + leftovers
-  const crypto = await getCryptoPrices([...cryptoSyms, ...leftover]);
+  const crypto = await getCryptoPrices([...cryptoSyms, ...leftover], signal);
   for (const sym of [...cryptoSyms, ...leftover]) {
     if (crypto[sym]) prices[sym] = { priceUsd: crypto[sym]!, type: "crypto" };
   }
@@ -123,7 +127,7 @@ export async function getPrices(
   // Try stock for known stock + leftovers that crypto didn't return
   const stockLeftover = stockSyms.filter((s) => !prices[s]);
   const stillMissing = leftover.filter((s) => !prices[s]);
-  const stock = await getStockPrices([...stockLeftover, ...stillMissing]);
+  const stock = await getStockPrices([...stockLeftover, ...stillMissing], signal);
   for (const sym of [...stockLeftover, ...stillMissing]) {
     if (stock[sym]) prices[sym] = { priceUsd: stock[sym]!, type: "stock" };
   }

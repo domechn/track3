@@ -293,7 +293,7 @@ const ExchangeSection = memo(function ExchangeSection({
               <TableBody>
                 {paged.map((ex, idx) => (
                   <TableRow
-                    key={ex.type + ex.apiKey + idx}
+                    key={ex.type + idx}
                     className="h-[42px] group align-middle"
                   >
                     <TableCell className="w-[170px]">

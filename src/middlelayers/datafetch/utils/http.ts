@@ -38,9 +38,11 @@ export async function sendHttpRequest<T>(
 
   const resp = await fetch(url, payload);
   if (resp.status > 299) {
-    throw new Error(
-      `Request failed with status ${resp.status}, message: ${await resp.text()}`,
-    );
+    // Consume body to free the connection, but don't leak it in the error
+    // message — response bodies can contain API keys, signatures, or
+    // tokens that would be visible in user-facing toast notifications.
+    await resp.text().catch(() => {});
+    throw new Error(`Request failed with status ${resp.status}`);
   }
   return resp.json();
 }

@@ -143,6 +143,17 @@ export async function cleanAIConfig(): Promise<void> {
   return deleteConfigurationById(aiConfigId);
 }
 
+const RESERVED_HEADERS = new Set([
+  "authorization",
+  "host",
+  "cookie",
+  "content-length",
+  "transfer-encoding",
+  "connection",
+  "expect",
+  "upgrade",
+]);
+
 function sanitizeAIAdvanced(advanced: AIAdvancedOptions): AIAdvancedOptions {
   const out: AIAdvancedOptions = {};
   if (typeof advanced.temperature === "number") {
@@ -154,7 +165,7 @@ function sanitizeAIAdvanced(advanced: AIAdvancedOptions): AIAdvancedOptions {
   if (advanced.headers && typeof advanced.headers === "object") {
     out.headers = Object.fromEntries(
       Object.entries(advanced.headers).filter(
-        ([, v]) => typeof v === "string",
+        ([k, v]) => typeof v === "string" && !RESERVED_HEADERS.has(k.toLowerCase()),
       ),
     );
   }
@@ -262,8 +273,8 @@ async function saveConfigurationById(id: string, cfg: string, encrypt = true) {
     : cfg;
 
   await db.execute(
-    `INSERT OR REPLACE INTO configuration (id, data) VALUES (${id}, ?)`,
-    [saveStr],
+    `INSERT OR REPLACE INTO configuration (id, data) VALUES (?, ?)`,
+    [id, saveStr],
   );
 }
 
@@ -305,7 +316,7 @@ async function getConfigurationById(
       };
     })
     .catch((err) => {
-      if (err.includes("not ent")) {
+      if ((typeof err === "string" && err.includes("not ent")) || (err instanceof Error && err.message.includes("not ent"))) {
         return model;
       }
       throw err;
@@ -402,9 +413,10 @@ async function getConfigurationModelById(
   id: string,
 ): Promise<ConfigurationModel | undefined> {
   const db = await getDatabase();
-  const configurations = await db.select<ConfigurationModel[]>(
-    `SELECT * FROM configuration where id = ${id}`,
-  );
+    const configurations = await db.select<ConfigurationModel[]>(
+      `SELECT * FROM configuration where id = ?`,
+      [id],
+    );
   if (configurations.length === 0) {
     return undefined;
   }

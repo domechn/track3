@@ -39,9 +39,9 @@ import {
 import { SUIAnalyzer } from "./datafetch/coins/sui";
 import { StockAnalyzer } from "./datafetch/coins/stock/stock-analyzer";
 
-export function queryStableCoins(): Promise<string[]> {
+export async function queryStableCoins(): Promise<string[]> {
   try {
-    return new RemoteStableCoinsQuery().listAllStableCoins();
+    return await new RemoteStableCoinsQuery().listAllStableCoins();
   } catch (e) {
     console.error("failed to query stable coins", e);
     return new StableCoinsQuery().listAllStableCoins();
@@ -237,11 +237,11 @@ async function loadPortfoliosByConfig(
             config,
           );
       const anaName = a.getAnalyzeName();
-      console.log("loading portfolio from ", anaName);
+      console.debug("loading portfolio from ", anaName);
       try {
         await a.preLoad();
         const portfolio = await a.loadPortfolio();
-        console.log("loaded portfolio from ", anaName);
+        console.debug("loaded portfolio from ", anaName);
         await a.postLoad();
         addProgress(perProgressPer);
         return portfolio;

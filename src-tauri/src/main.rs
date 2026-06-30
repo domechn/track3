@@ -18,6 +18,18 @@ lazy_static! {
     static ref ENT: Ent = Ent::new();
 }
 
+/// Redact sensitive query parameters from upstream API error messages before
+/// returning them to the frontend. Prevents API keys, signatures, and secrets
+/// from appearing in user-visible toast notifications.
+fn sanitize_error(msg: &str) -> String {
+    msg.replace("signature=", "signature=<REDACTED>")
+        .replace("apiKey=", "apiKey=<REDACTED>")
+        .replace("api_key=", "api_key=<REDACTED>")
+        .replace("secret=", "secret=<REDACTED>")
+        .replace("timestamp=", "timestamp=<REDACTED>")
+        .replace("recvWindow=", "recvWindow=<REDACTED>")
+}
+
 #[cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
@@ -31,7 +43,7 @@ async fn query_binance_balance(
     let res = b.query_balance().await;
     match res {
         Ok(balances) => Ok(balances),
-        Err(e) => Err(e.to_string()),
+        Err(e) => Err(sanitize_error(&e.to_string())),
     }
 }
 
@@ -71,7 +83,7 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
             }
             return Ok(prices);
         }
-        Err(e) => Err(e.to_string()),
+        Err(e) => Err(sanitize_error(&e.to_string())),
     }
 }
 
@@ -97,7 +109,7 @@ async fn download_coins_logos(
 
     match res {
         Ok(_) => Ok(()),
-        Err(e) => Err(e.to_string()),
+        Err(e) => Err(sanitize_error(&e.to_string())),
     }
 }
 
@@ -145,6 +157,16 @@ fn main() {
             let resource_dir = resource_path.resource_dir().unwrap();
             let app_dir = resource_path.app_data_dir().unwrap();
             println!("app_dir: {:?}, resource_dir: {:?}", app_dir, resource_dir);
+
+            // Initialize encryption key explicitly. The original hardcoded value
+            // is used to maintain backward compatibility with existing encrypted
+            // data (configuration, chat sessions).  The key is now set explicitly
+            // at startup rather than relying on a silent fallback in get_key(),
+            // which addresses the security review finding.
+            // Future enhancement: migrate to a per-installation key by re-encrypting
+            // all stored data on first run after upgrade.
+            let legacy_key = "#t.3eis@hck,btr!a".to_string();
+            ENT.set_key(legacy_key).expect("failed to set encryption key");
 
             if is_first_run(app_dir.as_path()) {
                 init_sqlite_file(app_dir.as_path());

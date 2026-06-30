@@ -23,7 +23,8 @@ async function saveAttachment(file: File): Promise<ImageAttachment> {
   const dir = `${base.replace(/\/+$/, "")}/ai/attachments`;
   await mkdir(dir, { recursive: true });
   const id = uuidv4();
-  const ext = file.name.split(".").pop() || "png";
+  const rawExt = (file.name.split(".").pop() || "png").toLowerCase();
+  const ext = /^(png|jpg|jpeg|gif|webp|bmp|svg)$/.test(rawExt) ? rawExt : "png";
   const path = `${dir}/${id}.${ext}`;
   const buffer = await file.arrayBuffer();
   await writeFile(path, new Uint8Array(buffer));

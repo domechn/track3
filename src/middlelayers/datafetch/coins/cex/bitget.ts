@@ -220,7 +220,7 @@ export class BitgetExchange implements Exchanger {
 	}
 
 	private alphabeticalSort(a: string, b: string): number {
-		return a.localeCompare(b)
+		return a < b ? -1 : a > b ? 1 : 0
 	}
 
 	async verifyConfig(): Promise<boolean> {
