@@ -3,22 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Track3 — Privacy-First Crypto & Stock Portfolio Tracker</title>
+    <title>
+      Track3 — Privacy-First Crypto & Stock Portfolio Tracker with AI
+    </title>
     <meta
       name="description"
-      content="Track3 is a privacy-first desktop app for tracking crypto and stock assets across exchanges, brokers, and wallets. No backend server. All data stays local."
+      content="Track3 is a privacy-first desktop app for tracking crypto and stock assets across exchanges, brokers, and wallets. Now with built-in AI assistant for portfolio analysis. No backend server. All data stays local."
     />
     <meta
       name="keywords"
-      content="portfolio tracker, crypto, stocks, ibkr, interactive brokers, bitcoin, ethereum, binance, okx, privacy, desktop, tauri"
+      content="portfolio tracker, crypto, stocks, AI, ai assistant, ibkr, interactive brokers, bitcoin, ethereum, binance, okx, privacy, desktop, tauri"
     />
     <meta
       property="og:title"
-      content="Track3 — Privacy-First Crypto & Stock Portfolio Tracker"
+      content="Track3 — Privacy-First Crypto & Stock Portfolio Tracker with AI"
     />
     <meta
       property="og:description"
-      content="Track crypto and stock assets across exchanges, brokers, and wallets. All data stays local with encryption."
+      content="Track crypto and stock assets across exchanges, brokers, and wallets. Now with built-in AI assistant. All data stays local with encryption."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://domechn.github.io/track3/" />
@@ -1095,6 +1097,7 @@
         </a>
         <div class="nav__links">
           <a href="#features">Features</a>
+          <a href="#ai">AI</a>
           <a href="#exchanges">Sources</a>
           <a href="#pro">Pro</a>
           <a href="#screenshots">Screenshots</a>
@@ -1134,17 +1137,18 @@
               >
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
-              Privacy-first &middot; Open Source &middot; Desktop App
+              Privacy-first &middot; Open Source &middot; AI-Powered
             </div>
             <p class="hero__eyebrow">
               Private portfolio intelligence for crypto and stocks
             </p>
-            <h1>Track your <span>crypto and stock assets</span></h1>
+            <h1>Track your <span>crypto and stock assets</span> with AI</h1>
             <p class="hero__copy">
-              Track3 is a desktop portfolio tracker for centralized exchanges,
-              web3 wallets, and Interactive Brokers accounts. No servers, no
-              wallet signatures, and no mandatory cloud sync. Your data stays on
-              your device.
+              Track3 is a desktop portfolio tracker with a built-in AI assistant
+              for centralized exchanges, web3 wallets, and Interactive Brokers
+              accounts. Ask questions about your holdings in natural language.
+              No servers, no wallet signatures, and no mandatory cloud sync.
+              Your data stays on your device.
             </p>
             <div class="hero__actions">
               <a href="./download.html" class="btn btn--primary">
@@ -1298,6 +1302,86 @@
           />
         </div>
         <div class="screenshots__dots" id="screenshotDots"></div>
+      </div>
+    </section>
+
+    <!-- AI Assistant -->
+    <section class="section" id="ai">
+      <div class="container">
+        <div class="animate-in">
+          <p class="section__label">&#129302; AI Assistant</p>
+          <h2 class="section__title">Ask your portfolio anything</h2>
+          <p class="section__desc">
+            Track3 now includes a built-in AI assistant that understands your
+            portfolio. Ask about allocation, performance, trends, or get
+            personalized insights — all processed with your privacy intact.
+          </p>
+        </div>
+
+        <!-- AI Feature Cards -->
+        <div class="features" style="margin-bottom: 48px">
+          <div class="feature animate-in">
+            <div class="feature__icon feature__icon--purple">&#128172;</div>
+            <h3>Natural Language Queries</h3>
+            <p>
+              Ask questions like "How much BTC do I hold?" or "What's my best
+              performing asset this month?" and get instant answers from your
+              own data.
+            </p>
+          </div>
+          <div class="feature animate-in">
+            <div class="feature__icon feature__icon--green">&#128202;</div>
+            <h3>Portfolio Analysis</h3>
+            <p>
+              Get AI-powered breakdowns of your asset allocation, risk exposure,
+              and performance trends across all connected accounts and wallets.
+            </p>
+          </div>
+          <div class="feature animate-in">
+            <div class="feature__icon feature__icon--blue">&#128274;</div>
+            <h3>Private &amp; Local</h3>
+            <p>
+              The AI assistant works with your local data. Your portfolio
+              information never leaves your device — same privacy guarantee as
+              the rest of Track3.
+            </p>
+          </div>
+          <div class="feature animate-in">
+            <div class="feature__icon feature__icon--amber">&#128241;</div>
+            <h3>Desktop &amp; Mobile Ready</h3>
+            <p>
+              The AI chat interface is available on both desktop and iOS, so you
+              can query your portfolio and get insights wherever you are.
+            </p>
+          </div>
+        </div>
+
+        <!-- AI Screenshots Carousel -->
+        <div class="screenshots__frame animate-in">
+          <div class="screenshots__track" id="aiScreenshotTrack">
+            <img
+              src="images/ai/ai-screenshot-1.jpg"
+              alt="Track3 AI Assistant — Portfolio Q&amp;A"
+              loading="lazy"
+            />
+            <img
+              src="images/ai/ai-screenshot-2.jpg"
+              alt="Track3 AI — Portfolio Analysis &amp; Insights"
+              loading="lazy"
+            />
+            <img
+              src="images/ai/ai-screenshot-3.jpg"
+              alt="Track3 AI — Mobile Assistant on iOS"
+              loading="lazy"
+            />
+            <img
+              src="images/ai/ai-screenshot-4.jpg"
+              alt="Track3 AI — Market &amp; Asset Insights"
+              loading="lazy"
+            />
+          </div>
+          <div class="screenshots__dots" id="aiScreenshotDots"></div>
+        </div>
       </div>
     </section>
 
@@ -1773,41 +1857,44 @@
         .forEach((el) => observer.observe(el));
 
       /* ── Screenshot carousel dots ── */
-      const track = document.getElementById("screenshotTrack");
-      const dotsContainer = document.getElementById("screenshotDots");
-      const images = track.querySelectorAll("img");
-      let currentIdx = 0;
+      function setupCarousel(trackId, dotsId) {
+        const track = document.getElementById(trackId);
+        const dotsContainer = document.getElementById(dotsId);
+        if (!track || !dotsContainer) return;
+        const images = track.querySelectorAll("img");
 
-      // Create dots
-      images.forEach((_, i) => {
-        const dot = document.createElement("button");
-        dot.setAttribute("aria-label", "Go to screenshot " + (i + 1));
-        if (i === 0) dot.classList.add("active");
-        dot.addEventListener("click", () => {
-          images[i].scrollIntoView({
-            behavior: "smooth",
-            inline: "center",
-            block: "nearest",
+        images.forEach((_, i) => {
+          const dot = document.createElement("button");
+          dot.setAttribute("aria-label", "Go to screenshot " + (i + 1));
+          if (i === 0) dot.classList.add("active");
+          dot.addEventListener("click", () => {
+            images[i].scrollIntoView({
+              behavior: "smooth",
+              inline: "center",
+              block: "nearest",
+            });
           });
+          dotsContainer.appendChild(dot);
         });
-        dotsContainer.appendChild(dot);
-      });
 
-      // Observe which image is visible
-      const dotObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((e) => {
-            if (e.isIntersecting) {
-              const idx = Array.from(images).indexOf(e.target);
-              dotsContainer.querySelectorAll("button").forEach((d, i) => {
-                d.classList.toggle("active", i === idx);
-              });
-            }
-          });
-        },
-        { root: track, threshold: 0.6 },
-      );
-      images.forEach((img) => dotObserver.observe(img));
+        const dotObserver = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                const idx = Array.from(images).indexOf(e.target);
+                dotsContainer.querySelectorAll("button").forEach((d, i) => {
+                  d.classList.toggle("active", i === idx);
+                });
+              }
+            });
+          },
+          { root: track, threshold: 0.6 },
+        );
+        images.forEach((img) => dotObserver.observe(img));
+      }
+
+      setupCarousel("screenshotTrack", "screenshotDots");
+      setupCarousel("aiScreenshotTrack", "aiScreenshotDots");
 
       /* ── Smooth scroll for anchor links ── */
       document.querySelectorAll('a[href^="#"]').forEach((a) => {
