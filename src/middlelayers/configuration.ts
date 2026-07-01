@@ -229,12 +229,11 @@ export async function saveConfiguration(cfg: GlobalConfig) {
     others: cfg.others,
   });
 
-  await Promise.all([
-    saveConfigurationById(exchangesConfigId, exchangesData),
-    saveConfigurationById(walletsConfigId, walletsData),
-    saveConfigurationById(generalConfigId, generalData, false),
-    saveStockConfig(cfg.stockConfig ?? { brokers: [] }),
-  ]);
+  // Serialize writes to prevent transaction conflicts on the shared SQLite connection.
+  await saveConfigurationById(exchangesConfigId, exchangesData);
+  await saveConfigurationById(walletsConfigId, walletsData);
+  await saveConfigurationById(generalConfigId, generalData, false);
+  await saveStockConfig(cfg.stockConfig ?? { brokers: [] });
 }
 
 export async function getStockConfig(): Promise<StockConfig> {

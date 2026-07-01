@@ -452,6 +452,7 @@ const App = ({
       .then(() => notifyConfigurationSaved())
       .catch((e) => (saveError = e))
       .finally(() => {
+        setFormChanged(false);
         if (saveError) {
           toast({
             description: saveError.message ?? saveError,
