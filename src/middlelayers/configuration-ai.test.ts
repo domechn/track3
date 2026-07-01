@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { getDatabase } from "./database";
+import { getDatabase, executeWrite } from "./database";
 import {
   AIConfigMissingError,
   cleanAIConfig,
@@ -15,6 +15,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("./database", () => ({
   getDatabase: vi.fn(),
+  executeWrite: vi.fn(),
 }));
 
 const aiConfigId = "994";
@@ -51,6 +52,10 @@ beforeEach(() => {
   vi.mocked(getDatabase).mockResolvedValue(
     createConfigurationDb(configurationRows) as never,
   );
+  vi.mocked(executeWrite).mockImplementation(async (sql: string, values?: unknown[]) => {
+    const db = await getDatabase();
+    return db.execute(sql, values);
+  });
   // saveConfigurationById calls invoke("encrypt", ...) to wrap the payload
   // with the "!ent:" prefix; simulate the round-trip by appending the
   // prefix so the read path triggers the decrypt branch.

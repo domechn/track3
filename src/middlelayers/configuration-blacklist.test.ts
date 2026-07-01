@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { getDatabase } from "./database";
+import { getDatabase, executeWrite } from "./database";
 import {
   addToBlacklist,
   getBlacklistCoins,
@@ -14,6 +14,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("./database", () => ({
   getDatabase: vi.fn(),
+  executeWrite: vi.fn(),
 }));
 
 const blacklistConfigId = "995";
@@ -50,6 +51,10 @@ beforeEach(() => {
   vi.mocked(getDatabase).mockResolvedValue(
     createConfigurationDb(configurationRows) as never,
   );
+  vi.mocked(executeWrite).mockImplementation(async (sql: string, values?: unknown[]) => {
+    const db = await getDatabase();
+    return db.execute(sql, values);
+  });
 });
 
 describe("blacklist configuration", () => {

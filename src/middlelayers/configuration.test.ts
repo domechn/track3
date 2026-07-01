@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { getDatabase } from "./database";
+import { getDatabase, executeWrite } from "./database";
 import { saveConfiguration } from "./configuration";
 import { GlobalConfig } from "./datafetch/types";
 
@@ -18,6 +18,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("./database", () => ({
   getDatabase: vi.fn(),
+  executeWrite: vi.fn(),
 }));
 
 /** Minimal mock that tracks every execute call in order. */
@@ -39,6 +40,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   tracing = createTracingDb();
   vi.mocked(getDatabase).mockResolvedValue(tracing.db as never);
+  vi.mocked(executeWrite).mockImplementation(async (sql: string, values?: unknown[]) => {
+    const db = await getDatabase();
+    return db.execute(sql, values);
+  });
 });
 
 describe("saveConfiguration", () => {

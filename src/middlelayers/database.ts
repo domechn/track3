@@ -3,6 +3,12 @@ import { UniqueIndexConflictResolver } from './types'
 
 export const databaseName = "track3.db"
 
+
+/** Write queue that serializes all db.execute() calls to prevent 
+ * concurrent SQLite transaction conflicts. Each execute() in 
+ * @tauri-apps/plugin-sql is wrapped in an internal BEGIN/COMMIT; 
+ * parallel writes on the same connection cause "cannot rollback" errors. */
+let writeQueue: Promise<unknown> = Promise.resolve()
 let dbInstance: Database
 
 export async function getDatabase(): Promise<Database> {
@@ -11,6 +17,20 @@ export async function getDatabase(): Promise<Database> {
 	}
 	dbInstance = await Database.load(`sqlite:${databaseName}`)
 	return dbInstance
+}
+
+/**
+ * Serialized database write. All execute() calls go through this queue so that
+ * only one write is in-flight on the shared connection at a time.
+ */
+export async function executeWrite(sql: string, values?: unknown[]): Promise<{rowsAffected: number}> {
+	const db = await getDatabase()
+	return new Promise((resolve, reject) => {
+		writeQueue = writeQueue.then(
+			() => db.execute(sql, values).then(resolve, reject),
+			() => db.execute(sql, values).then(resolve, reject),
+		)
+	})
 }
 
 export async function saveModelsToDatabase<T extends object>(table: TableName, models: T[], conflictResolver: UniqueIndexConflictResolver = 'REPLACE') {
@@ -93,5 +113,5 @@ export async function deleteFromDatabase<T extends object>(table: TableName, whe
 
 	const sql = `DELETE FROM ${table} WHERE ${whereStr}`
 
-	return db.execute(sql, values)
+	return executeWrite(sql, values)
 }

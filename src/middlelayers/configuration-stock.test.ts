@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { getDatabase } from "./database";
+import { getDatabase, executeWrite } from "./database";
 import * as configuration from "./configuration";
 import { StockConfig } from "./datafetch/types";
 
@@ -18,6 +18,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("./database", () => ({
   getDatabase: vi.fn(),
+  executeWrite: vi.fn(),
 }));
 
 const stockConfigId = "20";
@@ -52,6 +53,10 @@ beforeEach(() => {
     createConfigurationDb(configurationRows) as never,
   );
 });
+  vi.mocked(executeWrite).mockImplementation(async (sql: string, values?: unknown[]) => {
+    const db = await getDatabase();
+    return db.execute(sql, values);
+  });
 
 describe("stock configuration", () => {
   it("saves stock brokers in the encrypted stock configuration slot", async () => {

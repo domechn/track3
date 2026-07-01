@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCachedPreferCurrency,
   getConfiguration,
@@ -142,6 +142,9 @@ const App = ({
   const [preferCurrencyLoading, setPreferCurrencyLoading] = useState(
     !warmStartPreferCurrency,
   );
+
+  const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
 
   const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
   const [addStockBrokerDialogOpen, setAddStockBrokerDialogOpen] =
@@ -452,7 +455,6 @@ const App = ({
       .then(() => notifyConfigurationSaved())
       .catch((e) => (saveError = e))
       .finally(() => {
-        setFormChanged(false);
         if (saveError) {
           toast({
             description: saveError.message ?? saveError,

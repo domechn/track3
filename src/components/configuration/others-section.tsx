@@ -72,13 +72,7 @@ const OthersSection = memo(function OthersSection({
 
             <AddOtherDialog
               t={t}
-              onAdd={(draft) => {
-                onOthersChange(others.length, "symbol", draft.symbol);
-                onOthersChange(others.length, "amount", String(draft.amount));
-                if (draft.alias) {
-                  onOthersChange(others.length, "alias", draft.alias);
-                }
-              }}
+              onAdd={onAdd}
             />
           </div>
         </CardHeader>

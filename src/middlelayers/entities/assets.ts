@@ -1,6 +1,5 @@
 import {
   deleteFromDatabase,
-  getDatabase,
   saveModelsToDatabase,
   selectFromDatabase,
   selectFromDatabaseWithSql,
@@ -327,40 +326,32 @@ class AssetHandler implements AssetHandlerImpl {
     models: AssetModel[],
     conflictResolver: UniqueIndexConflictResolver,
   ): Promise<AssetModel[]> {
-    // split models to chunks to avoid too large sql
     const chunkSize = 1000;
     const res = [];
-    const db = await getDatabase();
-    await db.execute("BEGIN");
 
-    try {
-      for (let i = 0; i < models.length; i += chunkSize) {
-        const chunk = models.slice(i, i + chunkSize);
-        const resModels = await saveModelsToDatabase<AssetDatabaseModel>(
-          this.assetTableName,
-          chunk.map(
-            (m) =>
-              ({
-                uuid: m.uuid,
-                createdAt: m.createdAt,
-                asset_type: getAssetType(m),
-                symbol: m.symbol,
-                amount: m.amount,
-                value: m.value,
-                price: m.price,
-                wallet: m.wallet,
-              }) as AssetDatabaseModel,
-          ),
-          conflictResolver,
-        );
+    for (let i = 0; i < models.length; i += chunkSize) {
+      const chunk = models.slice(i, i + chunkSize);
+      const resModels = await saveModelsToDatabase<AssetDatabaseModel>(
+        this.assetTableName,
+        chunk.map(
+          (m) =>
+            ({
+              uuid: m.uuid,
+              createdAt: m.createdAt,
+              asset_type: getAssetType(m),
+              symbol: m.symbol,
+              amount: m.amount,
+              value: m.value,
+              price: m.price,
+              wallet: m.wallet,
+            }) as AssetDatabaseModel,
+        ),
+        conflictResolver,
+      );
 
-        res.push(...this.normalizeAssetModels(resModels));
-      }
-      await db.execute("COMMIT");
-    } catch (e) {
-      await db.execute("ROLLBACK");
-      throw e;
+      res.push(...this.normalizeAssetModels(resModels));
     }
+
     return res;
   }
 

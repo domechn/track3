@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getDatabase } from "./database";
+import { getDatabase, executeWrite } from "./database";
 import { GlobalConfig, StockConfig } from "./datafetch/types";
 import {
   AIAdvancedOptions,
@@ -276,21 +276,19 @@ async function migrateConfigurationToSplit(cfg: GlobalConfig) {
 }
 
 async function saveConfigurationById(id: string, cfg: string, encrypt = true) {
-  const db = await getDatabase();
   // encrypt data
   const saveStr = encrypt
     ? await invoke<string>("encrypt", { data: cfg })
     : cfg;
 
-  await db.execute(
+  await executeWrite(
     `INSERT OR REPLACE INTO configuration (id, data) VALUES (?, ?)`,
     [id, saveStr],
   );
 }
 
 async function deleteConfigurationById(id: string) {
-  const db = await getDatabase();
-  await db.execute(`DELETE FROM configuration WHERE id = ?`, [id]);
+  await executeWrite(`DELETE FROM configuration WHERE id = ?`, [id]);
 }
 
 export async function exportConfigurationString(): Promise<string | undefined> {
