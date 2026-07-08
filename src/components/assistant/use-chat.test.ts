@@ -388,15 +388,23 @@ describe("useChat", () => {
   });
 
   it("preserves the draft when active session messages refresh after persistence", () => {
+    const initialProps: {
+      sessionId: string | null;
+      initialMessages: ChatMessage[];
+    } = {
+      sessionId: "session-1",
+      initialMessages: [{ role: "user", content: "old session" }],
+    };
+
     const { result, rerender } = renderHook(
-      ({ sessionId, initialMessages }) =>
-        useChat({ config, baseCurrency, sessionId, initialMessages }),
-      {
-        initialProps: {
-          sessionId: "session-1",
-          initialMessages: [{ role: "user" as const, content: "old session" }],
-        },
-      },
+      ({
+        sessionId,
+        initialMessages,
+      }: {
+        sessionId: string | null;
+        initialMessages: ChatMessage[];
+      }) => useChat({ config, baseCurrency, sessionId, initialMessages }),
+      { initialProps },
     );
 
     act(() => {

@@ -72,7 +72,7 @@ jobs:
           releaseBody: "See the assets to download this version and install."
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: --config src-tauri/tauri.release.conf.json ${{ matrix.args }}
   update-release:
     needs: publish-tauri
     runs-on: ubuntu-22.04

@@ -37,7 +37,7 @@
         "depends": []
       }
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false
   },
   "productName": "track3",
   "mainBinaryName": "track3",
