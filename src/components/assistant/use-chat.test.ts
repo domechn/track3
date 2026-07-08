@@ -5,9 +5,10 @@ import type { CurrencyRateDetail } from "@/middlelayers/types";
 import type { StreamEvent } from "@/middlelayers/ai/types";
 
 vi.mock("@/middlelayers/ai", async () => {
-  const actual = await vi.importActual<typeof import("@/middlelayers/ai")>(
-    "@/middlelayers/ai",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/middlelayers/ai")>(
+      "@/middlelayers/ai",
+    );
   return {
     ...actual,
     streamChatCompletion: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@/middlelayers/ai", async () => {
 });
 
 import { useChat } from "./use-chat";
+import type { ChatMessage } from "./use-chat";
 import {
   probeConnection,
   runSkill,
@@ -60,9 +62,7 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
 
     await act(async () => {
       await result.current.send("Hi");
@@ -88,9 +88,7 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
     await act(async () => {
       await result.current.send("Hi");
     });
@@ -126,9 +124,7 @@ describe("useChat", () => {
       },
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
     await act(async () => {
       await result.current.send("summary");
     });
@@ -146,9 +142,7 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
     await act(async () => {
       await result.current.send("Hi");
     });
@@ -163,21 +157,19 @@ describe("useChat", () => {
 
   it("stop() aborts the in-flight request and leaves streaming false", async () => {
     let externalSignal: AbortSignal | undefined;
-    vi.mocked(streamChatCompletion).mockImplementation(
-      async function* (req: { signal?: AbortSignal }) {
-        externalSignal = req.signal;
-        // Yield a tiny bit before checking abort, then exit.
-        yield { kind: "text", delta: "part" };
-        await new Promise((r) => setTimeout(r, 0));
-        if (req.signal?.aborted) return;
-        yield { kind: "text", delta: "ial" };
-        yield { kind: "done" };
-      },
-    );
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (req: {
+      signal?: AbortSignal;
+    }) {
+      externalSignal = req.signal;
+      // Yield a tiny bit before checking abort, then exit.
+      yield { kind: "text", delta: "part" };
+      await new Promise((r) => setTimeout(r, 0));
+      if (req.signal?.aborted) return;
+      yield { kind: "text", delta: "ial" };
+      yield { kind: "done" };
+    });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
 
     let sendPromise: Promise<void> | undefined;
     act(() => {
@@ -201,9 +193,7 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
     await act(async () => {
       await result.current.runQuickAction("recentAnalysis", "summarize");
     });
@@ -215,9 +205,7 @@ describe("useChat", () => {
 
   it("probe() returns the probeConnection result", async () => {
     vi.mocked(probeConnection).mockResolvedValue(undefined);
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
     await act(async () => {
       const err = await result.current.probe();
       expect(err).toBeUndefined();
@@ -230,9 +218,7 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
 
     // Send a message first so there is state to clear
     await act(async () => {
@@ -261,9 +247,7 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
 
     await act(async () => {
       await result.current.send("First");
@@ -305,9 +289,11 @@ describe("useChat", () => {
     });
     // Verify the hook state directly after act flushes updates
     expect(result.current.messages).toHaveLength(2);
-    expect(result.current.messages[0]).toEqual({ role: "user", content: "Hello" });
+    expect(result.current.messages[0]).toEqual({
+      role: "user",
+      content: "Hello",
+    });
   });
-
 
   it("splits streamed text containing <think> tags into separate think and text blocks", async () => {
     vi.mocked(streamChatCompletion).mockImplementation(async function* () {
@@ -318,9 +304,7 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
 
     await act(async () => {
       await result.current.send("How is my portfolio?");
@@ -340,10 +324,14 @@ describe("useChat", () => {
     const fullText = textBlocks.map((b) => b.text ?? "").join("");
     expect(fullText).toContain("Let me analyze");
     expect(fullText).toContain("The portfolio is healthy");
-    expect(assistant.blocks.some((b) =>
-      "text" in b && typeof b.text === "string" &&
-      (b.text.includes("<think>") || b.text.includes("</think>")),
-    )).toBe(false);
+    expect(
+      assistant.blocks.some(
+        (b) =>
+          "text" in b &&
+          typeof b.text === "string" &&
+          (b.text.includes("<think>") || b.text.includes("</think>")),
+      ),
+    ).toBe(false);
   });
 
   it("handles think reasoning_content events from the API", async () => {
@@ -354,9 +342,7 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
 
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency }),
-    );
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
 
     await act(async () => {
       await result.current.send("Explain");
@@ -369,11 +355,12 @@ describe("useChat", () => {
 
     expect(assistant.blocks).toHaveLength(2);
     expect(assistant.blocks[0]?.kind).toBe("think");
-    expect(assistant.blocks[0]?.text).toContain("reasoning step 1 reasoning step 2");
+    expect(assistant.blocks[0]?.text).toContain(
+      "reasoning step 1 reasoning step 2",
+    );
     expect(assistant.blocks[1]?.kind).toBe("text");
     expect(assistant.blocks[1]?.text).toBe("Final answer");
   });
-
 
   it("calls onStreamComplete with correct messages after stream finishes", async () => {
     vi.mocked(streamChatCompletion).mockImplementation(async function* () {
@@ -400,28 +387,106 @@ describe("useChat", () => {
     });
   });
 
-  it("resets messages and input when initialMessages change (session switch)", async () => {
+  it("preserves the draft when active session messages refresh after persistence", () => {
     const { result, rerender } = renderHook(
-      ({ initialMessages }) =>
-        useChat({ config, baseCurrency, initialMessages }),
+      ({ sessionId, initialMessages }) =>
+        useChat({ config, baseCurrency, sessionId, initialMessages }),
       {
         initialProps: {
-          initialMessages: [
-            { role: "user" as const, content: "old session" },
-          ],
+          sessionId: "session-1",
+          initialMessages: [{ role: "user" as const, content: "old session" }],
         },
       },
     );
 
-    // Simulate session switch
+    act(() => {
+      result.current.setInput("follow-up draft");
+    });
+
     rerender({
+      sessionId: "session-1",
       initialMessages: [
-        { role: "user" as const, content: "new session" },
+        { role: "user" as const, content: "old session" },
+        {
+          role: "assistant" as const,
+          blocks: [{ kind: "text" as const, text: "saved reply" }],
+        },
       ],
     });
 
-    expect(result.current.messages).toHaveLength(1);
-    expect(result.current.messages[0]).toEqual({ role: "user", content: "new session" });
+    expect(result.current.input).toBe("follow-up draft");
   });
 
+  it("preserves the draft when the first streamed reply gets a persisted session id", async () => {
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "Assistant reply" };
+      yield { kind: "done" };
+    });
+
+    const { result, rerender } = renderHook(
+      ({ sessionId, initialMessages }) =>
+        useChat({ config, baseCurrency, sessionId, initialMessages }),
+      {
+        initialProps: {
+          sessionId: null as string | null,
+          initialMessages: [] as ChatMessage[],
+        },
+      },
+    );
+
+    await act(async () => {
+      await result.current.send("hello");
+    });
+
+    act(() => {
+      result.current.setInput("next question");
+    });
+
+    const persistedMessages = result.current.messages;
+
+    rerender({
+      sessionId: "session-1",
+      initialMessages: [],
+    });
+
+    expect(result.current.input).toBe("next question");
+    expect(result.current.messages).toEqual(persistedMessages);
+
+    rerender({
+      sessionId: "session-1",
+      initialMessages: persistedMessages,
+    });
+
+    expect(result.current.input).toBe("next question");
+  });
+
+  it("resets messages and input when sessionId changes to another session", async () => {
+    const { result, rerender } = renderHook(
+      ({ sessionId, initialMessages }) =>
+        useChat({ config, baseCurrency, sessionId, initialMessages }),
+      {
+        initialProps: {
+          sessionId: "session-a",
+          initialMessages: [{ role: "user" as const, content: "old session" }],
+        },
+      },
+    );
+
+    act(() => {
+      result.current.setInput("stale draft");
+    });
+
+    // Simulate session switch
+    rerender({
+      sessionId: "session-b",
+      initialMessages: [{ role: "user" as const, content: "new session" }],
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toEqual({
+      role: "user",
+      content: "new session",
+    });
+    expect(result.current.input).toBe("");
+  });
 });

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,7 +10,8 @@ vi.mock("@/i18n", () => ({
         "assistant.chat.stop": "Stop",
         "assistant.chat.send": "Send",
         "assistant.chat.streaming": "Streaming...",
-        "assistant.chat.composer.hint": "Enter to send, Shift+Enter for new line",
+        "assistant.chat.composer.hint":
+          "Enter to send, Shift+Enter for new line",
       };
       return map[key] ?? key;
     },
@@ -136,6 +137,32 @@ describe("ChatComposer", () => {
     const input = screen.getByTestId("chat-input");
     await userEvent.type(input, "{enter}");
     expect(onSend).toHaveBeenCalled();
+  });
+
+  it("does not send or prevent default when Enter confirms IME composition", () => {
+    const onSendDuringComposition = vi.fn();
+
+    render(
+      <ChatComposer
+        value="ni"
+        onChange={onChange}
+        onSend={onSendDuringComposition}
+        onStop={onStop}
+        isStreaming={false}
+      />,
+    );
+
+    const input = screen.getByTestId("chat-input");
+    const event = createEvent.keyDown(input, {
+      key: "Enter",
+      code: "Enter",
+      isComposing: true,
+    });
+
+    fireEvent(input, event);
+
+    expect(onSendDuringComposition).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it("does not send when streaming and send is clicked", async () => {

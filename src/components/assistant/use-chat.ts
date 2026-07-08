@@ -1,5 +1,4 @@
-import {
-  useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AIConfig } from "@/middlelayers/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import {
@@ -30,9 +29,9 @@ export type AgentActivityBlock = {
 };
 
 export type AssistantBlock =
- | { kind: "text"; text: string }
- | { kind: "think"; text: string }
- | AgentActivityBlock;
+  | { kind: "text"; text: string }
+  | { kind: "think"; text: string }
+  | AgentActivityBlock;
 
 export type ChatMessage =
   | { role: "user"; content: string }
@@ -47,7 +46,6 @@ export type UseChatOptions = {
   onStreamComplete?: (messages: ChatMessage[]) => void;
   onStreamingChange?: (streaming: boolean) => void;
 };
-
 
 // Stable reference for the default empty initialMessages array.
 // Using [] as a default in destructuring creates a new array on every render,
@@ -76,12 +74,12 @@ function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
       out.push({ role: "user", content: m.content });
       continue;
     }
-   const text = m.blocks
-     .map((b) => {
-       if (b.kind === "text") return b.text;
-       if (b.kind === "think") return "";
-       if (b.kind === "agent_activity") return "";
-     })
+    const text = m.blocks
+      .map((b) => {
+        if (b.kind === "text") return b.text;
+        if (b.kind === "think") return "";
+        if (b.kind === "agent_activity") return "";
+      })
       .join("")
       .trim();
     if (text) {
@@ -91,7 +89,10 @@ function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
   return out;
 }
 
-function trimMessages(messages: ProviderMessage[], maxCount: number): ProviderMessage[] {
+function trimMessages(
+  messages: ProviderMessage[],
+  maxCount: number,
+): ProviderMessage[] {
   if (maxCount <= 0 || messages.length <= maxCount) {
     return messages;
   }
@@ -101,7 +102,14 @@ function trimMessages(messages: ProviderMessage[], maxCount: number): ProviderMe
 }
 
 export function useChat(options: UseChatOptions): UseChatResult {
-  const { config, baseCurrency, contextSize = 8192, initialMessages = EMPTY_INITIAL_MSGS, onStreamComplete, sessionId } = options;
+  const {
+    config,
+    baseCurrency,
+    contextSize = 8192,
+    initialMessages = EMPTY_INITIAL_MSGS,
+    onStreamComplete,
+    sessionId,
+  } = options;
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -124,17 +132,38 @@ export function useChat(options: UseChatOptions): UseChatResult {
       prevStreamingRef.current = isStreaming;
     }
   }, [isStreaming]);
-  // Reset chat state when initialMessages changes (session switch).
-  // useState only picks up the initial value once, so we need this effect
-  // to apply the new messages from the freshly loaded session.
+  // Sync externally loaded messages into the hook state without treating
+  // every refresh as a full composer reset. This preserves drafts when the
+  // active session is reloaded after stream persistence, while still
+  // clearing the composer when the user actually switches conversations.
   const prevInitialMsgsRef = useRef(initialMessages);
+  const syncedSessionIdRef = useRef(sessionId);
   useEffect(() => {
-    if (initialMessages !== prevInitialMsgsRef.current) {
-      setMessages(initialMessages);
-      setInput("");
-      prevInitialMsgsRef.current = initialMessages;
+    const initialMessagesChanged =
+      initialMessages !== prevInitialMsgsRef.current;
+    const sessionChanged = sessionId !== syncedSessionIdRef.current;
+
+    if (!initialMessagesChanged && !sessionChanged) {
+      return;
     }
-  }, [initialMessages]);
+
+    const preservesDraftForNewSessionId =
+      syncedSessionIdRef.current == null &&
+      sessionId != null &&
+      messagesRef.current.length > 0;
+
+    if (sessionChanged) {
+      if (!preservesDraftForNewSessionId) {
+        setMessages(initialMessagesChanged ? initialMessages : []);
+        setInput("");
+      }
+    } else if (initialMessagesChanged) {
+      setMessages(initialMessages);
+    }
+
+    prevInitialMsgsRef.current = initialMessages;
+    syncedSessionIdRef.current = sessionId;
+  }, [initialMessages, sessionId]);
   // Abort any in-flight stream when sessionId changes (session switch).
   // This prevents the old stream's completion callback from persisting
   // data to the newly selected session.
@@ -169,16 +198,18 @@ export function useChat(options: UseChatOptions): UseChatResult {
   // assistant message. Any `tool_call` is dispatched against the skill
   // registry.
   const consumeStream = useCallback(
-    async (
-      events: AsyncGenerator<StreamEvent>,
-      assistantIndex: number,
-    ) => {
+    async (events: AsyncGenerator<StreamEvent>, assistantIndex: number) => {
       // State machine for <think> tag parsing.  When the model bakes
       // reasoning content into the text stream via <think>...</think>
-  // tags we split it into separate think/text blocks rather than
-  // relying on reasoning_content (which most models don't send).
-  const toolCallResults: Array<{ id: string; name: string; args: unknown; result: ToolResult | null }> = [];
-  const TAG_BUF = 12;
+      // tags we split it into separate think/text blocks rather than
+      // relying on reasoning_content (which most models don't send).
+      const toolCallResults: Array<{
+        id: string;
+        name: string;
+        args: unknown;
+        result: ToolResult | null;
+      }> = [];
+      const TAG_BUF = 12;
       const TAG_OPEN = "<think>";
       const TAG_CLOSE = "</think>";
       let thinkState: "outside" | "inside" = "outside";
@@ -188,18 +219,18 @@ export function useChat(options: UseChatOptions): UseChatResult {
       const addToBlock = (kind: "text" | "think", delta: string) => {
         if (!delta) return;
         const next = messagesRef.current.slice();
-          const target = { ...next[assistantIndex] };
-          if (target.role !== "assistant") return;
-          const blocks = target.blocks.slice();
-          const last = blocks[blocks.length - 1];
-          if (last && last.kind === kind) {
-            blocks[blocks.length - 1] = { ...last, text: last.text + delta };
-          } else {
-            blocks.push({ kind, text: delta });
-          }
-          next[assistantIndex] = { ...target, blocks };
-          messagesRef.current = next;
-          setMessages(next);
+        const target = { ...next[assistantIndex] };
+        if (target.role !== "assistant") return;
+        const blocks = target.blocks.slice();
+        const last = blocks[blocks.length - 1];
+        if (last && last.kind === kind) {
+          blocks[blocks.length - 1] = { ...last, text: last.text + delta };
+        } else {
+          blocks.push({ kind, text: delta });
+        }
+        next[assistantIndex] = { ...target, blocks };
+        messagesRef.current = next;
+        setMessages(next);
       };
 
       const dispatchToolCall = async (ev: {
@@ -207,16 +238,21 @@ export function useChat(options: UseChatOptions): UseChatResult {
         id: string;
         name: string;
         args: unknown;
-      }): Promise<{ id: string; name: string; args: unknown; result: ToolResult | null }> => {
+      }): Promise<{
+        id: string;
+        name: string;
+        args: unknown;
+        result: ToolResult | null;
+      }> => {
         const skillResult = await runSkill(
           ev.name,
           (ev.args as Record<string, unknown>) ?? {},
           { baseCurrency },
         );
-       let result: ToolResult | null = null;
-       if (skillResult.ok) {
-         result = skillResult.result;
-       }
+        let result: ToolResult | null = null;
+        if (skillResult.ok) {
+          result = skillResult.result;
+        }
         return { id: ev.id, name: ev.name, args: ev.args, result };
       };
 
@@ -224,27 +260,27 @@ export function useChat(options: UseChatOptions): UseChatResult {
         if (ev.kind === "think") {
           hasReasoningContent = true;
           const next = messagesRef.current.slice();
-            const target = { ...next[assistantIndex] };
-            if (target.role !== "assistant") return;
-            const blocks = target.blocks.slice();
-            const last = blocks[blocks.length - 1];
-            if (last && last.kind === "think") {
-              blocks[blocks.length - 1] = {
-                kind: "think",
-                text: last.text + ev.delta,
-              };
+          const target = { ...next[assistantIndex] };
+          if (target.role !== "assistant") return;
+          const blocks = target.blocks.slice();
+          const last = blocks[blocks.length - 1];
+          if (last && last.kind === "think") {
+            blocks[blocks.length - 1] = {
+              kind: "think",
+              text: last.text + ev.delta,
+            };
+          } else {
+            // Insert the think block before any text blocks
+            const textIdx = blocks.findIndex((b) => b.kind === "text");
+            if (textIdx >= 0) {
+              blocks.splice(textIdx, 0, { kind: "think", text: ev.delta });
             } else {
-              // Insert the think block before any text blocks
-              const textIdx = blocks.findIndex((b) => b.kind === "text");
-              if (textIdx >= 0) {
-                blocks.splice(textIdx, 0, { kind: "think", text: ev.delta });
-              } else {
-                blocks.push({ kind: "think", text: ev.delta });
-              }
+              blocks.push({ kind: "think", text: ev.delta });
             }
-            next[assistantIndex] = { ...target, blocks };
-            messagesRef.current = next;
-            setMessages(next);
+          }
+          next[assistantIndex] = { ...target, blocks };
+          messagesRef.current = next;
+          setMessages(next);
         } else if (ev.kind === "text") {
           if (hasReasoningContent) {
             addToBlock("text", ev.delta);
@@ -288,13 +324,13 @@ export function useChat(options: UseChatOptions): UseChatResult {
           toolCallResults.push(await dispatchToolCall(ev));
         } else if (ev.kind === "error") {
           const next = messagesRef.current.slice();
-            const target = { ...next[assistantIndex] };
-            if (target.role !== "assistant") return;
-            const blocks = target.blocks.slice();
-            blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
-            next[assistantIndex] = { ...target, blocks };
-            messagesRef.current = next;
-            setMessages(next);
+          const target = { ...next[assistantIndex] };
+          if (target.role !== "assistant") return;
+          const blocks = target.blocks.slice();
+          blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
+          next[assistantIndex] = { ...target, blocks };
+          messagesRef.current = next;
+          setMessages(next);
         } else if (ev.kind === "done") {
           break;
         }
@@ -360,12 +396,15 @@ export function useChat(options: UseChatOptions): UseChatResult {
             upsertAgentActivityBlock(blocks, agentActivityMap);
             break;
           }
-         case "agent_result": {
-           if (ev.text) {
-             blocks.push({ kind: "text", text: `[${ev.skillName}] ${ev.text}` });
-           }
-           break;
-         }
+          case "agent_result": {
+            if (ev.text) {
+              blocks.push({
+                kind: "text",
+                text: `[${ev.skillName}] ${ev.text}`,
+              });
+            }
+            break;
+          }
           case "synthesizing": {
             blocks.push({ kind: "think", text: "Synthesising results\u2026" });
             break;
@@ -385,19 +424,19 @@ export function useChat(options: UseChatOptions): UseChatResult {
             }
             break;
           }
-         case "text": {
-           const last = blocks[blocks.length - 1];
-           if (last?.kind === "text") {
-             blocks[blocks.length - 1] = {
-               kind: "text",
-               text: last.text + ev.delta,
-             };
-           } else {
-             blocks.push({ kind: "text", text: ev.delta });
-           }
-           break;
-         }
-         case "error": {
+          case "text": {
+            const last = blocks[blocks.length - 1];
+            if (last?.kind === "text") {
+              blocks[blocks.length - 1] = {
+                kind: "text",
+                text: last.text + ev.delta,
+              };
+            } else {
+              blocks.push({ kind: "text", text: ev.delta });
+            }
+            break;
+          }
+          case "error": {
             blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
             break;
           }
@@ -438,7 +477,10 @@ export function useChat(options: UseChatOptions): UseChatResult {
       try {
         const idx = messages.length + 1; // user then assistant
         const history = flattenForProvider([...messages, userMessage]);
-        const trimmed = trimMessages(history, Math.max(2, Math.floor(contextSize / 256)));
+        const trimmed = trimMessages(
+          history,
+          Math.max(2, Math.floor(contextSize / 256)),
+        );
 
         // ── Try orchestration first ──
         const historySnapshot = trimmed
@@ -525,9 +567,12 @@ export function useChat(options: UseChatOptions): UseChatResult {
             role: "tool",
             tool_call_id: tc.id,
             content: tc.result
-              ? (tc.result.text && tc.result.data
-                  ? tc.result.text + "\n\n\`\`\`json\n" + JSON.stringify(tc.result.data, null, 2).slice(0, 10000) + "\n\`\`\`"
-                  : (tc.result.text ?? JSON.stringify(tc.result.data)))
+              ? tc.result.text && tc.result.data
+                ? tc.result.text +
+                  "\n\n\`\`\`json\n" +
+                  JSON.stringify(tc.result.data, null, 2).slice(0, 10000) +
+                  "\n\`\`\`"
+                : (tc.result.text ?? JSON.stringify(tc.result.data))
               : "Tool execution failed.",
           }));
 
@@ -549,7 +594,17 @@ export function useChat(options: UseChatOptions): UseChatResult {
         }
       }
     },
-    [input, isStreaming, messages, config, systemPrompt, contextSize, consumeStream, consumeOrchestrator, baseCurrency],
+    [
+      input,
+      isStreaming,
+      messages,
+      config,
+      systemPrompt,
+      contextSize,
+      consumeStream,
+      consumeOrchestrator,
+      baseCurrency,
+    ],
   );
 
   const runQuickAction = useCallback(

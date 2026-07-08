@@ -56,7 +56,9 @@ export default function ChatComposer({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
   const valueRef = useRef(value);
-  useEffect(() => { valueRef.current = value; }, [value]);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   useEffect(() => {
     // Autofocus on mount for a faster first interaction.
@@ -100,39 +102,43 @@ export default function ChatComposer({
       .catch((err) => console.error("Failed to save pasted image:", err));
   }, []);
 
-// Resize large images before base64 encoding to save AI context window.
-// Most vision models don't need full resolution — 2048px is plenty.
-async function imageToCompressedBase64(
-  path: string,
-  mimeType: string,
-): Promise<string> {
-  const data = await readFile(path);
-  const blob = new Blob([data], { type: mimeType });
-  const img = await createImageBitmap(blob);
-  let { width, height } = img;
-  const MAX_DIM = 2048;
-  if (width > MAX_DIM || height > MAX_DIM) {
-    const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
-    width = Math.round(width * ratio);
-    height = Math.round(height * ratio);
+  // Resize large images before base64 encoding to save AI context window.
+  // Most vision models don't need full resolution — 2048px is plenty.
+  async function imageToCompressedBase64(
+    path: string,
+    mimeType: string,
+  ): Promise<string> {
+    const data = await readFile(path);
+    const blob = new Blob([data], { type: mimeType });
+    const img = await createImageBitmap(blob);
+    let { width, height } = img;
+    const MAX_DIM = 2048;
+    if (width > MAX_DIM || height > MAX_DIM) {
+      const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx?.drawImage(img, 0, 0, width, height);
+    img.close();
+    const compressedBlob = await new Promise<Blob>((resolve) =>
+      canvas.toBlob(
+        (b) => resolve(b!),
+        mimeType === "image/png" ? "image/jpeg" : mimeType,
+        0.8,
+      ),
+    );
+    const buffer = await compressedBlob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return `data:image/jpeg;base64,${btoa(binary)}`;
   }
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  ctx?.drawImage(img, 0, 0, width, height);
-  img.close();
-  const compressedBlob = await new Promise<Blob>((resolve) =>
-    canvas.toBlob((b) => resolve(b!), mimeType === "image/png" ? "image/jpeg" : mimeType, 0.8),
-  );
-  const buffer = await compressedBlob.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return `data:image/jpeg;base64,${btoa(binary)}`;
-}
 
   const handleSend = useCallback(async () => {
     if (attachments.length > 0) {
@@ -178,53 +184,64 @@ async function imageToCompressedBase64(
           </div>
         )}
         <div className="flex items-end gap-2 p-2">
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onPaste={handlePaste}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (canSend) {
-                handleSend();
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onPaste={handlePaste}
+            onKeyDown={(e) => {
+              const nativeEvent = e.nativeEvent as KeyboardEvent & {
+                isComposing?: boolean;
+                keyCode?: number;
+              };
+              const isImeConfirm =
+                nativeEvent.isComposing || nativeEvent.keyCode === 229;
+
+              if (isImeConfirm) {
+                return;
               }
-            }
-          }}
-          placeholder={t("assistant.chat.placeholder")}
-          rows={1}
-          disabled={disabled}
-          className="min-h-[36px] max-h-40 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-0 disabled:opacity-50"
-          data-testid="chat-input"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          autoComplete="off"
-        />
-        {isStreaming ? (
-          <button
-            type="button"
-            onClick={onStop}
-            aria-label={t("assistant.chat.stop")}
-            data-testid="chat-stop"
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground transition-all duration-200 ease-out hover:bg-destructive/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <StopIcon className="h-3.5 w-3.5" />
-            {t("assistant.chat.stop")}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={!canSend}
-            aria-label={t("assistant.chat.send")}
-            data-testid="chat-send"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-all duration-200 ease-out hover:bg-primary/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-          >
-            <PaperPlaneIcon className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (canSend) {
+                  handleSend();
+                }
+              }
+            }}
+            placeholder={t("assistant.chat.placeholder")}
+            rows={1}
+            disabled={disabled}
+            className="min-h-[36px] max-h-40 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-0 disabled:opacity-50"
+            data-testid="chat-input"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            autoComplete="off"
+          />
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={onStop}
+              aria-label={t("assistant.chat.stop")}
+              data-testid="chat-stop"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground transition-all duration-200 ease-out hover:bg-destructive/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <StopIcon className="h-3.5 w-3.5" />
+              {t("assistant.chat.stop")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleSend()}
+              disabled={!canSend}
+              aria-label={t("assistant.chat.send")}
+              data-testid="chat-send"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-all duration-200 ease-out hover:bg-primary/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+            >
+              <PaperPlaneIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-2 px-1">
         <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
