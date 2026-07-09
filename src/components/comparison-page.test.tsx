@@ -52,6 +52,14 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  function toLocalDateTimeParts(iso: string) {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return {
+      time: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
+    };
+  }
+
   it("shows a heading and keeps the loading status visible while comparison data is unresolved", async () => {
     vi.useFakeTimers();
     const pending = new Promise<never>(() => {});
@@ -202,11 +210,10 @@ describe("Comparison page", () => {
     });
 
     expect(queryCoinDataByUUID).toHaveBeenCalledWith("latest-snapshot");
-    expect(queryCoinDataByUUID).toHaveBeenCalledWith(
-      "older-same-day-snapshot",
-    );
-    expect(screen.getByRole("button", { name: /choose base date/i }))
-      .toHaveTextContent("2024-04-16 10:30:00");
+    expect(queryCoinDataByUUID).toHaveBeenCalledWith("older-same-day-snapshot");
+    expect(
+      screen.getByRole("button", { name: /choose base date/i }),
+    ).toHaveTextContent("2024-04-16 10:30:00");
 
     vi.mocked(queryCoinDataByUUID).mockClear();
 
@@ -220,8 +227,42 @@ describe("Comparison page", () => {
       }),
     );
 
-    expect(queryCoinDataByUUID).toHaveBeenCalledWith(
-      "older-same-day-snapshot",
+    expect(queryCoinDataByUUID).toHaveBeenCalledWith("older-same-day-snapshot");
+  });
+
+  it("formats UTC snapshot timestamps in local timezone for picker labels", async () => {
+    const latestCreatedAt = "2024-04-16T16:30:00.000Z";
+    const olderCreatedAt = "2024-04-16T10:30:00.000Z";
+    const latest = toLocalDateTimeParts(latestCreatedAt);
+    const older = toLocalDateTimeParts(olderCreatedAt);
+
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      {
+        id: "latest-snapshot",
+        date: "2024-04-16",
+        createdAt: latestCreatedAt,
+      },
+      {
+        id: "older-same-day-snapshot",
+        date: "2024-04-16",
+        createdAt: olderCreatedAt,
+      },
+    ] as never);
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+
+    render(
+      <Comparison currency={usdCurrency} quoteColor="green-up-red-down" />,
     );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("button", { name: /choose head date/i }),
+    ).toHaveTextContent(`2024-04-16 ${latest.time}`);
+    expect(
+      screen.getByRole("button", { name: /choose base date/i }),
+    ).toHaveTextContent(`2024-04-16 ${older.time}`);
   });
 });

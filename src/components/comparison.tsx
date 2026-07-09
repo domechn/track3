@@ -9,7 +9,7 @@ import {
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
-import { parseDateToTS } from "@/utils/date";
+import { parseDateToTS, timeToDateStr } from "@/utils/date";
 import { getImageApiPath } from "@/utils/app";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { downloadCoinLogos } from "@/middlelayers/data";
@@ -26,7 +26,11 @@ import {
   resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
-import { CalendarIcon, EyeClosedIcon, EyeOpenIcon } from "@radix-ui/react-icons";
+import {
+  CalendarIcon,
+  EyeClosedIcon,
+  EyeOpenIcon,
+} from "@radix-ui/react-icons";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { isSameDay } from "date-fns";
@@ -90,11 +94,11 @@ const App = ({
   }, [baseId, headId]);
 
   const baseDate = useMemo(() => {
-    return dateOptions.find(item => item.value === baseId)?.displayLabel;
+    return dateOptions.find((item) => item.value === baseId)?.displayLabel;
   }, [dateOptions, baseId]);
 
   const headDate = useMemo(() => {
-    return dateOptions.find(item => item.value === headId)?.displayLabel;
+    return dateOptions.find((item) => item.value === headId)?.displayLabel;
   }, [dateOptions, headId]);
 
   useEffect(() => {
@@ -112,7 +116,13 @@ const App = ({
         value: `${d.id}`,
         createdAt: d.createdAt,
       }));
-      const dateCounts = rawOptions.reduce((acc, opt) => { acc[opt.label] = (acc[opt.label] || 0) + 1; return acc; }, {} as Record<string, number>);
+      const dateCounts = rawOptions.reduce(
+        (acc, opt) => {
+          acc[opt.label] = (acc[opt.label] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
       const dateIndexes: Record<string, number> = {};
       const options = rawOptions.map((option) => {
         dateIndexes[option.label] = (dateIndexes[option.label] || 0) + 1;
@@ -205,7 +215,9 @@ const App = ({
     const baseMap = buildMap(baseData);
     const headMap = buildMap(headData);
     const assetKeys = Array.from(
-      new Set([...baseData, ...headData].map((asset) => getAssetLogoKey(asset))),
+      new Set(
+        [...baseData, ...headData].map((asset) => getAssetLogoKey(asset)),
+      ),
     );
 
     return assetKeys.map((assetKey) => {
@@ -245,7 +257,12 @@ const App = ({
     () =>
       coinComparisons
         .filter((coin) => shouldDownloadCryptoLogo(coin))
-        .filter((coin, idx, arr) => arr.findIndex(c => getAssetLogoKey(c) === getAssetLogoKey(coin)) === idx),
+        .filter(
+          (coin, idx, arr) =>
+            arr.findIndex(
+              (c) => getAssetLogoKey(c) === getAssetLogoKey(coin),
+            ) === idx,
+        ),
     [coinComparisons],
   );
 
@@ -499,18 +516,30 @@ const App = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm">{t("comparison.quick")}</span>
+                  <span className="text-muted-foreground text-sm">
+                    {t("comparison.quick")}
+                  </span>
                   <ButtonGroup
                     value={currentQuickCompare || ""}
                     onValueChange={(val: string) =>
                       onQuickCompareButtonClick(val as QuickCompareType)
                     }
                   >
-                    <ButtonGroupItem value="7D">{t("comparison.7D")}</ButtonGroupItem>
-                    <ButtonGroupItem value="1M">{t("comparison.1M")}</ButtonGroupItem>
-                    <ButtonGroupItem value="1Y">{t("comparison.1Y")}</ButtonGroupItem>
-                    <ButtonGroupItem value="YTD">{t("comparison.ytd")}</ButtonGroupItem>
-                    <ButtonGroupItem value="ALL">{t("comparison.all")}</ButtonGroupItem>
+                    <ButtonGroupItem value="7D">
+                      {t("comparison.7D")}
+                    </ButtonGroupItem>
+                    <ButtonGroupItem value="1M">
+                      {t("comparison.1M")}
+                    </ButtonGroupItem>
+                    <ButtonGroupItem value="1Y">
+                      {t("comparison.1Y")}
+                    </ButtonGroupItem>
+                    <ButtonGroupItem value="YTD">
+                      {t("comparison.ytd")}
+                    </ButtonGroupItem>
+                    <ButtonGroupItem value="ALL">
+                      {t("comparison.all")}
+                    </ButtonGroupItem>
                   </ButtonGroup>
                 </div>
               </div>
@@ -551,7 +580,9 @@ const App = ({
                       </p>
                     </div>
                     <div className="text-center min-w-0">
-                      <p className="text-xs text-muted-foreground">{t("common.changeLabel")}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("common.changeLabel")}
+                      </p>
                       <p
                         className={`text-sm font-semibold tabular-nums truncate ${changeClass(totalValue.changePercent)}`}
                       >
@@ -636,14 +667,21 @@ function ComparisonDatePicker({
   const [open, setOpen] = useState(false);
   const [activeDateLabel, setActiveDateLabel] = useState<string | undefined>();
   const selectedOption = useMemo(
-    () => dateOptions.find(item => item.value === value),
+    () => dateOptions.find((item) => item.value === value),
     [dateOptions, value],
   );
   const selectedDate = selectedOption
     ? dateOptionToDate(selectedOption)
     : undefined;
   const optionsByDate = useMemo(
-    () => dateOptions.reduce((acc, opt) => { (acc[opt.label] = acc[opt.label] || []).push(opt); return acc; }, {} as Record<string, typeof dateOptions>),
+    () =>
+      dateOptions.reduce(
+        (acc, opt) => {
+          (acc[opt.label] = acc[opt.label] || []).push(opt);
+          return acc;
+        },
+        {} as Record<string, typeof dateOptions>,
+      ),
     [dateOptions],
   );
   const selectableDates = useMemo(
@@ -740,7 +778,9 @@ function ComparisonDatePicker({
             <div
               className="grid gap-1"
               role="group"
-              aria-label={t("comparison.snapshotsAria").replace("{label}", label).replace("{date}", activeDateLabel || "")}
+              aria-label={t("comparison.snapshotsAria")
+                .replace("{label}", label)
+                .replace("{date}", activeDateLabel || "")}
             >
               {activeDateOptions.map((option) => (
                 <Button
@@ -777,7 +817,12 @@ function formatSnapshotLabel(createdAt: string | undefined, index: number) {
     return `Snapshot ${index}`;
   }
 
-  const time = createdAt.match(/[T\s](\d{2}:\d{2}(?::\d{2})?)/)?.[1];
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) {
+    return `Snapshot ${index}`;
+  }
+
+  const time = timeToDateStr(date, true).split(" ")[1];
   return time || `Snapshot ${index}`;
 }
 
@@ -827,7 +872,9 @@ function CoinCard({
         </div>
 
         <div className="grid grid-cols-[56px_minmax(0,1fr)_96px_minmax(0,1fr)] mb-1 gap-2">
-          <span className="text-xs text-muted-foreground">{t("common.metricLabel")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("common.metricLabel")}
+          </span>
           <span className="text-xs text-muted-foreground truncate">
             {baseDate}
           </span>
