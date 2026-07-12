@@ -195,12 +195,12 @@ export class CexAnalyzer implements Analyzer {
       // filter all keys are capital
       const coins = filterCoinsInPortfolio(ex.getIdentity(), portfolio);
       return coins.map(
-          (c) =>
-            ({
-              ...c,
-              price: getPrice(ex.getExchangeName(), c.symbol),
-            }) as WalletCoin,
-        );
+        (c) =>
+          ({
+            ...c,
+            price: getPrice(ex.getExchangeName(), c.symbol),
+          }) as WalletCoin,
+      );
     });
 
     return coinLists.flat();
@@ -212,10 +212,10 @@ export class CexAnalyzer implements Analyzer {
     alias?: string;
   }[] {
     return this.exchanges.map((ex) => ({
-        exchangeName: ex.getExchangeName(),
-        identity: ex.getIdentity(),
-        alias: ex.getAlias(),
-      }));
+      exchangeName: ex.getExchangeName(),
+      identity: ex.getIdentity(),
+      alias: ex.getAlias(),
+    }));
   }
 }
 

@@ -1,10 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import bluebird from "bluebird";
-import {
-  Analyzer,
-  GlobalConfig,
-  WalletCoin,
-} from "./datafetch/types";
+import { Analyzer, GlobalConfig, WalletCoin } from "./datafetch/types";
 import { BTCAnalyzer } from "./datafetch/coins/btc";
 import { combineCoinLists, getAssetType } from "./datafetch/utils/coins";
 import { DOGEAnalyzer } from "./datafetch/coins/doge";
@@ -214,7 +210,9 @@ async function loadPortfoliosByConfig(
     OthersAnalyzer,
     BTCAnalyzer,
     DOGEAnalyzer,
-    ...(userInfo.isPro ? [TRC20ProUserAnalyzer as typeof TRC20ProUserAnalyzer] : []),
+    ...(userInfo.isPro
+      ? [TRC20ProUserAnalyzer as typeof TRC20ProUserAnalyzer]
+      : []),
     TonAnalyzer,
     SUIAnalyzer,
     StockAnalyzer,
@@ -233,9 +231,7 @@ async function loadPortfoliosByConfig(
             cfg: GlobalConfig,
             license: string,
           ) => Analyzer)(config, userInfo.license!)
-        : new (ana as unknown as new (cfg: GlobalConfig) => Analyzer)(
-            config,
-          );
+        : new (ana as unknown as new (cfg: GlobalConfig) => Analyzer)(config);
       const anaName = a.getAnalyzeName();
       console.debug("loading portfolio from ", anaName);
       try {
@@ -302,7 +298,7 @@ export async function checkIfDuplicatedHistoricalData(
   );
 
   // check if there is duplicated uuid
-  return allUUIDs.filter(x => importUUIDs.includes(x)).length > 0;
+  return allUUIDs.filter((x) => importUUIDs.includes(x)).length > 0;
 }
 
 // readHistoricalDataFromFile from file
@@ -407,9 +403,9 @@ export async function autoImportHistoricalData(): Promise<boolean> {
     await DATA_MANAGER.importHistoricalData("IGNORE", ed, (datas) => {
       // only import data that is after last auto import at
       return datas.filter((d) => {
-          const createdAt = new Date(d.createdAt);
-          return createdAt.getTime() > aia.getTime();
-        });
+        const createdAt = new Date(d.createdAt);
+        return createdAt.getTime() > aia.getTime();
+      });
     });
   } catch (e) {
     console.error("failed to auto import", e);
