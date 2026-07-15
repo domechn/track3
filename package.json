@@ -1,7 +1,7 @@
 {
   "name": "track3",
   "private": true,
-  "version": "0.8.1",
+  "version": "0.8.2",
   "type": "module",
   "packageManager": "yarn@4.9.2",
   "repository": {
