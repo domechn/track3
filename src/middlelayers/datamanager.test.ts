@@ -6,7 +6,8 @@ import { getClientID, getVersion } from "@/utils/app";
 import { queryHistoricalData } from "./charts";
 import {
   exportConfigurationString,
-  importRawConfiguration,
+  parseRawConfiguration,
+  runWithPreparedConfigurationWrite,
 } from "./configuration";
 import { DATA_MANAGER, ExportData } from "./datamanager";
 import { ASSET_HANDLER } from "./entities/assets";
@@ -18,12 +19,19 @@ const mocks = vi.hoisted(() => ({
   getClientID: vi.fn(),
   getVersion: vi.fn(),
   importAssets: vi.fn(),
-  importRawConfiguration: vi.fn(),
+  parseRawConfiguration: vi.fn(),
+  runWithPreparedConfigurationWrite: vi.fn(),
   importTransactions: vi.fn(),
   queryHistoricalData: vi.fn(),
   readTextFile: vi.fn(),
   writeTextFile: vi.fn(),
   stat: vi.fn(),
+  executeWriteWork: vi.fn(),
+  writeDatabase: {
+    execute: vi.fn(),
+    select: vi.fn(),
+  },
+  writeConfiguration: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/plugin-fs", () => ({
@@ -43,7 +51,12 @@ vi.mock("./charts", () => ({
 
 vi.mock("./configuration", () => ({
   exportConfigurationString: mocks.exportConfigurationString,
-  importRawConfiguration: mocks.importRawConfiguration,
+  parseRawConfiguration: mocks.parseRawConfiguration,
+  runWithPreparedConfigurationWrite: mocks.runWithPreparedConfigurationWrite,
+}));
+
+vi.mock("./database", () => ({
+  executeWriteWork: mocks.executeWriteWork,
 }));
 
 vi.mock("./entities/assets", () => ({
@@ -128,7 +141,17 @@ beforeEach(() => {
   mocks.queryHistoricalData.mockResolvedValue([makeHistoricalData()]);
   mocks.importAssets.mockResolvedValue([]);
   mocks.importTransactions.mockResolvedValue([]);
-  mocks.importRawConfiguration.mockResolvedValue(undefined);
+  mocks.parseRawConfiguration.mockResolvedValue({
+    configs: { groupUSD: false },
+  });
+  mocks.writeConfiguration.mockResolvedValue(undefined);
+  mocks.runWithPreparedConfigurationWrite.mockImplementation(
+    async (_configuration, operation) =>
+      operation(mocks.writeDatabase, mocks.writeConfiguration),
+  );
+  mocks.executeWriteWork.mockImplementation(async (operation) =>
+    operation(mocks.writeDatabase),
+  );
 });
 
 describe("DATA_MANAGER historical data import/export", () => {
@@ -178,12 +201,17 @@ describe("DATA_MANAGER historical data import/export", () => {
     expect(ASSET_HANDLER.importAssets).toHaveBeenCalledWith(
       data.historicalData[0].assets,
       "REPLACE",
+      mocks.writeDatabase,
     );
     expect(TRANSACTION_HANDLER.importTransactions).toHaveBeenCalledWith(
       data.historicalData[0].transactions,
       "REPLACE",
+      mocks.writeDatabase,
     );
-    expect(importRawConfiguration).toHaveBeenCalledWith("raw-config");
+    expect(mocks.executeWriteWork).not.toHaveBeenCalled();
+    expect(parseRawConfiguration).toHaveBeenCalledWith("raw-config");
+    expect(runWithPreparedConfigurationWrite).toHaveBeenCalledTimes(1);
+    expect(mocks.writeConfiguration).toHaveBeenCalledWith(true);
   });
 
   it("rejects data whose checksum no longer matches the payload", async () => {
@@ -196,7 +224,7 @@ describe("DATA_MANAGER historical data import/export", () => {
 
     expect(ASSET_HANDLER.importAssets).not.toHaveBeenCalled();
     expect(TRANSACTION_HANDLER.importTransactions).not.toHaveBeenCalled();
-    expect(importRawConfiguration).not.toHaveBeenCalled();
+    expect(parseRawConfiguration).not.toHaveBeenCalled();
   });
 
   it("rejects imported assets missing required fields before saving", async () => {
@@ -215,6 +243,7 @@ describe("DATA_MANAGER historical data import/export", () => {
 
     expect(ASSET_HANDLER.importAssets).not.toHaveBeenCalled();
     expect(TRANSACTION_HANDLER.importTransactions).not.toHaveBeenCalled();
+    expect(parseRawConfiguration).not.toHaveBeenCalled();
   });
 
   it("rejects imported transactions missing required fields before saving", async () => {

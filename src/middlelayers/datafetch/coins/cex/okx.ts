@@ -89,11 +89,11 @@ export class OkxExchange implements Exchanger {
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
 		const [sb, ssb, fb, esb, sdb, dib] = await bluebird.map([
 			this.fetchSpotBalance(),
-			this.fetchSavingBalance(),
-			this.fetchFundingBalance(),
-			this.fetchETHStakingBalance(),
-			this.fetchStakingDefiBalance(),
-			this.fetchDualInvestmentBalance(),
+			this.fetchOptionalBalance("savings", () => this.fetchSavingBalance()),
+			this.fetchOptionalBalance("funding", () => this.fetchFundingBalance()),
+			this.fetchOptionalBalance("ETH staking", () => this.fetchETHStakingBalance()),
+			this.fetchOptionalBalance("DeFi staking", () => this.fetchStakingDefiBalance()),
+			this.fetchOptionalBalance("dual investment", () => this.fetchDualInvestmentBalance()),
 		], (v) => v)
 		const balance: { [k: string]: number } = mergeBalances([sb, ssb, fb, sdb, dib])
 		Object.entries(esb).forEach(([k, v]) => {
@@ -121,7 +121,8 @@ export class OkxExchange implements Exchanger {
 		return Object.fromEntries(
 			allPrices.data
 				.filter((p) => p.instId.endsWith(suffix))
-				.map((p) => [p.instId.replace(suffix, ""), parseFloat(p.last)]),
+				.map((p) => [p.instId.replace(suffix, "").toUpperCase(), parseFloat(p.last)] as const)
+				.filter(([, price]) => Number.isFinite(price) && price > 0),
 		)
 	}
 
@@ -165,16 +166,22 @@ export class OkxExchange implements Exchanger {
 		const path = "/finance/savings/balance"
 		const resp = await this.fetch<SavingBalanceResp>("GET", path, "")
 
-		return Object.fromEntries(resp.data.map((v) => [v.ccy, parseFloat(v.amt)]))
+		const balances: { [k: string]: number } = {}
+		resp.data.forEach((v) => {
+			addToBalanceMap(balances, v.ccy, toNumber(v.amt))
+		})
+		return balances
 	}
 
 	private async fetchFundingBalance(): Promise<{ [k: string]: number }> {
 		const path = "/asset/balances"
 		const resp = await this.fetch<FundingBalanceResp>("GET", path, "")
 
-		return Object.fromEntries(
-			resp.data.flat().map((d) => [d.ccy, parseFloat(d.bal)]),
-		)
+		const balances: { [k: string]: number } = {}
+		resp.data.flat().forEach((v) => {
+			addToBalanceMap(balances, v.ccy, toNumber(v.bal))
+		})
+		return balances
 	}
 
 	// this function will return the amount of BETH which get by ETH Staking
@@ -183,7 +190,11 @@ export class OkxExchange implements Exchanger {
 		const path = "/finance/staking-defi/eth/balance"
 		const resp = await this.fetch<ETHStakingBalanceResp>("GET", path, "")
 
-		return Object.fromEntries(resp.data.map((v) => [v.ccy, parseFloat(v.amt)]))
+		const balances: { [k: string]: number } = {}
+		resp.data.forEach((v) => {
+			addToBalanceMap(balances, v.ccy, toNumber(v.amt))
+		})
+		return balances
 	}
 
 	// key is productId
@@ -240,6 +251,18 @@ export class OkxExchange implements Exchanger {
 		})
 
 		return res
+	}
+
+	private async fetchOptionalBalance(
+		productName: string,
+		fetcher: () => Promise<{ [k: string]: number }>,
+	): Promise<{ [k: string]: number }> {
+		try {
+			return await fetcher()
+		} catch (error) {
+			console.error(`Fetch OKX ${productName} balance failed`, error)
+			return {}
+		}
 	}
 
 	private async fetchDualInvestmentOrdersByState(state: "initial" | "live" | "pending_settle" | "pending_redeem"): Promise<DualInvestmentOrderHistoryResp["data"]> {

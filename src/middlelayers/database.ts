@@ -1,44 +1,79 @@
+import { invoke } from "@tauri-apps/api/core"
 import Database from "@tauri-apps/plugin-sql"
 import { UniqueIndexConflictResolver } from './types'
 
 export const databaseName = "track3.db"
 
+export type WriteDatabase = Pick<Database, "execute" | "select">
 
-/** Write queue that serializes all db.execute() calls to prevent 
- * concurrent SQLite transaction conflicts. Each execute() in 
- * @tauri-apps/plugin-sql is wrapped in an internal BEGIN/COMMIT; 
+/** Write queue that serializes all renderer database mutations to prevent
+ * concurrent SQLite transaction conflicts. Each write in
+ * @tauri-apps/plugin-sql is wrapped in an internal BEGIN/COMMIT;
  * parallel writes on the same connection cause "cannot rollback" errors. */
-let writeQueue: Promise<unknown> = Promise.resolve()
-let dbInstance: Database
+let dbPromise: Promise<Database> | undefined
+let writeQueue: Promise<void> = Promise.resolve()
 
-export async function getDatabase(): Promise<Database> {
-	if (dbInstance) {
-		return dbInstance
+export function getDatabase(): Promise<Database> {
+	dbPromise ??= invoke<string>("get_database_url")
+		.then((url) => Database.load(url))
+		.catch((error) => {
+			dbPromise = undefined
+			throw error
+		})
+	return dbPromise
+}
+
+export async function getLatestCommittedRefreshCreatedAt(
+	database?: Pick<Database, "select">,
+): Promise<string | undefined> {
+	const db = database ?? await getDatabase()
+	const columns = await db.select<Array<{name: string}>>(
+		"SELECT name FROM pragma_table_info('refresh_operations')",
+		[],
+	)
+	if (!columns.some(({name}) => name === "created_at")) {
+		return undefined
 	}
-	dbInstance = await Database.load(`sqlite:${databaseName}`)
-	return dbInstance
+
+	const [latest] = await db.select<Array<{createdAt: string | null}>>(
+		"SELECT MAX(created_at) AS createdAt FROM refresh_operations",
+		[],
+	)
+	return latest?.createdAt ?? undefined
+}
+
+export function executeWriteWork<T>(
+	operation: (db: WriteDatabase) => Promise<T>,
+): Promise<T> {
+	const result = writeQueue.then(async () => operation(await getDatabase()))
+	writeQueue = result.then(() => undefined, () => undefined)
+	return result
+}
+
+export function enqueueWrite<T>(
+	operation: (db: WriteDatabase) => Promise<T>,
+): Promise<T> {
+	return executeWriteWork(operation)
 }
 
 /**
- * Serialized database write. All execute() calls go through this queue so that
- * only one write is in-flight on the shared connection at a time.
+ * Serialized database write. Only one renderer mutation is in-flight on the
+ * shared connection at a time.
  */
-export async function executeWrite(sql: string, values?: unknown[]): Promise<{rowsAffected: number}> {
-	const db = await getDatabase()
-	return new Promise((resolve, reject) => {
-		writeQueue = writeQueue.then(
-			() => db.execute(sql, values).then(resolve, reject),
-			() => db.execute(sql, values).then(resolve, reject),
-		)
-	})
+export function executeWrite(sql: string, values?: unknown[]): Promise<{rowsAffected: number}> {
+	return enqueueWrite((db) => db.execute(sql, values))
 }
 
-export async function saveModelsToDatabase<T extends object>(table: TableName, models: T[], conflictResolver: UniqueIndexConflictResolver = 'REPLACE') {
-	const db = await getDatabase()
-	return saveToDatabase(db, table, models, conflictResolver)
+export function saveModelsToDatabase<T extends object>(table: TableName, models: T[], conflictResolver: UniqueIndexConflictResolver = 'REPLACE') {
+	return executeWriteWork((db) => saveModelsInWriteWork(db, table, models, conflictResolver))
 }
 
-async function saveToDatabase<T extends object>(db: Database, table: TableName, models: T[], conflictResolver: UniqueIndexConflictResolver) {
+export async function saveModelsInWriteWork<T extends object>(
+	db: WriteDatabase,
+	table: TableName,
+	models: T[],
+	conflictResolver: UniqueIndexConflictResolver,
+) {
 	if (models.length === 0) {
 		return models
 	}
@@ -99,8 +134,6 @@ export async function selectFromDatabaseWithSql<T extends object>(sql: string, v
 }
 
 export async function deleteFromDatabase<T extends object>(table: TableName, where: Partial<T>, allowFullDelete = false) {
-	const db = await getDatabase()
-
 	const filteredWhere = Object.fromEntries(Object.entries(where).filter(([,v]) => v !== undefined))
 	const whereKeys = Object.keys(filteredWhere)
 	if (!allowFullDelete && whereKeys.length === 0) {
@@ -113,5 +146,5 @@ export async function deleteFromDatabase<T extends object>(table: TableName, whe
 
 	const sql = `DELETE FROM ${table} WHERE ${whereStr}`
 
-	return executeWrite(sql, values)
+	return enqueueWrite<{rowsAffected: number}>((db) => db.execute(sql, values))
 }

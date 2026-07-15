@@ -8,7 +8,8 @@ import {
 import { queryHistoricalData } from "./charts";
 import {
   exportConfigurationString,
-  importRawConfiguration,
+  parseRawConfiguration,
+  runWithPreparedConfigurationWrite,
 } from "./configuration";
 import { writeTextFile, readTextFile, stat } from "@tauri-apps/plugin-fs";
 import { ASSET_HANDLER, AssetHandlerImpl } from "./entities/assets";
@@ -17,6 +18,7 @@ import {
   TRANSACTION_HANDLER,
   TransactionHandlerImpl,
 } from "./entities/transactions";
+import { executeWriteWork, WriteDatabase } from "./database";
 
 export interface DataManager {
   readHistoricalData(filePath: string): Promise<ExportData>;
@@ -129,13 +131,9 @@ class DataManagement implements DataManager {
     );
   }
 
-  // import historicalData from file
-  private async saveHistoricalDataAssets(
-    historicalData: PartlyHistoricalData,
-    conflictResolver: UniqueIndexConflictResolver,
-  ) {
-    const assets = historicalData.flatMap((d) => d.assets);
-    const transactions = historicalData.flatMap((d) => d.transactions);
+  private validateHistoricalData(historicalData: PartlyHistoricalData): void {
+    const assets = historicalData.flatMap((data) => data.assets);
+    const transactions = historicalData.flatMap((data) => data.transactions);
 
     if (assets.length === 0) {
       throw new Error("no data need to be imported: errorCode 003");
@@ -146,10 +144,26 @@ class DataManagement implements DataManager {
     if (!this.validateHistoricalDataTransactions(transactions)) {
       throw new Error(`invalid data: errorCode 004`);
     }
-    await this.assetHandler.importAssets(assets, conflictResolver);
+  }
+
+  // import historicalData from file
+  private async saveHistoricalDataAssets(
+    historicalData: PartlyHistoricalData,
+    conflictResolver: UniqueIndexConflictResolver,
+    writeDatabase: WriteDatabase,
+  ) {
+    const assets = historicalData.flatMap((d) => d.assets);
+    const transactions = historicalData.flatMap((d) => d.transactions);
+
+    await this.assetHandler.importAssets(
+      assets,
+      conflictResolver,
+      writeDatabase,
+    );
     await this.transactionHandler.importTransactions(
       transactions,
       conflictResolver,
+      writeDatabase,
     );
   }
 
@@ -197,13 +211,32 @@ class DataManagement implements DataManager {
     }
 
     const savedData = dataFilter ? dataFilter(historicalData) : historicalData;
+    this.validateHistoricalData(savedData);
+    const importedConfiguration = configuration
+      ? await parseRawConfiguration(configuration)
+      : undefined;
 
     // start to import
-    await this.saveHistoricalDataAssets(savedData, conflictResolver);
-
-    // import configuration if exported
-    if (configuration) {
-      await importRawConfiguration(configuration);
+    if (importedConfiguration) {
+      await runWithPreparedConfigurationWrite(
+        importedConfiguration,
+        async (writeDatabase, writeConfiguration) => {
+          await this.saveHistoricalDataAssets(
+            savedData,
+            conflictResolver,
+            writeDatabase,
+          );
+          await writeConfiguration(true);
+        },
+      );
+    } else {
+      await executeWriteWork((writeDatabase) =>
+        this.saveHistoricalDataAssets(
+          savedData,
+          conflictResolver,
+          writeDatabase,
+        ),
+      );
     }
   }
 }

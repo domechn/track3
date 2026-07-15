@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RefreshData from "@/components/refresh-data";
@@ -163,9 +163,14 @@ describe("RefreshData — currency rates refresh ordering", () => {
     await waitFor(() => {
       expect(refreshAllData).toHaveBeenCalledTimes(2);
     });
-    expect(refreshAllData).toHaveBeenLastCalledWith(expect.any(Function), {
-      useLastKnownDataForFailedSources: false,
-    });
+    expect(refreshAllData).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      {
+        useLastKnownDataForFailedSources: false,
+      },
+      expect.any(Object),
+      expect.any(Function),
+    );
   });
 
   it("reruns refresh with last-known data enabled from the data source failure dialog", async () => {
@@ -204,8 +209,99 @@ describe("RefreshData — currency rates refresh ordering", () => {
     await waitFor(() => {
       expect(refreshAllData).toHaveBeenCalledTimes(2);
     });
-    expect(refreshAllData).toHaveBeenLastCalledWith(expect.any(Function), {
-      useLastKnownDataForFailedSources: true,
+    expect(refreshAllData).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      {
+        useLastKnownDataForFailedSources: true,
+      },
+      expect.any(Object),
+      expect.any(Function),
+    );
+  });
+
+  it("passes automatic retries into one refresh operation call", async () => {
+    vi.useFakeTimers();
+    try {
+      let persistenceAttempts = 0;
+      vi.mocked(refreshAllData).mockImplementation(
+        async (_addProgress, _options, _operation, retry) => {
+          await retry!(async () => {
+            persistenceAttempts += 1;
+            if (persistenceAttempts === 1) {
+              throw new Error("temporary failure");
+            }
+          });
+          return {
+            failedSources: [],
+            requiresDataSourceAction: false,
+            usedLastKnownData: false,
+          } as never;
+        },
+      );
+
+      render(<RefreshData loading={false} />);
+
+      act(() => {
+        screen.getByRole("button").click();
+      });
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(refreshAllData).toHaveBeenCalledTimes(1);
+      expect(persistenceAttempts).toBe(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      expect(refreshAllData).toHaveBeenCalledTimes(1);
+      expect(persistenceAttempts).toBe(2);
+      expect(refreshAllData).toHaveBeenCalledWith(
+        expect.any(Function),
+        {
+          useLastKnownDataForFailedSources: false,
+        },
+        {
+          operationUuid: expect.stringMatching(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+          ),
+        },
+        expect.any(Function),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("forwards refresh progress as absolute values across query retries", async () => {
+    vi.mocked(refreshAllData).mockImplementation(async (setProgress) => {
+      setProgress(75);
+      setProgress(0);
+      setProgress(90);
+      setProgress(100);
+      return {
+        failedSources: [],
+        requiresDataSourceAction: false,
+        usedLastKnownData: false,
+      } as never;
     });
+
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(refreshAllData).toHaveBeenCalledOnce();
+      expect(mockSetProgress).toHaveBeenCalledTimes(6);
+    });
+    expect(mockSetProgress.mock.calls.map(([value]) => value)).toEqual([
+      0,
+      75,
+      0,
+      90,
+      100,
+      0,
+    ]);
   });
 });

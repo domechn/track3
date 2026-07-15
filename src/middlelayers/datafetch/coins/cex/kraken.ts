@@ -67,6 +67,7 @@ export class KrakenExchange implements Exchanger {
 					break
 				}
 			}
+			symbol = normalizeKrakenSymbol(symbol)
 
 			const amount = (parseFloat(v.balance) || 0) + (parseFloat(v.hold_trade) || 0)
 
@@ -102,7 +103,8 @@ export class KrakenExchange implements Exchanger {
 				.filter(([k, v]) => k.endsWith(suffix) && v.a.length === 3 && v.b.length === 3)
 				.map(([k, v]) => {
 					const price = getPrice(v.a, v.b)
-					return [k.replace(suffix, ""), price] as const
+					const symbol = normalizeKrakenSymbol(k.slice(0, -suffix.length))
+					return [symbol, price] as const
 				})
 				.filter(([, price]) => !!price),
 		)
@@ -144,4 +146,15 @@ export class KrakenExchange implements Exchanger {
 			"API-Sign": hmac.finalize().toString(CryptoJS.enc.Base64)
 		}
 	}
+}
+
+function normalizeKrakenSymbol(symbol: string): string {
+	const normalized = symbol.trim().toUpperCase()
+	if (normalized === "XBT" || normalized === "XXBT") {
+		return "BTC"
+	}
+	if (normalized === "XETH") {
+		return "ETH"
+	}
+	return normalized
 }

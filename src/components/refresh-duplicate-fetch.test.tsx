@@ -4,10 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AthValue from "@/components/ath-value";
 import ProfitMetrics from "@/components/profit-metrics";
 import TopCoinsRank from "@/components/top-coins-rank";
+import WalletAssetsChange from "@/components/wallet-assets-change";
 import { ChartResizeContext } from "@/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { DataChangedContext } from "@/contexts/data-changed";
 import { MemoryRouter } from "react-router-dom";
+
+const queryWalletAssetsChange = vi.hoisted(() => vi.fn());
 
 vi.mock("react-chartjs-2", async () => {
   const React = await import("react");
@@ -38,6 +41,9 @@ vi.mock("@/middlelayers/data", () => ({
 }));
 
 vi.mock("@/middlelayers/charts", () => ({
+  WALLET_ANALYZER: {
+    queryWalletAssetsChange,
+  },
   queryMaxTotalValue: vi.fn(),
   queryTotalValue: vi.fn(),
   queryTotalValues: vi.fn(),
@@ -269,5 +275,35 @@ describe("Refresh — stale fetch protection", () => {
     await waitFor(() => {
       expect(queryTopCoinsRank).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it("reports wallet changes loaded without an unhandled rejection when the query fails", async () => {
+    const unhandledRejection = vi.fn();
+    process.on("unhandledRejection", unhandledRejection);
+    queryWalletAssetsChange.mockRejectedValue(
+      new Error("wallet history unavailable"),
+    );
+
+    try {
+      render(
+        wrapWithProviders(
+          <WalletAssetsChange
+            currency={usdCurrency}
+            dateRange={baseDateRange}
+            quoteColor="green-up-red-down"
+          />,
+          0,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(reportLoaded).toHaveBeenCalledTimes(1);
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+      expect(unhandledRejection).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandledRejection);
+    }
   });
 });

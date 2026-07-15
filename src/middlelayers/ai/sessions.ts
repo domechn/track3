@@ -16,6 +16,7 @@ import {
   selectFromDatabase,
 } from "@/middlelayers/database";
 import type { AIConfig } from "@/middlelayers/types";
+import { runWithEncryptionWriteGate } from "@/middlelayers/encryption-write-gate";
 
 const SESSIONS_TABLE = "chat_sessions" as const;
 const FILE_VERSION = 1;
@@ -215,15 +216,17 @@ export async function togglePin(id: string, pinned: 0 | 1): Promise<void> {
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  await deleteFromDatabase<ChatSessionMeta>(SESSIONS_TABLE, { id });
-  try {
-    const path = await fullPathFor(id);
-    if (await exists(path)) {
-      await remove(path);
+  await runWithEncryptionWriteGate(async () => {
+    await deleteFromDatabase<ChatSessionMeta>(SESSIONS_TABLE, { id });
+    try {
+      const path = await fullPathFor(id);
+      if (await exists(path)) {
+        await remove(path);
+      }
+    } catch {
+      // ignore: missing files are not a failure mode for delete
     }
-  } catch {
-    // ignore: missing files are not a failure mode for delete
-  }
+  });
 }
 
 async function readSessionMessages(
@@ -279,8 +282,10 @@ export async function appendMessages(
   id: string,
   messages: PersistedChatMessage[],
 ): Promise<void> {
-  const existing = await readSessionMessages(id);
-  await writeSessionMessages(id, [...existing, ...messages]);
+  await runWithEncryptionWriteGate(async () => {
+    const existing = await readSessionMessages(id);
+    await writeSessionMessages(id, [...existing, ...messages]);
+  });
 }
 
 function trimForPreview(text: string): string {

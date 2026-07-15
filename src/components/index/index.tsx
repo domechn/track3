@@ -16,15 +16,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import Setting from "../settings";
 import RefreshData from "../refresh-data";
 import ChartDataLabels from "chartjs-plugin-datalabels";
-import HistoricalData from "../historical-data";
-import Overview from "../overview";
-import Comparison from "../comparison";
 import PageWrapper from "../page-wrapper";
-import WalletAnalysis from "../wallet-analytics";
-import CoinAnalysis from "../coin-analytics";
 import DatePicker from "../date-picker";
 import RealTimeTotalValue from "../realtime-total-value";
 import Sidebar from "../sidebar";
@@ -48,11 +42,6 @@ import {
   getQuoteColor,
   getDefaultCurrencyRate,
 } from "@/middlelayers/configuration";
-import Configuration from "@/components/configuration";
-import DataManagement from "@/components/data-management";
-import SystemInfo from "@/components/system-info";
-import ChatPage from "@/components/assistant/chat-page";
-import AssistantSettings from "@/components/settings/assistant";
 import React from "react";
 import { Progress } from "../ui/progress";
 import {
@@ -61,17 +50,28 @@ import {
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
 import { parseISO } from "date-fns";
-import Summary from "../summary";
-import Appearance from "../appearance";
-import {
-  getLocalStorageCacheInstance,
-  getMemoryCacheInstance,
-} from "@/middlelayers/datafetch/utils/cache";
+import { invalidateCacheGroups } from "@/middlelayers/datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { ChartResizeContext } from "@/App";
 import { useTranslation } from "@/i18n";
 import { DataChangedContext } from "@/contexts/data-changed";
+
+const Setting = React.lazy(() => import("../settings"));
+const HistoricalData = React.lazy(() => import("../historical-data"));
+const Overview = React.lazy(() => import("../overview"));
+const Comparison = React.lazy(() => import("../comparison"));
+const WalletAnalysis = React.lazy(() => import("../wallet-analytics"));
+const CoinAnalysis = React.lazy(() => import("../coin-analytics"));
+const Configuration = React.lazy(() => import("@/components/configuration"));
+const DataManagement = React.lazy(() => import("@/components/data-management"));
+const SystemInfo = React.lazy(() => import("@/components/system-info"));
+const ChatPage = React.lazy(() => import("@/components/assistant/chat-page"));
+const AssistantSettings = React.lazy(
+  () => import("@/components/settings/assistant"),
+);
+const Summary = React.lazy(() => import("../summary"));
+const Appearance = React.lazy(() => import("../appearance"));
 
 ChartJS.register(
   ...registerables,
@@ -179,6 +179,20 @@ function TopBar({
   );
 }
 
+function RouteLoadingFallback({ hidden }: { hidden: boolean }) {
+  const { t } = useTranslation();
+  if (hidden) {
+    return null;
+  }
+
+  return (
+    <PageLoadingOverlay
+      title={t("loading.route")}
+      description={t("loading.routeDesc")}
+    />
+  );
+}
+
 type LayoutProps = {
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
@@ -238,7 +252,11 @@ function Layout({
         {/* Main content */}
         <main className="p-5">
           <div className="relative min-h-[400px]" aria-busy={initializing}>
-            <Outlet />
+            <React.Suspense
+              fallback={<RouteLoadingFallback hidden={initializing} />}
+            >
+              <Outlet />
+            </React.Suspense>
             {initializing && (
               <PageLoadingOverlay
                 title={t("loading.portfolio")}
@@ -441,7 +459,11 @@ function AppRoutes({
           path="coins/:symbol"
           element={
             <AnimatedPage>
-              <CoinAnalysis currency={currentCurrency} dateRange={tDateRange} />
+              <CoinAnalysis
+                currency={currentCurrency}
+                dateRange={tDateRange}
+                onDataChanged={onDataChanged}
+              />
             </AnimatedPage>
           }
         />
@@ -615,11 +637,15 @@ const App = () => {
     // through DataChangedContext sees a new value during this same tick,
     // even when the settings route skips loadAllData() below.
     setDataChangedVersion((v) => v + 1);
-    if (!isSettingsRoute) {
-      loadAllData();
-    }
-    autoBackupHistoricalData(true);
     clearAllCache();
+    if (!isSettingsRoute) {
+      void loadAllData().catch(() => {
+        console.warn("data reload failed");
+      });
+    }
+    void autoBackupHistoricalData(true).catch(() => {
+      console.warn("forced auto backup failed");
+    });
   }
 
   const onDataChangedRef = useRef(onDataChanged);
@@ -637,13 +663,10 @@ const App = () => {
 
   function clearAllCache() {
     console.debug("clear all cache");
-    // clear all cache
-    getLocalStorageCacheInstance(
-      CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY,
-    ).clearCache();
-    getMemoryCacheInstance(
-      CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY,
-    ).clearCache();
+    invalidateCacheGroups({
+      localStorage: [CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY],
+      memory: [CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY],
+    });
   }
 
   function onDatePickerValueChange(

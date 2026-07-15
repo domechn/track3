@@ -12,10 +12,11 @@ export function toNumberOptional(value?: string): number | undefined {
 }
 
 export function addToBalanceMap(balance: { [k: string]: number }, symbol: string, amount: number): void {
-	if (!symbol || !Number.isFinite(amount) || amount === 0) {
+	const normalizedSymbol = symbol.trim().toUpperCase()
+	if (!normalizedSymbol || !Number.isFinite(amount) || amount === 0) {
 		return
 	}
-	balance[symbol] = (balance[symbol] || 0) + amount
+	balance[normalizedSymbol] = (balance[normalizedSymbol] || 0) + amount
 }
 
 export function netAssetFromBalanceFields(fields: {

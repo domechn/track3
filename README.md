@@ -29,7 +29,7 @@
 
 ## Features
 
-1. **No wallet signature required. No backend server, all data is stored locally by default**
+1. **Local-first desktop app. Portfolio assets and transactions are stored in a local SQLite database by default; no Track3 account is required.**
 2. Support Binance, OKX, Bitget, Kraken, Gate.io, Coinbase, Bybit, HTX and MEXC. **Readonly access is enough**. API key setup references: [Binance](https://www.binance.com/en-BH/support/faq/how-to-create-api-360002502072), [OKX](https://use.autoview.com/hc/en-us/articles/360004576632-OKEx-Creating-an-API), [Gate.io](https://www.gate.io/help/guide/common/17521/how-to-utilize-api), [MEXC](https://www.mexc.com/user/openapi)
 3. Support BTC, ETH, BNB, SOL and Doge ( Base Users ).
 4. Support stock broker positions from Interactive Brokers (IBKR) through Flex Web Service imports with Query ID and Token.
@@ -66,7 +66,7 @@
 
 ### Notice
 
-**All your data is private, only you can access it. And track3 will never sync your configurations into cloud, they are always stored locally with encryption. So your wallet addresses and api keys are totally safe.**
+**Privacy and storage:** Track3 stores portfolio assets and transactions locally in a standard SQLite database; these records are not encrypted by the application. Sensitive configuration values, including exchange credentials and wallet addresses, and chat message content are encrypted by the application before storage. Track3 does not automatically sync configuration data to a Track3 cloud service. Backups, exports, and requests to user-configured services leave the device only when you choose or configure those features.
 
 ## Sponsor
 

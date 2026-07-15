@@ -65,6 +65,110 @@ class LocalStorageCacheProvider implements CacheProvider {
 // key is groupKey
 const memoryCacheInstance = new Map<string, CacheCenter>()
 const localStorageCacheInstance = new Map<string, CacheCenter>()
+const cacheGroupEpochs = new Map<string, number>()
+const CACHE_EPOCH_STORAGE_PREFIX = "track3-cache-epoch/"
+const CACHE_EPOCH_SCHEMA = "v1:"
+
+function cacheEpochStorageKey(groupKey: string) {
+	return `${CACHE_EPOCH_STORAGE_PREFIX}${groupKey}`
+}
+
+function createCacheGroupEpoch() {
+	const randomPart = Math.floor(Math.random() * 1000)
+	return Date.now() * 1000 + randomPart
+}
+
+function parseCacheGroupEpoch(value: string | null) {
+	if (!value?.startsWith(CACHE_EPOCH_SCHEMA)) {
+		return
+	}
+	const epoch = Number(value.slice(CACHE_EPOCH_SCHEMA.length))
+	if (!Number.isSafeInteger(epoch) || epoch <= 0) {
+		return
+	}
+	return epoch
+}
+
+function persistCacheGroupEpoch(groupKey: string, epoch: number) {
+	localStorage.setItem(
+		cacheEpochStorageKey(groupKey),
+		`${CACHE_EPOCH_SCHEMA}${epoch}`,
+	)
+}
+
+function removeCacheGroupEpochMarker(groupKey: string) {
+	try {
+		localStorage.removeItem(cacheEpochStorageKey(groupKey))
+	} catch {
+		console.warn("cache epoch marker cleanup failed")
+	}
+}
+
+export function getCacheGroupEpoch(groupKey: string) {
+	const cached = cacheGroupEpochs.get(groupKey)
+	if (cached !== undefined) {
+		return cached
+	}
+
+	let epoch = createCacheGroupEpoch()
+	try {
+		const stored = parseCacheGroupEpoch(
+			localStorage.getItem(cacheEpochStorageKey(groupKey)),
+		)
+		if (stored !== undefined) {
+			epoch = stored
+		} else {
+			persistCacheGroupEpoch(groupKey, epoch)
+		}
+	} catch {
+		console.warn("cache epoch persistence failed")
+		epoch = -createCacheGroupEpoch()
+		removeCacheGroupEpochMarker(groupKey)
+	}
+	cacheGroupEpochs.set(groupKey, epoch)
+	return epoch
+}
+
+export function invalidateCacheGroups({
+	localStorage = [],
+	memory = [],
+}: {
+	localStorage?: readonly string[]
+	memory?: readonly string[]
+}) {
+	const localStorageGroups = Array.from(new Set(localStorage))
+	const memoryGroups = Array.from(new Set(memory))
+	const allGroups = new Set([...localStorageGroups, ...memoryGroups])
+
+	for (const groupKey of allGroups) {
+		const currentEpoch = getCacheGroupEpoch(groupKey)
+		const nextEpoch =
+			currentEpoch > 0 ? currentEpoch + 1 : createCacheGroupEpoch()
+		cacheGroupEpochs.set(groupKey, nextEpoch)
+		try {
+			persistCacheGroupEpoch(groupKey, nextEpoch)
+		} catch {
+			console.warn("cache epoch persistence failed")
+			cacheGroupEpochs.set(groupKey, -createCacheGroupEpoch())
+			removeCacheGroupEpochMarker(groupKey)
+		}
+	}
+
+	for (const groupKey of localStorageGroups) {
+		try {
+			getLocalStorageCacheInstance(groupKey).clearCache()
+		} catch {
+			console.warn("local storage cache cleanup failed")
+		}
+	}
+	for (const groupKey of memoryGroups) {
+		try {
+			getMemoryCacheInstance(groupKey).clearCache()
+		} catch {
+			console.warn("memory cache cleanup failed")
+		}
+	}
+}
 
 export function getMemoryCacheInstance(groupKey?: string) {
 	const k = groupKey ?? "default"
@@ -91,20 +195,34 @@ export class CacheCenter {
 	// ttl is second
 	public setCache<T>(key: string, value: T, ttl = 0) {
 		const vu = ttl > 0 ? Date.now() + ttl * 1000 : 0
-		this.provider.set(key, {
-			validUntil: vu,
-			data: value
-		})
+		try {
+			this.provider.set(key, {
+				validUntil: vu,
+				data: value
+			})
+		} catch {
+			console.warn("cache write failed")
+		}
 	}
 
 	public getCache<T>(key: string): T | undefined {
-		const cv = this.provider.get(key)
+		let cv: CacheValue | undefined
+		try {
+			cv = this.provider.get(key)
+		} catch {
+			console.warn("cache read failed")
+			return
+		}
 
 		if (!cv) {
 			return
 		}
 		if (cv.validUntil && cv.validUntil < Date.now()) {
-			this.provider.delete(key)
+			try {
+				this.provider.delete(key)
+			} catch {
+				console.warn("expired cache cleanup failed")
+			}
 			return
 		}
 

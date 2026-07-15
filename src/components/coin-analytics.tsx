@@ -88,13 +88,27 @@ import {
 } from "./ui/select";
 import { useTranslation } from "@/i18n";
 
+function formatEditablePrice(value: number): string {
+  if (!Number.isFinite(value)) {
+    return String(value);
+  }
+  return String(Number(value.toPrecision(15)));
+}
+
+function transactionMutationKey(
+  transactionId: number,
+  field: "price" | "type",
+) {
+  return `${transactionId}:${field}`;
+}
+
 interface UpdatePriceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  updatePriceValue: number;
-  setUpdatePriceValue: (value: number) => void;
+  updatePriceValue: string;
+  setUpdatePriceValue: (value: string) => void;
   onSave: () => void;
-  currency: CurrencyRateDetail;
+  pending?: boolean;
 }
 
 export const UpdatePriceDialog = ({
@@ -103,7 +117,7 @@ export const UpdatePriceDialog = ({
   updatePriceValue,
   setUpdatePriceValue,
   onSave,
-  currency,
+  pending = false,
 }: UpdatePriceDialogProps) => {
   const { t } = useTranslation();
   return (
@@ -115,20 +129,8 @@ export const UpdatePriceDialog = ({
         <div className="grid gap-4 py-4">
           <Input
             type="number"
-            defaultValue={currencyWrapper(currency)(updatePriceValue)}
-            onChange={(e) => {
-              if (!e.target.value || e.target.value === "0.") {
-                return;
-              }
-              if (+e.target.value < 0) {
-                toast({
-                  description: t("coin.invalidPrice"),
-                  variant: "destructive",
-                });
-                return;
-              }
-              setUpdatePriceValue(+e.target.value);
-            }}
+            value={updatePriceValue}
+            onChange={(e) => setUpdatePriceValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 onSave();
@@ -137,7 +139,7 @@ export const UpdatePriceDialog = ({
           />
         </div>
         <DialogFooter>
-          <Button type="submit" onClick={onSave}>
+          <Button type="submit" onClick={onSave} disabled={pending}>
             {t("common.save")}
           </Button>
         </DialogFooter>
@@ -152,6 +154,7 @@ interface UpdateTransactionTypeDialogProps {
   updateTxnTypeValue?: TransactionType;
   setUpdateTxnTypeValue: (value: TransactionType) => void;
   onSave: () => void;
+  pending?: boolean;
 }
 
 export const UpdateTransactionTypeDialog = ({
@@ -160,6 +163,7 @@ export const UpdateTransactionTypeDialog = ({
   updateTxnTypeValue,
   setUpdateTxnTypeValue,
   onSave,
+  pending = false,
 }: UpdateTransactionTypeDialogProps) => {
   const { t } = useTranslation();
   return (
@@ -187,7 +191,7 @@ export const UpdateTransactionTypeDialog = ({
           </Select>
         </div>
         <DialogFooter>
-          <Button type="submit" onClick={onSave}>
+          <Button type="submit" onClick={onSave} disabled={pending}>
             {t("common.save")}
           </Button>
         </DialogFooter>
@@ -199,9 +203,11 @@ export const UpdateTransactionTypeDialog = ({
 const App = ({
   currency,
   dateRange,
+  onDataChanged,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  onDataChanged?: () => void;
 }) => {
   const { symbol } = useParams() as { symbol: string };
   const [searchParams] = useSearchParams();
@@ -244,13 +250,88 @@ const App = ({
   >();
 
   const [updateTxnId, setUpdateTxnId] = useState<number>(0);
-  const [updatePriceValue, setUpdatePriceValue] = useState(-1);
+  const editSessionRef = useRef(0);
+  const [updatePriceValue, setUpdatePriceValue] = useState("");
+  const [updatePriceOriginalValue, setUpdatePriceOriginalValue] =
+    useState<number>(Number.NaN);
+  const [updatePriceRate, setUpdatePriceRate] =
+    useState<number>(Number.NaN);
+  const [updatePriceDirty, setUpdatePriceDirty] = useState(false);
   const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
 
   const [updateTxnTypeValue, setUpdateTxnTypeValue] = useState<
     TransactionType | undefined
   >();
   const [updateTxnDialogOpen, setUpdateTxnTypeDialogOpen] = useState(false);
+  const pendingMutationKeysRef = useRef<Set<string>>(new Set());
+  const [pendingMutationKeys, setPendingMutationKeys] = useState<Set<string>>(
+    new Set(),
+  );
+
+  function beginEditSession() {
+    editSessionRef.current += 1;
+    return editSessionRef.current;
+  }
+
+  function onUpdatePriceDialogOpenChange(open: boolean) {
+    if (!open) {
+      beginEditSession();
+    }
+    setUpdatePriceDialogOpen(open);
+  }
+
+  function onUpdateTxnTypeDialogOpenChange(open: boolean) {
+    if (!open) {
+      beginEditSession();
+    }
+    setUpdateTxnTypeDialogOpen(open);
+  }
+
+  function setMutationPending(key: string, pending: boolean) {
+    const next = new Set(pendingMutationKeysRef.current);
+    if (pending) {
+      next.add(key);
+    } else {
+      next.delete(key);
+    }
+    pendingMutationKeysRef.current = next;
+    setPendingMutationKeys(next);
+  }
+
+  function openUpdateTxnTypeDialog(act: Transaction) {
+    if (
+      pendingMutationKeysRef.current.has(
+        transactionMutationKey(act.id, "type"),
+      )
+    ) {
+      return;
+    }
+    beginEditSession();
+    setUpdatePriceDialogOpen(false);
+    setUpdateTxnId(act.id);
+    setUpdateTxnTypeValue(act.txnType);
+    setUpdateTxnTypeDialogOpen(true);
+  }
+
+  function openUpdatePriceDialog(act: Transaction) {
+    if (
+      pendingMutationKeysRef.current.has(
+        transactionMutationKey(act.id, "price"),
+      )
+    ) {
+      return;
+    }
+    beginEditSession();
+    setUpdateTxnTypeDialogOpen(false);
+    setUpdateTxnId(act.id);
+    setUpdatePriceValue(
+      formatEditablePrice(act.price * currency.rate),
+    );
+    setUpdatePriceOriginalValue(act.price);
+    setUpdatePriceRate(currency.rate);
+    setUpdatePriceDirty(false);
+    setUpdatePriceDialogOpen(true);
+  }
 
   const [maxPosition, setMaxPosition] = useState<number>(0);
 
@@ -485,7 +566,11 @@ const App = ({
     setAllowSymbols(ss);
   }
 
-  function onUpdatePriceDialogSaveClick() {
+  async function onUpdatePriceDialogSaveClick() {
+    const mutationKey = transactionMutationKey(updateTxnId, "price");
+    if (pendingMutationKeysRef.current.has(mutationKey)) {
+      return;
+    }
     if (!symbol) {
       toast({
         description: t("coin.invalidSymbol"),
@@ -493,7 +578,14 @@ const App = ({
       });
       return;
     }
-    if (updatePriceValue < 0) {
+    const quotePrice = Number(updatePriceValue);
+    if (
+      updatePriceValue.trim() === "" ||
+      !Number.isFinite(quotePrice) ||
+      quotePrice < 0 ||
+      !Number.isFinite(updatePriceRate) ||
+      updatePriceRate <= 0
+    ) {
       toast({
         description: t("coin.invalidPrice"),
         variant: "destructive",
@@ -509,20 +601,55 @@ const App = ({
       return;
     }
     const act = transactions[txnIndex];
+    const editSession = editSessionRef.current;
 
-    const usdPrice = updatePriceValue / currency.rate;
+    const usdPrice = updatePriceDirty
+      ? quotePrice / updatePriceRate
+      : updatePriceOriginalValue;
+    if (!Number.isFinite(usdPrice) || usdPrice < 0) {
+      toast({
+        description: t("coin.invalidPrice"),
+        variant: "destructive",
+      });
+      return;
+    }
 
-    updateTransactionPrice(act.id, usdPrice).then(() => {
-      const newTxns = [...transactions];
-      newTxns[txnIndex].price = usdPrice;
-      setTransactions(newTxns);
-      setUpdatePriceDialogOpen(false);
-      setUpdateTxnId(0);
-      setUpdatePriceValue(-1);
-    });
+    setMutationPending(mutationKey, true);
+    try {
+      await updateTransactionPrice(act.id, usdPrice);
+    } catch {
+      if (editSession === editSessionRef.current) {
+        toast({
+          description: t("coin.transactionUpdateFailed"),
+          variant: "destructive",
+        });
+      }
+      return;
+    } finally {
+      setMutationPending(mutationKey, false);
+    }
+
+    setTransactions((current) =>
+      current.map((txn) =>
+        txn.id === act.id ? { ...txn, price: usdPrice } : txn,
+      ),
+    );
+    onDataChanged?.();
+    if (editSession !== editSessionRef.current) {
+      return;
+    }
+    beginEditSession();
+    setUpdatePriceDialogOpen(false);
+    setUpdateTxnId(0);
+    setUpdatePriceValue("");
+    setUpdatePriceDirty(false);
   }
 
-  function onUpdateTxnTypeDialogSaveClick() {
+  async function onUpdateTxnTypeDialogSaveClick() {
+    const mutationKey = transactionMutationKey(updateTxnId, "type");
+    if (pendingMutationKeysRef.current.has(mutationKey)) {
+      return;
+    }
     if (!symbol) {
       toast({
         description: t("coin.invalidSymbol"),
@@ -546,15 +673,37 @@ const App = ({
       return;
     }
     const act = transactions[txnIndex];
+    const txnType = updateTxnTypeValue;
+    const editSession = editSessionRef.current;
 
-    updateTransactionTxnType(act.id, updateTxnTypeValue).then(() => {
-      const newTxns = [...transactions];
-      newTxns[txnIndex].txnType = updateTxnTypeValue;
-      setTransactions(newTxns);
-      setUpdateTxnTypeDialogOpen(false);
-      setUpdateTxnId(0);
-      setUpdateTxnTypeValue(undefined);
-    });
+    setMutationPending(mutationKey, true);
+    try {
+      await updateTransactionTxnType(act.id, txnType);
+    } catch {
+      if (editSession === editSessionRef.current) {
+        toast({
+          description: t("coin.transactionUpdateFailed"),
+          variant: "destructive",
+        });
+      }
+      return;
+    } finally {
+      setMutationPending(mutationKey, false);
+    }
+
+    setTransactions((current) =>
+      current.map((txn) =>
+        txn.id === act.id ? { ...txn, txnType } : txn,
+      ),
+    );
+    onDataChanged?.();
+    if (editSession !== editSessionRef.current) {
+      return;
+    }
+    beginEditSession();
+    setUpdateTxnTypeDialogOpen(false);
+    setUpdateTxnId(0);
+    setUpdateTxnTypeValue(undefined);
   }
 
   function HistoryTable() {
@@ -657,11 +806,7 @@ const App = ({
                         </div>
                         <Pencil2Icon
                           className="h-4 w-4 cursor-pointer hidden group-hover:inline-block text-muted-foreground"
-                          onClick={() => {
-                            setUpdateTxnId(act.id);
-                            setUpdateTxnTypeValue(act.txnType);
-                            setUpdateTxnTypeDialogOpen(true);
-                          }}
+                          onClick={() => openUpdateTxnTypeDialog(act)}
                         />
                       </div>
                     </TableCell>
@@ -675,11 +820,7 @@ const App = ({
                         </div>
                         <Pencil2Icon
                           className="h-4 w-4 cursor-pointer hidden group-hover:inline-block text-muted-foreground"
-                          onClick={() => {
-                            setUpdateTxnId(act.id);
-                            setUpdatePriceValue(act.price);
-                            setUpdatePriceDialogOpen(true);
-                          }}
+                          onClick={() => openUpdatePriceDialog(act)}
                         />
                       </div>
                     </TableCell>
@@ -724,19 +865,27 @@ const App = ({
         <StaggerContainer className="space-y-4">
           <UpdatePriceDialog
             open={updatePriceDialogOpen}
-            onOpenChange={setUpdatePriceDialogOpen}
+            onOpenChange={onUpdatePriceDialogOpenChange}
             updatePriceValue={updatePriceValue}
-            setUpdatePriceValue={setUpdatePriceValue}
+            setUpdatePriceValue={(value) => {
+              setUpdatePriceValue(value);
+              setUpdatePriceDirty(true);
+            }}
             onSave={onUpdatePriceDialogSaveClick}
-            currency={currency}
+            pending={pendingMutationKeys.has(
+              transactionMutationKey(updateTxnId, "price"),
+            )}
           />
 
           <UpdateTransactionTypeDialog
             open={updateTxnDialogOpen}
-            onOpenChange={setUpdateTxnTypeDialogOpen}
+            onOpenChange={onUpdateTxnTypeDialogOpenChange}
             updateTxnTypeValue={updateTxnTypeValue}
             setUpdateTxnTypeValue={setUpdateTxnTypeValue}
             onSave={onUpdateTxnTypeDialogSaveClick}
+            pending={pendingMutationKeys.has(
+              transactionMutationKey(updateTxnId, "type"),
+            )}
           />
           <div className="grid gap-4 grid-cols-6">
             <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">

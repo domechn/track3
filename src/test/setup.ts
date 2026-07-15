@@ -6,7 +6,7 @@ afterEach(() => {
   cleanup();
 });
 
-if (!window.matchMedia) {
+if (typeof window !== "undefined" && !window.matchMedia) {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: (query: string) => ({
@@ -22,7 +22,7 @@ if (!window.matchMedia) {
   });
 }
 
-if (!window.ResizeObserver) {
+if (typeof window !== "undefined" && !window.ResizeObserver) {
   window.ResizeObserver = class ResizeObserver {
     observe() {}
     unobserve() {}

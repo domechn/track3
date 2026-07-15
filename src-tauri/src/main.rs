@@ -1,33 +1,28 @@
 #[macro_use]
 extern crate lazy_static;
-use std::collections::HashMap;
+use std::{collections::HashMap, io};
 
 use tauri::Manager;
 use track3::{
     binance::Binance,
-    ent::Ent,
-    info::get_coin_info_provider,
-    migration::{
-        init_sqlite_file, init_sqlite_tables, is_first_run, load_previous_version,
-        prepare_required_data, Migration, V1TV2, V2TV3, V3TV4, V4TV5, V6TV7, V7TV8,
+    database_path::{
+        initialize_database_if_needed, resolve_database_path, sqlite_url, DatabasePath,
     },
-    types::CoinWithPrice,
+    ent::Ent,
+    info::{get_coin_info_provider, sanitize_upstream_error, validate_coin_prices},
+    key_rotation::{
+        recover_pending_rotation,
+        rotate_encryption_key_for_command as rotate_encryption_key_recoverably,
+        RotationCommandError,
+    },
+    migration::run_migrations,
+    refresh_persistence::persist_refresh as persist_refresh_atomically,
+    startup_security::{acquire_app_instance_lock, load_encryption_key},
+    types::{CoinWithPrice, RefreshAssetInput, RefreshTransactionInput},
 };
 
 lazy_static! {
     static ref ENT: Ent = Ent::new();
-}
-
-/// Redact sensitive query parameters from upstream API error messages before
-/// returning them to the frontend. Prevents API keys, signatures, and secrets
-/// from appearing in user-visible toast notifications.
-fn sanitize_error(msg: &str) -> String {
-    msg.replace("signature=", "signature=<REDACTED>")
-        .replace("apiKey=", "apiKey=<REDACTED>")
-        .replace("api_key=", "api_key=<REDACTED>")
-        .replace("secret=", "secret=<REDACTED>")
-        .replace("timestamp=", "timestamp=<REDACTED>")
-        .replace("recvWindow=", "recvWindow=<REDACTED>")
 }
 
 /// Decrypt data with an explicit key (for import where the current ENT key
@@ -38,48 +33,52 @@ fn sanitize_error(msg: &str) -> String {
 )]
 #[tauri::command]
 fn decrypt_with_key(data: String, key: String) -> Result<String, String> {
-    let temp_ent = track3::ent::Ent::new();
-    temp_ent.set_key(key).map_err(|e| format!("key error: {}", e))?;
-    match temp_ent.decrypt(data) {
+    match ENT.decrypt_with_key(data, &key) {
         Ok(decrypted) => Ok(decrypted),
         Err(e) => Err(format!("{}", e)),
     }
 }
 
-/// Encrypt data with an explicit key (for re-encrypting data during a key
-/// rotation from the frontend).
 #[cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
 #[tauri::command]
-fn encrypt_with_key(plaintext: String, key: String) -> Result<String, String> {
-    let temp_ent = track3::ent::Ent::new();
-    temp_ent.set_key(key).map_err(|e| format!("key error: {}", e))?;
-    match temp_ent.encrypt(plaintext) {
-        Ok(encrypted) => Ok(encrypted),
-        Err(e) => Err(format!("{}", e)),
-    }
+async fn rotate_encryption_key(
+    handle: tauri::AppHandle,
+    database_path: tauri::State<'_, DatabasePath>,
+    new_key: String,
+) -> Result<(), RotationCommandError> {
+    let app_dir = handle
+        .path()
+        .app_data_dir()
+        .map_err(|error| RotationCommandError::Failed {
+            message: format!("failed to resolve application data directory: {error}"),
+        })?;
+    let database_path = database_path.0.clone();
+    rotate_encryption_key_recoverably(&database_path, &app_dir, &ENT, new_key).await
 }
 
-/// Persist a new encryption key to disk and activate it immediately on the
-/// ENT instance.  The frontend is responsible for re-encrypting all stored
-/// data with the new key before calling this command.
 #[cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
 #[tauri::command]
-async fn persist_encryption_key(
-    handle: tauri::AppHandle,
-    key: String,
+async fn persist_refresh(
+    database_path: tauri::State<'_, DatabasePath>,
+    operation_uuid: String,
+    created_at: String,
+    assets: Vec<RefreshAssetInput>,
+    txns: Vec<RefreshTransactionInput>,
 ) -> Result<(), String> {
-    let app_dir = handle.path().app_data_dir().map_err(|e| format!("{}", e))?;
-    let key_path = app_dir.join(".ent-key");
-    std::fs::write(&key_path, &key).map_err(|e| format!("write .ent-key failed: {}", e))?;
-    // Activate the new key for the running session
-    ENT.change_key(key).map_err(|e| format!("change key failed: {}", e))?;
-    Ok(())
+    persist_refresh_atomically(
+        &database_path.0,
+        &operation_uuid,
+        &created_at,
+        &assets,
+        &txns,
+    )
+    .await
 }
 
 #[cfg_attr(
@@ -95,7 +94,7 @@ async fn query_binance_balance(
     let res = b.query_balance().await;
     match res {
         Ok(balances) => Ok(balances),
-        Err(e) => Err(sanitize_error(&e.to_string())),
+        Err(e) => Err(sanitize_upstream_error(&e.to_string())),
     }
 }
 
@@ -119,23 +118,8 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
     let res = client.query_coins_prices(symbols).await;
 
     match res {
-        Ok(prices) => {
-            // if all value in prices is 0, raise error
-            // fix issue: https://github.com/domechn/track3/issues/257
-            let mut is_all_zero = true;
-            for (_, v) in prices.iter() {
-                if *v != 0.0 {
-                    is_all_zero = false;
-                    break;
-                }
-            }
-
-            if is_all_zero {
-                return Err("get coin prices failed: all prices are 0".to_string());
-            }
-            return Ok(prices);
-        }
-        Err(e) => Err(sanitize_error(&e.to_string())),
+        Ok(prices) => validate_coin_prices(prices),
+        Err(e) => Err(sanitize_upstream_error(&e.to_string())),
     }
 }
 
@@ -161,7 +145,7 @@ async fn download_coins_logos(
 
     match res {
         Ok(_) => Ok(()),
-        Err(e) => Err(sanitize_error(&e.to_string())),
+        Err(e) => Err(sanitize_upstream_error(&e.to_string())),
     }
 }
 
@@ -191,6 +175,15 @@ fn decrypt(data: String) -> Result<String, String> {
     }
 }
 
+#[cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+#[tauri::command]
+fn get_database_url(database_path: tauri::State<'_, DatabasePath>) -> Result<String, String> {
+    sqlite_url(&database_path.0)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
@@ -206,73 +199,46 @@ fn main() {
         .setup(|app| {
             let app_version = app.package_info().version.to_string();
             let resource_path = app.path();
-            let resource_dir = resource_path.resource_dir().unwrap();
-            let app_dir = resource_path.app_data_dir().unwrap();
-            println!("app_dir: {:?}, resource_dir: {:?}", app_dir, resource_dir);
+            let resource_dir = resource_path.resource_dir()?;
+            let app_data_dir = resource_path.app_data_dir()?;
+            let app_config_dir = resource_path.app_config_dir()?;
+            let instance_lock =
+                acquire_app_instance_lock(&app_data_dir).map_err(io::Error::other)?;
+            app.manage(instance_lock);
+            let database_path = tauri::async_runtime::block_on(resolve_database_path(
+                &app_data_dir,
+                &app_config_dir,
+            ))
+            .map_err(io::Error::other)?;
+            tauri::async_runtime::block_on(initialize_database_if_needed(
+                &database_path,
+                &app_version,
+                &resource_dir,
+            ))
+            .map_err(io::Error::other)?;
+            app.manage(DatabasePath(database_path.clone()));
+            println!(
+                "database_path: {:?}, resource_dir: {:?}",
+                database_path, resource_dir
+            );
 
-            // Initialize encryption key.
-            // 1. If a user has set a custom key (persisted in .ent-key), use it.
-            // 2. Otherwise fall back to the deterministic legacy key so existing
-            //    encrypted data remains readable.
-            // The key is explicitly set here rather than relying on a silent
-            // fallback in Ent::get_key(), which addresses the security review
-            // finding.  OnceLock / Mutex ensures the key cannot be set twice
-            // through different paths.
-            let key_path = app_dir.join(".ent-key");
-            let enc_key = if key_path.exists() {
-                std::fs::read_to_string(&key_path)
-                    .unwrap_or_else(|_| "#t.3eis@hck,btr!a".to_string())
-                    .trim()
-                    .to_string()
-            } else {
-                "#t.3eis@hck,btr!a".to_string()
-            };
-            ENT.set_key(enc_key).expect("failed to set encryption key");
+            let key_path = app_data_dir.join(".ent-key");
+            let enc_key = load_encryption_key(&key_path).map_err(io::Error::other)?;
+            ENT.set_key(enc_key).map_err(io::Error::other)?;
 
-            if is_first_run(app_dir.as_path()) {
-                init_sqlite_file(app_dir.as_path());
-                init_sqlite_tables(
-                    app_version.clone(),
-                    app_dir.as_path(),
-                    resource_dir.as_path(),
-                );
-            }
-            let app_dir_str = app_dir.to_str().unwrap().to_string();
-            let resource_dir_str = resource_dir.to_str().unwrap().to_string();
+            tauri::async_runtime::block_on(recover_pending_rotation(
+                &database_path,
+                &app_data_dir,
+                &ENT,
+            ))
+            .map_err(io::Error::other)?;
 
-       let v1tv2 = V1TV2::new(app_dir_str.clone(), resource_dir_str.clone());
-       let v2tv3 = V2TV3::new(app_dir_str.clone(), resource_dir_str.clone());
-       let v3tv4 = V3TV4::new(app_dir_str.clone(), resource_dir_str.clone());
-       let v4tv5 = V4TV5::new(app_dir_str.clone(), resource_dir_str.clone());
-       let v6tv7 = V6TV7::new(app_dir_str.clone(), resource_dir_str.clone());
-        let v7tv8 = V7TV8::new(app_dir_str.clone(), resource_dir_str.clone());
-
-            let pv = load_previous_version(app_dir.as_path()).unwrap();
-            if v1tv2.need_to_run(&pv).unwrap() {
-                v1tv2.migrate();
-            }
-
-            if v2tv3.need_to_run(&pv).unwrap() {
-                v2tv3.migrate();
-            }
-
-            if v3tv4.need_to_run(&pv).unwrap() {
-                v3tv4.migrate();
-            }
-
-            if v4tv5.need_to_run(&pv).unwrap() {
-                v4tv5.migrate();
-            }
-
-       if v6tv7.need_to_run(&pv).unwrap() {
-           v6tv7.migrate();
-       }
-
-        if v7tv8.need_to_run(&pv).unwrap() {
-            v7tv8.migrate();
-        }
-
-            prepare_required_data(app_version.clone(), app_dir.as_path());
+            tauri::async_runtime::block_on(run_migrations(
+                &database_path,
+                &resource_dir,
+                &app_version,
+            ))
+            .map_err(io::Error::other)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -282,8 +248,9 @@ fn main() {
             decrypt,
             download_coins_logos,
             decrypt_with_key,
-            encrypt_with_key,
-            persist_encryption_key,
+            rotate_encryption_key,
+            persist_refresh,
+            get_database_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

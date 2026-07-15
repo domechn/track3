@@ -39,7 +39,7 @@ export class CexAnalyzer implements Analyzer {
     this.config = config;
 
     this.exchanges = (config.exchanges ?? [])
-      .map((exCfg) => {
+      .map((exCfg): Exchanger | undefined => {
         console.log("loading exchange", exCfg.name);
         if (exCfg.active === false) {
           console.log("exchange is not active, skip");
@@ -110,11 +110,12 @@ export class CexAnalyzer implements Analyzer {
               exCfg.alias,
             );
           default:
-            return new OtherCexExchanges(
+            new OtherCexExchanges(
               exCfg.name,
               exCfg.initParams,
               exCfg.alias,
             );
+            return;
         }
       })
       .filter((ex): ex is Exchanger => !!ex);
@@ -238,18 +239,22 @@ export function filterCoinsInPortfolio(
 }
 
 function coinSymbolHandler(name: string): string | undefined {
+  const normalizedName = name.trim().toUpperCase();
   const ld = "LD";
   // LD in binance is for earn in spot, we can skip it
-  if (name.startsWith(ld) && name.length > ld.length + 1) {
+  if (
+    normalizedName.startsWith(ld) &&
+    normalizedName.length > ld.length + 1
+  ) {
     return;
   }
   // for binance
-  if (name === "BETH" || name === "ETH2") {
+  if (normalizedName === "BETH" || normalizedName === "ETH2") {
     return "ETH";
   }
   // for bitget
-  if (name === "BGBTC") {
+  if (normalizedName === "BGBTC") {
     return "BTC";
   }
-  return name;
+  return normalizedName;
 }

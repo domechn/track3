@@ -103,6 +103,12 @@ const App = ({
         }
         setWalletAssetsChange(wac);
       })
+      .catch(() => {
+        if (!mounted || gen !== loadGenRef.current) {
+          return;
+        }
+        setWalletAssetsChange([]);
+      })
       .finally(() => {
         if (mounted) {
           reportLoaded();

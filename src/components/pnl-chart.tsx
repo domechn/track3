@@ -42,12 +42,12 @@ const App = ({
 
   useEffect(() => {
     let active = true;
-    void loadChartData(dateRange)
-      .then(() => {
-        if (active) {
-          resizeChartWithDelay(chartName);
-        }
-      });
+    void queryPNLChartValue(dateRange).then((data) => {
+      if (active) {
+        setPnlChartData(data);
+        resizeChartWithDelay(chartName);
+      }
+    });
 
     return () => {
       active = false;
@@ -55,11 +55,6 @@ const App = ({
   }, [rangeKey, dataChangedVersion]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
-
-  async function loadChartData(dr: TDateRange) {
-    const pd = await queryPNLChartValue(dr);
-    setPnlChartData(pd);
-  }
 
   const options = {
     maintainAspectRatio: false,

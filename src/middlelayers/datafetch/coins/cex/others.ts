@@ -1,36 +1,42 @@
 import { Exchanger } from './cex'
 
 export class OtherCexExchanges implements Exchanger {
+	private readonly exchangeName: string
+	private readonly apiKey: string
+	private readonly alias?: string
+
 	constructor(exchangeName: string, initParams: {
 		apiKey: string
 		secret: string
 		password?: string
 	}, alias?: string) {
+		this.exchangeName = exchangeName
+		this.apiKey = initParams.apiKey
+		this.alias = alias
 		console.warn(`[cex] Unknown exchange "${exchangeName}" — this exchange will be skipped. If "${exchangeName}" is a valid exchange, add its analyzer to the cex analyzer registry.`);
 	}
 
 	getExchangeName(): string {
-		throw new Error('Method not implemented.')
+		return this.exchangeName
 	}
 
 	getAlias(): string | undefined {
-		throw new Error('Method not implemented.')
+		return this.alias
 	}
 
 	getIdentity(): string {
-		throw new Error('Method not implemented.')
+		return `${this.exchangeName}-${this.apiKey}`
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		throw new Error('Method not implemented.')
+		return {}
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
-		throw new Error('Method not implemented.')
-
+		return {}
 	}
 
 	async verifyConfig(): Promise<boolean> {
-		throw new Error('Method not implemented.')
+		return false
 	}
 }
