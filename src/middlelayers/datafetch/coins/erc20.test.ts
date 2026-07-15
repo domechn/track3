@@ -57,13 +57,13 @@ describe("ERC20 analyzers", () => {
 
   it("matches out-of-order JSON-RPC results by id and converts wei", async () => {
     vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
-      if (url === "https://bscrpc.com") {
+      if (url === "https://bsc-dataseed.bnbchain.org") {
         return [
           { id: 1, jsonrpc: "2.0", result: "0x1bc16d674ec80000" },
           { id: 0, jsonrpc: "2.0", result: "0xde0b6b3a7640000" },
         ];
       }
-      if (url === "https://eth.public-rpc.com") {
+      if (url === "https://ethereum-rpc.publicnode.com") {
         return [
           { id: 1, jsonrpc: "2.0", result: "0x3782dace9d900000" },
           { id: 0, jsonrpc: "2.0", result: "0x29a2241af62c0000" },
@@ -110,7 +110,7 @@ describe("ERC20 analyzers", () => {
     ]);
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "POST",
-      "https://bscrpc.com",
+      "https://bsc-dataseed.bnbchain.org",
       5000,
       undefined,
       [
@@ -133,7 +133,10 @@ describe("ERC20 analyzers", () => {
   it("retries a rate-limited normal RPC batch", async () => {
     let bscAttempts = 0;
     vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
-      if (url === "https://bscrpc.com" && bscAttempts++ === 0) {
+      if (
+        url === "https://bsc-dataseed.bnbchain.org" &&
+        bscAttempts++ === 0
+      ) {
         throw new Error("429 Too Many Requests");
       }
       return [{ id: 0, jsonrpc: "2.0", result: "0xde0b6b3a7640000" }];

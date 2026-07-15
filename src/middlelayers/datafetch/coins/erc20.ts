@@ -22,9 +22,9 @@ class ERC20RPCQuery implements ERC20Querier {
   constructor(mainSymbol: "ETH" | "BNB") {
     this.mainSymbol = mainSymbol;
     if (mainSymbol === "ETH") {
-      this.queryUrl = "https://eth.public-rpc.com";
+      this.queryUrl = "https://ethereum-rpc.publicnode.com";
     } else {
-      this.queryUrl = "https://bscrpc.com";
+      this.queryUrl = "https://bsc-dataseed.bnbchain.org";
     }
   }
 
