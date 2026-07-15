@@ -223,7 +223,10 @@ const App = ({
         <TableCell className="py-1.5">
           <Link
             to={buildAssetDetailsPath(d)}
-            aria-label={`Open ${formatAssetLabel(d)} details`}
+            aria-label={t("common.openAssetDetails").replace(
+              "{asset}",
+              formatAssetLabel(d),
+            )}
             className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <img
@@ -251,7 +254,7 @@ const App = ({
             <div className="text-xs text-muted-foreground">
               {(d.percentage || 0) < 0 ? "" : "+"}
               {d.percentage === undefined
-                ? "∞"
+                ? t("common.infinity")
                 : prettyNumberKeepNDigitsAfterDecimalPoint(d.percentage, 2)}
               %
             </div>
@@ -268,8 +271,10 @@ const App = ({
             {t("profit.title")}
           </CardTitle>
           <div className="text-xs text-muted-foreground">
-            Total {coinsProfit.length} coins | Up {positiveCount} | Down{" "}
-            {negativeCount}
+            {t("profit.totalLabel")
+              .replace("{n}", String(coinsProfit.length))
+              .replace("{up}", String(positiveCount))
+              .replace("{down}", String(negativeCount))}
           </div>
         </div>
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -282,14 +287,14 @@ const App = ({
                 )}
             </div>
             <div className="text-xs text-muted-foreground">
-              Net PnL For Selected Range
+              {t("profit.netPnl")}
             </div>
           </div>
           <div
             className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${totalToneBadgeClass}`}
           >
             {profitPercentage === undefined
-              ? "∞"
+              ? t("common.infinity")
               : prettyNumberKeepNDigitsAfterDecimalPoint(profitPercentage, 2)}
             %
           </div>

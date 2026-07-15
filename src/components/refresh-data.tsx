@@ -4,6 +4,8 @@ import {
   type FailedPortfolioSource,
   type RefreshAllDataResult,
 } from "../middlelayers/charts";
+import type { RefreshOperation } from "../middlelayers/charts-refresh";
+import { v4 as uuidv4 } from "uuid";
 import { trackEventWithClientID } from "../utils/app";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "./ui/button";
@@ -67,8 +69,8 @@ const App = ({
     }
   };
 
-  function addProgress(p: number) {
-    setRefreshProgress((preP: number) => Math.min(preP + p, 100));
+  function setProgress(p: number) {
+    setRefreshProgress(Math.min(Math.max(p, 0), 100));
   }
 
   function clearProgress() {
@@ -78,6 +80,9 @@ const App = ({
   const runRefresh = (useLastKnownDataForFailedSources = false) => {
     setRefreshLoading(true);
     setFailureDialogOpen(false);
+    const operation: RefreshOperation = {
+      operationUuid: uuidv4(),
+    };
 
     let refreshError: Error | undefined;
     let refreshResult: RefreshAllDataResult | undefined;
@@ -86,18 +91,17 @@ const App = ({
       .catch(() => {
         // non-fatal: proceed with refresh even if rate update fails
       })
-      .then(() =>
-        retry(
-          async () => {
-            clearProgress();
-            return refreshAllData(addProgress, {
-              useLastKnownDataForFailedSources,
-            });
+      .then(() => {
+        clearProgress();
+        return refreshAllData(
+          setProgress,
+          {
+            useLastKnownDataForFailedSources,
           },
-          retries,
-          retryInterval,
-        ),
-      )
+          operation,
+          (attempt) => retry(attempt, retries, retryInterval),
+        );
+      })
       .then((result) => {
         refreshResult = result;
         if (!result.requiresDataSourceAction) {

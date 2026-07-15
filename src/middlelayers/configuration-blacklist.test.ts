@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { getDatabase, executeWrite } from "./database";
+import { getDatabase, executeWrite, executeWriteWork } from "./database";
 import {
   addToBlacklist,
   getBlacklistCoins,
+  getPortfolioInputGeneration,
   removeFromBlacklist,
   saveBlacklistCoins,
 } from "./configuration";
@@ -15,6 +16,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("./database", () => ({
   getDatabase: vi.fn(),
   executeWrite: vi.fn(),
+  executeWriteWork: vi.fn(),
 }));
 
 const blacklistConfigId = "995";
@@ -55,14 +57,20 @@ beforeEach(() => {
     const db = await getDatabase();
     return db.execute(sql, values);
   });
+  vi.mocked(executeWriteWork).mockImplementation(async (operation) =>
+    operation((await getDatabase()) as never),
+  );
 });
 
 describe("blacklist configuration", () => {
   it("normalizes saved symbols and removes duplicates", async () => {
+    const generation = getPortfolioInputGeneration();
+
     await saveBlacklistCoins(["btc", "", "ETH", "eth", "  sol  "]);
 
     expect(configurationRows.get(blacklistConfigId)).toBe("BTC,ETH,SOL");
     expect(invoke).not.toHaveBeenCalled();
+    expect(getPortfolioInputGeneration()).toBe(generation + 2);
   });
 
   it("returns normalized symbols from stored configuration", async () => {

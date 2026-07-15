@@ -85,88 +85,177 @@ function createHttpErrorMessage(
   return `Request failed (${requestMeta}) with status ${status}, detail: ${detail}`;
 }
 
+function createRequestErrorMessage(method: string, url: string): string {
+  return `Request failed (${method.toUpperCase()} ${getSafeEndpoint(url)})`;
+}
+
+function createTimeoutErrorMessage(
+  method: string,
+  url: string,
+  timeout: number,
+): string {
+  return `Request timed out (${method.toUpperCase()} ${getSafeEndpoint(url)}) after ${timeout}ms`;
+}
+
 export function getCurrentUA() {
   const userAgent = window.navigator.userAgent;
   return userAgent;
+}
+
+type RequestPayload = RequestInit & {
+  connectTimeout: number;
+};
+
+type RequestHeaders = Record<string, string | undefined>;
+
+function createRequestPayload(
+  method: string,
+  timeout: number,
+  signal: AbortSignal,
+  headers: RequestHeaders,
+  json: object,
+  formData: object,
+): RequestPayload {
+  const hs: { [k: string]: string } = {
+    "user-agent": getCurrentUA(),
+  };
+  Object.entries(headers).forEach(([key, value]) => {
+    if (value !== undefined) {
+      hs[key] = value;
+    }
+  });
+  if (Object.keys(json).length > 0) {
+    hs["content-type"] = "application/json";
+  }
+  const payload: RequestPayload = {
+    method,
+    headers: hs,
+    connectTimeout: timeout,
+    signal,
+  };
+  if (Object.keys(json).length > 0) {
+    payload.body = JSON.stringify(json);
+  }
+  if (Object.keys(formData).length > 0) {
+    const fd = new URLSearchParams();
+    (Object.entries(formData) as [string, string][]).forEach(([k, v]) => {
+      fd.append(k, v);
+    });
+    payload.body = fd;
+  }
+
+  return payload;
+}
+
+async function withTotalTimeout<T>(
+  method: string,
+  url: string,
+  timeout: number,
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(createTimeoutErrorMessage(method, url, timeout)));
+      controller.abort();
+    }, timeout);
+  });
+
+  try {
+    return await Promise.race([operation(controller.signal), timeoutPromise]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+async function performHttpRequest<T>(
+  method: string,
+  url: string,
+  timeout: number,
+  headers: RequestHeaders,
+  json: object,
+  formData: object,
+  readResponse: (response: Response) => Promise<T>,
+  readFailure: string,
+): Promise<T> {
+  return withTotalTimeout(method, url, timeout, async (signal) => {
+    let payload: RequestPayload;
+    try {
+      payload = createRequestPayload(
+        method,
+        timeout,
+        signal,
+        headers,
+        json,
+        formData,
+      );
+    } catch {
+      throw new Error(createRequestErrorMessage(method, url));
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url, payload);
+    } catch {
+      throw new Error(createRequestErrorMessage(method, url));
+    }
+
+    if (response.status > 299) {
+      const responseText = await response.text().catch(() => "");
+      throw new Error(
+        createHttpErrorMessage(method, url, response.status, responseText),
+      );
+    }
+
+    try {
+      return await readResponse(response);
+    } catch {
+      throw new Error(
+        `${createRequestErrorMessage(method, url)} ${readFailure}`,
+      );
+    }
+  });
 }
 
 export async function sendHttpRequest<T>(
   method: string,
   url: string,
   timeout = 5000,
-  headers = {},
-  json = {},
-  formData = {},
+  headers: RequestHeaders = {},
+  json: object = {},
+  formData: object = {},
 ): Promise<T> {
-  const hs: { [k: string]: string } = {
-    "user-agent": getCurrentUA(),
-    ...headers,
-  };
-  if (Object.keys(json).length > 0) {
-    hs["content-type"] = "application/json";
-  }
-  const payload: RequestInit = {
+  return performHttpRequest(
     method,
-    headers: hs,
-    connectTimeout: timeout,
-  } as any;
-  if (Object.keys(json).length > 0) {
-    payload.body = JSON.stringify(json);
-  }
-  if (Object.keys(formData).length > 0) {
-    const fd = new URLSearchParams();
-    (Object.entries(formData) as [string, string][]).forEach(([k, v]) => {
-      fd.append(k, v);
-    });
-    payload.body = fd;
-  }
-
-  const resp = await fetch(url, payload);
-  if (resp.status > 299) {
-    const responseText = await resp.text().catch(() => "");
-    throw new Error(
-      createHttpErrorMessage(method, url, resp.status, responseText),
-    );
-  }
-  return resp.json();
+    url,
+    timeout,
+    headers,
+    json,
+    formData,
+    (response) => response.json() as Promise<T>,
+    "while parsing JSON response",
+  );
 }
 
 export async function sendHttpTextRequest(
   method: string,
   url: string,
   timeout = 5000,
-  headers = {},
-  json = {},
-  formData = {},
+  headers: RequestHeaders = {},
+  json: object = {},
+  formData: object = {},
 ): Promise<string> {
-  const hs: { [k: string]: string } = {
-    "user-agent": getCurrentUA(),
-    ...headers,
-  };
-  if (Object.keys(json).length > 0) {
-    hs["content-type"] = "application/json";
-  }
-  const payload: RequestInit = {
+  return performHttpRequest(
     method,
-    headers: hs,
-    connectTimeout: timeout,
-  } as any;
-  if (Object.keys(json).length > 0) {
-    payload.body = JSON.stringify(json);
-  }
-  if (Object.keys(formData).length > 0) {
-    const fd = new URLSearchParams();
-    (Object.entries(formData) as [string, string][]).forEach(([k, v]) => {
-      fd.append(k, v);
-    });
-    payload.body = fd;
-  }
-
-  const resp = await fetch(url, payload);
-  if (resp.status > 299) {
-    throw new Error(
-      `Request failed with status ${resp.status}, message: ${await resp.text()}`,
-    );
-  }
-  return resp.text();
+    url,
+    timeout,
+    headers,
+    json,
+    formData,
+    (response) => response.text(),
+    "while reading text response",
+  );
 }

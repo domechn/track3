@@ -1,10 +1,25 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import App from "./index";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChartResizeContext } from "@/App";
 
-const summarySpy = vi.fn();
+const lazySummary = vi.hoisted(() => {
+  let shouldHold = false;
+  let releaseImport!: () => void;
+  const importGate = new Promise<void>((resolve) => {
+    releaseImport = resolve;
+  });
+  const importStarted = vi.fn();
+
+  return {
+    importStarted,
+    releaseImport,
+    startHolding: () => {
+      shouldHold = true;
+    },
+    waitIfHeld: () => (shouldHold ? importGate : Promise.resolve()),
+  };
+});
 
 vi.mock("../settings", () => ({
   default: () => <div>settings</div>,
@@ -66,16 +81,23 @@ vi.mock("@/components/system-info", () => ({
   default: () => <div>system info</div>,
 }));
 
-vi.mock("../summary", () => ({
-  default: ({ dateRange }: { dateRange: { start: Date; end: Date } }) => {
-    summarySpy(dateRange);
-    return (
-      <div data-testid="summary-range">
-        {dateRange.start.toISOString()}|{dateRange.end.toISOString()}
-      </div>
-    );
-  },
-}));
+vi.mock("../summary", async () => {
+  lazySummary.importStarted();
+  await lazySummary.waitIfHeld();
+  const { createElement } = await import("react");
+  return {
+    default: ({
+      dateRange,
+    }: {
+      dateRange: { start: Date; end: Date };
+    }) =>
+      createElement(
+        "div",
+        { "data-testid": "summary-range" },
+        `${dateRange.start.toISOString()}|${dateRange.end.toISOString()}`,
+      ),
+  };
+});
 
 vi.mock("@/middlelayers/charts", () => ({
   getAvailableDates: vi.fn(),
@@ -96,6 +118,7 @@ vi.mock("@/middlelayers/data", () => ({
 }));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
+  invalidateCacheGroups: vi.fn(),
   getLocalStorageCacheInstance: vi.fn().mockReturnValue({ clearCache: vi.fn() }),
   getMemoryCacheInstance: vi.fn().mockReturnValue({ clearCache: vi.fn() }),
 }));
@@ -113,8 +136,13 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 
+let App: typeof import("./index").default;
+
+beforeAll(async () => {
+  App = (await import("./index")).default;
+});
+
 beforeEach(() => {
-  summarySpy.mockClear();
   window.location.hash = "#/summary";
 
   vi.mocked(queryLastRefreshAt).mockResolvedValue("2024-04-13T00:00:00.000Z");
@@ -150,6 +178,31 @@ beforeEach(() => {
 });
 
 describe("Summary route date range", () => {
+  it("shows a localized fallback while the summary route import is pending", async () => {
+    expect(lazySummary.importStarted).not.toHaveBeenCalled();
+    lazySummary.startHolding();
+    render(
+      <ChartResizeContext.Provider
+        value={{
+          needResize: 0,
+          setNeedResize: vi.fn() as React.Dispatch<
+            React.SetStateAction<number>
+          >,
+        }}
+      >
+        <App />
+      </ChartResizeContext.Provider>,
+    );
+
+    try {
+      expect(await screen.findByText("Loading page")).toBeInTheDocument();
+      expect(screen.getByText("Preparing this view.")).toBeInTheDocument();
+    } finally {
+      lazySummary.releaseImport();
+    }
+    expect(await screen.findByTestId("summary-range")).toBeInTheDocument();
+  });
+
   it("shows an app loading overlay while startup data is still being prepared", async () => {
     vi.mocked(queryPreferCurrency).mockImplementation(
       () => new Promise(() => {})
@@ -166,8 +219,12 @@ describe("Summary route date range", () => {
       </ChartResizeContext.Provider>
     );
 
-    expect(screen.getByRole("status")).toHaveTextContent(/loading portfolio data/i);
-    expect(screen.getByRole("status")).toHaveTextContent(/preparing your latest balances/i);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /loading portfolio data/i,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /preparing your latest balances/i,
+    );
   });
 
   it("passes the full available range to the summary page instead of the selected date range", async () => {

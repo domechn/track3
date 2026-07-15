@@ -6,7 +6,9 @@ import { getClientID } from "@/utils/app";
 import { PRO_API_ENDPOINT } from "@/middlelayers/configuration";
 
 type QueryAssetResp = {
+  id: number;
   result: string;
+  error?: unknown;
 };
 
 interface ERC20Querier {
@@ -20,9 +22,9 @@ class ERC20RPCQuery implements ERC20Querier {
   constructor(mainSymbol: "ETH" | "BNB") {
     this.mainSymbol = mainSymbol;
     if (mainSymbol === "ETH") {
-      this.queryUrl = "https://eth.public-rpc.com";
+      this.queryUrl = "https://ethereum-rpc.publicnode.com";
     } else {
-      this.queryUrl = "https://bscrpc.com";
+      this.queryUrl = "https://bsc-dataseed.bnbchain.org";
     }
   }
 
@@ -63,13 +65,33 @@ class ERC20RPCQuery implements ERC20Querier {
       );
     }
 
-    return results.map((r, idx) => ({
-      wallet: addresses[idx],
-      symbol: this.mainSymbol,
-      assetType: "crypto" as const,
-      amount: parseInt(r.result) / 1e18,
-      chain: this.getChain(),
-    }));
+    const resultsById = new Map<number, QueryAssetResp>();
+    results.forEach((result) => {
+      if (
+        !Number.isInteger(result.id) ||
+        result.id < 0 ||
+        result.id >= addresses.length ||
+        resultsById.has(result.id) ||
+        result.error !== undefined
+      ) {
+        throw new Error("failed to query erc20 assets");
+      }
+      resultsById.set(result.id, result);
+    });
+
+    return addresses.map((wallet, id) => {
+      const result = resultsById.get(id);
+      if (!result || typeof result.result !== "string") {
+        throw new Error("failed to query erc20 assets");
+      }
+      return {
+        wallet,
+        symbol: this.mainSymbol,
+        assetType: "crypto" as const,
+        amount: parseInt(result.result) / 1e18,
+        chain: this.getChain(),
+      };
+    });
   }
 }
 

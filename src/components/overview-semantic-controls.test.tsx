@@ -7,6 +7,7 @@ import Profit from "@/components/profit";
 import LatestAssetsPercentage from "@/components/latest-assets-percentage";
 import { ChartResizeContext } from "@/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 
 vi.mock("react-chartjs-2", async () => {
   const React = await import("react");
@@ -73,6 +74,7 @@ function renderWithProviders(node: React.ReactNode) {
 }
 
 beforeEach(() => {
+  localStorage.removeItem(localeLocalStorageKey);
   vi.mocked(queryTotalValue).mockResolvedValue({ totalValue: 1250 });
   vi.mocked(queryAssetChange).mockResolvedValue({
     timestamps: [1713158400, 1713244800],
@@ -261,5 +263,38 @@ describe("Overview semantic controls", () => {
       name: /open btc details/i,
     });
     expect(btcLink).toHaveAttribute("href", "/coins/BTC?assetType=crypto");
+  });
+
+  it("localizes profit copy and asset detail links with the Chinese provider", async () => {
+    localStorage.setItem(localeLocalStorageKey, "zh");
+    renderWithProviders(
+      <I18nProvider>
+        <div>
+          <Profit
+            currency={usdCurrency}
+            dateRange={{
+              start: new Date("2024-04-15"),
+              end: new Date("2024-04-16"),
+            }}
+            quoteColor="green-up-red-down"
+          />
+          <LatestAssetsPercentage
+            currency={usdCurrency}
+            dateRange={{
+              start: new Date("2024-04-15"),
+              end: new Date("2024-04-16"),
+            }}
+          />
+        </div>
+      </I18nProvider>,
+    );
+
+    expect(
+      await screen.findByText("共 10 个币种 | 上涨 5 | 下跌 5"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("所选区间净盈亏")).toBeInTheDocument();
+    expect(
+      await screen.findAllByRole("link", { name: "打开 BTC 详情" }),
+    ).toHaveLength(2);
   });
 });

@@ -75,9 +75,10 @@ const App = ({
 
   useEffect(() => {
     let active = true;
-    void loadData(dateRange)
-      .then(() => {
+    void queryLatestAssetsPercentage(dateRange)
+      .then((data) => {
         if (active) {
+          setLatestAssetsPercentageData(data);
           resizeChartWithDelay(chartName);
         }
       })
@@ -95,6 +96,8 @@ const App = ({
   useEffect(() => resizeChart(chartName), [needResize]);
 
   useEffect(() => {
+    let active = true;
+
     // download coin logos
     downloadCoinLogos(
       latestAssetsPercentageData
@@ -106,13 +109,16 @@ const App = ({
     );
 
     // set logo map
-    getLogoMap(latestAssetsPercentageData).then((m) => setLogoMap(m));
-  }, [latestAssetsPercentageData]);
+    void getLogoMap(latestAssetsPercentageData).then((map) => {
+      if (active) {
+        setLogoMap(map);
+      }
+    });
 
-  async function loadData(dr: TDateRange) {
-    const lap = await queryLatestAssetsPercentage(dr);
-    setLatestAssetsPercentageData(lap);
-  }
+    return () => {
+      active = false;
+    };
+  }, [latestAssetsPercentageData]);
 
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
@@ -278,7 +284,13 @@ const App = ({
                       symbol: d.coin,
                       assetType: d.assetType,
                     })}
-                    aria-label={`Open ${formatAssetLabel({ symbol: d.coin, assetType: d.assetType })} details`}
+                    aria-label={t("common.openAssetDetails").replace(
+                      "{asset}",
+                      formatAssetLabel({
+                        symbol: d.coin,
+                        assetType: d.assetType,
+                      }),
+                    )}
                     className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <img

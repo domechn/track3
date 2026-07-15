@@ -187,23 +187,27 @@ export class WalletAnalyzer {
 
   public async queryWalletAssetsChange(): Promise<WalletAssetsChangeData> {
     const assets = await this.queryAssets(2);
-    const latestAssets = assets[0];
-    const previousAssets = assets[1];
+    const currentAssets = assets[0] ?? [];
+    const previousAssets = assets[1] ?? [];
 
-    const latestWalletAssets = Object.fromEntries(
-      this.loadWalletTotalAssetsValue(latestAssets).map((wa) => [wa.wallet, wa.total]),
+    if (currentAssets.length === 0 && previousAssets.length === 0) {
+      return [];
+    }
+
+    const currentWalletAssets = Object.fromEntries(
+      this.loadWalletTotalAssetsValue(currentAssets).map((wa) => [wa.wallet, wa.total]),
     );
     const previousWalletAssets = Object.fromEntries(
       this.loadWalletTotalAssetsValue(previousAssets).map((wa) => [wa.wallet, wa.total]),
     );
 
     const walletAliases = await this.listWalletAliases(
-      Object.keys(latestWalletAssets),
+      Object.keys(currentWalletAssets),
     );
     const res: WalletAssetsChangeData = [];
     // calculate change
-    Object.keys(latestWalletAssets).forEach((wallet) => {
-        const latest = latestWalletAssets[wallet];
+    Object.keys(currentWalletAssets).forEach((wallet) => {
+        const latest = currentWalletAssets[wallet];
         const previous = previousWalletAssets[wallet];
 
         if (!previous) {

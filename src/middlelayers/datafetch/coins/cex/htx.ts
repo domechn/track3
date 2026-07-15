@@ -307,7 +307,8 @@ export class HtxExchange implements Exchanger {
 		return Object.fromEntries(
 			resp.data
 				.filter((p) => p.symbol.endsWith(suffix))
-				.map((p) => [p.symbol.slice(0, -suffix.length).toUpperCase(), p.close]),
+				.map((p) => [p.symbol.slice(0, -suffix.length).toUpperCase(), p.close] as const)
+				.filter(([, price]) => Number.isFinite(price) && price > 0),
 		)
 	}
 

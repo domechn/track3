@@ -1,6 +1,28 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshAssetInput {
+    pub asset_type: String,
+    pub wallet: String,
+    pub symbol: String,
+    pub amount: f64,
+    pub value: f64,
+    pub price: f64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshTransactionInput {
+    pub asset_type: String,
+    pub wallet: String,
+    pub symbol: String,
+    pub amount: f64,
+    pub price: f64,
+    pub txn_type: String,
+}
+
 pub struct Addresses {
     pub addresses: Vec<String>,
 }

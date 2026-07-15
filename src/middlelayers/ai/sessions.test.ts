@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AIConfig } from "@/middlelayers/types";
+import {
+  resetEncryptionWriteGateForTests,
+  runEncryptionKeyRotation,
+  runWithEncryptionWriteGate,
+} from "@/middlelayers/encryption-write-gate";
 
 const mocks = vi.hoisted(() => {
   const dbState = {
@@ -104,6 +109,7 @@ vi.mock("uuid", () => ({
 const fsFileMap = new Map<string, string>();
 
 beforeEach(() => {
+  resetEncryptionWriteGateForTests();
   mocks.dbState.rows.length = 0;
   fsFileMap.clear();
   mocks.invoke.mockReset();
@@ -358,6 +364,97 @@ describe("chat sessions middlelayer", () => {
     const decrypted = String(payload).slice(4);
     const parsed = JSON.parse(decrypted);
     expect(parsed.messages).toEqual([{ role: "user", content: "first" }]);
+  });
+
+  it("drains an active session write before rotation and delays late encryption until activation", async () => {
+    const sessions = await import("./sessions");
+    const events: string[] = [];
+    let activeKey = "old";
+    let releaseFirstWrite: (() => void) | undefined;
+    let firstWriteStarted: (() => void) | undefined;
+    const firstWriteBlocked = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    const firstWriteReady = new Promise<void>((resolve) => {
+      firstWriteStarted = resolve;
+    });
+
+    mocks.exists.mockResolvedValue(false);
+    mocks.invoke.mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === "encrypt") {
+        const content = JSON.parse(String(args.data)).messages[0].content;
+        events.push(`encrypt:${content}:${activeKey}`);
+        return `enc:${activeKey}:${args.data}`;
+      }
+      throw new Error(`unexpected command: ${cmd}`);
+    });
+    mocks.writeTextFile.mockImplementation(async (path: string, data: string) => {
+      const content = JSON.parse(
+        data.replace(/^enc:(old|new):/, ""),
+      ).messages[0].content;
+      events.push(`write:${content}:${path.endsWith(".tmp") ? "temp" : "main"}`);
+      if (content === "first" && path.endsWith(".tmp")) {
+        firstWriteStarted?.();
+        await firstWriteBlocked;
+      }
+      fsFileMap.set(path, data);
+    });
+
+    const first = sessions.appendMessages("uuid-1", [
+      { role: "user", content: "first" },
+    ]);
+    await firstWriteReady;
+
+    const rotation = runWithEncryptionWriteGate(async () => {
+      events.push("rotation");
+      activeKey = "new";
+    });
+    const late = sessions.appendMessages("uuid-2", [
+      { role: "user", content: "late" },
+    ]);
+
+    await Promise.resolve();
+    expect(events).toEqual([
+      "encrypt:first:old",
+      "write:first:temp",
+    ]);
+
+    releaseFirstWrite?.();
+    await Promise.all([first, rotation, late]);
+    expect(events).toEqual([
+      "encrypt:first:old",
+      "write:first:temp",
+      "write:first:main",
+      "rotation",
+      "encrypt:late:new",
+      "write:late:temp",
+      "write:late:main",
+    ]);
+  });
+
+  it("rejects queued and future session writes when recovery is required", async () => {
+    const sessions = await import("./sessions");
+    const rotation = runEncryptionKeyRotation(async () => {
+      throw { code: "recovery_required", message: "Restart Track3" };
+    });
+    const queued = sessions.appendMessages("uuid-1", [
+      { role: "user", content: "queued" },
+    ]);
+
+    await expect(rotation).rejects.toMatchObject({
+      code: "recovery_required",
+    });
+    await expect(queued).rejects.toThrow("Restart Track3");
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.writeTextFile).not.toHaveBeenCalled();
+
+    await expect(
+      sessions.appendMessages("uuid-2", [
+        { role: "user", content: "future" },
+      ]),
+    ).rejects.toThrow("Restart Track3");
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.writeTextFile).not.toHaveBeenCalled();
   });
 
   it("generateTitle returns a 2-6 word title from the LLM response", async () => {

@@ -11,7 +11,6 @@ import { CexAnalyzer } from "./datafetch/coins/cex/cex";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { AddProgressFunc, AssetModel, UserLicenseInfo } from "./types";
 import { ASSET_HANDLER } from "./entities/assets";
-import { addMD5PrefixToWallet, isSameWallet } from "../lib/utils";
 import { TRC20ProUserAnalyzer } from "./datafetch/coins/trc20";
 import { DATA_MANAGER, ExportData } from "./datamanager";
 import {
@@ -34,6 +33,20 @@ import {
 } from "./datafetch/coins/stable";
 import { SUIAnalyzer } from "./datafetch/coins/sui";
 import { StockAnalyzer } from "./datafetch/coins/stock/stock-analyzer";
+import { getAddressList } from "./datafetch/utils/address";
+import {
+  mergePortfoliosWithBaseline,
+  type FailedPortfolioSource,
+  type LoadPortfoliosOptions,
+  type LoadPortfoliosResult,
+} from "./portfolio-baseline";
+
+export {
+  mergePortfoliosWithBaseline,
+  type FailedPortfolioSource,
+  type LoadPortfoliosOptions,
+  type LoadPortfoliosResult,
+} from "./portfolio-baseline";
 
 export async function queryStableCoins(): Promise<string[]> {
   try {
@@ -67,59 +80,11 @@ export async function downloadCoinLogos(
   return invoke("download_coins_logos", { coins });
 }
 
-export type FailedPortfolioSource = {
-  analyzerName: string;
-  walletIdentities: string[];
-  error: string;
-};
-
-export type LoadPortfoliosOptions = {
-  useLastKnownDataForFailedSources?: boolean;
-};
-
-export type LoadPortfoliosResult = {
-  coins: WalletCoin[];
-  failedSources: FailedPortfolioSource[];
-};
-
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
   return String(error);
-}
-
-function getFailedWalletIdentities(
-  failedSources: FailedPortfolioSource[],
-): string[] {
-  return Array.from(
-    new Set(failedSources.flatMap((source) => source.walletIdentities)),
-  );
-}
-
-function isFailedWallet(
-  wallet: string | undefined,
-  failedWalletIdentities: string[],
-): boolean {
-  if (!wallet) {
-    return false;
-  }
-  return failedWalletIdentities.some((identity) =>
-    isSameWallet(identity, wallet),
-  );
-}
-
-function assetModelToLastKnownWalletCoin(asset: AssetModel): WalletCoin {
-  return {
-    symbol: asset.symbol,
-    assetType: getAssetType(asset),
-    amount: asset.amount,
-    price: {
-      base: "usd",
-      value: asset.price,
-    },
-    wallet: addMD5PrefixToWallet(asset.wallet || ""),
-  };
 }
 
 export async function loadPortfolios(
@@ -130,68 +95,60 @@ export async function loadPortfolios(
   options: LoadPortfoliosOptions = {},
 ): Promise<LoadPortfoliosResult> {
   // all coins currently owned ( amount > 0 )
-  const { coins: currentCoins, failedSources } = await loadPortfoliosByConfig(
-    config,
-    addProgress,
-    userInfo,
-  );
+  const portfolioResult = await fetchPortfolios(config, addProgress, userInfo);
+  return mergePortfoliosWithBaseline(portfolioResult, lastAssets, options);
+}
 
-  if (failedSources.length > 0 && !options.useLastKnownDataForFailedSources) {
-    return {
-      coins: currentCoins,
-      failedSources,
-    };
+function uniqueIdentities(identities: string[]): string[] {
+  return Array.from(new Set(identities));
+}
+
+export function resolveFailedAnalyzerWalletIdentities(
+  analyzer: Analyzer,
+  config: GlobalConfig,
+): string[] {
+  if (analyzer.getWalletIdentities) {
+    return uniqueIdentities(analyzer.getWalletIdentities());
   }
 
-  const failedWalletIdentities = getFailedWalletIdentities(failedSources);
-  const lastKnownCoins = options.useLastKnownDataForFailedSources
-    ? lastAssets
-        .flat()
-        .filter((asset) => isFailedWallet(asset.wallet, failedWalletIdentities))
-        .map(assetModelToLastKnownWalletCoin)
-    : [];
-  const currentCoinsWithFallback = [...currentCoins, ...lastKnownCoins];
-
-  // need to list coins owned before but not now ( amount = 0 )
-  const beforeCoins: WalletCoin[] = lastAssets
-    .flat()
-    .map((s) => {
-      if (isFailedWallet(s.wallet, failedWalletIdentities)) {
-        return null;
-      }
-
-      const found = currentCoinsWithFallback.find(
-        (c) =>
-          c.symbol === s.symbol &&
-          getAssetType(c) === getAssetType(s) &&
-          isSameWallet(c.wallet, s.wallet ?? ""),
-      );
-      if (found) {
-        // todo check price
-        return null;
-      }
-      return {
-        symbol: s.symbol,
-        assetType: getAssetType(s),
-        price: currentCoinsWithFallback.find((c) => c.symbol === s.symbol)
-          ?.price ?? {
-          base: "usd",
-          value: s.price,
-        },
-        amount: 0,
-        value: 0,
-        wallet: addMD5PrefixToWallet(s.wallet || ""),
-      } as WalletCoin | null;
-    })
-    .filter((c): c is WalletCoin => c !== null);
-  return {
-    coins: [...currentCoinsWithFallback, ...beforeCoins],
-    failedSources,
+  const sourceMetadata = analyzer as Analyzer & {
+    listExchangeIdentities?: () => { identity: string }[];
   };
+  if (sourceMetadata.listExchangeIdentities) {
+    return uniqueIdentities(
+      sourceMetadata.listExchangeIdentities().map(({ identity }) => identity),
+    );
+  }
+
+  if (analyzer instanceof ERC20NormalAnalyzer) {
+    return getAddressList(config.erc20);
+  }
+  if (analyzer instanceof BTCAnalyzer) {
+    return getAddressList(config.btc);
+  }
+  if (analyzer instanceof SOLAnalyzer) {
+    return getAddressList(config.sol);
+  }
+  if (analyzer instanceof DOGEAnalyzer) {
+    return getAddressList(config.doge);
+  }
+  if (analyzer instanceof TRC20ProUserAnalyzer) {
+    return getAddressList(config.trc20);
+  }
+  if (analyzer instanceof TonAnalyzer) {
+    return getAddressList(config.ton);
+  }
+  if (analyzer instanceof SUIAnalyzer) {
+    return getAddressList(config.sui);
+  }
+
+  throw new Error(
+    `Cannot determine wallet identities for failed analyzer ${analyzer.getAnalyzeName()}`,
+  );
 }
 
 // progress percent is 70
-async function loadPortfoliosByConfig(
+export async function fetchPortfolios(
   config: GlobalConfig,
   addProgress: AddProgressFunc,
   userInfo: UserLicenseInfo,
@@ -243,9 +200,13 @@ async function loadPortfoliosByConfig(
         return portfolio;
       } catch (e) {
         console.error("failed to load portfolio from ", anaName, e);
+        const walletIdentities = resolveFailedAnalyzerWalletIdentities(
+          a,
+          config,
+        );
         failedSources.push({
           analyzerName: anaName,
-          walletIdentities: a.getWalletIdentities?.() ?? [],
+          walletIdentities,
           error: getErrorMessage(e),
         });
         addProgress(perProgressPer);

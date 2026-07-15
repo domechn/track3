@@ -1,9 +1,10 @@
 import React from "react";
-import { render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import TotalValue from "@/components/total-value-and-change";
 import LatestAssetsPercentage from "@/components/latest-assets-percentage";
+import PNLChart from "@/components/pnl-chart";
 import AthValue from "@/components/ath-value";
 import CoinAnalysis from "@/components/coin-analytics";
 import { ChartResizeContext } from "@/App";
@@ -13,6 +14,16 @@ vi.mock("react-chartjs-2", async () => {
   const React = await import("react");
   return {
     Line: () => <div data-testid="line-chart" />,
+    Bar: ({
+      data,
+    }: {
+      data: { datasets: { data: (number | undefined)[] }[] };
+    }) => (
+      <div
+        data-testid="bar-chart"
+        data-values={JSON.stringify(data.datasets.map(({ data }) => data))}
+      />
+    ),
     Doughnut: React.forwardRef<HTMLDivElement>((_props, _ref) => (
       <div data-testid="doughnut-chart" />
     )),
@@ -86,8 +97,10 @@ vi.mock("@/middlelayers/charts", () => ({
   updateTransactionPrice: vi.fn(),
   updateTransactionTxnType: vi.fn(),
   queryMaxTotalValue: vi.fn(),
+  queryPNLChartValue: vi.fn(),
 }));
 
+import { getImageApiPath } from "@/utils/app";
 import {
   calculateTotalProfit,
   listAllowedSymbols,
@@ -96,6 +109,7 @@ import {
   queryLastAssetsBySymbol,
   queryLatestAssetsPercentage,
   queryMaxTotalValue,
+  queryPNLChartValue,
   queryTotalValue,
   queryTransactionsBySymbolAndDateRange,
 } from "@/middlelayers/charts";
@@ -145,6 +159,16 @@ function renderCoinAnalysis(dateRange: { start: Date; end: Date }) {
       </OverviewLoadingContext.Provider>
     </MemoryRouter>,
   );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 beforeEach(() => {
@@ -222,9 +246,216 @@ beforeEach(() => {
     price: 1100,
   });
   vi.mocked(queryAssetMaxAmountBySymbol).mockResolvedValue(2);
+  vi.mocked(queryPNLChartValue).mockResolvedValue([]);
 });
 
 describe("Range-sensitive component queries", () => {
+  it("does not let an older PNL range overwrite the latest chart data", async () => {
+    const requestA = deferred<
+      { totalValue: number; timestamp: number }[]
+    >();
+    const requestB = deferred<
+      { totalValue: number; timestamp: number }[]
+    >();
+    vi.mocked(queryPNLChartValue).mockImplementation((dateRange) =>
+      dateRange.end.getTime() === rangeA.end.getTime()
+        ? requestA.promise
+        : requestB.promise,
+    );
+
+    const view = renderWithOverviewProviders(
+      <PNLChart
+        currency={usdCurrency}
+        dateRange={rangeA}
+        quoteColor="green-up-red-down"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryPNLChartValue).toHaveBeenCalledWith(rangeA);
+    });
+
+    view.rerender(
+      <MemoryRouter>
+        <ChartResizeContext.Provider
+          value={{
+            needResize: 0,
+            setNeedResize: vi.fn() as React.Dispatch<
+              React.SetStateAction<number>
+            >,
+          }}
+        >
+          <OverviewLoadingContext.Provider value={{ reportLoaded }}>
+            <PNLChart
+              currency={usdCurrency}
+              dateRange={rangeB}
+              quoteColor="green-up-red-down"
+            />
+          </OverviewLoadingContext.Provider>
+        </ChartResizeContext.Provider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(queryPNLChartValue).toHaveBeenLastCalledWith(rangeB);
+    });
+
+    await act(async () => {
+      requestB.resolve([
+        { totalValue: 1000, timestamp: rangeB.start.getTime() },
+        { totalValue: 1200, timestamp: rangeB.end.getTime() },
+      ]);
+      await requestB.promise;
+    });
+    expect(screen.getByTestId("bar-chart")).toHaveAttribute(
+      "data-values",
+      "[[200],[null]]",
+    );
+
+    await act(async () => {
+      requestA.resolve([
+        { totalValue: 1000, timestamp: rangeA.start.getTime() },
+        { totalValue: 1050, timestamp: rangeA.end.getTime() },
+      ]);
+      await requestA.promise;
+    });
+    expect(screen.getByTestId("bar-chart")).toHaveAttribute(
+      "data-values",
+      "[[200],[null]]",
+    );
+  });
+
+  it("does not let older token holdings overwrite the latest range", async () => {
+    const requestA = deferred<
+      Awaited<ReturnType<typeof queryLatestAssetsPercentage>>
+    >();
+    const requestB = deferred<
+      Awaited<ReturnType<typeof queryLatestAssetsPercentage>>
+    >();
+    vi.mocked(queryLatestAssetsPercentage).mockImplementation((dateRange) =>
+      dateRange?.end.getTime() === rangeA.end.getTime()
+        ? requestA.promise
+        : requestB.promise,
+    );
+
+    const view = renderWithOverviewProviders(
+      <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeA} />,
+    );
+    await waitFor(() => {
+      expect(queryLatestAssetsPercentage).toHaveBeenCalledWith(rangeA);
+    });
+
+    view.rerender(
+      <MemoryRouter>
+        <ChartResizeContext.Provider
+          value={{
+            needResize: 0,
+            setNeedResize: vi.fn() as React.Dispatch<
+              React.SetStateAction<number>
+            >,
+          }}
+        >
+          <OverviewLoadingContext.Provider value={{ reportLoaded }}>
+            <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeB} />
+          </OverviewLoadingContext.Provider>
+        </ChartResizeContext.Provider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(queryLatestAssetsPercentage).toHaveBeenLastCalledWith(rangeB);
+    });
+
+    await act(async () => {
+      requestB.resolve([
+        {
+          coin: "ETH",
+          assetType: "crypto",
+          amount: 2,
+          value: 2200,
+          percentage: 100,
+          chartColor: "#3b82f6",
+        },
+      ]);
+      await requestB.promise;
+    });
+    expect(await screen.findByText("ETH")).toBeInTheDocument();
+
+    await act(async () => {
+      requestA.resolve([
+        {
+          coin: "BTC",
+          assetType: "crypto",
+          amount: 1,
+          value: 1100,
+          percentage: 100,
+          chartColor: "#f59e0b",
+        },
+      ]);
+      await requestA.promise;
+    });
+    expect(screen.getByText("ETH")).toBeInTheDocument();
+    expect(screen.queryByText("BTC")).not.toBeInTheDocument();
+  });
+
+  it("does not let an older logo lookup replace the latest logo map", async () => {
+    const logoA = deferred<string>();
+    const logoB = deferred<string>();
+    vi.mocked(getImageApiPath).mockImplementation((_dir, symbol) =>
+      symbol === "BTC" ? logoA.promise : logoB.promise,
+    );
+
+    const view = renderWithOverviewProviders(
+      <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeA} />,
+    );
+    await waitFor(() => {
+      expect(getImageApiPath).toHaveBeenCalledWith(
+        "/tmp/track3-cache",
+        "BTC",
+      );
+    });
+
+    view.rerender(
+      <MemoryRouter>
+        <ChartResizeContext.Provider
+          value={{
+            needResize: 0,
+            setNeedResize: vi.fn() as React.Dispatch<
+              React.SetStateAction<number>
+            >,
+          }}
+        >
+          <OverviewLoadingContext.Provider value={{ reportLoaded }}>
+            <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeB} />
+          </OverviewLoadingContext.Provider>
+        </ChartResizeContext.Provider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(getImageApiPath).toHaveBeenCalledWith(
+        "/tmp/track3-cache",
+        "ETH",
+      );
+    });
+
+    await act(async () => {
+      logoB.resolve("/logos/ETH.png");
+      await logoB.promise;
+    });
+    expect(screen.getByAltText("ETH")).toHaveAttribute(
+      "src",
+      "/logos/ETH.png",
+    );
+
+    await act(async () => {
+      logoA.resolve("/logos/BTC.png");
+      await logoA.promise;
+    });
+    expect(screen.getByAltText("ETH")).toHaveAttribute(
+      "src",
+      "/logos/ETH.png",
+    );
+  });
+
   it("passes the selected range to total value queries when the overview range changes", async () => {
     const view = renderWithOverviewProviders(
       <TotalValue

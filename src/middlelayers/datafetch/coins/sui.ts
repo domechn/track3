@@ -31,7 +31,10 @@ export class SUIAnalyzer implements Analyzer {
   private async query(address: string): Promise<WalletCoin[]> {
     const positions = await Promise.all([
       this.queryHolding(this.endpoint, address),
-      this.queryDefiPositions(this.endpoint, address),
+      this.queryDefiPositions(this.endpoint, address).catch((error) => {
+        console.error("Failed to query SUI DeFi positions", error);
+        return [];
+      }),
     ]);
     return positions.flat().map((p) => ({
       symbol: p.symbol,

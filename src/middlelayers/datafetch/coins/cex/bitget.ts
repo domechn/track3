@@ -96,7 +96,8 @@ export class BitgetExchange implements Exchanger {
 		return Object.fromEntries(
 			allTickers.data
 				.filter((t) => t.symbol.endsWith("USDT"))
-				.map((t) => [t.symbol.replace("USDT", ""), this.parseFloat(t.lastPr)]),
+				.map((t) => [t.symbol.replace("USDT", "").toUpperCase(), this.parseFloat(t.lastPr)] as const)
+				.filter(([, price]) => price > 0),
 		)
 	}
 
@@ -104,9 +105,15 @@ export class BitgetExchange implements Exchanger {
 		const path = "/api/v2/spot/account/assets"
 		const resp = await this.fetch<{ data: SpotAccountResp }>("GET", path)
 
-		return Object.fromEntries(
-			resp.data.map((v) => [v.coin, this.parseFloat(v.available) + this.parseFloat(v.locked) + this.parseFloat(v.frozen)]),
-		)
+		const balances: { [k: string]: number } = {}
+		resp.data.forEach((v) => {
+			addToBalanceMap(
+				balances,
+				v.coin,
+				this.parseFloat(v.available) + this.parseFloat(v.locked) + this.parseFloat(v.frozen),
+			)
+		})
+		return balances
 	}
 
 	private async fetchFutureBalance(): Promise<{ [k: string]: number }> {
@@ -120,9 +127,15 @@ export class BitgetExchange implements Exchanger {
 				{ productType, marginCoin }
 			)
 
-			return Object.fromEntries(
-				resp.data.map((v) => [v.marginCoin, this.parseFloat(v.locked) + this.parseFloat(v.available)]),
-			)
+			const balances: { [k: string]: number } = {}
+			resp.data.forEach((v) => {
+				addToBalanceMap(
+					balances,
+					v.marginCoin,
+					this.parseFloat(v.locked) + this.parseFloat(v.available),
+				)
+			})
+			return balances
 
 		} catch (e) {
 			console.error("Fetch future balance failed", e)
@@ -144,9 +157,11 @@ export class BitgetExchange implements Exchanger {
 		const path = "/api/v2/earn/account/assets"
 		try {
 			const resp = await this.fetch<{ data: EarnAccountResp }>("GET", path)
-			return Object.fromEntries(
-				resp.data.map((v) => [v.coin, parseFloat(v.amount)]),
-			)
+			const balances: { [k: string]: number } = {}
+			resp.data.forEach((v) => {
+				addToBalanceMap(balances, v.coin, this.parseFloat(v.amount))
+			})
+			return balances
 		} catch (e) {
 			console.error("Fetch earn balance failed", e)
 			return {}

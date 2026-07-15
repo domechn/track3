@@ -1,17 +1,34 @@
-import { isSameWallet } from "../lib/utils";
+import { invoke } from "@tauri-apps/api/core";
+import { v4 as uuidv4 } from "uuid";
+import { isSameWallet, normalizeWalletToMD5 } from "../lib/utils";
 import {
   AddProgressFunc,
   Asset,
   AssetModel,
-  TransactionModel,
+  TransactionType,
   UserLicenseInfo,
   WalletCoinUSD,
 } from "./types";
-import { loadPortfolios, queryCoinPrices, queryStableCoins } from "./data";
-import type { FailedPortfolioSource, LoadPortfoliosOptions } from "./data";
+import {
+  fetchPortfolios,
+  queryCoinPrices,
+  queryStableCoins,
+} from "./data";
+import type {
+  FailedPortfolioSource,
+  LoadPortfoliosOptions,
+  LoadPortfoliosResult,
+} from "./data";
+import {
+  canonicalizePortfolioBaseline,
+  canonicalizePortfolioCoins,
+  mergePortfoliosWithBaseline,
+} from "./portfolio-baseline";
+import type { PortfolioCanonicalization } from "./portfolio-baseline";
 import {
   getConfiguration,
   getBlacklistCoins,
+  getPortfolioInputGeneration,
   saveStableCoins,
 } from "./configuration";
 import {
@@ -24,16 +41,59 @@ import { WalletAnalyzer } from "./wallet";
 import { OthersAnalyzer } from "./datafetch/coins/others";
 import { ASSET_HANDLER } from "./entities/assets";
 import { isProVersion } from "./license";
-import { getMemoryCacheInstance } from "./datafetch/utils/cache";
+import {
+  getCacheGroupEpoch,
+  getMemoryCacheInstance,
+} from "./datafetch/utils/cache";
 import { GlobalConfig, WalletCoin } from "./datafetch/types";
 import { CACHE_GROUP_KEYS } from "./consts";
-import { TRANSACTION_HANDLER } from "./entities/transactions";
+import {
+  executeWriteWork,
+  getLatestCommittedRefreshCreatedAt,
+} from "./database";
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
   ASSET_HANDLER.listAssets(size),
 );
 
 export type RefreshAllDataOptions = LoadPortfoliosOptions;
+export type RefreshRetry = <T>(attempt: () => Promise<T>) => Promise<T>;
+
+export type RefreshOperation = {
+  operationUuid: string;
+  refreshCreatedAt?: string;
+  prepared?: {
+    payload: {
+      operationUuid: string;
+      createdAt: string;
+      assets: RefreshAssetInput[];
+      txns: RefreshTransactionDraft[];
+    };
+    result: RefreshAllDataResult;
+  };
+};
+
+export type RefreshTransactionDraft = {
+  uuid: string;
+  assetType: "crypto" | "stock";
+  wallet: string;
+  symbol: string;
+  amount: number;
+  price: number;
+  txnType: TransactionType;
+  txnCreatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type RefreshAssetInput = {
+  assetType: "crypto" | "stock";
+  wallet: string;
+  symbol: string;
+  amount: number;
+  value: number;
+  price: number;
+};
 
 export type RefreshAllDataResult = {
   failedSources: FailedPortfolioSource[];
@@ -41,116 +101,335 @@ export type RefreshAllDataResult = {
   usedLastKnownData: boolean;
 };
 
-type QueryCoinsDataResult = RefreshAllDataResult & {
-  coins: WalletCoinUSD[];
+type WalletCoinValueContext = {
+  priceMap: Record<string, number>;
+  upperCaseStableCoins: string[];
 };
 
-export async function refreshAllData(
-  addProgress: AddProgressFunc,
-  options: RefreshAllDataOptions = {},
-): Promise<RefreshAllDataResult> {
-  const lastAssets = (await ASSET_HANDLER.listAssets(1)).flat();
-  // will add 90 percent in query coins data
-  const queryResult = await queryCoinsData(lastAssets, addProgress, options);
-  if (queryResult.requiresDataSourceAction) {
-    return {
-      failedSources: queryResult.failedSources,
-      requiresDataSourceAction: true,
-      usedLastKnownData: false,
+type QueryCoinsDataReady = {
+  failedSources: FailedPortfolioSource[];
+  requiresDataSourceAction: false;
+  usedLastKnownData: boolean;
+  blacklistedSymbols: string[];
+  config: GlobalConfig;
+  portfolioInputGeneration: number;
+  portfolioResult: LoadPortfoliosResult;
+  valueContext: WalletCoinValueContext;
+};
+
+type QueryCoinsDataResult =
+  | QueryCoinsDataReady
+  | {
+      failedSources: FailedPortfolioSource[];
+      requiresDataSourceAction: true;
+      usedLastKnownData: false;
+      blacklistedSymbols: [];
+      portfolioInputGeneration: number;
     };
-  }
 
-  // todo: add db transaction
-  const uid = await ASSET_HANDLER.saveCoinsToDatabase(queryResult.coins);
-  addProgress(5);
-
-  // calculate transactions and save
-  const newAssets = (await ASSET_HANDLER.listAssets(1)).flat();
-  await TRANSACTION_HANDLER.saveTransactions(
-    generateTransactions(uid, lastAssets, newAssets),
-  );
-  addProgress(5);
-
+export function createRefreshOperation(): RefreshOperation {
   return {
-    failedSources: queryResult.failedSources,
-    requiresDataSourceAction: false,
-    usedLastKnownData: queryResult.usedLastKnownData,
+    operationUuid: uuidv4(),
   };
 }
 
-function generateTransactions(
-  uid: string,
+function getSnapshotTimestamp(snapshot: AssetModel[]): number {
+  return snapshot.reduce((latest, asset) => {
+    const timestamp = Date.parse(asset.createdAt);
+    return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+  }, Number.NEGATIVE_INFINITY);
+}
+
+function getSnapshotMaxId(snapshot: AssetModel[]): number {
+  return snapshot.reduce(
+    (latest, asset) => Math.max(latest, Number(asset.id) || 0),
+    0,
+  );
+}
+
+function selectLatestPersistedSnapshot(snapshots: AssetModel[][]): {
+  assets: AssetModel[];
+  latestTimestamp: number;
+} {
+  const latestTimestamp = snapshots.reduce(
+    (latest, snapshot) => Math.max(latest, getSnapshotTimestamp(snapshot)),
+    Number.NEGATIVE_INFINITY,
+  );
+  const assets =
+    snapshots.slice().sort((left, right) => {
+      const timestampDifference =
+        getSnapshotTimestamp(right) - getSnapshotTimestamp(left);
+      if (timestampDifference !== 0) {
+        return timestampDifference;
+      }
+      const idDifference = getSnapshotMaxId(right) - getSnapshotMaxId(left);
+      if (idDifference !== 0) {
+        return idDifference;
+      }
+      return (right[0]?.uuid ?? "").localeCompare(left[0]?.uuid ?? "");
+    })[0] ?? [];
+
+  return { assets, latestTimestamp };
+}
+
+function allocateRefreshCreatedAt(latestPersistedTimestamp: number): string {
+  const timestamp = Number.isFinite(latestPersistedTimestamp)
+    ? Math.max(Date.now(), latestPersistedTimestamp + 1)
+    : Date.now();
+  return new Date(timestamp).toISOString();
+}
+
+export async function refreshAllData(
+  setProgress: AddProgressFunc,
+  options: RefreshAllDataOptions = {},
+  operation: RefreshOperation = createRefreshOperation(),
+  retry: RefreshRetry = (attempt) => attempt(),
+): Promise<RefreshAllDataResult> {
+  let queryProgress = 0;
+  while (true) {
+    let queryResult: QueryCoinsDataResult | undefined;
+    if (!operation.prepared) {
+      queryResult = await retry(() => {
+        queryProgress = 0;
+        setProgress(0);
+        return queryCoinsData((increment) => {
+          queryProgress = Math.min(queryProgress + increment, 90);
+          setProgress(queryProgress);
+        }, options);
+      });
+    }
+
+    const result = await executeWriteWork(async (database) => {
+      if (!operation.prepared) {
+        const currentQueryResult = queryResult!;
+        if (
+          currentQueryResult.portfolioInputGeneration !==
+          getPortfolioInputGeneration()
+        ) {
+          return undefined;
+        }
+        if (currentQueryResult.requiresDataSourceAction) {
+          return {
+            failedSources: currentQueryResult.failedSources,
+            requiresDataSourceAction: true,
+            usedLastKnownData: false,
+          };
+        }
+        const readyQueryResult = currentQueryResult;
+        const persistedSnapshots = await ASSET_HANDLER.listAssets(1);
+        const {
+          assets: rawLatestBaseline,
+          latestTimestamp: latestAssetSnapshotTimestamp,
+        } = selectLatestPersistedSnapshot(persistedSnapshots);
+        const latestCommittedRefreshCreatedAt =
+          await getLatestCommittedRefreshCreatedAt(database);
+        const latestCommittedRefreshTimestamp = Date.parse(
+          latestCommittedRefreshCreatedAt ?? "",
+        );
+        const latestPersistedTimestamp = Math.max(
+          latestAssetSnapshotTimestamp,
+          Number.isFinite(latestCommittedRefreshTimestamp)
+            ? latestCommittedRefreshTimestamp
+            : Number.NEGATIVE_INFINITY,
+        );
+        const refreshCreatedAt = allocateRefreshCreatedAt(
+          latestPersistedTimestamp,
+        );
+        operation.refreshCreatedAt = refreshCreatedAt;
+        const canonicalization = getPortfolioCanonicalization(
+          readyQueryResult.config,
+          readyQueryResult.valueContext,
+          readyQueryResult.blacklistedSymbols,
+        );
+        const latestBaseline = canonicalizePortfolioBaseline(
+          rawLatestBaseline,
+          canonicalization,
+        );
+        const portfolioResult = mergePortfoliosWithBaseline(
+          readyQueryResult.portfolioResult,
+          latestBaseline,
+          options,
+          canonicalization,
+        );
+        const coins = resolveWalletCoins(
+          portfolioResult.coins,
+          latestBaseline,
+          readyQueryResult.valueContext,
+          canonicalization,
+        );
+        const transactions = generateTransactions(
+          operation.operationUuid,
+          refreshCreatedAt,
+          latestBaseline,
+          coins,
+          readyQueryResult.blacklistedSymbols,
+        );
+        operation.prepared = {
+          payload: {
+            operationUuid: operation.operationUuid,
+            createdAt: refreshCreatedAt,
+            assets: generateRefreshAssets(coins, transactions),
+            txns: transactions,
+          },
+          result: {
+            failedSources: readyQueryResult.failedSources,
+            requiresDataSourceAction: false,
+            usedLastKnownData: readyQueryResult.usedLastKnownData,
+          },
+        };
+      }
+
+      setProgress(90);
+      await retry(() =>
+        invoke<void>("persist_refresh", operation.prepared!.payload),
+      );
+      setProgress(100);
+
+      return operation.prepared.result;
+    });
+    if (result) {
+      return result;
+    }
+  }
+}
+
+export function generateTransactions(
+  operationUuid: string,
+  refreshCreatedAt: string,
   before: AssetModel[],
-  after: AssetModel[],
-): TransactionModel[] {
-  const getAssetKey = (asset: AssetModel) =>
-    `${getAssetType(asset)}:${asset.symbol}:${asset.wallet}`;
+  afterCoins: WalletCoinUSD[],
+  blacklistedSymbols: string[] = [],
+): RefreshTransactionDraft[] {
   const beforeAssetMap = new Map<string, AssetModel>();
-  const afterAssetMap = new Map<string, AssetModel>();
+  const afterAssetMap = new Map<string, WalletCoinUSD>();
   before.forEach((asset) => {
-    beforeAssetMap.set(getAssetKey(asset), asset);
+    beforeAssetMap.set(getStoredAssetIdentity(asset), asset);
   });
-  after.forEach((asset) => {
-    afterAssetMap.set(getAssetKey(asset), asset);
+  afterCoins.forEach((asset) => {
+    afterAssetMap.set(getRefreshCoinIdentity(asset), asset);
   });
 
-  const updatedTxns = after
+  const makeDraft = (
+    assetType: "crypto" | "stock",
+    wallet: string,
+    symbol: string,
+    amount: number,
+    price: number,
+    txnType: TransactionType,
+  ): RefreshTransactionDraft => ({
+    uuid: operationUuid,
+    assetType,
+    wallet,
+    symbol,
+    amount,
+    price,
+    txnType,
+    txnCreatedAt: refreshCreatedAt,
+    createdAt: refreshCreatedAt,
+    updatedAt: refreshCreatedAt,
+  });
+
+  const updatedTxns = afterCoins
     .map((a) => {
-      const l = beforeAssetMap.get(getAssetKey(a));
+      const wallet = normalizeWalletToMD5(a.wallet);
+      const l = beforeAssetMap.get(getRefreshCoinIdentity(a));
       if (!l) {
         if (a.amount !== 0) {
-          return {
-            uuid: uid,
-            assetID: a.id,
-            assetType: getAssetType(a),
-            wallet: a.wallet,
-            symbol: a.symbol,
-            amount: a.amount,
-            price: a.price,
-            txnType: "buy",
-            txnCreatedAt: a.createdAt,
-            createdAt: a.createdAt,
-          } as TransactionModel;
+          return makeDraft(
+            getAssetType(a),
+            wallet,
+            a.symbol,
+            a.amount,
+            a.price,
+            "buy",
+          );
         }
-        return undefined as unknown as TransactionModel;
+        return undefined;
       }
       if (a.amount === l.amount) {
-        return undefined as unknown as TransactionModel;
+        return undefined;
       }
-      return {
-        uuid: uid,
-        assetID: a.id,
-        assetType: getAssetType(a),
-        wallet: a.wallet,
-        symbol: a.symbol,
-        amount: Math.abs(a.amount - l.amount),
-        price: a.price,
-        txnType: a.amount > l.amount ? "buy" : "sell",
-        txnCreatedAt: a.createdAt,
-      } as TransactionModel;
+      return makeDraft(
+        getAssetType(a),
+        wallet,
+        a.symbol,
+        Math.abs(a.amount - l.amount),
+        a.price,
+        a.amount > l.amount ? "buy" : "sell",
+      );
     })
-    .filter((x): x is TransactionModel => !!x);
+    .filter((x): x is RefreshTransactionDraft => !!x);
+  const blacklisted = new Set(
+    blacklistedSymbols.map((symbol) => symbol.toUpperCase()),
+  );
   const removedTxns = before
-    .filter((la) => !afterAssetMap.has(getAssetKey(la)))
+    .filter(
+      (lastAsset) =>
+        !afterAssetMap.has(getStoredAssetIdentity(lastAsset)) &&
+        !blacklisted.has(lastAsset.symbol.toUpperCase()),
+    )
     .map((la) => {
       if (la.amount === 0) {
-        return undefined as unknown as TransactionModel;
+        return undefined;
       }
-      return {
-        uuid: uid,
-        assetID: la.id,
-        assetType: getAssetType(la),
-        wallet: la.wallet,
-        symbol: la.symbol,
-        amount: la.amount,
-        price: la.price,
-        txnType: "sell",
-        txnCreatedAt: la.createdAt,
-      } as TransactionModel;
+      return makeDraft(
+        getAssetType(la),
+        storedWallet(la.wallet),
+        la.symbol,
+        la.amount,
+        la.price,
+        "sell",
+      );
     })
-    .filter((x): x is TransactionModel => !!x);
+    .filter((x): x is RefreshTransactionDraft => !!x);
 
   return [...updatedTxns, ...removedTxns];
+}
+
+function generateRefreshAssets(
+  afterCoins: WalletCoinUSD[],
+  transactions: RefreshTransactionDraft[],
+): RefreshAssetInput[] {
+  const afterIdentities = new Set(afterCoins.map(getRefreshCoinIdentity));
+  const currentAssets = afterCoins.map((coin) => ({
+    assetType: getAssetType(coin),
+    wallet: normalizeWalletToMD5(coin.wallet),
+    symbol: coin.symbol,
+    amount: coin.amount,
+    value: coin.usdValue,
+    price: coin.price,
+  }));
+  const removedAssets = transactions
+    .filter(
+      (transaction) =>
+        transaction.txnType === "sell" &&
+        !afterIdentities.has(getTransactionIdentity(transaction)),
+    )
+    .map((transaction) => ({
+      assetType: transaction.assetType,
+      wallet: transaction.wallet,
+      symbol: transaction.symbol,
+      amount: 0,
+      value: 0,
+      price: transaction.price,
+    }));
+  return [...currentAssets, ...removedAssets];
+}
+
+function storedWallet(wallet?: string): string {
+  return wallet?.startsWith("md5:") ? wallet.slice(4) : (wallet ?? "");
+}
+
+function getStoredAssetIdentity(asset: AssetModel): string {
+  return `${getAssetType(asset)}:${storedWallet(asset.wallet)}:${asset.symbol}`;
+}
+
+function getRefreshCoinIdentity(coin: WalletCoinUSD): string {
+  return `${getAssetType(coin)}:${normalizeWalletToMD5(coin.wallet)}:${coin.symbol}`;
+}
+
+function getTransactionIdentity(transaction: RefreshTransactionDraft): string {
+  return `${transaction.assetType}:${transaction.wallet}:${transaction.symbol}`;
 }
 
 // query the real-time price of the last queried asset
@@ -158,7 +437,10 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
   const cache = getMemoryCacheInstance(
     CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY,
   );
-  const cacheKey = "real-time-assets";
+  const cacheEpoch = getCacheGroupEpoch(
+    CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY,
+  );
+  const cacheKey = `${cacheEpoch}-real-time-assets`;
   const c = cache.getCache<Asset[]>(cacheKey);
   if (c) {
     return c;
@@ -219,25 +501,27 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
   return assetRes;
 }
 
-async function queryCoinsDataByWalletCoins(
+async function queryWalletCoinValueContext(
   assets: WalletCoin[],
-  config: GlobalConfig,
-  lastAssets: AssetModel[],
   userProInfo: UserLicenseInfo,
   addProgress?: AddProgressFunc,
-): Promise<WalletCoinUSD[]> {
+): Promise<WalletCoinValueContext> {
   const needPriceAssets = assets.filter((a) => !a.price);
-  const cryptoPriceSymbols = Array.from(new Set(
-    needPriceAssets
-      .filter((a) => getAssetType(a) === "crypto")
-      .map((a) => a.symbol)
-      .concat(["USDT", "BTC"])
-  )).filter((x): x is string => !!x);
-  const stockPriceSymbols = Array.from(new Set(
-    needPriceAssets
-      .filter((a) => getAssetType(a) === "stock")
-      .map((a) => a.symbol)
-  )).filter((x): x is string => !!x);
+  const cryptoPriceSymbols = Array.from(
+    new Set(
+      needPriceAssets
+        .filter((a) => getAssetType(a) === "crypto")
+        .map((a) => a.symbol)
+        .concat(["USDT", "BTC"]),
+    ),
+  ).filter((x): x is string => !!x);
+  const stockPriceSymbols = Array.from(
+    new Set(
+      needPriceAssets
+        .filter((a) => getAssetType(a) === "stock")
+        .map((a) => a.symbol),
+    ),
+  ).filter((x): x is string => !!x);
   const [cryptoPriceMap, stockPriceMap] = await Promise.all([
     cryptoPriceSymbols.length > 0
       ? queryCoinPrices(cryptoPriceSymbols, userProInfo)
@@ -246,11 +530,13 @@ async function queryCoinsDataByWalletCoins(
   ]);
   const typedCryptoPriceMap: Record<string, number> = {};
   for (const symbol of Object.keys(cryptoPriceMap)) {
-    typedCryptoPriceMap[getAssetIdentity({ symbol, assetType: "crypto" })] = cryptoPriceMap[symbol];
+    typedCryptoPriceMap[getAssetIdentity({ symbol, assetType: "crypto" })] =
+      cryptoPriceMap[symbol];
   }
   const typedStockPriceMap: Record<string, number> = {};
   for (const symbol of Object.keys(stockPriceMap)) {
-    typedStockPriceMap[getAssetIdentity({ symbol, assetType: "stock" })] = stockPriceMap[symbol];
+    typedStockPriceMap[getAssetIdentity({ symbol, assetType: "stock" })] =
+      stockPriceMap[symbol];
   }
   const priceMap = {
     ...cryptoPriceMap,
@@ -262,51 +548,28 @@ async function queryCoinsDataByWalletCoins(
     addProgress(10);
   }
 
-  let latestAssets = [...assets];
-
   const stableCoins = await queryStableCoins();
-
   const upperCaseStableCoins = stableCoins.map((c) => c.toUpperCase());
-
-  // save stable coins to configuration
   await saveStableCoins(upperCaseStableCoins);
 
-  const groupUSD: boolean = (config as any)?.configs?.groupUSD || false;
-  if (groupUSD) {
-    Object.values(
-      assets.reduce((map, coin) => {
-        const w = coin.wallet ?? "";
-        if (!map[w]) map[w] = [];
-        map[w].push(coin);
-        return map;
-      }, {} as Record<string, WalletCoin[]>)
-    ).forEach((coins) => {
-      const wallet = coins[0]?.wallet ?? "";
-      const cryptoCoins = coins.filter((c) => getAssetType(c) === "crypto");
-      const nonCryptoCoins = coins.filter((c) => getAssetType(c) !== "crypto");
-      // not case sensitive
-      const usdAmount = cryptoCoins
-        .filter((c) => upperCaseStableCoins.includes(c.symbol.toUpperCase()))
-        .reduce((s, c) => s + c.amount, 0);
-      const removedUSDCoins = cryptoCoins
-        .filter((c) => !upperCaseStableCoins.includes(c.symbol.toUpperCase()))
-        .concat(nonCryptoCoins);
-      latestAssets = latestAssets
-        .filter((a) => a.wallet !== wallet)
-        .concat(removedUSDCoins);
-      if (usdAmount > 0) {
-        latestAssets.push({
-          symbol: "USDT",
-          assetType: "crypto",
-          amount: usdAmount,
-          wallet,
-        });
-      }
-    });
-  }
+  return {
+    priceMap,
+    upperCaseStableCoins,
+  };
+}
+
+function resolveWalletCoins(
+  assets: WalletCoin[],
+  lastAssets: AssetModel[],
+  valueContext: WalletCoinValueContext,
+  canonicalization: PortfolioCanonicalization,
+  addProgress?: AddProgressFunc,
+): WalletCoinUSD[] {
+  const { priceMap } = valueContext;
+  const latestAssets = canonicalizePortfolioCoins(assets, canonicalization);
 
   // add btc value if not exist
-  const btcData = assets.find(
+  const btcData = latestAssets.find(
     (c) => c.symbol === "BTC" && getAssetType(c) === "crypto",
   );
   if (!btcData) {
@@ -385,9 +648,8 @@ async function queryCoinsDataByWalletCoins(
   if (addProgress) {
     addProgress(5);
   }
-  const blacklist = await getBlacklistCoins();
-  if (blacklist.length > 0) {
-    const blacklistedSymbols = blacklist.map((s) => s.toUpperCase());
+  const blacklistedSymbols = canonicalization.blacklistedSymbols ?? [];
+  if (blacklistedSymbols.length > 0) {
     return filteredTotals.filter(
       (t) => !blacklistedSymbols.includes(t.symbol.toUpperCase()),
     );
@@ -396,14 +658,60 @@ async function queryCoinsDataByWalletCoins(
   return filteredTotals;
 }
 
+function getPortfolioCanonicalization(
+  config: GlobalConfig,
+  valueContext: WalletCoinValueContext,
+  blacklistedSymbols: string[],
+): PortfolioCanonicalization {
+  return {
+    groupStablecoins: !!(config as any)?.configs?.groupUSD,
+    stablecoinSymbols: valueContext.upperCaseStableCoins,
+    blacklistedSymbols,
+  };
+}
+
+async function queryCoinsDataByWalletCoins(
+  assets: WalletCoin[],
+  config: GlobalConfig,
+  lastAssets: AssetModel[],
+  userProInfo: UserLicenseInfo,
+  addProgress?: AddProgressFunc,
+  knownBlacklistedSymbols?: string[],
+): Promise<WalletCoinUSD[]> {
+  const [valueContext, blacklistedSymbols] = await Promise.all([
+    queryWalletCoinValueContext(assets, userProInfo, addProgress),
+    knownBlacklistedSymbols
+      ? Promise.resolve(knownBlacklistedSymbols)
+      : getBlacklistCoins().then((symbols) =>
+          symbols.map((symbol) => symbol.toUpperCase()),
+        ),
+  ]);
+  const canonicalization = getPortfolioCanonicalization(
+    config,
+    valueContext,
+    blacklistedSymbols,
+  );
+  return resolveWalletCoins(
+    assets,
+    lastAssets,
+    valueContext,
+    canonicalization,
+    addProgress,
+  );
+}
+
 // query all assets and calculate their value in USD
 async function queryCoinsData(
-  lastAssets: AssetModel[],
   addProgress: AddProgressFunc,
   options: RefreshAllDataOptions = {},
 ): Promise<QueryCoinsDataResult> {
   addProgress(1);
-  const config = await getConfiguration();
+  let portfolioInputGeneration: number;
+  let config: GlobalConfig | undefined;
+  do {
+    portfolioInputGeneration = getPortfolioInputGeneration();
+    config = await getConfiguration();
+  } while (portfolioInputGeneration !== getPortfolioInputGeneration());
   if (!config) {
     throw new Error("no configuration found,\n please add configuration first");
   }
@@ -411,13 +719,10 @@ async function queryCoinsData(
   // check if pro user
   const userProInfo = await isProVersion();
   addProgress(2);
-  // will add 70 percent progress in load portfolios
-  const portfolioResult = await loadPortfolios(
+  const portfolioResult = await fetchPortfolios(
     config,
-    lastAssets,
     addProgress,
     userProInfo,
-    options,
   );
 
   if (
@@ -425,27 +730,33 @@ async function queryCoinsData(
     !options.useLastKnownDataForFailedSources
   ) {
     return {
-      coins: [],
       failedSources: portfolioResult.failedSources,
       requiresDataSourceAction: true,
       usedLastKnownData: false,
+      blacklistedSymbols: [],
+      portfolioInputGeneration,
     };
   }
 
-  const coins = await queryCoinsDataByWalletCoins(
+  const blacklistedSymbols = (await getBlacklistCoins()).map((symbol) =>
+    symbol.toUpperCase(),
+  );
+  const valueContext = await queryWalletCoinValueContext(
     portfolioResult.coins,
-    config,
-    lastAssets,
     userProInfo,
     addProgress,
   );
 
   return {
-    coins,
     failedSources: portfolioResult.failedSources,
     requiresDataSourceAction: false,
     usedLastKnownData:
       portfolioResult.failedSources.length > 0 &&
       !!options.useLastKnownDataForFailedSources,
+    blacklistedSymbols,
+    config,
+    portfolioInputGeneration,
+    portfolioResult,
+    valueContext,
   };
 }

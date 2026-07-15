@@ -9,6 +9,12 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 let lastDataChangedVersion = 0;
 let lastDateRange: { start: Date; end: Date } | undefined;
 
+const cacheMocks = vi.hoisted(() => ({
+  clearLocalStorageCache: vi.fn(),
+  clearMemoryCache: vi.fn(),
+  invalidateCacheGroups: vi.fn(),
+}));
+
 vi.mock("../settings", () => ({
   default: () => <div>settings</div>,
 }));
@@ -49,7 +55,19 @@ vi.mock("../wallet-analytics", () => ({
   default: () => <div>wallets</div>,
 }));
 vi.mock("../coin-analytics", () => ({
-  default: () => <div>coin analytics</div>,
+  default: ({ onDataChanged }: { onDataChanged?: () => void }) => {
+    const version = realUseDataChangedVersion();
+    return (
+      <button
+        type="button"
+        data-testid="trigger-coin-data-changed"
+        data-version={version}
+        onClick={onDataChanged}
+      >
+        coin analytics
+      </button>
+    );
+  },
 }));
 vi.mock("../date-picker", () => ({
   default: () => <div>date picker</div>,
@@ -107,10 +125,13 @@ vi.mock("@/middlelayers/data", () => ({
 }));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
-  getLocalStorageCacheInstance: vi
-    .fn()
-    .mockReturnValue({ clearCache: vi.fn() }),
-  getMemoryCacheInstance: vi.fn().mockReturnValue({ clearCache: vi.fn() }),
+  invalidateCacheGroups: cacheMocks.invalidateCacheGroups,
+  getLocalStorageCacheInstance: vi.fn().mockReturnValue({
+    clearCache: cacheMocks.clearLocalStorageCache,
+  }),
+  getMemoryCacheInstance: vi.fn().mockReturnValue({
+    clearCache: cacheMocks.clearMemoryCache,
+  }),
 }));
 
 import { getAvailableDates, queryLastRefreshAt } from "@/middlelayers/charts";
@@ -131,6 +152,21 @@ beforeEach(() => {
   lastDataChangedVersion = 0;
   lastDateRange = undefined;
   window.location.hash = "#/summary";
+  cacheMocks.clearLocalStorageCache.mockReset();
+  cacheMocks.clearMemoryCache.mockReset();
+  cacheMocks.invalidateCacheGroups.mockReset();
+  cacheMocks.invalidateCacheGroups.mockImplementation(() => {
+    try {
+      cacheMocks.clearLocalStorageCache();
+    } catch {
+      console.warn("local storage cache cleanup failed");
+    }
+    try {
+      cacheMocks.clearMemoryCache();
+    } catch {
+      console.warn("memory cache cleanup failed");
+    }
+  });
 
   vi.mocked(queryLastRefreshAt).mockResolvedValue("2024-04-13T00:00:00.000Z");
   vi.mocked(getAvailableDates).mockResolvedValue([
@@ -184,9 +220,7 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     // Wait for the route to mount and the summary mock to observe the
     // initial data-changed version. Nothing triggers onDataChanged on
     // mount, so it should still be the default 0.
-    await waitFor(() => {
-      expect(view.getByTestId("summary-range")).toBeTruthy();
-    });
+    await view.findByTestId("summary-range");
     expect(lastDataChangedVersion).toBe(0);
 
     fireEvent.click(view.getByTestId("trigger-refresh"));
@@ -199,9 +233,7 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
   it("bumps the data-changed version when the soft refresh event fires", async () => {
     const view = renderApp();
 
-    await waitFor(() => {
-      expect(view.getByTestId("summary-range")).toBeTruthy();
-    });
+    await view.findByTestId("summary-range");
     expect(lastDataChangedVersion).toBe(0);
 
     window.dispatchEvent(new Event(APP_SOFT_REFRESH_EVENT));
@@ -209,5 +241,123 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     await waitFor(() => {
       expect(lastDataChangedVersion).toBeGreaterThan(0);
     });
+  });
+
+  it("passes the data-changed callback to the coin analytics route", async () => {
+    window.location.hash = "#/coins/BTC";
+    const view = renderApp();
+
+    const trigger = await view.findByTestId("trigger-coin-data-changed");
+    expect(trigger).toHaveAttribute("data-version", "0");
+
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(
+        Number(
+          view
+            .getByTestId("trigger-coin-data-changed")
+            .getAttribute("data-version"),
+        ),
+      ).toBe(1);
+    });
+    expect(cacheMocks.invalidateCacheGroups).toHaveBeenCalledTimes(1);
+    expect(cacheMocks.invalidateCacheGroups).toHaveBeenCalledWith({
+      localStorage: ["total-profit"],
+      memory: ["realtime-asset-values"],
+    });
+  });
+
+  it("handles rejected reload and forced backup promises without an unhandled rejection", async () => {
+    window.location.hash = "#/coins/BTC";
+    const unhandledRejection = vi.fn();
+    const consoleWarn = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    process.on("unhandledRejection", unhandledRejection);
+
+    try {
+      const view = renderApp();
+      const trigger = await view.findByTestId("trigger-coin-data-changed");
+
+      vi.mocked(getAvailableDates).mockRejectedValueOnce(
+        new Error("sensitive reload details"),
+      );
+      vi.mocked(autoBackupHistoricalData).mockRejectedValueOnce(
+        new Error("sensitive backup details"),
+      );
+      fireEvent.click(trigger);
+
+      await waitFor(() => {
+        expect(consoleWarn).toHaveBeenCalledWith("data reload failed");
+        expect(consoleWarn).toHaveBeenCalledWith("forced auto backup failed");
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+      expect(unhandledRejection).not.toHaveBeenCalled();
+      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain(
+        "sensitive reload details",
+      );
+      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain(
+        "sensitive backup details",
+      );
+      expect(
+        Number(
+          view
+            .getByTestId("trigger-coin-data-changed")
+            .getAttribute("data-version"),
+        ),
+      ).toBeGreaterThan(0);
+    } finally {
+      process.off("unhandledRejection", unhandledRejection);
+      consoleWarn.mockRestore();
+    }
+  });
+
+  it("contains cache cleanup failures while reload and backup continue independently", async () => {
+    window.location.hash = "#/coins/BTC";
+    const unhandledRejection = vi.fn();
+    const consoleWarn = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    process.on("unhandledRejection", unhandledRejection);
+
+    try {
+      const view = renderApp();
+      const trigger = await view.findByTestId("trigger-coin-data-changed");
+      await waitFor(() => {
+        expect(getAvailableDates).toHaveBeenCalled();
+      });
+
+      vi.mocked(getAvailableDates).mockClear();
+      vi.mocked(autoBackupHistoricalData).mockClear();
+      cacheMocks.clearLocalStorageCache.mockImplementationOnce(() => {
+        throw new Error("sensitive localStorage details");
+      });
+      fireEvent.click(trigger);
+
+      await waitFor(() => {
+        expect(consoleWarn).toHaveBeenCalledWith(
+          "local storage cache cleanup failed",
+        );
+        expect(getAvailableDates).toHaveBeenCalledTimes(1);
+        expect(autoBackupHistoricalData).toHaveBeenCalledWith(true);
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+      expect(cacheMocks.clearMemoryCache).toHaveBeenCalledTimes(1);
+      expect(
+        vi
+          .mocked(autoBackupHistoricalData)
+          .mock.calls.filter(([forced]) => forced === true),
+      ).toHaveLength(1);
+      expect(unhandledRejection).not.toHaveBeenCalled();
+      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain(
+        "sensitive localStorage details",
+      );
+    } finally {
+      process.off("unhandledRejection", unhandledRejection);
+      consoleWarn.mockRestore();
+    }
   });
 });

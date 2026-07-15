@@ -18,6 +18,65 @@ struct CoinGeckoCoin {
     symbol: String,
 }
 
+fn map_coin_prices(
+    coins: &[CoinGeckoCoin],
+    mut get_price: impl FnMut(&str) -> Option<f64>,
+) -> HashMap<String, f64> {
+    coins
+        .iter()
+        .filter_map(|coin| get_price(&coin.id).map(|price| (coin.symbol.clone(), price)))
+        .collect()
+}
+
+pub fn validate_coin_prices(prices: HashMap<String, f64>) -> Result<HashMap<String, f64>, String> {
+    if prices.is_empty() || prices.values().all(|price| *price == 0.0) {
+        return Err("get coin prices failed: all prices are 0".to_string());
+    }
+    Ok(prices)
+}
+
+fn redact_value_after_marker(input: &str, marker: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut remaining = input;
+
+    while let Some(index) = remaining.find(marker) {
+        output.push_str(&remaining[..index]);
+        output.push_str(marker);
+        output.push_str("<REDACTED>");
+
+        let value = &remaining[index + marker.len()..];
+        let value_end = value
+            .find(|character: char| {
+                character.is_whitespace() || matches!(character, '&' | ',' | ';' | '"' | '\'' | '}')
+            })
+            .unwrap_or(value.len());
+        remaining = &value[value_end..];
+    }
+
+    output.push_str(remaining);
+    output
+}
+
+pub fn sanitize_upstream_error(message: &str) -> String {
+    [
+        "signature=",
+        "Signature=",
+        "apiKey=",
+        "api_key=",
+        "apiSecret=",
+        "api_secret=",
+        "secret=",
+        "timestamp=",
+        "recvWindow=",
+        "token=",
+        "authorization=",
+    ]
+    .iter()
+    .fold(message.to_string(), |sanitized, marker| {
+        redact_value_after_marker(&sanitized, marker)
+    })
+}
+
 // to return infos of currencies
 impl CoinGecko {
     pub fn new() -> CoinGecko {
@@ -66,8 +125,7 @@ impl CoinGecko {
                 continue;
             }
             if coins.len() > 1 {
-                if filter_duplicate != None {
-                    let filter_duplicate = filter_duplicate.unwrap();
+                if let Some(filter_duplicate) = filter_duplicate {
                     res.push(filter_duplicate(coins));
                 } else {
                     res.append(&mut coins.clone());
@@ -115,15 +173,9 @@ impl CoinGecko {
             .price(&all_ids, &["usd"], false, false, false, false)
             .await?;
 
-        let mut res = HashMap::new();
-
-        for coin in all_coins {
-            if let Some(price) = all_prices.get(&coin.id) {
-                if let Some(price) = price.usd {
-                    res.insert(coin.symbol, price);
-                }
-            }
-        }
+        let res = map_coin_prices(&all_coins, |id| {
+            all_prices.get(id).and_then(|price| price.usd)
+        });
 
         return Ok(res);
     }
@@ -272,9 +324,7 @@ impl CoinGecko {
         let markets_size = markets.len() as i64;
 
         for m in markets {
-            let _ = self
-                .download_coin_logo(download_dir, m.clone())
-                .await;
+            let _ = self.download_coin_logo(download_dir, m.clone()).await;
         }
 
         if markets_size >= page_size {
@@ -321,5 +371,79 @@ impl CoinGecko {
             logo,
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct FixturePrice {
+        usd: Option<f64>,
+    }
+
+    #[test]
+    fn maps_price_fixture_by_coin_id_and_omits_missing_prices() {
+        let fixture: HashMap<String, FixturePrice> = serde_json::from_str(
+            r#"{
+                "bitcoin": {"usd": 65000.0},
+                "ethereum": {"usd": 3500.0},
+                "missing": {}
+            }"#,
+        )
+        .unwrap();
+        let coins = vec![
+            CoinGeckoCoin {
+                id: "bitcoin".to_string(),
+                symbol: "BTC".to_string(),
+            },
+            CoinGeckoCoin {
+                id: "ethereum".to_string(),
+                symbol: "ETH".to_string(),
+            },
+            CoinGeckoCoin {
+                id: "missing".to_string(),
+                symbol: "MISS".to_string(),
+            },
+        ];
+
+        let prices = map_coin_prices(&coins, |id| fixture.get(id).and_then(|price| price.usd));
+
+        assert_eq!(prices.get("BTC"), Some(&65000.0));
+        assert_eq!(prices.get("ETH"), Some(&3500.0));
+        assert!(!prices.contains_key("MISS"));
+    }
+
+    #[test]
+    fn rejects_empty_and_all_zero_price_maps() {
+        let empty_error = validate_coin_prices(HashMap::new()).unwrap_err();
+        assert_eq!(empty_error, "get coin prices failed: all prices are 0");
+
+        let zero_error =
+            validate_coin_prices(HashMap::from([("BTC".to_string(), 0.0)])).unwrap_err();
+        assert_eq!(zero_error, "get coin prices failed: all prices are 0");
+
+        let prices = HashMap::from([("BTC".to_string(), 65000.0), ("USDT".to_string(), 0.0)]);
+        assert_eq!(validate_coin_prices(prices.clone()).unwrap(), prices);
+    }
+
+    #[test]
+    fn redacts_sensitive_upstream_error_values_without_leaving_suffixes() {
+        let message = sanitize_upstream_error(
+            "request failed?api_key=public-key&signature=signed-value \
+             secret=private-secret apiSecret=another-secret timestamp=1700000000",
+        );
+
+        assert!(message.contains("api_key=<REDACTED>"));
+        assert!(message.contains("signature=<REDACTED>"));
+        assert!(message.contains("secret=<REDACTED>"));
+        assert!(message.contains("apiSecret=<REDACTED>"));
+        assert!(!message.contains("public-key"));
+        assert!(!message.contains("signed-value"));
+        assert!(!message.contains("private-secret"));
+        assert!(!message.contains("another-secret"));
+        assert!(!message.contains("1700000000"));
     }
 }

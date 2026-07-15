@@ -46,7 +46,8 @@ export class BinanceExchange implements Exchanger {
 		return Object.fromEntries(
 			allPrices
 				.filter((p) => p.symbol.endsWith(suffix))
-				.map((p) => [p.symbol.replace(suffix, ""), parseFloat(p.price)]),
+				.map((p) => [p.symbol.replace(suffix, "").toUpperCase(), parseFloat(p.price)] as const)
+				.filter(([, price]) => Number.isFinite(price) && price > 0),
 		)
 	}
 

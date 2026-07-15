@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import md5 from "md5";
 import { loadPortfolios } from "./data";
 import { AssetModel, UserLicenseInfo } from "./types";
 import { GlobalConfig, WalletCoin } from "./datafetch/types";
+import { isSameWallet } from "../lib/utils";
 
 const mockProgress = vi.fn();
 
 const mockAnalyzers = vi.hoisted(() => {
+  const scenario = {
+    attachedOthersOverlapsFailedWallet: false,
+  };
+
   class SuccessfulAnalyzer {
     getAnalyzeName() {
       return "Successful Analyzer";
@@ -51,10 +57,31 @@ const mockAnalyzers = vi.hoisted(() => {
     }
   }
 
+  class ConfigurableCexAnalyzer extends EmptyAnalyzer {
+    getAnalyzeName() {
+      return "CEX Analyzer";
+    }
+
+    getWalletIdentities() {
+      return scenario.attachedOthersOverlapsFailedWallet
+        ? ["binance-api-key"]
+        : [];
+    }
+
+    async loadPortfolio(): Promise<WalletCoin[]> {
+      if (scenario.attachedOthersOverlapsFailedWallet) {
+        throw new Error("Binance maintenance");
+      }
+      return [];
+    }
+  }
+
   return {
     SuccessfulAnalyzer,
     EmptyAnalyzer,
     FailingStockAnalyzer,
+    ConfigurableCexAnalyzer,
+    scenario,
   };
 });
 
@@ -73,15 +100,11 @@ vi.mock("./datafetch/coins/erc20", () => ({
 }));
 
 vi.mock("./datafetch/coins/cex/cex", () => ({
-  CexAnalyzer: mockAnalyzers.EmptyAnalyzer,
+  CexAnalyzer: mockAnalyzers.ConfigurableCexAnalyzer,
 }));
 
 vi.mock("./datafetch/coins/sol", () => ({
   SOLAnalyzer: mockAnalyzers.EmptyAnalyzer,
-}));
-
-vi.mock("./datafetch/coins/others", () => ({
-  OthersAnalyzer: mockAnalyzers.EmptyAnalyzer,
 }));
 
 vi.mock("./datafetch/coins/btc", () => ({
@@ -143,6 +166,7 @@ const lastAssets: AssetModel[] = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockAnalyzers.scenario.attachedOthersOverlapsFailedWallet = false;
 });
 
 describe("loadPortfolios data source fallback", () => {
@@ -194,4 +218,83 @@ describe("loadPortfolios data source fallback", () => {
       ]),
     );
   });
+
+  it.each([
+    {
+      currentOthersAmount: 5,
+      expectedConservativeAmount: 10,
+      caseName: "decreases",
+    },
+    {
+      currentOthersAmount: 12,
+      expectedConservativeAmount: 12,
+      caseName: "increases",
+    },
+  ])(
+    "keeps one conservative aggregate when attached Others $caseName during a CEX failure",
+    async ({ currentOthersAmount, expectedConservativeAmount }) => {
+      mockAnalyzers.scenario.attachedOthersOverlapsFailedWallet = true;
+      const overlappingConfig: GlobalConfig = {
+        ...config,
+        exchanges: [
+          {
+            name: "binance",
+            initParams: {
+              apiKey: "api-key",
+              secret: "secret",
+            },
+          },
+        ],
+        others: [
+          {
+            symbol: "BTC",
+            amount: currentOthersAmount,
+            attachTo: {
+              kind: "cex",
+              type: "binance",
+              identity: "api-key",
+            },
+          },
+        ],
+      };
+      const overlappingLastAssets: AssetModel[] = [
+        {
+          id: 2,
+          uuid: "last-refresh",
+          createdAt: "2026-06-20T00:00:00.000Z",
+          assetType: "crypto",
+          symbol: "BTC",
+          amount: 10,
+          value: 1000,
+          price: 100,
+          wallet: md5("binance-api-key"),
+        },
+      ];
+
+      const result = await loadPortfolios(
+        overlappingConfig,
+        overlappingLastAssets,
+        mockProgress,
+        userInfo,
+        { useLastKnownDataForFailedSources: true },
+      );
+
+      expect(
+        result.coins.filter(
+          (coin) =>
+            coin.assetType === "crypto" &&
+            isSameWallet(coin.wallet, "binance-api-key") &&
+            coin.symbol === "BTC",
+        ),
+      ).toEqual([
+        {
+          symbol: "BTC",
+          assetType: "crypto",
+          amount: expectedConservativeAmount,
+          wallet: "binance-api-key",
+          chain: "unknown",
+        },
+      ]);
+    },
+  );
 });

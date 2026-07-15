@@ -1,9 +1,11 @@
 import { TransactionModel, UniqueIndexConflictResolver } from "../types";
 import {
   deleteFromDatabase,
+  saveModelsInWriteWork,
   saveModelsToDatabase,
   selectFromDatabase,
   selectFromDatabaseWithSql,
+  WriteDatabase,
 } from "../database";
 import { AssetType } from "../datafetch/types";
 import { getAssetType } from "../datafetch/utils/coins";
@@ -17,6 +19,7 @@ export interface TransactionHandlerImpl {
   importTransactions(
     models: TransactionModel[],
     conflictResolver: UniqueIndexConflictResolver,
+    writeDatabase?: WriteDatabase,
   ): Promise<TransactionModel[]>;
 }
 
@@ -136,13 +139,19 @@ class TransactionHandler implements TransactionHandlerImpl {
   async importTransactions(
     models: TransactionModel[],
     conflictResolver: UniqueIndexConflictResolver,
+    writeDatabase?: WriteDatabase,
   ): Promise<TransactionModel[]> {
-    return this.saveTransactionsInternal(models, conflictResolver);
+    return this.saveTransactionsInternal(
+      models,
+      conflictResolver,
+      writeDatabase,
+    );
   }
 
   private async saveTransactionsInternal(
     models: TransactionModel[],
     conflictResolver: UniqueIndexConflictResolver,
+    writeDatabase?: WriteDatabase,
   ): Promise<TransactionModel[]> {
     // split models to chunks to avoid too large sql
     const chunkSize = 1000;
@@ -150,11 +159,19 @@ class TransactionHandler implements TransactionHandlerImpl {
 
     for (let i = 0; i < models.length; i += chunkSize) {
       const chunk = models.slice(i, i + chunkSize);
-      const resModels = await saveModelsToDatabase<TransactionDatabaseModel>(
-        this.transactionTableName,
-        chunk.map((m) => this.toDatabaseModel(m)),
-        conflictResolver,
-      );
+      const databaseModels = chunk.map((m) => this.toDatabaseModel(m));
+      const resModels = writeDatabase
+        ? await saveModelsInWriteWork<TransactionDatabaseModel>(
+            writeDatabase,
+            this.transactionTableName,
+            databaseModels,
+            conflictResolver,
+          )
+        : await saveModelsToDatabase<TransactionDatabaseModel>(
+            this.transactionTableName,
+            databaseModels,
+            conflictResolver,
+          );
 
       res.push(...this.normalizeTransactionModels(resModels));
     }

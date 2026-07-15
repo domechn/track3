@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getDatabase, executeWrite } from "./database";
+import {
+  getDatabase,
+  executeWrite,
+  executeWriteWork,
+  WriteDatabase,
+} from "./database";
 import { GlobalConfig, StockConfig } from "./datafetch/types";
 import {
   AIAdvancedOptions,
@@ -12,6 +17,7 @@ import { CURRENCY_RATE_HANDLER } from "./entities/currency";
 import { ASSET_HANDLER } from "./entities/assets";
 import { DateRange } from "react-day-picker";
 import { Theme } from "@/components/common/theme";
+import { runWithEncryptionWriteGate } from "./encryption-write-gate";
 
 // todo: update to dedicated domain
 export const PRO_API_ENDPOINT = "https://track3-pro-api.domc.me";
@@ -23,6 +29,12 @@ const exchangesConfigId = "10";
 const walletsConfigId = "11";
 const generalConfigId = "12";
 const stockConfigId = "20";
+const activeConfigurationIds = [
+  exchangesConfigId,
+  walletsConfigId,
+  generalConfigId,
+  stockConfigId,
+] as const;
 
 const walletKeys = [
   "btc",
@@ -48,6 +60,30 @@ const aiConfigId = "994";
 const preferCurrencyLocalStorageKey = "track3-prefer-currency";
 
 export const themeLocalStorageKey = "track3-ui-theme";
+
+let portfolioInputGeneration = 0;
+
+export function getPortfolioInputGeneration(): number {
+  return portfolioInputGeneration;
+}
+
+function markPortfolioInputChanged(): void {
+  portfolioInputGeneration += 1;
+}
+
+async function runPortfolioInputWrite<T>(
+  operation: (writeDatabase: WriteDatabase) => Promise<T>,
+): Promise<T> {
+  return executeWriteWork(async (writeDatabase) => {
+    // Bracket the mutation so queries started before or during it both go stale.
+    markPortfolioInputChanged();
+    try {
+      return await operation(writeDatabase);
+    } finally {
+      markPortfolioInputChanged();
+    }
+  });
+}
 
 // Thrown by loadAIConfig / saveAIConfig when no AI configuration is persisted
 // yet. The chat page catches this and renders the "configure first" empty state.
@@ -183,13 +219,21 @@ function sanitizeAIAdvanced(advanced: AIAdvancedOptions): AIAdvancedOptions {
 }
 
 export async function getConfiguration(): Promise<GlobalConfig | undefined> {
-  const [exchangesModel, walletsModel, generalModel, stockConfig] =
-    await Promise.all([
-      getConfigurationById(exchangesConfigId),
-      getConfigurationById(walletsConfigId),
-      getConfigurationModelById(generalConfigId),
-      getStockConfig(),
-    ]);
+  const activeModels = await getConfigurationModelsByIds(
+    activeConfigurationIds,
+  );
+  const modelsById = new Map(
+    activeModels.map((model) => [String(model.id), model]),
+  );
+  const [exchangesModel, walletsModel, stockModel] = await Promise.all([
+    decryptConfigurationModel(modelsById.get(exchangesConfigId)),
+    decryptConfigurationModel(modelsById.get(walletsConfigId)),
+    decryptConfigurationModel(modelsById.get(stockConfigId)),
+  ]);
+  const generalModel = modelsById.get(generalConfigId);
+  const stockConfig = stockModel?.data
+    ? (yaml.parse(stockModel.data) as StockConfig)
+    : { brokers: [] };
 
   // new-format exists: merge and return
   if (exchangesModel || walletsModel || generalModel) {
@@ -221,19 +265,87 @@ export async function getConfiguration(): Promise<GlobalConfig | undefined> {
   return cfg;
 }
 
-export async function saveConfiguration(cfg: GlobalConfig) {
+type PreparedConfigurationWrite = {
+  rows: { id: string; data: string }[];
+};
+
+function splitConfiguration(cfg: GlobalConfig) {
   const exchangesData = yaml.stringify({ exchanges: cfg.exchanges });
-  const walletsData = yaml.stringify(Object.fromEntries(walletKeys.filter(k => k in cfg).map(k => [k, cfg[k]])));
+  const walletsData = yaml.stringify(
+    Object.fromEntries(
+      walletKeys.filter((key) => key in cfg).map((key) => [key, cfg[key]]),
+    ),
+  );
   const generalData = yaml.stringify({
     configs: cfg.configs,
     others: cfg.others,
   });
+  const stockData = yaml.stringify(cfg.stockConfig ?? { brokers: [] });
 
-  // Serialize writes to prevent transaction conflicts on the shared SQLite connection.
-  await saveConfigurationById(exchangesConfigId, exchangesData);
-  await saveConfigurationById(walletsConfigId, walletsData);
-  await saveConfigurationById(generalConfigId, generalData, false);
-  await saveStockConfig(cfg.stockConfig ?? { brokers: [] });
+  return { exchangesData, walletsData, generalData, stockData };
+}
+
+async function prepareConfigurationWrite(
+  cfg: GlobalConfig,
+): Promise<PreparedConfigurationWrite> {
+  const { exchangesData, walletsData, generalData, stockData } =
+    splitConfiguration(cfg);
+  const [encryptedExchanges, encryptedWallets, encryptedStock] =
+    await Promise.all([
+      invoke<string>("encrypt", { data: exchangesData }),
+      invoke<string>("encrypt", { data: walletsData }),
+      invoke<string>("encrypt", { data: stockData }),
+    ]);
+
+  return {
+    rows: [
+      { id: exchangesConfigId, data: encryptedExchanges },
+      { id: walletsConfigId, data: encryptedWallets },
+      { id: generalConfigId, data: generalData },
+      { id: stockConfigId, data: encryptedStock },
+    ],
+  };
+}
+
+async function writePreparedConfiguration(
+  writeDatabase: WriteDatabase,
+  prepared: PreparedConfigurationWrite,
+  deleteLegacy: boolean,
+): Promise<void> {
+  const valuesClause = prepared.rows.map(() => "(?, ?)").join(", ");
+  await writeDatabase.execute(
+    `INSERT INTO configuration (id, data) VALUES ${valuesClause} ON CONFLICT(id) DO UPDATE SET data = excluded.data`,
+    prepared.rows.flatMap(({ id, data }) => [id, data]),
+  );
+  if (deleteLegacy) {
+    await writeDatabase.execute(`DELETE FROM configuration WHERE id = ?`, [
+      generalFixId,
+    ]);
+  }
+}
+
+export async function runWithPreparedConfigurationWrite<T>(
+  cfg: GlobalConfig,
+  operation: (
+    writeDatabase: WriteDatabase,
+    writeConfiguration: (deleteLegacy?: boolean) => Promise<void>,
+  ) => Promise<T>,
+): Promise<T> {
+  return runWithEncryptionWriteGate(async () => {
+    const prepared = await prepareConfigurationWrite(cfg);
+    return runPortfolioInputWrite((writeDatabase) =>
+      operation(writeDatabase, (deleteLegacy = false) =>
+        writePreparedConfiguration(writeDatabase, prepared, deleteLegacy),
+      ),
+    );
+  });
+}
+
+export async function saveConfiguration(cfg: GlobalConfig) {
+  return runWithPreparedConfigurationWrite(
+    cfg,
+    (_writeDatabase, writeConfiguration) => writeConfiguration(),
+  );
 }
 
 export async function getStockConfig(): Promise<StockConfig> {
@@ -245,11 +357,13 @@ export async function getStockConfig(): Promise<StockConfig> {
 }
 
 export async function saveStockConfig(cfg: StockConfig) {
-  return saveConfigurationById(stockConfigId, yaml.stringify(cfg));
+  return savePortfolioInputConfigurationById(
+    stockConfigId,
+    yaml.stringify(cfg),
+  );
 }
 
-// used for import data
-export async function importRawConfiguration(data: string) {
+export async function parseRawConfiguration(data: string) {
   let raw = data;
   if (raw.startsWith(prefix)) {
     try {
@@ -265,30 +379,74 @@ export async function importRawConfiguration(data: string) {
       raw = await invoke<string>("decrypt_with_key", { data: raw, key: customKey });
     }
   }
-  const cfg = yaml.parse(raw) as GlobalConfig;
-  await saveConfiguration(cfg);
-  await deleteConfigurationById(generalFixId);
+  return yaml.parse(raw) as GlobalConfig;
 }
 
-async function migrateConfigurationToSplit(cfg: GlobalConfig) {
-  await saveConfiguration(cfg);
-  await deleteConfigurationById(generalFixId);
-}
-
-async function saveConfigurationById(id: string, cfg: string, encrypt = true) {
-  // encrypt data
-  const saveStr = encrypt
-    ? await invoke<string>("encrypt", { data: cfg })
-    : cfg;
-
-  await executeWrite(
-    `INSERT OR REPLACE INTO configuration (id, data) VALUES (?, ?)`,
-    [id, saveStr],
+// used for import data
+export async function importRawConfiguration(data: string) {
+  const cfg = await parseRawConfiguration(data);
+  await runWithPreparedConfigurationWrite(
+    cfg,
+    (_writeDatabase, writeConfiguration) => writeConfiguration(true),
   );
 }
 
-async function deleteConfigurationById(id: string) {
-  await executeWrite(`DELETE FROM configuration WHERE id = ?`, [id]);
+async function migrateConfigurationToSplit(cfg: GlobalConfig) {
+  await runWithPreparedConfigurationWrite(
+    cfg,
+    (_writeDatabase, writeConfiguration) => writeConfiguration(true),
+  );
+}
+
+async function saveConfigurationById(
+  id: string,
+  cfg: string,
+  encrypt = true,
+  portfolioInput = false,
+) {
+  await runWithEncryptionWriteGate(async () => {
+    const saveStr = encrypt
+      ? await invoke<string>("encrypt", { data: cfg })
+      : cfg;
+
+    const write = (writeDatabase: WriteDatabase) =>
+      writeDatabase.execute(
+        `INSERT OR REPLACE INTO configuration (id, data) VALUES (?, ?)`,
+        [id, saveStr],
+      );
+    if (portfolioInput) {
+      await runPortfolioInputWrite(write);
+    } else {
+      await executeWrite(
+        `INSERT OR REPLACE INTO configuration (id, data) VALUES (?, ?)`,
+        [id, saveStr],
+      );
+    }
+  });
+}
+
+async function deleteConfigurationById(id: string, portfolioInput = false) {
+  await runWithEncryptionWriteGate(async () => {
+    if (portfolioInput) {
+      await runPortfolioInputWrite((writeDatabase) =>
+        writeDatabase.execute(`DELETE FROM configuration WHERE id = ?`, [id]),
+      );
+    } else {
+      await executeWrite(`DELETE FROM configuration WHERE id = ?`, [id]);
+    }
+  });
+}
+
+async function savePortfolioInputConfigurationById(
+  id: string,
+  data: string,
+  encrypt = true,
+) {
+  await saveConfigurationById(id, data, encrypt, true);
+}
+
+async function deletePortfolioInputConfigurationById(id: string) {
+  await deleteConfigurationById(id, true);
 }
 
 export async function exportConfigurationString(): Promise<string | undefined> {
@@ -304,6 +462,12 @@ async function getConfigurationById(
   id: string,
 ): Promise<ConfigurationModel | undefined> {
   const model = await getConfigurationModelById(id);
+  return decryptConfigurationModel(model);
+}
+
+async function decryptConfigurationModel(
+  model?: ConfigurationModel,
+): Promise<ConfigurationModel | undefined> {
   if (!model) {
     return;
   }
@@ -420,16 +584,21 @@ export async function getClientIDConfiguration(): Promise<string | undefined> {
 async function getConfigurationModelById(
   id: string,
 ): Promise<ConfigurationModel | undefined> {
-  const db = await getDatabase();
-    const configurations = await db.select<ConfigurationModel[]>(
-      `SELECT * FROM configuration where id = ?`,
-      [id],
-    );
-  if (configurations.length === 0) {
-    return undefined;
-  }
-
+  const configurations = await getConfigurationModelsByIds([id]);
   return configurations[0];
+}
+
+async function getConfigurationModelsByIds(
+  ids: readonly string[],
+): Promise<ConfigurationModel[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+  const db = await getDatabase();
+  return db.select<ConfigurationModel[]>(
+    `SELECT * FROM configuration WHERE id IN (${ids.map(() => "?").join(", ")})`,
+    [...ids],
+  );
 }
 
 export async function getStableCoins(): Promise<string[]> {
@@ -456,7 +625,7 @@ export async function getBlacklistCoins(): Promise<string[]> {
 }
 
 export async function saveBlacklistCoins(symbols: string[]) {
-  return saveConfigurationById(
+  return savePortfolioInputConfigurationById(
     blacklistCoinsId,
     normalizeBlacklistSymbols(symbols).join(","),
     false,
@@ -476,12 +645,12 @@ export async function removeFromBlacklist(symbol: string) {
 
 // license
 export async function saveLicense(license: string) {
-  return saveConfigurationById(licenseFixId, license);
+  return savePortfolioInputConfigurationById(licenseFixId, license);
 }
 
 // license
 export async function cleanLicense() {
-  return deleteConfigurationById(licenseFixId);
+  return deletePortfolioInputConfigurationById(licenseFixId);
 }
 
 // auto backup

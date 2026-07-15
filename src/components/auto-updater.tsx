@@ -11,7 +11,9 @@ const App = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
   useEffect(() => {
-    autoInstallLatestVersion();
+    void autoInstallLatestVersion().catch(() => {
+      console.warn("Automatic update check failed");
+    });
   }, []);
 
   async function autoInstallLatestVersion() {

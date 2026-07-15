@@ -4,8 +4,46 @@ on:
     branches:
       - release
 
+concurrency:
+  group: publish-${{ github.sha }}
+  cancel-in-progress: false
+
 jobs:
+  prepare-release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      release-id: ${{ steps.release.outputs.release-id }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: create draft release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="$(jq -r '.version' src-tauri/tauri.conf.json)"
+          tag="app-v${version}"
+          if release="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" 2>/dev/null)"; then
+            if [ "$(jq -r '.draft' <<< "${release}")" != "true" ]; then
+              echo "Release ${tag} is already public" >&2
+              exit 1
+            fi
+          else
+            release="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
+              -f tag_name="${tag}" \
+              -f target_commitish="${GITHUB_SHA}" \
+              -f name="App v${version}" \
+              -f body="See the assets to download this version and install." \
+              -F draft=true \
+              -F prerelease=false)"
+          fi
+          echo "release-id=$(jq -r '.id' <<< "${release}")" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
   publish-tauri:
+    needs: prepare-release
     permissions:
       contents: write
     strategy:
@@ -14,12 +52,16 @@ jobs:
         include:
           - os: ubuntu-22.04
             args: ""
+            target: ""
           - os: macos-latest
             args: --target x86_64-apple-darwin
+            target: x86_64-apple-darwin
           - os: macos-latest
             args: --target aarch64-apple-darwin
+            target: aarch64-apple-darwin
           - os: windows-latest
             args: ""
+            target: ""
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -54,58 +96,43 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-      - name: install target (mac only)
-        if: matrix.os == 'macos-latest'
-        run: |
-          rustup target add x86_64-apple-darwin
+      - name: install target
+        if: matrix.target != ''
+        run: rustup target add ${{ matrix.target }}
       - name: install frontend dependencies
         run: corepack yarn install --immutable
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: corepack yarn tauri
-          tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version
-          releaseName: "App v__VERSION__"
-          releaseBody: "See the assets to download this version and install."
-          releaseDraft: false
+          releaseId: ${{ needs.prepare-release.outputs.release-id }}
+          tagName: ${{ needs.prepare-release.outputs.tag }}
+          releaseDraft: true
+          includeUpdaterJson: false
           prerelease: false
           args: --config src-tauri/tauri.release.conf.json ${{ matrix.args }}
-  update-release:
-    needs: publish-tauri
+
+  finalize-release:
+    needs: [prepare-release, publish-tauri]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Install Node
+      - uses: actions/checkout@v4
+      - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-
-      - name: Enable Corepack
+      - name: enable corepack
         run: |
           corepack enable
           corepack prepare yarn@4.9.2 --activate
-
-      - name: Get Yarn cache
-        id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
-        shell: bash
-
-      - name: Cache Yarn dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.yarn-cache.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-
-      - run: corepack yarn install --immutable
-
-      - name: Create Update
+      - name: install frontend dependencies
+        run: corepack yarn install --immutable
+      - name: validate and publish release
         run: corepack yarn update-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

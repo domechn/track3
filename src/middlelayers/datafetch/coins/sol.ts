@@ -35,7 +35,10 @@ export class SOLAnalyzer implements Analyzer {
       addresses,
       async (address) => {
         const balances = await this.queryBalances(address);
-        const earnings = await this.queryEarnings(address);
+        const earnings = await this.queryEarnings(address).catch((error) => {
+          console.error("Failed to query Solana earn positions", error);
+          return [];
+        });
         return { address, balances, earnings };
       },
       2,
@@ -67,6 +70,7 @@ export class SOLAnalyzer implements Analyzer {
     const tokens = await this.queryTokens(cas);
 
     return newBalances
+      .filter((b) => b.amount > 0)
       .map((b) => {
         if (b.ca === "SOL") {
           return {

@@ -7,12 +7,22 @@ import {
   TransactionType,
 } from "./types";
 import { getAssetIdentity, getAssetType } from "./datafetch/utils/coins";
-import { getLocalStorageCacheInstance } from "./datafetch/utils/cache";
+import {
+  getCacheGroupEpoch,
+  getLocalStorageCacheInstance,
+  invalidateCacheGroups,
+} from "./datafetch/utils/cache";
 import { AssetType } from "./datafetch/types";
 import { CACHE_GROUP_KEYS } from "./consts";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { filterByAssetType } from "./charts-shared";
+import { executeWrite } from "./database";
+
+const TOTAL_PROFIT_CACHE_TTL_SECONDS = 15 * 60;
+const TOTAL_PROFIT_CACHE_SESSION_ID =
+  globalThis.crypto?.randomUUID?.() ??
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 type TotalProfit = {
   // total profit
@@ -70,7 +80,10 @@ export async function calculateTotalProfit(
   const cache = getLocalStorageCacheInstance(
     CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY,
   );
-  const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}-${symbol ?? "all"}-${assetType ?? "all"}`;
+  const cacheEpoch = getCacheGroupEpoch(
+    CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY,
+  );
+  const key = `${TOTAL_PROFIT_CACHE_SESSION_ID}-${cacheEpoch}-${dateRange.start.getTime()}-${dateRange.end.getTime()}-${symbol ?? "all"}-${assetType ?? "all"}`;
   const c = cache.getCache<TotalProfit>(key);
   if (c) {
     return c;
@@ -275,34 +288,41 @@ export async function calculateTotalProfit(
     coins,
     lastRecordDate: lrd ? new Date(lrd) : undefined,
   };
-  cache.setCache<TotalProfit>(key, resp);
+  cache.setCache<TotalProfit>(key, resp, TOTAL_PROFIT_CACHE_TTL_SECONDS);
   return resp;
 }
 
 export function cleanTotalProfitCache() {
-  const cache = getLocalStorageCacheInstance(
-    CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY,
-  );
-  cache.clearCache();
+  invalidateCacheGroups({
+    localStorage: [CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY],
+  });
 }
 
 export async function updateTransactionPrice(id: number, price: number) {
-  const txnModel = await TRANSACTION_HANDLER.getTransactionByID(id);
-  await TRANSACTION_HANDLER.createOrUpdate({
-    ...txnModel,
-    price,
-  });
+  const updatedAt = new Date().toISOString();
+  const result = await executeWrite(
+    "UPDATE transactions SET price = ?, updatedAt = ? WHERE id = ?",
+    [price, updatedAt, id],
+  );
+  if (result.rowsAffected === 0) {
+    throw new Error(`Transaction with id ${id} not found`);
+  }
+  cleanTotalProfitCache();
 }
 
 export async function updateTransactionTxnType(
   id: number,
   txnType: TransactionType,
 ) {
-  const txnModel = await TRANSACTION_HANDLER.getTransactionByID(id);
-  await TRANSACTION_HANDLER.createOrUpdate({
-    ...txnModel,
-    txnType,
-  });
+  const updatedAt = new Date().toISOString();
+  const result = await executeWrite(
+    "UPDATE transactions SET txnType = ?, updatedAt = ? WHERE id = ?",
+    [txnType, updatedAt, id],
+  );
+  if (result.rowsAffected === 0) {
+    throw new Error(`Transaction with id ${id} not found`);
+  }
+  cleanTotalProfitCache();
 }
 
 // return all transactions for exporting data

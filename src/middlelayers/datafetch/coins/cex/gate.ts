@@ -123,13 +123,13 @@ export class GateExchange implements Exchanger {
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
 		const resp = await bluebird.map([
 			this.fetchSpotBalance(),
-			this.fetchEarnBalance(),
-			this.fetchFixedTermBalance(),
-			this.fetchStakingBalance(),
-			this.fetchDualInvestmentBalance(),
-			this.fetchPortfolioBalance(),
-			this.fetchMarginBalance(),
-			this.functionOthersBalance(),
+			this.fetchOptionalBalance("earn", () => this.fetchEarnBalance()),
+			this.fetchOptionalBalance("fixed-term earn", () => this.fetchFixedTermBalance()),
+			this.fetchOptionalBalance("staking", () => this.fetchStakingBalance()),
+			this.fetchOptionalBalance("dual investment", () => this.fetchDualInvestmentBalance()),
+			this.fetchOptionalBalance("portfolio", () => this.fetchPortfolioBalance()),
+			this.fetchOptionalBalance("margin", () => this.fetchMarginBalance()),
+			this.fetchOptionalBalance("wallet total", () => this.functionOthersBalance()),
 		], (v) => v)
 		return mergeBalances(resp)
 	}
@@ -145,25 +145,34 @@ export class GateExchange implements Exchanger {
 		return Object.fromEntries(
 			allPrices
 				.filter((p) => p.currency_pair.endsWith(suffix))
-				.map((p) => [p.currency_pair.replace(suffix, ""), parseFloat(p.last)]),
+				.map((p) => [p.currency_pair.replace(suffix, "").toUpperCase(), parseFloat(p.last)] as const)
+				.filter(([, price]) => Number.isFinite(price) && price > 0),
 		)
 	}
 
 	private async fetchSpotBalance(): Promise<{ [k: string]: number }> {
 		const path = "/spot/accounts"
 		const resp = await this.fetch<SpotAccountResp>("GET", path, "")
-		return Object.fromEntries(
-			resp.map((v) => [v.currency, parseFloat(v.available) + parseFloat(v.locked)]),
-		)
+		const balances: { [k: string]: number } = {}
+		resp.forEach((v) => {
+			addToBalanceMap(
+				balances,
+				v.currency,
+				toNumber(v.available) + toNumber(v.locked),
+			)
+		})
+		return balances
 	}
 
 	private async fetchEarnBalance(): Promise<{ [k: string]: number }> {
 		const path = "/earn/uni/lends"
 		const resp = await this.fetch<EarnAccountResp>("GET", path, "")
 
-		return Object.fromEntries(
-			resp.map((v) => [v.currency, toNumber(v.amount)]),
-		)
+		const balances: { [k: string]: number } = {}
+		resp.forEach((v) => {
+			addToBalanceMap(balances, v.currency, toNumber(v.amount))
+		})
+		return balances
 	}
 
 	private async fetchFixedTermBalance(): Promise<{ [k: string]: number }> {
@@ -225,9 +234,9 @@ export class GateExchange implements Exchanger {
 		try {
 			const resp = await this.fetch<DualBalanceResp>("GET", "/earn/dual/balance", "")
 			
-			return {
-				USDT: toNumber(resp.user_total_interest_usdt),
-			}
+			const balances: { [k: string]: number } = {}
+			addToBalanceMap(balances, "USDT", toNumber(resp.user_total_interest_usdt))
+			return balances
 		} catch (e) {
 			console.error("Fetch dual investment balance failed", e)
 			return {}
@@ -238,9 +247,11 @@ export class GateExchange implements Exchanger {
 		const path = "/portfolio/accounts"
 		try {
 			const resp = await this.fetch<PortfolioAccountResp>("GET", path, "")
-			return Object.fromEntries(
-				Object.entries(resp.balances).map(([k, v]) => [k, parseFloat(v.available)]),
-			)
+			const balances: { [k: string]: number } = {}
+			Object.entries(resp.balances).forEach(([symbol, value]) => {
+				addToBalanceMap(balances, symbol, toNumber(value.available))
+			})
+			return balances
 
 		} catch (e) {
 			if (e instanceof Error && e.message.includes("Please open the portfolio account")) {
@@ -284,11 +295,25 @@ export class GateExchange implements Exchanger {
 		const path = "/wallet/total_balance"
 		const resp = await this.fetch<TotalBalanceResp>("GET", path, "")
 
-		return Object.fromEntries(
-			Object.entries(resp.details)
-				.filter(([k]) => ["futures", "options", "payment", "quant"].includes(k))
-				.map(([, v]) => [v.currency, parseFloat(v.amount)]),
-		)
+		const balances: { [k: string]: number } = {}
+		Object.entries(resp.details)
+			.filter(([k]) => ["futures", "options", "payment", "quant"].includes(k))
+			.forEach(([, value]) => {
+				addToBalanceMap(balances, value.currency, toNumber(value.amount))
+			})
+		return balances
+	}
+
+	private async fetchOptionalBalance(
+		productName: string,
+		fetcher: () => Promise<{ [k: string]: number }>,
+	): Promise<{ [k: string]: number }> {
+		try {
+			return await fetcher()
+		} catch (error) {
+			console.error(`Fetch Gate ${productName} balance failed`, error)
+			return {}
+		}
 	}
 
 	private async fetch<T>(method: "GET", path: string, queryParam: string): Promise<T> {

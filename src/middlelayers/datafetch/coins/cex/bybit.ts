@@ -217,7 +217,14 @@ export class BybitExchange implements Exchanger {
     return Object.fromEntries(
       resp.result.list
         .filter((p) => p.symbol.endsWith(suffix))
-        .map((p) => [p.symbol.replace(suffix, ""), parseFloat(p.lastPrice)]),
+        .map(
+          (p) =>
+            [
+              p.symbol.replace(suffix, "").toUpperCase(),
+              parseFloat(p.lastPrice),
+            ] as const,
+        )
+        .filter(([, price]) => Number.isFinite(price) && price > 0),
     );
   }
 

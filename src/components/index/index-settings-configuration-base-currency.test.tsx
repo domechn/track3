@@ -125,6 +125,7 @@ vi.mock("@/middlelayers/data", () => ({
 }));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
+  invalidateCacheGroups: vi.fn(),
   getLocalStorageCacheInstance: vi
     .fn()
     .mockReturnValue({ clearCache: vi.fn() }),
@@ -186,7 +187,7 @@ beforeEach(() => {
 });
 
 describe("Settings configuration route base currency warm start", () => {
-  it("does not flash USD before showing cached currency on direct route navigation", () => {
+  it("does not flash USD before showing cached currency on direct route navigation", async () => {
     render(
       <ChartResizeContext.Provider
         value={{
@@ -200,7 +201,7 @@ describe("Settings configuration route base currency warm start", () => {
       </ChartResizeContext.Provider>,
     );
 
-    expect(screen.getByText("EUR")).toBeInTheDocument();
+    expect(await screen.findByText("EUR")).toBeInTheDocument();
     expect(screen.queryByText(/^USD$/)).not.toBeInTheDocument();
   });
 });

@@ -8,6 +8,11 @@ import {
   loadAIConfig,
   saveAIConfig,
 } from "./configuration";
+import {
+  resetEncryptionWriteGateForTests,
+  runEncryptionKeyRotation,
+  runWithEncryptionWriteGate,
+} from "./encryption-write-gate";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -47,6 +52,7 @@ function createConfigurationDb(rows: Map<string, string>) {
 let configurationRows: Map<string, string>;
 
 beforeEach(() => {
+  resetEncryptionWriteGateForTests();
   vi.clearAllMocks();
   configurationRows = new Map<string, string>();
   vi.mocked(getDatabase).mockResolvedValue(
@@ -101,6 +107,90 @@ describe("AI configuration storage", () => {
     expect(loaded.apiKey).toBe(validConfig.apiKey);
     expect(loaded.model).toBe(validConfig.model);
     expect(loaded.contextSize).toBe(validConfig.contextSize);
+  });
+
+  it("drains an active config write before rotation and delays late writes until activation", async () => {
+    const events: string[] = [];
+    let activeKey = "old";
+    let releaseFirstWrite: (() => void) | undefined;
+    let firstWriteStarted: (() => void) | undefined;
+    const firstWriteBlocked = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    const firstWriteReady = new Promise<void>((resolve) => {
+      firstWriteStarted = resolve;
+    });
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === "encrypt") {
+        const endpoint = JSON.parse(String(args.data)).endpoint;
+        events.push(`encrypt:${endpoint}:${activeKey}`);
+        return `!ent:${activeKey}:${args.data}`;
+      }
+      return undefined;
+    });
+    vi.mocked(executeWrite).mockImplementation(
+      async (_sql: string, values?: unknown[]) => {
+        const endpoint = JSON.parse(
+          String(values?.[1]).replace(/^!ent:(old|new):/, ""),
+        ).endpoint;
+        events.push(`persist:${endpoint}`);
+        if (endpoint === "https://first.example") {
+          firstWriteStarted?.();
+          await firstWriteBlocked;
+        }
+        return { rowsAffected: 1 } as never;
+      },
+    );
+
+    const first = saveAIConfig({
+      ...validConfig,
+      endpoint: "https://first.example",
+    });
+    await firstWriteReady;
+
+    const rotation = runWithEncryptionWriteGate(async () => {
+      events.push("rotation");
+      activeKey = "new";
+    });
+    const late = saveAIConfig({
+      ...validConfig,
+      endpoint: "https://late.example",
+    });
+
+    await Promise.resolve();
+    expect(events).toEqual([
+      "encrypt:https://first.example:old",
+      "persist:https://first.example",
+    ]);
+
+    releaseFirstWrite?.();
+    await Promise.all([first, rotation, late]);
+    expect(events).toEqual([
+      "encrypt:https://first.example:old",
+      "persist:https://first.example",
+      "rotation",
+      "encrypt:https://late.example:new",
+      "persist:https://late.example",
+    ]);
+  });
+
+  it("rejects queued and future configuration writes when recovery is required", async () => {
+    const rotation = runEncryptionKeyRotation(async () => {
+      throw { code: "recovery_required", message: "Restart Track3" };
+    });
+    const queued = saveAIConfig(validConfig);
+
+    await expect(rotation).rejects.toMatchObject({
+      code: "recovery_required",
+    });
+    await expect(queued).rejects.toThrow("Restart Track3");
+    expect(invoke).not.toHaveBeenCalled();
+    expect(executeWrite).not.toHaveBeenCalled();
+
+    await expect(saveAIConfig(validConfig)).rejects.toThrow("Restart Track3");
+    expect(invoke).not.toHaveBeenCalled();
+    expect(executeWrite).not.toHaveBeenCalled();
   });
 
   it("trims trailing slashes from the endpoint and normalizes contextSize", async () => {

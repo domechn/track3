@@ -48,6 +48,7 @@ vi.mock("./license", () => ({
 }));
 
 vi.mock("./datafetch/utils/cache", () => ({
+  getCacheGroupEpoch: vi.fn(() => 0),
   getLocalStorageCacheInstance: vi.fn(),
   getMemoryCacheInstance: vi.fn(() => ({
     getCache: vi.fn(),

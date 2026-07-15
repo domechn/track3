@@ -1,8 +1,10 @@
 import {
   deleteFromDatabase,
+  saveModelsInWriteWork,
   saveModelsToDatabase,
   selectFromDatabase,
   selectFromDatabaseWithSql,
+  WriteDatabase,
 } from "../database";
 import {
   AssetModel,
@@ -24,6 +26,7 @@ export interface AssetHandlerImpl {
   importAssets(
     models: AssetModel[],
     conflictResolver: UniqueIndexConflictResolver,
+    writeDatabase?: WriteDatabase,
   ): Promise<AssetModel[]>;
 }
 
@@ -318,36 +321,46 @@ class AssetHandler implements AssetHandlerImpl {
   async importAssets(
     models: AssetModel[],
     conflictResolver: UniqueIndexConflictResolver,
+    writeDatabase?: WriteDatabase,
   ): Promise<AssetModel[]> {
-    return this.saveAssetsInternal(models, conflictResolver);
+    return this.saveAssetsInternal(models, conflictResolver, writeDatabase);
   }
 
   private async saveAssetsInternal(
     models: AssetModel[],
     conflictResolver: UniqueIndexConflictResolver,
+    writeDatabase?: WriteDatabase,
   ): Promise<AssetModel[]> {
     const chunkSize = 1000;
     const res = [];
 
     for (let i = 0; i < models.length; i += chunkSize) {
       const chunk = models.slice(i, i + chunkSize);
-      const resModels = await saveModelsToDatabase<AssetDatabaseModel>(
-        this.assetTableName,
-        chunk.map(
-          (m) =>
-            ({
-              uuid: m.uuid,
-              createdAt: m.createdAt,
-              asset_type: getAssetType(m),
-              symbol: m.symbol,
-              amount: m.amount,
-              value: m.value,
-              price: m.price,
-              wallet: m.wallet,
-            }) as AssetDatabaseModel,
-        ),
-        conflictResolver,
+      const databaseModels = chunk.map(
+        (m) =>
+          ({
+            uuid: m.uuid,
+            createdAt: m.createdAt,
+            asset_type: getAssetType(m),
+            symbol: m.symbol,
+            amount: m.amount,
+            value: m.value,
+            price: m.price,
+            wallet: m.wallet,
+          }) as AssetDatabaseModel,
       );
+      const resModels = writeDatabase
+        ? await saveModelsInWriteWork<AssetDatabaseModel>(
+            writeDatabase,
+            this.assetTableName,
+            databaseModels,
+            conflictResolver,
+          )
+        : await saveModelsToDatabase<AssetDatabaseModel>(
+            this.assetTableName,
+            databaseModels,
+            conflictResolver,
+          );
 
       res.push(...this.normalizeAssetModels(resModels));
     }

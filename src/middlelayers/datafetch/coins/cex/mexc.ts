@@ -107,7 +107,8 @@ export class MexcExchange implements Exchanger {
 		return Object.fromEntries(
 			tickers
 				.filter((ticker) => ticker.symbol.endsWith(suffix))
-				.map((ticker) => [ticker.symbol.replace(suffix, ""), toNumberish(ticker.price)]),
+				.map((ticker) => [ticker.symbol.replace(suffix, "").toUpperCase(), toNumberish(ticker.price)] as const)
+				.filter(([, price]) => price > 0),
 		)
 	}
 
@@ -159,9 +160,9 @@ export class MexcExchange implements Exchanger {
 		const balances: { [k: string]: number } = {}
 		const assets = resp.data ?? []
 		assets.forEach((asset: any) => {
-			const amount = toNumberish(asset.equity)
+			const amount = toNumberishOptional(asset.equity)
 			const fallbackAmount = toNumberish(asset.availableBalance) + toNumberish(asset.frozenBalance) + toNumberish(asset.unrealized)
-			addToBalanceMap(balances, asset.currency.toUpperCase(), Number.isFinite(amount) ? amount : fallbackAmount)
+			addToBalanceMap(balances, asset.currency.toUpperCase(), amount ?? fallbackAmount)
 		})
 
 		return balances
@@ -277,4 +278,12 @@ function toNumberish(value?: string | number): number {
 	}
 	const parsed = typeof value === "number" ? value : parseFloat(value)
 	return Number.isFinite(parsed) ? parsed : 0
+}
+
+function toNumberishOptional(value?: string | number): number | undefined {
+	if (value === undefined) {
+		return undefined
+	}
+	const parsed = typeof value === "number" ? value : parseFloat(value)
+	return Number.isFinite(parsed) ? parsed : undefined
 }
