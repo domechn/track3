@@ -282,7 +282,6 @@ describe("release finalizer", () => {
   });
 
   it("rejects manifest versions that do not match the app tag", () => {
-    const escapedAppVersion = appVersion.replace(/\./g, "\\.");
     expect(() =>
       updateModule.validateManifestForTag(
         {
@@ -296,7 +295,7 @@ describe("release finalizer", () => {
         },
         appReleaseTag,
       ),
-    ).toThrow(new RegExp(`app-v0\\.8\\.0.*app-v${escapedAppVersion}`));
+    ).toThrow(`app-v0.8.0 does not match release tag ${appReleaseTag}`);
   });
 
   it("rejects an existing public tag and older or equal publication", async () => {
@@ -323,6 +322,7 @@ describe("release finalizer", () => {
     await expect(updateModule.main(harness.dependencies)).rejects.toThrow(
       /not found/i,
     );
+    expect(harness.listReleases).toHaveBeenCalled();
     expect(harness.uploadReleaseAsset).not.toHaveBeenCalled();
     expect(harness.updateRelease).not.toHaveBeenCalled();
   });

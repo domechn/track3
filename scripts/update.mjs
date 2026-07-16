@@ -224,7 +224,8 @@ async function getLatestPublishedRelease(repos, options) {
 }
 
 async function getDraftReleaseByTag(repos, options, releaseTag) {
-  for (let page = 1; ; page += 1) {
+  let page = 1;
+  while (true) {
     const { data: releases } = await repos.listReleases({
       ...options,
       per_page: 100,
@@ -239,6 +240,8 @@ async function getDraftReleaseByTag(repos, options, releaseTag) {
     if (releases.length < 100) {
       throw new Error(`Release with tag ${releaseTag} not found`);
     }
+
+    page += 1;
   }
 }
 
