@@ -83,6 +83,7 @@ const bootstrap = vi.hoisted(() => {
             },
     }),
   );
+  const listReleases = vi.fn().mockResolvedValue({ data: [] });
 
   return {
     fetch: vi.fn().mockResolvedValue({
@@ -90,6 +91,7 @@ const bootstrap = vi.hoisted(() => {
       json: async () => manifest,
     }),
     getReleaseByTag,
+    listReleases,
     getLatestRelease: vi.fn(),
     deleteReleaseAsset: vi.fn(),
     uploadReleaseAsset: vi.fn(),
@@ -103,6 +105,7 @@ vi.mock("@actions/github", () => ({
       repos: {
         getLatestRelease: bootstrap.getLatestRelease,
         getReleaseByTag: bootstrap.getReleaseByTag,
+        listReleases: bootstrap.listReleases,
         deleteReleaseAsset: bootstrap.deleteReleaseAsset,
         uploadReleaseAsset: bootstrap.uploadReleaseAsset,
       },
@@ -161,6 +164,7 @@ function makeHarness({
     draft: false,
     assets: [asset("update.json", 100)],
   };
+  const listReleases = vi.fn().mockResolvedValue({ data: [release] });
   const getReleaseByTag = vi.fn(
     async ({ tag }: { tag: string }) => ({
       data: tag === "updater" ? legacyRelease : release,
@@ -217,6 +221,7 @@ function makeHarness({
           deleteReleaseAsset,
           getLatestRelease,
           getReleaseByTag,
+          listReleases,
           updateRelease,
           uploadReleaseAsset,
         },
@@ -233,6 +238,7 @@ function makeHarness({
     fetchMock,
     getLatestRelease,
     getReleaseByTag,
+    listReleases,
     updateRelease,
     uploadReleaseAsset,
   };
@@ -289,7 +295,7 @@ describe("release finalizer", () => {
         },
         appReleaseTag,
       ),
-    ).toThrow(/app-v0\.8\.0.*app-v0\.8\.1/);
+    ).toThrow(`app-v0.8.0 does not match release tag ${appReleaseTag}`);
   });
 
   it("rejects an existing public tag and older or equal publication", async () => {
@@ -307,6 +313,18 @@ describe("release finalizer", () => {
       );
       expect(harness.uploadReleaseAsset).not.toHaveBeenCalled();
     }
+  });
+
+  it("rejects when the draft release is not found in the release list", async () => {
+    const harness = makeHarness();
+    harness.listReleases.mockResolvedValue({ data: [] });
+
+    await expect(updateModule.main(harness.dependencies)).rejects.toThrow(
+      /not found/i,
+    );
+    expect(harness.listReleases).toHaveBeenCalled();
+    expect(harness.uploadReleaseAsset).not.toHaveBeenCalled();
+    expect(harness.updateRelease).not.toHaveBeenCalled();
   });
 
   it("publishes only after one complete manifest upload", async () => {

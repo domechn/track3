@@ -223,6 +223,31 @@ async function getLatestPublishedRelease(repos, options) {
   }
 }
 
+async function findReleaseByTag(repos, options, releaseTag) {
+  const MAX_PAGES = 10;
+  let page = 1;
+  while (page <= MAX_PAGES) {
+    const { data: releases } = await repos.listReleases({
+      ...options,
+      per_page: 100,
+      page,
+    });
+
+    const release = releases.find((r) => r.tag_name === releaseTag);
+    if (release) {
+      return release;
+    }
+
+    if (releases.length < 100) {
+      throw new Error(`Release with tag ${releaseTag} not found`);
+    }
+
+    page += 1;
+  }
+
+  throw new Error(`Release with tag ${releaseTag} not found`);
+}
+
 async function replaceAsset({
   data,
   existingAsset,
@@ -260,8 +285,8 @@ export async function main({
   const repos = octokit.rest.repos;
   const options = { owner, repo };
   const releaseTag = `${APP_RELEASE_TAG_PREFIX}${appVersion}`;
-  const [{ data: release }, latestRelease] = await Promise.all([
-    repos.getReleaseByTag({ ...options, tag: releaseTag }),
+  const [release, latestRelease] = await Promise.all([
+    findReleaseByTag(repos, options, releaseTag),
     getLatestPublishedRelease(repos, options),
   ]);
 
