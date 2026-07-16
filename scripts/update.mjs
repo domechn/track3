@@ -223,9 +223,10 @@ async function getLatestPublishedRelease(repos, options) {
   }
 }
 
-async function getDraftReleaseByTag(repos, options, releaseTag) {
+async function findReleaseByTag(repos, options, releaseTag) {
+  const MAX_PAGES = 10;
   let page = 1;
-  while (true) {
+  while (page <= MAX_PAGES) {
     const { data: releases } = await repos.listReleases({
       ...options,
       per_page: 100,
@@ -243,6 +244,8 @@ async function getDraftReleaseByTag(repos, options, releaseTag) {
 
     page += 1;
   }
+
+  throw new Error(`Release with tag ${releaseTag} not found`);
 }
 
 async function replaceAsset({
@@ -283,7 +286,7 @@ export async function main({
   const options = { owner, repo };
   const releaseTag = `${APP_RELEASE_TAG_PREFIX}${appVersion}`;
   const [release, latestRelease] = await Promise.all([
-    getDraftReleaseByTag(repos, options, releaseTag),
+    findReleaseByTag(repos, options, releaseTag),
     getLatestPublishedRelease(repos, options),
   ]);
 
