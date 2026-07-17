@@ -150,8 +150,14 @@ async function downloadSignature(asset, repos, options) {
     headers: { accept: "application/octet-stream" },
   });
 
+  // Octokit returns the raw response body; handle both string (text/plain)
+  // and binary (ArrayBuffer / Buffer) depending on the runtime and Octokit version.
   const signature =
-    typeof data === "string" ? data : Buffer.from(data).toString("utf8");
+    typeof data === "string"
+      ? data
+      : data instanceof ArrayBuffer || ArrayBuffer.isView(data)
+        ? new TextDecoder().decode(data)
+        : Buffer.from(data).toString("utf8");
   if (!signature) {
     throw new Error(`Updater signature ${asset.name} is empty`);
   }

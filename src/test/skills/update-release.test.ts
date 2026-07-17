@@ -366,6 +366,21 @@ describe("release finalizer", () => {
     }
   });
 
+  it("handles binary ArrayBuffer response from getReleaseAsset", async () => {
+    const harness = makeHarness();
+    harness.getReleaseAsset.mockImplementation(
+      async ({ asset_id }: { asset_id: number }) => ({
+        data: new TextEncoder().encode(`binary-sig-${asset_id}`).buffer,
+      }),
+    );
+
+    const manifest = await updateModule.main(harness.dependencies);
+
+    for (const platform of Object.values(manifest.platforms)) {
+      expect(platform.signature).toMatch(/^binary-sig-\d+$/);
+    }
+  });
+
   it("updates the legacy bridge only after publication", async () => {
     const harness = makeHarness();
 
