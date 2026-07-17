@@ -24,6 +24,7 @@ type Manifest = {
 type MainDependencies = {
   appVersion: string;
   now: () => Date;
+  releaseId?: number;
   octokit: {
     rest: {
       repos: Record<string, ReturnType<typeof vi.fn>>;
@@ -152,9 +153,11 @@ function makeRelease(overrides: Partial<Release> = {}): Release {
 function makeHarness({
   release = makeRelease(),
   latestTag = "app-v0.8.0",
+  listReleasesData,
 }: {
   release?: Release;
   latestTag?: string;
+  listReleasesData?: Release[];
 } = {}) {
   const calls: string[] = [];
   const legacyRelease = {
@@ -163,7 +166,10 @@ function makeHarness({
     draft: false,
     assets: [asset("update.json", 100)],
   };
-  const listReleases = vi.fn().mockResolvedValue({ data: [release] });
+  const listReleases = vi
+    .fn()
+    .mockResolvedValue({ data: listReleasesData ?? [release] });
+  const getRelease = vi.fn(async () => ({ data: release }));
   const getReleaseByTag = vi.fn(
     async ({ tag }: { tag: string }) => ({
       data: tag === "updater" ? legacyRelease : release,
@@ -215,6 +221,7 @@ function makeHarness({
         repos: {
           deleteReleaseAsset,
           getLatestRelease,
+          getRelease,
           getReleaseAsset,
           getReleaseByTag,
           listReleases,
@@ -232,6 +239,7 @@ function makeHarness({
     deleteReleaseAsset,
     dependencies,
     getLatestRelease,
+    getRelease,
     getReleaseAsset,
     getReleaseByTag,
     listReleases,
@@ -321,6 +329,46 @@ describe("release finalizer", () => {
     expect(harness.listReleases).toHaveBeenCalled();
     expect(harness.uploadReleaseAsset).not.toHaveBeenCalled();
     expect(harness.updateRelease).not.toHaveBeenCalled();
+  });
+
+  it("resolves the draft by explicit release id when provided", async () => {
+    const populatedDraft = makeRelease({ id: 42 });
+    const harness = makeHarness({
+      release: populatedDraft,
+      // A stale empty draft shares the same tag and would be returned first
+      // by a tag-based lookup, so the id must take precedence.
+      listReleasesData: [makeRelease({ id: 41, assets: [] })],
+    });
+    harness.dependencies.releaseId = 42;
+
+    const manifest = await updateModule.main(harness.dependencies);
+
+    expect(Object.keys(manifest.platforms).sort()).toEqual([
+      "darwin-aarch64",
+      "darwin-x86_64",
+      "linux-x86_64",
+      "windows-x86_64",
+    ]);
+    expect(harness.getRelease).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: "domechn",
+        repo: "track3",
+        release_id: 42,
+      }),
+    );
+    expect(harness.listReleases).not.toHaveBeenCalled();
+    expect(harness.updateRelease).toHaveBeenCalledWith(
+      expect.objectContaining({ release_id: 42, draft: false }),
+    );
+  });
+
+  it("falls back to tag lookup when no release id is provided", async () => {
+    const harness = makeHarness();
+
+    await updateModule.main(harness.dependencies);
+
+    expect(harness.listReleases).toHaveBeenCalled();
+    expect(harness.getRelease).not.toHaveBeenCalled();
   });
 
   it("publishes only after one complete manifest upload", async () => {

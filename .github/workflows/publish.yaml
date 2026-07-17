@@ -136,3 +136,4 @@ jobs:
         run: corepack yarn update-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.prepare-release.outputs.release-id }}
