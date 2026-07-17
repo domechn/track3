@@ -178,7 +178,11 @@ function makeHarness({
     }),
   });
   const getReleaseAsset = vi.fn(
-    async ({ asset_id }: { asset_id: number }) => ({
+    async ({
+      asset_id,
+    }: {
+      asset_id: number;
+    }): Promise<{ data: string | ArrayBufferLike }> => ({
       data: `signature-for-asset-${asset_id}`,
     }),
   );
