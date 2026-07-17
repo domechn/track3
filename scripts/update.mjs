@@ -147,12 +147,18 @@ function decodeSignatureData(data) {
   if (typeof data === "string") {
     return data;
   }
-  // Octokit returns ArrayBuffer or a TypedArray view (including Node.js Buffer,
-  // which is a Uint8Array subclass and therefore passes ArrayBuffer.isView).
-  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+  // Octokit returns a TypedArray view (including Node.js Buffer, which is a
+  // Uint8Array subclass) or a plain ArrayBuffer. Use toString-based detection
+  // for the ArrayBuffer case to remain correct across JS realms (e.g. jsdom).
+  if (
+    ArrayBuffer.isView(data) ||
+    Object.prototype.toString.call(data) === "[object ArrayBuffer]"
+  ) {
     return new TextDecoder().decode(data);
   }
-  return Buffer.from(data).toString("utf8");
+  throw new Error(
+    `Unexpected signature data type: ${Object.prototype.toString.call(data)}`,
+  );
 }
 
 async function downloadSignature(asset, repos, options) {
