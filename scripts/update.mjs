@@ -263,6 +263,21 @@ async function findReleaseByTag(repos, options, releaseTag) {
   throw new Error(`Release with tag ${releaseTag} not found`);
 }
 
+async function getReleaseById(repos, options, releaseId) {
+  const { data } = await repos.getRelease({
+    ...options,
+    release_id: releaseId,
+  });
+  return data;
+}
+
+async function resolveDraftRelease(repos, options, releaseTag, releaseId) {
+  if (releaseId !== undefined && releaseId !== null) {
+    return getReleaseById(repos, options, releaseId);
+  }
+  return findReleaseByTag(repos, options, releaseTag);
+}
+
 async function replaceAsset({
   data,
   existingAsset,
@@ -294,13 +309,14 @@ export async function main({
   now,
   octokit,
   owner,
+  releaseId,
   repo,
 }) {
   const repos = octokit.rest.repos;
   const options = { owner, repo };
   const releaseTag = `${APP_RELEASE_TAG_PREFIX}${appVersion}`;
   const [release, latestRelease] = await Promise.all([
-    findReleaseByTag(repos, options, releaseTag),
+    resolveDraftRelease(repos, options, releaseTag, releaseId),
     getLatestPublishedRelease(repos, options),
   ]);
 
@@ -362,11 +378,21 @@ async function createDefaultDependencies() {
     await readFile(resolve(process.cwd(), "src-tauri/tauri.conf.json"), "utf8"),
   );
 
+  const rawReleaseId = process.env.RELEASE_ID;
+  const releaseId =
+    rawReleaseId && rawReleaseId.trim() !== ""
+      ? Number(rawReleaseId)
+      : undefined;
+  if (releaseId !== undefined && !Number.isInteger(releaseId)) {
+    throw new Error(`Invalid RELEASE_ID: ${rawReleaseId}`);
+  }
+
   return {
     appVersion: tauriConfig.version,
     now: () => new Date(),
     octokit: getOctokit(process.env.GITHUB_TOKEN),
     owner: context.repo.owner,
+    releaseId,
     repo: context.repo.repo,
   };
 }
