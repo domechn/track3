@@ -23,7 +23,6 @@ type Manifest = {
 
 type MainDependencies = {
   appVersion: string;
-  fetch: typeof fetch;
   now: () => Date;
   octokit: {
     rest: {
@@ -178,6 +177,11 @@ function makeHarness({
       assets: [],
     }),
   });
+  const getReleaseAsset = vi.fn(
+    async ({ asset_id }: { asset_id: number }) => ({
+      data: `signature-for-asset-${asset_id}`,
+    }),
+  );
   const uploadReleaseAsset = vi.fn(
     async ({
       release_id,
@@ -199,27 +203,15 @@ function makeHarness({
   const deleteReleaseAsset = vi.fn(async () => {
     calls.push("delete-legacy");
   });
-  const fetchMock = vi.fn(async (input: string | URL | Request) => {
-    const url = String(input);
-    if (!url.endsWith(".sig")) {
-      throw new Error(`Unexpected download: ${url}`);
-    }
-
-    return {
-      ok: true,
-      status: 200,
-      text: async () => `signature:${url.split("/").at(-1)}`,
-    } as Response;
-  });
   const dependencies: MainDependencies = {
     appVersion,
-    fetch: fetchMock as typeof fetch,
     now: () => new Date("2026-07-15T00:00:00.000Z"),
     octokit: {
       rest: {
         repos: {
           deleteReleaseAsset,
           getLatestRelease,
+          getReleaseAsset,
           getReleaseByTag,
           listReleases,
           updateRelease,
@@ -235,8 +227,8 @@ function makeHarness({
     calls,
     deleteReleaseAsset,
     dependencies,
-    fetchMock,
     getLatestRelease,
+    getReleaseAsset,
     getReleaseByTag,
     listReleases,
     updateRelease,
@@ -356,6 +348,22 @@ describe("release finalizer", () => {
         make_latest: "true",
       }),
     );
+  });
+
+  it("downloads signatures via authenticated API instead of browser_download_url", async () => {
+    const harness = makeHarness();
+
+    await updateModule.main(harness.dependencies);
+
+    expect(harness.getReleaseAsset).toHaveBeenCalledTimes(4);
+    for (const [request] of harness.getReleaseAsset.mock.calls) {
+      expect(request).toMatchObject({
+        owner: "domechn",
+        repo: "track3",
+        headers: { accept: "application/octet-stream" },
+      });
+      expect(typeof request.asset_id).toBe("number");
+    }
   });
 
   it("updates the legacy bridge only after publication", async () => {

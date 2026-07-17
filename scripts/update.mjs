@@ -143,15 +143,15 @@ function findTargetAssets(release, target) {
   return { updaterAsset, signatureAsset };
 }
 
-async function downloadSignature(asset, fetchImplementation) {
-  const response = await fetchImplementation(asset.browser_download_url);
-  if (!response.ok) {
-    throw new Error(
-      `Updater signature ${asset.name} download failed with status ${response.status}`,
-    );
-  }
+async function downloadSignature(asset, repos, options) {
+  const { data } = await repos.getReleaseAsset({
+    ...options,
+    asset_id: asset.id,
+    headers: { accept: "application/octet-stream" },
+  });
 
-  const signature = await response.text();
+  const signature =
+    typeof data === "string" ? data : Buffer.from(data).toString("utf8");
   if (!signature) {
     throw new Error(`Updater signature ${asset.name} is empty`);
   }
@@ -161,19 +161,17 @@ async function downloadSignature(asset, fetchImplementation) {
 
 export async function buildManifest({
   appVersion,
-  fetchImplementation,
   now,
+  options,
   release,
+  repos,
 }) {
   const platforms = {};
 
   for (const target of EXPECTED_TARGETS) {
     const { updaterAsset, signatureAsset } = findTargetAssets(release, target);
     platforms[target.platform] = {
-      signature: await downloadSignature(
-        signatureAsset,
-        fetchImplementation,
-      ),
+      signature: await downloadSignature(signatureAsset, repos, options),
       url: updaterAsset.browser_download_url,
     };
   }
@@ -276,7 +274,6 @@ async function replaceAsset({
 
 export async function main({
   appVersion,
-  fetch: fetchImplementation,
   now,
   octokit,
   owner,
@@ -295,9 +292,10 @@ export async function main({
   const manifest = validateManifestForTag(
     await buildManifest({
       appVersion,
-      fetchImplementation,
       now,
+      options,
       release,
+      repos,
     }),
     releaseTag,
   );
@@ -349,7 +347,6 @@ async function createDefaultDependencies() {
 
   return {
     appVersion: tauriConfig.version,
-    fetch,
     now: () => new Date(),
     octokit: getOctokit(process.env.GITHUB_TOKEN),
     owner: context.repo.owner,
