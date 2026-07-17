@@ -143,15 +143,32 @@ function findTargetAssets(release, target) {
   return { updaterAsset, signatureAsset };
 }
 
-async function downloadSignature(asset, fetchImplementation) {
-  const response = await fetchImplementation(asset.browser_download_url);
-  if (!response.ok) {
-    throw new Error(
-      `Updater signature ${asset.name} download failed with status ${response.status}`,
-    );
+function decodeSignatureData(data) {
+  if (typeof data === "string") {
+    return data;
   }
+  // Octokit returns a TypedArray view (including Node.js Buffer, which is a
+  // Uint8Array subclass) or a plain ArrayBuffer. Use toString-based detection
+  // for the ArrayBuffer case to remain correct across JS realms (e.g. jsdom).
+  if (
+    ArrayBuffer.isView(data) ||
+    Object.prototype.toString.call(data) === "[object ArrayBuffer]"
+  ) {
+    return new TextDecoder().decode(data);
+  }
+  throw new Error(
+    `Unexpected signature data type: ${Object.prototype.toString.call(data)}`,
+  );
+}
 
-  const signature = await response.text();
+async function downloadSignature(asset, repos, options) {
+  const { data } = await repos.getReleaseAsset({
+    ...options,
+    asset_id: asset.id,
+    headers: { accept: "application/octet-stream" },
+  });
+
+  const signature = decodeSignatureData(data);
   if (!signature) {
     throw new Error(`Updater signature ${asset.name} is empty`);
   }
@@ -161,19 +178,17 @@ async function downloadSignature(asset, fetchImplementation) {
 
 export async function buildManifest({
   appVersion,
-  fetchImplementation,
   now,
+  options,
   release,
+  repos,
 }) {
   const platforms = {};
 
   for (const target of EXPECTED_TARGETS) {
     const { updaterAsset, signatureAsset } = findTargetAssets(release, target);
     platforms[target.platform] = {
-      signature: await downloadSignature(
-        signatureAsset,
-        fetchImplementation,
-      ),
+      signature: await downloadSignature(signatureAsset, repos, options),
       url: updaterAsset.browser_download_url,
     };
   }
@@ -276,7 +291,6 @@ async function replaceAsset({
 
 export async function main({
   appVersion,
-  fetch: fetchImplementation,
   now,
   octokit,
   owner,
@@ -295,9 +309,10 @@ export async function main({
   const manifest = validateManifestForTag(
     await buildManifest({
       appVersion,
-      fetchImplementation,
       now,
+      options,
       release,
+      repos,
     }),
     releaseTag,
   );
@@ -349,7 +364,6 @@ async function createDefaultDependencies() {
 
   return {
     appVersion: tauriConfig.version,
-    fetch,
     now: () => new Date(),
     octokit: getOctokit(process.env.GITHUB_TOKEN),
     owner: context.repo.owner,
