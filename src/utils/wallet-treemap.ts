@@ -12,6 +12,7 @@ export const KNOWN_CEX_EXCHANGES: ReadonlySet<string> = new Set([
   "coinbase",
   "htx",
   "mexc",
+  "backpack",
 ]);
 
 export const KNOWN_CHAINS: ReadonlySet<string> = new Set([

@@ -11,6 +11,7 @@ import { CoinbaseExchange } from "./coinbase";
 import { BybitExchange } from "./bybit";
 import { HtxExchange } from "./htx";
 import { MexcExchange } from "./mexc";
+import { BackpackExchange } from "./backpack";
 
 export interface Exchanger {
   getExchangeName(): string;
@@ -105,6 +106,12 @@ export class CexAnalyzer implements Analyzer {
             );
           case "mexc":
             return new MexcExchange(
+              exCfg.initParams.apiKey,
+              exCfg.initParams.secret,
+              exCfg.alias,
+            );
+          case "backpack":
+            return new BackpackExchange(
               exCfg.initParams.apiKey,
               exCfg.initParams.secret,
               exCfg.alias,
