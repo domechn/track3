@@ -15,6 +15,7 @@ import SUILogo from "@/assets/icons/sui-logo.svg";
 import BybitLogo from "@/assets/icons/bybit-logo.svg";
 import HtxLogo from "@/assets/icons/htx-logo.svg";
 import MexcLogo from "@/assets/icons/mexc-logo.svg";
+import BackpackLogo from "@/assets/icons/backpack-logo.svg";
 
 const dropsBotUrl = "https://drops.bot/address/";
 const debankUrl = "https://debank.com/profile/";
@@ -41,6 +42,7 @@ export const WALLET_LOGS: { [k: string]: string } = {
   bybit: BybitLogo,
   htx: HtxLogo,
   mexc: MexcLogo,
+  backpack: BackpackLogo,
   btc: BTCLogo,
   erc20: ETHLogo,
   sol: SOLLogo,
@@ -88,6 +90,10 @@ export const CEX_OPTIONS = [
   {
     value: "mexc",
     label: "MEXC",
+  },
+  {
+    value: "backpack",
+    label: "Backpack",
   },
 ];
 
