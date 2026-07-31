@@ -6266,6 +6266,7 @@ __metadata:
     tailwindcss: "npm:^3.4.19"
     tailwindcss-animate: "npm:^1.0.7"
     tauri-plugin-context-menu: "npm:^0.8.0"
+    tweetnacl: "npm:^1.0.3"
     typescript: "npm:^4.6.4"
     uuid: "npm:^11.1.1"
     vite: "npm:^6.4.3"
@@ -6306,6 +6307,13 @@ __metadata:
   version: 0.0.6
   resolution: "tunnel@npm:0.0.6"
   checksum: 10c0/e27e7e896f2426c1c747325b5f54efebc1a004647d853fad892b46d64e37591ccd0b97439470795e5262b5c0748d22beb4489a04a0a448029636670bfd801b75
+  languageName: node
+  linkType: hard
+
+"tweetnacl@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "tweetnacl@npm:1.0.3"
+  checksum: 10c0/069d9df51e8ad4a89fbe6f9806c68e06c65be3c7d42f0701cc43dba5f0d6064686b238bbff206c5addef8854e3ce00c643bff59432ea2f2c639feab0ee1a93f9
   languageName: node
   linkType: hard
 
