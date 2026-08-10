@@ -84,7 +84,8 @@
     "yaml": "^2.8.3"
   },
   "resolutions": {
-    "undici": "^7.28.0",
+    "undici": "^7.29.0",
+    "nanoid": "^3.3.17",
     "@babel/core": "^7.29.6",
     "tar": "^7.5.22",
     "postcss": "^8.5.24"
