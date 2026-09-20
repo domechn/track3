@@ -10,6 +10,8 @@
 // it lets the assistant refine its own answer before presenting it.
 
 import { callLlm } from "./llm";
+import { perAgentDataChars, serializeData } from "./synthesizer";
+import type { SynthesisOptions } from "./synthesizer";
 import type { AnalysisPlan, LlmCallParams, SubTaskResult } from "./types";
 
 // ── Prompt template ──
@@ -18,11 +20,13 @@ function buildOptimizerPrompt(
   query: string,
   draft: string,
   results: SubTaskResult[],
+  options: SynthesisOptions,
 ): string {
+  const perAgentChars = perAgentDataChars(options.contextSize, results.length);
   const resultsBlock = results
     .map(
       (r) =>
-        `[${r.skillName}]\n${r.text ?? "(no text)"}\nData: ${JSON.stringify(r.data).slice(0, 2000)}`,
+        `[${r.skillName}]\n${r.text ?? "(no text)"}\nData: ${serializeData(r.data, perAgentChars)}`,
     )
     .join("\n\n");
 
@@ -38,7 +42,13 @@ function buildOptimizerPrompt(
     "  5. **Tone** — Professional and helpful.",
     "- If the draft is already good, output it with minor polish only.",
     "- If the draft is missing important information, add it from the raw data.",
+    "- If data is marked [truncated ...] keep the draft's caveat about partial data; never invent the missing part.",
+    "- Reply in the language the user writes in (see the conversation below).",
+    "- You cannot draw charts or create files; present numbers as tables instead.",
     "- OUTPUT ONLY THE IMPROVED ANSWER. No explanations, no commentary, no meta-analysis.",
+    "",
+    "Recent conversation:",
+    options.historySnapshot || "(none)",
     "",
     "User query:",
     query,
@@ -64,6 +74,7 @@ export async function refineOutput(
   draft: string,
   results: SubTaskResult[],
   maxRounds: number,
+  options: SynthesisOptions = {},
 ): Promise<OptimizerOutput> {
   if (maxRounds <= 0 || !draft.trim()) {
     return { text: draft, rounds: 0 };
@@ -73,7 +84,7 @@ export async function refineOutput(
   let rounds = 0;
 
   for (let round = 0; round < Math.min(maxRounds, 3); round++) {
-    const prompt = buildOptimizerPrompt(plan.query, current, results);
+    const prompt = buildOptimizerPrompt(plan.query, current, results, options);
     const llmResult = await callLlm({
       ...params,
       temperature: 0.2, // low temperature for reliable improvement

@@ -3,6 +3,7 @@ use std::{fs, path::Path};
 use sqlx::Connection;
 
 use crate::ent::Ent;
+use crate::startup_security::LEGACY_ENCRYPTION_KEY;
 
 use super::{
     database,
@@ -115,8 +116,12 @@ pub(super) async fn prepare(
     for (file_name, path) in session_paths {
         let old_ciphertext = read_optional_string(&path)?
             .ok_or_else(|| format!("session preflight file disappeared: {file_name}"))?;
+        // Sessions written before a user-specific key existed are still
+        // under the built-in legacy key; rotation is how they finally move
+        // to a user key, so read them with the same fallback as `decrypt`.
         let plaintext = ent
             .decrypt_with_key(old_ciphertext.clone(), &old_key)
+            .or_else(|_| ent.decrypt_with_key(old_ciphertext.clone(), LEGACY_ENCRYPTION_KEY))
             .map_err(|_| format!("session preflight decryption failed for {file_name}"))?;
         let new_ciphertext = ent
             .encrypt_with_key(plaintext.clone(), &new_key)

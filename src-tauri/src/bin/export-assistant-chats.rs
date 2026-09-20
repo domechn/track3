@@ -7,7 +7,10 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use track3::{ent::Ent, startup_security::load_encryption_key};
+use track3::{
+    ent::Ent,
+    startup_security::{load_encryption_key, LEGACY_ENCRYPTION_KEY},
+};
 
 #[derive(Debug, Serialize, FromRow)]
 struct SessionMeta {
@@ -120,6 +123,7 @@ async fn main() -> Result<(), String> {
 
     let key = load_encryption_key(&key_path)?;
     let ent = Ent::new();
+    ent.set_key(key)?;
 
     let conn_options =
         SqliteConnectOptions::from_str(&format!("sqlite:{}", database_path.display()))
@@ -143,7 +147,7 @@ async fn main() -> Result<(), String> {
         let mut error: Option<String> = None;
 
         match fs::read_to_string(&session_file) {
-            Ok(ciphertext) => match ent.decrypt_with_key(ciphertext, &key) {
+            Ok(ciphertext) => match ent.decrypt_with_fallback(ciphertext, LEGACY_ENCRYPTION_KEY) {
                 Ok(plaintext) => match serde_json::from_str::<serde_json::Value>(&plaintext) {
                     Ok(json) => payload = Some(json),
                     Err(parse_error) => {

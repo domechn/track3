@@ -26,13 +26,17 @@ function buildAnalyzerPrompt(
     )
     .join("\n");
 
+  const today = new Date().toISOString().slice(0, 10);
+
   return [
     "You are a portfolio-analysis planner. Given a user query and recently available tools, produce a JSON plan.",
+    `Current date: ${today}. Resolve relative periods (\"30 days ago\", \"this year\") into ISO dates from this date.`,
     "",
     "Rules:",
     "- Output ONLY valid JSON — no markdown, no commentary.",
     "- Include only skills listed below. Do not invent tools.",
     "- Set `complexity` to `\"simple\"` if 1 skill is sufficient, `\"multi\"` if >= 2 are needed.",
+    "- Short acknowledgements or follow-ups that need no new data (\"ok\", \"thanks\", \"go on\") are `\"simple\"`.",
     "- For `complexity: \"simple\"`, set `tasks` to an empty array `[]`. The caller will let the model handle it directly.",
     "- For `complexity: \"multi\"`, define 1 task per skill needed.",
     "- Use `dependsOn: []` for independent tasks (they run in parallel).",

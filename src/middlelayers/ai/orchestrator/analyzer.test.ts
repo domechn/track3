@@ -149,4 +149,15 @@ describe("orchestrator.analyzer", () => {
     // Unknown skill should be filtered, resulting in empty tasks => fallback
     expect(plan.tasks).toHaveLength(0);
   });
+
+  it("tells the planner today's date so relative ranges resolve", async () => {
+    mockCallLlm.mockResolvedValue({ content: "", ok: false, error: "x" });
+    await analyzeQuery(
+      { endpoint: "https://test.com", apiKey: "sk-test", model: "gpt-4o-mini", messages: [] },
+      "30-day change?",
+      "",
+    );
+    const prompt = mockCallLlm.mock.calls[0]![0].messages[0]!.content;
+    expect(prompt).toContain(new Date().toISOString().slice(0, 10));
+  });
 });

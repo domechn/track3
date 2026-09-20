@@ -17,36 +17,33 @@ const skill: Skill = {
     type: "object",
     properties: {
       left: {
-        type: "object",
-        properties: {
-          date: { type: "string", description: "ISO date for the older/left snapshot." },
-          uuid: { type: "string", description: "Snapshot UUID." },
-        },
-        description: "Older snapshot. Provide either date or uuid.",
+        type: "string",
+        description:
+          "Older snapshot: ISO date, snapshot UUID, or a relative spec such as " +
+          "\"30 days ago\" / \"-30d\".",
       },
       right: {
-        type: "object",
-        properties: {
-          date: { type: "string", description: "ISO date for the newer/right snapshot." },
-          uuid: { type: "string", description: "Snapshot UUID." },
-        },
-        description: "Newer snapshot. Provide either date or uuid.",
+        type: "string",
+        description:
+          "Newer snapshot in the same formats, or \"latest\". Defaults to the latest snapshot.",
       },
     },
-    required: ["left", "right"],
+    required: ["left"],
   },
   async run(args, ctx): Promise<ToolResult> {
     trace("SKILL: portfolio_comparison called", "args:", JSON.stringify(args).slice(0, 200));
-    const left = await resolveSnapshot(
-      args.left as Record<string, unknown> | undefined,
-    );
-    const right = await resolveSnapshot(
-      args.right as Record<string, unknown> | undefined,
-    );
+    const totals = await getSnapshotSummaries();
+    const left = resolveSnapshot(totals, args.left);
+    const right = resolveSnapshot(totals, args.right || "latest");
 
     if (!left || !right) {
       return {
-        data: { error: "Could not resolve one or both sides" },
+        data: {
+          error: "Could not resolve one or both sides",
+          left: args.left,
+          right: args.right,
+          hint: "Pass an ISO date, a snapshot UUID, \"latest\", or \"N days ago\".",
+        },
         text: "Could not resolve one or both sides of the comparison.",
       };
     }
@@ -60,30 +57,48 @@ const skill: Skill = {
   },
 };
 
-async function resolveSnapshot(
-  side: Record<string, unknown> | undefined,
-): Promise<
-  { uuid: string; createdAt: Date; totalValue: number } | undefined
-> {
-  if (!side) return undefined;
-  const totals = await getSnapshotSummaries();
+type Snapshot = { uuid: string; createdAt: Date; totalValue: number };
+
+/**
+ * Resolve one side of the comparison. Planners send this in many shapes:
+ * "2026-06-20", {date}, {uuid}, "latest", "30 days ago", "-30d", {daysAgo: 30}.
+ */
+function resolveSnapshot(totals: Snapshot[], side: unknown): Snapshot | undefined {
   if (totals.length === 0) return undefined;
+  const latest = totals[totals.length - 1]!;
 
-  const uuid = side.uuid as string | undefined;
-  if (uuid) return totals.find((t) => t.uuid === uuid);
-
-  const dateStr = side.date as string | undefined;
-  if (dateStr) {
-    const target = new Date(dateStr).getTime();
-    if (Number.isNaN(target)) return undefined;
-    return totals.reduce((best, t) => {
-      const d = Math.abs(t.createdAt.getTime() - target);
-      if (!best || d < Math.abs(best.createdAt.getTime() - target)) return t;
-      return best;
-    }, undefined as (typeof totals)[number] | undefined);
+  if (side == null) return undefined;
+  if (typeof side === "object") {
+    const o = side as Record<string, unknown>;
+    if (typeof o.uuid === "string") return totals.find((t) => t.uuid === o.uuid);
+    if (typeof o.daysAgo === "number") return nearest(totals, daysAgo(o.daysAgo));
+    if (typeof o.date === "string") return resolveSnapshot(totals, o.date);
+    return Object.keys(o).length === 0 ? latest : undefined;
   }
+  if (typeof side === "number") return nearest(totals, daysAgo(side));
+  if (typeof side !== "string") return undefined;
 
-  return undefined;
+  const raw = side.trim();
+  if (!raw) return undefined;
+  if (/^(latest|now|today|current)$/i.test(raw)) return latest;
+  const byUuid = totals.find((t) => t.uuid === raw);
+  if (byUuid) return byUuid;
+  const rel = raw.match(/^-?\s*(\d+)\s*(d|day|days)(\s+ago)?$/i);
+  if (rel) return nearest(totals, daysAgo(Number(rel[1])));
+  const target = new Date(raw).getTime();
+  return Number.isNaN(target) ? undefined : nearest(totals, target);
+}
+
+function daysAgo(days: number): number {
+  return Date.now() - days * 86_400_000;
+}
+
+function nearest(totals: Snapshot[], target: number): Snapshot {
+  return totals.reduce((best, t) =>
+    Math.abs(t.createdAt.getTime() - target) < Math.abs(best.createdAt.getTime() - target)
+      ? t
+      : best,
+  );
 }
 
 async function runCompare(

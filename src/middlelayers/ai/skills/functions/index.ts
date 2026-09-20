@@ -9,6 +9,7 @@ export {
   getAllSymbols,
   getAssetDetail,
   listSnapshotDates,
+  downsample,
 } from "./assets";
 export type {
   SnapshotSummary,

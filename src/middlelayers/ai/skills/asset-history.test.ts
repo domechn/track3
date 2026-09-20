@@ -115,4 +115,39 @@ describe("asset_history skill", () => {
     expect(data.points[2].valueUsd).toBe(1300);
   });
 
+  it("aggregates per-wallet rows of the same snapshot into one point", async () => {
+    const groups = [
+      [
+        { id: 1, uuid: "a", createdAt: "2026-01-01T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 1, value: 1000, price: 1000, wallet: "w1" },
+        { id: 2, uuid: "a", createdAt: "2026-01-01T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 1, value: 1000, price: 1000, wallet: "w2" },
+      ],
+      [
+        { id: 3, uuid: "b", createdAt: "2026-01-02T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 1, value: 1500, price: 1500, wallet: "w1" },
+        { id: 4, uuid: "b", createdAt: "2026-01-02T00:00:00.000Z", assetType: "crypto", symbol: "BTC", amount: 1, value: 1500, price: 1500, wallet: "w2" },
+      ],
+    ];
+    vi.mocked(ASSET_HANDLER.listAssetsBySymbolByDateRange).mockResolvedValue(groups as any);
+
+    const result = await skill.run({ symbol: "BTC" }, { baseCurrency });
+    const data = result.data as any;
+    expect(data.points).toHaveLength(2);
+    expect(data.points[0].amount).toBe(2);
+    expect(data.points[0].valueUsd).toBe(2000);
+    expect(data.points[0].priceUsd).toBe(1000);
+    expect(data.pnl.percentage).toBe(50);
+  });
+
+  it("downsamples long series to maxPoints", async () => {
+    const rows = Array.from({ length: 400 }, (_, i) => ({
+      id: i, uuid: `u${i}`, createdAt: new Date(Date.UTC(2026, 0, 1) + i * 3600_000).toISOString(),
+      assetType: "crypto", symbol: "BTC", amount: 1, value: 1000 + i, price: 1000 + i,
+    }));
+    vi.mocked(ASSET_HANDLER.listAssetsBySymbolByDateRange).mockResolvedValue([rows] as any);
+
+    const result = await skill.run({ symbol: "BTC", maxPoints: 50 }, { baseCurrency });
+    const data = result.data as any;
+    expect(data.points.length).toBeLessThanOrEqual(50);
+    expect(data.points[0].valueUsd).toBe(1000);
+    expect(data.points[data.points.length - 1].valueUsd).toBe(1399);
+  });
 });

@@ -17,7 +17,7 @@ use track3::{
     },
     migration::run_migrations,
     refresh_persistence::persist_refresh as persist_refresh_atomically,
-    startup_security::{acquire_app_instance_lock, load_encryption_key},
+    startup_security::{acquire_app_instance_lock, load_encryption_key, LEGACY_ENCRYPTION_KEY},
     types::{CoinWithPrice, RefreshAssetInput, RefreshTransactionInput},
 };
 
@@ -168,7 +168,8 @@ fn encrypt(data: String) -> Result<String, String> {
 )]
 #[tauri::command]
 fn decrypt(data: String) -> Result<String, String> {
-    let res = ENT.decrypt(data);
+    // Sessions written before a user-specific key existed stay readable.
+    let res = ENT.decrypt_with_fallback(data, LEGACY_ENCRYPTION_KEY);
     match res {
         Ok(encrypted) => Ok(encrypted),
         Err(e) => Err(format!("decrypt error: {:?}", e)),

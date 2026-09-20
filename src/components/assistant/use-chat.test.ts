@@ -14,16 +14,19 @@ vi.mock("@/middlelayers/ai", async () => {
     streamChatCompletion: vi.fn(),
     runSkill: vi.fn(),
     probeConnection: vi.fn(),
+    orchestrateQuery: vi.fn(),
   };
 });
 
 import { useChat } from "./use-chat";
 import type { ChatMessage } from "./use-chat";
 import {
+  orchestrateQuery,
   probeConnection,
   runSkill,
   streamChatCompletion,
 } from "@/middlelayers/ai";
+import type { OrchestratorEvent } from "@/middlelayers/ai/orchestrator/types";
 
 const baseCurrency: CurrencyRateDetail = {
   currency: "USD",
@@ -49,6 +52,10 @@ beforeEach(() => {
   vi.mocked(streamChatCompletion).mockReset();
   vi.mocked(runSkill).mockReset();
   vi.mocked(probeConnection).mockReset();
+  vi.mocked(orchestrateQuery).mockReset();
+  // Default: the planner decides the query is simple, so the normal
+  // tool-calling loop handles it.
+  vi.mocked(orchestrateQuery).mockImplementation(async function* () {});
 });
 
 afterEach(() => {
@@ -496,5 +503,170 @@ describe("useChat", () => {
       content: "new session",
     });
     expect(result.current.input).toBe("");
+  });
+
+  it("asks the model to answer without tools once tool results exceed the context budget", async () => {
+    const requests: any[] = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (req) {
+      requests.push(req);
+      if (requests.length === 1) {
+        yield { kind: "tool_call", id: "c1", name: "transaction_list", args: {} };
+        yield { kind: "done" };
+        return;
+      }
+      yield { kind: "text", delta: "Final answer" };
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({
+      ok: true,
+      result: {
+        data: { rows: Array.from({ length: 500 }, (_, i) => ({ i, symbol: "BTC" })) },
+        text: "Returned 500 transaction(s).",
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useChat({ config, baseCurrency, contextSize: 512 }),
+    );
+    await act(async () => {
+      await result.current.send("average buy price?");
+    });
+
+    // Round 1 issued tools; the over-budget follow-up must still happen,
+    // but without tools so the model has to answer from what it has.
+    expect(requests).toHaveLength(2);
+    expect(requests[1].tools).toBeUndefined();
+
+    const toolMsg = requests[1].messages.find((m: any) => m.role === "tool");
+    expect(toolMsg.content).toContain("[truncated:");
+    expect(toolMsg.content).not.toContain('{\n  "rows"');
+
+    const assistant = result.current.messages[1] as { role: "assistant"; blocks: any[] };
+    expect(assistant.blocks.some((b) => b.kind === "text" && b.text.includes("Final answer"))).toBe(true);
+  });
+
+  it("does not mark tool results as truncated when they fit", async () => {
+    const requests: any[] = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (req) {
+      requests.push(req);
+      if (requests.length === 1) {
+        yield { kind: "tool_call", id: "c1", name: "asset_snapshot", args: {} };
+        yield { kind: "done" };
+        return;
+      }
+      yield { kind: "text", delta: "ok" };
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({
+      ok: true,
+      result: { data: { total: 1 }, text: "one" },
+    });
+
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => {
+      await result.current.send("snapshot");
+    });
+
+    const toolMsg = requests[1].messages.find((m: any) => m.role === "tool");
+    expect(toolMsg.content).toContain('{"total":1}');
+    expect(toolMsg.content).not.toContain("[truncated:");
+    expect(requests[1].tools).toBeDefined();
+  });
+
+  it("does not persist orchestrator agent_result lines as assistant text", async () => {
+    const events: OrchestratorEvent[] = [
+      { kind: "agent_start", taskId: "t1", skillName: "transaction_list", description: "List" },
+      {
+        kind: "agent_complete", taskId: "t1", skillName: "transaction_list", description: "List",
+        result: { id: "t1", skillName: "transaction_list", status: "completed", description: "List", text: "Returned 10 transaction(s)." },
+      },
+      { kind: "agent_result", taskId: "t1", skillName: "transaction_list", text: "Returned 10 transaction(s)." },
+      { kind: "synthesizing" },
+      { kind: "text", delta: "Your average is 65k." },
+      { kind: "done" },
+    ];
+    vi.mocked(orchestrateQuery).mockImplementation(async function* () {
+      for (const ev of events) yield ev;
+    });
+
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => {
+      await result.current.send("average?");
+    });
+
+    const assistant = result.current.messages[1] as { role: "assistant"; blocks: any[] };
+    const texts = assistant.blocks.filter((b) => b.kind === "text").map((b) => b.text);
+    expect(texts).toEqual(["Your average is 65k."]);
+    expect(assistant.blocks.some((b) => b.kind === "agent_activity")).toBe(true);
+    expect(streamChatCompletion).not.toHaveBeenCalled();
+  });
+
+  it("starts a new text block for each tool-loop round", async () => {
+    let call = 0;
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      call++;
+      if (call === 1) {
+        yield { kind: "text", delta: "Let me check." };
+        yield { kind: "tool_call", id: "c1", name: "asset_detail", args: {} };
+        yield { kind: "done" };
+        return;
+      }
+      yield { kind: "text", delta: "You hold 4 BTC." };
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({ ok: true, result: { data: { totalAmount: 4 }, text: "4" } });
+
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => {
+      await result.current.send("btc?");
+    });
+
+    const assistant = result.current.messages[1] as { role: "assistant"; blocks: any[] };
+    expect(assistant.blocks.filter((b) => b.kind === "text").map((b) => b.text)).toEqual([
+      "Let me check.",
+      "You hold 4 BTC.",
+    ]);
+  });
+
+  it("tells the model why a tool failed and shares the round budget across parallel calls", async () => {
+    const requests: any[] = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (req) {
+      requests.push(req);
+      if (requests.length === 1) {
+        for (let i = 0; i < 7; i++) {
+          yield { kind: "tool_call", id: `c${i}`, name: i === 6 ? "nope" : "transaction_list", args: {} };
+        }
+        yield { kind: "done" };
+        return;
+      }
+      yield { kind: "text", delta: "done" };
+      yield { kind: "done" };
+    });
+    const bigRows = Array.from({ length: 60 }, (_, i) => ({
+      id: i, symbol: "BTC", wallet: "f15f2bf3aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      txnType: "buy", amount: 0.0123, price: 62000.12, value: 762.6, valueInBase: 762.6,
+      txnCreatedAt: "2026-07-02T10:00:00.000Z",
+    }));
+    vi.mocked(runSkill).mockImplementation(async (name) =>
+      name === "nope"
+        ? { ok: false, error: "Unknown skill: nope" }
+        : { ok: true, result: { data: { rows: bigRows }, text: "Returned 60 transaction(s)." } },
+    );
+
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => {
+      await result.current.send("all months");
+    });
+
+    const toolMsgs = requests[1].messages.filter((m: any) => m.role === "tool");
+    expect(toolMsgs).toHaveLength(7);
+    expect(toolMsgs[6].content).toContain("Unknown skill: nope");
+    const totalChars = requests[1].messages.reduce(
+      (n: number, m: any) => n + (typeof m.content === "string" ? m.content.length : 0),
+      0,
+    );
+    // 7 uncapped results would be ~100k chars; the round budget keeps the
+    // whole request near the configured window.
+    expect(totalChars).toBeLessThan(8192 * 2.5 * 1.5);
   });
 });

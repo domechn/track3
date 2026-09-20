@@ -1,7 +1,7 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
 import { trace } from "./functions/trace";
-import { getAssetHistory } from "./functions/assets";
+import { downsample, getAssetHistory } from "./functions/assets";
 import type { AssetType } from "../../datafetch/types";
 
 const skill: Skill = {
@@ -23,6 +23,10 @@ const skill: Skill = {
       },
       from: { type: "string", description: "ISO date (inclusive)." },
       to: { type: "string", description: "ISO date (inclusive)." },
+      maxPoints: {
+        type: "number",
+        description: "Maximum points to return (default 80).",
+      },
     },
     required: ["symbol"],
   },
@@ -37,7 +41,14 @@ const skill: Skill = {
     const start = parseDateArg(args.from);
     const end = parseDateArg(args.to);
 
-    const series = await getAssetHistory(symbol, assetType, start, end);
+    const maxPoints =
+      typeof args.maxPoints === "number" && Number.isFinite(args.maxPoints)
+        ? args.maxPoints
+        : 80;
+    const series = downsample(
+      await getAssetHistory(symbol, assetType, start, end),
+      maxPoints,
+    );
     if (series.length === 0) {
       return {
         data: { symbol, assetType, empty: true, series: [] },

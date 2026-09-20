@@ -5,14 +5,15 @@ import { getTransactions, getTransactionStats } from "./functions/transactions";
 import { getAssetType } from "../../datafetch/utils/coins";
 
 const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
+const MAX_LIMIT = 500;
 
 const skill: Skill = {
   name: "transaction_list",
   description:
     "List transactions with optional filters. Returns transaction details " +
     "including symbol, type, amount, price, and wallet. Use this when the " +
-    "user asks about their recent buys, sells, deposits, or withdrawals.",
+    "user asks about their recent buys, sells, deposits, or withdrawals. " +
+    "For totals or average prices prefer transaction_stats.",
   parameters: {
     type: "object",
     properties: {
@@ -34,7 +35,7 @@ const skill: Skill = {
       to: { type: "string", description: "ISO date (inclusive)." },
       limit: {
         type: "number",
-        description: "Max transactions to return (default 20, max 100).",
+        description: "Max transactions to return (default 20, max 500).",
       },
     },
   },

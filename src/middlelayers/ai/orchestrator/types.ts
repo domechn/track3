@@ -91,6 +91,8 @@ export interface OrchestratorOptions {
   apiKey: string;
   model: string;
   baseCurrency: { currency: string; rate: number; alias: string; symbol: string };
+  /** Model context window in tokens; bounds inlined tool data. */
+  contextSize?: number;
   signal?: AbortSignal;
   // Whether to skip the LLM-based analyzer (useful for tests or fixed plans).
   skipAnalyzer?: boolean;

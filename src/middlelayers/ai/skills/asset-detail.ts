@@ -7,9 +7,9 @@ import { getAssetType } from "../../datafetch/utils/coins";
 const skill: Skill = {
   name: "asset_detail",
   description:
-    "Get current detail for one specific asset: total amount, value, " +
-    "and per-wallet breakdown. Use this when the user asks about a " +
-    "specific coin or stock they hold.",
+    "Get current detail for one specific asset from the latest snapshot: " +
+    "total amount, value, and per-wallet breakdown. Use this when the user " +
+    "asks about a specific coin or stock they hold.",
   parameters: {
     type: "object",
     properties: {
@@ -75,6 +75,7 @@ const skill: Skill = {
       data: {
         symbol,
         assetType: resolvedType,
+        asOf: new Date(records[0]!.createdAt).toISOString(),
         baseCurrency: ctx.baseCurrency.currency,
         totalAmount,
         totalValueUsd: totalValue,

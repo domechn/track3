@@ -22,6 +22,8 @@ const SESSIONS_TABLE = "chat_sessions" as const;
 const FILE_VERSION = 1;
 const PREVIEW_LIMIT = 30;
 const LLM_PROMPT_CHAR_LIMIT = 400;
+// Anything longer than this is the model answering the question, not titling it.
+const TITLE_MAX_CHARS = 60;
 
 // Module-level event system for notifying components when a session's
 // messages have been updated by an orphaned background stream.
@@ -324,7 +326,7 @@ async function callTitleLLM(
       {
         role: "system",
         content:
-          "You generate concise chat titles. Output only the title in 2-6 words. No quotes, no trailing punctuation.",
+          "You generate concise chat titles. Output only the title in 2-6 words, in the user's language. Do not answer or continue the conversation. No quotes, no trailing punctuation.",
       },
       {
         role: "user",
@@ -350,9 +352,10 @@ async function callTitleLLM(
       .replace(/<think>[\s\S]*?<\/think>/gi, "")
       .trim()
       .replace(/^["']+|["']+$/g, "")
-      .replace(/\.+$/, "")
-      .slice(0, 100);
-    if (cleaned.length === 0) return null;
+      .replace(/[.。]+$/, "");
+    if (cleaned.length === 0 || cleaned.length > TITLE_MAX_CHARS || /\n/.test(cleaned)) {
+      return null;
+    }
     return cleaned;
   } catch {
     return null;
