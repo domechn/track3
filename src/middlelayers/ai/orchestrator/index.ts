@@ -98,6 +98,7 @@ export async function* orchestrateQuery(
     llmParams,
     plan,
     collectedResults,
+    { historySnapshot, contextSize: options.contextSize },
   );
 
   if (options.signal?.aborted) {
@@ -124,6 +125,7 @@ export async function* orchestrateQuery(
         finalText,
         collectedResults,
         1,
+        { historySnapshot, contextSize: options.contextSize },
       );
 
       if (options.signal?.aborted) break;

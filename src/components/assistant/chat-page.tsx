@@ -125,7 +125,10 @@ function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
   return {
     role: "assistant",
     blocks: msg.blocks
-      .filter((b): b is { kind: "text"; text: string } => b.kind === "text")
+      .filter(
+        (b): b is { kind: "text"; text: string } =>
+          b.kind === "text" && b.text.trim().length > 0,
+      )
       .map((b): PersistedBlock => ({ kind: "text", text: b.text })),
   };
 }
@@ -262,7 +265,7 @@ function ReadyChat({
         console.error("Failed to persist chat exchange:", err);
       }
     },
-    [sessionId, navigate, refresh],
+    [sessionId, navigate, refresh, config, createNew],
   );
 
 	  // Hooks must be before the conditional early return so hook ordering
@@ -360,7 +363,15 @@ function ChatContent({
   onToggleSidebar: () => void;
 }) {
   const { t } = useTranslation();
-  const chat = useChat({ config, baseCurrency, sessionId, initialMessages, onStreamComplete, onStreamingChange });
+  const chat = useChat({
+    config,
+    baseCurrency,
+    contextSize: config.contextSize,
+    sessionId,
+    initialMessages,
+    onStreamComplete,
+    onStreamingChange,
+  });
 
   return (
     <Card

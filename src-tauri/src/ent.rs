@@ -193,6 +193,25 @@ impl Ent {
         self.decrypt_legacy_with_key(encrypted_data, key)
     }
 
+    /// Decrypt with the current key, falling back to `fallback_key` for
+    /// payloads written before the current key existed (e.g. chat sessions
+    /// that were never re-encrypted). Writes always use the current key, so
+    /// such payloads heal the next time they are saved or the key is rotated.
+    pub fn decrypt_with_fallback(
+        &self,
+        encrypted_data: String,
+        fallback_key: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let key = self.get_key()?;
+        match self.decrypt_with_key(encrypted_data.clone(), &key) {
+            Ok(plaintext) => Ok(plaintext),
+            Err(error) if key != fallback_key => self
+                .decrypt_with_key(encrypted_data, fallback_key)
+                .map_err(|_| error),
+            Err(error) => Err(error),
+        }
+    }
+
     fn is_ent(&self, data: &str) -> bool {
         data.starts_with(&self.ent_prefix)
     }
@@ -288,6 +307,33 @@ mod tests {
                 .unwrap(),
             "current"
         );
+    }
+
+    #[test]
+    fn decrypt_with_fallback_reads_payloads_written_under_the_fallback_key() {
+        let ent = make_ent();
+        let fallback_key = "pre-rotation-key";
+        let old_payload = ent
+            .encrypt_with_key("old session".to_string(), fallback_key)
+            .unwrap();
+        let current_payload = ent.encrypt("current".to_string()).unwrap();
+        let foreign_payload = ent
+            .encrypt_with_key("foreign".to_string(), "some-other-key")
+            .unwrap();
+
+        assert_eq!(
+            ent.decrypt_with_fallback(old_payload, fallback_key)
+                .unwrap(),
+            "old session"
+        );
+        assert_eq!(
+            ent.decrypt_with_fallback(current_payload, fallback_key)
+                .unwrap(),
+            "current"
+        );
+        assert!(ent
+            .decrypt_with_fallback(foreign_payload, fallback_key)
+            .is_err());
     }
 
     #[test]

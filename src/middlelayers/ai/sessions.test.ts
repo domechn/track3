@@ -503,4 +503,55 @@ describe("chat sessions middlelayer", () => {
     expect(title.length).toBeLessThanOrEqual(30);
     expect(title.endsWith("…")).toBe(true);
   });
+
+  it("generateTitle rejects LLM output that is an answer rather than a title", async () => {
+    const sessions = await import("./sessions");
+    const config: AIConfig = {
+      endpoint: "https://api.example.com/v1",
+      apiKey: "sk-test",
+      model: "gpt-4o-mini",
+      contextSize: 1024,
+    };
+    mocks.fetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content:
+                  "好的，我正在按月分批拉取你自 2026 年以来的全部买入记录，共 232 笔。拉完后我会用每笔买入的 BTC 数量和实际花费做加权平均，算出你的 BTC 买入均价",
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ) as any,
+    );
+    const title = await sessions.generateTitle(
+      config,
+      "能算出我从 26 年开始，连续买入 btc 的买入均价吗",
+      "232 笔买入超出了单次返回上限",
+    );
+    expect(title.length).toBeLessThanOrEqual(30);
+    expect(title.startsWith("能算出我")).toBe(true);
+  });
+
+  it("generateTitle rejects multi-line LLM output", async () => {
+    const sessions = await import("./sessions");
+    const config: AIConfig = {
+      endpoint: "https://api.example.com/v1",
+      apiKey: "sk-test",
+      model: "gpt-4o-mini",
+      contextSize: 1024,
+    };
+    mocks.fetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: "Line one\nLine two" } }] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ) as any,
+    );
+    const title = await sessions.generateTitle(config, "What is my BTC average?", "x");
+    expect(title).not.toContain("\n");
+    expect(title.startsWith("What is my")).toBe(true);
+  });
 });

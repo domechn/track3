@@ -12,6 +12,7 @@ import {
 import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
 import type { ToolResult } from "@/middlelayers/ai/skills/types";
 import type { OrchestratorEvent } from "@/middlelayers/ai/orchestrator/types";
+import { JSON_CHARS_PER_TOKEN } from "@/middlelayers/ai/orchestrator/synthesizer";
 
 // Agent-activity block rendered when the orchestrator decomposes a
 // complex query into multiple sub-tasks.
@@ -208,6 +209,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         name: string;
         args: unknown;
         result: ToolResult | null;
+        error?: string;
       }> = [];
       const TAG_BUF = 12;
       const TAG_OPEN = "<think>";
@@ -215,6 +217,10 @@ export function useChat(options: UseChatOptions): UseChatResult {
       let thinkState: "outside" | "inside" = "outside";
       let pendingBuf = "";
       let hasReasoningContent = false;
+      // Each model call (tool-loop round) starts its own text block so the
+      // pre-tool-call sentence and the post-result answer are not glued
+      // together mid-sentence.
+      let freshTextBlock = true;
 
       const addToBlock = (kind: "text" | "think", delta: string) => {
         if (!delta) return;
@@ -223,7 +229,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
         if (target.role !== "assistant") return;
         const blocks = target.blocks.slice();
         const last = blocks[blocks.length - 1];
-        if (last && last.kind === kind) {
+        const startNew = kind === "text" && freshTextBlock;
+        if (kind === "text") freshTextBlock = false;
+        if (last && last.kind === kind && !startNew) {
           blocks[blocks.length - 1] = { ...last, text: last.text + delta };
         } else {
           blocks.push({ kind, text: delta });
@@ -243,17 +251,17 @@ export function useChat(options: UseChatOptions): UseChatResult {
         name: string;
         args: unknown;
         result: ToolResult | null;
+        error?: string;
       }> => {
         const skillResult = await runSkill(
           ev.name,
           (ev.args as Record<string, unknown>) ?? {},
           { baseCurrency },
         );
-        let result: ToolResult | null = null;
         if (skillResult.ok) {
-          result = skillResult.result;
+          return { id: ev.id, name: ev.name, args: ev.args, result: skillResult.result };
         }
-        return { id: ev.id, name: ev.name, args: ev.args, result };
+        return { id: ev.id, name: ev.name, args: ev.args, result: null, error: skillResult.error };
       };
 
       for await (const ev of events) {
@@ -397,12 +405,8 @@ export function useChat(options: UseChatOptions): UseChatResult {
             break;
           }
           case "agent_result": {
-            if (ev.text) {
-              blocks.push({
-                kind: "text",
-                text: `[${ev.skillName}] ${ev.text}`,
-              });
-            }
+            // Already surfaced as resultPreview in the agent_activity block;
+            // pushing it as text would persist it and feed it back to the model.
             break;
           }
           case "synthesizing": {
@@ -495,6 +499,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
             apiKey: config.apiKey,
             model: config.model,
             baseCurrency,
+            contextSize,
             signal: controller.signal,
           },
           content,
@@ -520,31 +525,34 @@ export function useChat(options: UseChatOptions): UseChatResult {
         // Multi-round tool calling: loop tool results back to the model so it
         // can generate natural-language analysis from the returned data.
         const MAX_ROUNDS = 5;
+        // Character budget for the whole request; compact JSON is dense
+        // (~2.5 chars/token) so size everything by that. Each round's tool
+        // results may together use at most half of it.
+        const charBudget = Math.floor(contextSize * JSON_CHARS_PER_TOKEN);
         for (let round = 0; round < MAX_ROUNDS; round++) {
-          // Token budget guard: estimate total characters from provider messages
-          // (roughly 1 token ≈ 4 chars). If the history has grown beyond the
-          // configured context size, stop making further tool calls to avoid
-          // exceeding the model's context window or incurring unbounded cost.
-          const charBudget = (contextSize ?? 8192) * 4;
           const usedChars = providerMessages.reduce((sum, m) => {
             const content = typeof m.content === "string" ? m.content : "";
             return sum + content.length + (m.role ?? "").length + 100;
           }, 0);
-          if (usedChars > charBudget) break;
+          // Once the history outgrows the budget (or this is the last round)
+          // make one final call WITHOUT tools so the model answers from the
+          // data it already has instead of the turn ending silently.
+          const finalRound =
+            round === MAX_ROUNDS - 1 || (round > 0 && usedChars > charBudget);
 
           const events = streamChatCompletion({
             endpoint: config.endpoint,
             apiKey: config.apiKey,
             model: config.model,
             messages: providerMessages,
-            tools: toOpenAITools(),
+            tools: finalRound ? undefined : toOpenAITools(),
             advanced: config.advanced,
             signal: controller.signal,
           });
 
           const toolCalls = (await consumeStream(events, idx)) ?? [];
 
-          if (toolCalls.length === 0) {
+          if (toolCalls.length === 0 || finalRound) {
             break;
           }
 
@@ -562,18 +570,14 @@ export function useChat(options: UseChatOptions): UseChatResult {
             })),
           };
 
-          // Build tool result messages
+          // Build tool result messages; parallel calls share the round's budget.
+          const perToolChars = Math.floor(charBudget / 2 / toolCalls.length);
           const toolResultMessages: ProviderMessage[] = toolCalls.map((tc) => ({
             role: "tool",
             tool_call_id: tc.id,
             content: tc.result
-              ? tc.result.text && tc.result.data
-                ? tc.result.text +
-                  "\n\n\`\`\`json\n" +
-                  JSON.stringify(tc.result.data, null, 2).slice(0, 10000) +
-                  "\n\`\`\`"
-                : (tc.result.text ?? JSON.stringify(tc.result.data))
-              : "Tool execution failed.",
+              ? formatToolResult(tc.result, perToolChars)
+              : `Tool execution failed: ${tc.error ?? "unknown error"}`,
           }));
 
           // Extend provider messages for the next round
@@ -640,6 +644,21 @@ export function useChat(options: UseChatOptions): UseChatResult {
 }
 
 // ── Helpers ──
+
+/**
+ * Render a skill result for the model: summary line plus compact JSON.
+ * When the JSON is cut, say so explicitly so the model reports partial
+ * data or narrows its query instead of assuming it saw everything.
+ */
+export function formatToolResult(result: ToolResult, maxChars: number): string {
+  const json = result.data === undefined ? "" : JSON.stringify(result.data);
+  if (!json) return result.text ?? "";
+  const body =
+    json.length <= maxChars
+      ? json
+      : `${json.slice(0, maxChars)}\n[truncated: showing ${maxChars} of ${json.length} chars — narrow the query (date range, limit) if the missing part matters]`;
+  return `${result.text ? result.text + "\n\n" : ""}\`\`\`json\n${body}\n\`\`\``;
+}
 
 function upsertAgentActivityBlock(
   blocks: AssistantBlock[],

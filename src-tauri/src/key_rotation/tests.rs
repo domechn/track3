@@ -412,6 +412,39 @@ fn corrupt_session_ciphertext_aborts_without_mutation() {
 }
 
 #[test]
+fn legacy_key_session_is_rotated_to_the_new_key() {
+    tauri::async_runtime::block_on(async {
+        let fixture = Fixture::new().await;
+        // A session written before `.ent-key` existed: encrypted with the
+        // built-in legacy key while the app key is OLD_KEY.
+        let legacy_plaintext = fixture.session_plaintexts[SECOND_SESSION_FILE].clone();
+        fs::write(
+            fixture
+                .app_data_dir
+                .join("ai/sessions")
+                .join(SECOND_SESSION_FILE),
+            fixture
+                .ent
+                .encrypt_with_key(legacy_plaintext, LEGACY_KEY)
+                .unwrap(),
+        )
+        .unwrap();
+
+        rotate_encryption_key(
+            &fixture.database_path,
+            &fixture.app_data_dir,
+            &fixture.ent,
+            NEW_KEY.to_string(),
+        )
+        .await
+        .unwrap();
+
+        assert_session_data_uses_key(&fixture, NEW_KEY);
+        assert_no_rotation_artifacts(&fixture.app_data_dir);
+    });
+}
+
+#[test]
 fn invalid_new_keys_are_rejected_without_mutation() {
     tauri::async_runtime::block_on(async {
         for invalid_key in [

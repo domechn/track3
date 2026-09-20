@@ -137,4 +137,24 @@ describe("orchestrator.shouldOptimize", () => {
       }),
     ).toBe(true);
   });
+
+  it("gives the reviewer the conversation, the language rule, and budgeted data", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Improved draft answer text.", ok: true });
+    const big = { rows: Array.from({ length: 300 }, (_, i) => ({ i, symbol: "BTC", amount: i })) };
+
+    await refineOutput(
+      baseParams,
+      { query: "ok", tasks: [], requiresRefinement: true, maxOptimizerRounds: 1 },
+      "Draft answer that is long enough to be accepted.",
+      [{ id: "t1", skillName: "transaction_list", status: "completed", description: "d", data: big, text: "t" }],
+      1,
+      { historySnapshot: "user: 买入均价是多少", contextSize: 1024 },
+    );
+
+    const prompt = mockCallLlm.mock.calls[0]![0].messages[0]!.content;
+    expect(prompt).toContain("买入均价是多少");
+    expect(prompt).toContain("[truncated:");
+    expect(prompt).toContain("language the user writes in");
+    expect(prompt).not.toContain(JSON.stringify(big));
+  });
 });

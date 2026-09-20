@@ -17,11 +17,19 @@ export interface TransactionFilters {
   txnType?: string;
 }
 
+export type TransactionTypeStats = {
+  count: number;
+  /** Sum of amount (units of the asset). */
+  amount: number;
+  /** Sum of amount * price in USD. */
+  volume: number;
+};
+
 export interface TransactionStats {
-  buy: { count: number; volume: number };
-  sell: { count: number; volume: number };
-  deposit: { count: number; volume: number };
-  withdraw: { count: number; volume: number };
+  buy: TransactionTypeStats;
+  sell: TransactionTypeStats;
+  deposit: TransactionTypeStats;
+  withdraw: TransactionTypeStats;
 }
 
 // ── Query ──
@@ -60,8 +68,12 @@ export async function getTransactions(
         new Date(a.txnCreatedAt).getTime(),
     );
 
-  const clamped = Math.max(1, Math.min(1000, Math.floor(limit ?? 1000)));
-  const result = sorted.slice(0, clamped);
+  // No limit means the whole filtered set: aggregates (transaction_stats)
+  // must not silently drop the oldest rows.
+  const result =
+    limit === undefined
+      ? sorted
+      : sorted.slice(0, Math.max(1, Math.min(1000, Math.floor(limit))));
   trace("getTransactions", "->", result.length, "txns");
   return result;
   } catch (err) {
@@ -75,10 +87,10 @@ export function getTransactionStats(
   transactions: TransactionModel[],
 ): TransactionStats {
   const stats: TransactionStats = {
-    buy: { count: 0, volume: 0 },
-    sell: { count: 0, volume: 0 },
-    deposit: { count: 0, volume: 0 },
-    withdraw: { count: 0, volume: 0 },
+    buy: { count: 0, amount: 0, volume: 0 },
+    sell: { count: 0, amount: 0, volume: 0 },
+    deposit: { count: 0, amount: 0, volume: 0 },
+    withdraw: { count: 0, amount: 0, volume: 0 },
   };
 
   for (const t of transactions) {
@@ -86,6 +98,7 @@ export function getTransactionStats(
     const s = stats[type];
     if (s) {
       s.count += 1;
+      s.amount += t.amount;
       s.volume += t.amount * t.price;
     }
   }

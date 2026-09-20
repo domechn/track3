@@ -7,8 +7,9 @@ const skill: Skill = {
   name: "transaction_stats",
   description:
     "Aggregate transaction statistics over a period. Returns buy, sell, " +
-    "deposit, and withdraw totals (count and volume). Use this when " +
-    "the user asks for spending, income, or trading volume summaries.",
+    "deposit, and withdraw totals (count, amount, volume, and weighted " +
+    "average price). Use this for spending, trading volume, average buy " +
+    "price, or cost-basis questions instead of listing every transaction.",
   parameters: {
     type: "object",
     properties: {
@@ -47,10 +48,16 @@ const skill: Skill = {
 
     const rate = ctx.baseCurrency.rate || 1;
 
-    const enrich = (s: { count: number; volume: number }) => ({
+    const cur = ctx.baseCurrency.currency;
+    const summarize = (label: string, s: { count: number; amount: number; volume: number }) =>
+      `${label}: ${s.count} txns, ${+s.amount.toFixed(8)} units for ${(s.volume * rate).toFixed(2)} ${cur} (avg ${(enrich(s).averagePrice).toFixed(2)} ${cur}).`;
+    const enrich = (s: { count: number; amount: number; volume: number }) => ({
       count: s.count,
+      amount: s.amount,
       volumeUsd: s.volume,
       volume: s.volume * rate,
+      averagePriceUsd: s.amount > 0 ? s.volume / s.amount : 0,
+      averagePrice: s.amount > 0 ? (s.volume / s.amount) * rate : 0,
     });
 
     return {
@@ -68,7 +75,7 @@ const skill: Skill = {
           withdraw: enrich(stats.withdraw),
         },
       },
-      text: `Transaction summary: ${transactions.length} total. Buy: ${stats.buy.count} (${(stats.buy.volume * rate).toFixed(2)} ${ctx.baseCurrency.currency}), Sell: ${stats.sell.count} (${(stats.sell.volume * rate).toFixed(2)} ${ctx.baseCurrency.currency}).`,
+      text: `Transaction summary: ${transactions.length} total. ${summarize("Buy", stats.buy)} ${summarize("Sell", stats.sell)}`,
     };
   },
 };
