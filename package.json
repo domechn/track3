@@ -66,7 +66,7 @@
     "framer-motion": "^11.0.0",
     "jose": "^6.0.11",
     "md5": "^2.3.0",
-    "qs": "^6.15.2",
+    "qs": "^6.16.0",
     "query-string": "^8.1.0",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.2.0",
@@ -88,7 +88,10 @@
     "nanoid": "^3.3.17",
     "@babel/core": "^7.29.6",
     "tar": "^7.5.22",
-    "postcss": "^8.5.24"
+    "postcss": "^8.5.24",
+    "browserslist": "^4.29.0",
+    "decode-uri-component": "^0.5.0",
+    "postcss-selector-parser": "^6.1.3"
   },
   "devDependencies": {
     "@actions/github": "^9.1.0",
@@ -109,13 +112,13 @@
     "@types/react-router-dom": "^5.3.3",
     "@types/uuid": "^9.0.2",
     "@vitejs/plugin-react": "^5.1.0",
-    "@vitest/coverage-v8": "4.1.8",
+    "@vitest/coverage-v8": "4.1.11",
     "autoprefixer": "^10.4.16",
     "jsdom": "^29.0.2",
     "postcss": "^8.5.24",
     "tailwindcss": "^3.4.19",
     "typescript": "^4.6.4",
     "vite": "^6.4.3",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.11"
   }
 }
