@@ -26,7 +26,7 @@ import { AnimatedPage } from "../motion";
 import PageLoadingOverlay from "../page-loading-overlay";
 import AutoBackupIndicator from "../auto-backup-indicator";
 import "./index.css";
-import { Route, Routes, HashRouter, Outlet, Navigate } from "react-router-dom";
+import { Route, Routes, HashRouter, Outlet, Navigate, useLocation } from "react-router-dom";
 
 import { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -284,6 +284,8 @@ type AppRoutesProps = {
   tDateRange: { start: Date; end: Date };
   maxDateRange: { start: Date; end: Date };
   hasData: boolean;
+  retainHistory: boolean;
+  setRetainHistory: React.Dispatch<React.SetStateAction<boolean>>;
   onDatePickerValueChange: (
     selectedTimes: number,
     nextDateRange: DateRange | undefined,
@@ -307,11 +309,21 @@ function AppRoutes({
   tDateRange,
   maxDateRange,
   hasData,
+  retainHistory,
+  setRetainHistory,
   onDatePickerValueChange,
   lastRefreshAt,
   onDataChanged,
   handleConfigurationSave,
 }: AppRoutesProps) {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname !== "/history") {
+      setRetainHistory(false);
+    }
+  }, [location.pathname, setRetainHistory]);
+
   return (
     <Routes>
       <Route
@@ -392,7 +404,10 @@ function AppRoutes({
           path="history"
           element={
             <AnimatedPage>
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+              <PageWrapper
+                dateRange={tDateRange}
+                hasData={hasData || retainHistory}
+              >
                 <HistoricalData
                   currency={currentCurrency}
                   dateRange={tDateRange}
@@ -491,6 +506,7 @@ const App = () => {
 
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
+  const [retainHistory, setRetainHistory] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [dataChangedVersion, setDataChangedVersion] = useState(0);
   const [autoBackupStatus, setAutoBackupStatus] = useState<
@@ -630,16 +646,20 @@ const App = () => {
     }
   }
 
-  function onDataChanged() {
+  function onDataChanged(action?: "delete" | "undoDeletion") {
     const currentHash = window.location.hash || "";
     const isSettingsRoute = currentHash.startsWith("#/settings");
+    setRetainHistory(action === "delete" || action === "undoDeletion");
     // Bump the data-changed version first so any consumer that subscribes
     // through DataChangedContext sees a new value during this same tick,
     // even when the settings route skips loadAllData() below.
     setDataChangedVersion((v) => v + 1);
     clearAllCache();
     if (!isSettingsRoute) {
-      void loadAllData().catch(() => {
+      void loadAllData(
+        true,
+        action === "delete" || action === "undoDeletion",
+      ).catch(() => {
         console.warn("data reload failed");
       });
     }
@@ -685,7 +705,7 @@ const App = () => {
     });
   }
 
-  function loadAllData(active = true) {
+  function loadAllData(active = true, preserveDateRange = false) {
     return Promise.all([
       queryLastRefreshAt(),
       getAvailableDates(),
@@ -702,16 +722,18 @@ const App = () => {
       setAvailableDates((prev) => (isSameDateList(prev, days) ? prev : days));
 
       const { dr, size } = queryInfo;
-      setDateRange((prev) => {
-        const prevFrom = prev?.from?.getTime() ?? 0;
-        const prevTo = prev?.to?.getTime() ?? 0;
-        const nextFrom = dr?.from?.getTime() ?? 0;
-        const nextTo = dr?.to?.getTime() ?? 0;
-        if (prevFrom === nextFrom && prevTo === nextTo) {
-          return prev;
-        }
-        return dr;
-      });
+      if (!preserveDateRange) {
+        setDateRange((prev) => {
+          const prevFrom = prev?.from?.getTime() ?? 0;
+          const prevTo = prev?.to?.getTime() ?? 0;
+          const nextFrom = dr?.from?.getTime() ?? 0;
+          const nextTo = dr?.to?.getTime() ?? 0;
+          if (prevFrom === nextFrom && prevTo === nextTo) {
+            return prev;
+          }
+          return dr;
+        });
+      }
       setOriginalQuerySize((prev) => (prev === size ? prev : size));
     });
   }
@@ -772,6 +794,8 @@ const App = () => {
           tDateRange={tDateRange}
           maxDateRange={maxDateRange}
           hasData={hasData}
+          retainHistory={retainHistory}
+          setRetainHistory={setRetainHistory}
           onDatePickerValueChange={onDatePickerValueChange}
           lastRefreshAt={lastRefreshAt}
           onDataChanged={onDataChanged}
