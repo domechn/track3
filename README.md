@@ -36,6 +36,12 @@
 5. Support dozens of charts to analyze data such as asset allocation, wallet proportion, position changes, profit and loss, and more.
 6. Support data backup and restore. Users can export data to local files and import them to other devices, or share them between multiple devices by cloud drive ( e.g. iCloud ).
 
+### Automatic backup format
+
+Automatic backups use `<autoBackupDir>/track3-backup/<clientID>/`. Each client has its own `metadata.json` and a `data/` directory with one JSON part per UTC month (`YYYY-MM.<hash8>.json`). Metadata lists each part's record count, UTF-8 byte length, and SHA-256 hash of the exact part text. Its `metaHash` is SHA-256 of the JSON without `metaHash`, with object keys sorted. Track3 writes changed parts first and replaces metadata last; imports verify hashes before loading each part.
+
+Manual exports remain single JSON files. Upgraded installations still import the older `track3-auto-backup.json` when its client has no valid v2 backup. This sharing is one-way: older installations must upgrade to receive new automatic backups.
+
 ## Supported Sources
 
 - Centralized exchanges: Binance, OKX, Bitget, Kraken, Gate.io, Coinbase, Bybit, HTX, MEXC
