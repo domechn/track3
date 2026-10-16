@@ -27,7 +27,7 @@ const skill: Skill = {
     },
   },
   async run(args, ctx): Promise<ToolResult> {
-    trace("SKILL: transaction_stats called", "args:", JSON.stringify(args).slice(0, 200));
+    trace("SKILL: transaction_stats called");
     const symbol =
       typeof args.symbol === "string" && args.symbol.trim()
         ? args.symbol.trim().toUpperCase()

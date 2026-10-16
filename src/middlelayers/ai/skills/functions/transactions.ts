@@ -4,7 +4,7 @@ import { TRANSACTION_HANDLER } from "../../../entities/transactions";
 import { getAssetType } from "../../../datafetch/utils/coins";
 import type { TransactionModel } from "../../../types";
 import type { AssetType } from "../../../datafetch/types";
-import { trace, traceError } from "./trace";
+import { trace } from "./trace";
 
 // ── Types ──
 
@@ -77,7 +77,6 @@ export async function getTransactions(
   trace("getTransactions", "->", result.length, "txns");
   return result;
   } catch (err) {
-    traceError("getTransactions failed", err);
     throw err;
   }
 }

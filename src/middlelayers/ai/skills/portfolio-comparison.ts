@@ -31,7 +31,7 @@ const skill: Skill = {
     required: ["left"],
   },
   async run(args, ctx): Promise<ToolResult> {
-    trace("SKILL: portfolio_comparison called", "args:", JSON.stringify(args).slice(0, 200));
+    trace("SKILL: portfolio_comparison called");
     const totals = await getSnapshotSummaries();
     const left = resolveSnapshot(totals, args.left);
     const right = resolveSnapshot(totals, args.right || "latest");

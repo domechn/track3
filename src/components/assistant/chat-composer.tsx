@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/i18n";
 import { v4 as uuidv4 } from "uuid";
-import { mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
+import { remove } from "@tauri-apps/plugin-fs";
 import { appDataDir } from "@tauri-apps/api/path";
 import {
   KeyboardIcon,
@@ -13,28 +13,15 @@ import {
 
 type ImageAttachment = {
   id: string;
-  path: string;
+  file: File;
   previewUrl: string;
-  mimeType: string;
 };
 
-async function saveAttachment(file: File): Promise<ImageAttachment> {
-  const base = await appDataDir();
-  const dir = `${base.replace(/\/+$/, "")}/ai/attachments`;
-  await mkdir(dir, { recursive: true });
-  const id = uuidv4();
-  const rawExt = (file.name.split(".").pop() || "png").toLowerCase();
-  const ext = /^(png|jpg|jpeg|gif|webp|bmp|svg)$/.test(rawExt) ? rawExt : "png";
-  const path = `${dir}/${id}.${ext}`;
-  const buffer = await file.arrayBuffer();
-  await writeFile(path, new Uint8Array(buffer));
-  return {
-    id,
-    path,
-    previewUrl: URL.createObjectURL(file),
-    mimeType: file.type || `image/${ext}`,
-  };
+function makeAttachment(file: File): ImageAttachment {
+  return { id: uuidv4(), file, previewUrl: URL.createObjectURL(file) };
 }
+
+let legacyAttachmentCleanupStarted = false;
 
 export default function ChatComposer({
   value,
@@ -53,12 +40,25 @@ export default function ChatComposer({
 }) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const attachmentUrlsRef = useRef(new Set<string>());
   const valueRef = useRef(value);
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
+
+  useEffect(() => {
+    if (!legacyAttachmentCleanupStarted) {
+      legacyAttachmentCleanupStarted = true;
+      void appDataDir()
+        .then((base) => remove(`${base.replace(/\/+$/, "")}/ai/attachments`, { recursive: true }))
+        .catch(() => {});
+    }
+    return () => {
+      for (const url of attachmentUrlsRef.current) URL.revokeObjectURL(url);
+      attachmentUrlsRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     // Autofocus on mount for a faster first interaction.
@@ -76,12 +76,15 @@ export default function ChatComposer({
     el.style.height = `${next}px`;
   }, [value]);
 
-  const canSend = !isStreaming && value.trim().length > 0 && !disabled;
+  const canSend = !isStreaming && (value.trim().length > 0 || attachments.length > 0) && !disabled;
 
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => {
       const removed = prev.find((a) => a.id === id);
-      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      if (removed) {
+        URL.revokeObjectURL(removed.previewUrl);
+        attachmentUrlsRef.current.delete(removed.previewUrl);
+      }
       return prev.filter((a) => a.id !== id);
     });
   }, []);
@@ -95,22 +98,17 @@ export default function ChatComposer({
     e.preventDefault();
     const file = imageItem.getAsFile();
     if (!file) return;
-    saveAttachment(file)
-      .then((attachment) => {
-        setAttachments((prev) => [...prev, attachment]);
-      })
-      .catch((err) => console.error("Failed to save pasted image:", err));
+    const attachment = makeAttachment(file);
+    attachmentUrlsRef.current.add(attachment.previewUrl);
+    setAttachments((prev) => [...prev, attachment]);
   }, []);
 
   // Resize large images before base64 encoding to save AI context window.
   // Most vision models don't need full resolution — 2048px is plenty.
   async function imageToCompressedBase64(
-    path: string,
-    mimeType: string,
+    file: File,
   ): Promise<string> {
-    const data = await readFile(path);
-    const blob = new Blob([data], { type: mimeType });
-    const img = await createImageBitmap(blob);
+    const img = await createImageBitmap(file);
     let { width, height } = img;
     const MAX_DIM = 2048;
     if (width > MAX_DIM || height > MAX_DIM) {
@@ -124,10 +122,20 @@ export default function ChatComposer({
     const ctx = canvas.getContext("2d");
     ctx?.drawImage(img, 0, 0, width, height);
     img.close();
+    let hasTransparency = false;
+    if (file.type !== "image/jpeg") {
+      try {
+        const pixels = ctx?.getImageData(0, 0, width, height).data;
+        hasTransparency = !pixels || pixels.some((alpha, index) => index % 4 === 3 && alpha < 255);
+      } catch {
+        hasTransparency = true;
+      }
+    }
+    const outputType = hasTransparency ? "image/png" : "image/jpeg";
     const compressedBlob = await new Promise<Blob>((resolve) =>
       canvas.toBlob(
         (b) => resolve(b!),
-        mimeType === "image/png" ? "image/jpeg" : mimeType,
+        outputType,
         0.8,
       ),
     );
@@ -137,14 +145,14 @@ export default function ChatComposer({
     for (let i = 0; i < bytes.length; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
-    return `data:image/jpeg;base64,${btoa(binary)}`;
+    return `data:${outputType};base64,${btoa(binary)}`;
   }
 
   const handleSend = useCallback(async () => {
     if (attachments.length > 0) {
       const imageParts = await Promise.all(
         attachments.map(async (a) => {
-          const dataUrl = await imageToCompressedBase64(a.path, a.mimeType);
+          const dataUrl = await imageToCompressedBase64(a.file);
           return `![image](${dataUrl})`;
         }),
       );
@@ -153,7 +161,10 @@ export default function ChatComposer({
         ? [...imageParts, text].join("\n\n")
         : imageParts.join("\n\n");
       onSend(fullText);
-      attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl));
+      attachments.forEach((a) => {
+        URL.revokeObjectURL(a.previewUrl);
+        attachmentUrlsRef.current.delete(a.previewUrl);
+      });
       setAttachments([]);
     } else {
       onSend();

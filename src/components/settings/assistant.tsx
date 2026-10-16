@@ -58,6 +58,14 @@ function parseAdvanced(
   const value: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
     if ((ALLOWED_ADVANCED_KEYS as readonly string[]).includes(k)) {
+      if (
+        ((k === "temperature" || k === "top_p") && (typeof v !== "number" || !Number.isFinite(v))) ||
+        (k === "provider" && !["openai", "anthropic", "custom"].includes(String(v))) ||
+        (k === "headers" && (v === null || typeof v !== "object" || Array.isArray(v) || Object.values(v).some((header) => typeof header !== "string"))) ||
+        (k === "extraBody" && (v === null || typeof v !== "object" || Array.isArray(v)))
+      ) {
+        return { error: "settings.assistant.invalidAdvancedValue", warnings: [] };
+      }
       value[k] = v as never;
     } else {
       warnings.push(k);
@@ -157,7 +165,7 @@ const App = () => {
         messages: [{ role: "user", content: "ping" }],
       });
       if (err) {
-        setProbeError(err);
+        setProbeError(t(err, err));
         toast({
           description: t("settings.assistant.testFailed"),
           variant: "destructive",
@@ -330,7 +338,9 @@ const App = () => {
               className="text-xs text-destructive"
               data-testid="assistant-advanced-error"
             >
-              {t("settings.assistant.invalidJson")} {advancedError}
+              {advancedError === "settings.assistant.invalidAdvancedValue"
+                ? t(advancedError)
+                : `${t("settings.assistant.invalidJson")} ${advancedError}`}
             </p>
           )}
           {advancedWarnings.length > 0 && (
@@ -338,7 +348,7 @@ const App = () => {
               className="text-xs text-amber-600 dark:text-amber-400"
               data-testid="assistant-advanced-warnings"
             >
-              Unknown keys ignored: {advancedWarnings.join(", ")}
+              {t("settings.assistant.unknownKeysIgnored").replace("{keys}", advancedWarnings.join(", "))}
             </p>
           )}
         </CardContent>

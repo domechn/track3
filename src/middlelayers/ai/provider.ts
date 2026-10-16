@@ -72,7 +72,9 @@ function buildBody(
     if (typeof a.top_p === "number") body.top_p = a.top_p;
     if (a.extraBody) {
       for (const [k, v] of Object.entries(a.extraBody)) {
-        body[k] = v;
+        if (!["model", "messages", "stream", "stream_options", "tools", "tool_choice"].includes(k)) {
+          body[k] = v;
+        }
       }
     }
   }
@@ -91,39 +93,50 @@ function buildProbeMessages(req: StreamRequest): ProviderMessage[] {
 // parseSSEStream reads a fetch ReadableStream and yields parsed JSON
 // payloads. The OpenAI stream protocol is `data: {json}\n\n` with a
 // terminating `data: [DONE]`.
-async function* parseSSEStream(body: ReadableStream<Uint8Array>): AsyncGenerator<unknown> {
+async function* parseSSEStream(
+  body: ReadableStream<Uint8Array>,
+  signal: AbortSignal,
+  onChunk: () => void,
+  onMalformed: () => void,
+): AsyncGenerator<unknown> {
   const reader = body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
   try {
     while (true) {
-      const { value, done } = await reader.read();
+      let rejectOnAbort!: (reason: Error) => void;
+      const abortPromise = new Promise<never>((_, reject) => { rejectOnAbort = reject; });
+      const abortRead = () => rejectOnAbort(new DOMException("aborted", "AbortError"));
+      signal.addEventListener("abort", abortRead, { once: true });
+      let result: ReadableStreamReadResult<Uint8Array>;
+      try {
+        if (signal.aborted) abortRead();
+        result = await Promise.race([reader.read(), abortPromise]);
+      } finally {
+        signal.removeEventListener("abort", abortRead);
+      }
+      const { value, done } = result;
       if (done) {
         break;
       }
+      onChunk();
       buffer += decoder.decode(value, { stream: true });
+      buffer = buffer.replace(/\r\n/g, "\n");
       let sep: number;
       // SSE events are separated by a blank line. Split into records.
       while ((sep = buffer.indexOf("\n\n")) >= 0) {
         const record = buffer.slice(0, sep);
         buffer = buffer.slice(sep + 2);
-        const lines = record.split(/\r?\n/);
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) {
-            continue;
-          }
-          const payload = trimmed.slice(5).trim();
-          if (payload === "[DONE]") {
-            return;
-          }
-          if (!payload) {
-            continue;
-          }
+        const payload = record.split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trimStart())
+          .join("\n").trim();
+        if (payload === "[DONE]") return;
+        if (payload) {
           try {
             yield JSON.parse(payload);
           } catch {
-            // ignore malformed chunks; some endpoints pad the stream
+            onMalformed();
           }
         }
       }
@@ -134,11 +147,12 @@ async function* parseSSEStream(body: ReadableStream<Uint8Array>): AsyncGenerator
       try {
         yield JSON.parse(tail.slice(5).trim());
       } catch {
-        // ignore
+        onMalformed();
       }
     }
   } finally {
     try {
+      await reader.cancel();
       reader.releaseLock();
     } catch {
       // ignore
@@ -205,128 +219,160 @@ export async function* streamChatCompletion(
     true,
   );
 
-  let resp: Response;
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  req.signal?.addEventListener("abort", onAbort, { once: true });
+  if (req.signal?.aborted) controller.abort();
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const resetTimeout = (duration = 60_000) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, duration);
+  };
+  resetTimeout(180_000);
+  const signal = controller.signal;
   try {
-    resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    } as any);
-  } catch (err) {
-    if (req.signal?.aborted) {
+    let resp: Response;
+    try {
+      resp = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal,
+      } as any);
+    } catch (err) {
+      if (req.signal?.aborted) {
+        yield { kind: "done" };
+        return;
+      }
+      yield { kind: "error", message: timedOut ? "AI request timed out" : (err as Error).message ?? String(err) };
       yield { kind: "done" };
       return;
     }
-    yield { kind: "error", message: (err as Error).message ?? String(err) };
-    yield { kind: "done" };
-    return;
-  }
 
-  if (resp.status > 299) {
-    const text = await safeReadText(resp);
-    yield {
-      kind: "error",
-      message: `Request failed with status ${resp.status}: ${text}`,
-    };
-    yield { kind: "done" };
-    return;
-  }
-
-  const contentType = resp.headers.get("content-type") ?? "";
-  const isEventStream = contentType.includes("text/event-stream");
-
-  if (!isEventStream || !resp.body) {
-    // Non-streaming JSON fallback. Some endpoints ignore `stream: true`.
-    try {
-      const json = await resp.json();
-      const choice = pickChoice(json);
-      const message = choice?.message ?? {};
-      if (typeof message?.content === "string" && message.content.length > 0) {
-        yield { kind: "text", delta: message.content };
-      }
-      const calls: ProviderToolCall[] = Array.isArray(message?.tool_calls)
-        ? message.tool_calls
-        : [];
-      for (const c of calls) {
-        const fn = c?.function ?? {};
-        yield {
-          kind: "tool_call",
-          id: c.id ?? "",
-          name: fn.name ?? "",
-          args: safeParseArgs(fn.arguments ?? "{}"),
-        };
-      }
-    } catch (err) {
-      yield { kind: "error", message: (err as Error).message ?? String(err) };
+    resetTimeout();
+    if (resp.status > 299) {
+      const text = await safeReadText(resp);
+      yield {
+        kind: "error",
+        message: `Request failed with status ${resp.status}: ${text}`,
+      };
+      yield { kind: "done" };
+      return;
     }
-    yield { kind: "done" };
-    return;
-  }
 
-  const toolAcc: Record<number, ToolCallAcc> = {};
-  let finishReason: string | undefined;
+    const contentType = resp.headers.get("content-type") ?? "";
+    const isEventStream = contentType.includes("text/event-stream");
 
-  try {
-    for await (const chunk of parseSSEStream(resp.body)) {
-      if (req.signal?.aborted) {
-        break;
+    if (!isEventStream || !resp.body) {
+      // Non-streaming JSON fallback. Some endpoints ignore `stream: true`.
+      try {
+        const json = await resp.json();
+        const choice = pickChoice(json);
+        const message = choice?.message ?? {};
+        if (typeof message?.content === "string" && message.content.length > 0) {
+          yield { kind: "text", delta: message.content };
+        }
+        const calls: ProviderToolCall[] = Array.isArray(message?.tool_calls)
+          ? message.tool_calls
+          : [];
+        for (const c of calls) {
+          const fn = c?.function ?? {};
+          yield {
+            kind: "tool_call",
+            id: c.id ?? "",
+            name: fn.name ?? "",
+            args: safeParseArgs(fn.arguments ?? "{}"),
+          };
+        }
+      } catch (err) {
+        yield { kind: "error", message: (err as Error).message ?? String(err) };
       }
-      const choice = pickChoice(chunk);
-      if (!choice) {
-        continue;
-      }
-      const delta = choice.delta ?? choice.message ?? {};
-      const thinkContent = delta?.reasoning_content;
-      if (typeof thinkContent === "string" && thinkContent.length > 0) {
-        yield { kind: "think", delta: thinkContent };
-      }
-      const content = delta?.content;
-      if (typeof content === "string" && content.length > 0) {
-        yield { kind: "text", delta: content };
-      }
-      const toolCalls = delta?.tool_calls;
-      if (Array.isArray(toolCalls)) {
-        for (const frag of toolCalls) {
-          const idx = typeof frag?.index === "number" ? frag.index : 0;
-          toolAcc[idx] = mergeToolCall(toolAcc[idx], frag);
+      yield { kind: "done" };
+      return;
+    }
+
+    const toolAcc: Record<number, ToolCallAcc> = {};
+    let finishReason: string | undefined;
+    let failed = false;
+    let malformed = false;
+    let sawContent = false;
+
+    try {
+      for await (const chunk of parseSSEStream(resp.body, signal, resetTimeout, () => { malformed = true; })) {
+        if (req.signal?.aborted) {
+          break;
+        }
+        const choice = pickChoice(chunk);
+        if (!choice) {
+          continue;
+        }
+        const delta = choice.delta ?? choice.message ?? {};
+        const thinkContent = delta?.reasoning_content;
+        if (typeof thinkContent === "string" && thinkContent.length > 0) {
+          sawContent = true;
+          yield { kind: "think", delta: thinkContent };
+        }
+        const content = delta?.content;
+        if (typeof content === "string" && content.length > 0) {
+          sawContent = true;
+          yield { kind: "text", delta: content };
+        }
+        const toolCalls = delta?.tool_calls;
+        if (Array.isArray(toolCalls)) {
+          for (const frag of toolCalls) {
+            const idx = typeof frag?.index === "number" ? frag.index : 0;
+            toolAcc[idx] = mergeToolCall(toolAcc[idx], frag);
+          }
+        }
+        if (typeof choice.finish_reason === "string" && choice.finish_reason) {
+          finishReason = choice.finish_reason;
         }
       }
-      if (typeof choice.finish_reason === "string" && choice.finish_reason) {
-        finishReason = choice.finish_reason;
+    } catch (err) {
+      if (!req.signal?.aborted) {
+        yield { kind: "error", message: timedOut ? "AI request timed out" : (err as Error).message ?? String(err) };
       }
+      failed = true;
     }
-  } catch (err) {
-    if (!req.signal?.aborted) {
-      yield { kind: "error", message: (err as Error).message ?? String(err) };
+
+    // Emit accumulated tool calls in index order.
+    const ordered = failed || req.signal?.aborted ? [] : Object.keys(toolAcc)
+      .map((k) => Number(k))
+      .sort((a, b) => a - b)
+      .map((k) => toolAcc[k])
+      .filter((c) => c && (c.id || c.name));
+
+    if (malformed && !sawContent && ordered.length === 0) {
+      yield { kind: "error", message: "Malformed AI response stream" };
     }
-  }
 
-  // Emit accumulated tool calls in index order.
-  const ordered = Object.keys(toolAcc)
-    .map((k) => Number(k))
-    .sort((a, b) => a - b)
-    .map((k) => toolAcc[k])
-    .filter((c) => c && (c.id || c.name));
+    for (const c of ordered) {
+      yield {
+        kind: "tool_call",
+        id: c.id,
+        name: c.name,
+        args: safeParseArgs(c.args),
+      };
+    }
 
-  for (const c of ordered) {
-    yield {
-      kind: "tool_call",
-      id: c.id,
-      name: c.name,
-      args: safeParseArgs(c.args),
-    };
-  }
-
-  if (finishReason) {
-    yield { kind: "done", reason: finishReason };
-  } else {
-    yield { kind: "done" };
+    if (finishReason) {
+      yield { kind: "done", reason: finishReason };
+    } else {
+      yield { kind: "done" };
+    }
+  } finally {
+    clearTimeout(timer);
+    req.signal?.removeEventListener("abort", onAbort);
   }
 }
 
 async function safeReadText(resp: Response): Promise<string> {
   try {
-    return await resp.text();
+    return (await resp.text()).slice(0, 1000);
   } catch {
     return "";
   }
@@ -336,13 +382,15 @@ async function safeReadText(resp: Response): Promise<string> {
 // returns the error message if the request fails, otherwise undefined.
 export async function probeConnection(req: StreamRequest): Promise<string | undefined> {
   let lastError: string | undefined;
+  let sawResponse = false;
   for await (const ev of streamChatCompletion({ ...req, probe: true })) {
     if (ev.kind === "error") {
       lastError = ev.message;
     }
+    if ((ev.kind === "text" || ev.kind === "think") && ev.delta.trim()) sawResponse = true;
     if (ev.kind === "done") {
       break;
     }
   }
-  return lastError;
+  return lastError ?? (sawResponse ? undefined : "settings.assistant.emptyResponse");
 }

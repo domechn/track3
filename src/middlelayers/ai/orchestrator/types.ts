@@ -63,6 +63,7 @@ export interface LlmCallParams {
   model: string;
   messages: Array<{ role: string; content: string }>;
   temperature?: number;
+  signal?: AbortSignal;
 }
 
 export interface LlmCallResult {

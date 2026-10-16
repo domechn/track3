@@ -32,7 +32,11 @@ const sessionUpdateListeners = new Map<string, Set<(sessionId: string) => void>>
 export function onSessionUpdate(sessionId: string, callback: (sessionId: string) => void): () => void {
   if (!sessionUpdateListeners.has(sessionId)) sessionUpdateListeners.set(sessionId, new Set());
   sessionUpdateListeners.get(sessionId)!.add(callback);
-  return () => { sessionUpdateListeners.get(sessionId)?.delete(callback); };
+  return () => {
+    const listeners = sessionUpdateListeners.get(sessionId);
+    listeners?.delete(callback);
+    if (listeners?.size === 0) sessionUpdateListeners.delete(sessionId);
+  };
 }
 
 export function notifySessionUpdate(sessionId: string): void {
@@ -162,72 +166,86 @@ export async function loadSession(
       `unsupported chat session version: ${String(parsed.version)}`,
     );
   }
-  return { ...meta, messages: parsed.messages ?? [] };
+  if (!validMessages(parsed.messages)) {
+    throw new Error("chat session payload has invalid messages");
+  }
+  return { ...meta, messages: parsed.messages };
+}
+
+function validMessages(value: unknown): value is PersistedChatMessage[] {
+  return Array.isArray(value) && value.every((message) =>
+    message && typeof message === "object" && (
+      (message.role === "user" && typeof message.content === "string") ||
+      (message.role === "assistant" && Array.isArray(message.blocks))
+    ),
+  );
 }
 
 export async function touchSession(
   id: string,
   patch: { messageCount: number; preview: string },
 ): Promise<void> {
-  const rows = await selectFromDatabase<Record<string, unknown>>(
-    SESSIONS_TABLE,
-    { id },
-  );
-  const metaRow = rows[0];
-  if (!metaRow) {
-    return;
-  }
-  const meta = normalizeMeta(metaRow);
-  const next: ChatSessionMeta = {
-    ...meta,
-    messageCount: patch.messageCount,
-    preview: patch.preview,
-    updatedAt: nowIso(),
-  };
-  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [next]);
+  await runWithEncryptionWriteGate(async () => {
+    const rows = await selectFromDatabase<Record<string, unknown>>(
+      SESSIONS_TABLE,
+      { id },
+    );
+    const metaRow = rows[0];
+    if (!metaRow) {
+      return;
+    }
+    const meta = normalizeMeta(metaRow);
+    const next: ChatSessionMeta = {
+      ...meta,
+      messageCount: patch.messageCount,
+      preview: patch.preview,
+      updatedAt: nowIso(),
+    };
+    await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [next]);
+  });
 }
 
 export async function renameSession(id: string, title: string): Promise<void> {
-  const rows = await selectFromDatabase<Record<string, unknown>>(
-    SESSIONS_TABLE,
-    { id },
-  );
-  const metaRow = rows[0];
-  if (!metaRow) {
-    return;
-  }
-  const meta = normalizeMeta(metaRow);
-  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [
-    { ...meta, title, updatedAt: nowIso() },
-  ]);
+  await runWithEncryptionWriteGate(async () => {
+    const rows = await selectFromDatabase<Record<string, unknown>>(
+      SESSIONS_TABLE,
+      { id },
+    );
+    const metaRow = rows[0];
+    if (!metaRow) {
+      return;
+    }
+    const meta = normalizeMeta(metaRow);
+    await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [
+      { ...meta, title, updatedAt: nowIso() },
+    ]);
+  });
 }
 
 export async function togglePin(id: string, pinned: 0 | 1): Promise<void> {
-  const rows = await selectFromDatabase<Record<string, unknown>>(
-    SESSIONS_TABLE,
-    { id },
-  );
-  const metaRow = rows[0];
-  if (!metaRow) {
-    return;
-  }
-  const meta = normalizeMeta(metaRow);
-  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [
-    { ...meta, pinned, updatedAt: nowIso() },
-  ]);
+  await runWithEncryptionWriteGate(async () => {
+    const rows = await selectFromDatabase<Record<string, unknown>>(
+      SESSIONS_TABLE,
+      { id },
+    );
+    const metaRow = rows[0];
+    if (!metaRow) {
+      return;
+    }
+    const meta = normalizeMeta(metaRow);
+    await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [
+      { ...meta, pinned, updatedAt: nowIso() },
+    ]);
+  });
 }
 
 export async function deleteSession(id: string): Promise<void> {
   await runWithEncryptionWriteGate(async () => {
-    await deleteFromDatabase<ChatSessionMeta>(SESSIONS_TABLE, { id });
-    try {
-      const path = await fullPathFor(id);
-      if (await exists(path)) {
-        await remove(path);
-      }
-    } catch {
-      // ignore: missing files are not a failure mode for delete
+    const path = await fullPathFor(id);
+    if (await exists(path)) {
+      await remove(path);
     }
+    await deleteFromDatabase<ChatSessionMeta>(SESSIONS_TABLE, { id });
   });
 }
 
@@ -255,12 +273,12 @@ async function readSessionMessages(
   const decrypted = await invoke<string>("decrypt", { data: encrypted });
   try {
     const parsed = JSON.parse(decrypted);
-    if (parsed && parsed.version === FILE_VERSION && Array.isArray(parsed.messages)) {
+    if (parsed && parsed.version === FILE_VERSION && validMessages(parsed.messages)) {
       return parsed.messages as PersistedChatMessage[];
     }
-    return [];
-  } catch {
-    return [];
+    throw new Error(`unsupported chat session payload for ${id}`);
+  } catch (err) {
+    throw new Error(`cannot append to chat session ${id}: ${(err as Error).message}`);
   }
 }
 
@@ -286,7 +304,17 @@ export async function appendMessages(
 ): Promise<void> {
   await runWithEncryptionWriteGate(async () => {
     const existing = await readSessionMessages(id);
-    await writeSessionMessages(id, [...existing, ...messages]);
+    const combined = [...existing, ...messages];
+    await writeSessionMessages(id, combined);
+    const rows = await selectFromDatabase<Record<string, unknown>>(SESSIONS_TABLE, { id });
+    if (rows[0]) {
+      await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [{
+        ...normalizeMeta(rows[0]),
+        messageCount: combined.length,
+        preview: buildSessionPreview(combined),
+        updatedAt: nowIso(),
+      }]);
+    }
   });
 }
 
@@ -335,11 +363,14 @@ async function callTitleLLM(
     ],
     stream: false,
   };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
   try {
     const resp = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
     if (!resp.ok) return null;
     const json: any = await resp.json();
@@ -359,6 +390,8 @@ async function callTitleLLM(
     return cleaned;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

@@ -1,6 +1,6 @@
 import type { ProviderFunctionDef } from "./types";
 import type { Skill, SkillArgs, ToolResult } from "./skills/types";
-import { trace, traceError } from "./skills/functions/trace";
+import { trace } from "./skills/functions/trace";
 
 // SkillRegistry owns the lookup of every registered AI skill. Skills
 // register themselves at module load time via the side-effect import in
@@ -50,13 +50,41 @@ export async function runSkill(
   if (!skill) {
     return { ok: false, error: `Unknown skill: ${name}` };
   }
+  const validationError = validateArgs(args, skill.parameters);
+  if (validationError) return { ok: false, error: `Invalid arguments for ${name}: ${validationError}` };
+  const properties = (skill.parameters.properties ?? {}) as Record<string, unknown>;
+  const normalizedArgs = Object.fromEntries(
+    Object.entries(args).filter(([key, value]) => key in properties && value != null),
+  );
   try {
-    trace("runSkill", name, "args:", JSON.stringify(args).slice(0, 200));
-    const result = await skill.run(args ?? {}, ctx);
-    trace("runSkill", name, "-> ok, text:", result.text?.slice(0, 80));
+    trace("runSkill");
+    const result = await skill.run(normalizedArgs, ctx);
+    trace("runSkill complete");
     return { ok: true, result };
   } catch (err) {
-    traceError("runSkill " + name + " threw", err);
     return { ok: false, error: (err as Error).message ?? String(err) };
   }
+}
+
+function validateArgs(args: unknown, schema: Record<string, unknown>): string | undefined {
+  if (!args || typeof args !== "object" || Array.isArray(args)) return "expected an object";
+  if ("__raw" in args) return "invalid JSON";
+  const json = JSON.stringify(args);
+  if (json.length > 16_384) return "arguments are too large";
+  const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  for (const key of (schema.required ?? []) as string[]) {
+    if (!(key in args) || (args as Record<string, unknown>)[key] == null) return `${key} is required`;
+  }
+  for (const [key, value] of Object.entries(args)) {
+    const rule = properties[key];
+    if (!rule || value == null) continue;
+    const type = rule.type;
+    if (type === "string" && typeof value !== "string") return `${key} must be a string`;
+    if (type === "number" && (typeof value !== "number" || !Number.isFinite(value))) return `${key} must be a number`;
+    if (type === "array" && (!Array.isArray(value) || value.length > 100 || value.some((item) => typeof item !== (rule.items as { type?: string })?.type))) {
+      return `${key} must be a valid array`;
+    }
+    if (Array.isArray(rule.enum) && !rule.enum.includes(value)) return `${key} has an unsupported value`;
+  }
+  return undefined;
 }

@@ -13,6 +13,7 @@ import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
 import type { ToolResult } from "@/middlelayers/ai/skills/types";
 import type { OrchestratorEvent } from "@/middlelayers/ai/orchestrator/types";
 import { JSON_CHARS_PER_TOKEN } from "@/middlelayers/ai/orchestrator/synthesizer";
+import { useTranslation } from "@/i18n";
 
 // Agent-activity block rendered when the orchestrator decomposes a
 // complex query into multiple sub-tasks.
@@ -93,16 +94,21 @@ function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
 function trimMessages(
   messages: ProviderMessage[],
   maxCount: number,
+  maxChars: number,
 ): ProviderMessage[] {
-  if (maxCount <= 0 || messages.length <= maxCount) {
-    return messages;
+  const kept = messages.slice(-Math.max(1, maxCount));
+  let chars = kept.reduce((sum, message) => sum + (message.content?.length ?? 0), 0);
+  while (kept.length > 1 && chars > maxChars) {
+    chars -= kept.shift()?.content?.length ?? 0;
   }
-  // Always keep the most recent N messages and drop older turns. The
-  // system prompt is prepended by the caller so we only trim turns.
-  return messages.slice(messages.length - maxCount);
+  while (kept.length > 1 && kept[0]?.role !== "user") {
+    kept.shift();
+  }
+  return kept;
 }
 
 export function useChat(options: UseChatOptions): UseChatResult {
+  const { t } = useTranslation();
   const {
     config,
     baseCurrency,
@@ -115,6 +121,8 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const inFlightRef = useRef(false);
+  const mountedRef = useRef(true);
   const messagesRef = useRef<ChatMessage[]>(initialMessages);
   const onStreamCompleteRef = useRef(onStreamComplete);
   onStreamCompleteRef.current = onStreamComplete;
@@ -147,6 +155,10 @@ export function useChat(options: UseChatOptions): UseChatResult {
     if (!initialMessagesChanged && !sessionChanged) {
       return;
     }
+    if (initialMessagesChanged && !sessionChanged && inFlightRef.current) {
+      prevInitialMsgsRef.current = initialMessages;
+      return;
+    }
 
     const preservesDraftForNewSessionId =
       syncedSessionIdRef.current == null &&
@@ -155,10 +167,12 @@ export function useChat(options: UseChatOptions): UseChatResult {
 
     if (sessionChanged) {
       if (!preservesDraftForNewSessionId) {
+        messagesRef.current = initialMessagesChanged ? initialMessages : [];
         setMessages(initialMessagesChanged ? initialMessages : []);
         setInput("");
       }
     } else if (initialMessagesChanged) {
+      messagesRef.current = initialMessages;
       setMessages(initialMessages);
     }
 
@@ -171,12 +185,23 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const prevSessionIdRef = useRef(sessionId);
   useEffect(() => {
     if (sessionId !== prevSessionIdRef.current) {
-      abortRef.current?.abort();
-      abortRef.current = null;
-      setIsStreaming(false);
+      if (prevSessionIdRef.current != null || sessionId == null || messagesRef.current.length === 0) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        inFlightRef.current = false;
+        setIsStreaming(false);
+      }
       prevSessionIdRef.current = sessionId;
     }
   }, [sessionId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (inFlightRef.current) onStreamingChangeRef.current?.(false);
+    };
+  }, []);
 
   const systemPrompt = useMemo(
     () => buildSystemPrompt(baseCurrency),
@@ -186,6 +211,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const stop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    inFlightRef.current = false;
     setIsStreaming(false);
   }, []);
 
@@ -199,18 +225,18 @@ export function useChat(options: UseChatOptions): UseChatResult {
   // assistant message. Any `tool_call` is dispatched against the skill
   // registry.
   const consumeStream = useCallback(
-    async (events: AsyncGenerator<StreamEvent>, assistantIndex: number) => {
+    async (events: AsyncGenerator<StreamEvent>, assistantIndex: number, signal: AbortSignal) => {
       // State machine for <think> tag parsing.  When the model bakes
       // reasoning content into the text stream via <think>...</think>
       // tags we split it into separate think/text blocks rather than
       // relying on reasoning_content (which most models don't send).
-      const toolCallResults: Array<{
+      const toolCalls: Array<{
+        kind: "tool_call";
         id: string;
         name: string;
         args: unknown;
-        result: ToolResult | null;
-        error?: string;
       }> = [];
+      let failed = false;
       const TAG_BUF = 12;
       const TAG_OPEN = "<think>";
       const TAG_CLOSE = "</think>";
@@ -238,7 +264,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         }
         next[assistantIndex] = { ...target, blocks };
         messagesRef.current = next;
-        setMessages(next);
+        if (mountedRef.current) setMessages(next);
       };
 
       const dispatchToolCall = async (ev: {
@@ -256,7 +282,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         const skillResult = await runSkill(
           ev.name,
           (ev.args as Record<string, unknown>) ?? {},
-          { baseCurrency },
+          { baseCurrency, signal },
         );
         if (skillResult.ok) {
           return { id: ev.id, name: ev.name, args: ev.args, result: skillResult.result };
@@ -265,6 +291,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
       };
 
       for await (const ev of events) {
+        if (signal.aborted) break;
         if (ev.kind === "think") {
           hasReasoningContent = true;
           const next = messagesRef.current.slice();
@@ -288,7 +315,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
           }
           next[assistantIndex] = { ...target, blocks };
           messagesRef.current = next;
-          setMessages(next);
+          if (mountedRef.current) setMessages(next);
         } else if (ev.kind === "text") {
           if (hasReasoningContent) {
             addToBlock("text", ev.delta);
@@ -329,8 +356,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
             }
           }
         } else if (ev.kind === "tool_call") {
-          toolCallResults.push(await dispatchToolCall(ev));
+          toolCalls.push(ev);
         } else if (ev.kind === "error") {
+          failed = true;
           const next = messagesRef.current.slice();
           const target = { ...next[assistantIndex] };
           if (target.role !== "assistant") return;
@@ -338,15 +366,20 @@ export function useChat(options: UseChatOptions): UseChatResult {
           blocks.push({ kind: "text", text: `\n\n[error] ${ev.message}` });
           next[assistantIndex] = { ...target, blocks };
           messagesRef.current = next;
-          setMessages(next);
+          if (mountedRef.current) setMessages(next);
         } else if (ev.kind === "done") {
           break;
         }
       }
       // Flush any remaining buffer at end-of-stream
-      if (pendingBuf) {
+      if (pendingBuf && !signal.aborted) {
         addToBlock(thinkState === "outside" ? "text" : "think", pendingBuf);
         pendingBuf = "";
+      }
+      if (failed || signal.aborted) return [];
+      const toolCallResults: Awaited<ReturnType<typeof dispatchToolCall>>[] = [];
+      for (let i = 0; i < toolCalls.length; i += 4) {
+        toolCallResults.push(...await Promise.all(toolCalls.slice(i, i + 4).map(dispatchToolCall)));
       }
       return toolCallResults;
     },
@@ -361,11 +394,13 @@ export function useChat(options: UseChatOptions): UseChatResult {
     async (
       events: AsyncGenerator<OrchestratorEvent>,
       assistantIndex: number,
+      signal: AbortSignal,
     ): Promise<boolean> => {
       let yielded = false;
       const agentActivityMap = new Map<string, AgentActivity>();
 
       for await (const ev of events) {
+        if (signal.aborted) break;
         yielded = true;
         const next = messagesRef.current.slice();
         const target = { ...next[assistantIndex] };
@@ -410,11 +445,13 @@ export function useChat(options: UseChatOptions): UseChatResult {
             break;
           }
           case "synthesizing": {
-            blocks.push({ kind: "think", text: "Synthesising results\u2026" });
+            blocks.push({ kind: "think", text: t("assistant.chat.synthesizing") });
             break;
           }
           case "optimizing": {
-            const msg = `Refining answer (round ${ev.round}/${ev.totalRounds})\u2026`;
+            const msg = t("assistant.chat.refining")
+              .replace("{round}", String(ev.round))
+              .replace("{total}", String(ev.totalRounds));
             const thinkIdx = (() => {
               for (let i = blocks.length - 1; i >= 0; i--) {
                 if (blocks[i]!.kind === "think") return i;
@@ -451,39 +488,40 @@ export function useChat(options: UseChatOptions): UseChatResult {
 
         next[assistantIndex] = { ...target, blocks };
         messagesRef.current = next;
-        setMessages(next);
+        if (mountedRef.current) setMessages(next);
       }
 
       return yielded;
     },
-    [],
+    [t],
   );
 
   const send = useCallback(
     async (text?: string) => {
       const content = (text ?? input).trim();
-      if (!content || isStreaming) return;
+      if (!mountedRef.current || !content || inFlightRef.current) return;
+      inFlightRef.current = true;
       setInput("");
       const userMessage: ChatMessage = { role: "user", content };
       const assistantMessage: ChatMessage = {
         role: "assistant",
         blocks: [],
       };
-      setMessages((prev) => {
-        const next = [...prev, userMessage, assistantMessage];
-        messagesRef.current = next;
-        return next;
-      });
+      const previous = messagesRef.current;
+      const next = [...previous, userMessage, assistantMessage];
+      messagesRef.current = next;
+      setMessages(next);
       setIsStreaming(true);
 
       const controller = new AbortController();
       abortRef.current = controller;
+      const idx = next.length - 1;
       try {
-        const idx = messages.length + 1; // user then assistant
-        const history = flattenForProvider([...messages, userMessage]);
+        const history = flattenForProvider([...previous, userMessage]);
         const trimmed = trimMessages(
           history,
           Math.max(2, Math.floor(contextSize / 256)),
+          Math.floor(contextSize * JSON_CHARS_PER_TOKEN * 0.6),
         );
 
         // ── Try orchestration first ──
@@ -509,7 +547,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
         const usedOrchestrator = await consumeOrchestrator(
           orchestratorEvents,
           idx,
+          controller.signal,
         );
+        if (controller.signal.aborted) return;
 
         // If the orchestrator handled it, we're done
         if (usedOrchestrator) {
@@ -530,6 +570,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         // results may together use at most half of it.
         const charBudget = Math.floor(contextSize * JSON_CHARS_PER_TOKEN);
         for (let round = 0; round < MAX_ROUNDS; round++) {
+          if (controller.signal.aborted) break;
           const usedChars = providerMessages.reduce((sum, m) => {
             const content = typeof m.content === "string" ? m.content : "";
             return sum + content.length + (m.role ?? "").length + 100;
@@ -550,9 +591,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
             signal: controller.signal,
           });
 
-          const toolCalls = (await consumeStream(events, idx)) ?? [];
+          const toolCalls = (await consumeStream(events, idx, controller.signal)) ?? [];
 
-          if (toolCalls.length === 0 || finalRound) {
+          if (controller.signal.aborted || toolCalls.length === 0 || finalRound) {
             break;
           }
 
@@ -587,9 +628,22 @@ export function useChat(options: UseChatOptions): UseChatResult {
             ...toolResultMessages,
           ];
         }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          const failedMessages = messagesRef.current.slice();
+          const target = failedMessages[idx];
+          if (target?.role === "assistant") {
+            failedMessages[idx] = { ...target, blocks: [...target.blocks, { kind: "text", text: `\n\n[error] ${(err as Error).message ?? String(err)}` }] };
+            messagesRef.current = failedMessages;
+            if (mountedRef.current) setMessages(failedMessages);
+          }
+        }
       } finally {
-        setIsStreaming(false);
-        abortRef.current = null;
+        if (abortRef.current === controller) {
+          inFlightRef.current = false;
+          if (mountedRef.current) setIsStreaming(false);
+          abortRef.current = null;
+        }
         // Only fire completion callback if the stream wasn't aborted
         // (e.g., by stop() or session switch). Aborted streams should not
         // persist partial data.
@@ -600,8 +654,6 @@ export function useChat(options: UseChatOptions): UseChatResult {
     },
     [
       input,
-      isStreaming,
-      messages,
       config,
       systemPrompt,
       contextSize,
@@ -652,12 +704,18 @@ export function useChat(options: UseChatOptions): UseChatResult {
  */
 export function formatToolResult(result: ToolResult, maxChars: number): string {
   const json = result.data === undefined ? "" : JSON.stringify(result.data);
-  if (!json) return result.text ?? "";
+  const rawText = result.text ?? "";
+  const textLimit = Math.max(0, Math.floor(maxChars / 4));
+  const text = rawText.length > textLimit
+    ? `${rawText.slice(0, textLimit)}\n[truncated: tool summary]`
+    : rawText;
+  if (!json) return text;
+  const dataLimit = Math.max(0, maxChars - Math.min(textLimit, rawText.length));
   const body =
-    json.length <= maxChars
+    json.length <= dataLimit
       ? json
-      : `${json.slice(0, maxChars)}\n[truncated: showing ${maxChars} of ${json.length} chars — narrow the query (date range, limit) if the missing part matters]`;
-  return `${result.text ? result.text + "\n\n" : ""}\`\`\`json\n${body}\n\`\`\``;
+      : `${json.slice(0, dataLimit)}\n[truncated: showing ${dataLimit} of ${json.length} chars — narrow the query (date range, limit) if the missing part matters]`;
+  return `${text ? text + "\n\n" : ""}\`\`\`json\n${body}\n\`\`\``;
 }
 
 function upsertAgentActivityBlock(

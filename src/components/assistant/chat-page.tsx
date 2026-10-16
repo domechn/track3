@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -32,11 +32,9 @@ import {
 } from "@/middlelayers/configuration";
 import {
   appendMessages,
-  buildSessionPreview,
   generateTitle,
   loadSession,
   renameSession,
-  touchSession,
   onSessionUpdate,
   notifySessionUpdate,
 } from "@/middlelayers/ai";
@@ -149,10 +147,31 @@ function ReadyChat({
     useChatSessions();
   const [initialMsgs, setInitialMsgs] = useState<ChatMessage[]>([]);
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+  const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [sessionVersion, setSessionVersion] = useState(0);
+  const newSessionRef = useRef<Promise<string> | null>(null);
+  const createdSessionIdRef = useRef<string | null>(null);
+  const currentSessionIdRef = useRef(sessionId);
+  currentSessionIdRef.current = sessionId;
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     if (sessionId) {
+      setSessionLoadError(null);
+      // The live chat already holds this session's messages. Reloading here
+      // could replace a follow-up sent while the first exchange is saved.
+      if (sessionId === createdSessionIdRef.current && loadedSessionId !== sessionId) {
+        createdSessionIdRef.current = null;
+        setLoadedSessionId(sessionId);
+        return;
+      }
       // Only clear messages when switching to a different session.
       // Avoid clearing on sessionVersion bumps (e.g. after stream
       // completion persistence), which would reset the scroll position
@@ -162,7 +181,13 @@ function ReadyChat({
       }
       let cancelled = false;
       (async () => {
-        const session = await loadSession(sessionId).catch(() => null);
+        let session;
+        try {
+          session = await loadSession(sessionId);
+        } catch (error) {
+          if (!cancelled) setSessionLoadError((error as Error).message ?? String(error));
+          return;
+        }
         if (cancelled) return;
         if (session) {
           setInitialMsgs(session.messages.map(persistedToRuntime));
@@ -175,6 +200,9 @@ function ReadyChat({
       })();
       return () => { cancelled = true; };
     } else {
+      setSessionLoadError(null);
+      newSessionRef.current = null;
+      createdSessionIdRef.current = null;
       // No sessionId — render a fresh empty chat without creating a
       // session.  A new session is created lazily when the user sends
       // their first message (see handleStreamComplete).
@@ -197,8 +225,8 @@ function ReadyChat({
   // The effect above loads session data and initializes initialMsgs.
   // The useChat hook's initialMessages watcher picks up the new
   // messages via reference comparison when loading completes.
-	  const handleStreamComplete = useCallback(
-	    async (newMessages: ChatMessage[]) => {
+  const handleStreamComplete = useCallback(
+    async (newMessages: ChatMessage[]) => {
       try {
         if (newMessages.length < 2) return;
         const exchange = [
@@ -210,20 +238,30 @@ function ReadyChat({
 
         let targetId = sessionId ?? undefined;
         if (!targetId) {
-          // Lazy session creation on first message
-          const meta = await createNew();
-          targetId = meta.id;
+          // Concurrent completions from a new chat must share one session.
+          newSessionRef.current ??= createNew().then((meta) => meta.id);
+          try {
+            targetId = await newSessionRef.current;
+          } catch (error) {
+            newSessionRef.current = null;
+            throw error;
+          }
         }
 
         await appendMessages(targetId, persistedExchange);
-        const allPersisted = newMessages.map(runtimeToPersisted);
+        if (mountedRef.current) setSaveError(null);
         const msgCount = newMessages.length;
-        await touchSession(targetId, {
-          messageCount: msgCount,
-          preview: buildSessionPreview(allPersisted),
-        });
 
-        // Auto-generate title after the first exchange in a new session
+        if (!sessionId && mountedRef.current && currentSessionIdRef.current == null) {
+          createdSessionIdRef.current = targetId;
+          navigate(`/assistant/${targetId}`, { replace: true });
+        }
+        if (mountedRef.current) await refresh();
+        if (sessionId) {
+          notifySessionUpdate(targetId);
+        }
+
+        // Title generation must not hold up navigation or the next send.
         if (msgCount === 2) {
           const firstUser = newMessages[0];
           const firstAssistant = newMessages[1];
@@ -235,44 +273,27 @@ function ReadyChat({
             .map((b) => b.text)
             .join("");
           if (userContent) {
-            const title = await generateTitle(config, userContent, assistantText);
-            if (title) {
-              await renameSession(targetId, title);
-            }
+            const titleSessionId = targetId;
+            void generateTitle(config, userContent, assistantText)
+              .then(async (title) => {
+                if (title) await renameSession(titleSessionId, title);
+                if (mountedRef.current) await refresh();
+              })
+              .catch((error) => console.error("Failed to name chat session:", error));
           }
         }
-
-        if (!sessionId) {
-          navigate(`/assistant/${targetId}`, { replace: true });
-        }
-
-        await refresh();
-        // Only notify other component instances (e.g. after navigation
-        // away mid-stream) when the session already existed.  For fresh
-        // chats the navigation above already triggers a session reload
-        // via sessionId change, so the extra sessionVersion bump from
-        // notifySessionUpdate would cause a cascading re-render where
-        // the session loading effect runs twice, initialMsgs is
-        // overwritten, and the useChat initialMessages effect resets
-        // messages — a redundant cycle that grows worse with each
-        // additional message.
-        if (sessionId) {
-          notifySessionUpdate(targetId);
-        }
       } catch (err) {
-        // Log but don't throw — the streamed messages in React state
-        // are still visible in the UI; only the DB persistence failed.
-        console.error("Failed to persist chat exchange:", err);
+        if (mountedRef.current) setSaveError((err as Error).message ?? String(err));
       }
     },
     [sessionId, navigate, refresh, config, createNew],
   );
 
-	  // Hooks must be before the conditional early return so hook ordering
-	  // is consistent across renders.
-	  const handleToggleSidebar = useCallback(() => {
-	    setSidebarOpen((prev) => !prev);
-	  }, []);
+  // Hooks must be before the conditional early return so hook ordering
+  // is consistent across renders.
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => !prev);
+  }, []);
 
   const handleStreamingChange = useCallback(
     (streaming: boolean) => {
@@ -295,22 +316,32 @@ function ReadyChat({
 
   const handleDeleteSession = useCallback(
     async (id: string) => {
-      await remove(id);
-      // If the deleted session is the currently active one, navigate
-      // back to the no-session state so the chat area resets to the
-      // welcome/empty panel instead of showing stale messages.
-      if (id === sessionId) {
-        navigate(`/assistant`, { replace: true });
+      try {
+        await remove(id);
+        setDeleteError(null);
+        // If the deleted session is the currently active one, navigate
+        // back to the no-session state so the chat area resets to the
+        // welcome/empty panel instead of showing stale messages.
+        if (id === sessionId) {
+          navigate(`/assistant`, { replace: true });
+        }
+      } catch (error) {
+        setDeleteError((error as Error).message ?? String(error));
       }
     },
     [remove, sessionId, navigate],
   );
 
-	  return (
-	    <div
-      className="flex h-[calc(100vh-88px)] overflow-hidden"
+  return (
+    <div
+      className="relative flex h-[calc(100vh-88px)] overflow-hidden"
       data-testid="chat-session-layout"
     >
+      {deleteError && (
+        <p role="alert" className="absolute right-4 top-4 z-10 rounded bg-card px-4 py-2 text-sm text-destructive">
+          {t("assistant.chat.deleteFailed")}: {deleteError}
+        </p>
+      )}
       <div
         className={`overflow-hidden transition-[width] duration-200 ease-in-out ${
           sidebarOpen ? "w-[260px]" : "w-0"
@@ -329,16 +360,23 @@ function ReadyChat({
        />
         </div>
       </div>
-     <ChatContent
+     {sessionLoadError ? (
+       <div role="alert" className="flex-1 p-6 text-sm text-destructive">
+         {t("assistant.chat.sessionLoadFailed")}: {sessionLoadError}
+       </div>
+     ) : sessionId && loadedSessionId !== sessionId && createdSessionIdRef.current !== sessionId ? (
+       <div className="flex-1 p-6"><Skeleton className="h-24 w-full" /></div>
+     ) : <ChatContent
        sessionId={sessionId ?? null}
        config={config}
        baseCurrency={baseCurrency}
        initialMessages={initialMsgs}
        onStreamComplete={handleStreamComplete}
+       saveError={saveError}
         onStreamingChange={handleStreamingChange}
        sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
-     />
+     />}
     </div>
   );
 }
@@ -349,6 +387,7 @@ function ChatContent({
   sessionId,
   initialMessages,
   onStreamComplete,
+  saveError,
   onStreamingChange,
   sidebarOpen,
   onToggleSidebar,
@@ -358,6 +397,7 @@ function ChatContent({
   sessionId?: string | null;
   initialMessages: ChatMessage[];
   onStreamComplete?: (messages: ChatMessage[]) => void;
+  saveError?: string | null;
   onStreamingChange?: (streaming: boolean) => void;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
@@ -379,6 +419,11 @@ function ChatContent({
       className="flex min-w-0 flex-1 flex-col overflow-hidden"
     >
       <ChatHeader config={config} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />
+      {saveError && (
+        <p role="alert" className="px-4 py-2 text-sm text-destructive">
+          {t("assistant.chat.saveFailed")}: {saveError}
+        </p>
+      )}
       <ChatThread
         messages={chat.messages}
         isStreaming={chat.isStreaming}
@@ -389,7 +434,7 @@ function ChatContent({
           disabled={chat.isStreaming}
           onRun={(key) => {
             const k = key as keyof typeof QUICK_ACTION_KEYS;
-            void chat.runQuickAction(k, quickActionPrompt(QUICK_ACTION_KEYS[k]));
+            void chat.runQuickAction(k, quickActionPrompt(QUICK_ACTION_KEYS[k], t));
           }}
         />
       )}
