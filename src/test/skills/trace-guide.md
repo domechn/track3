@@ -2,15 +2,16 @@
 
 ## Overview
 
-The AI skills system includes a dev-only debug trace that logs the full skill execution
-pipeline to the browser DevTools console. It shows:
+The AI skills system includes a dev-only debug trace that logs operation names
+to the browser DevTools console. It shows:
 
 - Skill registration
-- When each skill's `run()` method is called (with args)
+- When each skill's `run()` method is called
 - When atomic functions (`getLatestSnapshot`, `getSnapshotSummaries`, etc.) are called
-- Database query results (count of records, errors)
-- Orchestrator scheduler dispatching (task IDs, skill names, results)
-- Full error stack traces for any failures
+- Database query operation names
+- Orchestrator scheduler operation names
+
+Arguments, portfolio values, and raw errors are omitted because they may contain private data.
 
 **Active only in dev mode** (`import.meta.env.DEV === true`, i.e. `yarn dev` or `yarn tauri dev`).
 In production builds these traces are no-ops.
@@ -26,22 +27,20 @@ In production builds these traces are no-ops.
 ## Trace log format
 
 ```
-[skill-trace] SKILL: asset_snapshot called args: {...}
-[skill-trace] getLatestSnapshot date: undefined
-[skill-trace] getSnapshotSummaries from: undefined to: undefined
-[skill-trace] getLatestSnapshot -> latest: 2026-06-29T10:00:00.000Z 12345.67
-[skill-trace] getAssetsBySnapshot uuid: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-[skill-trace] getAssetsBySnapshot -> 15 assets
-[skill-trace] runSkill asset_snapshot -> ok, text: Snapshot at ...
+[skill-trace] SKILL: asset_snapshot called
+[skill-trace] getLatestSnapshot
+[skill-trace] getSnapshotSummaries
+[skill-trace] getAssetsBySnapshot
+[skill-trace] runSkill
 ```
 
 ## Key trace prefixes
 
 | Prefix | Source | What it shows |
 |---|---|---|
-| `SKILL:` | skill `.ts` files | Skill `run()` called, args received |
+| `SKILL:` | skill `.ts` files | Skill `run()` called |
 | `registerSkill` | `tools.ts` | Skills being registered at startup |
-| `runSkill` | `tools.ts` | Skill dispatch, result |
+| `runSkill` | `tools.ts` | Skill dispatch |
 | `getSnapshotSummaries` | `functions/assets.ts` | DB query: total value records |
 | `getLatestSnapshot` | `functions/assets.ts` | Latest snapshot lookup |
 | `getAssetsBySnapshot` | `functions/assets.ts` | DB query: assets by UUID |
@@ -49,19 +48,15 @@ In production builds these traces are no-ops.
 | `getAssetHistory` | `functions/assets.ts` | Single asset history query |
 | `getTransactions` | `functions/transactions.ts` | Transaction query |
 | `getPrices` / `getCryptoPrices` / `getStockPrices` | `functions/prices.ts` | Price lookups |
-| `SCHEDULER:` | `orchestrator/scheduler.ts` | Task dispatch, result, error |
-| `[skill-trace:error]` | All files | Unhandled exceptions with stack |
+| `SCHEDULER:` | `orchestrator/scheduler.ts` | Task dispatch |
 
 ## Common failure patterns
 
 ### "Unknown skill: portfolio_summary"
 The LLM is calling old skill names from conversation history. Start a new chat session.
 
-### "listTotalValueRecords failed" in traceError
-The Tauri SQL plugin is not available. Check that `yarn tauri dev` (not just `yarn dev`) is running.
-
-### "runSkill threw" with TypeError about `const downsampled`
-Duplicate declaration bug in `functions/assets.ts` — check for duplicate variable declarations.
+### Data access fails
+Check that `yarn tauri dev` is running so the Tauri SQL plugin is available.
 
 ## Trace files
 

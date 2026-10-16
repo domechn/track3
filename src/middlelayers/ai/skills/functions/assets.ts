@@ -6,7 +6,7 @@ import { ASSET_HANDLER } from "../../../entities/assets";
 import { getAssetType } from "../../../datafetch/utils/coins";
 import type { AssetModel } from "../../../types";
 import type { AssetType } from "../../../datafetch/types";
-import { trace, traceError } from "./trace";
+import { trace } from "./trace";
 
 // ── Types ──
 
@@ -62,7 +62,6 @@ export async function getSnapshotSummaries(
     trace("getSnapshotSummaries", "->", result.length, "records");
     return result.map(r => ({ ...r, createdAt: new Date(r.createdAt) }));
   } catch (err) {
-    traceError("getSnapshotSummaries failed", err);
     throw err;
   }
 }
@@ -95,7 +94,6 @@ export async function getLatestSnapshot(
     trace("getLatestSnapshot", "-> nearest:", nearestDate?.toISOString(), best?.totalValue);
     return best ? { ...best, createdAt: nearestDate! } : undefined;
   } catch (err) {
-    traceError("getLatestSnapshot failed", err);
     throw err;
   }
 }
@@ -110,7 +108,6 @@ export async function getAssetsBySnapshot(
     trace("getAssetsBySnapshot", "->", result.length, "assets");
     return result;
   } catch (err) {
-    traceError("getAssetsBySnapshot failed", err);
     throw err;
   }
 }
@@ -139,7 +136,6 @@ export async function getPortfolioValueSeries(
     value: r.totalValue,
   }));
   } catch (err) {
-    traceError("getPortfolioValueSeries failed", err);
     throw err;
   }
 }
@@ -176,7 +172,6 @@ export async function getAssetHistory(
     .sort((a, b) => a.timestamp - b.timestamp)
     .map((p) => ({ ...p, price: p.amount > 0 ? p.value / p.amount : p.price }));
   } catch (err) {
-    traceError("getAssetHistory failed", err);
     throw err;
   }
 }
@@ -226,7 +221,6 @@ export async function getAllSymbols(): Promise<string[]> {
     trace("getAllSymbols", "->", result.length, "symbols");
     return result;
   } catch (err) {
-    traceError("getAllSymbols failed", err);
     throw err;
   }
 }
@@ -252,7 +246,6 @@ export async function getAssetDetail(
     trace("getAssetDetail", "->", result.length, "records");
     return result;
   } catch (err) {
-    traceError("getAssetDetail failed", err);
     throw err;
   }
 }
@@ -264,7 +257,6 @@ export async function listSnapshotDates(size?: number): Promise<Date[]> {
     trace("listSnapshotDates", "->", result.length, "dates");
     return result;
   } catch (err) {
-    traceError("listSnapshotDates failed", err);
     throw err;
   }
 }

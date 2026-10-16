@@ -18,20 +18,14 @@ function isDevEnv(): boolean {
 
  const isDev = /* @__PURE__ */ isDevEnv();
 
-/** Log a trace message. No-op in production. */
+/** Log only the operation name; arguments may contain private portfolio data. */
 export function trace(...args: unknown[]): void {
   if (!isDev) return;
-  console.log("[skill-trace]", ...args);
+  console.log("[skill-trace]", args[0]);
 }
 
-/** Log a warning trace message. No-op in production. */
+/** Log only the operation name. */
 export function traceWarn(...args: unknown[]): void {
   if (!isDev) return;
-  console.warn("[skill-trace:warn]", ...args);
-}
-
-/** Log an error trace message. No-op in production — does NOT surface error details to the browser console. */
-export function traceError(msg: string, err?: unknown): void {
-  if (!isDev) return;
-  console.error("[skill-trace:error]", msg, err ?? "");
+  console.warn("[skill-trace:warn]", args[0]);
 }

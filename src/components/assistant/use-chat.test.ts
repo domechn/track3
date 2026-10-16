@@ -1,4 +1,6 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { createElement } from "react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIConfig } from "@/middlelayers/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
@@ -18,7 +20,7 @@ vi.mock("@/middlelayers/ai", async () => {
   };
 });
 
-import { useChat } from "./use-chat";
+import { formatToolResult, useChat } from "./use-chat";
 import type { ChatMessage } from "./use-chat";
 import {
   orchestrateQuery,
@@ -27,6 +29,7 @@ import {
   streamChatCompletion,
 } from "@/middlelayers/ai";
 import type { OrchestratorEvent } from "@/middlelayers/ai/orchestrator/types";
+import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 
 const baseCurrency: CurrencyRateDetail = {
   currency: "USD",
@@ -192,6 +195,54 @@ describe("useChat", () => {
     });
     expect(externalSignal?.aborted).toBe(true);
     expect(result.current.isStreaming).toBe(false);
+  });
+
+  it("finishes and persists a stream after unmount while clearing the processing indicator", async () => {
+    let release!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    let signal: AbortSignal | undefined;
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (req) {
+      signal = req.signal;
+      yield { kind: "text", delta: "partial response" };
+      await paused;
+      yield { kind: "text", delta: " complete" };
+      yield { kind: "done" };
+    });
+    const onStreamingChange = vi.fn();
+    const onStreamComplete = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useChat({ config, baseCurrency, sessionId: "session-a", onStreamingChange, onStreamComplete }),
+    );
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.send("question"); });
+    await waitFor(() => expect(onStreamingChange).toHaveBeenLastCalledWith(true));
+    unmount();
+    expect(onStreamingChange).toHaveBeenLastCalledWith(false);
+    expect(signal?.aborted).toBe(false);
+    release();
+    await pending;
+    expect(onStreamComplete).toHaveBeenCalledWith([
+      { role: "user", content: "question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "partial response complete" }] },
+    ]);
+  });
+
+  it("does not flush buffered stream text after Stop", async () => {
+    let release!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "leftover" };
+      await paused;
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.send("question"); });
+    await waitFor(() => expect(result.current.isStreaming).toBe(true));
+    act(() => { result.current.stop(); });
+    release();
+    await act(async () => { await pending; });
+    expect(result.current.messages[1]).toEqual({ role: "assistant", blocks: [] });
   });
 
   it("runQuickAction auto-sends a templated prompt", async () => {
@@ -475,6 +526,31 @@ describe("useChat", () => {
     expect(result.current.input).toBe("next question");
   });
 
+  it("does not abort a follow-up when a new chat receives its first session id", async () => {
+    let release!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "reply" };
+      await paused;
+      yield { kind: "text", delta: " more" };
+      yield { kind: "done" };
+    });
+    const { result, rerender } = renderHook(
+      ({ sessionId }) => useChat({ config, baseCurrency, sessionId }),
+      { initialProps: { sessionId: null as string | null } },
+    );
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.send("follow-up"); });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+    rerender({ sessionId: "session-a" });
+    release();
+    await act(async () => { await pending; });
+    expect(result.current.messages[1]).toMatchObject({
+      role: "assistant",
+      blocks: [{ kind: "text", text: "reply more" }],
+    });
+  });
+
   it("resets messages and input when sessionId changes to another session", async () => {
     const { result, rerender } = renderHook(
       ({ sessionId, initialMessages }) =>
@@ -668,5 +744,160 @@ describe("useChat", () => {
     // 7 uncapped results would be ~100k chars; the round budget keeps the
     // whole request near the configured window.
     expect(totalChars).toBeLessThan(8192 * 2.5 * 1.5);
+  });
+
+  it("accepts only one send while a request is starting", async () => {
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "done" };
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => {
+      await Promise.all([result.current.send("first"), result.current.send("second")]);
+    });
+    expect(result.current.messages.filter((message) => message.role === "user")).toEqual([
+      { role: "user", content: "first" },
+    ]);
+  });
+
+  it("bounds long earlier turns before sending the current question", async () => {
+    const requests: any[] = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (req) {
+      requests.push(req);
+      yield { kind: "done" };
+    });
+    const initialMessages: ChatMessage[] = [
+      { role: "user", content: "private".repeat(2000) },
+      { role: "assistant", blocks: [{ kind: "text", text: "answer".repeat(2000) }] },
+    ];
+    const { result } = renderHook(() => useChat({ config, baseCurrency, contextSize: 512, initialMessages }));
+    await act(async () => { await result.current.send("current question"); });
+    const sent = requests[0].messages;
+    expect(sent.at(-1)).toEqual({ role: "user", content: "current question" });
+    expect(JSON.stringify(sent)).not.toContain("privateprivate");
+  });
+
+  it("starts shortened provider history with a user turn", async () => {
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "done" };
+    });
+    const initialMessages: ChatMessage[] = [
+      { role: "user", content: "Earlier question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "Earlier answer" }] },
+    ];
+    const { result } = renderHook(() => useChat({ config, baseCurrency, contextSize: 512, initialMessages }));
+    await act(async () => { await result.current.send("Current question"); });
+    const sent = vi.mocked(streamChatCompletion).mock.calls[0]![0].messages;
+    expect(sent.filter((message) => message.role !== "system")).toEqual([
+      { role: "user", content: "Current question" },
+    ]);
+  });
+
+  it("stops after a provider error without sending another tool round", async () => {
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "tool_call", id: "c1", name: "asset_snapshot", args: {} };
+      yield { kind: "error", message: "network lost" };
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({ ok: true, result: { data: {} } });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("snapshot"); });
+    expect(streamChatCompletion).toHaveBeenCalledTimes(1);
+    expect(runSkill).not.toHaveBeenCalled();
+  });
+
+  it("runs independent tool calls in parallel", async () => {
+    let active = 0;
+    let peak = 0;
+    let round = 0;
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      if (round++ === 0) {
+        yield { kind: "tool_call", id: "c1", name: "asset_snapshot", args: {} };
+        yield { kind: "tool_call", id: "c2", name: "portfolio_value", args: {} };
+      }
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockImplementation(async () => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active--;
+      return { ok: true, result: { data: {} } };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("summary"); });
+    expect(peak).toBe(2);
+  });
+
+  it("bounds the text summary as well as the data in a tool result", () => {
+    const result = formatToolResult({ text: "A".repeat(10_000), data: { count: 1 } }, 200);
+    expect(result.length).toBeLessThan(500);
+    expect(result).toContain("[truncated:");
+  });
+
+  it("does not replace an active reply with a stale session reload", async () => {
+    let release!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "A reply that is already streaming" };
+      await paused;
+      yield { kind: "text", delta: " and now finished." };
+      yield { kind: "done" };
+    });
+    const initialMessages: ChatMessage[] = [{ role: "user", content: "old" }];
+    const { result, rerender } = renderHook(
+      ({ initialMessages }) => useChat({ config, baseCurrency, sessionId: "session-1", initialMessages }),
+      { initialProps: { initialMessages } },
+    );
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.send("new"); });
+    await waitFor(() => expect(result.current.messages).toHaveLength(3));
+    rerender({ initialMessages: [{ role: "user", content: "old" }] });
+    expect(result.current.messages).toHaveLength(3);
+    release();
+    await act(async () => { await pending; });
+    expect((result.current.messages[2] as any).blocks.map((b: any) => b.text).join("")).toContain("finished");
+  });
+
+  it("accepts a new send immediately after Stop even if the old planner settles late", async () => {
+    let releaseOld!: () => void;
+    const oldPlanner = new Promise<void>((resolve) => { releaseOld = resolve; });
+    let plannerCalls = 0;
+    vi.mocked(orchestrateQuery).mockImplementation(async function* () {
+      if (plannerCalls++ === 0) await oldPlanner;
+    });
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "New answer" };
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    let oldSend!: Promise<void>;
+    act(() => { oldSend = result.current.send("old"); });
+    await waitFor(() => expect(result.current.isStreaming).toBe(true));
+    act(() => { result.current.stop(); });
+    await act(async () => { await result.current.send("new"); });
+    releaseOld();
+    await act(async () => { await oldSend; });
+    expect(result.current.messages.filter((message) => message.role === "user").map((message: any) => message.content)).toEqual(["old", "new"]);
+    expect(result.current.messages.some((message) => message.role === "assistant" && message.blocks.some((block: any) => block.kind === "text" && block.text.includes("New answer")))).toBe(true);
+  });
+
+  it("shows orchestration progress in the selected interface language", async () => {
+    localStorage.setItem(localeLocalStorageKey, "zh");
+    try {
+      vi.mocked(orchestrateQuery).mockImplementation(async function* () {
+        yield { kind: "synthesizing" };
+        yield { kind: "text", delta: "完成" };
+        yield { kind: "done" };
+      });
+      const { result } = renderHook(() => useChat({ config, baseCurrency }), {
+        wrapper: ({ children }: { children: ReactNode }) => createElement(I18nProvider, null, children),
+      });
+      await act(async () => { await result.current.send("分析"); });
+      const think = (result.current.messages[1] as any).blocks.find((block: any) => block.kind === "think");
+      expect(think?.text).toContain("汇总");
+    } finally {
+      localStorage.removeItem(localeLocalStorageKey);
+    }
   });
 });

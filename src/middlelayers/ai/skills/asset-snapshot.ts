@@ -26,7 +26,7 @@ const skill: Skill = {
     },
   },
   async run(args, ctx): Promise<ToolResult> {
-    trace("SKILL: asset_snapshot called", "args:", JSON.stringify(args).slice(0, 200));
+    trace("SKILL: asset_snapshot called");
     const date =
       typeof args.date === "string" && args.date
         ? new Date(args.date)

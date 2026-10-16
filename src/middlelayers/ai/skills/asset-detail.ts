@@ -26,7 +26,7 @@ const skill: Skill = {
     required: ["symbol"],
   },
   async run(args, ctx): Promise<ToolResult> {
-    trace("SKILL: asset_detail called", "args:", JSON.stringify(args).slice(0, 200));
+    trace("SKILL: asset_detail called");
     const symbol = String(args.symbol ?? "").trim().toUpperCase();
     if (!symbol) {
       return { data: { error: "symbol is required" }, text: "symbol is required." };

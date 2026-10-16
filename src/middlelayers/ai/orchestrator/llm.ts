@@ -49,18 +49,22 @@ export async function callLlm(
     body.temperature = params.temperature;
   }
 
+  const controller = new AbortController();
+  let timedOut = false;
+  const onAbort = () => controller.abort();
+  params.signal?.addEventListener("abort", onAbort, { once: true });
+  if (params.signal?.aborted) controller.abort();
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
     const resp = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     } as any);
-
-    clearTimeout(timer);
 
     if (!resp.ok) {
       const text = await safeReadText(resp);
@@ -73,19 +77,25 @@ export async function callLlm(
 
     const json: any = await resp.json();
     const choice = json?.choices?.[0];
-    const content: string = choice?.message?.content ?? "";
+    const content: unknown = choice?.message?.content;
+    if (typeof content !== "string") {
+      return { content: "", ok: false, error: "LLM response did not contain text" };
+    }
     return { content, ok: true };
   } catch (err: any) {
-    if (err?.name === "AbortError") {
+    if (timedOut) {
       return { content: "", ok: false, error: "LLM call timed out" };
     }
     return { content: "", ok: false, error: err?.message ?? String(err) };
+  } finally {
+    clearTimeout(timer);
+    params.signal?.removeEventListener("abort", onAbort);
   }
 }
 
 async function safeReadText(resp: Response): Promise<string> {
   try {
-    return await resp.text();
+    return (await resp.text()).slice(0, 1000);
   } catch {
     return "";
   }

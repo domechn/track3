@@ -36,6 +36,7 @@ import {
   AIConfigMissingError,
 } from "@/middlelayers/configuration";
 import { probeConnection } from "@/middlelayers/ai";
+import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 
 beforeEach(() => {
   vi.mocked(loadAIConfig).mockReset();
@@ -179,6 +180,30 @@ describe("AssistantSettings", () => {
     ).toBeTruthy();
     const callArg = vi.mocked(saveAIConfig).mock.calls[0]?.[0];
     expect(callArg?.advanced?.temperature).toBe(0.7);
+  });
+
+  it("rejects advanced options with invalid value types", async () => {
+    vi.mocked(loadAIConfig).mockRejectedValue(new AIConfigMissingError());
+    render(<AssistantSettings />);
+    const advanced = (await screen.findByLabelText(/advanced options/i)) as HTMLTextAreaElement;
+    fireEvent.change(advanced, { target: { value: '{"temperature":"hot","headers":{"X-Test":3}}' } });
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(saveAIConfig).not.toHaveBeenCalled();
+    expect(screen.getByTestId("assistant-advanced-error")).toBeTruthy();
+  });
+
+  it("translates unknown option warnings in Chinese", async () => {
+    localStorage.setItem(localeLocalStorageKey, "zh");
+    vi.mocked(loadAIConfig).mockRejectedValue(new AIConfigMissingError());
+    try {
+      render(<I18nProvider><AssistantSettings /></I18nProvider>);
+      const advanced = (await screen.findByTestId("assistant-advanced")) as HTMLTextAreaElement;
+      fireEvent.change(advanced, { target: { value: '{"weird":1}' } });
+      await userEvent.click(screen.getByTestId("assistant-save"));
+      expect((await screen.findByTestId("assistant-advanced-warnings")).textContent).toContain("忽略");
+    } finally {
+      localStorage.removeItem(localeLocalStorageKey);
+    }
   });
 
   it("runs Test Connection via probeConnection with the form values", async () => {

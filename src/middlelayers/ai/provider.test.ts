@@ -156,6 +156,13 @@ describe("provider.streamChatCompletion", () => {
     expect(events.at(-1)?.kind).toBe("done");
   });
 
+  it("bounds the error text returned by an endpoint", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeErrorResponse(500, "X".repeat(100_000)) as any);
+    const events = await collect(streamChatCompletion(baseReq));
+    const error = events.find((event) => event.kind === "error");
+    expect(error?.kind === "error" && error.message.length).toBeLessThan(2000);
+  });
+
   it("yields done immediately when the signal is already aborted", async () => {
     const controller = new AbortController();
     controller.abort();
@@ -176,6 +183,139 @@ describe("provider.streamChatCompletion", () => {
     expect(headers["content-type"]).toBe("application/json");
     expect(headers["authorization"]).toBe("Bearer sk-test");
   });
+
+  it("passes cancellation to the HTTP request", async () => {
+    const controller = new AbortController();
+    vi.mocked(fetch).mockImplementation(async (_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    }));
+    const pending = collect(streamChatCompletion({ ...baseReq, signal: controller.signal }));
+    await Promise.resolve();
+    const requestSignal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal;
+    expect(requestSignal).toBeInstanceOf(AbortSignal);
+    controller.abort();
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await pending).toEqual([{ kind: "done" }]);
+  });
+
+  it("allows an active stream to run beyond 60 seconds and emits its tool call", async () => {
+    vi.useFakeTimers();
+    try {
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"asset_detail","arguments":"{\\"symbol\\":\\"BTC\\"}"}}]}}]}\n\n'));
+          setTimeout(() => controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"working"}}]}\n\n')), 40_000);
+          setTimeout(() => {
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          }, 80_000);
+        },
+      });
+      vi.mocked(fetch).mockResolvedValue(new Response(body, { headers: { "content-type": "text/event-stream" } }) as any);
+      const pending = collect(streamChatCompletion(baseReq));
+      await vi.advanceTimersByTimeAsync(40_000);
+      await vi.advanceTimersByTimeAsync(40_000);
+      const events = await pending;
+      expect(events).toContainEqual({ kind: "tool_call", id: "c1", name: "asset_detail", args: { symbol: "BTC" } });
+      expect(events.some((event) => event.kind === "error")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports an idle stream timeout instead of discarding tool calls silently", async () => {
+    vi.useFakeTimers();
+    try {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"start"}}]}\n\n'));
+        },
+      });
+      vi.mocked(fetch).mockResolvedValue(new Response(body, { headers: { "content-type": "text/event-stream" } }) as any);
+      const pending = collect(streamChatCompletion(baseReq));
+      await vi.advanceTimersByTimeAsync(60_001);
+      const events = await pending;
+      expect(events).toContainEqual({ kind: "error", message: "AI request timed out" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("allows more than 60 seconds for the first response from a cold model", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetch).mockImplementation(async (_url, init) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(makeSseResponse([
+          'data: {"choices":[{"delta":{"content":"ready"}}]}\n\n',
+          "data: [DONE]\n\n",
+        ]) as any), 70_000);
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(new DOMException("aborted", "AbortError"));
+        }, { once: true });
+      }));
+      const pending = collect(streamChatCompletion(baseReq));
+      await vi.advanceTimersByTimeAsync(70_000);
+      expect(await pending).toContainEqual({ kind: "text", delta: "ready" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("parses CRLF SSE events and joined data lines", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeSseResponse([
+      'data: {"choices":[{"delta":\r\n',
+      'data: {"content":"hello"}}]}\r\n\r\n',
+      'data: [DONE]\r\n\r\n',
+    ]) as any);
+    const events = await collect(streamChatCompletion(baseReq));
+    expect(events).toContainEqual({ kind: "text", delta: "hello" });
+  });
+
+  it("reports malformed SSE data instead of silently returning an empty reply", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeSseResponse(["data: {broken}\n\n", "data: [DONE]\n\n"]) as any);
+    const events = await collect(streamChatCompletion(baseReq));
+    expect(events.some((event) => event.kind === "error")).toBe(true);
+  });
+
+  it("skips padded non-JSON SSE records when a valid reply follows", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeSseResponse([
+      "data: keepalive\n\n",
+      'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n',
+      "data: [DONE]\n\n",
+    ]) as any);
+    const events = await collect(streamChatCompletion(baseReq));
+    expect(events).toContainEqual({ kind: "text", delta: "answer" });
+    expect(events.some((event) => event.kind === "error")).toBe(false);
+  });
+
+  it("does not execute partial tool calls after a broken stream", async () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"asset_detail","arguments":"{\\"symbol\\":\\"BTC\\"}"}}]}}]}\n\n'));
+        controller.error(new Error("connection dropped"));
+      },
+    });
+    vi.mocked(fetch).mockResolvedValue(new Response(body, { headers: { "content-type": "text/event-stream" } }) as any);
+    const events = await collect(streamChatCompletion(baseReq));
+    expect(events.some((event) => event.kind === "error")).toBe(true);
+    expect(events.some((event) => event.kind === "tool_call")).toBe(false);
+  });
+
+  it("keeps provider protocol fields when extra body options contain the same keys", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeSseResponse(["data: [DONE]\n\n"]) as any);
+    await collect(streamChatCompletion({
+      ...baseReq,
+      advanced: { extraBody: { messages: [], model: "wrong", stream: false, max_tokens: 100 } },
+    }));
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body));
+    expect(body.messages).toEqual(baseReq.messages);
+    expect(body.model).toBe(baseReq.model);
+    expect(body.stream).toBe(true);
+    expect(body.max_tokens).toBe(100);
+  });
 });
 
 describe("provider.probeConnection", () => {
@@ -190,9 +330,22 @@ describe("provider.probeConnection", () => {
     expect(err).toBeUndefined();
   });
 
+  it("accepts a reasoning-only response as a successful connection", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeSseResponse([
+      'data: {"choices":[{"delta":{"reasoning_content":"thinking"}}]}\n\n',
+      "data: [DONE]\n\n",
+    ]) as any);
+    expect(await probeConnection(baseReq)).toBeUndefined();
+  });
+
   it("returns the error message when the endpoint returns 4xx", async () => {
     vi.mocked(fetch).mockResolvedValue(makeErrorResponse(403, "nope") as any);
     const err = await probeConnection(baseReq);
     expect(err).toContain("403");
+  });
+
+  it("does not report an empty completion as a successful connection", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeSseResponse(["data: [DONE]\n\n"]) as any);
+    expect(await probeConnection(baseReq)).toBeDefined();
   });
 });

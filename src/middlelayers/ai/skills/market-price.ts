@@ -26,7 +26,7 @@ const skill: Skill = {
     required: ["symbols"],
   },
   async run(args, ctx): Promise<ToolResult> {
-    trace("SKILL: market_price called", "args:", JSON.stringify(args).slice(0, 200));
+    trace("SKILL: market_price called");
     const symbols = normalizeSymbols(args.symbols);
     if (symbols.length === 0) {
       return {

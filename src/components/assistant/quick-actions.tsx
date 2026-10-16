@@ -18,8 +18,8 @@ const PROMPTS: Record<QuickActionKey, string> = {
     "type, and flag any unusual activity.",
 };
 
-export function quickActionPrompt(key: QuickActionKey): string {
-  return PROMPTS[key];
+export function quickActionPrompt(key: QuickActionKey, translate?: (key: string) => string): string {
+  return translate ? translate(`assistant.chat.quickActions.prompt.${key}`) : PROMPTS[key];
 }
 
 export default function QuickActions({

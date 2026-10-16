@@ -253,6 +253,13 @@ describe("chat sessions middlelayer", () => {
     await expect(sessions.loadSession("uuid-1")).rejects.toThrow(/decrypt/);
   });
 
+  it("rejects a session payload with a non-array message list", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    fsFileMap.set("/appdata/ai/sessions/uuid-1.json.ent", 'enc:{"version":1,"messages":"broken"}');
+    await expect(sessions.loadSession("uuid-1")).rejects.toThrow(/payload/);
+  });
+
   it("touchSession updates messageCount, preview and updatedAt", async () => {
     const sessions = await import("./sessions");
     mocks.dbState.rows.push({
@@ -326,6 +333,16 @@ describe("chat sessions middlelayer", () => {
     expect(fsFileMap.has("/appdata/ai/sessions/uuid-1.json.ent")).toBe(false);
   });
 
+  it("keeps the session row if its encrypted file cannot be deleted", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    const path = "/appdata/ai/sessions/uuid-1.json.ent";
+    fsFileMap.set(path, "enc:{}");
+    mocks.remove.mockRejectedValueOnce(new Error("permission denied"));
+    await expect(sessions.deleteSession("uuid-1")).rejects.toThrow("permission denied");
+    expect((await sessions.listSessions()).map((row) => row.id)).toContain("uuid-1");
+  });
+
   it("appendMessages merges new messages with the existing file", async () => {
     const sessions = await import("./sessions");
     fsFileMap.set(
@@ -364,6 +381,30 @@ describe("chat sessions middlelayer", () => {
     const decrypted = String(payload).slice(4);
     const parsed = JSON.parse(decrypted);
     expect(parsed.messages).toEqual([{ role: "user", content: "first" }]);
+  });
+
+  it("preserves an existing encrypted session when its payload is invalid", async () => {
+    const sessions = await import("./sessions");
+    const path = "/appdata/ai/sessions/uuid-1.json.ent";
+    fsFileMap.set(path, "enc:{broken");
+    await expect(sessions.appendMessages("uuid-1", [{ role: "user", content: "new" }])).rejects.toThrow();
+    expect(fsFileMap.get(path)).toBe("enc:{broken");
+  });
+
+  it("updates session metadata from the committed messages", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    await sessions.appendMessages("uuid-1", [
+      { role: "user", content: "First question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "First answer" }] },
+    ]);
+    await sessions.appendMessages("uuid-1", [
+      { role: "user", content: "Second question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "Second answer" }] },
+    ]);
+    const meta = (await sessions.listSessions())[0]!;
+    expect(meta.messageCount).toBe(4);
+    expect(meta.preview).toBe("First question");
   });
 
   it("drains an active session write before rotation and delays late encryption until activation", async () => {
@@ -553,5 +594,21 @@ describe("chat sessions middlelayer", () => {
     const title = await sessions.generateTitle(config, "What is my BTC average?", "x");
     expect(title).not.toContain("\n");
     expect(title.startsWith("What is my")).toBe(true);
+  });
+
+  it("uses a bounded request for title generation", async () => {
+    const sessions = await import("./sessions");
+    const config: AIConfig = { endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192 };
+    mocks.fetch.mockImplementation(async (_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    }));
+    vi.useFakeTimers();
+    try {
+      const pending = sessions.generateTitle(config, "A question to title", "An answer");
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(await pending).toBe("A question to title");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -27,7 +27,7 @@ const skill: Skill = {
     },
   },
   async run(args, ctx): Promise<ToolResult> {
-    trace("SKILL: portfolio_value called", "args:", JSON.stringify(args).slice(0, 200));
+    trace("SKILL: portfolio_value called");
     const start = parseDateArg(args.from);
     const end = parseDateArg(args.to);
     const maxPoints = clampMax(args.maxPoints);

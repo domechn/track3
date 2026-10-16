@@ -130,4 +130,14 @@ describe("useChatSessions", () => {
     expect(sessionMocks.togglePin).toHaveBeenCalledWith("a", 1);
     expect(result.current.sessions[0]?.pinned).toBe(1);
   });
+
+  it("does not let a stale refresh remove a newly created session", async () => {
+    let resolveList!: (sessions: any[]) => void;
+    sessionMocks.listSessions.mockImplementationOnce(() => new Promise((resolve) => { resolveList = resolve; }));
+    const { result } = renderHook(() => useChatSessions());
+    await act(async () => { await result.current.createNew(); });
+    expect(result.current.sessions.map((session) => session.id)).toEqual(["new-id"]);
+    await act(async () => { resolveList([]); });
+    expect(result.current.sessions.map((session) => session.id)).toEqual(["new-id"]);
+  });
 });

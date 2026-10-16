@@ -40,7 +40,7 @@ const skill: Skill = {
     },
   },
   async run(args, ctx): Promise<ToolResult> {
-    trace("SKILL: transaction_list called", "args:", JSON.stringify(args).slice(0, 200));
+    trace("SKILL: transaction_list called");
     const limit =
       typeof args.limit === "number" && Number.isFinite(args.limit)
         ? Math.max(1, Math.min(MAX_LIMIT, Math.floor(args.limit)))

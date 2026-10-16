@@ -185,4 +185,39 @@ describe("orchestrator.scheduler", () => {
 
     expect(skillAbortSignal).toBe(controller.signal);
   });
+
+  it("does not run a task whose prerequisite failed", async () => {
+    mockRunSkill.mockResolvedValue({ ok: false, error: "query failed" });
+    const plan: AnalysisPlan = {
+      query: "test", requiresRefinement: false, maxOptimizerRounds: 0,
+      tasks: [
+        { id: "t1", skillName: "asset_snapshot", args: {}, description: "Snapshot", dependsOn: [] },
+        { id: "t2", skillName: "portfolio_value", args: {}, description: "Value", dependsOn: ["t1"] },
+      ],
+    };
+    const events = await collectEvents(plan, baseCtx);
+    expect(mockRunSkill).toHaveBeenCalledTimes(1);
+    expect(events.some((event) => event.kind === "agent_error" && event.taskId === "t2")).toBe(true);
+  });
+
+  it("limits the number of independent skills running at once", async () => {
+    let active = 0;
+    let peak = 0;
+    mockRunSkill.mockImplementation(async () => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active--;
+      return { ok: true, result: { data: {} } };
+    });
+    const plan: AnalysisPlan = {
+      query: "test", requiresRefinement: false, maxOptimizerRounds: 0,
+      tasks: Array.from({ length: 12 }, (_, i) => ({
+        id: `t${i}`, skillName: "asset_snapshot", args: {}, description: "Snapshot", dependsOn: [],
+      })),
+    };
+    await collectEvents(plan, baseCtx);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(mockRunSkill).toHaveBeenCalledTimes(12);
+  });
 });

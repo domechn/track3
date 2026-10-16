@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetchStockPrices } from "../../../datafetch/utils/price";
 import { ASSET_HANDLER } from "../../../entities/assets";
-import { trace, traceError } from "./trace";
+import { trace } from "./trace";
 
 export interface PriceEntry {
   priceUsd: number;

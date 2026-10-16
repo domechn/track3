@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import QuickActions, { QUICK_ACTION_KEYS, quickActionPrompt } from "./quick-actions";
+import zh from "@/i18n/locales/zh.json";
 
 vi.mock("@/i18n", () => ({
   useTranslation: () => ({
@@ -62,5 +63,10 @@ describe("quickActionPrompt", () => {
     const prompt = quickActionPrompt(QUICK_ACTION_KEYS.recentOperations);
     expect(prompt.length).toBeGreaterThan(10);
     expect(prompt).toContain("transactions");
+  });
+
+  it("uses the Chinese quick-action prompt in a Chinese chat", () => {
+    const translate = (key: string) => (zh as Record<string, string>)[key] ?? key;
+    expect(quickActionPrompt(QUICK_ACTION_KEYS.recentAnalysis, translate)).toContain("投资组合");
   });
 });

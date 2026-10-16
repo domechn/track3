@@ -9,7 +9,7 @@
 
 import { runSkill } from "../tools";
 import type { SkillContext } from "../skills/types";
-import { trace, traceError } from "../skills/functions/trace";
+import { trace } from "../skills/functions/trace";
 import type {
   AnalysisPlan,
   OrchestratorEvent,
@@ -35,7 +35,6 @@ export async function* executePlan(
   }
 
   // Track which tasks have finished or failed
-  const completed = new Set<string>();
   const results = new Map<string, SubTaskResult>();
 
   // Topological sort by dependency depth so we know what's ready
@@ -50,73 +49,85 @@ export async function* executePlan(
 
     const group = depthGroups.get(level)!;
 
-    // Fire all tasks at this depth level concurrently
-    const promises = group.map((task) =>
-      executeSingleTask(task, ctx, signal),
-    );
-
-    // Emit start events eagerly so the UI shows in-flight status
-    for (const task of group) {
-      yield {
-        kind: "agent_start",
-        taskId: task.id,
-        skillName: task.skillName,
-        description: task.description,
-      };
-    }
-
-    const batchResults = await Promise.allSettled(promises);
-
-    for (let i = 0; i < group.length; i++) {
-      const task = group[i]!;
-      const settled = batchResults[i]!;
-
-      if (settled.status === "fulfilled") {
-        const result = settled.value;
-        completed.add(task.id);
+    for (let offset = 0; offset < group.length; offset += 4) {
+      if (signal?.aborted) break;
+      const batch = group.slice(offset, offset + 4);
+      const ready = batch.filter((task) =>
+        task.dependsOn.every((id) => results.get(id)?.status === "completed"),
+      );
+      for (const task of batch.filter((task) => !ready.includes(task))) {
+        const result: SubTaskResult = {
+          id: task.id, skillName: task.skillName, status: "failed",
+          description: task.description, error: "Prerequisite task failed",
+        };
         results.set(task.id, result);
-        if (result.status === "completed") {
-          yield {
-            kind: "agent_complete",
-            taskId: task.id,
-            skillName: task.skillName,
-            description: task.description,
-            result,
-          };
-          if (result.text) {
+        yield {
+          kind: "agent_error", taskId: task.id, skillName: task.skillName,
+          description: task.description, error: result.error!,
+        };
+      }
+      for (const task of ready) {
+        yield {
+          kind: "agent_start",
+          taskId: task.id,
+          skillName: task.skillName,
+          description: task.description,
+        };
+      }
+
+      const batchResults = await Promise.allSettled(
+        ready.map((task) => executeSingleTask(task, ctx, signal)),
+      );
+
+      for (let i = 0; i < ready.length; i++) {
+        const task = ready[i]!;
+        const settled = batchResults[i]!;
+
+        if (settled.status === "fulfilled") {
+          const result = settled.value;
+          results.set(task.id, result);
+          if (result.status === "completed") {
             yield {
-              kind: "agent_result",
+              kind: "agent_complete",
               taskId: task.id,
               skillName: task.skillName,
-              text: result.text ?? "",
+              description: task.description,
+              result,
+            };
+            if (result.text) {
+              yield {
+                kind: "agent_result",
+                taskId: task.id,
+                skillName: task.skillName,
+                text: result.text ?? "",
+              };
+            }
+          } else {
+            yield {
+              kind: "agent_error",
+              taskId: task.id,
+              skillName: task.skillName,
+              description: task.description,
+              error: result.error ?? "Unknown error",
             };
           }
         } else {
+          const err = settled.reason?.message ?? String(settled.reason);
+          results.set(task.id, {
+            id: task.id,
+            skillName: task.skillName,
+            status: "failed",
+            description: task.description,
+            error: err,
+          });
           yield {
             kind: "agent_error",
             taskId: task.id,
             skillName: task.skillName,
             description: task.description,
-            error: result.error ?? "Unknown error",
+            error: err,
           };
         }
-      } else {
-        const err = settled.reason?.message ?? String(settled.reason);
-        completed.add(task.id);
-        results.set(task.id, {
-          id: task.id,
-          skillName: task.skillName,
-          status: "failed",
-          description: task.description,
-          error: err,
-        });
-        yield {
-          kind: "agent_error",
-          taskId: task.id,
-          skillName: task.skillName,
-          description: task.description,
-          error: err,
-        };
       }
     }
   }
@@ -129,7 +140,7 @@ async function executeSingleTask(
   ctx: SkillContext,
   signal?: AbortSignal,
 ): Promise<SubTaskResult> {
-  trace("SCHEDULER: executeSingleTask", task.id, task.skillName, "depth:", task.dependsOn.length ? "depends-on:" + task.dependsOn.join(",") : "independent", "args:", JSON.stringify(task.args).slice(0, 200));
+  trace("SCHEDULER: executeSingleTask");
   try {
     const skillResult = await runSkill(
       task.skillName,
@@ -138,7 +149,6 @@ async function executeSingleTask(
     );
 
     if (!skillResult.ok) {
-      traceError("SCHEDULER: executeSingleTask failed", task.id + " " + task.skillName + " error: " + skillResult.error);
       return {
         id: task.id,
         skillName: task.skillName,
@@ -158,7 +168,6 @@ async function executeSingleTask(
       text: skillResult.result.text,
     };
   } catch (err: any) {
-    traceError("SCHEDULER: executeSingleTask threw", task.id + " " + task.skillName + " " + String(err));
     return {
       id: task.id,
       skillName: task.skillName,

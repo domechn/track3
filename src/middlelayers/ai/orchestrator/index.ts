@@ -83,6 +83,12 @@ export async function* orchestrateQuery(
     if (ev.kind === "agent_complete") {
       collectedResults.push(ev.result);
     }
+    if (ev.kind === "agent_error") {
+      collectedResults.push({
+        id: ev.taskId, skillName: ev.skillName, status: "failed",
+        description: ev.description, error: ev.error,
+      });
+    }
   }
 
   if (options.signal?.aborted) {
@@ -156,5 +162,6 @@ function llmParamsFromOptions(options: OrchestratorOptions): LlmCallParams {
     apiKey: options.apiKey,
     model: options.model,
     messages: [],
+    signal: options.signal,
   };
 }
