@@ -242,6 +242,25 @@ describe("provider.streamChatCompletion", () => {
     }
   });
 
+  it("reports a timeout while reading a non-streaming JSON reply", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetch).mockImplementation(async (_url, init) => ({
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        body: null,
+        json: () => new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+        }),
+      }) as any);
+      const pending = collect(streamChatCompletion(baseReq));
+      await vi.advanceTimersByTimeAsync(60_001);
+      expect(await pending).toContainEqual({ kind: "error", message: "AI request timed out" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("allows more than 60 seconds for the first response from a cold model", async () => {
     vi.useFakeTimers();
     try {

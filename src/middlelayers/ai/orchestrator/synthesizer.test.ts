@@ -131,6 +131,18 @@ describe("orchestrator.synthesizer", () => {
     expect(prompt).toContain('{"a":1}');
   });
 
+  it("keeps useful result data for each task when many tasks share a small context", async () => {
+    mockCallLlm.mockResolvedValue({ content: "ok", ok: true });
+    const detail = `${"A".repeat(900)} end-of-detail`;
+    const results: SubTaskResult[] = Array.from({ length: 8 }, (_, i) => ({
+      id: `t${i}`, skillName: "x", status: "completed", description: "d",
+      data: { detail }, text: "summary",
+    }));
+    await synthesizeResults(baseParams, dummyPlan, results, { contextSize: 1024 });
+    const prompt = mockCallLlm.mock.calls[0]![0].messages[1]?.content ?? "";
+    expect(prompt.split("end-of-detail")).toHaveLength(9);
+  });
+
   it("keeps a long skill summary when it fits the context budget", async () => {
     mockCallLlm.mockResolvedValue({ content: "ok", ok: true });
     const summary = `Summary: ${"A".repeat(4000)} critical allocation finding`;

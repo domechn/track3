@@ -151,6 +151,9 @@ function ReadyChat({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [sessionVersion, setSessionVersion] = useState(0);
+  const [noSessionEpoch, setNoSessionEpoch] = useState(0);
+  const noSessionEpochRef = useRef(0);
+  const inNoSessionRef = useRef(false);
   const newSessionRef = useRef<Promise<string> | null>(null);
   const createdSessionIdRef = useRef<string | null>(null);
   const currentSessionIdRef = useRef(sessionId);
@@ -164,6 +167,7 @@ function ReadyChat({
 
   useEffect(() => {
     if (sessionId) {
+      inNoSessionRef.current = false;
       setSessionLoadError(null);
       // The live chat already holds this session's messages. Reloading here
       // could replace a follow-up sent while the first exchange is saved.
@@ -201,8 +205,12 @@ function ReadyChat({
       return () => { cancelled = true; };
     } else {
       setSessionLoadError(null);
-      newSessionRef.current = null;
-      createdSessionIdRef.current = null;
+      if (!inNoSessionRef.current) {
+        inNoSessionRef.current = true;
+        setNoSessionEpoch(++noSessionEpochRef.current);
+        newSessionRef.current = null;
+        createdSessionIdRef.current = null;
+      }
       // No sessionId — render a fresh empty chat without creating a
       // session.  A new session is created lazily when the user sends
       // their first message (see handleStreamComplete).
@@ -239,11 +247,13 @@ function ReadyChat({
         let targetId = sessionId ?? undefined;
         if (!targetId) {
           // Concurrent completions from a new chat must share one session.
-          newSessionRef.current ??= createNew().then((meta) => meta.id);
+          const sessionPromise = noSessionEpoch === noSessionEpochRef.current
+            ? (newSessionRef.current ??= createNew().then((meta) => meta.id))
+            : createNew().then((meta) => meta.id);
           try {
-            targetId = await newSessionRef.current;
+            targetId = await sessionPromise;
           } catch (error) {
-            newSessionRef.current = null;
+            if (newSessionRef.current === sessionPromise) newSessionRef.current = null;
             throw error;
           }
         }
@@ -252,11 +262,11 @@ function ReadyChat({
         if (mountedRef.current) setSaveError(null);
         const msgCount = newMessages.length;
 
-        if (!sessionId && mountedRef.current && currentSessionIdRef.current == null) {
+        if (!sessionId && mountedRef.current && currentSessionIdRef.current == null && noSessionEpoch === noSessionEpochRef.current) {
           createdSessionIdRef.current = targetId;
           navigate(`/assistant/${targetId}`, { replace: true });
         }
-        if (mountedRef.current) await refresh();
+        if (mountedRef.current) await refresh().catch(() => {});
         if (sessionId) {
           notifySessionUpdate(targetId);
         }
@@ -286,7 +296,7 @@ function ReadyChat({
         if (mountedRef.current) setSaveError((err as Error).message ?? String(err));
       }
     },
-    [sessionId, navigate, refresh, config, createNew],
+    [sessionId, noSessionEpoch, navigate, refresh, config, createNew],
   );
 
   // Hooks must be before the conditional early return so hook ordering

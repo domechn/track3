@@ -289,7 +289,7 @@ export async function* streamChatCompletion(
           };
         }
       } catch (err) {
-        yield { kind: "error", message: (err as Error).message ?? String(err) };
+        yield { kind: "error", message: timedOut ? "AI request timed out" : (err as Error).message ?? String(err) };
       }
       yield { kind: "done" };
       return;

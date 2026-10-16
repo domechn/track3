@@ -3,15 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIConfig, CurrencyRateDetail } from "@/middlelayers/types";
+import type { ChatSessionMeta } from "@/middlelayers/ai";
 
 // sendSpy is referenced from inside the hoisted vi.mock below; we declare
 // it via vi.hoisted so the factory closure can pick it up.
-const { sendSpy, chatOptions, titleSpy, createNewSpy, removeSpy, sessionList } = vi.hoisted(() => ({
+const { sendSpy, chatOptions, titleSpy, createNewSpy, removeSpy, refreshSpy, sessionList } = vi.hoisted(() => ({
   sendSpy: vi.fn(),
   chatOptions: { current: null as any },
   titleSpy: vi.fn(),
   createNewSpy: vi.fn(),
   removeSpy: vi.fn(),
+  refreshSpy: vi.fn(),
   sessionList: { current: [] as any[] },
 }));
 
@@ -36,7 +38,7 @@ vi.mock("./use-chat-sessions", () => ({
   useChatSessions: () => ({
     sessions: sessionList.current,
     isLoading: false,
-    refresh: vi.fn(),
+    refresh: refreshSpy,
     createNew: createNewSpy,
     remove: removeSpy,
     pin: vi.fn(),
@@ -121,6 +123,8 @@ beforeEach(() => {
     updatedAt: new Date().toISOString(), pinned: 0, messageCount: 0, preview: "",
   });
   removeSpy.mockReset();
+  refreshSpy.mockReset();
+  refreshSpy.mockResolvedValue(undefined);
   sessionList.current = [];
 });
 
@@ -315,6 +319,80 @@ describe("ChatPage", () => {
     expect(loadSession).toHaveBeenCalledWith("mock-session-id");
   });
 
+  it("does not navigate a later blank chat to a previously saved reply", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    titleSpy.mockResolvedValue(null);
+    sessionList.current = [{
+      id: "session-b", title: "Session B", createdAt: "", updatedAt: "",
+      pinned: 0, messageCount: 2, preview: "",
+    }];
+    let finishAppend!: () => void;
+    vi.mocked(appendMessages).mockImplementationOnce(() => new Promise<void>((resolve) => {
+      finishAppend = resolve;
+    }));
+
+    renderAt("/assistant", true);
+    await screen.findByTestId("chat-thread");
+    const pending = chatOptions.current.onStreamComplete([
+      { role: "user", content: "Question A" },
+      { role: "assistant", blocks: [{ kind: "text", text: "Answer A" }] },
+    ]);
+    await waitFor(() => expect(appendMessages).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByTestId("sidebar-toggle"));
+    await userEvent.click(screen.getByTestId("session-item-session-b"));
+    await waitFor(() => expect(chatOptions.current.sessionId).toBe("session-b"));
+    await userEvent.click(screen.getByText("Assistant route"));
+    await waitFor(() => expect(chatOptions.current.sessionId).toBeNull());
+
+    await act(async () => {
+      finishAppend();
+      await pending;
+    });
+    expect(chatOptions.current.sessionId).toBeNull();
+    expect(screen.getByTestId("chat-welcome")).toBeTruthy();
+  });
+
+  it("creates a separate session when a later blank chat starts before an old creation finishes", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    titleSpy.mockResolvedValue(null);
+    sessionList.current = [{
+      id: "session-b", title: "Session B", createdAt: "", updatedAt: "",
+      pinned: 0, messageCount: 2, preview: "",
+    }];
+    let finishFirstCreate!: (meta: ChatSessionMeta) => void;
+    createNewSpy
+      .mockImplementationOnce(() => new Promise((resolve) => { finishFirstCreate = resolve; }))
+      .mockResolvedValueOnce({ id: "session-new", title: "", createdAt: "", updatedAt: "", pinned: 0, messageCount: 0, preview: "" });
+
+    renderAt("/assistant", true);
+    await screen.findByTestId("chat-thread");
+    const oldCompletion = chatOptions.current.onStreamComplete([
+      { role: "user", content: "Old question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "Old answer" }] },
+    ]);
+    await waitFor(() => expect(createNewSpy).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByTestId("sidebar-toggle"));
+    await userEvent.click(screen.getByTestId("session-item-session-b"));
+    await waitFor(() => expect(chatOptions.current.sessionId).toBe("session-b"));
+    await userEvent.click(screen.getByText("Assistant route"));
+    await waitFor(() => expect(chatOptions.current.sessionId).toBeNull());
+    const newCompletion = chatOptions.current.onStreamComplete([
+      { role: "user", content: "New question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "New answer" }] },
+    ]);
+    await waitFor(() => expect(createNewSpy).toHaveBeenCalledTimes(2));
+    await newCompletion;
+    await waitFor(() => expect(chatOptions.current.sessionId).toBe("session-new"));
+    await act(async () => {
+      finishFirstCreate({ id: "session-old", title: "", createdAt: "", updatedAt: "", pinned: 0, messageCount: 0, preview: "" });
+      await oldCompletion;
+    });
+    expect(chatOptions.current.sessionId).toBe("session-new");
+    expect(vi.mocked(appendMessages).mock.calls.map(([id]) => id)).toEqual(["session-new", "session-old"]);
+  });
+
   it("reloads a newly created session after visiting another session", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue(config);
     vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
@@ -388,6 +466,22 @@ describe("ChatPage", () => {
       { role: "assistant", blocks: [{ kind: "text", text: "Answer" }] },
     ]);
     expect(await screen.findByRole("alert")).toHaveTextContent("disk full");
+  });
+
+  it("does not report a saved reply as failed when the sidebar refresh fails", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    titleSpy.mockResolvedValue(null);
+    refreshSpy.mockRejectedValueOnce(new Error("list unavailable"));
+    renderAt("/assistant", true);
+    await screen.findByTestId("chat-thread");
+    await chatOptions.current.onStreamComplete([
+      { role: "user", content: "Question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "Answer" }] },
+    ]);
+    expect(appendMessages).toHaveBeenCalledWith("mock-session-id", expect.any(Array));
+    await waitFor(() => expect(chatOptions.current.sessionId).toBe("mock-session-id"));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("waits for existing conversation history before enabling a new send", async () => {
