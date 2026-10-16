@@ -1,6 +1,6 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import { asyncMap } from "../utils/async";
-import { sendHttpRequest } from "../utils/http";
+import { retryOnHttpStatus, sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
 import { getClientID } from "@/utils/app";
 import { PRO_API_ENDPOINT } from "@/middlelayers/configuration";
@@ -151,24 +151,19 @@ export class ERC20NormalAnalyzer implements Analyzer {
   }
 
   async loadPortfolioWithRetry(max: number): Promise<WalletCoin[]> {
-    try {
-      if (max <= 0) {
-        throw new Error("failed to query erc20 assets");
-      }
-      const addrs = getAddressList(this.config.erc20);
-      const coinLists = await this.query(addrs);
-      return coinLists;
-    } catch (e) {
-      if (e instanceof Error && e.message.includes("429")) {
-        console.error("failed to query erc20 assets due to 429, retrying...");
-        // sleep 3000ms
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        // try again
-        return this.loadPortfolioWithRetry(max - 1);
-      } else {
-        throw e;
-      }
+    if (max <= 0) {
+      throw new Error("failed to query erc20 assets");
     }
+    const addrs = getAddressList(this.config.erc20);
+    return retryOnHttpStatus(() => this.query(addrs), {
+      status: 429,
+      maxRetries: max - 1,
+      baseDelayMs: 2000,
+      maxDelayMs: 10000,
+      onRetry: () => {
+        console.error("failed to query erc20 assets due to 429, retrying...");
+      },
+    });
   }
 }
 

@@ -1,5 +1,5 @@
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
-import { sendHttpRequest } from "../utils/http";
+import { retryOnHttpStatus, sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
 import { asyncMap } from "../utils/async";
 
@@ -206,7 +206,14 @@ export class SOLAnalyzer implements Analyzer {
 
   async loadPortfolio(): Promise<WalletCoin[]> {
     const addresses = getAddressList(this.config.sol);
-
-    return this.query(addresses);
+    return retryOnHttpStatus(() => this.query(addresses), {
+      status: 429,
+      maxRetries: 5,
+      baseDelayMs: 2000,
+      maxDelayMs: 10000,
+      onRetry: () => {
+        console.error("failed to query sol assets due to 429, retrying...");
+      },
+    });
   }
 }
