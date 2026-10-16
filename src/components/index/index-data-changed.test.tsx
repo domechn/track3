@@ -40,16 +40,27 @@ vi.mock("../refresh-data", () => {
 });
 
 vi.mock("../historical-data", () => ({
-  default: () => <div>history</div>,
+  default: ({
+    afterDataChanged,
+    dateRange,
+  }: {
+    afterDataChanged?: (action: "delete") => void;
+    dateRange: { start: Date; end: Date };
+  }) => (
+    <button
+      data-testid="trigger-history-delete"
+      data-range={`${dateRange.start.toISOString()}|${dateRange.end.toISOString()}`}
+      onClick={() => afterDataChanged?.("delete")}
+    >
+      history
+    </button>
+  ),
 }));
 vi.mock("../overview", () => ({
   default: () => <div>overview</div>,
 }));
 vi.mock("../comparison", () => ({
   default: () => <div>comparison</div>,
-}));
-vi.mock("../page-wrapper", () => ({
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("../wallet-analytics", () => ({
   default: () => <div>wallets</div>,
@@ -214,6 +225,60 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it("keeps the selected History range when a local delete updates app metadata", async () => {
+    window.location.hash = "#/history";
+    const view = renderApp();
+    const history = await view.findByTestId("trigger-history-delete");
+    const initialQueryCount = vi.mocked(getInitialQueryDateRange).mock.calls.length;
+    const originalRange = history.getAttribute("data-range");
+
+    vi.mocked(getInitialQueryDateRange).mockResolvedValue({
+      dr: {
+        from: new Date("2024-04-01T00:00:00.000Z"),
+        to: new Date("2024-04-02T00:00:00.000Z"),
+      },
+      size: 1,
+    });
+    fireEvent.click(history);
+
+    await waitFor(() => expect(vi.mocked(getInitialQueryDateRange).mock.calls.length).toBeGreaterThan(initialQueryCount));
+    expect(view.getByTestId("trigger-history-delete")).toHaveAttribute("data-range", originalRange);
+  });
+
+  it("keeps History mounted when deleting its last snapshot", async () => {
+    window.location.hash = "#/history";
+    const view = renderApp();
+    const history = await view.findByTestId("trigger-history-delete");
+    const initialQueryCount = vi.mocked(queryLastRefreshAt).mock.calls.length;
+
+    vi.mocked(queryLastRefreshAt).mockResolvedValueOnce(undefined);
+    vi.mocked(getAvailableDates).mockResolvedValueOnce([]);
+    fireEvent.click(history);
+
+    await waitFor(() => expect(vi.mocked(queryLastRefreshAt).mock.calls.length).toBeGreaterThan(initialQueryCount));
+    expect(view.getByTestId("trigger-history-delete")).toBe(history);
+  });
+
+  it("shows the no-data panel after leaving and returning to empty History", async () => {
+    window.location.hash = "#/history";
+    const view = renderApp();
+    const history = await view.findByTestId("trigger-history-delete");
+
+    const initialQueryCount = vi.mocked(queryLastRefreshAt).mock.calls.length;
+    vi.mocked(queryLastRefreshAt).mockResolvedValueOnce(undefined);
+    vi.mocked(getAvailableDates).mockResolvedValueOnce([]);
+    fireEvent.click(history);
+    await waitFor(() => expect(vi.mocked(queryLastRefreshAt).mock.calls.length).toBeGreaterThan(initialQueryCount));
+    expect(view.getByTestId("trigger-history-delete")).toBe(history);
+
+    window.location.hash = "#/settings";
+    await view.findByText("settings");
+    window.location.hash = "#/history";
+
+    expect(await view.findByText("There is not enough data")).toBeInTheDocument();
+    expect(view.queryByTestId("trigger-history-delete")).not.toBeInTheDocument();
+  });
+
   it("bumps the data-changed version when the refresh button succeeds", async () => {
     const view = renderApp();
 

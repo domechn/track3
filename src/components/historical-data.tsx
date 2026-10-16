@@ -132,9 +132,7 @@ const App = ({
   const loadGenRef = useRef(0);
   // Set right before calling `afterDataChanged` from a local mutation
   // (delete/undo) so the next dataChangedVersion bump skips the loading
-  // overlay. The local state is already correct, so the overlay flash
-  // is just visual noise. `loadAllData` still runs in the background to
-  // keep the cache fresh.
+  // overlay. Keep the current list visible while `loadAllData` refreshes it.
   const skipNextLoadingRef = useRef(false);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
@@ -232,9 +230,6 @@ const App = ({
         return;
       }
       setData(records);
-      setDataPage(0);
-      setSelectedDataId(null);
-      setIsModalOpen(false);
     } finally {
       if (currentGen === loadGenRef.current) {
         setPageLoading(false);
@@ -245,6 +240,12 @@ const App = ({
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  useEffect(() => {
+    setDataPage(0);
+    setSelectedDataId(null);
+    setIsModalOpen(false);
+  }, [rangeKey]);
 
   const maxDataPage = useMemo(() => {
     const pageCount = Math.ceil(dataRows.length / pageSize);
@@ -264,6 +265,13 @@ const App = ({
   const selectedData = useMemo(() => {
     return data.find((item) => item.id === selectedDataId) ?? null;
   }, [data, selectedDataId]);
+
+  useEffect(() => {
+    if (isModalOpen && selectedDataId && !selectedData) {
+      setIsModalOpen(false);
+      setSelectedDataId(null);
+    }
+  }, [isModalOpen, selectedDataId, selectedData]);
 
   const rankData = useMemo<RankData[]>(() => {
     if (!selectedData) {
@@ -892,13 +900,15 @@ const App = ({
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell className="py-1.5">
+                            <TableCell
+                              className="py-1.5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {isLatest ? (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <button
                                       className="hidden group-hover:inline-block opacity-80 hover:opacity-100 transition-opacity"
-                                      onClick={(e) => e.stopPropagation()}
                                       disabled={deleting}
                                     >
                                       <img
