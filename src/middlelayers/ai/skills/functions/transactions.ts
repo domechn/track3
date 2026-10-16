@@ -40,7 +40,6 @@ export async function getTransactions(
 ): Promise<TransactionModel[]> {
   trace("getTransactions", JSON.stringify({...filters, limit: filters.limit}).slice(0, 300));
   const { symbol, assetType, from, to, limit, txnType } = filters;
-  try {
   // If we have a date range, use the date-range query; otherwise list all.
   let results: TransactionModel[];
   if (from || to) {
@@ -76,9 +75,6 @@ export async function getTransactions(
       : sorted.slice(0, Math.max(1, Math.min(1000, Math.floor(limit))));
   trace("getTransactions", "->", result.length, "txns");
   return result;
-  } catch (err) {
-    throw err;
-  }
 }
 
 /** Aggregate transaction stats from the given transaction list. */

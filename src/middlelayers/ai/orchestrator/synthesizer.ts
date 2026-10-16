@@ -26,7 +26,7 @@ const DEFAULT_CONTEXT_SIZE = 8192;
 // rows); give data 60% of the window and leave the rest for prompt + answer.
 export const JSON_CHARS_PER_TOKEN = 2.5;
 const DATA_SHARE_OF_CONTEXT = 0.6;
-const MIN_CHARS_PER_AGENT = 128;
+const MIN_CHARS_PER_AGENT = 1500;
 
 /** Character budget for one agent's raw data when n agents share the window. */
 export function perAgentDataChars(contextSize: number | undefined, n: number): number {

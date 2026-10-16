@@ -118,6 +118,19 @@ describe("tools registry", () => {
     expect(received).toEqual({ symbol: "BTC" });
   });
 
+  it("accepts finite numeric strings for number arguments and passes numbers to skills", async () => {
+    registerSkill({
+      name: "numeric_limit", description: "Limit results",
+      parameters: { type: "object", properties: { limit: { type: "number" }, maxPoints: { type: "number" } } },
+      async run(args) { return { data: args }; },
+    });
+    const ctx = { baseCurrency: { currency: "USD", rate: 1, alias: "USD", symbol: "$" } };
+    const result = await runSkill("numeric_limit", { limit: "20", maxPoints: "30" }, ctx);
+    expect(result).toEqual({ ok: true, result: { data: { limit: 20, maxPoints: 30 } } });
+    expect((await runSkill("numeric_limit", { limit: "not a number" }, ctx)).ok).toBe(false);
+    expect((await runSkill("numeric_limit", { limit: " " }, ctx)).ok).toBe(false);
+  });
+
   it("reports invalid JSON tool arguments clearly", async () => {
     registerSkill(noopSkill);
     const result = await runSkill("noop", { __raw: "{oops" }, {

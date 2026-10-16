@@ -353,6 +353,32 @@ describe("useChat", () => {
     });
   });
 
+  it("completes a send with the callback active when that send started", async () => {
+    let finish!: () => void;
+    const gate = new Promise<void>((resolve) => { finish = resolve; });
+    vi.mocked(orchestrateQuery).mockImplementation(async function* () {
+      await gate;
+      yield { kind: "text", delta: "Answer" };
+      yield { kind: "done" };
+    });
+    const firstCompletion = vi.fn();
+    const laterCompletion = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ onStreamComplete }) => useChat({ config, baseCurrency, onStreamComplete }),
+      { initialProps: { onStreamComplete: firstCompletion } },
+    );
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.send("Question"); });
+    await waitFor(() => expect(orchestrateQuery).toHaveBeenCalledTimes(1));
+    rerender({ onStreamComplete: laterCompletion });
+    await act(async () => {
+      finish();
+      await pending;
+    });
+    expect(firstCompletion).toHaveBeenCalledTimes(1);
+    expect(laterCompletion).not.toHaveBeenCalled();
+  });
+
   it("splits streamed text containing <think> tags into separate think and text blocks", async () => {
     vi.mocked(streamChatCompletion).mockImplementation(async function* () {
       yield { kind: "text", delta: "Let me analyze" };

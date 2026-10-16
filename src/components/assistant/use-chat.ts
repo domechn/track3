@@ -500,6 +500,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
     async (text?: string) => {
       const content = (text ?? input).trim();
       if (!mountedRef.current || !content || inFlightRef.current) return;
+      const completion = onStreamCompleteRef.current;
       inFlightRef.current = true;
       setInput("");
       const userMessage: ChatMessage = { role: "user", content };
@@ -648,7 +649,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         // (e.g., by stop() or session switch). Aborted streams should not
         // persist partial data.
         if (!controller.signal.aborted) {
-          onStreamCompleteRef.current?.(messagesRef.current);
+          completion?.(messagesRef.current);
         }
       }
     },

@@ -57,13 +57,9 @@ export async function getSnapshotSummaries(
   to?: Date,
 ): Promise<SnapshotSummary[]> {
   trace("getSnapshotSummaries", "from:", from?.toISOString(), "to:", to?.toISOString());
-  try {
-    const result = await ASSET_HANDLER.listTotalValueRecords(from, to);
-    trace("getSnapshotSummaries", "->", result.length, "records");
-    return result.map(r => ({ ...r, createdAt: new Date(r.createdAt) }));
-  } catch (err) {
-    throw err;
-  }
+  const result = await ASSET_HANDLER.listTotalValueRecords(from, to);
+  trace("getSnapshotSummaries", "->", result.length, "records");
+  return result.map(r => ({ ...r, createdAt: new Date(r.createdAt) }));
 }
 
 /** Return the latest snapshot, or the one closest to a given date. */
@@ -71,31 +67,27 @@ export async function getLatestSnapshot(
   date?: Date,
 ): Promise<SnapshotSummary | undefined> {
   trace("getLatestSnapshot", "date:", date?.toISOString());
-  try {
-    const totals = await ASSET_HANDLER.listTotalValueRecords();
-    if (totals.length === 0) {
-      trace("getLatestSnapshot", "-> no records");
-      return undefined;
-    }
-    if (!date) {
-      const latest = totals[totals.length - 1]!;
-      const latestDate = new Date(latest.createdAt);
-      trace("getLatestSnapshot", "-> latest:", latestDate.toISOString(), latest.totalValue);
-      return { ...latest, createdAt: latestDate };
-    }
-    const best = totals.reduce((best, t) => {
-      const d = Math.abs(new Date(t.createdAt).getTime() - date.getTime());
-      if (!best || d < Math.abs(new Date(best.createdAt).getTime() - date.getTime())) {
-        return t;
-      }
-      return best;
-    }, undefined as SnapshotSummary | undefined);
-    const nearestDate = best ? new Date(best.createdAt) : undefined;
-    trace("getLatestSnapshot", "-> nearest:", nearestDate?.toISOString(), best?.totalValue);
-    return best ? { ...best, createdAt: nearestDate! } : undefined;
-  } catch (err) {
-    throw err;
+  const totals = await ASSET_HANDLER.listTotalValueRecords();
+  if (totals.length === 0) {
+    trace("getLatestSnapshot", "-> no records");
+    return undefined;
   }
+  if (!date) {
+    const latest = totals[totals.length - 1]!;
+    const latestDate = new Date(latest.createdAt);
+    trace("getLatestSnapshot", "-> latest:", latestDate.toISOString(), latest.totalValue);
+    return { ...latest, createdAt: latestDate };
+  }
+  const best = totals.reduce((best, t) => {
+    const d = Math.abs(new Date(t.createdAt).getTime() - date.getTime());
+    if (!best || d < Math.abs(new Date(best.createdAt).getTime() - date.getTime())) {
+      return t;
+    }
+    return best;
+  }, undefined as SnapshotSummary | undefined);
+  const nearestDate = best ? new Date(best.createdAt) : undefined;
+  trace("getLatestSnapshot", "-> nearest:", nearestDate?.toISOString(), best?.totalValue);
+  return best ? { ...best, createdAt: nearestDate! } : undefined;
 }
 
 /** Return all assets belonging to a snapshot UUID. */
@@ -103,13 +95,9 @@ export async function getAssetsBySnapshot(
   uuid: string,
 ): Promise<AssetModel[]> {
   trace("getAssetsBySnapshot", "uuid:", uuid);
-  try {
-    const result = await ASSET_HANDLER.listAssetsByUUIDs([uuid]);
-    trace("getAssetsBySnapshot", "->", result.length, "assets");
-    return result;
-  } catch (err) {
-    throw err;
-  }
+  const result = await ASSET_HANDLER.listAssetsByUUIDs([uuid]);
+  trace("getAssetsBySnapshot", "->", result.length, "assets");
+  return result;
 }
 
 // ── Portfolio value ──
@@ -124,20 +112,15 @@ export async function getPortfolioValueSeries(
   maxPoints = 80,
 ): Promise<ValuePoint[]> {
   trace("getPortfolioValueSeries", "from:", from?.toISOString(), "to:", to?.toISOString(), "max:", maxPoints);
-  try {
-    const records = await ASSET_HANDLER.listTotalValueRecords(from, to);
-    trace("getPortfolioValueSeries", "raw records:", records.length);
-    if (records.length === 0) return [];
-
+  const records = await ASSET_HANDLER.listTotalValueRecords(from, to);
+  trace("getPortfolioValueSeries", "raw records:", records.length);
+  if (records.length === 0) return [];
   const downsampled = downsample(records, maxPoints);
   trace("getPortfolioValueSeries", "downsampled:", downsampled.length, "points");
   return downsampled.map((r) => ({
     timestamp: new Date(r.createdAt).getTime(),
     value: r.totalValue,
   }));
-  } catch (err) {
-    throw err;
-  }
 }
 
 // ── Single-asset history ──
@@ -150,13 +133,12 @@ export async function getAssetHistory(
   to?: Date,
 ): Promise<AssetHistoryPoint[]> {
   trace("getAssetHistory", symbol, assetType, "from:", from?.toISOString(), "to:", to?.toISOString());
-  try {
-    const groups = await ASSET_HANDLER.listAssetsBySymbolByDateRange(
-      symbol,
-      from,
-      to,
-    );
-    trace("getAssetHistory", "raw groups:", groups.length);
+  const groups = await ASSET_HANDLER.listAssetsBySymbolByDateRange(
+    symbol,
+    from,
+    to,
+  );
+  trace("getAssetHistory", "raw groups:", groups.length);
   // One snapshot holds one row per wallet; merge them so each point is
   // the whole position at that time, not a single wallet's slice.
   const bySnapshot = new Map<number, AssetHistoryPoint>();
@@ -171,9 +153,6 @@ export async function getAssetHistory(
   return Array.from(bySnapshot.values())
     .sort((a, b) => a.timestamp - b.timestamp)
     .map((p) => ({ ...p, price: p.amount > 0 ? p.value / p.amount : p.price }));
-  } catch (err) {
-    throw err;
-  }
 }
 
 // ── Grouping / aggregation ──
@@ -216,13 +195,9 @@ export function totalValue(assets: AssetModel[]): number {
 /** Return all symbols that have ever appeared in the asset table. */
 export async function getAllSymbols(): Promise<string[]> {
   trace("getAllSymbols");
-  try {
-    const result = await ASSET_HANDLER.listAllSymbols();
-    trace("getAllSymbols", "->", result.length, "symbols");
-    return result;
-  } catch (err) {
-    throw err;
-  }
+  const result = await ASSET_HANDLER.listAllSymbols();
+  trace("getAllSymbols", "->", result.length, "symbols");
+  return result;
 }
 
 /**
@@ -235,28 +210,20 @@ export async function getAssetDetail(
   assetType?: AssetType,
 ): Promise<AssetModel[]> {
   trace("getAssetDetail", symbol, assetType);
-  try {
-    const latest = await getLatestSnapshot();
-    if (!latest) return [];
-    const result = (await getAssetsBySnapshot(latest.uuid)).filter(
-      (a) =>
-        a.symbol.toUpperCase() === symbol.toUpperCase() &&
-        (!assetType || getAssetType(a) === assetType),
-    );
-    trace("getAssetDetail", "->", result.length, "records");
-    return result;
-  } catch (err) {
-    throw err;
-  }
+  const latest = await getLatestSnapshot();
+  if (!latest) return [];
+  const result = (await getAssetsBySnapshot(latest.uuid)).filter(
+    (a) =>
+      a.symbol.toUpperCase() === symbol.toUpperCase() &&
+      (!assetType || getAssetType(a) === assetType),
+  );
+  trace("getAssetDetail", "->", result.length, "records");
+  return result;
 }
 
 export async function listSnapshotDates(size?: number): Promise<Date[]> {
   trace("listSnapshotDates", "size:", size);
-  try {
-    const result = await ASSET_HANDLER.getHasDataCreatedAtDates(size);
-    trace("listSnapshotDates", "->", result.length, "dates");
-    return result;
-  } catch (err) {
-    throw err;
-  }
+  const result = await ASSET_HANDLER.getHasDataCreatedAtDates(size);
+  trace("listSnapshotDates", "->", result.length, "dates");
+  return result;
 }

@@ -54,7 +54,14 @@ export async function runSkill(
   if (validationError) return { ok: false, error: `Invalid arguments for ${name}: ${validationError}` };
   const properties = (skill.parameters.properties ?? {}) as Record<string, unknown>;
   const normalizedArgs = Object.fromEntries(
-    Object.entries(args).filter(([key, value]) => key in properties && value != null),
+    Object.entries(args)
+      .filter(([key, value]) => key in properties && value != null)
+      .map(([key, value]) => [
+        key,
+        (properties[key] as { type?: string }).type === "number" && typeof value === "string"
+          ? Number(value)
+          : value,
+      ]),
   );
   try {
     trace("runSkill");
@@ -80,7 +87,10 @@ function validateArgs(args: unknown, schema: Record<string, unknown>): string | 
     if (!rule || value == null) continue;
     const type = rule.type;
     if (type === "string" && typeof value !== "string") return `${key} must be a string`;
-    if (type === "number" && (typeof value !== "number" || !Number.isFinite(value))) return `${key} must be a number`;
+    if (type === "number" && (
+      !(typeof value === "number" && Number.isFinite(value)) &&
+      !(typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)))
+    )) return `${key} must be a number`;
     if (type === "array" && (!Array.isArray(value) || value.length > 100 || value.some((item) => typeof item !== (rule.items as { type?: string })?.type))) {
       return `${key} must be a valid array`;
     }
