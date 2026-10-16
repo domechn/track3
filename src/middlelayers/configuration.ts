@@ -52,6 +52,7 @@ const lastAutoImportAtId = "5";
 const querySizeId = "6";
 const preferCurrencyId = "7";
 const quoteColorId = "8";
+const importedPartHashesId = "9";
 const clientInfoFixId = "998";
 const licenseFixId = "997";
 const stableCoinsId = "996";
@@ -704,6 +705,35 @@ export async function saveLastAutoImportAt(d?: Date) {
   return saveConfigurationById(
     lastAutoImportAtId,
     d ? d.toISOString() : new Date().toISOString(),
+    false,
+  );
+}
+
+export async function getImportedPartHashes(): Promise<
+  Record<string, Record<string, string>>
+> {
+  const model = await getConfigurationById(importedPartHashesId);
+  if (!model?.data) return {};
+  try {
+    const hashes: unknown = JSON.parse(model.data);
+    return hashes && typeof hashes === "object" && !Array.isArray(hashes)
+      ? (hashes as Record<string, Record<string, string>>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveImportedPartHash(
+  client: string,
+  month: string,
+  sha256: string,
+) {
+  const hashes = await getImportedPartHashes();
+  hashes[client] = { ...hashes[client], [month]: sha256 };
+  await saveConfigurationById(
+    importedPartHashesId,
+    JSON.stringify(hashes),
     false,
   );
 }

@@ -13,10 +13,15 @@ import { AddProgressFunc, AssetModel, UserLicenseInfo } from "./types";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRC20ProUserAnalyzer } from "./datafetch/coins/trc20";
 import { DATA_MANAGER, ExportData } from "./datamanager";
+import { queryHistoricalData } from "./charts-history";
+import { exists, stat } from "@tauri-apps/plugin-fs";
+import { importBackupV2, writeBackupV2 } from "./backup-v2";
 import {
   getAutoBackupDirectory,
+  getImportedPartHashes,
   getLastAutoImportAt,
   getLastAutoBackupAt,
+  saveImportedPartHash,
   saveLastAutoImportAt,
   saveLastAutoBackupAt,
 } from "./configuration";
@@ -26,7 +31,7 @@ import {
   ProCoinPriceQuery,
 } from "./datafetch/coins/price";
 import { TonAnalyzer } from "./datafetch/coins/ton";
-import { getClientID } from "@/utils/app";
+import { getClientID, getVersion } from "@/utils/app";
 import {
   RemoteStableCoinsQuery,
   StableCoinsQuery,
@@ -292,11 +297,18 @@ export async function importHistoricalData(
 }
 
 const autoBackupHistoricalDataFilename = "track3-auto-backup.json";
+let autoBackupQueue: Promise<unknown> = Promise.resolve();
 
 // auto backup data to specific path, if user set auto backup directory
-export async function autoBackupHistoricalData(
+export function autoBackupHistoricalData(
   force = false,
 ): Promise<boolean> {
+  const backup = autoBackupQueue.then(() => performAutoBackupHistoricalData(force));
+  autoBackupQueue = backup.catch(() => {});
+  return backup;
+}
+
+async function performAutoBackupHistoricalData(force: boolean): Promise<boolean> {
   const abd = await getAutoBackupDirectory();
   // user did not set auto backup directory
   if (!abd) {
@@ -317,9 +329,12 @@ export async function autoBackupHistoricalData(
     return false;
   }
 
-  const filePath = abd + "/" + autoBackupHistoricalDataFilename;
-  console.debug("start to backup to ", filePath);
-  await DATA_MANAGER.exportHistoricalData(filePath, false);
+  const client = await getClientID();
+  if (!client) {
+    throw new Error("missing client ID for auto backup");
+  }
+  const records = await queryHistoricalData(-1, false);
+  await writeBackupV2(abd, client, await getVersion(), records);
 
   await saveLastAutoBackupAt();
   // also update auto import at
@@ -335,44 +350,62 @@ export async function autoImportHistoricalData(): Promise<boolean> {
     return false;
   }
 
+  const client = await getClientID();
+  if (!client) return false;
+
+  let imported = false;
+  let clientsWithV2 = new Set<string>();
   try {
-    const filePath = abd + "/" + autoBackupHistoricalDataFilename;
-    const ed = await DATA_MANAGER.readHistoricalData(filePath);
-    if (!ed) {
-      console.debug("no data to auto import");
-      return false;
-    }
-
-    // check if client is same, if the same, no need to import
-    const client = await getClientID();
-    if (ed.client && ed.client === client) {
-      console.debug("the same client, no need to auto import");
-      return false;
-    }
-
-    const aia = await getLastAutoImportAt();
-    const exportAt = new Date(ed.exportAt);
-    const needImport = aia.getTime() < exportAt.getTime();
-
-    if (!needImport) {
-      console.debug("latest data, no need to auto import");
-      return false;
-    }
-
-    console.debug("start to import backup data");
-
-    await DATA_MANAGER.importHistoricalData("IGNORE", ed, (datas) => {
-      // only import data that is after last auto import at
-      return datas.filter((d) => {
-        const createdAt = new Date(d.createdAt);
-        return createdAt.getTime() > aia.getTime();
-      });
-    });
-  } catch (e) {
-    console.error("failed to auto import", e);
-    return false;
+    const hashes = await getImportedPartHashes();
+    const result = await importBackupV2(
+      abd,
+      client,
+      (partClient, month) => hashes[partClient]?.[month],
+      saveImportedPartHash,
+      // Parts were checked against their raw SHA-256 before this callback.
+      (historicalData, metadata) =>
+        DATA_MANAGER.importHistoricalData("IGNORE", {
+          client: metadata.client,
+          clientVersion: metadata.clientVersion,
+          exportAt: metadata.exportAt,
+          historicalData,
+          md5V2: "",
+        }),
+    );
+    imported = result.imported;
+    clientsWithV2 = result.clientsWithV2;
+  } catch (error) {
+    console.error("failed to auto import v2 backup", error);
   }
 
-  await saveLastAutoImportAt();
-  return true;
+  const legacyPath = `${abd}/${autoBackupHistoricalDataFilename}`;
+  try {
+    if (await exists(legacyPath)) {
+      const mtime = (await stat(legacyPath)).mtime;
+      const aia = await getLastAutoImportAt();
+      if (!mtime || mtime.getTime() > aia.getTime()) {
+        const ed = await DATA_MANAGER.readHistoricalData(legacyPath);
+        if (
+          ed &&
+          ed.client !== client &&
+          (!ed.client || !clientsWithV2.has(ed.client))
+        ) {
+          if (aia.getTime() < new Date(ed.exportAt).getTime()) {
+            const fresh = ed.historicalData.filter(
+              (d) => new Date(d.createdAt).getTime() > aia.getTime(),
+            );
+            if (fresh.length > 0) {
+              await DATA_MANAGER.importHistoricalData("IGNORE", ed, () => fresh);
+              imported = true;
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("failed to auto import legacy backup", error);
+  }
+
+  if (imported) await saveLastAutoImportAt();
+  return imported;
 }

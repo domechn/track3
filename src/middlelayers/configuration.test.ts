@@ -10,6 +10,8 @@ import {
   saveConfiguration,
   saveLicense,
   saveStableCoins,
+  getImportedPartHashes,
+  saveImportedPartHash,
 } from "./configuration";
 import { GlobalConfig } from "./datafetch/types";
 
@@ -223,5 +225,32 @@ describe("saveConfiguration", () => {
 
     await cleanLicense();
     expect(getPortfolioInputGeneration()).toBe(generation + 4);
+  });
+});
+
+describe("auto backup part import state", () => {
+  it("stores each client and month checksum as JSON without losing other entries", async () => {
+    let stored: string | undefined;
+    tracing.db.select.mockImplementation(async () => stored ? [{ id: "9", data: stored }] as never : []);
+    vi.mocked(executeWrite).mockImplementation(async (_sql, values) => {
+      expect(values?.[0]).toBe("9");
+      stored = String(values?.[1]);
+      return { rowsAffected: 1 } as never;
+    });
+
+    await saveImportedPartHash("client-a", "2024-01", "a".repeat(64));
+    await saveImportedPartHash("client-b", "2024-01", "b".repeat(64));
+    await saveImportedPartHash("client-a", "2024-02", "c".repeat(64));
+
+    expect(JSON.parse(stored!)).toEqual({
+      "client-a": { "2024-01": "a".repeat(64), "2024-02": "c".repeat(64) },
+      "client-b": { "2024-01": "b".repeat(64) },
+    });
+    expect(await getImportedPartHashes()).toEqual(JSON.parse(stored!));
+  });
+
+  it("treats malformed saved state as empty", async () => {
+    tracing.db.select.mockResolvedValue([{ id: "9", data: "{" }] as never);
+    expect(await getImportedPartHashes()).toEqual({});
   });
 });
