@@ -3,9 +3,15 @@ import { sendHttpRequest } from "../utils/http";
 import { getMemoryCacheInstance } from "../utils/cache";
 import { SOLAnalyzer } from "./sol";
 
-vi.mock("../utils/http", () => ({
-  sendHttpRequest: vi.fn(),
-}));
+vi.mock("../utils/http", async () => {
+  const actual = await vi.importActual<typeof import("../utils/http")>(
+    "../utils/http",
+  );
+  return {
+    ...actual,
+    sendHttpRequest: vi.fn(),
+  };
+});
 
 const SOL_ADDRESS = "1".repeat(44);
 
@@ -161,5 +167,40 @@ describe("SOLAnalyzer", () => {
     await vi.runAllTimersAsync();
 
     await expect(portfolio).resolves.toEqual([]);
+  });
+
+  it("retries holdings request when Jupiter returns 429", async () => {
+    let holdingsAttempts = 0;
+
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.endsWith(`/ultra/v1/holdings/${SOL_ADDRESS}`)) {
+        holdingsAttempts += 1;
+        if (holdingsAttempts < 3) {
+          throw new Error(
+            `Request failed (GET https://lite-api.jup.ag/ultra/v1/holdings/${SOL_ADDRESS}) with status 429`,
+          );
+        }
+        return { uiAmount: 1, tokens: {} };
+      }
+      return [];
+    });
+
+    const analyzer = new SOLAnalyzer({
+      sol: { addresses: [SOL_ADDRESS] },
+    });
+
+    const portfolioPromise = analyzer.loadPortfolio();
+    await vi.runAllTimersAsync();
+
+    await expect(portfolioPromise).resolves.toEqual([
+      {
+        symbol: "SOL",
+        assetType: "crypto",
+        amount: 1,
+        wallet: SOL_ADDRESS,
+        chain: "sol",
+      },
+    ]);
+    expect(holdingsAttempts).toBe(3);
   });
 });

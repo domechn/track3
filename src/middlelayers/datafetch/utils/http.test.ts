@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sendHttpRequest, sendHttpTextRequest } from "./http";
+import {
+  HttpRequestError,
+  retryOnHttpStatus,
+  sendHttpRequest,
+  sendHttpTextRequest,
+} from "./http";
 import { fetch } from "@tauri-apps/plugin-http";
 
 vi.mock("@tauri-apps/plugin-http", () => ({
@@ -270,5 +275,68 @@ describe("total request timeout", () => {
 
     expect(clearTimeoutSpy).toHaveBeenCalledTimes(2);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("429 retry utilities", () => {
+  it("captures status and retry-after metadata from 429 responses", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      status: 429,
+      headers: new Headers({
+        "Retry-After": "2",
+      }),
+      text: vi.fn().mockResolvedValue("[API Gateway] Too many requests"),
+    } as unknown as Response);
+
+    const error = await sendHttpRequest(
+      "GET",
+      "https://lite-api.jup.ag/ultra/v1/holdings/address",
+    ).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(HttpRequestError);
+    expect((error as HttpRequestError).status).toBe(429);
+    expect((error as HttpRequestError).retryAfterMs).toBe(2000);
+  });
+
+  it("retries on 429 and honors retry-after delay", async () => {
+    const attempt = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(
+        new HttpRequestError("too many requests", 429, 2000),
+      )
+      .mockResolvedValueOnce("ok");
+
+    const promise = retryOnHttpStatus(attempt, {
+      status: 429,
+      maxRetries: 2,
+      baseDelayMs: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(attempt).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(promise).resolves.toBe("ok");
+    expect(attempt).toHaveBeenCalledTimes(2);
+  });
+
+  it("caps an excessive retry-after delay at maxDelayMs", async () => {
+    const attempt = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(
+        new HttpRequestError("too many requests", 429, 3_600_000),
+      )
+      .mockResolvedValueOnce("ok");
+
+    const promise = retryOnHttpStatus(attempt, {
+      status: 429,
+      maxRetries: 2,
+      baseDelayMs: 100,
+      maxDelayMs: 5000,
+    });
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(attempt).toHaveBeenCalledTimes(2);
+    await expect(promise).resolves.toBe("ok");
   });
 });

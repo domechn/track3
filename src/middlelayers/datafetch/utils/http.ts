@@ -2,6 +2,18 @@ import { fetch } from "@tauri-apps/plugin-http";
 
 const ERROR_DETAIL_MAX_LENGTH = 200;
 
+export class HttpRequestError extends Error {
+  status?: number;
+  retryAfterMs?: number;
+
+  constructor(message: string, status?: number, retryAfterMs?: number) {
+    super(message);
+    this.name = "HttpRequestError";
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 function getSafeEndpoint(url: string): string {
   try {
     const parsed = new URL(url);
@@ -83,6 +95,29 @@ function createHttpErrorMessage(
     return `Request failed (${requestMeta}) with status ${status}`;
   }
   return `Request failed (${requestMeta}) with status ${status}, detail: ${detail}`;
+}
+
+function parseRetryAfterMs(response: Response): number | undefined {
+  const retryAfter = response.headers.get("Retry-After");
+  if (!retryAfter) {
+    return;
+  }
+
+  const numericSeconds = Number.parseInt(retryAfter, 10);
+  if (Number.isFinite(numericSeconds) && numericSeconds > 0) {
+    return numericSeconds * 1000;
+  }
+
+  const retryAtMillis = Date.parse(retryAfter);
+  if (Number.isNaN(retryAtMillis)) {
+    return;
+  }
+
+  const diffMs = retryAtMillis - Date.now();
+  if (diffMs <= 0) {
+    return;
+  }
+  return diffMs;
 }
 
 function createRequestErrorMessage(method: string, url: string): string {
@@ -205,8 +240,12 @@ async function performHttpRequest<T>(
 
     if (response.status > 299) {
       const responseText = await response.text().catch(() => "");
-      throw new Error(
+      const retryAfterMs =
+        response.status === 429 ? parseRetryAfterMs(response) : undefined;
+      throw new HttpRequestError(
         createHttpErrorMessage(method, url, response.status, responseText),
+        response.status,
+        retryAfterMs,
       );
     }
 
@@ -218,6 +257,60 @@ async function performHttpRequest<T>(
       );
     }
   });
+}
+
+export function isHttpStatusError(
+  error: unknown,
+  status: number,
+): error is HttpRequestError | Error {
+  if (error instanceof HttpRequestError) {
+    return error.status === status;
+  }
+  if (error instanceof Error) {
+    return (
+      error.message.includes(`status ${status}`) ||
+      error.message.includes(`${status}`)
+    );
+  }
+  return false;
+}
+
+type RetryOnHttpStatusOptions = {
+  status: number;
+  maxRetries: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  onRetry?: (error: Error, nextDelayMs: number, retriesLeft: number) => void;
+};
+
+export async function retryOnHttpStatus<T>(
+  attempt: () => Promise<T>,
+  options: RetryOnHttpStatusOptions,
+): Promise<T> {
+  const baseDelayMs = options.baseDelayMs ?? 3000;
+  const maxDelayMs = options.maxDelayMs ?? 30000;
+
+  let retriesLeft = options.maxRetries;
+  while (true) {
+    try {
+      return await attempt();
+    } catch (error) {
+      if (!isHttpStatusError(error, options.status) || retriesLeft <= 0) {
+        throw error;
+      }
+      const backoffFactor = 2 ** (options.maxRetries - retriesLeft);
+      const fallbackDelay = Math.min(baseDelayMs * backoffFactor, maxDelayMs);
+      const retryAfterMs =
+        error instanceof HttpRequestError ? error.retryAfterMs : undefined;
+      const waitMs =
+        retryAfterMs !== undefined
+          ? Math.min(retryAfterMs, maxDelayMs)
+          : fallbackDelay;
+      options.onRetry?.(error, waitMs, retriesLeft - 1);
+      retriesLeft -= 1;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
 }
 
 export async function sendHttpRequest<T>(

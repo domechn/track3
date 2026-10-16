@@ -8,9 +8,15 @@ vi.mock("@/utils/app", () => ({
   getClientID: vi.fn(),
 }));
 
-vi.mock("../utils/http", () => ({
-  sendHttpRequest: vi.fn(),
-}));
+vi.mock("../utils/http", async () => {
+  const actual = await vi.importActual<typeof import("../utils/http")>(
+    "../utils/http",
+  );
+  return {
+    ...actual,
+    sendHttpRequest: vi.fn(),
+  };
+});
 
 const ADDRESS_A = `0x${"1".repeat(40)}`;
 const ADDRESS_B = `0x${"2".repeat(40)}`;
