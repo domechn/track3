@@ -130,6 +130,33 @@ beforeEach(() => {
 });
 
 describe("Historical-data — delete does not flash loading overlay", () => {
+  it("removes a snapshot immediately and restores it if deletion fails", async () => {
+    let rejectDelete!: (error: Error) => void;
+    vi.mocked(deleteHistoricalDataByUUID).mockImplementation(
+      () => new Promise((_, reject) => { rejectDelete = reject; }),
+    );
+    render(
+      <VersionHarness
+        currency={usdCurrency}
+        dateRange={dateRange}
+        quoteColor="green-up-red-down"
+      />,
+    );
+    await screen.findAllByText("snapshot");
+    fireEvent.click(screen.getByRole("button", { name: /delete/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm/i }));
+    expect(screen.getAllByText("snapshot")).toHaveLength(1);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    await waitFor(() => expect(deleteHistoricalDataByUUID).toHaveBeenCalledWith("snapshot-1"));
+    rejectDelete(new Error("disk failed"));
+    await waitFor(() => expect(screen.getAllByText("snapshot")).toHaveLength(2));
+    expect(toastMock.mock.lastCall?.[0]).toMatchObject({
+      description: "disk failed",
+      variant: "destructive",
+    });
+  });
+
   it("keeps the snapshot detail closed when clicking the delete dialog backdrop", async () => {
     render(
       <VersionHarness
