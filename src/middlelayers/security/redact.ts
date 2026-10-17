@@ -50,12 +50,16 @@ export function redactSecrets(text: string, configured: readonly string[] = [], 
     });
 }
 
+export function sanitizeUntrustedText(value: string, configured: readonly string[] = [], preserveIdentifier = false): string {
+  return redactSecrets(value.replace(/[\u200b-\u200d\ufeff]/g, ""), configured, preserveIdentifier)
+    .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/<\/?tool_result[^>]*>|<\/?think\b[^>]*>|<\|(?:im_start|im_end|system|assistant|user|developer|tool|eot_id|eom_id|start_header_id|end_header_id|begin_of_text|end_of_text)\|>|\[(?:\/?INST|im_start|im_end)\]|<\/?(?:start_of_turn|end_of_turn)>|<<\/?SYS>>/gi, "[untrusted text]");
+}
+
 export function sanitizeUntrustedData(value: unknown, configured: readonly string[] = [], depth = 0, preserveIdentifier = false): unknown {
   if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.toISOString() : null;
   if (typeof value === "string") {
-    const clean = redactSecrets(value, configured, preserveIdentifier)
-      .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ")
-      .replace(/<\/?tool_result[^>]*>|<\/?think\b[^>]*>|<\|(?:im_start|im_end|system|assistant|user|developer|tool|eot_id|eom_id|start_header_id|end_header_id|begin_of_text|end_of_text)\|>|\[(?:\/?INST|im_start|im_end)\]|<\/?(?:start_of_turn|end_of_turn)>|<<\/?SYS>>/gi, "[untrusted text]");
+    const clean = sanitizeUntrustedText(value, configured, preserveIdentifier);
     return clean.length > 500 ? `${clean.slice(0, 236)}[truncated: field]${clean.slice(-246)}` : clean;
   }
   if (depth >= 12) return "[nested data omitted]";

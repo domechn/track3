@@ -235,6 +235,9 @@ export default function MessageBubble({
                 b, i, isStreaming, blocks.slice(i + 1).some((later) => later.kind === "text"),
               ))
             )}
+            {!isStreaming && !blocks.some((block) => block.kind === "text" && stripThinkTags(block.text)) && (
+              <p className="text-sm italic text-muted-foreground">{t("assistant.chat.noResponse")}</p>
+            )}
             {message.usage && <UsageLabel usage={message.usage} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />}
           </div>
         )}
