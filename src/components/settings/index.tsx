@@ -68,7 +68,7 @@ function TabLink({
       to={to}
       aria-current={match ? "page" : undefined}
       className={cn(
-        "flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+        "flex touch:min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
         match
           ? "bg-accent/80 text-accent-foreground"
           : "text-muted-foreground hover:text-foreground hover:bg-accent/40"

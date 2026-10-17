@@ -61,7 +61,7 @@ const OthersSection = memo(function OthersSection({
     <TooltipProvider>
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4 touch:flex-wrap">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {t("config.others")}

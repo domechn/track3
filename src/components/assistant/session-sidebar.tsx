@@ -65,7 +65,7 @@ export default function SessionSidebar({
           variant="ghost"
           size="sm"
           onClick={onNew}
-          className="h-11 gap-1 px-2 text-xs sm:h-7"
+          className="touch:h-11 gap-1 px-2 text-xs h-7"
           data-testid="session-new-chat"
         >
           <PlusIcon className="h-3.5 w-3.5" />
@@ -180,7 +180,7 @@ function SessionItem({
             type="button"
             onClick={() => onSelect(session.id)}
             aria-current={isActive ? "true" : undefined}
-            className="min-h-11 min-w-0 flex-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
+            className="min-h-8 touch:min-h-11 min-w-0 flex-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             data-testid={`session-select-${session.id}`}
           >
             <span className="flex min-w-0 items-center gap-2">
@@ -199,12 +199,12 @@ function SessionItem({
             </span>
           </button>
           {/* Hover actions */}
-          <span className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 motion-reduce:opacity-100">
+          <span className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 touch:opacity-100 motion-reduce:opacity-100">
             <button
               type="button"
               onClick={handlePin}
               title={session.pinned === 1 ? t("ai.session.unpin") : t("ai.session.pin")}
-              className="inline-flex h-11 w-11 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:h-8 sm:w-8"
+              className="inline-flex h-6 w-6 touch:h-11 touch:w-11 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               data-testid={`session-pin-${session.id}`}
             >
               {session.pinned === 1 ? (
@@ -218,7 +218,7 @@ function SessionItem({
                 <button
                   type="button"
                   title={t("ai.session.delete")}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring sm:h-8 sm:w-8"
+                  className="inline-flex h-6 w-6 touch:h-11 touch:w-11 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid={`session-delete-${session.id}`}
                 >
                   <Cross2Icon className="h-3.5 w-3.5" />

@@ -24,6 +24,11 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
 }));
 
 describe("SyncStatusIndicator", () => {
+  it("keeps its desktop height and expands the touch target", () => {
+    render(<SyncStatusIndicator />);
+    expect(screen.getByRole("button", { name: "Sync error" })).toHaveClass("min-h-9", "touch:min-h-11");
+  });
+
   afterEach(() => {
     state.current.mode = "ready";
     state.current.sync.phase = "error";

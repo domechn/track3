@@ -249,7 +249,7 @@ const App = ({
               variant="outline"
               size="sm"
               aria-label={t("latestAssets.previousPage")}
-              className="h-11 min-w-[44px] px-3 sm:h-8 sm:min-w-[32px]"
+              className="h-8 min-w-[32px] touch:h-11 touch:min-w-[44px] px-3"
               onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
               disabled={dataPage <= 0}
             >
@@ -262,7 +262,7 @@ const App = ({
               variant="outline"
               size="sm"
               aria-label={t("latestAssets.nextPage")}
-              className="h-11 min-w-[44px] px-3 sm:h-8 sm:min-w-[32px]"
+              className="h-8 min-w-[32px] touch:h-11 touch:min-w-[44px] px-3"
               onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
               disabled={dataPage >= maxDataPage}
             >
@@ -281,13 +281,13 @@ const App = ({
                 })}
                 className="h-[42px]"
               >
-                <TableCell className="py-0 sm:py-1.5">
+                <TableCell className="py-1.5 touch:py-0">
                   <Link
                     to={buildAssetDetailsPath({
                       symbol: d.coin,
                       assetType: d.assetType,
                     })}
-                    className="group inline-flex min-h-11 flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
+                    className="group inline-flex touch:min-h-11 flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className="sr-only">{t("common.openAssetDetails").replace(
                       "{asset}",

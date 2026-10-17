@@ -519,7 +519,7 @@ function ChatHeader({
           type="button"
           onClick={onToggleSidebar}
           title={sidebarOpen ? t("ai.session.hide") : t("ai.session.show")}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:h-8 sm:w-8"
+          className="inline-flex touch:h-11 touch:w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring h-8 w-8"
           data-testid="sidebar-toggle"
         >
           {sidebarOpen ? (

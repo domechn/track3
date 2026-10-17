@@ -45,7 +45,7 @@ const AttachModal = memo(function AttachModal({
             type="button"
             aria-pressed={!currentEncoded}
             className={
-              "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+              "flex touch:min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
               (!currentEncoded
                 ? "bg-accent text-accent-foreground"
                 : "hover:bg-muted")
@@ -70,7 +70,7 @@ const AttachModal = memo(function AttachModal({
                     type="button"
                     aria-pressed={currentEncoded === opt.value}
                     className={
-                      "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                      "flex touch:min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                       (currentEncoded === opt.value
                         ? "bg-accent text-accent-foreground"
                         : "hover:bg-muted")
@@ -103,7 +103,7 @@ const AttachModal = memo(function AttachModal({
                     type="button"
                     aria-pressed={currentEncoded === opt.value}
                     className={
-                      "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                      "flex touch:min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                       (currentEncoded === opt.value
                         ? "bg-accent text-accent-foreground"
                         : "hover:bg-muted")

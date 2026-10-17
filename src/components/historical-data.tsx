@@ -65,6 +65,7 @@ import { useOptimisticDelete } from "./common/use-optimistic-delete";
 import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
 import { useTranslation } from "@/i18n";
+import { ScrollArea } from "./ui/scroll-area";
 
 type RankData = {
   id: number;
@@ -562,7 +563,7 @@ const App = ({
             }
           }}
         >
-          <DialogContent className="w-[calc(100vw-1rem)] max-w-[1200px] max-h-[calc(100dvh-1rem)] overflow-auto">
+          <DialogContent className="min-w-[80%] touch:min-w-0 touch:w-[calc(100vw-1rem)] touch:max-w-[1200px] touch:max-h-[calc(100dvh-1rem)]">
             <DialogHeader>
               <DialogTitle>{t("history.detailTitle")}</DialogTitle>
               <DialogDescription className="sr-only">
@@ -835,7 +836,7 @@ const App = ({
                 {t("history.recordsCardSubtitle")}
               </p>
             </CardHeader>
-            <CardContent className="min-w-0 space-y-3">
+            <CardContent className="space-y-3 touch:min-w-0">
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                 <div>
                   {pageLoading
@@ -845,7 +846,7 @@ const App = ({
                     ? ` · ${t("history.showing").replace("{start}", String(loadedRangeStart)).replace("{end}", String(loadedRangeEnd))}`
                     : ""}
                 </div>
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 touch:min-w-0 touch:flex-wrap">
                   <span className="text-xs text-muted-foreground">{t("history.rowsLabel")}</span>
                   <Select
                     value={String(pageSize)}
@@ -871,7 +872,7 @@ const App = ({
                     variant="outline"
                     size="sm"
                     aria-label={t("history.prevPage")}
-                    className="h-11 w-11 px-0 sm:h-8 sm:w-8"
+                    className="touch:h-11 touch:w-11 px-0 h-8 w-8"
                     onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
                     disabled={dataPage <= 0}
                   >
@@ -920,7 +921,7 @@ const App = ({
                     variant="outline"
                     size="sm"
                     aria-label={t("history.nextPage")}
-                    className="h-11 w-11 px-0 sm:h-8 sm:w-8"
+                    className="touch:h-11 touch:w-11 px-0 h-8 w-8"
                     onClick={() =>
                       setDataPage(Math.min(dataPage + 1, maxDataPage))
                     }
@@ -931,11 +932,12 @@ const App = ({
                 </div>
               </div>
 
-              <div className="relative min-w-0 max-w-full rounded-lg border border-border/40 bg-background/20">
-                  <Table className="min-w-[600px]">
+              <div className="relative">
+                <ScrollArea className="w-full touch:min-w-0 touch:max-w-full rounded-lg border border-border/40 bg-background/20">
+                  <Table className="touch:min-w-[600px]">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="sticky left-0 z-10 h-[42px] bg-card">{t("profitMetrics.date")}</TableHead>
+                        <TableHead className="h-[42px] touch:sticky touch:left-0 touch:z-10 touch:bg-card">{t("profitMetrics.date")}</TableHead>
                         <TableHead className="h-[42px] text-right">
                           {t("history.total")}
                         </TableHead>
@@ -958,10 +960,10 @@ const App = ({
                             className="group cursor-pointer hover:bg-muted/40 transition-colors"
                             onClick={() => onRowClick(row.id)}
                           >
-                            <TableCell className="sticky left-0 z-10 bg-card py-1.5 text-sm group-hover:bg-muted">
+                            <TableCell className="py-1.5 text-sm touch:sticky touch:left-0 touch:z-10 touch:bg-card touch:group-hover:bg-muted">
                               <button type="button"
                                 aria-label={t("history.viewSnapshot").replace("{date}", timeToDateStr(new Date(row.createdAt).getTime(), true))}
-                                className="flex min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                className="flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <span>
                                   {timeToDateStr(
                                     new Date(row.createdAt).getTime(),
@@ -969,7 +971,7 @@ const App = ({
                                   )}
                                 </span>
                               </button>
-                              <span className="text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
+                              <span className="block text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
                             </TableCell>
                             <TableCell className="py-1.5 text-right text-sm font-semibold">
                               {currency.symbol}
@@ -1046,6 +1048,7 @@ const App = ({
                       })}
                     </TableBody>
                   </Table>
+                </ScrollArea>
 
                 {pageLoading && (
                   <PageLoadingOverlay

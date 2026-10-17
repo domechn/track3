@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 import { FakeS3 } from "../../src/middlelayers/sync/object-store";
 
@@ -22,8 +22,7 @@ async function contrastOnWhite(text: Locator): Promise<number> {
   });
 }
 
-for (const width of [360, 768]) for (const route of routes) {
-  test(`${route} at ${width}px has no automated accessibility violations or page overflow`, async ({ page }) => {
+async function checkRouteAccessibility(page: Page, route: string, width: number) {
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.setViewportSize({ width, height: 740 });
@@ -50,20 +49,22 @@ for (const width of [360, 768]) for (const route of routes) {
         .slice(0, 12).map((element) => `${element.tagName} ${element.textContent?.trim().slice(0, 80)} ${element.getBoundingClientRect().x}`),
     }), width);
     expect(overflow.width, overflow.offenders.join("\n")).toBeLessThanOrEqual(width);
-    if (width === 360) {
-      const small = await page.locator("main button, main a, main input, main select, aside button, aside a, header button, header a").evaluateAll((controls) =>
-        controls.filter((control) => {
-          const style = getComputedStyle(control);
-          const box = control.getBoundingClientRect();
-          if (box.width === 0 || box.height === 0 || style.opacity === "0" || control.classList.contains("sr-only")) return false;
-          const labelledBy = control.id ? document.querySelector(`label[for="${control.id}"]`) : control.closest("label");
-          const labelBox = labelledBy?.getBoundingClientRect();
-          return (box.width < 44 || box.height < 44) && !(labelBox && labelBox.width >= 44 && labelBox.height >= 44);
-        }).slice(0, 12).map((control) => `${control.tagName} ${control.getAttribute("aria-label") ?? control.textContent?.trim().slice(0, 35)} ${Math.round(control.getBoundingClientRect().width)}x${Math.round(control.getBoundingClientRect().height)}`));
-      expect(small, route).toEqual([]);
-    }
+}
+
+for (const route of routes) {
+  test(`${route} at 768px with a mouse has no automated accessibility violations or page overflow`, async ({ page }) => {
+    await checkRouteAccessibility(page, route, 768);
   });
 }
+
+test.describe("coarse pointer narrow viewport", () => {
+  test.use({ isMobile: true, hasTouch: true });
+  for (const route of routes) {
+    test(`${route} at 360px has no automated accessibility violations or page overflow`, async ({ page }) => {
+      await checkRouteAccessibility(page, route, 360);
+    });
+  }
+});
 
 test("shared delete dialog stays in the viewport and restores focus after Escape", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
@@ -117,6 +118,9 @@ test("navigation follows visual order and shows a keyboard focus ring", async ({
   expect(await page.locator("main").evaluate((node) => node.contains(document.activeElement))).toBe(true);
 });
 
+test.describe("coarse pointer date picker", () => {
+test.use({ isMobile: true, hasTouch: true });
+
 test("date picker popover fits a narrow viewport", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -130,12 +134,7 @@ test("date picker popover fits a narrow viewport", async ({ page }) => {
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(360);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
-  const small = await popover.locator("button").evaluateAll((buttons) =>
-    buttons.filter((button) => {
-      const box = button.getBoundingClientRect();
-      return box.width > 0 && box.height > 0 && (box.width < 44 || box.height < 44);
-    }).slice(0, 5).map((button) => `${button.textContent?.trim()} ${Math.round(button.getBoundingClientRect().width)}x${Math.round(button.getBoundingClientRect().height)}`));
-  expect(small).toEqual([]);
+});
 });
 
 test("comparison controls announce localized actions", async ({ page }) => {
@@ -160,8 +159,7 @@ test("overview charts expose text summaries", async ({ page }) => {
   }
 });
 
-for (const width of [360, 768]) {
-  test(`expanded P&L attribution at ${width}px passes axe without page overflow`, async ({ page }) => {
+async function checkAttributionAccessibility(page: Page, width: number) {
     await page.setViewportSize({ width, height: 740 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await installTauriBridge(page);
@@ -173,8 +171,18 @@ for (const width of [360, 768]) {
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     expect(results.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-  });
 }
+
+test("expanded P&L attribution at 768px passes axe without page overflow", async ({ page }) => {
+  await checkAttributionAccessibility(page, 768);
+});
+
+test.describe("coarse pointer attribution", () => {
+  test.use({ isMobile: true, hasTouch: true });
+  test("expanded P&L attribution at 360px passes axe without page overflow", async ({ page }) => {
+    await checkAttributionAccessibility(page, 360);
+  });
+});
 
 test("expanded overview and asset charts expose text summaries", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
@@ -232,6 +240,9 @@ test("small muted text in assistant sessions and expanded Overview meets AA cont
   ]) expect(await contrastOnWhite(locator)).toBeGreaterThanOrEqual(4.5);
 });
 
+test.describe("coarse pointer", () => {
+test.use({ isMobile: true, hasTouch: true });
+
 test("mobile switch track and thumb share a center line", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await installTauriBridge(page);
@@ -247,17 +258,19 @@ test("mobile switch track and thumb share a center line", async ({ page }) => {
   });
   expect(Math.abs(centers.track - centers.thumb), JSON.stringify(centers)).toBeLessThanOrEqual(0.5);
 });
+});
 
-test("history first cell retains row hover feedback", async ({ page }) => {
+test("history first cell shows the row hover feedback with a mouse", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
   await installTauriBridge(page);
   await page.goto("/#/history");
   const row = page.getByTestId("history-snapshot-row").first();
   const firstCell = row.locator("td").first();
-  const before = await firstCell.evaluate((node) => getComputedStyle(node).backgroundColor);
+  const before = await row.evaluate((node) => getComputedStyle(node).backgroundColor);
   await row.hover();
-  const after = await firstCell.evaluate((node) => getComputedStyle(node).backgroundColor);
+  const after = await row.evaluate((node) => getComputedStyle(node).backgroundColor);
   expect(after).not.toBe(before);
+  expect(await firstCell.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
 });
 
 test("P&L rank column moves with its table instead of pinning", async ({ page }) => {
@@ -285,10 +298,6 @@ test("configuration dialog fits mobile width and passes axe", async ({ page }) =
   expect(box).not.toBeNull();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(360);
-  const closeBox = await dialog.getByRole("button", { name: "Close" }).boundingBox();
-  expect(closeBox).not.toBeNull();
-  expect(closeBox!.width).toBeGreaterThanOrEqual(44);
-  expect(closeBox!.height).toBeGreaterThanOrEqual(44);
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(results.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => `${node.target.join(" ")} ${node.failureSummary}`).join(", ")}`)).toEqual([]);
   await page.keyboard.press("Escape");
@@ -311,6 +320,56 @@ test("remaining configuration editors have named controls", async ({ page }) => 
     await page.keyboard.press("Escape");
     await expect(trigger).toBeFocused();
   }
+});
+
+test.describe("coarse pointer touch targets", () => {
+test.use({ isMobile: true, hasTouch: true });
+
+test("visible controls across routes have 44px targets or 44px labels", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await installTauriBridge(page);
+  for (const route of routes) {
+    await page.goto(`/#${route}`);
+    await expect(page.locator("main > div")).toHaveAttribute("aria-busy", "false");
+    const small = await page.locator("main button, main a, main input, main select, aside button, aside a, header button, header a").evaluateAll((controls) =>
+      controls.filter((control) => {
+        const style = getComputedStyle(control);
+        const box = control.getBoundingClientRect();
+        if (box.width === 0 || box.height === 0 || style.opacity === "0" || control.classList.contains("sr-only")) return false;
+        const labelledBy = control.id ? document.querySelector(`label[for="${control.id}"]`) : control.closest("label");
+        const labelBox = labelledBy?.getBoundingClientRect();
+        return (box.width < 44 || box.height < 44) && !(labelBox && labelBox.width >= 44 && labelBox.height >= 44);
+      }).slice(0, 12).map((control) => `${control.tagName} ${control.getAttribute("aria-label") ?? control.textContent?.trim().slice(0, 35)} ${Math.round(control.getBoundingClientRect().width)}x${Math.round(control.getBoundingClientRect().height)}`));
+    expect(small, route).toEqual([]);
+  }
+});
+
+test("date picker controls have 44px targets", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await installTauriBridge(page);
+  await page.goto("/#/overview");
+  await page.getByRole("button", { name: "Choose date range" }).click();
+  const small = await page.locator("[data-radix-popper-content-wrapper] button").evaluateAll((buttons) =>
+    buttons.filter((button) => {
+      const box = button.getBoundingClientRect();
+      return box.width > 0 && box.height > 0 && (box.width < 44 || box.height < 44);
+    }).slice(0, 5).map((button) => `${button.textContent?.trim()} ${Math.round(button.getBoundingClientRect().width)}x${Math.round(button.getBoundingClientRect().height)}`));
+  expect(small).toEqual([]);
+});
+
+test("configuration dialog close control has a 44px target", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await installTauriBridge(page);
+  await page.goto("/#/settings/configuration");
+  await page.getByRole("button", { name: "Add Exchange Configuration" }).click();
+  const closeBox = await page.getByRole("dialog", { name: "Add Exchange Configuration" })
+    .getByRole("button", { name: "Close" }).boundingBox();
+  expect(closeBox).not.toBeNull();
+  expect(closeBox!.width).toBeGreaterThanOrEqual(44);
+  expect(closeBox!.height).toBeGreaterThanOrEqual(44);
 });
 
 test("visible mobile controls provide 44px touch targets", async ({ page }) => {
@@ -351,6 +410,7 @@ test("assistant composer controls meet the mobile touch target size", async ({ p
   expect(box).not.toBeNull();
   expect(box!.width).toBeGreaterThanOrEqual(44);
   expect(box!.height).toBeGreaterThanOrEqual(44);
+});
 });
 
 test("reduced motion stops repeated animations", async ({ page }) => {
@@ -396,6 +456,9 @@ test("sync status popover stays visible and announces state", async ({ page }) =
   expect(results.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => `${node.target.join(" ")} ${node.failureSummary}`).join(", ")}`)).toEqual([]);
 });
 
+test.describe("coarse pointer cost basis table", () => {
+test.use({ isMobile: true, hasTouch: true });
+
 test("wide cost basis tables keep their first column visible while scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await installTauriBridge(page);
@@ -412,6 +475,7 @@ test("wide cost basis tables keep their first column visible while scrolling", a
   expect(before).not.toBeNull();
   expect(after).not.toBeNull();
   expect(Math.abs(after!.x - before!.x)).toBeLessThan(2);
+});
 });
 
 test("summary detail dialog fits and passes axe", async ({ page }) => {
@@ -443,6 +507,9 @@ test("history detail dialog exposes virtual table rows and passes axe", async ({
   expect(results.violations.map(({ id }) => id)).toEqual([]);
 });
 
+test.describe("coarse pointer rebalance editor", () => {
+test.use({ isMobile: true, hasTouch: true });
+
 test("rebalance target editor fits the mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await installTauriBridge(page);
@@ -450,6 +517,7 @@ test("rebalance target editor fits the mobile viewport", async ({ page }) => {
   await page.getByRole("button", { name: "Equal weight" }).click();
   await expect(page.getByRole("button", { name: /Remove target/ }).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
 });
 
 test("refresh status dialog fits and has no axe violations", async ({ page }) => {

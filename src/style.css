@@ -2,11 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-.table-scroll > table.sticky-first-column > :is(thead, tbody, tfoot) > tr > :first-child {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background-color: hsl(var(--card));
+@media (pointer: coarse) {
+  .table-scroll > table.sticky-first-column > :is(thead, tbody, tfoot) > tr > :first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: hsl(var(--card));
+  }
 }
 
 /*
@@ -153,7 +155,7 @@
       transition-duration: 0ms !important;
     }
   }
-  @media (max-width: 639px) {
+  @media (pointer: coarse) {
     select {
       min-height: 44px;
     }

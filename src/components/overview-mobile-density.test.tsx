@@ -126,7 +126,7 @@ describe("Overview mobile density", () => {
     expect(summaryGrid).toHaveClass("sm:grid-cols-3");
   });
 
-  it("labels pagination buttons and gives them touch-friendly sizing", async () => {
+  it("keeps pagination compact for mouse pointers and sized for touch", async () => {
     renderWithProviders(
       <LatestAssetsPercentage
         currency={usdCurrency}
@@ -144,7 +144,7 @@ describe("Overview mobile density", () => {
       name: /next token holdings page/i,
     });
 
-    expect(previousButton).toHaveClass("h-11");
-    expect(nextButton).toHaveClass("h-11");
+    expect(previousButton).toHaveClass("h-8", "touch:h-11");
+    expect(nextButton).toHaveClass("h-8", "touch:h-11");
   });
 });

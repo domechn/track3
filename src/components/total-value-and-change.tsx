@@ -503,7 +503,7 @@ const App = ({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-11 w-11 text-muted-foreground sm:h-8 sm:w-8"
+              className="touch:h-11 touch:w-11 text-muted-foreground h-8 w-8"
               aria-label={t("totalValue.showPercentage")}
               onClick={() => setShowPercentageInChart(!showPercentageInChart)}
             >
@@ -528,7 +528,7 @@ const App = ({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-11 w-11 text-muted-foreground sm:h-8 sm:w-8"
+              className="touch:h-11 touch:w-11 text-muted-foreground h-8 w-8"
               aria-label={t("totalValue.switchBase")}
               onClick={() => setBtcAsBase(!btcAsBase)}
             >

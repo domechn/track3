@@ -286,7 +286,7 @@ const App = ({
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
               {t("profitMetrics.maxContProfit")}
             </div>
-            <div className="min-w-0 break-words text-right text-sm font-semibold md:text-base">
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
               {timeToDateStr(maxProfileDateRange.start)} ~{" "}
               {timeToDateStr(maxProfileDateRange.end)} (
               {daysBetweenDates(maxProfileDateRange.start, maxProfileDateRange.end)})
@@ -296,7 +296,7 @@ const App = ({
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
               {t("profitMetrics.maxContLoss")}
             </div>
-            <div className="min-w-0 break-words text-right text-sm font-semibold md:text-base">
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
               {timeToDateStr(maxLostDateRange.start)} ~{" "}
               {timeToDateStr(maxLostDateRange.end)} (
               {daysBetweenDates(maxLostDateRange.start, maxLostDateRange.end)})
@@ -306,7 +306,7 @@ const App = ({
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
               {t("profitMetrics.maxProfit")}
             </div>
-            <div className="min-w-0 break-words text-right text-sm font-semibold md:text-base">
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
               {maxSingleDayProfitData.value < 0 ? (
                 "-"
               ) : (
@@ -328,7 +328,7 @@ const App = ({
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
               {t("profitMetrics.maxLoss")}
             </div>
-            <div className="min-w-0 break-words text-right text-sm font-semibold md:text-base">
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
               {maxSingleDayLostData.value > 0 ? (
                 "-"
               ) : (
@@ -353,7 +353,7 @@ const App = ({
             <div className="text-[11px] text-muted-foreground whitespace-nowrap">
               {t("profitMetrics.maxDrawdown")}
             </div>
-            <div className="min-w-0 break-words text-right text-sm font-semibold md:text-base">
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
               <span
                 className={positiveNegativeTextClass(-1, quoteColor, 700)}
               >
@@ -368,7 +368,7 @@ const App = ({
             </div>
             <button
               type="button"
-              className="flex min-h-11 min-w-11 items-center whitespace-nowrap rounded text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring md:text-base"
+              className="flex touch:min-h-11 touch:min-w-11 items-center whitespace-nowrap rounded text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring md:text-base"
               onClick={onATHTimesClick}
             >
               <span>{athTimes.times}</span>

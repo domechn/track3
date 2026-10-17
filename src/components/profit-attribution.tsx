@@ -77,7 +77,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
       ))}
     </div>
     <ButtonGroup value={dimension} onValueChange={(value) => setDimension(value as AttributionDimension)} aria-label={label("groupBy")} className="h-auto max-w-full flex-wrap justify-start gap-0.5">
-      {dimensions.map((value) => <ButtonGroupItem key={value} value={value} className="min-h-11 px-2 text-xs sm:px-3 sm:text-sm">{label(value)}</ButtonGroupItem>)}
+      {dimensions.map((value) => <ButtonGroupItem key={value} value={value} className="touch:min-h-11 px-2 text-xs sm:px-3 sm:text-sm">{label(value)}</ButtonGroupItem>)}
     </ButtonGroup>
     <figure className="grid gap-4 sm:grid-cols-2" aria-label={label("chart")}>
       <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("contributors")}</h3>{bars(contributors)}</section>
