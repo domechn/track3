@@ -18,6 +18,11 @@ use track3::{
     migration::run_migrations,
     refresh_persistence::persist_refresh as persist_refresh_atomically,
     startup_security::{acquire_app_instance_lock, load_encryption_key, LEGACY_ENCRYPTION_KEY},
+    sync_persistence::{
+        delete_sync_snapshot as delete_sync_snapshot_atomically,
+        import_sync_snapshot as import_sync_snapshot_atomically,
+        replace_sync_snapshot as replace_sync_snapshot_atomically,
+    },
     types::{CoinWithPrice, RefreshAssetInput, RefreshTransactionInput},
 };
 
@@ -79,6 +84,30 @@ async fn persist_refresh(
         &txns,
     )
     .await
+}
+
+#[tauri::command]
+async fn import_sync_snapshot(
+    database_path: tauri::State<'_, DatabasePath>,
+    snapshot: serde_json::Value,
+) -> Result<bool, String> {
+    import_sync_snapshot_atomically(&database_path.0, snapshot).await
+}
+
+#[tauri::command]
+async fn replace_sync_snapshot(
+    database_path: tauri::State<'_, DatabasePath>,
+    snapshot: serde_json::Value,
+) -> Result<(), String> {
+    replace_sync_snapshot_atomically(&database_path.0, snapshot).await
+}
+
+#[tauri::command]
+async fn delete_sync_snapshot(
+    database_path: tauri::State<'_, DatabasePath>,
+    uuid: String,
+) -> Result<(), String> {
+    delete_sync_snapshot_atomically(&database_path.0, &uuid).await
 }
 
 #[cfg_attr(
@@ -256,6 +285,9 @@ fn main() {
             decrypt_with_key,
             rotate_encryption_key,
             persist_refresh,
+            import_sync_snapshot,
+            replace_sync_snapshot,
+            delete_sync_snapshot,
             get_database_url,
         ])
         .run(tauri::generate_context!())

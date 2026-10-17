@@ -31,10 +31,19 @@ function encode64(bytes: Uint8Array): string {
 }
 
 function decode64(value: string): Uint8Array {
-  if (typeof value !== "string" || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+  if (typeof value !== "string" || value.length % 4 !== 0) {
     throw new Error("Invalid sync format");
   }
-  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+  const content = value.slice(0, value.length - padding);
+  if (content.length % 4 !== (padding ? 4 - padding : 0) || /[^A-Za-z0-9+/]/.test(content)) {
+    throw new Error("Invalid sync format");
+  }
+  try {
+    return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+  } catch {
+    throw new Error("Invalid sync format");
+  }
 }
 
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<Uint8Array> {

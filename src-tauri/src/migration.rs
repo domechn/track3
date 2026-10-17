@@ -953,6 +953,7 @@ async fn migrate_v8_to_v9(
 ) -> MigrationResult<()> {
     let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
     let alerts = read_migration_sql(resource_dir, "v09t10/alerts_up.sql")?;
+    let sync_state = read_migration_sql(resource_dir, "v10t11/sync_state_up.sql")?;
     let mut transaction = connection
         .begin()
         .await
@@ -965,6 +966,10 @@ async fn migrate_v8_to_v9(
         .execute(&mut *transaction)
         .await
         .map_err(|error| format!("failed to create alert tables: {error}"))?;
+    sqlx::raw_sql(&sync_state)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to create sync state tables: {error}"))?;
     write_migration_version(&mut transaction, "0.9.0").await?;
     transaction
         .commit()
@@ -983,6 +988,7 @@ async fn repair_required_schema(
     let chat_sessions = read_migration_sql(resource_dir, "init/chat_sessions_up.sql")?;
     let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
     let alerts = read_migration_sql(resource_dir, "v09t10/alerts_up.sql")?;
+    let sync_state = read_migration_sql(resource_dir, "v10t11/sync_state_up.sql")?;
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
     let mut transaction = connection
         .begin()
@@ -1076,6 +1082,10 @@ async fn repair_required_schema(
             .execute(&mut *transaction)
             .await
             .map_err(|error| format!("failed to ensure alert tables: {error}"))?;
+        sqlx::raw_sql(&sync_state)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to ensure sync state tables: {error}"))?;
     }
     repair_index(
         &mut transaction,
@@ -2825,6 +2835,29 @@ mod tests {
     }
 
     #[test]
+    fn legacy_database_upgraded_directly_to_0_9_gets_sync_tables() {
+        let root = make_temp_dir("sync-direct-upgrade");
+        let database_path = root.join("legacy.db");
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            create_legacy_fixture(&database_path, LegacyVersion::V07).await;
+            run_migrations(&database_path, &resource_dir(), "0.9.0")
+                .await
+                .unwrap();
+            let mut conn = connect(&database_path).await;
+            assert!(table_exists(&mut conn, "rebalance_profiles").await);
+            assert!(table_exists(&mut conn, "sync_state").await);
+            assert!(table_exists(&mut conn, "sync_applied_objects").await);
+            assert_eq!(
+                configuration(&mut conn, 999).await.as_deref(),
+                Some("0.9.0")
+            );
+            conn.close().await.unwrap();
+        });
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn v8_to_v9_creates_a_single_validated_rebalance_profile_without_changing_assets() {
         let root = make_temp_dir("rebalance-profile");
         let database_path = root.join("legacy.db");
@@ -2847,6 +2880,8 @@ mod tests {
                 .unwrap();
             let mut conn = connect(&database_path).await;
             assert!(table_exists(&mut conn, "rebalance_profiles").await);
+            assert!(table_exists(&mut conn, "sync_state").await);
+            assert!(table_exists(&mut conn, "sync_applied_objects").await);
             assert_eq!(
                 configuration(&mut conn, 999).await.as_deref(),
                 Some("0.9.0")
@@ -2883,6 +2918,22 @@ mod tests {
                     .await
                     .unwrap(),
                 1
+            );
+            assert!(table_exists(&mut conn, "sync_state").await);
+            conn.execute("DROP TABLE sync_state; DROP TABLE sync_applied_objects;")
+                .await
+                .unwrap();
+            conn.close().await.unwrap();
+
+            run_migrations(&database_path, &resource_dir(), "0.9.0")
+                .await
+                .unwrap();
+            let mut conn = connect(&database_path).await;
+            assert!(table_exists(&mut conn, "sync_state").await);
+            assert!(table_exists(&mut conn, "sync_applied_objects").await);
+            assert_eq!(
+                configuration(&mut conn, 999).await.as_deref(),
+                Some("0.9.0")
             );
             conn.close().await.unwrap();
         });

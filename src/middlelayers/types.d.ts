@@ -205,6 +205,7 @@ export type HistoricalData = {
 export type RestoreHistoricalData = {
   assets: AssetModel[];
   transactions: TransactionModel[];
+  snapshot?: import("./sync/engine").Snapshot;
 };
 
 export type CurrencyRateModel = {

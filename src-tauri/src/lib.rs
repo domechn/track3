@@ -6,4 +6,5 @@ pub mod key_rotation;
 pub mod migration;
 pub mod refresh_persistence;
 pub mod startup_security;
+pub mod sync_persistence;
 pub mod types;

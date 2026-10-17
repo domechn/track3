@@ -71,7 +71,7 @@ export function getPortfolioInputGeneration(): number {
   return portfolioInputGeneration;
 }
 
-function markPortfolioInputChanged(): void {
+export function markPortfolioInputChanged(): void {
   portfolioInputGeneration += 1;
 }
 
@@ -608,8 +608,13 @@ export function getCachedPreferCurrency(): string | undefined {
   }
 }
 
-function cachePreferCurrency(currency: string) {
+export function cachePreferCurrency(currency: string | null) {
   if (!currency) {
+    try {
+      localStorage.removeItem(preferCurrencyLocalStorageKey);
+    } catch {
+      // Ignore cache write failures, persisted configuration remains source of truth.
+    }
     return;
   }
 
