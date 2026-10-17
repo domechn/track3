@@ -15,6 +15,8 @@ const CONFIGURATION_KEYS: Record<string, ConfigurationKey> = {
   "11": { category: "secrets", encrypted: true },
   "12": { category: "settings", encrypted: false },
   "20": { category: "secrets", encrypted: true },
+  "991": { category: "local", encrypted: true },
+  "992": { category: "local", encrypted: true },
   "993": { category: "settings", encrypted: false },
   "994": { category: "secrets", encrypted: true },
   "995": { category: "settings", encrypted: false },

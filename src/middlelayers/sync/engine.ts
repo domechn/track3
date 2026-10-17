@@ -1,5 +1,5 @@
 import { decryptObject, encryptObject, objectName, unlockSyncHeader } from "./crypto";
-import { readSyncHeader, type S3Store } from "./object-store";
+import { isS3Conflict, readSyncHeader, type S3Store } from "./object-store";
 import { compareClock, nextClock, validRemoteClock, type Hlc } from "./clock";
 import { syncCategory, type SyncCategory } from "./config-keys";
 
@@ -33,6 +33,7 @@ type SnapshotEdit = {
 export type SyncState = {
   deviceId?: string;
   clock?: Hlc;
+  headerSalt?: string;
   known?: string[];
   published?: string[];
   config?: Record<string, ConfigMarker>;
@@ -55,6 +56,10 @@ export type SyncState = {
   lastSync?: number;
 };
 
+export function resetSyncState(state: SyncState): SyncState {
+  return { deviceId: state.deviceId, clock: state.clock };
+}
+
 export interface SyncRepository {
   loadState(): Promise<SyncState>;
   saveState(state: SyncState): Promise<void>;
@@ -76,12 +81,13 @@ export interface SyncRepository {
 
 export type SyncReport = {
   pulled: number; pushed: number; tombstonesApplied: number; configChanges: number;
-  conflicts: string[]; errors: string[];
+  conflicts: string[]; errors: string[]; pulledFrom?: string[];
+  devices?: Array<{ id: string; lastUpload?: string }>;
 };
 export type SyncOptions = {
   signal?: AbortSignal;
   onProgress?: (progress: { phase: "pull" | "push"; completed: number; total: number }) => void;
-  categories?: Partial<Record<SyncCategory | "chat", boolean>>;
+  categories?: Partial<Record<SyncCategory | "chat" | "history", boolean>>;
   dryRun?: boolean;
 };
 
@@ -222,6 +228,9 @@ async function applyEditEvents(
 
 export class SyncEngine {
   private workQueue: Promise<void> = Promise.resolve();
+  private stateWrites: Promise<void> = Promise.resolve();
+  private tombstoneQueue: Promise<void> = Promise.resolve();
+  private activeState?: SyncState;
 
   constructor(
     private readonly store: S3Store,
@@ -238,9 +247,15 @@ export class SyncEngine {
     return result;
   }
 
+  private saveState(state: SyncState): Promise<void> {
+    const result = this.stateWrites.then(() => this.repo.saveState(state));
+    this.stateWrites = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
   private async device(state: SyncState, save = true): Promise<string> {
     state.deviceId ??= crypto.randomUUID();
-    if (save) await this.repo.saveState(state);
+    if (save) await this.saveState(state);
     return state.deviceId;
   }
 
@@ -258,16 +273,18 @@ export class SyncEngine {
   async recordUndo(uuid: string): Promise<void> { await this.recordTombstone(uuid, false); }
 
   private async recordTombstone(uuid: string, deleted: boolean): Promise<void> {
-    return this.exclusive(() => this.writeTombstone(uuid, deleted));
+    const result = this.tombstoneQueue.then(() => this.writeTombstone(uuid, deleted));
+    this.tombstoneQueue = result.then(() => undefined, () => undefined);
+    return result;
   }
 
   private async writeTombstone(uuid: string, deleted: boolean): Promise<void> {
-    const state = await this.repo.loadState();
+    const state = this.activeState ?? await this.repo.loadState();
     await this.device(state);
     const event = { deleted, clock: this.tick(state, state.tombstones?.[uuid]?.clock) };
     (state.tombstones ??= {})[uuid] = event;
     (state.pendingTombstones ??= {})[uuid] = event;
-    await this.repo.saveState(state);
+    await this.saveState(state);
   }
 
   async dryRun(options: Omit<SyncOptions, "dryRun"> = {}): Promise<SyncReport> {
@@ -275,7 +292,10 @@ export class SyncEngine {
   }
 
   syncOnce(options: SyncOptions = {}): Promise<SyncReport> {
-    return this.exclusive(() => this.syncRound(options));
+    return this.exclusive(async () => {
+      try { return await this.syncRound(options); }
+      finally { this.activeState = undefined; }
+    });
   }
 
   private async syncRound(options: SyncOptions): Promise<SyncReport> {
@@ -285,8 +305,20 @@ export class SyncEngine {
     if (!header) throw new Error("Sync has not been initialized");
     const key = await unlockSyncHeader(header, this.passphrase);
     if (options.signal?.aborted) throw new Error("Sync aborted");
-    const state = await this.repo.loadState();
-    const secretKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const stateReady = this.tombstoneQueue.then(async () => {
+      let state = await this.repo.loadState();
+      if (state.headerSalt && state.headerSalt !== header.kdf.salt) state = resetSyncState(state);
+      state.headerSalt = header.kdf.salt;
+      this.activeState = state;
+      return state;
+    });
+    this.tombstoneQueue = stateReady.then(() => undefined, () => undefined);
+    const state = await stateReady;
+    const hkdf = await crypto.subtle.importKey("raw", key, "HKDF", false, ["deriveKey"]);
+    const secretKey = await crypto.subtle.deriveKey(
+      { name: "HKDF", hash: "SHA-256", salt: encoder.encode("track3-sync-v1"), info: encoder.encode("config-fingerprints") },
+      hkdf, { name: "HMAC", hash: "SHA-256", length: 256 }, false, ["sign"],
+    );
     const configHash = async (value: string | null): Promise<string> => {
       if (value === null) return "";
       return Array.from(new Uint8Array(await crypto.subtle.sign("HMAC", secretKey, encoder.encode(value))),
@@ -312,9 +344,10 @@ export class SyncEngine {
     state.rowEvents ??= {};
     state.transactionRows ??= {};
     state.transactionEvents ??= {};
+    const enabled = (category: SyncCategory | "chat" | "history") => options.categories?.[category] !== false;
     const publishedSnapshotIds = new Set(state.published);
-    const localIdsBeforePull = new Set(await this.repo.listSnapshotIds());
-    for (const id of new Set([...Object.keys(state.snapshotHashes), ...Object.keys(state.tombstones)])) {
+    const localIdsBeforePull = new Set(enabled("history") ? await this.repo.listSnapshotIds() : []);
+    for (const id of enabled("history") ? new Set([...Object.keys(state.snapshotHashes), ...Object.keys(state.tombstones)]) : []) {
       if (state.snapshotHashes[id] && !localIdsBeforePull.has(id) && !state.tombstones[id]?.deleted) {
         const event = { deleted: true, clock: this.tick(state, state.tombstones[id]?.clock) };
         state.tombstones[id] = event;
@@ -326,7 +359,6 @@ export class SyncEngine {
       }
     }
     const known = new Set(state.known);
-    const enabled = (category: SyncCategory | "chat") => options.categories?.[category] !== false;
     const aborted = () => {
       if (options.signal?.aborted) {
         if (!options.dryRun && (report.pulled || report.tombstonesApplied || report.configChanges)) this.repo.dataChanged();
@@ -368,6 +400,7 @@ export class SyncEngine {
       return JSON.parse(decoder.decode(result)) as T;
     };
     const manifests: Array<{ owner: string; manifest: Manifest; etag: string }> = [];
+    report.devices = [];
     let manifestReadFailed = false;
     let continuationToken: string | undefined;
     do {
@@ -385,6 +418,7 @@ export class SyncEngine {
               !Array.isArray(manifest.entries) || manifest.entries.length > 100_000 ||
               !manifest.entries.every(validEntry)) throw new Error("Invalid sync manifest");
           manifests.push({ owner: match[1], manifest, etag: object.etag });
+          report.devices.push({ id: match[1], lastUpload: item.lastModified });
         } catch {
           manifestReadFailed = true;
           report.errors.push("Failed to read sync manifest");
@@ -410,7 +444,7 @@ export class SyncEngine {
         delete state.pendingConfig[id];
         delete state.applyingConfig[id];
         this.tick(state, value.clock);
-        await this.repo.saveState(state);
+        await this.saveState(state);
       } catch {
         blockedConfig.add(id);
         report.errors.push("Failed to recover config apply");
@@ -433,6 +467,7 @@ export class SyncEngine {
       aborted();
       const token = entryToken(owner, entry);
       if (known.has(token)) continue;
+      if (!enabled("history") && ["snapshot", "edit", "tombstone"].includes(entry.kind)) continue;
       try {
         if ((entry.kind === "session" || entry.kind === "session-delete") && !enabled("chat")) continue;
         if (entry.kind === "config") {
@@ -458,7 +493,10 @@ export class SyncEngine {
               if (!localIdsBeforePull.has(entry.id)) report.pulled++;
             } else {
               const imported = await this.repo.importSnapshot(value);
-              if (imported) report.pulled++;
+              if (imported) {
+                report.pulled++;
+                (report.pulledFrom ??= []).push(owner);
+              }
               const local = imported ? value : await this.repo.readSnapshot(entry.id);
               if (!imported && snapshotContent(local) !== snapshotContent(value)) {
                 report.conflicts.push(`snapshot:${entry.id}`);
@@ -543,7 +581,10 @@ export class SyncEngine {
             const source = entries.find(({ entry }) => entry.kind === "snapshot" && entry.id === id);
             if (source) {
               const base = await read<Snapshot>(source.owner, source.entry);
-              if (await this.repo.importSnapshot(base)) report.pulled++;
+              if (await this.repo.importSnapshot(base)) {
+                report.pulled++;
+                (report.pulledFrom ??= []).push(source.owner);
+              }
               let latest: SnapshotEdit | undefined;
               for (const editSource of entries.filter(({ entry }) => entry.kind === "edit" && entry.id === id)) {
                 const edit = await read<SnapshotEdit>(editSource.owner, editSource.entry);
@@ -573,9 +614,9 @@ export class SyncEngine {
         report.errors.push("Failed to apply tombstone object");
       }
     }
-    const changes = await this.repo.listChangedSnapshotIds?.(state.snapshotRevision);
+    const changes = enabled("history") ? await this.repo.listChangedSnapshotIds?.(state.snapshotRevision) : undefined;
     let snapshotScanFailed = false;
-    for (const id of changes?.ids ?? await this.repo.listSnapshotIds()) {
+    for (const id of enabled("history") ? changes?.ids ?? await this.repo.listSnapshotIds() : []) {
       if (state.tombstones[id]?.deleted) continue;
       try {
         const snapshot = await this.repo.readSnapshot(id);
@@ -709,7 +750,7 @@ export class SyncEngine {
     if (configApplies.length) {
       let markersSaved = false;
       try {
-        await this.repo.saveState(state);
+        await this.saveState(state);
         markersSaved = true;
       } catch {
         for (const [id, source] of configApplies) {
@@ -736,7 +777,7 @@ export class SyncEngine {
           }
         }
         try {
-          await this.repo.saveState(state);
+          await this.saveState(state);
         } catch {
           report.errors.push("Failed to apply config object");
         }
@@ -796,11 +837,11 @@ export class SyncEngine {
     if (!options.dryRun) {
       if (enabled("chat")) state.trackedSessions = [...new Set([...state.trackedSessions, ...localSessions.keys()])];
       state.known = [...known];
-      await this.repo.saveState(state);
+      await this.saveState(state);
     }
     const writes: Array<{ kind: Kind; id: string; version: string; value: unknown }> = [];
     const remoteSnapshotIds = new Set(entries.filter(({ entry }) => entry.kind === "snapshot").map(({ entry }) => entry.id));
-    for (const id of await this.repo.listSnapshotIds()) {
+    for (const id of enabled("history") ? await this.repo.listSnapshotIds() : []) {
       if (state.tombstones[id]?.deleted || publishedSnapshotIds.has(id) || manifestReadFailed) continue;
       if (remoteSnapshotIds.has(id)) continue;
       writes.push({ kind: "snapshot", id, version: "1", value: await this.repo.readSnapshot(id) });
@@ -812,10 +853,10 @@ export class SyncEngine {
         value: localConfig[id] ?? null, clock: marker.clock,
       } satisfies ConfigVersion });
     }
-    for (const [id, value] of Object.entries(state.pendingTombstones)) {
+    for (const [id, value] of enabled("history") ? Object.entries(state.pendingTombstones) : []) {
       writes.push({ kind: "tombstone", id, version: `${value.clock.ms}-${value.clock.counter}`, value });
     }
-    for (const [id, clock] of Object.entries(state.pendingSnapshotEdits)) {
+    for (const [id, clock] of enabled("history") ? Object.entries(state.pendingSnapshotEdits) : []) {
       if (state.tombstones[id]?.deleted) continue;
       writes.push({ kind: "edit", id, version: `${clock.ms}-${clock.counter}`, value: {
         clock, snapshot: await this.repo.readSnapshot(id),
@@ -846,7 +887,7 @@ export class SyncEngine {
           try {
             await this.store.putObject(probe, content, conditions, options.signal);
           } catch (error) {
-            if (!(error instanceof Error && "status" in error && error.status === 412)) throw error;
+            if (!isS3Conflict(error)) throw error;
             rejected = true;
           }
           if (!rejected) throw new Error("Sync store does not enforce conditional writes");
@@ -888,7 +929,7 @@ export class SyncEngine {
             try {
               await this.store.putObject(chunkPath, chunkBody, { ifNoneMatch: "*" }, options.signal);
             } catch (error) {
-              if (!(error instanceof Error && "status" in error && error.status === 412)) throw error;
+              if (!isS3Conflict(error)) throw error;
               const existing = await this.store.getObject(chunkPath, options.signal);
               if (!existing || existing.body.length > MAX_OBJECT_BYTES) {
                 throw new Error("Immutable sync part changed");
@@ -921,7 +962,7 @@ export class SyncEngine {
           await this.store.putObject(path, body, { ifNoneMatch: "*" }, options.signal);
         }
       } catch (error) {
-        if (!(error instanceof Error && "status" in error && error.status === 412)) {
+        if (!isS3Conflict(error)) {
           report.errors.push(error instanceof Error && error.message === "Immutable sync object changed"
             ? error.message : `Failed to push ${write.kind} object`);
           continue;
@@ -974,6 +1015,9 @@ export class SyncEngine {
       else {
         try {
           await this.store.putObject(path, body, own ? { ifMatch: own.etag } : { ifNoneMatch: "*" }, options.signal);
+          const currentDevice = report.devices.find((device) => device.id === state.deviceId);
+          if (currentDevice) currentDevice.lastUpload = new Date(this.now()).toISOString();
+          else report.devices.push({ id: state.deviceId!, lastUpload: new Date(this.now()).toISOString() });
           report.pushed = written;
           for (const entry of published) {
             known.add(entryToken(state.deviceId!, entry));
@@ -988,14 +1032,18 @@ export class SyncEngine {
               state.assetRows[entry.id] = await assetKeys(snapshot);
               state.transactionRows[entry.id] = await transactionRows(snapshot);
             }
-            if (entry.kind === "tombstone") delete state.pendingTombstones[entry.id];
+            const pendingTombstone = state.pendingTombstones[entry.id];
+            if (entry.kind === "tombstone" && pendingTombstone &&
+                entry.version === `${pendingTombstone.clock.ms}-${pendingTombstone.clock.counter}`) {
+              delete state.pendingTombstones[entry.id];
+            }
             if (entry.kind === "edit") delete state.pendingSnapshotEdits[entry.id];
             if (entry.kind === "config") delete state.pendingConfig[entry.id];
             if (entry.kind === "session") state.sessionHashes[entry.id] = entry.version;
             if (entry.kind === "session-delete") delete state.pendingSessionDeletions[entry.id];
           }
           state.known = [...known];
-          await this.repo.saveState(state);
+          await this.saveState(state);
           for (const entry of obsolete) {
             if (entry.kind === "config" || entry.kind === "tombstone") continue;
             try {
@@ -1027,7 +1075,7 @@ export class SyncEngine {
       state.trackedSessions = state.trackedSessions.filter((id) =>
         !state.sessionDeletions?.[id] || !!state.pendingSessionDeletions?.[id]);
       state.lastSync = this.now();
-      await this.repo.saveState(state);
+      await this.saveState(state);
     }
     if (report.pulled || report.tombstonesApplied || report.configChanges) this.repo.dataChanged();
     return report;

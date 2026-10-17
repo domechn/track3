@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 import initSqlJs from "sql.js";
+import { FakeS3, S3Error } from "../../src/middlelayers/sync/object-store";
 
 const schemaFiles = [
   "assets_v2", "asset_prices", "transactions", "chat_sessions",
   "currency_rates", "configuration",
 ];
 
-export async function installTauriBridge(page: Page) {
+export async function installTauriBridge(page: Page, s3?: FakeS3) {
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
   });
@@ -35,6 +36,8 @@ export async function installTauriBridge(page: Page) {
     "btc: {addresses: []}\nerc20: {addresses: []}\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
   ]);
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/history_snapshots_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/v08t09/rebalance_profiles_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/v10t11/sync_state_up.sql"), "utf8"));
   const config = JSON.stringify({
     endpoint: "https://assistant.test/v1",
     apiKey: "sk-e2e",
@@ -42,7 +45,7 @@ export async function installTauriBridge(page: Page) {
     contextSize: 10,
   });
   const files = new Map<string, string>();
-  const requests = new Map<number, { url: string; data?: number[] }>();
+  const requests = new Map<number, { url: string; method?: string; headers?: Record<string, string> | [string, string][]; data?: number[] }>();
   const responses = new Map<number, { bytes: number[]; read: boolean }>();
   let nextRid = 1;
   let refreshes = 0;
@@ -118,6 +121,39 @@ export async function installTauriBridge(page: Page) {
         [args.operationUuid, args.createdAt]);
       return null;
     }
+    if (cmd === "delete_sync_snapshot") {
+      db.run("BEGIN");
+      try {
+        for (const table of ["asset_prices", "transactions", "assets_v2"]) {
+          execute(`DELETE FROM ${table} WHERE uuid = ?`, [args.uuid]);
+        }
+        db.run("COMMIT");
+      } catch (error) {
+        db.run("ROLLBACK");
+        throw error;
+      }
+      return null;
+    }
+    if (cmd === "import_sync_snapshot") {
+      const snapshot = args.snapshot;
+      if (select("SELECT 1 FROM assets_v2 WHERE uuid = ? LIMIT 1", [snapshot.uuid]).length) return false;
+      db.run("BEGIN");
+      try {
+        for (const [table, rows] of [
+          ["assets_v2", snapshot.assets], ["asset_prices", snapshot.prices], ["transactions", snapshot.transactions],
+        ] as const) {
+          for (const row of rows) {
+            const keys = Object.keys(row);
+            execute(`INSERT INTO ${table} (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`, keys.map((key) => row[key]));
+          }
+        }
+        db.run("COMMIT");
+      } catch (error) {
+        db.run("ROLLBACK");
+        throw error;
+      }
+      return true;
+    }
     if (cmd === "plugin:fs|exists") return files.has(args.path);
     if (cmd === "plugin:fs|mkdir") return null;
     if (cmd === "plugin:fs|remove") {
@@ -142,6 +178,55 @@ export async function installTauriBridge(page: Page) {
     if (cmd === "plugin:http|fetch_send") {
       const request = requests.get(args.rid);
       if (!request) throw new Error("HTTP request missing");
+      if (s3 && new URL(request.url).hostname === "s3.example.test") {
+        const url = new URL(request.url);
+        const key = decodeURIComponent(url.pathname.replace(/^\/track3\/?/, ""));
+        const method = request.method ?? "GET";
+        const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
+        let status = 200;
+        let bytes = new Uint8Array();
+        let responseHeaders: Record<string, string> = {};
+        try {
+          if (url.searchParams.get("list-type") === "2") {
+            const page = await s3.listObjectsV2({
+              prefix: url.searchParams.get("prefix") ?? undefined,
+              continuationToken: url.searchParams.get("continuation-token") ?? undefined,
+            });
+            const xml = `<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>${!!page.nextContinuationToken}</IsTruncated>${page.objects.map((object) =>
+              `<Contents><Key>${encodeURIComponent(object.key)}</Key><ETag>${object.etag.replaceAll("&", "&amp;").replaceAll('"', "&quot;")}</ETag><Size>${object.size}</Size><LastModified>${object.lastModified}</LastModified></Contents>`).join("")}${page.nextContinuationToken ? `<NextContinuationToken>${page.nextContinuationToken}</NextContinuationToken>` : ""}</ListBucketResult>`;
+            bytes = new TextEncoder().encode(xml);
+            responseHeaders = { "content-type": "application/xml" };
+          } else if (method === "PUT") {
+            const result = await s3.putObject(key, Uint8Array.from(request.data ?? []), {
+              ...(headers["if-match"] ? { ifMatch: headers["if-match"] } : {}),
+              ...(headers["if-none-match"] === "*" ? { ifNoneMatch: "*" } : {}),
+            });
+            responseHeaders = { etag: result.etag };
+          } else if (method === "GET") {
+            const result = await s3.getObject(key);
+            if (!result) status = 404;
+            else {
+              bytes = result.body;
+              responseHeaders = { etag: result.etag };
+            }
+          } else if (method === "HEAD") {
+            const result = await s3.headObject(key);
+            if (!result) status = 404;
+            else responseHeaders = { etag: result.etag, "content-length": String(result.size) };
+          } else if (method === "DELETE") {
+            await s3.deleteObject(key);
+            status = 204;
+          } else {
+            status = 400;
+          }
+        } catch (error) {
+          if (error instanceof S3Error) status = error.status;
+          else throw error;
+        }
+        const rid = nextRid++;
+        responses.set(rid, { bytes: Array.from(bytes), read: false });
+        return { status, statusText: status < 300 ? "OK" : "Error", url: request.url, headers: responseHeaders, rid };
+      }
       let contentType = "application/json";
       let body = "{}";
       if (request.url.endsWith("/api/license/isPro")) {

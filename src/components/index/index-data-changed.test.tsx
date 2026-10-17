@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./index";
 import { ChartResizeContext } from "@/App";
@@ -14,6 +14,32 @@ const cacheMocks = vi.hoisted(() => ({
   clearLocalStorageCache: vi.fn(),
   clearMemoryCache: vi.fn(),
   invalidateCacheGroups: vi.fn(),
+}));
+const syncMocks = vi.hoisted(() => ({
+  listeners: new Set<() => void>(),
+  trigger: vi.fn(),
+  snapshot: { mode: "disabled", sync: { phase: "idle", report: undefined as
+    undefined | { pulled: number; pushed: number; tombstonesApplied: number; configChanges: number;
+      conflicts: string[]; errors: string[]; pulledFrom?: string[] } } },
+}));
+const syncToast = vi.hoisted(() => vi.fn());
+
+vi.mock("@/middlelayers/sync/runtime", () => ({
+  syncRuntime: {
+    initialize: vi.fn(async () => {}),
+    stop: vi.fn(),
+    trigger: syncMocks.trigger,
+    status: () => syncMocks.snapshot,
+    subscribe: (listener: () => void) => {
+      syncMocks.listeners.add(listener);
+      return () => syncMocks.listeners.delete(listener);
+    },
+    getSettings: () => ({ deviceNames: { "device-one": "Laptop" } }),
+  },
+}));
+vi.mock("@/components/ui/use-toast", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/components/ui/use-toast")>(),
+  toast: syncToast,
 }));
 
 vi.mock("../settings", () => ({
@@ -166,6 +192,9 @@ beforeEach(() => {
   vi.mocked(processAlerts).mockResolvedValue([]);
   lastDataChangedVersion = 0;
   lastDateRange = undefined;
+  syncMocks.trigger.mockClear();
+  syncMocks.snapshot = { mode: "disabled", sync: { phase: "idle", report: undefined } };
+  syncToast.mockClear();
   window.location.hash = "#/summary";
   cacheMocks.clearLocalStorageCache.mockReset();
   cacheMocks.clearMemoryCache.mockReset();
@@ -234,6 +263,39 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     const view = renderApp();
     await waitFor(() => expect(view.container.querySelector("[aria-busy]")).toHaveAttribute("aria-busy", "false"));
     expect(processAlerts).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards successful refreshes and window focus to the sync scheduler", async () => {
+    const view = renderApp();
+    await view.findByTestId("summary-range");
+    fireEvent.click(view.getByTestId("trigger-refresh"));
+    window.dispatchEvent(new Event("focus"));
+    expect(syncMocks.trigger).toHaveBeenCalledWith("refresh");
+    expect(syncMocks.trigger).toHaveBeenCalledWith("focus");
+  });
+
+  it("toasts pulled snapshots from the source device once per report", async () => {
+    renderApp();
+    const report = { pulled: 2, pushed: 0, tombstonesApplied: 0, configChanges: 0,
+      conflicts: [], errors: [], pulledFrom: ["device-one", "device-one"] };
+    act(() => {
+      syncMocks.snapshot = { mode: "ready", sync: { phase: "idle", report } };
+      for (const listener of syncMocks.listeners) listener();
+      for (const listener of syncMocks.listeners) listener();
+    });
+    expect(syncToast).toHaveBeenCalledTimes(1);
+    expect(syncToast).toHaveBeenCalledWith({ description: "2 new snapshots from Laptop" });
+  });
+  it("does not call pulled edits new snapshots", async () => {
+    renderApp();
+    act(() => {
+      syncMocks.snapshot = { mode: "ready", sync: { phase: "idle", report: {
+        pulled: 1, pushed: 0, tombstonesApplied: 0, configChanges: 0,
+        conflicts: [], errors: [],
+      } } };
+      for (const listener of syncMocks.listeners) listener();
+    });
+    expect(syncToast).not.toHaveBeenCalled();
   });
   it("keeps the selected History range when a local delete updates app metadata", async () => {
     window.location.hash = "#/history";

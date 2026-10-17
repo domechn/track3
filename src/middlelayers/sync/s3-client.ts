@@ -7,6 +7,7 @@ type S3Config = {
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
+  prefix?: string;
   sessionToken?: string;
   addressingStyle?: "path" | "virtual";
   timeoutMs?: number;
@@ -27,6 +28,10 @@ type SignInput = {
 };
 
 const encoder = new TextEncoder();
+
+function validPath(path: string): boolean {
+  return path.split("/").every((part) => part !== "" && !/^(?:\.|%2e){1,2}$/i.test(part));
+}
 
 function hex(bytes: ArrayBuffer | Uint8Array): string {
   return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -110,9 +115,10 @@ export function parseListObjectsV2(xml: string): ListPage {
       const size = Number(xmlText(item, "Size"));
       if (rawKey === undefined || !Number.isSafeInteger(size) || size < 0) throw new Error("Invalid S3 list response");
       return {
-        key: encoded ? decodeURIComponent(rawKey) : rawKey,
+        key: encoded ? decodeURIComponent(rawKey.replace(/\+/g, " ")) : rawKey,
         etag: xmlText(item, "ETag") ?? "",
         size,
+        ...(xmlText(item, "LastModified") ? { lastModified: xmlText(item, "LastModified") } : {}),
       };
     });
   const truncation = xmlText(root, "IsTruncated");
@@ -123,7 +129,11 @@ export function parseListObjectsV2(xml: string): ListPage {
   return { objects, nextContinuationToken: truncated ? nextContinuationToken : undefined };
 }
 
-async function readResponse<T>(read: () => Promise<T>, timeoutMs: number, signal?: AbortSignal): Promise<T> {
+async function discardResponse(response: Response): Promise<void> {
+  try { await response.body?.cancel(); } catch { /* The reader may already own the stream. */ }
+}
+
+async function readResponse<T>(response: Response, read: () => Promise<T>, timeoutMs: number, signal?: AbortSignal): Promise<T> {
   if (signal?.aborted) throw new Error("S3 request aborted");
   let timer: ReturnType<typeof setTimeout> | undefined;
   let onAbort: () => void = () => {};
@@ -140,6 +150,9 @@ async function readResponse<T>(read: () => Promise<T>, timeoutMs: number, signal
       cancelled,
       deadline,
     ]);
+  } catch (error) {
+    await discardResponse(response);
+    throw error;
   } finally {
     if (timer) clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);
@@ -160,6 +173,7 @@ export class S3Client implements S3Store {
     if ((endpoint.protocol !== "https:" && !(endpoint.protocol === "http:" && ["localhost", "127.0.0.1"].includes(endpoint.hostname))) ||
       endpoint.username || endpoint.password || endpoint.search || endpoint.hash ||
       !/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(config.bucket) ||
+      (config.prefix !== undefined && config.prefix !== "" && !validPath(config.prefix)) ||
       !config.region || !config.accessKeyId || !config.secretAccessKey) {
       throw new Error("Invalid S3 configuration");
     }
@@ -171,11 +185,15 @@ export class S3Client implements S3Store {
   }
 
   private url(key?: string): URL {
+    if (key !== undefined && !validPath(key)) {
+      throw new Error("Invalid S3 object path");
+    }
     const url = new URL(this.endpoint);
     if (this.config.addressingStyle === "virtual") url.hostname = `${this.config.bucket}.${url.hostname}`;
     const base = this.endpoint.pathname.replace(/\/$/, "");
     const bucket = this.config.addressingStyle === "virtual" ? "" : `/${encode(this.config.bucket)}`;
-    const object = key === undefined ? "" : `/${key.split("/").map(encode).join("/")}`;
+    const path = [this.config.prefix, key].filter(Boolean).join("/");
+    const object = path ? `/${path.split("/").map(encode).join("/")}` : "";
     url.pathname = `${base}${bucket}${object}` || "/";
     return url;
   }
@@ -234,7 +252,10 @@ export class S3Client implements S3Store {
         if (timer) clearTimeout(timer);
         signal?.removeEventListener("abort", onAbort);
       }
-      if ((response.status === 429 || response.status >= 500) && attempt < 3) {
+      if ((response.status === 429 || response.status >= 500) && attempt < 3 &&
+          !(response.status >= 500 && method === "PUT" && conditions &&
+            (conditions.ifMatch !== undefined || conditions.ifNoneMatch !== undefined))) {
+        await discardResponse(response);
         const retryAfter = Number(response.headers.get("retry-after"));
         const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
           ? Math.min(retryAfter * 1000, 30000)
@@ -252,7 +273,10 @@ export class S3Client implements S3Store {
         });
         continue;
       }
-      if (!response.ok) throw new S3Error(`S3 request failed (status ${response.status})`, response.status);
+      if (!response.ok) {
+        await discardResponse(response);
+        throw new S3Error(`S3 request failed (status ${response.status})`, response.status);
+      }
       return response;
     }
   }
@@ -260,6 +284,7 @@ export class S3Client implements S3Store {
   async putObject(key: string, body: Uint8Array, conditions?: WriteConditions, signal?: AbortSignal): Promise<{ etag: string }> {
     const response = await this.request("PUT", this.url(key), body, conditions, signal);
     const etag = response.headers.get("etag");
+    await discardResponse(response);
     if (!etag) throw new Error("S3 response missing ETag");
     return { etag };
   }
@@ -268,8 +293,11 @@ export class S3Client implements S3Store {
     try {
       const response = await this.request("GET", this.url(key), undefined, undefined, signal);
       const etag = response.headers.get("etag");
-      if (!etag) throw new Error("S3 response missing ETag");
-      const body = new Uint8Array(await readResponse(() => response.arrayBuffer(), this.config.timeoutMs ?? 15000, signal));
+      if (!etag) {
+        await discardResponse(response);
+        throw new Error("S3 response missing ETag");
+      }
+      const body = new Uint8Array(await readResponse(response, () => response.arrayBuffer(), this.config.timeoutMs ?? 15000, signal));
       return { body, etag };
     } catch (error) {
       if (error instanceof S3Error && error.status === 404) return null;
@@ -281,6 +309,7 @@ export class S3Client implements S3Store {
     try {
       const response = await this.request("HEAD", this.url(key), undefined, undefined, signal);
       const etag = response.headers.get("etag");
+      await discardResponse(response);
       if (!etag) throw new Error("S3 response missing ETag");
       return { etag, size: Number(response.headers.get("content-length") ?? 0) };
     } catch (error) {
@@ -290,17 +319,24 @@ export class S3Client implements S3Store {
   }
 
   async deleteObject(key: string, signal?: AbortSignal): Promise<void> {
-    await this.request("DELETE", this.url(key), undefined, undefined, signal);
+    await discardResponse(await this.request("DELETE", this.url(key), undefined, undefined, signal));
   }
 
   async listObjectsV2(options: ListOptions = {}): Promise<ListPage> {
     const url = this.url();
     url.searchParams.set("list-type", "2");
     url.searchParams.set("encoding-type", "url");
-    if (options.prefix !== undefined) url.searchParams.set("prefix", options.prefix);
+    const prefix = this.config.prefix ? `${this.config.prefix}/${options.prefix ?? ""}` : options.prefix;
+    if (prefix !== undefined) url.searchParams.set("prefix", prefix);
     if (options.continuationToken !== undefined) url.searchParams.set("continuation-token", options.continuationToken);
     const response = await this.request("GET", url, undefined, undefined, options.signal);
-    const xml = await readResponse(() => response.text(), this.config.timeoutMs ?? 15000, options.signal);
-    return parseListObjectsV2(xml);
+    const xml = await readResponse(response, () => response.text(), this.config.timeoutMs ?? 15000, options.signal);
+    const page = parseListObjectsV2(xml);
+    if (this.config.prefix) {
+      const base = `${this.config.prefix}/`;
+      page.objects = page.objects.filter((item) => item.key.startsWith(base))
+        .map((item) => ({ ...item, key: item.key.slice(base.length) }));
+    }
+    return page;
   }
 }

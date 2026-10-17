@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { expect, it, vi } from "vitest";
 import { registerSnapshotSync } from "@/middlelayers/sync/delete-hook";
+import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { useOptimisticDelete } from "./use-optimistic-delete";
 
 const toast = vi.hoisted(() => vi.fn());
@@ -91,6 +92,37 @@ it("shows delete feedback while sync is still recording the tombstone", async ()
     await run;
   } finally {
     release();
+    unregister();
+  }
+});
+
+it("schedules sync after a committed delete and after Undo", async () => {
+  toast.mockClear();
+  const trigger = vi.spyOn(syncRuntime, "trigger");
+  const unregister = registerSnapshotSync({
+    recordDeletion: async () => {},
+    recordUndo: async () => {},
+  });
+  const view = renderHook(() => {
+    const [items, setItems] = useState(["one"]);
+    return { items, ...useOptimisticDelete(setItems) };
+  });
+  try {
+    await act(async () => {
+      await view.result.current.run({
+        update: (items) => items.filter((item) => item !== "one"),
+        rollback: (items) => [...items, "one"],
+        commit: async () => "saved-undo",
+        undo: async () => {},
+        successMessage: "Deleted", undoLabel: "Undo", undoAltText: "Undo deletion",
+        undoWindowMs: 5000, syncSnapshotUuid: "one",
+      });
+    });
+    await waitFor(() => expect(trigger).toHaveBeenCalledTimes(1));
+    await act(async () => { toast.mock.calls[0][0].action.props.onClick(); });
+    await waitFor(() => expect(trigger).toHaveBeenCalledTimes(2));
+  } finally {
+    trigger.mockRestore();
     unregister();
   }
 });

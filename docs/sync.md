@@ -12,7 +12,11 @@ that have a path prefix.
 
 The plaintext `sync-header` object contains format version 1, a random 16 byte
 salt, Argon2id settings (64 MiB, 3 iterations, one lane), and an encrypted key
-check. A passphrase derives a 32 byte key with Argon2id. The key check detects
+check. A passphrase derives a 32 byte root key with Argon2id. HKDF-SHA-256
+with salt `track3-sync-v1` derives an AES-256-GCM key with info
+`object-encryption`, an HMAC naming key with info `object-names`, and a
+configuration fingerprint key with info `config-fingerprints`.
+The key check detects
 a wrong passphrase or damaged header. Losing the sync passphrase makes the
 synced data unrecoverable. Anyone with the header can attempt offline
 passphrase guesses, so the passphrase must be strong.
@@ -33,13 +37,19 @@ by itself. S3 credentials are sent only in SigV4 authorization headers over
 HTTPS or to the explicitly allowed local HTTP endpoints.
 
 The engine checks that the provider rejects `If-None-Match: *` on an existing
-object and stale `If-Match` ETags before each write round. A provider that
-ignores those conditions cannot safely host multi-device sync.
+object and stale `If-Match` ETags before each write round. Both HTTP 409
+`ConditionalRequestConflict` and 412 `PreconditionFailed` mean a conditional
+write conflict. Conditional PUTs are never blindly retried after a server
+failure because the first attempt may already have succeeded. A provider that
+ignores write conditions cannot safely host multi-device sync.
 
 ## Device objects
 
 Each installation stores a random device UUID and hybrid logical clock in its
-local `sync_state` table. It writes only to `devices/<device UUID>/`. A snapshot
+local `sync_state` table. The state also stores the header salt; when the
+configured bucket has a different header, the device keeps its UUID and clock
+but clears publication markers so it can upload its local data again. It writes
+only to `devices/<device UUID>/`. A snapshot
 object contains one refresh UUID and its `assets_v2`, `asset_prices`, and
 `transactions` rows. It is immutable. Remote SQLite row IDs are translated to
 new local IDs when importing prices and transactions. A transaction and a
@@ -148,10 +158,74 @@ conflicts, and sanitized errors. `dryRun()` estimates changes without writing
 the database or object store. `status()` exposes the local device ID, clock,
 and last successful sync time.
 To use the desktop adapter, construct it with `createSqliteSyncEngine`; call
-the returned `unregister` when sync is disabled. The settings and scheduler
-wiring is part of the next PR.
+the returned `unregister` when sync is disabled. `SyncRuntime` owns the
+desktop adapter, session passphrase, and `SyncScheduler`. The scheduler
+debounces triggers, keeps one round in flight, throttles focus, and retries
+failures with exponential backoff. It never blocks a portfolio refresh.
 
-Malformed individual objects are reported and retried on the next round. A
-missing or invalid passphrase stops the round before local changes. The first
+Malformed individual objects are reported. Partial rounds retry with exponential
+backoff; permanently damaged remote data needs repair before a retry can succeed.
+A missing remote header, invalid passphrase, access error, or invalid configuration
+stops automatic retries and shows the reason. The first
 round downloads existing manifests and merges without deleting local-only
-snapshots. Old tombstone and version objects remain for now.
+snapshots. Old tombstone and version objects remain for now; compaction needs a
+device acknowledgement or retention policy so an offline device cannot
+resurrect deleted data.
+
+## User guide
+
+Open **Settings → Sync**. Create a private bucket for Track3, then enter its
+endpoint, region, bucket name, access key ID, and secret access key. A prefix
+is optional when sharing a bucket. Use credentials scoped to that bucket and
+prefix with list, read, write, and delete access. The connection test checks
+listing, a temporary conditional write, cleanup, and an existing sync header.
+It separates configuration, permission, missing bucket, network, unsupported
+conditional write, damaged header, and passphrase failures without displaying
+credentials.
+
+- **Amazon S3:** enter the regional HTTPS endpoint, such as
+  `https://s3.us-east-1.amazonaws.com`, the matching region, and the bucket.
+  Path style works; virtual host style requires a bucket DNS name and a TLS
+  certificate for the bucket host.
+- **Cloudflare R2:** enter
+  `https://<account-id>.r2.cloudflarestorage.com`, region `auto`, and the
+  bucket. Enable path style.
+- **MinIO:** enter its HTTPS endpoint and configured region with path style.
+  Local development may use `http://localhost:<port>` or
+  `http://127.0.0.1:<port>`. Plain HTTP to a remote host is rejected.
+
+Choose a unique passphrase of at least 16 characters. When creating a new sync
+bucket, confirm it before enabling. A device joining an existing bucket only
+needs the existing passphrase. **The sync passphrase can NEVER be recovered.** Losing it makes all
+remote data permanently unreadable, even with valid S3 credentials. Store it
+in a safe place before enabling. Track3 keeps the passphrase in memory only
+for the current app session. After a restart, unlock sync from the status
+indicator or Sync settings; automatic sync starts after unlock. There is no
+OS keychain option because Track3 has no existing keychain integration.
+
+The category switches cover snapshot history, settings, exchange/wallet/
+assistant secrets, rebalance targets, goals, and assistant chats. Goals have no
+synced keys until the goals schema exists. Secrets are decrypted from each
+device's local configuration and encrypted with the sync passphrase before
+upload. Sync also stores S3 credentials in this device's encrypted
+configuration row `991`; it never uploads that row. Licenses, local backup
+paths, and machine IDs stay local. A first join can replace conflicting
+settings according to the protocol's last writer rule, so save a backup
+before joining a populated bucket.
+
+Sync runs after unlock at app start, after a successful refresh, when the
+window regains focus, and on **Sync now**. A change during a running round
+starts one more round when it finishes. The small indicator shows progress,
+errors, conflicts, and the last round's pulled and pushed counts. Pulling
+snapshots refreshes the portfolio once after the round and shows the source
+device IDs or locally assigned names. Device names are editable labels stored
+only on this device and are not shared with other devices. The current installation
+is marked **This device**. Device timestamps show the last manifest upload, which
+can be earlier than the last sync round. A snapshot deletion and Undo publish matching tombstone
+events. **Disable sync** stops future sync while retaining local and remote
+data. **Forget remote data** requires typing `FORGET`; it deletes `sync-header`
+and `devices/` objects inside the configured prefix, then disables sync.
+It leaves local data and unrelated bucket objects untouched. Disable sync on
+other devices first; a device that remains active can upload its local data
+again. Re-enabling this device after forgetting remote data also uploads its
+remaining local data.

@@ -2,6 +2,7 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from "react
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
 import { recordSnapshotDeleted, recordSnapshotUndone } from "@/middlelayers/sync/delete-hook";
+import { syncRuntime } from "@/middlelayers/sync/runtime";
 
 type DeleteOptions<T, Result> = {
   update: (items: T) => T;
@@ -45,7 +46,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
     try {
       const result = await commit();
       if (syncSnapshotUuid) {
-        void recordSnapshotDeleted(syncSnapshotUuid).catch(showError);
+        void recordSnapshotDeleted(syncSnapshotUuid).catch(showError).finally(() => syncRuntime.trigger("refresh"));
       }
       
       onDeleted?.(result);
@@ -60,7 +61,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
                 .then(() => {
                   setItems(undoUpdate ?? rollback);
                   onUndone?.();
-                  if (syncSnapshotUuid) void recordSnapshotUndone(syncSnapshotUuid).catch(showError);
+                  if (syncSnapshotUuid) void recordSnapshotUndone(syncSnapshotUuid).catch(showError).finally(() => syncRuntime.trigger("refresh"));
                 })
                 .catch(showError);
             }}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createSyncHeader,
   decryptObject,
+  deriveKey,
   encryptObject,
   objectName,
   unlockSyncHeader,
@@ -35,13 +36,20 @@ describe("sync crypto", () => {
   });
 
   it("decrypts a fixed AES-256-GCM vector with path AAD", async () => {
-    // Independently generated with Node crypto.createCipheriv, using a zero key and nonce.
+    // Independently generated with Node HKDF and crypto.createCipheriv, using a zero root key and nonce.
     const plaintext = await decryptObject(new Uint8Array(32), "snap/a", {
       version: 1,
       nonce: "AAAAAAAAAAAAAAAA",
-      ciphertext: "psIsUSIwAB0LoZoJlCrBNzQs54ec",
+      ciphertext: "Te7dIxkR9Ir9TM3x710bCf3Pei8p",
     });
     expect(new TextDecoder().decode(plaintext)).toBe("hello");
+  });
+
+  it("pins Argon2id derivation and the opaque object name", async () => {
+    const key = await deriveKey("vector passphrase", new Uint8Array(16));
+    expect(Buffer.from(key).toString("hex")).toBe("de5261080b48ca42c2856255551481afb2d80cd268de353c7162ad33c3128ae3");
+    expect(await objectName(key, "snap/vector-id"))
+      .toBe("snap/b60da97c23cfbb0eba4fbaf650419e5421735e92a3abaab982da399019f89fdc");
   });
 
   it("rejects modified KDF settings before deriving a key", async () => {

@@ -25,6 +25,7 @@ import Sidebar from "../sidebar";
 import { AnimatedPage } from "../motion";
 import PageLoadingOverlay from "../page-loading-overlay";
 import AutoBackupIndicator from "../auto-backup-indicator";
+import SyncStatusIndicator from "../sync-status-indicator";
 import "./index.css";
 import { Route, Routes, HashRouter, Outlet, Navigate, useLocation } from "react-router-dom";
 
@@ -59,7 +60,8 @@ import { useTranslation } from "@/i18n";
 import { DataChangedContext } from "@/contexts/data-changed";
 import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
-import { toast } from "../ui/use-toast";
+import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { toast } from "@/components/ui/use-toast";
 
 const Setting = React.lazy(() => import("../settings"));
 const HistoricalData = React.lazy(() => import("../historical-data"));
@@ -76,6 +78,7 @@ const ChatPage = React.lazy(() => import("@/components/assistant/chat-page"));
 const AssistantSettings = React.lazy(
   () => import("@/components/settings/assistant"),
 );
+const SyncSettingsPage = React.lazy(() => import("@/components/settings/sync"));
 const Summary = React.lazy(() => import("../summary"));
 const Appearance = React.lazy(() => import("../appearance"));
 const CostBasis = React.lazy(() => import("../cost-basis"));
@@ -347,7 +350,10 @@ function AppRoutes({
             dateRange={dateRange}
             onDatePickerValueChange={onDatePickerValueChange}
             lastRefreshAt={lastRefreshAt}
-            onRefreshSuccess={onDataChanged}
+            onRefreshSuccess={() => {
+              onDataChanged();
+              syncRuntime.trigger("refresh");
+            }}
           />
         }
       >
@@ -493,6 +499,7 @@ function AppRoutes({
             }
           />
           <Route path="assistant" element={<AssistantSettings />} />
+          <Route path="sync" element={<SyncSettingsPage />} />
         </Route>
         <Route
           path="coins/:symbol"
@@ -537,6 +544,7 @@ const App = () => {
   const [autoBackupStatus, setAutoBackupStatus] = useState<
     "idle" | "running"
   >("idle");
+  const lastSyncReport = useRef<object | undefined>(undefined);
   // Single mount guard reused by both boot and background effects.
   const activeRef = useRef(true);
 
@@ -588,6 +596,31 @@ const App = () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    void syncRuntime.initialize();
+    const onFocus = () => syncRuntime.trigger("focus");
+    const onQuit = () => syncRuntime.stop();
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("beforeunload", onQuit);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("beforeunload", onQuit);
+      syncRuntime.stop();
+    };
+  }, []);
+
+  useEffect(() => syncRuntime.subscribe(() => {
+    const { sync } = syncRuntime.status();
+    const report = sync.report;
+    if (!report?.pulledFrom?.length || lastSyncReport.current === report) return;
+    lastSyncReport.current = report;
+    const names = [...new Set(report.pulledFrom ?? [])].map((id) =>
+      syncRuntime.getSettings().deviceNames[id] ?? id.slice(0, 8));
+    toast({ description: t("sync.pulledToast")
+      .replace("{count}", String(report.pulledFrom.length))
+      .replace("{device}", names.join(", ")) });
+  }), [t]);
 
   const tDateRange = useMemo(
     () => ({
@@ -849,6 +882,7 @@ const App = () => {
   return (
     <div>
       <AutoBackupIndicator status={autoBackupStatus} />
+      <SyncStatusIndicator />
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>
           <AppRoutes
