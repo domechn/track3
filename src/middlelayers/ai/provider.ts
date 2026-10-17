@@ -273,6 +273,9 @@ export async function* streamChatCompletion(
         const json = await resp.json();
         const choice = pickChoice(json);
         const message = choice?.message ?? {};
+        if (typeof message?.reasoning_content === "string" && message.reasoning_content.length > 0) {
+          yield { kind: "think", delta: message.reasoning_content };
+        }
         if (typeof message?.content === "string" && message.content.length > 0) {
           yield { kind: "text", delta: message.content };
         }
