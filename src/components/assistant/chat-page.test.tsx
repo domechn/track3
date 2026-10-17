@@ -7,8 +7,9 @@ import type { ChatSessionMeta } from "@/middlelayers/ai";
 
 // sendSpy is referenced from inside the hoisted vi.mock below; we declare
 // it via vi.hoisted so the factory closure can pick it up.
-const { sendSpy, chatOptions, chatStats, titleSpy, createNewSpy, removeSpy, refreshSpy, sessionList, useActualChat, liveChat } = vi.hoisted(() => ({
+const { sendSpy, inputSpy, chatOptions, chatStats, titleSpy, createNewSpy, removeSpy, refreshSpy, sessionList, useActualChat, liveChat } = vi.hoisted(() => ({
   sendSpy: vi.fn(),
+  inputSpy: vi.fn(),
   chatOptions: { current: null as any },
   chatStats: { contextTokens: 0, promptTokens: 0, completionTokens: 0 },
   titleSpy: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock("./use-chat", async () => {
     contextTokens: chatStats.contextTokens,
     sessionUsage: { promptTokens: chatStats.promptTokens, completionTokens: chatStats.completionTokens, source: "reported" },
     input: "",
-    setInput: vi.fn(),
+    setInput: inputSpy,
     isStreaming: false,
     send: sendSpy,
     stop: vi.fn(),
@@ -125,12 +126,15 @@ const config: AIConfig = {
  }
 
 beforeEach(() => {
+  chatOptions.current = null;
   useActualChat.current = false;
   liveChat.current = null;
   chatStats.contextTokens = 0;
   chatStats.promptTokens = 0;
   chatStats.completionTokens = 0;
   sendSpy.mockReset();
+  inputSpy.mockReset();
+  sessionStorage.clear();
   vi.mocked(loadAIConfig).mockReset();
   vi.mocked(queryPreferCurrency).mockReset();
   titleSpy.mockReset();
@@ -154,6 +158,15 @@ beforeEach(() => {
 });
 
 describe("ChatPage", () => {
+  it("prefills an insight question without sending it", async () => {
+    sessionStorage.setItem("track3-insight-question", "Explain BTC concentration");
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    await waitFor(() => expect(inputSpy).toHaveBeenCalledWith("Explain BTC concentration"));
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("track3-insight-question")).toBeNull();
+  });
   it("passes advanced header secrets into session persistence", async () => {
     titleSpy.mockResolvedValueOnce("");
     vi.mocked(loadAIConfig).mockResolvedValue({

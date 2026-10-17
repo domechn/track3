@@ -58,6 +58,17 @@ describe("AssistantSettings", () => {
     await userEvent.click(screen.getByTestId("assistant-save"));
     expect(vi.mocked(saveAIConfig).mock.calls[0]?.[0].allowActions).toBe(false);
   });
+  it("defaults proactive insight summaries off and saves explicit opt-in", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,
+    });
+    render(<AssistantSettings />);
+    const toggle = await screen.findByRole("switch", { name: /summarize insights/i });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    await userEvent.click(toggle);
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(vi.mocked(saveAIConfig).mock.calls[0]?.[0].proactiveInsightsSummary).toBe(true);
+  });
   it("shows malformed advanced JSON errors in Chinese", async () => {
     localStorage.setItem(localeLocalStorageKey, "zh");
     vi.mocked(loadAIConfig).mockRejectedValue(new AIConfigMissingError());

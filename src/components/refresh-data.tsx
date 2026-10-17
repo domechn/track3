@@ -27,6 +27,7 @@ import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
 import { ALERT_SOURCE_STATUS_STORAGE_KEY, processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { redactSecrets } from "@/middlelayers/security/redact";
+import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 
 const retries = 3;
 const retryInterval = 3000;
@@ -63,7 +64,7 @@ const App = ({
   afterRefresh?: (success: boolean) => unknown;
 }) => {
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult>();
@@ -97,9 +98,11 @@ const App = ({
 
   const runRefresh = async (sourceId?: string) => {
     if (sourceId && !lastResult?.sourceResults) return;
+    cancelInsightRefresh();
     setRefreshLoading(true);
     const operation: RefreshOperation = { operationUuid: uuidv4() };
     let succeeded = false;
+    let insightStatuses = sourceStatuses;
     try {
       if (!sourceId) {
         await updateAllCurrencyRates().catch(() => {});
@@ -135,6 +138,7 @@ const App = ({
           ...(source.category ? { category: source.category } : {}),
         }));
         setSourceStatuses(statuses);
+        insightStatuses = statuses;
         setStatusDialogOpen(result.sourceStatuses.some((source) => source.status !== "ok"));
         try {
           localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
@@ -179,6 +183,11 @@ const App = ({
       setRefreshLoading(false);
       setProgress(0);
       afterRefresh?.(succeeded);
+      if (succeeded) {
+        queueMicrotask(() => {
+          void refreshInsights(insightStatuses, locale).catch(() => console.warn("insight generation failed"));
+        });
+      }
     }
   };
 

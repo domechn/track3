@@ -59,6 +59,7 @@ const licenseFixId = "997";
 const stableCoinsId = "996";
 const blacklistCoinsId = "995";
 const aiConfigId = "994";
+const insightCardId = "992";
 const costBasisMethodId = "993";
 const preferCurrencyLocalStorageKey = "track3-prefer-currency";
 
@@ -123,6 +124,9 @@ function validateAIConfig(cfg: AIConfig): void {
       price !== undefined && (typeof price !== "number" || !Number.isFinite(price) || price < 0))) {
     throw new AIConfigMissingError("AI configuration has an invalid token price");
   }
+  if (cfg.proactiveInsightsSummary !== undefined && typeof cfg.proactiveInsightsSummary !== "boolean") {
+    throw new AIConfigMissingError("AI configuration has an invalid insights preference");
+  }
 }
 
 // loadAIConfig returns the persisted AI configuration. Throws
@@ -181,6 +185,7 @@ export async function saveAIConfig(cfg: AIConfig): Promise<void> {
     inputPricePerMillionTokens: cfg.inputPricePerMillionTokens,
     outputPricePerMillionTokens: cfg.outputPricePerMillionTokens,
     advanced: cfg.advanced ? sanitizeAIAdvanced(cfg.advanced) : undefined,
+    proactiveInsightsSummary: cfg.proactiveInsightsSummary === true,
   };
   await saveConfigurationById(aiConfigId, JSON.stringify(sanitized), true);
 }
@@ -188,6 +193,14 @@ export async function saveAIConfig(cfg: AIConfig): Promise<void> {
 // cleanAIConfig removes the AI configuration slot.
 export async function cleanAIConfig(): Promise<void> {
   return deleteConfigurationById(aiConfigId);
+}
+
+export async function loadInsightCardData(): Promise<string | undefined> {
+  return (await getConfigurationById(insightCardId))?.data;
+}
+
+export async function saveInsightCardData(data: string): Promise<void> {
+  await saveConfigurationById(insightCardId, data, true);
 }
 
 const RESERVED_HEADERS = new Set([

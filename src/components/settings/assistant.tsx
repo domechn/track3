@@ -20,6 +20,7 @@ import { probeConnection } from "@/middlelayers/ai";
 import type { AIAdvancedOptions, AIConfig } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
 import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
+import { Switch } from "@/components/ui/switch";
 
 const ALLOWED_ADVANCED_KEYS = [
   "temperature",
@@ -105,6 +106,7 @@ const App = () => {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [probeError, setProbeError] = useState<string | undefined>();
+  const [proactiveInsightsSummary, setProactiveInsightsSummary] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -117,6 +119,7 @@ const App = () => {
         setModel(cfg.model);
         setContextSize(cfg.contextSize);
         setAllowActions(cfg.allowActions !== false);
+        setProactiveInsightsSummary(cfg.proactiveInsightsSummary === true);
         const input = cfg.inputPricePerMillionTokens ?? cfg.pricePerMillionTokens;
         const output = cfg.outputPricePerMillionTokens ?? cfg.pricePerMillionTokens;
         setInputPrice(input === undefined ? "" : String(input));
@@ -166,6 +169,7 @@ const App = () => {
       inputPricePerMillionTokens: inputTokenPrice,
       outputPricePerMillionTokens: outputTokenPrice,
       advanced: parsed.value,
+      proactiveInsightsSummary,
     };
 
     setSaving(true);
@@ -422,6 +426,17 @@ const App = () => {
             <Label htmlFor="assistant-allow-actions">{t("settings.assistant.allowActions")}</Label>
           </div>
           <p className="text-xs text-muted-foreground">{t("settings.assistant.allowActionsHint")}</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex items-center justify-between gap-4 pt-6">
+          <div className="space-y-1">
+            <Label htmlFor="assistant-insight-summary">{t("settings.assistant.insightSummary")}</Label>
+            <p className="text-xs text-muted-foreground">{t("settings.assistant.insightSummaryHint")}</p>
+          </div>
+          <Switch id="assistant-insight-summary" checked={proactiveInsightsSummary}
+            onCheckedChange={setProactiveInsightsSummary} disabled={!loaded} />
         </CardContent>
       </Card>
 

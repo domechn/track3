@@ -7,6 +7,8 @@ import {
   DEFAULT_AI_CONTEXT_SIZE,
   loadAIConfig,
   saveAIConfig,
+  loadInsightCardData,
+  saveInsightCardData,
 } from "./configuration";
 import {
   resetEncryptionWriteGateForTests,
@@ -93,6 +95,12 @@ describe("AI configuration storage", () => {
     expect((await loadAIConfig()).allowActions).toBe(true);
     await saveAIConfig({ ...validConfig, allowActions: false });
     expect((await loadAIConfig()).allowActions).toBe(false);
+  });
+  it("stores aggregate insight card data encrypted in the configuration table", async () => {
+    const data = '{"snapshotUuid":"sample","insights":[]}';
+    await saveInsightCardData(data);
+    expect(configurationRows.get("992")).toBe(`!ent:${data}`);
+    expect(await loadInsightCardData()).toBe(data);
   });
   it("throws AIConfigMissingError when the slot is empty", async () => {
     await expect(loadAIConfig()).rejects.toBeInstanceOf(AIConfigMissingError);

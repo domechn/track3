@@ -267,6 +267,7 @@ export type AIConfig = {
   inputPricePerMillionTokens?: number;
   outputPricePerMillionTokens?: number;
   advanced?: AIAdvancedOptions;
+  proactiveInsightsSummary?: boolean;
 };
 
 // Chart block returned by AI skills and rendered inline in chat messages.
