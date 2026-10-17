@@ -123,6 +123,27 @@ describe("Data Management", () => {
     expect(screen.getByText("BTC")).toBeInTheDocument();
   });
 
+  it("restores the original position for case-different blacklist entries", async () => {
+    mocks.getBlacklistCoins.mockResolvedValue(["btc", "ETH"]);
+    render(<DataManagement />);
+
+    expect(await screen.findByText("btc")).toBeInTheDocument();
+    expect(screen.getByText("ETH")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /remove btc from blacklist/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
+
+    await waitFor(() => expect(mocks.removeFromBlacklist).toHaveBeenCalledWith("btc"));
+    const toastView = render(<ToastProvider><Toast defaultOpen>
+      {mocks.toast.mock.lastCall?.[0].action}
+    </Toast><ToastViewport /></ToastProvider>);
+    fireEvent.click(toastView.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() => expect(mocks.addToBlacklist).toHaveBeenCalledWith("btc"));
+    expect(screen.getByText("btc")).toBeInTheDocument();
+    expect(screen.getByText("ETH")).toBeInTheDocument();
+  });
+
   it("confirms clearing the backup folder and can undo it", async () => {
     mocks.getAutoBackupDirectory.mockResolvedValue("/backups");
     render(<DataManagement />);

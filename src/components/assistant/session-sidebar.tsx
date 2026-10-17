@@ -218,6 +218,7 @@ function SessionItem({
               trigger={
                 <button
                   type="button"
+                  aria-label={t("ai.session.delete")}
                   title={t("ai.session.delete")}
                   className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                   data-testid={`session-delete-${session.id}`}

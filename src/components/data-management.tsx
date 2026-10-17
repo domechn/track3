@@ -215,13 +215,13 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   }
 
   function onRemoveFromBlacklist(symbol: string) {
-    const index = blacklist.indexOf(symbol);
+    const index = blacklist.findIndex((s) => s.toUpperCase() === symbol.toUpperCase());
     void runBlacklistDelete({
       update: (prev) => prev.filter((s) => s.toUpperCase() !== symbol.toUpperCase()),
       rollback: (prev) => {
-        if (prev.includes(symbol)) return prev;
+        if (prev.some((s) => s.toUpperCase() === symbol.toUpperCase())) return prev;
         const next = [...prev];
-        next.splice(index, 0, symbol);
+        next.splice(index >= 0 ? index : next.length, 0, symbol);
         return next;
       },
       commit: () => removeFromBlacklist(symbol),
