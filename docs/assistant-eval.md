@@ -29,7 +29,7 @@ corepack yarn eval
 
 `EVAL_ENDPOINT` may end at `/v1` or `/chat/completions`. The same fixture and questions run through the real model. The optional `EVAL_JUDGE_MODEL` requests a 0–1 answer quality score from the same endpoint; it is averaged with the deterministic rubric score. Without a judge, the rubric score is used alone. This command is separate from `yarn test` and is never part of CI.
 
-The command writes `evals/report.json` with each question, answer, plan, tool calls, pass state, score, failures, latency, and token usage when the endpoint supplies it. That report is ignored by Git. The aggregate is the mean of case scores. A run fails when the aggregate falls more than `threshold` below `evals/baseline.json`, or when any case marked `mustPass` fails. The committed baseline is the perfect score from recorded responses (`aggregate: 1`, `calibrated: false`), which sets a strict initial gate. Calibrate it with a representative live endpoint:
+The command writes `evals/report.json` with each question, answer, plan, tool calls, pass state, score, failures, latency, and token usage when the endpoint supplies it. Streaming endpoints may report `tokens: null` when their SSE response has no usage data. That report is ignored by Git. The aggregate is the mean of case scores. A run fails when any case marked `mustPass` fails. Once calibrated, it also fails when the aggregate falls more than `threshold` below `evals/baseline.json`. The committed recorded-response baseline (`calibrated: false`) lets the first live run produce a report without applying a score threshold from a different model. Calibrate it with a representative live endpoint:
 
 ```bash
 EVAL_ENDPOINT=https://example.com/v1 \

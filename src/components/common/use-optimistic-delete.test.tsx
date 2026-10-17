@@ -23,6 +23,25 @@ function Fixture({ commit, restore }: { commit: () => Promise<void>; restore: ()
   </>;
 }
 
+function ConcurrentFixture({ commit }: { commit: (item: string) => Promise<void> }) {
+  const [items, setItems] = useState(["a", "b"]);
+  const { run, isDeleting } = useOptimisticDelete(setItems);
+  return <>
+    <div>{items.join(",")}</div>
+    <div data-testid="delete-state">{isDeleting ? "Deleting" : "Idle"}</div>
+    {["a", "b"].map((item) => <button key={item} onClick={() => void run({
+      update: (previous) => previous.filter((value) => value !== item),
+      rollback: (previous) => [item, ...previous],
+      commit: () => commit(item),
+      undo: async () => {},
+      successMessage: "Deleted",
+      undoLabel: "Undo",
+      undoAltText: "Restore item",
+      undoWindowMs: 5000,
+    })}>Delete {item}</button>)}
+  </>;
+}
+
 beforeEach(() => vi.useRealTimers());
 
 describe("useOptimisticDelete", () => {
@@ -46,5 +65,36 @@ describe("useOptimisticDelete", () => {
     expect(await screen.findByText("a,b")).toBeInTheDocument();
     expect(screen.getByText("storage failed")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+  });
+
+  it("stays busy until both overlapping deletes finish", async () => {
+    const finishes = new Map<string, () => void>();
+    render(<ConcurrentFixture commit={(item) => new Promise((resolve) => { finishes.set(item, resolve); })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete a" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete b" }));
+    expect(screen.getByTestId("delete-state")).toHaveTextContent("Deleting");
+    await act(async () => finishes.get("a")?.());
+    expect(screen.getByTestId("delete-state")).toHaveTextContent("Deleting");
+    await act(async () => finishes.get("b")?.());
+    expect(screen.getByTestId("delete-state")).toHaveTextContent("Idle");
+  });
+
+  it("keeps the item deleted and reports a failed undo", async () => {
+    render(<Fixture commit={async () => {}} restore={async () => { throw new Error("restore failed"); }} />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Delete" })); });
+    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    expect(await screen.findByText("restore failed")).toBeInTheDocument();
+    expect(screen.getByText("b")).toBeInTheDocument();
+  });
+
+  it("removes the undo action when its window expires", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<Fixture commit={async () => {}} restore={async () => {}} />);
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Delete" })); });
+      expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(5001); });
+      expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
   });
 });

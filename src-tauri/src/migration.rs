@@ -954,6 +954,7 @@ async fn migrate_v8_to_v9(
     let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
     let alerts = read_migration_sql(resource_dir, "v09t10/alerts_up.sql")?;
     let sync_state = read_migration_sql(resource_dir, "v10t11/sync_state_up.sql")?;
+    let history_snapshots = read_migration_sql(resource_dir, "v08t09/history_snapshots_up.sql")?;
     let mut transaction = connection
         .begin()
         .await
@@ -970,6 +971,10 @@ async fn migrate_v8_to_v9(
         .execute(&mut *transaction)
         .await
         .map_err(|error| format!("failed to create sync state tables: {error}"))?;
+    sqlx::raw_sql(&history_snapshots)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to create history snapshot index: {error}"))?;
     write_migration_version(&mut transaction, "0.9.0").await?;
     transaction
         .commit()
@@ -989,6 +994,7 @@ async fn repair_required_schema(
     let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
     let alerts = read_migration_sql(resource_dir, "v09t10/alerts_up.sql")?;
     let sync_state = read_migration_sql(resource_dir, "v10t11/sync_state_up.sql")?;
+    let history_snapshots = read_migration_sql(resource_dir, "v08t09/history_snapshots_up.sql")?;
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
     let mut transaction = connection
         .begin()
@@ -1086,6 +1092,12 @@ async fn repair_required_schema(
             .execute(&mut *transaction)
             .await
             .map_err(|error| format!("failed to ensure sync state tables: {error}"))?;
+        if !migration_table_exists(&mut transaction, "history_snapshots").await? {
+            sqlx::raw_sql(&history_snapshots)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|error| format!("failed to ensure history snapshot index: {error}"))?;
+        }
     }
     repair_index(
         &mut transaction,

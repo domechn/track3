@@ -80,6 +80,7 @@ vi.mock("@tauri-apps/api/path", () => ({
 
 vi.mock("@/middlelayers/datafetch/coins/cex/cex", () => ({
   CexAnalyzer: class {},
+  supportedExchanges: new Set(["binance"]),
 }));
 
 vi.mock("@/middlelayers/datafetch/coins/stock/stock-analyzer", () => ({

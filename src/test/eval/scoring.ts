@@ -20,9 +20,13 @@ export type ActualCase = {
 
 export function scoreGoldenCase(golden: GoldenExpectation, actual: ActualCase): { passed: boolean; score: number; failures: string[] } {
   const failures: string[] = [];
-  let checks = 0;
-  const check = (valid: boolean, message: string) => {
-    checks++;
+  let scoredChecks = 0;
+  let scoredPasses = 0;
+  const check = (valid: boolean, message: string, required = true) => {
+    if (required || !valid) {
+      scoredChecks++;
+      if (valid) scoredPasses++;
+    }
     if (!valid) failures.push(message);
   };
   const matchTools = (expected: ExpectedTool[], observed: ExpectedTool[], label: string) => {
@@ -32,6 +36,7 @@ export function scoreGoldenCase(golden: GoldenExpectation, actual: ActualCase): 
           candidate.name === item.name && matchesShape(candidate.args, item.args),
         )),
       `${label}: expected ${expected.map((item) => item.name).join(", ") || "none"}`,
+      expected.length > 0,
     );
   };
 
@@ -45,17 +50,17 @@ export function scoreGoldenCase(golden: GoldenExpectation, actual: ActualCase): 
     );
   }
   for (const name of golden.forbiddenTools) {
-    check(!actual.tools.some((tool) => tool.name === name), `forbidden tool: ${name}`);
+    check(!actual.tools.some((tool) => tool.name === name), `forbidden tool: ${name}`, false);
   }
   for (const text of golden.rubric.mustContain) {
     check(actual.answer.toLowerCase().includes(text.toLowerCase()), `answer missing: ${text}`);
   }
   for (const text of golden.rubric.mustNotContain) {
-    check(!actual.answer.toLowerCase().includes(text.toLowerCase()), `answer contains forbidden: ${text}`);
+    check(!actual.answer.toLowerCase().includes(text.toLowerCase()), `answer contains forbidden: ${text}`, false);
   }
-  check(actual.rounds <= (golden.maxRounds ?? 5), "tool loop exceeded round budget");
-  check(!actual.tools.some((tool) => tool.error), "tool execution failed");
-  return { passed: failures.length === 0, score: (checks - failures.length) / checks, failures };
+  check(actual.rounds <= (golden.maxRounds ?? 5), "tool loop exceeded round budget", false);
+  check(!actual.tools.some((tool) => tool.error), "tool execution failed", false);
+  return { passed: failures.length === 0, score: scoredChecks ? scoredPasses / scoredChecks : 1, failures };
 }
 
 function matchesShape(actual: unknown, expected: unknown): boolean {
@@ -78,6 +83,45 @@ function getPath(data: unknown, path: string): unknown {
   );
 }
 
-export function compareBaseline(report: { aggregate: number }, baseline: number, threshold: number, mustPassFailed: boolean): boolean {
-  return !mustPassFailed && report.aggregate >= baseline - threshold;
+export function compareBaseline(
+  report: { aggregate: number },
+  baseline: number,
+  threshold: number,
+  mustPassFailed: boolean,
+  calibrated = true,
+): boolean {
+  return !mustPassFailed && (!calibrated || report.aggregate >= baseline - threshold);
+}
+
+export function parseJudgeScore(content: string): number | undefined {
+  const match = content.match(/\{[^{}]*\}/);
+  if (!match) return undefined;
+  try {
+    const score = (JSON.parse(match[0]) as { score?: unknown }).score;
+    return typeof score === "number" && score >= 0 && score <= 1 ? score : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function countToolRounds(prompts: string[]): number {
+  return prompts.filter((prompt) =>
+    prompt.includes("Track3 portfolio assistant") && !prompt.includes("synthesising"),
+  ).length;
+}
+
+export function parsePlannedTools(content: string): ExpectedTool[] {
+  const match = content.match(/\{[\s\S]*\}/);
+  if (!match) return [];
+  try {
+    const value: unknown = JSON.parse(match[0]);
+    if (!value || typeof value !== "object" || !("tasks" in value) || !Array.isArray(value.tasks)) return [];
+    return value.tasks.flatMap((task: unknown) => {
+      if (!task || typeof task !== "object" || !("skillName" in task) || typeof task.skillName !== "string" ||
+        !("args" in task) || !task.args || typeof task.args !== "object" || Array.isArray(task.args)) return [];
+      return [{ name: task.skillName, args: task.args as Record<string, unknown> }];
+    });
+  } catch {
+    return [];
+  }
 }

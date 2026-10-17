@@ -1,4 +1,5 @@
 import initSqlJs from "sql.js";
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { hourlyHistory } from "@/test/history-fixtures";
 
@@ -17,6 +18,8 @@ const range = {
 };
 
 describe("paged historical queries", () => {
+  let addRows: (sql: string) => void;
+  let queryPlan: (sql: string, values: unknown[]) => string[];
   beforeEach(async () => {
     const SQL = await initSqlJs();
     const db = new SQL.Database();
@@ -24,6 +27,8 @@ describe("paged historical queries", () => {
       id INTEGER PRIMARY KEY, uuid TEXT, createdAt TEXT, wallet TEXT,
       asset_type TEXT, symbol TEXT, amount REAL, value REAL, price REAL
     )`);
+    db.run("CREATE INDEX createdAt_idx ON assets_v2 (createdAt)");
+    db.run("CREATE INDEX uuid_idx ON assets_v2 (uuid)");
     db.run(`CREATE TABLE transactions (
       id INTEGER PRIMARY KEY, uuid TEXT, assetID INTEGER, asset_type TEXT,
       wallet TEXT, symbol TEXT, amount REAL, price REAL, txnType TEXT,
@@ -45,6 +50,16 @@ describe("paged historical queries", () => {
       (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt)
       VALUES ('snapshot-000042', 1, 'crypto', 'wallet', 'ASSET0', 1, 43, 'buy',
         '2022-01-02T18:00:00.000Z', '2022-01-02T18:00:00.000Z', '2022-01-02T18:00:00.000Z')`);
+    db.run(readFileSync("src-tauri/migrations/v08t09/history_snapshots_up.sql", "utf8"));
+    addRows = (sql) => db.run(sql);
+    queryPlan = (sql, values) => {
+      const statement = db.prepare(`EXPLAIN QUERY PLAN ${sql}`);
+      statement.bind(values as (string | number)[]);
+      const details: string[] = [];
+      while (statement.step()) details.push(String(statement.getAsObject().detail));
+      statement.free();
+      return details;
+    };
     sqlSelect.mockReset();
     sqlSelect.mockImplementation(async (sql: string, values: unknown[]) => {
       const stmt = db.prepare(sql);
@@ -145,5 +160,31 @@ describe("paged historical queries", () => {
       // Iterate without retaining the five million generated asset records.
     }
     expect(final?.id).toBe("snapshot-026279");
+  });
+
+  it("pages two thousand snapshots without aggregating every asset in the range", async () => {
+    for (const snapshot of hourlyHistory(2000, 1)) {
+      if (snapshot.id <= "snapshot-000042") continue;
+      addRows(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+        VALUES ('${snapshot.id}', '${snapshot.createdAt}', 'wallet', 'crypto', 'ASSET0', 1, 1, 1)`);
+    }
+    const page = await queryHistoricalPage(range, 20, 50);
+    expect(page.totalCount).toBe(2000);
+    expect(page.rows).toHaveLength(20);
+    expect(page.rows[0].id).toBe("snapshot-000999");
+    const [sql, values] = sqlSelect.mock.calls.at(-1)!;
+    expect(queryPlan(sql, values).some((detail) =>
+      detail.includes("assets_v2") && detail.includes("createdAt_idx"),
+    )).toBe(false);
+  });
+
+  it("keeps snapshot pagination current after asset imports and deletes", async () => {
+    addRows(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('imported', '2024-01-01T00:00:00.000Z', 'wallet', 'crypto', 'BTC', 1, 50, 50)`);
+    expect((await queryHistoricalPage(range, 20, 0)).latest).toMatchObject({ id: "imported", total: 50 });
+    addRows("DELETE FROM assets_v2 WHERE uuid = 'imported'");
+    const page = await queryHistoricalPage(range, 20, 0);
+    expect(page.totalCount).toBe(43);
+    expect(page.latest?.id).toBe("snapshot-000042");
   });
 });

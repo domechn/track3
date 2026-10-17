@@ -65,6 +65,8 @@ export type RefreshAllDataOptions = {
   previousSourceStatuses?: PortfolioSourceStatus[];
   previousInputGeneration?: number;
   previousRefreshCreatedAt?: string;
+  previousSnapshotId?: string | null;
+  previousSnapshotKey?: string;
 };
 export type RefreshRetry = <T>(attempt: () => Promise<T>) => Promise<T>;
 
@@ -113,6 +115,8 @@ export type RefreshAllDataResult = {
   persisted?: boolean;
   portfolioInputGeneration?: number;
   refreshCreatedAt?: string;
+  snapshotId?: string | null;
+  snapshotKey?: string;
 };
 
 type WalletCoinValueContext = {
@@ -160,6 +164,16 @@ function getSnapshotMaxId(snapshot: AssetModel[]): number {
     (latest, asset) => Math.max(latest, Number(asset.id) || 0),
     0,
   );
+}
+
+function getSnapshotContentKey(assets: Array<Pick<AssetModel, "symbol" | "amount" | "value" | "price"> & {
+  assetType?: AssetModel["assetType"];
+  wallet?: string;
+}>): string {
+  return JSON.stringify(assets.map((asset) => [
+    getAssetType(asset), storedWallet(asset.wallet), asset.symbol,
+    asset.amount, asset.value, asset.price,
+  ]).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))));
 }
 
 function selectLatestPersistedSnapshot(snapshots: AssetModel[][]): {
@@ -242,6 +256,8 @@ export async function refreshAllData(
             persisted: false,
             portfolioInputGeneration: options.previousInputGeneration,
             refreshCreatedAt: options.previousRefreshCreatedAt,
+            snapshotId: options.previousSnapshotId,
+            snapshotKey: options.previousSnapshotKey,
           };
         }
         const readyQueryResult = currentQueryResult;
@@ -253,8 +269,11 @@ export async function refreshAllData(
         const latestCommittedRefreshCreatedAt =
           await getLatestCommittedRefreshCreatedAt(database);
         if (
-          options.previousRefreshCreatedAt &&
-          options.previousRefreshCreatedAt !== latestCommittedRefreshCreatedAt
+          options.retrySourceId &&
+          (options.previousSnapshotId === undefined ||
+            options.previousSnapshotId !== (rawLatestBaseline[0]?.uuid ?? null) ||
+            options.previousSnapshotKey !== getSnapshotContentKey(rawLatestBaseline) ||
+            options.previousRefreshCreatedAt !== latestCommittedRefreshCreatedAt)
         ) {
           throw new FullRefreshRequiredError("Portfolio changed. Run a full refresh.");
         }
@@ -308,6 +327,8 @@ export async function refreshAllData(
             persisted: false,
             portfolioInputGeneration: readyQueryResult.portfolioInputGeneration,
             refreshCreatedAt: latestCommittedRefreshCreatedAt,
+            snapshotId: rawLatestBaseline[0]?.uuid ?? null,
+            snapshotKey: getSnapshotContentKey(rawLatestBaseline),
           };
         }
         const portfolioResult = mergePortfoliosWithBaseline(
@@ -340,11 +361,12 @@ export async function refreshAllData(
           coins,
           readyQueryResult.blacklistedSymbols,
         );
+        const refreshAssets = generateRefreshAssets(coins, transactions);
         operation.prepared = {
           payload: {
             operationUuid: operation.operationUuid,
             createdAt: refreshCreatedAt,
-            assets: generateRefreshAssets(coins, transactions),
+            assets: refreshAssets,
             txns: transactions,
           },
           result: {
@@ -356,6 +378,8 @@ export async function refreshAllData(
             persisted: true,
             portfolioInputGeneration: readyQueryResult.portfolioInputGeneration,
             refreshCreatedAt,
+            snapshotId: operation.operationUuid,
+            snapshotKey: getSnapshotContentKey(refreshAssets),
           },
         };
       }
@@ -621,7 +645,6 @@ async function queryWalletCoinValueContext(
   }
   const priceMap = {
     ...cryptoPriceMap,
-    ...stockPriceMap,
     ...typedCryptoPriceMap,
     ...typedStockPriceMap,
   };
@@ -673,7 +696,7 @@ function updateStalePrices(
   for (const [assetType, prices] of [["crypto", stalePrices.crypto], ["stock", stalePrices.stock]] as const) {
     for (const [symbol, price] of Object.entries(prices)) {
       priceMap[getAssetIdentity({ symbol, assetType })] = price;
-      priceMap[symbol] = price;
+      if (assetType === "crypto") priceMap[symbol] = price;
     }
   }
   for (const fresh of freshCoins) {

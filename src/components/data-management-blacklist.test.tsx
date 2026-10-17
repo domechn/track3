@@ -123,6 +123,37 @@ describe("Data Management", () => {
     expect(screen.getByText("BTC")).toBeInTheDocument();
   });
 
+  it("shows an undone blacklist entry in the order saved by addToBlacklist", async () => {
+    mocks.getBlacklistCoins.mockResolvedValue(["BTC", "ETH", "SOL"]);
+    render(<DataManagement />);
+    await screen.findByText("BTC");
+    fireEvent.click(screen.getByRole("button", { name: /remove btc from blacklist/i }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(mocks.removeFromBlacklist).toHaveBeenCalledOnce());
+    const undoAction = mocks.toast.mock.lastCall?.[0].action;
+    const toastView = render(<ToastProvider><Toast defaultOpen>{undoAction}</Toast><ToastViewport /></ToastProvider>);
+    fireEvent.click(toastView.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(mocks.addToBlacklist).toHaveBeenCalledWith("BTC"));
+    expect(screen.getAllByRole("button", { name: /remove .* from blacklist/i }).map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Remove ETH from blacklist", "Remove SOL from blacklist", "Remove BTC from blacklist",
+    ]);
+  });
+
+  it("keeps blacklist order when removing the first entry fails", async () => {
+    mocks.getBlacklistCoins.mockResolvedValue(["BTC", "ETH", "SOL"]);
+    mocks.removeFromBlacklist.mockRejectedValueOnce(new Error("storage failed"));
+    render(<DataManagement />);
+    await screen.findByText("BTC");
+    fireEvent.click(screen.getByRole("button", { name: /remove btc from blacklist/i }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
+      description: "storage failed", variant: "destructive",
+    }));
+    expect(screen.getAllByRole("button", { name: /remove .* from blacklist/i }).map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Remove BTC from blacklist", "Remove ETH from blacklist", "Remove SOL from blacklist",
+    ]);
+  });
+
   it("confirms clearing the backup folder and can undo it", async () => {
     mocks.getAutoBackupDirectory.mockResolvedValue("/backups");
     render(<DataManagement />);

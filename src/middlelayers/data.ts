@@ -6,7 +6,7 @@ import { DOGEAnalyzer } from "./datafetch/coins/doge";
 import { OthersAnalyzer } from "./datafetch/coins/others";
 import { SOLAnalyzer } from "./datafetch/coins/sol";
 import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from "./datafetch/coins/erc20";
-import { CexAnalyzer } from "./datafetch/coins/cex/cex";
+import { CexAnalyzer, supportedExchanges } from "./datafetch/coins/cex/cex";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { AddProgressFunc, UserLicenseInfo } from "./types";
 import { ASSET_HANDLER } from "./entities/assets";
@@ -93,10 +93,6 @@ function uniqueIdentities(identities: string[]): string[] {
 }
 
 const sourceTimeoutMs = 30_000;
-const supportedExchanges = new Set([
-  "binance", "okex", "okx", "bitget", "gate", "kraken", "coinbase",
-  "bybit", "htx", "mexc", "backpack",
-]);
 
 function hasValidHoldings(coins: unknown): coins is WalletCoin[] {
   return Array.isArray(coins) && coins.every((coin) =>
@@ -250,7 +246,7 @@ export async function fetchPortfolios(
           }
           await analyzer.postLoad();
           return coins;
-        }, kind === "cex" || kind === "sol" ? 120_000 : sourceTimeoutMs);
+        }, kind === "cex" || kind === "sol" || kind === "stock" ? 120_000 : sourceTimeoutMs);
         return { sourceId: source.sourceId, label: source.label, walletIdentities, status: "ok" as const, coins: portfolio };
       } catch (error) {
         // Upstream messages can contain credentials and request URLs. Keep only a category.

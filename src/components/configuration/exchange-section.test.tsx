@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ExchangeSection } from "./exchange-section";
 import type { ExchangeRow } from "./types";
@@ -95,5 +95,15 @@ describe("ExchangeSection", () => {
 
     // Should show page indicator
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
+  });
+
+  it("requires confirmation before removing an exchange", () => {
+    const onRemove = vi.fn();
+    render(<ExchangeSection {...baseProps} onRemove={onRemove} />);
+    const row = screen.getByText("Main").closest("tr")!;
+    fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    expect(onRemove).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    expect(onRemove).toHaveBeenCalledOnce();
   });
 });

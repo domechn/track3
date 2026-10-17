@@ -86,3 +86,10 @@ it("does not refill the balance cache after a retry clears it", async () => {
   expect(await pending).toEqual({ BTC: 2 });
   expect(cache.getCache("late-exchange_total_balance")).toBeUndefined();
 });
+
+it("does not treat an inherited object method as a supported exchange", async () => {
+  const analyzer = new CexAnalyzer({
+    exchanges: [{ name: "toString", initParams: { apiKey: "key", secret: "secret" } }],
+  });
+  expect(await analyzer.loadPortfolio()).toEqual([]);
+});

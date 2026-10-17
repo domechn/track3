@@ -129,6 +129,16 @@ describe("large time-series queries", () => {
     });
   });
 
+  it("uses the snapshot timestamp for ranked assets with mixed row timestamps", async () => {
+    addRows("UPDATE assets_v2 SET createdAt = '2022-01-02T18:01:00.000Z' WHERE uuid = 'snapshot-000042' AND symbol = 'ASSET199'");
+    const rank = await queryTopCoinsRank(range, 6);
+    const coin = rank.coins.find((item) => item.coin === "ASSET198");
+    expect(coin?.rankData.at(-1)).toEqual({
+      timestamp: new Date("2022-01-02T18:01:00.000Z").getTime(),
+      rank: 2,
+    });
+  });
+
   it("combines case and whitespace variants in top assets, composition, and coin series", async () => {
     addRows(`INSERT INTO assets_v2
       (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)

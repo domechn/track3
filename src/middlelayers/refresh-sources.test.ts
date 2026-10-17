@@ -34,7 +34,10 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
 vi.mock("./datafetch/coins/btc", () => ({ BTCAnalyzer: MockAnalyzer }));
 vi.mock("./datafetch/coins/erc20", () => ({ ERC20NormalAnalyzer: MockAnalyzer, ERC20ProAnalyzer: MockAnalyzer }));
-vi.mock("./datafetch/coins/cex/cex", () => ({ CexAnalyzer: MockAnalyzer }));
+vi.mock("./datafetch/coins/cex/cex", () => ({
+  CexAnalyzer: MockAnalyzer,
+  supportedExchanges: new Set(["binance", "kraken", "new-exchange"]),
+}));
 vi.mock("./datafetch/coins/sol", () => ({ SOLAnalyzer: MockAnalyzer }));
 vi.mock("./datafetch/coins/doge", () => ({ DOGEAnalyzer: MockAnalyzer }));
 vi.mock("./datafetch/coins/trc20", () => ({ TRC20ProUserAnalyzer: MockAnalyzer }));
@@ -104,6 +107,21 @@ describe("per-source refresh", () => {
       const result = await pending;
       expect(result.coins).toEqual([coin("wallet-b")]);
       expect(result.failedSources[0]).toMatchObject({ sourceId: "btc:0", category: "network" });
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("allows an IBKR statement longer than 30 seconds before timing out", async () => {
+    vi.useFakeTimers();
+    try {
+      const brokerConfig = {
+        ...config,
+        btc: { addresses: [] },
+        stockConfig: { brokers: [{ name: "ibkr", initParams: { token: "token", queryId: "slow" } }] },
+      };
+      scenario.load = async () => new Promise((resolve) => setTimeout(() => resolve([coin("slow")]), 40_000));
+      const pending = fetchPortfolios(brokerConfig, vi.fn(), userInfo);
+      await vi.advanceTimersByTimeAsync(40_000);
+      expect((await pending).sourceResults?.[0]).toMatchObject({ sourceId: "stock:0", status: "ok" });
     } finally { vi.useRealTimers(); }
   });
 
@@ -217,6 +235,15 @@ describe("per-source refresh", () => {
 
     expect(result.failedSources).toMatchObject([{ sourceId: "cex:0", category: "unsupported" }]);
     expect(result.coins).toEqual([]);
+  });
+
+  it("accepts an exchange supported by the CEX implementation", async () => {
+    const result = await fetchPortfolios({
+      ...config,
+      btc: { addresses: [] },
+      exchanges: [{ name: "new-exchange", initParams: { apiKey: "key", secret: "secret" } }],
+    }, vi.fn(), userInfo);
+    expect(result.coins).toEqual([coin("new-exchange")]);
   });
 
   it("never exposes secrets in failure status or console output", async () => {

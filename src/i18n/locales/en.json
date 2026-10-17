@@ -429,7 +429,7 @@
   "system.loadingPlan": "Loading...",
   "config.title": "Configuration",
   "config.removeDialogTitle": "Remove this configuration?",
-  "config.removeDialogDesc": "This change takes effect when you save the configuration.",
+  "config.removeDialogDesc": "This removes it from your configuration.",
   "config.exchange": "Exchange",
   "config.alias": "Alias",
   "config.apiKey": "API Key",
