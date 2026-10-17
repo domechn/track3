@@ -103,6 +103,7 @@
   "assistant.action.preview.current": "当前选择",
   "assistant.action.preview.noFile": "无文件",
   "assistant.action.preview.noRule": "无新规则",
+  "assistant.action.preview.acknowledgedAll": "已确认 {count} 条提醒",
   "assistant.action.preview.deleted": "已删除",
   "assistant.action.preview.export": "通过文件对话框保存",
   "assistant.action.result.done": "完成",

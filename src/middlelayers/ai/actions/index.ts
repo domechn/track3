@@ -112,7 +112,7 @@ export function validateActionArgs(name: string, raw: unknown): Record<string, u
         (name === "edit_alert" && Object.keys(args).length === 1) ||
         (args.assetType !== undefined && args.assetType !== null && !["crypto", "stock"].includes(String(args.assetType))) ||
         (args.symbol !== undefined && args.symbol !== null && !symbol(args.symbol) &&
-          !(args.kind === "allocation_deviation" && args.symbol === "*")) ||
+          !(args.symbol === "*" && (name === "edit_alert" || args.kind === "allocation_deviation"))) ||
         (args.window !== undefined && args.window !== null && !["24h", "7d", "30d"].includes(String(args.window))) ||
         (args.enabled !== undefined && typeof args.enabled !== "boolean") ||
         (args.cooldownSeconds !== undefined && (!integer(args.cooldownSeconds) || Number(args.cooldownSeconds) < 0))) {
@@ -208,6 +208,7 @@ export async function prepareAction(name: string, raw: unknown, toolCallId: stri
       window: args.window !== undefined ? args.window : changedKind && !usesWindow ? null : previous.window,
     };
     editedRule = makeAlertRule(merged);
+    if (editedRule.symbol === "*" && editedRule.kind !== "allocation_deviation") throw new Error("Invalid alert rule");
     validateAlertRule(editedRule);
     args = {
       id: editedRule.id, kind: editedRule.kind, comparator: editedRule.comparator,
@@ -258,7 +259,7 @@ export async function prepareAction(name: string, raw: unknown, toolCallId: stri
       from: args.from ?? settings.from, to: args.to ?? settings.to,
     });
   } else if (action === "create_alert") {
-    before = "assistant.action.preview.noRule";
+    before = "{}";
     after = JSON.stringify(args);
   } else if (action === "set_alert_enabled" || action === "delete_alert" || action === "edit_alert") {
     const rule = editedRule ?? (await listAlertRules()).find((item) => item.id === args.id);
@@ -275,7 +276,7 @@ export async function prepareAction(name: string, raw: unknown, toolCallId: stri
     const history = await listAlertHistory();
     before = JSON.stringify(history.map((item) => ({ id: item.id, acknowledgedAt: item.acknowledgedAt })));
     after = action === "clear_alert_history" ? "assistant.action.preview.deleted" :
-      `${history.filter((item) => !item.acknowledgedAt).length} alerts acknowledged`;
+      `assistant.action.preview.acknowledgedAll:${history.filter((item) => !item.acknowledgedAt).length}`;
   } else if (action === "set_base_currency") {
     const rates = await listAllCurrencyRates();
     if (!rates.some((rate) => rate.currency === args.currency)) throw new Error("Currency not available");

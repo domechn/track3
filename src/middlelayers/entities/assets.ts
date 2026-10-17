@@ -130,6 +130,7 @@ class AssetHandler implements AssetHandlerImpl {
   async listTotalValueRecords(
     start?: Date,
     end?: Date,
+    excludedSymbols: string[] = [],
   ): Promise<
     {
       uuid: string;
@@ -137,7 +138,10 @@ class AssetHandler implements AssetHandlerImpl {
       totalValue: number;
     }[]
   > {
-    const sql = `SELECT SUM(value) as totalValue, uuid, createdAt FROM ${this.assetTableName} WHERE 1=1 ${
+    const value = excludedSymbols.length
+      ? `SUM(CASE WHEN UPPER(symbol) IN (${excludedSymbols.map(() => "?").join(",")}) THEN 0 ELSE value END)`
+      : "SUM(value)";
+    const sql = `SELECT ${value} as totalValue, uuid, createdAt FROM ${this.assetTableName} WHERE 1=1 ${
       start ? " AND createdAt >= ?" : ""
     } ${end ? " AND createdAt <= ?" : ""} GROUP BY uuid ORDER BY createdAt ASC`;
     const results = await selectFromDatabaseWithSql<{
@@ -146,7 +150,8 @@ class AssetHandler implements AssetHandlerImpl {
       totalValue: number;
     }>(
       sql,
-      [start, end].filter((d): d is Date => d != null).map((d) => d.toISOString()),
+      [...excludedSymbols.map((symbol) => symbol.toUpperCase()),
+        ...[start, end].filter((d): d is Date => d != null).map((d) => d.toISOString())],
     );
 
     return results || [];

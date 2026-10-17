@@ -76,6 +76,20 @@ it("merges a partial asset alert edit before validation and preview", async () =
     kind: "asset_price_move", symbol: "BTC", window: "7d", threshold: -10,
   }));
 });
+it("accepts an unchanged any-coin symbol after merging the stored alert kind", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([{
+    id: 7, kind: "allocation_deviation", assetType: "crypto", symbol: "*", comparator: "gte", threshold: 5,
+    window: null, enabled: true, cooldownSeconds: 3600, lastTriggeredAt: null, lastValue: null, armed: true,
+  }]);
+  const action = await prepareAction("edit_alert", { id: 7, symbol: "*" }, "call-any");
+  expect(JSON.parse(action.preview.after)).toMatchObject({ kind: "allocation_deviation", symbol: "*" });
+});
+it("previews a new alert as individual fields", async () => {
+  const action = await prepareAction("create_alert", {
+    kind: "asset_price_target", assetType: "crypto", symbol: "BTC", comparator: "gte", threshold: 100000,
+  }, "call-create");
+  expect(action.preview.before).toBe("{}");
+});
 it("drops obsolete asset and window fields when an alert kind changes", async () => {
   vi.mocked(listAlertRules).mockResolvedValue([{
     id: 7, kind: "asset_price_move", assetType: "crypto", symbol: "BTC", comparator: "lte", threshold: -5,
@@ -137,6 +151,8 @@ it("acknowledges alert history only after confirmation", async () => {
     triggeredAt: "2025-01-01", acknowledgedAt: null,
   }]);
   const action = await prepareAction("acknowledge_all_alerts", {}, "call-5");
+  expect(action.preview.after).toBe("assistant.action.preview.acknowledgedAll:1");
+  expect(action.preview.after).not.toContain("alerts acknowledged");
   expect(acknowledgeAllAlerts).not.toHaveBeenCalled();
   await executePreparedAction(action);
   expect(acknowledgeAllAlerts).toHaveBeenCalledOnce();

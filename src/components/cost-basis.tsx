@@ -223,7 +223,7 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
       </Card>
       </details>
       {!validRange && <p id="cost-range-error" role="alert" className="text-sm text-destructive">{t("cost.invalidRange")}</p>}
-      {loading && !report && <FinanceChartSkeleton />}
+      {loading && (report ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p> : <FinanceChartSkeleton />)}
       {report && validRange && <>
         <CostCharts report={report} quoteColor={quoteColor} />
         {report.warnings.length > 0 && <Card className="border-amber-500/50"><CardHeader className="px-4 pb-1 pt-3"><CardTitle className="text-sm">{t("cost.warnings")}</CardTitle></CardHeader><CardContent className="px-4 pb-3"><ul className="list-disc space-y-1 pl-5 text-xs">{report.warnings.slice(pages.warnings * pageSize, (pages.warnings + 1) * pageSize).map((warning, index) => (

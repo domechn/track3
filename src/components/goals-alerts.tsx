@@ -75,10 +75,10 @@ export default function GoalsAlerts() {
       const [nextRules, nextHistory] = await Promise.all([listAlertRules(), listAlertHistory()]);
       const pnlWindows = nextRules.filter((rule) => rule.enabled && rule.kind === "period_pnl" && rule.window)
         .map((rule) => rule.window as AlertWindow);
-      const [evaluation, series] = await Promise.all([
-        loadAlertEvaluationData(undefined, undefined, new Date(), pnlWindows),
-        queryPNLChartValue({ start: new Date(0), end: new Date() }, 80).catch(() => []),
-      ]);
+      const evaluation = await loadAlertEvaluationData(undefined, undefined, new Date(), pnlWindows);
+      const series = await queryPNLChartValue(
+        { start: new Date(0), end: new Date() }, 80, evaluation.excludedSymbols,
+      ).catch(() => []);
       setRules(nextRules);
       if (!manualInitialized.current) {
         setManualOpen(nextRules.length === 0);

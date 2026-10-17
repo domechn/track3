@@ -55,6 +55,14 @@ it("keeps manual setup open after a filter reload", async () => {
   await waitFor(() => expect(loadCostBasisReport).toHaveBeenCalledWith(expect.objectContaining({ from: "2024-01-01" })));
   expect(panel).toHaveAttribute("open");
 });
+it("shows loading while a changed filter reloads an existing report", async () => {
+  render(<CostBasisPage />);
+  await screen.findAllByText("BTC");
+  vi.mocked(loadCostBasisReport).mockImplementation(() => new Promise(() => {}));
+  fireEvent.change(screen.getByLabelText("Tax year"), { target: { value: "2024" } });
+  await waitFor(() => expect(loadCostBasisReport).toHaveBeenCalledWith(expect.objectContaining({ from: "2024-01-01" })));
+  expect(screen.getByRole("status")).toHaveTextContent("Loading");
+});
 
 it("leads with AI setup and keeps report details in a collapsible section", async () => {
   render(<CostBasisPage />);
