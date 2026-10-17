@@ -53,6 +53,13 @@ describe("Sync settings page", () => {
     fireEvent.click(action);
     await waitFor(() => expect(syncRuntime.forgetRemote).toHaveBeenCalledTimes(1));
   });
+  it("keeps the typed confirmation input outside the dialog description", () => {
+    configuredEndpoint = "https://s3.example.test";
+    render(<SyncSettingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Forget remote data" }));
+    const input = screen.getByLabelText(/type FORGET/i);
+    expect(input.closest("p")).toBeNull();
+  });
   it("shows an unmissable recovery warning and masks both secrets", () => {
     render(<SyncSettingsPage />);
     expect(screen.getByText(/never be recovered/i)).toBeInTheDocument();

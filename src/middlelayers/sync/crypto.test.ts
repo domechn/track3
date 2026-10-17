@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSyncHeader,
   decryptObject,
@@ -11,6 +11,19 @@ import {
 const text = new TextEncoder();
 
 describe("sync crypto", () => {
+  it("reuses derived encryption and naming keys for the same root key", async () => {
+    const root = new Uint8Array(32);
+    const derive = vi.spyOn(crypto.subtle, "deriveKey");
+    try {
+      await encryptObject(root, "snap/one", text.encode("one"));
+      await encryptObject(root, "snap/two", text.encode("two"));
+      await objectName(root, "snap/one");
+      await objectName(root, "snap/two");
+      expect(derive).toHaveBeenCalledTimes(2);
+    } finally {
+      derive.mockRestore();
+    }
+  });
   it("unlocks a header only with the original passphrase", async () => {
     const { header, key } = await createSyncHeader("correct horse battery staple");
     expect(header.kdf.name).toBe("argon2id");

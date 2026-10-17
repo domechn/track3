@@ -86,6 +86,28 @@ describe("SyncScheduler", () => {
     scheduler.stop();
   });
 
+  it("stops automatic retries after repeated failures until a refresh", async () => {
+    vi.useFakeTimers();
+    const failed = { ...success, errors: ["Failed to read sync manifest"] };
+    const run = vi.fn(async () => failed);
+    const scheduler = new SyncScheduler(run, { debounceMs: 5, retryBaseMs: 10 });
+    await scheduler.syncNow();
+    await vi.advanceTimersByTimeAsync(300_000);
+    const exhausted = run.mock.calls.length;
+    expect(exhausted).toBeGreaterThan(1);
+    expect(exhausted).toBeLessThan(10);
+    expect(scheduler.status()).toMatchObject({ phase: "error", retryStopped: true });
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(run).toHaveBeenCalledTimes(exhausted);
+    scheduler.trigger("focus");
+    await vi.advanceTimersByTimeAsync(5);
+    expect(run).toHaveBeenCalledTimes(exhausted);
+    scheduler.trigger("refresh");
+    await vi.advanceTimersByTimeAsync(5);
+    expect(run).toHaveBeenCalledTimes(exhausted + 1);
+    scheduler.stop();
+  });
+
   it.each(["bucket", "conditions"] as const)("retries %s errors with backoff", async (kind) => {
     vi.useFakeTimers();
     const run = vi.fn().mockRejectedValueOnce(

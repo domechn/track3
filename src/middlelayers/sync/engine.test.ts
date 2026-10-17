@@ -85,6 +85,24 @@ describe("SyncEngine", () => {
       expect.objectContaining({ id: repos[0].state.deviceId, lastUpload: expect.any(String) }),
     ]));
   });
+  it("shares an edited device name through its manifest without requiring a new object", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("a", snapshot("a"));
+    await engines[0].syncOnce({ deviceName: "Laptop" });
+    expect((await engines[1].syncOnce()).devices).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: repos[0].state.deviceId, name: "Laptop" }),
+    ]));
+    const renamed = await engines[0].syncOnce({ deviceName: "Desk" });
+    expect(renamed.errors).toEqual([]);
+    expect((await engines[1].syncOnce()).devices).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: repos[0].state.deviceId, name: "Desk" }),
+    ]));
+    repos[0].config.set("7", "USD");
+    await engines[0].syncOnce();
+    expect((await engines[1].syncOnce()).devices).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: repos[0].state.deviceId, name: "Desk" }),
+    ]));
+  });
   it("does not use the root key directly for configuration fingerprints", async () => {
     const { s3, repos, engines } = await devices(1);
     repos[0].config.set("7", "USD");
@@ -153,6 +171,27 @@ describe("SyncEngine", () => {
     const a: SyncSession = { id: "chat", title: "Alpha", createdAt: "2026-01-01", updatedAt: "2026-01-02", pinned: 0, messageCount: 0, preview: "", messages: [] };
     const b = { ...a, title: "Beta" };
     expect(mergeSessions(a, b).title).toBe(mergeSessions(b, a).title);
+  });
+
+  it("keeps unpublished deletions when the remote header salt changes", () => {
+    const pending = { one: { deleted: true, clock: { ms: 10, counter: 0, deviceId: "device" } } };
+    expect(resetSyncState({ deviceId: "device", pendingTombstones: pending }).pendingTombstones).toEqual(pending);
+  });
+  it("prunes deleted snapshot row caches and rebuilds them after Undo", async () => {
+    const { repos, engines } = await devices(1);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    expect(repos[0].state.assetRows?.one).toHaveLength(1);
+    repos[0].snapshots.delete("one");
+    await engines[0].recordDeletion("one");
+    await engines[0].syncOnce();
+    expect(repos[0].state.assetRows?.one).toBeUndefined();
+    expect(repos[0].state.transactionRows?.one).toBeUndefined();
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].recordUndo("one");
+    await engines[0].syncOnce();
+    expect(repos[0].state.assetRows?.one).toHaveLength(1);
+    expect(Object.keys(repos[0].state.transactionRows?.one ?? {})).toHaveLength(1);
   });
   it("rejects session messages without stable IDs", () => {
     const session = {

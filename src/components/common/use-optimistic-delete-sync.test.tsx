@@ -1,12 +1,44 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi, afterEach } from "vitest";
 import { registerSnapshotSync } from "@/middlelayers/sync/delete-hook";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { useOptimisticDelete } from "./use-optimistic-delete";
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/components/ui/use-toast", () => ({ useToast: () => ({ toast }) }));
+afterEach(() => vi.useRealTimers());
+
+it("waits until the undo window ends before syncing a deletion", async () => {
+  vi.useFakeTimers();
+  toast.mockClear();
+  const trigger = vi.spyOn(syncRuntime, "trigger");
+  const unregister = registerSnapshotSync({ recordDeletion: async () => {}, recordUndo: async () => {} });
+  const view = renderHook(() => {
+    const [items, setItems] = useState(["one"]);
+    return { items, ...useOptimisticDelete(setItems) };
+  });
+  try {
+    await act(async () => {
+      await view.result.current.run({
+        update: (items) => items.filter((item) => item !== "one"),
+        rollback: (items) => [...items, "one"],
+        commit: async () => "saved-undo", undo: async () => {},
+        successMessage: "Deleted", undoLabel: "Undo", undoAltText: "Undo deletion",
+        undoWindowMs: 5000, syncSnapshotUuid: "one",
+      });
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(trigger).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(4999); });
+    expect(trigger).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(trigger).toHaveBeenCalledTimes(1);
+  } finally {
+    trigger.mockRestore();
+    unregister();
+  }
+});
 
 it("keeps a committed delete when recording its tombstone fails", async () => {
   const unregister = registerSnapshotSync({
@@ -96,7 +128,7 @@ it("shows delete feedback while sync is still recording the tombstone", async ()
   }
 });
 
-it("schedules sync after a committed delete and after Undo", async () => {
+it("syncs an Undo without first publishing the deletion", async () => {
   toast.mockClear();
   const trigger = vi.spyOn(syncRuntime, "trigger");
   const unregister = registerSnapshotSync({
@@ -118,9 +150,9 @@ it("schedules sync after a committed delete and after Undo", async () => {
         undoWindowMs: 5000, syncSnapshotUuid: "one",
       });
     });
-    await waitFor(() => expect(trigger).toHaveBeenCalledTimes(1));
+    expect(trigger).not.toHaveBeenCalled();
     await act(async () => { toast.mock.calls[0][0].action.props.onClick(); });
-    await waitFor(() => expect(trigger).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(trigger).toHaveBeenCalledTimes(1));
   } finally {
     trigger.mockRestore();
     unregister();

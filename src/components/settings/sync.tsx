@@ -248,14 +248,15 @@ export default function SyncSettingsPage() {
                 open={forgetOpen}
                 onOpenChange={(open) => { setForgetOpen(open); if (!open) setForgetText(""); }}
                 title={t("sync.forget")}
-                description={<div className="space-y-3">
-                  <p>{t("sync.forgetWarning")}</p>
-                  <Label htmlFor="sync-forget-confirm">{t("sync.forgetType")}</Label>
-                  <Input id="sync-forget-confirm" value={forgetText} onChange={(event) => setForgetText(event.target.value)} />
-                </div>}
+                description={t("sync.forgetWarning")}
                 cancelLabel={t("common.cancel")}
                 actions={[{ label: t("sync.forget"), disabled: forgetText !== "FORGET", onClick: () => { void forget(); } }]}
-              />
+              >
+                <div className="space-y-3">
+                  <Label htmlFor="sync-forget-confirm">{t("sync.forgetType")}</Label>
+                  <Input id="sync-forget-confirm" value={forgetText} onChange={(event) => setForgetText(event.target.value)} />
+                </div>
+              </ConfirmDeleteDialog>
             </div>
           </CardContent>
         </Card>

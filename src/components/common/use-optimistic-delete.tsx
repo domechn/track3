@@ -45,8 +45,12 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
     });
     try {
       const result = await commit();
+      let syncTimer: ReturnType<typeof setTimeout> | undefined;
       if (syncSnapshotUuid) {
-        void recordSnapshotDeleted(syncSnapshotUuid).catch(showError).finally(() => syncRuntime.trigger("refresh"));
+        const recorded = recordSnapshotDeleted(syncSnapshotUuid).catch(showError);
+        syncTimer = setTimeout(() => {
+          void recorded.finally(() => syncRuntime.trigger("refresh"));
+        }, undoWindowMs);
       }
       
       onDeleted?.(result);
@@ -57,13 +61,17 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
           <ToastAction
             altText={undoAltText}
             onClick={() => {
+              if (syncTimer) clearTimeout(syncTimer);
               void undo(result)
                 .then(() => {
                   setItems(undoUpdate ?? rollback);
                   onUndone?.();
                   if (syncSnapshotUuid) void recordSnapshotUndone(syncSnapshotUuid).catch(showError).finally(() => syncRuntime.trigger("refresh"));
                 })
-                .catch(showError);
+                .catch((error) => {
+                  showError(error);
+                  if (syncSnapshotUuid) syncRuntime.trigger("refresh");
+                });
             }}
           >
             {undoLabel}

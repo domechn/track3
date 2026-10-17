@@ -10,6 +10,20 @@ const configured: SyncSettings = {
 };
 
 describe("SyncRuntime", () => {
+  it("uses a shared device name when no local alias exists", async () => {
+    const runtime = new SyncRuntime({
+      load: async () => configured, save: async () => {}, store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: async () => ({
+        pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [],
+        devices: [{ id: "other", name: "Shared laptop" }],
+      }) }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.configure(configured, "correct horse battery staple");
+    await runtime.syncNow();
+    expect(await runtime.devices()).toEqual([{ id: "other", name: "Shared laptop", current: false, lastUpload: undefined }]);
+    runtime.stop();
+  });
   it("creates a header on first enable, then requires a passphrase after restart", async () => {
     const s3 = new FakeS3();
     let saved = { ...configured };

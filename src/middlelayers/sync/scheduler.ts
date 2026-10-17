@@ -6,6 +6,7 @@ export type SyncStatus = {
   report?: SyncReport;
   lastSync?: number;
   error?: Exclude<SyncConnectionResult, "ok"> | "sync";
+  retryStopped?: boolean;
 };
 
 export class SyncScheduler {
@@ -40,6 +41,10 @@ export class SyncScheduler {
     if (this.stopped) return;
     if (this.state.phase === "error" &&
         ["header", "passphrase", "access", "configuration"].includes(this.state.error ?? "")) return;
+    if (this.state.retryStopped) {
+      if (kind !== "refresh") return;
+      this.failures = 0;
+    }
     if (kind === "focus") {
       if (Date.now() - this.lastFocus < (this.options.focusThrottleMs ?? 60_000)) return;
       this.lastFocus = Date.now();
@@ -52,16 +57,21 @@ export class SyncScheduler {
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       this.timer = undefined;
-      void this.syncNow();
+      void this.runNow();
     }, this.options.debounceMs ?? 400);
   }
 
   syncNow(): Promise<void> {
+    if (!this.current) this.failures = 0;
+    return this.runNow();
+  }
+
+  private runNow(): Promise<void> {
     if (this.stopped) return Promise.resolve();
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     if (this.current) return this.current;
-    this.setStatus({ ...this.state, phase: "syncing", error: undefined });
+    this.setStatus({ ...this.state, phase: "syncing", error: undefined, retryStopped: false });
     const work = (async () => {
       try {
         const report = await this.run(this.controller.signal);
@@ -81,7 +91,7 @@ export class SyncScheduler {
         this.current = undefined;
         if (this.pending && !this.stopped) {
           this.pending = false;
-          if (!this.failures) void this.syncNow();
+          if (!this.failures) void this.runNow();
         }
       }
     })();
@@ -95,10 +105,16 @@ export class SyncScheduler {
       this.pending = false;
       return;
     }
-    const delay = Math.min((this.options.retryBaseMs ?? 1_000) * 2 ** this.failures++, 60_000);
+    this.failures++;
+    if (this.failures >= 5) {
+      this.pending = false;
+      this.setStatus({ ...this.state, retryStopped: true });
+      return;
+    }
+    const delay = Math.min((this.options.retryBaseMs ?? 1_000) * 2 ** (this.failures - 1), 60_000);
     this.timer = setTimeout(() => {
       this.timer = undefined;
-      void this.syncNow();
+      void this.runNow();
     }, delay);
   }
 

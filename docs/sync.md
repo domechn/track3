@@ -47,8 +47,9 @@ ignores write conditions cannot safely host multi-device sync.
 
 Each installation stores a random device UUID and hybrid logical clock in its
 local `sync_state` table. The state also stores the header salt; when the
-configured bucket has a different header, the device keeps its UUID and clock
-but clears publication markers so it can upload its local data again. It writes
+configured bucket has a different header, the device keeps its UUID, clock,
+and pending snapshot deletions, but clears publication markers so it can upload
+its local data again without losing unpublished deletions. It writes
 only to `devices/<device UUID>/`. A snapshot
 object contains one refresh UUID and its `assets_v2`, `asset_prices`, and
 `transactions` rows. It is immutable. Remote SQLite row IDs are translated to
@@ -88,9 +89,11 @@ be imported again. The optimistic snapshot delete toast calls
 `recordDeletion` and `recordUndo` through `delete-hook.ts` when sync is active.
 Local snapshot changes are detected from the last synced content hash.
 SQLite revision triggers identify changed snapshot UUIDs so unchanged history
-is not read and hashed on every sync round. The `sync_state` JSON row still
-grows with snapshot count; snapshot hash and row history must survive deletion
-so a later undo can publish edits made while restoring the snapshot.
+is not read and hashed on every sync round. After a successful deletion round,
+the `sync_state` row drops cached asset and transaction rows for deleted
+snapshots and rebuilds them after Undo. Snapshot hashes and edit events remain
+for reconciliation. The single JSON row still grows with active snapshot
+count and retained history.
 Edits and individual asset deletions publish
 a versioned snapshot edit; applying an edit replaces that snapshot in one
 SQLite transaction. Per-asset deletion events and transaction field events
@@ -119,13 +122,17 @@ The manifest retains only the latest config value and tombstone per key from
 each device. Older encrypted config and tombstone objects can remain in the
 bucket but are no longer referenced by the manifest. Immutable snapshot
 entries still accumulate. A serialized encrypted manifest above 8 MiB or
-100,000 entries is rejected on read; the writer enforces the 8 MiB cap.
+100,000 entries is rejected on read or write.
 The byte cap is expected to bind first, around 30,000–40,000 entries depending
 on ID and version lengths. Once reached, new pushes fail until the protocol
 supports smaller manifests. A future protocol should shard immutable snapshot
 entries, for example by month, and publish an authenticated per-device shard
 index last. Existing v1 readers must not mistake a partial sharded view for
 the complete history.
+
+Manifests may include a 60 character encrypted device name. Readers accept
+older manifests without a name. The current device publishes its name on the
+next sync; labels assigned locally to other devices remain local overrides.
 
 V1 does not garbage collect published snapshot tombstones or their underlying
 snapshot objects. Removing either without a safe checkpoint could let a
@@ -161,7 +168,10 @@ To use the desktop adapter, construct it with `createSqliteSyncEngine`; call
 the returned `unregister` when sync is disabled. `SyncRuntime` owns the
 desktop adapter, session passphrase, and `SyncScheduler`. The scheduler
 debounces triggers, keeps one round in flight, throttles focus, and retries
-failures with exponential backoff. It never blocks a portfolio refresh.
+failures with exponential backoff. After five consecutive failed rounds it
+stops automatic retry and marks the indicator accordingly. **Sync now** or a
+successful portfolio refresh starts a new attempt sequence; focus alone does
+not. It never blocks a portfolio refresh.
 
 Malformed individual objects are reported. Partial rounds retry with exponential
 backoff; permanently damaged remote data needs repair before a retry can succeed.
@@ -218,11 +228,12 @@ window regains focus, and on **Sync now**. A change during a running round
 starts one more round when it finishes. The small indicator shows progress,
 errors, conflicts, and the last round's pulled and pushed counts. Pulling
 snapshots refreshes the portfolio once after the round and shows the source
-device IDs or locally assigned names. Device names are editable labels stored
-only on this device and are not shared with other devices. The current installation
+device IDs or names. This device's name is shared through its encrypted
+manifest; names assigned to other devices stay local. The current installation
 is marked **This device**. Device timestamps show the last manifest upload, which
 can be earlier than the last sync round. A snapshot deletion and Undo publish matching tombstone
-events. **Disable sync** stops future sync while retaining local and remote
+events; the delete sync waits until the Undo window ends so other devices do
+not see a transient delete when Undo is pressed. **Disable sync** stops future sync while retaining local and remote
 data. **Forget remote data** requires typing `FORGET`; it deletes `sync-header`
 and `devices/` objects inside the configured prefix, then disables sync.
 It leaves local data and unrelated bucket objects untouched. Disable sync on

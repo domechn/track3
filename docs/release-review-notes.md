@@ -161,3 +161,26 @@ At configured contexts below 4096 tokens, the full tool schema may exceed the bu
 ### Reviewer follow-up
 
 Approval follow-ups now discard late summaries after a session switch, retain summary retry backoff, and save summary and reply token usage. Action errors attach only to that follow-up. The restored tool-context test covers a budget-forced answer without tools, and compact tool descriptions retain the transaction, USD, and read-only hints. Dismissing an insight during the load phase now allows the refreshed snapshot to be saved. A failed Regenerate request shows an error, and the Chinese mover window reads naturally.
+
+## Sync review leftovers for 0.9.0
+
+Checked the P2 lists in sync `s1/round1` and `s3/round4` against this worktree. No version or migration changed.
+
+| Finding | Disposition |
+| --- | --- |
+| S1: 409 conditional conflict, unsafe conditional PUT retry, unread response bodies | Already fixed in the S3 client and covered by its tests. |
+| S1: separate encryption key, key and name vectors, swapped objects, list pagination, If-Match signing, virtual-host URL and signature, retry exhaustion | Already covered; the virtual-host client test asserts `bucket.host` from `S3Client`, not just a prebuilt URL. |
+| S1: dot path segments, plus signs in list keys, AbortSignal in EncryptedStore | Already fixed and tested. |
+| S3: Forget dialog nesting | Fixed: the warning is the dialog description, and the typed-confirmation field is outside it. |
+| S3: deletion sync during Undo, unbounded retries, lost pending tombstones after salt change | Fixed with regression tests. The scheduler stops after five failed rounds until manual sync or refresh, and exposes that state in the status popover. |
+| S3: repeated HKDF derivation | Fixed: encryption and naming keys are cached by root-key identity in a WeakMap. |
+| S3: device names local only | The current device's name is published in its encrypted manifest. Older manifests remain readable, and locally assigned aliases for other devices remain local. |
+| S3: narrow status popover | Added viewport width cap and 16 px collision padding for Radix positioning. |
+| Sync state, manifest growth, tombstone GC | Deleted snapshot asset and transaction row caches are pruned after successful sync and rebuilt after Undo. Manifest writes now enforce the existing read cap of 100,000 entries and 8 MiB. Active snapshot state and immutable manifest entries still grow; tombstones remain until a versioned checkpoint can prevent offline devices from republishing deletions. `docs/sync.md` describes the limit and required protocol change. |
+| Two-device SQLite session merge | A sql.js test now uses the real session persistence and `SqliteSyncRepository` on two device stores and verifies convergence without repeated pushes. It caught an undefined-field hash mismatch, now fixed. |
+
+### Checks requiring a real environment
+
+- S3, R2, and MinIO conditional PUT and ETag behavior need live buckets and credentials. Fake S3 and S3 client tests cover local request and conflict behavior.
+- Tauri WebView URL scope, plugin HTTP header behavior, `beforeunload` on quit, and native narrow-window popover placement need a packaged desktop run. Browser and component tests cover the local code paths.
+- The review's goals and alerts evaluation beyond the sync `dataChanged` event needs that evaluator and a live multi-device setup.

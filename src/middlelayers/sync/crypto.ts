@@ -5,6 +5,11 @@ const MEMORY_KIB = 64 * 1024;
 const ITERATIONS = 3;
 const PARALLELISM = 1;
 const encoder = new TextEncoder();
+const derivedKeys = new WeakMap<Uint8Array, {
+  hkdf: Promise<CryptoKey>;
+  encryption?: Promise<CryptoKey>;
+  naming?: Promise<CryptoKey>;
+}>();
 
 export type Envelope = {
   version: number;
@@ -59,11 +64,20 @@ export async function deriveKey(passphrase: string, salt: Uint8Array): Promise<U
   });
 }
 
+function keysFor(root: Uint8Array) {
+  let keys = derivedKeys.get(root);
+  if (!keys) {
+    keys = { hkdf: crypto.subtle.importKey("raw", root, "HKDF", false, ["deriveKey"]) };
+    derivedKeys.set(root, keys);
+  }
+  return keys;
+}
+
 async function encryptionKey(root: Uint8Array): Promise<CryptoKey> {
-  const hkdf = await crypto.subtle.importKey("raw", root, "HKDF", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey(
+  const keys = keysFor(root);
+  return keys.encryption ??= crypto.subtle.deriveKey(
     { name: "HKDF", hash: "SHA-256", salt: encoder.encode("track3-sync-v1"), info: encoder.encode("object-encryption") },
-    hkdf,
+    await keys.hkdf,
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"],
@@ -133,14 +147,14 @@ export async function objectName(key: Uint8Array, path: string): Promise<string>
   const slash = path.indexOf("/");
   const kind = slash < 0 ? path : path.slice(0, slash);
   if (!/^[a-z][a-z0-9-]*$/.test(kind)) throw new Error("Invalid sync path");
-  const hkdf = await crypto.subtle.importKey("raw", key, "HKDF", false, ["deriveKey"]);
-  const hmac = await crypto.subtle.deriveKey(
+  const keys = keysFor(key);
+  const hmac = await (keys.naming ??= crypto.subtle.deriveKey(
     { name: "HKDF", hash: "SHA-256", salt: encoder.encode("track3-sync-v1"), info: encoder.encode("object-names") },
-    hkdf,
+    await keys.hkdf,
     { name: "HMAC", hash: "SHA-256", length: 256 },
     false,
     ["sign"],
-  );
+  ));
   const digest = new Uint8Array(await crypto.subtle.sign("HMAC", hmac, encoder.encode(path)));
   return `${kind}/${Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
