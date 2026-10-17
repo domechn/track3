@@ -115,7 +115,7 @@ Assistant prompt, skill, orchestrator, provider, and chat-loop changes should ru
 - Cache fetch-heavy paths via `CacheCenter` (`src/middlelayers/datafetch/utils/cache.ts`) with explicit TTL seconds.
 - Skill-related Vitest files live under `src/test/skills/`.
 - Sync protocol, bucket setup, and recovery limits are documented in `docs/sync.md`.
-- Sync settings live in `src/components/settings/sync.tsx`; `src/middlelayers/sync/runtime.ts` owns the in-memory passphrase and scheduler. Encrypted local configuration ID `992` holds S3 credentials and is never synced.
+- Sync settings live in `src/components/settings/sync.tsx`; `src/middlelayers/sync/runtime.ts` owns the in-memory passphrase and scheduler. Encrypted local configuration ID `991` holds S3 credentials and is never synced.
 - The app starts sync only after the user unlocks each session. A successful refresh schedules background sync; sync pulls use the existing soft refresh event. Keep delete/undo wired through `sync/delete-hook.ts`.
 - Conditional S3 writes depend on both HTTP 409 and 412 conflict handling. Never retry a conditional PUT without disambiguating the outcome, and keep encryption and naming HKDF contexts separate.
 
