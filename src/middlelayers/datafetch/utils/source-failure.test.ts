@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HttpRequestError } from "./http";
-import { classifySourceError } from "./source-failure";
+import { classifySourceError, recordSourceFailure, takeSourceFailure } from "./source-failure";
 
 describe("source error categories", () => {
   it("classifies transport errors as network without reading address digits", () => {
@@ -16,5 +16,11 @@ describe("source error categories", () => {
 
   it("uses a bad signature in an HTTP 400 response to identify an auth failure", () => {
     expect(classifySourceError(new HttpRequestError("invalid signature", 400))).toBe("auth");
+  });
+
+  it("returns a safe refresh error without the provider's credentials", () => {
+    const source = {};
+    recordSourceFailure(source, new Error("bad key sk-abcdefghijklmnop1234567890"));
+    expect(takeSourceFailure(source)?.message).not.toContain("sk-abcdefghijklmnop1234567890");
   });
 });

@@ -46,7 +46,9 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profileLoadError, setProfileLoadError] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
   const [status, setStatus] = useState("");
+  const [normalizeError, setNormalizeError] = useState(false);
   const [mode, setMode] = useState<"full" | "buys">("full");
   const [injectedCash, setInjectedCash] = useState(0);
   const [minimumTradeValue, setMinimumTradeValue] = useState(0);
@@ -76,6 +78,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
           setSaved(!!profile || failed);
           setProfileLoadError(failed);
           profileLoaded.current = true;
+          setProfileReady(true);
         }
         setHoldings(latest.holdings);
         setStablecoinSymbols(latest.stablecoinSymbols);
@@ -119,6 +122,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
   function updateTarget(index: number, next: RebalanceTarget & { previousAsset?: { assetType: AssetType; symbol: string } }) {
     setTargets((previous) => previous.map((target, i) => i === index ? { ...next, id: target.id } : target));
     setStatus("");
+    setNormalizeError(false);
   }
 
   function applyPreset(equal: boolean) {
@@ -180,7 +184,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
     }
   }
 
-  const total = targets.reduce((sum, target) => sum + target.percent, 0);
+  const total = targets.reduce((sum, target) => sum + (Number.isFinite(target.percent) ? target.percent : 0), 0);
   const numberField = (
     id: string, label: string, value: number, setter: (next: number) => void,
   ) => (
@@ -201,7 +205,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
       {loading && <p role="status">{t("common.loading")}</p>}
       {loadError && <p role="alert" className="text-sm text-destructive">{t("rebalance.loadError")}</p>}
       {profileLoadError && !loading && <p role="alert" className="text-sm text-destructive">{t("rebalance.profileLoadError")}</p>}
-      {!loading && !loadError && (
+      {profileReady && (
         <>
           {!holdings.length && <p className="text-sm text-muted-foreground">{t("rebalance.noData")}</p>}
           <Card>
@@ -213,9 +217,10 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
                   <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => applyPreset(false)}>{t("rebalance.currentHoldings")}</Button>
                   <Button size="sm" variant="outline" disabled={!targets.length} onClick={() => {
                     try {
-                      setTargets((previous) => normalizeTargets(previous)
-                        .map((target, index) => ({ ...previous[index], percent: target.percent })));
-                    } catch { /* draft needs positive weights */ }
+                      setTargets(normalizeTargets(targets)
+                        .map((target, index) => ({ ...targets[index], percent: target.percent })));
+                      setNormalizeError(false);
+                    } catch { setNormalizeError(true); }
                   }}>{t("rebalance.normalize")}</Button>
                 </div>
               </div>
@@ -283,7 +288,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
                   {t("rebalance.total").replace("{total}", total.toFixed(2))}
                 </span>
               </div>
-              {validation && <p role="alert" className="text-xs text-destructive">{validation}</p>}
+              {(normalizeError || validation) && <p role="alert" className="text-xs text-destructive">{normalizeError ? t("rebalance.validationOther") : validation}</p>}
               {status && <p role="status" className="text-xs text-muted-foreground">{status}</p>}
               <div className="flex gap-2">
                 <Button size="sm" disabled={!targets.length || !!validation} onClick={() => void save()}>{t("rebalance.saveTargets")}</Button>

@@ -71,6 +71,28 @@ describe("Rebalance page", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("explains why a cleared target cannot be normalized and keeps the total finite", async () => {
+    render(<Rebalance currency={currency} />);
+    await screen.findByText("Set targets to see suggestions.");
+    fireEvent.click(screen.getByRole("button", { name: "Equal weight" }));
+    fireEvent.change(screen.getByLabelText("Target percentage for BTC"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Normalize to 100%" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter unique targets with valid percentages and tolerance.");
+    expect(screen.queryByText(/NaN%/)).toBeNull();
+  });
+
+  it("keeps target focus while a background holdings refresh is pending", async () => {
+    const { rerender } = render(<DataChangedContext.Provider value={0}><Rebalance currency={currency} /></DataChangedContext.Provider>);
+    await screen.findByText("Set targets to see suggestions.");
+    fireEvent.click(screen.getByRole("button", { name: "Equal weight" }));
+    const input = screen.getByLabelText("Target percentage for BTC");
+    input.focus();
+    vi.mocked(loadRebalanceHoldings).mockImplementation(() => new Promise(() => {}));
+    rerender(<DataChangedContext.Provider value={1}><Rebalance currency={currency} /></DataChangedContext.Provider>);
+    expect(screen.getByLabelText("Target percentage for BTC")).toBe(input);
+    expect(input).toHaveFocus();
+  });
+
   it("updates buy suggestions when injected cash and buys-only mode are selected", async () => {
     vi.mocked(getRebalanceProfile).mockResolvedValue({
       targets: [

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import md5 from "md5";
 
 import type { AIConfig } from "@/middlelayers/types";
+import { summaryOffset } from "./history";
 import {
   resetEncryptionWriteGateForTests,
   runEncryptionKeyRotation,
@@ -163,6 +165,25 @@ afterEach(() => {
 });
 
 describe("chat sessions middlelayer", () => {
+  it("never writes configured secrets into a session payload or preview", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    await sessions.appendMessages("uuid-1", [
+      { role: "user", content: "check custom-private-key" },
+      { role: "assistant", blocks: [{ kind: "text", text: "sk-abcdefghijklmnop1234567890" }] },
+    ], undefined, ["custom-private-key"]);
+    const raw = fsFileMap.get("/appdata/ai/sessions/uuid-1.json.ent") ?? "";
+    expect(raw).not.toContain("custom-private-key");
+    expect(raw).not.toContain("sk-abcdefghijklmnop1234567890");
+    expect((await sessions.listSessions())[0]?.preview).not.toContain("custom-private-key");
+  });
+  it("keeps a public address in a saved user message", async () => {
+    const sessions = await import("./sessions");
+    const address = "0x52908400098527886E0F7030069857D2E4169EE7";
+    await sessions.createSession();
+    await sessions.appendMessages("uuid-1", [{ role: "user", content: `Check ${address}` }]);
+    expect((await sessions.loadSession("uuid-1"))?.messages[0]).toEqual({ role: "user", content: `Check ${address}` });
+  });
   it("persists a rolling summary and usage in the encrypted session file across appends", async () => {
     const sessions = await import("./sessions");
     await sessions.createSession();
@@ -177,6 +198,44 @@ describe("chat sessions middlelayer", () => {
     expect(loaded?.summary).toEqual(summary);
     expect(loaded?.messages[1]).toMatchObject({ usage: { promptTokens: 12, completionTokens: 4 } });
     expect(loaded?.messages[1]).toMatchObject({ contextTokens: 12 });
+  });
+  it("keeps a saved summary usable after reloading its hashed message", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    const history = [{ role: "user" as const, content: "old" }, { role: "assistant" as const, content: "answer" }];
+    const summary = {
+      content: "Prior BTC discussion",
+      throughMessageCount: 2,
+      throughMessageHash: md5(JSON.stringify(history[1])),
+    };
+    await sessions.appendMessages("uuid-1", [
+      { role: "user", content: "old" },
+      { role: "assistant", blocks: [{ kind: "text", text: "answer" }] },
+    ], summary);
+    const loaded = await sessions.loadSession("uuid-1");
+    expect(loaded?.summary).toEqual(summary);
+    expect(summaryOffset(history, loaded!.summary!)).toBe(2);
+  });
+  it("keeps the summary boundary usable when its message is redacted during save", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    const secret = "custom-private-key";
+    const summary = {
+      content: "Earlier discussion",
+      throughMessageCount: 2,
+      throughMessageHash: md5(JSON.stringify({ role: "assistant", content: `answer ${secret}` })),
+    };
+    await sessions.appendMessages("uuid-1", [
+      { role: "user", content: "old" },
+      { role: "assistant", blocks: [{ kind: "text", text: `answer ${secret}` }] },
+    ], summary, [secret]);
+    const loaded = await sessions.loadSession("uuid-1");
+    const history = [
+      { role: "user" as const, content: "old" },
+      { role: "assistant" as const, content: "answer <REDACTED>" },
+    ];
+    expect(loaded?.messages[1]).toMatchObject({ blocks: [{ kind: "text", text: "answer <REDACTED>" }] });
+    expect(summaryOffset(history, loaded!.summary!)).toBe(2);
   });
   it("drops malformed saved usage and context counts on load", async () => {
     const sessions = await import("./sessions");
@@ -550,6 +609,20 @@ describe("chat sessions middlelayer", () => {
       "Your portfolio is well diversified.",
     );
     expect(title).toBe("Portfolio health snapshot");
+  });
+  it("keeps advanced header secrets out of title prompts and titles", async () => {
+    const sessions = await import("./sessions");
+    const config: AIConfig = {
+      endpoint: "https://example.com/v1", apiKey: "main-key", model: "test", contextSize: 8192,
+      advanced: { headers: { "x-custom-auth": "custom-header-secret" } },
+    };
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: "custom-header-secret portfolio" } }],
+    }), { status: 200 }));
+    const title = await sessions.generateTitle(config, "check custom-header-secret", "done");
+    const request = JSON.parse(String(mocks.fetch.mock.calls[0]?.[1]?.body));
+    expect(JSON.stringify(request)).not.toContain("custom-header-secret");
+    expect(title).not.toContain("custom-header-secret");
   });
 
   it("generateTitle falls back to a preview snippet on LLM failure", async () => {

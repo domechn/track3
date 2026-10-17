@@ -18,5 +18,16 @@ describe("OtherCexExchanges", () => {
     await expect(exchange.verifyConfig()).resolves.toBe(false);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).not.toContain("private-secret");
+    warn.mockRestore();
+  });
+
+  it("does not print a secret embedded in an exchange name", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      new OtherCexExchanges("sk-abcdefghijklmnop1234567890", { apiKey: "key", secret: "secret" });
+      expect(JSON.stringify(warn.mock.calls)).not.toContain("sk-abcdefghijklmnop1234567890");
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

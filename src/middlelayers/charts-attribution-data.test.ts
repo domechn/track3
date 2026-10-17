@@ -30,6 +30,7 @@ describe("queryAttribution", () => {
     expect(TRANSACTION_HANDLER.listTransactionsByDateRange).toHaveBeenCalledWith(range.start, range.end);
     expect(result.attribution.totals).toEqual({ priceEffect: 20, flowEffect: 120, residual: 0, totalChange: 140 });
     expect(result.aliases.w).toMatchObject({ alias: "Main", type: "Binance" });
+    expect(Object.keys(localStorage).some((key) => key.includes("attribution-v2"))).toBe(false);
   });
 
   it("reuses a range result until the data-change epoch advances", async () => {

@@ -29,6 +29,16 @@ beforeEach(() => {
 });
 
 describe("orchestrator.scheduler", () => {
+  it("redacts rejected task errors before emitting them", async () => {
+    mockRunSkill.mockRejectedValue(new Error("Bearer private-scheduler-token"));
+    const events = await collectEvents({
+      query: "portfolio?",
+      tasks: [{ id: "t1", skillName: "portfolio_summary", args: {}, description: "Summary", dependsOn: [] }],
+      requiresRefinement: false,
+      maxOptimizerRounds: 0,
+    }, baseCtx);
+    expect(JSON.stringify(events)).not.toContain("private-scheduler-token");
+  });
   it("yields nothing for an empty plan", async () => {
     const plan: AnalysisPlan = {
       query: "test",

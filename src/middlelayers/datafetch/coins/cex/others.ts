@@ -1,4 +1,5 @@
 import { Exchanger } from './cex'
+import { redactSecrets } from '../../../security/redact'
 
 export class OtherCexExchanges implements Exchanger {
 	private readonly exchangeName: string
@@ -13,7 +14,7 @@ export class OtherCexExchanges implements Exchanger {
 		this.exchangeName = exchangeName
 		this.apiKey = initParams.apiKey
 		this.alias = alias
-		console.warn(`[cex] Unknown exchange "${exchangeName}" — this exchange will be skipped. If "${exchangeName}" is a valid exchange, add its analyzer to the cex analyzer registry.`);
+		console.warn(`[cex] Unknown exchange "${redactSecrets(exchangeName)}" — this exchange will be skipped. If it is valid, add its analyzer to the cex analyzer registry.`);
 	}
 
 	getExchangeName(): string {

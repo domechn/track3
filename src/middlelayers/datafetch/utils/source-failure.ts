@@ -48,7 +48,7 @@ export function recordSourceFailure(source: object, error: unknown): void {
   const nextPriority = priority[classifySourceError(error)];
   if (!failures.has(source) || nextPriority > failures.get(source)!.priority) {
     failures.set(source, {
-      error: error ?? new Error("Source provider failed"),
+      error: new SanitizedSourceError(error ?? new Error("Source provider failed")),
       priority: nextPriority,
     });
   }

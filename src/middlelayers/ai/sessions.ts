@@ -9,6 +9,7 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import { v4 as uuidv4 } from "uuid";
+import md5 from "md5";
 
 import {
   deleteFromDatabase,
@@ -19,6 +20,7 @@ import type { AIConfig } from "@/middlelayers/types";
 import { runWithEncryptionWriteGate } from "@/middlelayers/encryption-write-gate";
 import type { TokenUsage } from "./budget";
 import type { ConversationSummary } from "./history";
+import { configuredSecretValues, redactForExport, redactSecrets } from "../security/redact";
 
 const SESSIONS_TABLE = "chat_sessions" as const;
 const FILE_VERSION = 1;
@@ -240,7 +242,7 @@ export async function touchSession(
   });
 }
 
-export async function renameSession(id: string, title: string): Promise<void> {
+export async function renameSession(id: string, title: string, secrets: readonly string[] = []): Promise<void> {
   await runWithEncryptionWriteGate(async () => {
     const rows = await selectFromDatabase<Record<string, unknown>>(
       SESSIONS_TABLE,
@@ -252,7 +254,7 @@ export async function renameSession(id: string, title: string): Promise<void> {
     }
     const meta = normalizeMeta(metaRow);
     await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [
-      { ...meta, title, updatedAt: nowIso() },
+      { ...meta, title: redactSecrets(title, secrets), updatedAt: nowIso() },
     ]);
   });
 }
@@ -336,14 +338,30 @@ export async function appendMessages(
   id: string,
   messages: PersistedChatMessage[],
   summary?: ConversationSummary,
+  secrets: readonly string[] = [],
 ): Promise<void> {
   await runWithEncryptionWriteGate(async () => {
     const existing = await readSessionPayload(id);
-    const combined = [...existing.messages, ...messages];
+    const original = [...existing.messages, ...messages];
+    const combined = redactForExport(original, secrets);
+    const savedSummary = summary ?? existing.summary;
+    let throughMessageHash = savedSummary?.throughMessageHash;
+    if (throughMessageHash) {
+      const providerText = (message: PersistedChatMessage) => message.role === "user"
+        ? message.content
+        : message.blocks.map((block) => block.kind === "text" ? block.text : "").join("").trim();
+      const boundary = original.findIndex((message) => {
+        const content = providerText(message);
+        return content && md5(JSON.stringify({ role: message.role, content })) === throughMessageHash;
+      });
+      if (boundary >= 0) {
+        throughMessageHash = md5(JSON.stringify({ role: combined[boundary].role, content: providerText(combined[boundary]) }));
+      }
+    }
     await writeSessionPayload(id, {
       version: FILE_VERSION,
       messages: combined,
-      summary: summary ?? existing.summary,
+      summary: savedSummary ? { ...savedSummary, content: redactSecrets(savedSummary.content, secrets), throughMessageHash } : undefined,
     });
     const rows = await selectFromDatabase<Record<string, unknown>>(SESSIONS_TABLE, { id });
     if (rows[0]) {
@@ -378,13 +396,14 @@ async function callTitleLLM(
   firstUserMsg: string,
   firstAssistantMsg: string,
 ): Promise<string | null> {
+  const secrets = configuredSecretValues(config);
   const endpoint = (config.endpoint ?? "").trim().replace(/\/+$/, "");
   if (!endpoint) return null;
   const url = endpoint.endsWith("/chat/completions")
     ? endpoint
     : `${endpoint}/chat/completions`;
-  const trimmedUser = firstUserMsg.slice(0, LLM_PROMPT_CHAR_LIMIT);
-  const trimmedAssistant = firstAssistantMsg.slice(0, LLM_PROMPT_CHAR_LIMIT);
+  const trimmedUser = redactSecrets(firstUserMsg, secrets).slice(0, LLM_PROMPT_CHAR_LIMIT);
+  const trimmedAssistant = redactSecrets(firstAssistantMsg, secrets).slice(0, LLM_PROMPT_CHAR_LIMIT);
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
   const body = {
@@ -426,7 +445,7 @@ async function callTitleLLM(
     if (cleaned.length === 0 || cleaned.length > TITLE_MAX_CHARS || /\n/.test(cleaned)) {
       return null;
     }
-    return cleaned;
+    return redactSecrets(cleaned, secrets);
   } catch {
     return null;
   } finally {
@@ -441,8 +460,8 @@ export async function generateTitle(
 ): Promise<string> {
   const llmTitle = await callTitleLLM(config, firstUserMsg, firstAssistantMsg);
   if (llmTitle) return llmTitle;
-  return fallbackTitle([
+  return redactSecrets(fallbackTitle([
     { role: "user", content: firstUserMsg },
     { role: "assistant", blocks: [{ kind: "text", text: firstAssistantMsg }] },
-  ]);
+  ]), configuredSecretValues(config));
 }

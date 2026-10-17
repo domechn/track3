@@ -3,6 +3,7 @@ import { queryLatestAssets } from "./charts";
 import { executeWrite, getDatabase } from "./database";
 import type { AssetType } from "./datafetch/types";
 import type { CurrencyRateDetail } from "./types";
+import { redactSecrets } from "./security/redact";
 
 export type RebalanceTarget =
   | { kind: "asset"; assetType: AssetType; symbol: string; percent: number }
@@ -356,5 +357,5 @@ export function suggestionsToCsv(
     escape(row.tradeQuantity?.toFixed(8) ?? "", false),
     escape(note(row.note), true),
   ].join(","));
-  return "\uFEFF" + [headers.map((header) => escape(header, true)).join(","), ...lines].join("\r\n");
+  return redactSecrets("\uFEFF" + [headers.map((header) => escape(header, true)).join(","), ...lines].join("\r\n"));
 }

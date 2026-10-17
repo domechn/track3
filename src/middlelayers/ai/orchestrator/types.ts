@@ -60,6 +60,7 @@ export interface AnalysisPlan {
 export interface LlmCallParams {
   endpoint: string;
   apiKey: string;
+  secrets?: readonly string[];
   model: string;
   messages: Array<{ role: string; content: string }>;
   temperature?: number;
@@ -92,6 +93,7 @@ export type OrchestratorEvent =
 export interface OrchestratorOptions {
   endpoint: string;
   apiKey: string;
+  secrets?: readonly string[];
   model: string;
   baseCurrency: { currency: string; rate: number; alias: string; symbol: string };
   /** Model context window in tokens; bounds inlined tool data. */

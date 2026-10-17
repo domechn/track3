@@ -41,6 +41,7 @@ import { getAddressList } from "./datafetch/utils/address";
 import { classifySourceError, takeSourceFailure } from "./datafetch/utils/source-failure";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
 import { FullRefreshRequiredError } from "./refresh-error";
+import { redactSecrets } from "./security/redact";
 import {
   type FailedPortfolioSource,
   type LoadPortfoliosResult,
@@ -432,7 +433,7 @@ export async function autoImportHistoricalData(): Promise<boolean> {
     imported = result.imported;
     clientsWithV2 = result.clientsWithV2;
   } catch (error) {
-    console.error("failed to auto import v2 backup", error);
+    console.error("failed to auto import v2 backup", redactSecrets(String(error)));
   }
 
   const legacyPath = `${abd}/${autoBackupHistoricalDataFilename}`;
@@ -460,7 +461,7 @@ export async function autoImportHistoricalData(): Promise<boolean> {
       }
     }
   } catch (error) {
-    console.error("failed to auto import legacy backup", error);
+    console.error("failed to auto import legacy backup", redactSecrets(String(error)));
   }
 
   if (imported) await saveLastAutoImportAt();

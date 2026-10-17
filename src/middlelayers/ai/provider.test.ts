@@ -75,6 +75,13 @@ describe("provider.normalizeEndpoint", () => {
 });
 
 describe("provider.streamChatCompletion", () => {
+  it("redacts custom advanced header values from provider errors", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeErrorResponse(400, "bad custom-header-secret") as any);
+    const events = await collect(streamChatCompletion({
+      ...baseReq, advanced: { headers: { "x-custom-auth": "custom-header-secret" } },
+    }));
+    expect(events).toContainEqual({ kind: "error", message: "Request failed with status 400: bad <REDACTED>" });
+  });
   it("requests and parses usage from a final SSE chunk without choices", async () => {
     vi.mocked(fetch).mockResolvedValue(makeSseResponse([
       'data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n',
@@ -213,6 +220,14 @@ describe("provider.streamChatCompletion", () => {
     expect(err).toBeDefined();
     expect((err as { message: string }).message).toContain("401");
     expect(events.at(-1)?.kind).toBe("done");
+  });
+
+  it("redacts configured API keys from provider error bodies", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeErrorResponse(403, "invalid key sk-private123456789012345 https://api.test/?apiKey=leaked") as any);
+    const events = await collect(streamChatCompletion({ ...baseReq, apiKey: "sk-private123456789012345" }));
+    const error = events.find((event) => event.kind === "error");
+    expect(error?.kind === "error" && error.message).not.toContain("sk-private123456789012345");
+    expect(error?.kind === "error" && error.message).not.toContain("leaked");
   });
 
   it("bounds the error text returned by an endpoint", async () => {

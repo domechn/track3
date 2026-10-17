@@ -88,6 +88,22 @@ describe("sendHttpRequest error details", () => {
     );
   });
 
+  it("redacts standalone provider keys in an HTTP error", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      status: 401, text: vi.fn().mockResolvedValue("invalid sk-abcdefghijklmnop1234567890"),
+    } as unknown as Response);
+    await expect(sendHttpTextRequest("GET", "https://api.example.com/private")).rejects.not.toThrow("sk-abcdefghijklmnop1234567890");
+  });
+
+  it("redacts secret-shaped response codes", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      status: 401,
+      text: vi.fn().mockResolvedValue('{"msg":"request rejected","code":"sk-abcdefghijklmnop1234567890"}'),
+    } as unknown as Response);
+    await expect(sendHttpRequest("GET", "https://api.example.com/private"))
+      .rejects.not.toThrow("sk-abcdefghijklmnop1234567890");
+  });
+
   it("uses the sanitized HTTP error for text responses", async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       status: 403,

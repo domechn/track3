@@ -7,6 +7,7 @@ import { ASSET_HANDLER } from "./entities/assets";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { format } from "date-fns";
+import { redactForExport, redactSecrets } from "./security/redact";
 
 export async function loadCostBasisReport(
   options: { method: CostBasisMethod; from?: string; to?: string; holdingPeriodDays?: number },
@@ -46,6 +47,9 @@ export async function exportCostBasisReport(
     defaultPath: `track3-realized-gains.${format}`,
   });
   if (!filePath) return false;
-  await writeTextFile(filePath, serializeRealizedGains(report, format));
+  const serialized = serializeRealizedGains(report, format);
+  await writeTextFile(filePath, format === "json"
+    ? JSON.stringify(redactForExport(JSON.parse(serialized)), null, 2)
+    : redactSecrets(serialized));
   return true;
 }

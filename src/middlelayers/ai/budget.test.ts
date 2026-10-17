@@ -24,6 +24,7 @@ describe("AI context budget", () => {
   it("keeps totals and both ends of large arrays with a truncation marker", () => {
     const result = serializeBudgeted({ total: 100, rows: Array.from({ length: 100 }, (_, id) => ({ id, note: "abcdefghij" })) }, 110);
     expect(result).toContain("[truncated:");
+    expect(result).toContain("narrow the query (date range, limit)");
     expect(result).toContain('"total":100');
     expect(result).toContain('"id":0');
     expect(result).toContain('"id":99');

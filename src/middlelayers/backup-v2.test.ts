@@ -83,6 +83,24 @@ beforeEach(() => {
 });
 
 describe("v2 backup helpers", () => {
+  it("preserves long symbols in historical backup data", async () => {
+    const symbol = "0123456789abcdef0123456789abcdef";
+    await writeBackupV2("/backup", "client-a", "0.8.2", [{
+      ...january,
+      assets: [{ ...january.assets[0], symbol }],
+    }]);
+    const partFile = [...disk.files.entries()].find(([path]) => path.includes("/data/"))?.[1] ?? "";
+    expect(JSON.parse(partFile).historicalData[0].assets[0].symbol).toBe(symbol);
+  });
+
+  it("preserves wallet identifiers needed to restore a backup", async () => {
+    const wallet = "0123456789abcdef0123456789abcdef";
+    await writeBackupV2("/backup", "client-a", "0.8.2", [{
+      ...january, assets: [{ ...january.assets[0], wallet }],
+    }]);
+    const partFile = [...disk.files.entries()].find(([path]) => path.includes("/data/"))?.[1] ?? "";
+    expect(partFile).toContain(wallet);
+  });
   it("groups records by UTC month at a month boundary", () => {
     const grouped = groupByMonth([
       january,

@@ -1,6 +1,6 @@
 # Assistant regression evaluation
 
-The assistant evaluation uses a fixed portfolio of 61 daily snapshots from 2026-08-18 through 2026-10-17, six transactions, market prices, and untrusted strings in an asset symbol and wallet name. The 31 golden questions cover English and Simplified Chinese, portfolio changes, holdings, asset history, transactions, prices, comparisons, empty results, simple chat, out-of-scope requests, and prompt injection.
+The assistant evaluation uses a fixed portfolio of 61 daily snapshots from 2026-08-18 through 2026-10-17, six transactions, market prices, and untrusted strings in an asset symbol and wallet name. The 33 golden questions cover English and Simplified Chinese, portfolio changes, holdings, asset history, transactions, prices, comparisons, empty results, simple chat, out-of-scope requests, and prompt injection, including tool-call and secret-exfiltration attempts inside portfolio data.
 
 ## Offline tier
 
@@ -10,7 +10,7 @@ corepack yarn test
 
 `src/test/eval/golden.test.ts` runs in the normal Vitest suite. Recorded model responses drive the real `useChat` hook, planner, orchestrator, provider parsing, skill registry, argument validation, and fallback tool loop. Only the LLM transport and external portfolio/price queries use fixtures. Browser `fetch` throws if the offline evaluation attempts a network request.
 
-Each case checks the planner path, tool names and argument shapes, facts returned by tools, forbidden calls, and answer phrases. Extra tests check invalid tool arguments and the five round tool budget. The clock is fixed at 2026-10-17 so relative dates remain stable. Prompt checks cover the date and instructions to treat tool data as untrusted.
+Each case checks the planner path, tool names and argument shapes, facts returned by tools, forbidden calls, and answer phrases. Extra tests check invalid tool arguments and the five round tool budget, with one extra round for a narrower query after truncated tool output when context remains. The clock is fixed at 2026-10-17 so relative dates remain stable. Prompt checks cover the date and instructions to treat tool data as untrusted.
 
 The recorded responses test wiring and deterministic facts. They do not measure how a changed prompt affects a real model; use the live tier for that.
 

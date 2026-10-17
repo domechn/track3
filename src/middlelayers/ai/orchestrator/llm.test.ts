@@ -17,6 +17,16 @@ beforeEach(() => {
 });
 
 describe("orchestrator LLM requests", () => {
+  it("does not return the configured key in a model error", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response("bad key custom-private-key", { status: 403 }) as any);
+    const result = await callLlm({ ...params, apiKey: "custom-private-key" });
+    expect(result.error).not.toContain("custom-private-key");
+  });
+  it("redacts the configured header secret from a planner error", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response("bad custom-header-secret", { status: 403 }) as any);
+    const result = await callLlm({ ...params, secrets: ["custom-header-secret"] });
+    expect(result.error).not.toContain("custom-header-secret");
+  });
   it("returns reported usage from a JSON completion", async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
       choices: [{ message: { content: "ok" } }],

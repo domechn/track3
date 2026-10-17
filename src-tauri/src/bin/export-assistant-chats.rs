@@ -1,5 +1,6 @@
 use serde::Serialize;
 use sqlx::{sqlite::SqliteConnectOptions, Connection, FromRow, SqliteConnection};
+use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
     env, fs,
@@ -9,8 +10,218 @@ use std::{
 };
 use track3::{
     ent::Ent,
+    info::sanitize_upstream_error,
     startup_security::{load_encryption_key, LEGACY_ENCRYPTION_KEY},
 };
+
+fn redact_text(input: &str, configured: &[String]) -> String {
+    let mut text = input.to_string();
+    for secret in configured.iter().filter(|value| value.len() >= 4) {
+        text = text.replace(secret, "<REDACTED>");
+    }
+    text = sanitize_upstream_error(&text);
+    for prefix in ["Bearer ", "bearer ", "sk-"] {
+        let mut cursor = 0;
+        while let Some(offset) = text[cursor..].find(prefix) {
+            let start = cursor + offset;
+            let token_start = start + prefix.len();
+            let end = text[start + prefix.len()..]
+                .find(|ch: char| {
+                    !(ch.is_ascii_alphanumeric()
+                        || if prefix == "sk-" {
+                            ch == '_' || ch == '-'
+                        } else {
+                            "._~+/-".contains(ch)
+                        })
+                })
+                .map(|offset| start + prefix.len() + offset)
+                .unwrap_or(text.len());
+            if (prefix == "sk-"
+                && (text[..start]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|ch| ch.is_ascii_alphanumeric())
+                    || end - token_start < 12))
+                || end == token_start
+            {
+                cursor = token_start;
+                continue;
+            }
+            text.replace_range(start..end, "<REDACTED>");
+            cursor = start + "<REDACTED>".len();
+        }
+    }
+    redact_entropy_tokens(&text)
+}
+
+fn redact_entropy_tokens(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut output = String::with_capacity(text.len());
+    let mut cursor = 0;
+    let mut copied = 0;
+    while cursor < bytes.len() {
+        if !bytes[cursor].is_ascii_alphanumeric() && bytes[cursor] != b'+' {
+            cursor += 1;
+            continue;
+        }
+        let start = cursor;
+        while cursor < bytes.len()
+            && (bytes[cursor].is_ascii_alphanumeric() || matches!(bytes[cursor], b'+' | b'='))
+        {
+            cursor += 1;
+        }
+        let candidate = &bytes[start..cursor];
+        let distinct = candidate
+            .iter()
+            .map(|byte| byte.to_ascii_lowercase())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let hex_token = candidate.iter().all(u8::is_ascii_hexdigit);
+        let padding = candidate
+            .iter()
+            .rev()
+            .take_while(|byte| **byte == b'=')
+            .count();
+        let padded_base64 = (1..=2).contains(&padding)
+            && candidate[..candidate.len() - padding]
+                .iter()
+                .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'+');
+        if bytes.get(start.wrapping_sub(1)) != Some(&b'/')
+            && candidate.len() >= 32
+            && (hex_token || padded_base64)
+            && distinct >= 10
+            && !is_public_chain_identifier(&text[start..cursor], &text[..start])
+        {
+            output.push_str(&text[copied..start]);
+            output.push_str("<REDACTED>");
+            copied = cursor;
+        }
+    }
+    output.push_str(&text[copied..]);
+    output
+}
+
+fn is_public_chain_identifier(candidate: &str, prefix: &str) -> bool {
+    let value = candidate.rsplit('/').next().unwrap_or(candidate);
+    let path_label = candidate
+        .rsplit_once('/')
+        .and_then(|(path, _)| path.rsplit('/').next());
+    let is_chain_path = matches!(path_label, Some("address" | "account" | "tx"));
+    let labelled = is_chain_path
+        || ["wallet", "address", "account"]
+            .iter()
+            .any(|label| prefix.trim_end_matches([':', '/', ' ']).ends_with(label));
+    if let Some(hex) = value.strip_prefix("0x") {
+        if matches!(hex.len(), 40 | 64) && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return candidate == value || is_chain_path;
+        }
+    }
+    if value.starts_with("bc1")
+        && (14..=90).contains(&value.len())
+        && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        return candidate == value || is_chain_path;
+    }
+    (32..=88).contains(&value.len())
+        && labelled
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() && !matches!(byte, b'0' | b'O' | b'I' | b'l'))
+}
+
+fn redact_json(value: &mut serde_json::Value, configured: &[String]) {
+    match value {
+        serde_json::Value::String(text) => *text = redact_text(text, configured),
+        serde_json::Value::Array(items) => {
+            for item in items {
+                redact_json(item, configured);
+            }
+        }
+        serde_json::Value::Object(fields) => {
+            for (key, item) in fields {
+                let key_name = key.to_ascii_lowercase().replace(['_', '-'], "");
+                if [
+                    "apikey",
+                    "apisecret",
+                    "accesskey",
+                    "clientsecret",
+                    "privatekey",
+                    "secret",
+                    "signature",
+                    "token",
+                    "accesstoken",
+                    "refreshtoken",
+                    "password",
+                    "passphrase",
+                    "authorization",
+                    "licensekey",
+                    "cloudsynckey",
+                    "credential",
+                    "credentials",
+                ]
+                .contains(&key_name.as_str())
+                {
+                    *item = serde_json::Value::String("<REDACTED>".to_string());
+                } else {
+                    redact_json(item, configured);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+async fn configured_secrets(conn: &mut SqliteConnection, ent: &Ent) -> Vec<String> {
+    let rows = sqlx::query_as::<_, (i64, String)>(
+        "SELECT id, data FROM configuration WHERE id IN (10, 11, 12, 20, 994, 997)",
+    )
+    .fetch_all(conn)
+    .await
+    .unwrap_or_default();
+    let mut secrets = Vec::new();
+    for (id, data) in rows {
+        let plaintext = if data.starts_with("!ent:") {
+            match ent.decrypt_with_fallback(data, LEGACY_ENCRYPTION_KEY) {
+                Ok(value) => value,
+                Err(_) => continue,
+            }
+        } else {
+            data
+        };
+        if id == 997 {
+            secrets.push(plaintext);
+        } else if id == 994 {
+            if let Ok(config) = serde_json::from_str::<serde_json::Value>(&plaintext) {
+                if let Some(key) = config.get("apiKey").and_then(|value| value.as_str()) {
+                    secrets.push(key.to_string());
+                }
+                if let Some(headers) = config
+                    .pointer("/advanced/headers")
+                    .and_then(|value| value.as_object())
+                {
+                    secrets.extend(
+                        headers
+                            .values()
+                            .filter_map(|value| value.as_str().map(str::to_string)),
+                    );
+                }
+            }
+        } else {
+            for line in plaintext.lines() {
+                if let Some((key, value)) = line.split_once(':') {
+                    let key = key.to_ascii_lowercase();
+                    if ["key", "secret", "token", "password", "passphrase"]
+                        .iter()
+                        .any(|word| key.contains(word))
+                    {
+                        secrets.push(value.trim().trim_matches(['"', '\'']).to_string());
+                    }
+                }
+            }
+        }
+    }
+    secrets
+}
 
 #[derive(Debug, Serialize, FromRow)]
 struct SessionMeta {
@@ -138,6 +349,7 @@ async fn main() -> Result<(), String> {
     .fetch_all(&mut conn)
     .await
     .map_err(|error| format!("failed to query chat_sessions: {error}"))?;
+    let secrets = configured_secrets(&mut conn, &ent).await;
 
     let mut sessions: Vec<SessionExport> = Vec::with_capacity(metas.len());
 
@@ -194,7 +406,10 @@ async fn main() -> Result<(), String> {
         }
     }
 
-    let output_json = serde_json::to_string_pretty(&export_payload)
+    let mut safe_payload = serde_json::to_value(&export_payload)
+        .map_err(|error| format!("failed to build output JSON: {error}"))?;
+    redact_json(&mut safe_payload, &secrets);
+    let output_json = serde_json::to_string_pretty(&safe_payload)
         .map_err(|error| format!("failed to serialize output JSON: {error}"))?;
     fs::write(&output_path, output_json).map_err(|error| {
         format!(
@@ -209,4 +424,91 @@ async fn main() -> Result<(), String> {
         output_path.display()
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exported_payload_removes_secret_fields_and_strings() {
+        let mut payload = serde_json::json!({
+            "messages": [
+                {"role": "user", "content": "Bearer private-token-123456"},
+                {"role": "assistant", "apiKey": "custom-private-key",
+                 "content": "sk-abcdefghijklmnop1234567890",
+                 "accessKey": "short-access-key",
+                 "clientSecret": "short-client-secret"}
+            ]
+        });
+        redact_json(&mut payload, &["custom-private-key".to_string()]);
+        let text = payload.to_string();
+        assert!(!text.contains("private-token-123456"));
+        assert!(!text.contains("custom-private-key"));
+        assert!(!text.contains("sk-abcdefghijklmnop1234567890"));
+        assert!(!text.contains("short-access-key"));
+        assert!(!text.contains("short-client-secret"));
+    }
+
+    #[test]
+    fn exported_payload_removes_standalone_hex_and_base64_secrets() {
+        let mut payload = serde_json::json!({
+            "messages": [
+                {"content": "0123456789abcdef0123456789abcdef"},
+                {"content": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dg=="}
+            ]
+        });
+        redact_json(&mut payload, &[]);
+        let text = payload.to_string();
+        assert!(!text.contains("0123456789abcdef0123456789abcdef"));
+        assert!(!text.contains("YWJjZGVmZ2hpamtsbW5vcHFyc3R1dg=="));
+    }
+
+    #[test]
+    fn provider_prefix_requires_a_boundary_and_a_full_token() {
+        let text = redact_text("risk-free task-list ask- sk-short sk-abcdefghijklmnop", &[]);
+        assert!(text.contains("risk-free task-list ask- sk-short"));
+        assert!(!text.contains("sk-abcdefghijklmnop"));
+    }
+    #[test]
+    fn exported_payload_keeps_public_chain_identifiers() {
+        let address = format!("0x{}", "0123456789abcdef".repeat(4));
+        let link = format!("https://etherscan.io/tx/{address}");
+        let mut payload = serde_json::json!({"messages": [{"content": format!("{link} {address} secret-token")}]});
+        redact_json(&mut payload, &["secret-token".to_string()]);
+        let text = payload.to_string();
+        assert!(text.contains(&link));
+        assert!(text.contains(&address));
+        assert!(!text.contains("secret-token"));
+    }
+
+    #[test]
+    fn exported_payload_keeps_links_paths_addresses_and_prose() {
+        let address = "7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV";
+        for text in [
+            "https://github.com/domechn/track3/releases/download",
+            "/Users/alice/Library/Application/Support/track3",
+            "secret: I prefer low risk",
+            "Your token: USDC is up",
+        ] {
+            assert_eq!(redact_text(text, &[]), text);
+        }
+        assert_eq!(redact_text(address, &[]), address);
+    }
+
+    #[tokio::test]
+    async fn includes_broker_tokens_in_configured_secrets() {
+        let mut conn = SqliteConnection::connect("sqlite::memory:").await.unwrap();
+        sqlx::query("CREATE TABLE configuration (id INTEGER, data TEXT)")
+            .execute(&mut conn)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO configuration (id, data) VALUES (20, 'brokers:\n  - token: broker-private-token')")
+            .execute(&mut conn)
+            .await
+            .unwrap();
+        let ent = Ent::new();
+        let secrets = configured_secrets(&mut conn, &ent).await;
+        assert!(secrets.contains(&"broker-private-token".to_string()));
+    }
 }

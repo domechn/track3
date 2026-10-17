@@ -32,7 +32,7 @@ vi.mock("@/i18n", () => ({
 
 vi.mock("./message-bubble", () => ({
   default: ({ message, isStreaming }: { message: ChatMessage; isStreaming?: boolean }) => (
-    <div data-testid={message.role === "user" ? "user-bubble" : "assistant-bubble"}>
+    <div data-testid={message.role === "user" ? "user-bubble" : "assistant-bubble"} data-streaming={String(!!isStreaming)}>
       {message.role === "user"
         ? message.content
         : message.blocks.map((b, i) =>
@@ -47,6 +47,14 @@ vi.mock("./message-bubble", () => ({
 }));
 
 describe("ChatThread", () => {
+  it("streams only the newest bubble", () => {
+    render(<ChatThread messages={[
+      { role: "assistant", blocks: [{ kind: "text", text: "old" }] },
+      { role: "assistant", blocks: [{ kind: "text", text: "new" }] },
+    ]} isStreaming />);
+    expect(screen.getAllByTestId("assistant-bubble").map((element) => element.getAttribute("data-streaming")))
+      .toEqual(["false", "true"]);
+  });
   it("renders welcome panel when there are no messages and not streaming", () => {
     render(<ChatThread messages={[]} isStreaming={false} />);
     expect(screen.getByTestId("chat-welcome")).toBeTruthy();

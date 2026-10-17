@@ -219,7 +219,7 @@ export class GateExchange implements Exchanger {
 			resp.forEach((asset) => {
 				const coins = asset.mortgage_coin.split(",").map(v => v.trim()).filter(Boolean)
 				if (coins.length !== 1) {
-					console.warn("Skip multi-coin Gate staking asset", asset.mortgage_coin)
+					console.warn("Skip multi-coin Gate staking asset")
 					return
 				}
 				addToBalanceMap(balances, coins[0], toNumber(asset.mortgage_amount))

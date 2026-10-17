@@ -1,6 +1,7 @@
 import { listAllCurrencyRates } from "../../../configuration";
 import { sendHttpTextRequest } from "../../utils/http";
 import { StockBroker, applyMarketSuffix } from "./stock-broker";
+import { redactSecrets } from "../../../security/redact";
 
 export type IbkrFlexPosition = {
   symbol: string;
@@ -114,7 +115,6 @@ export function parseIbkrFlexOpenPositions(xml: string): IbkrFlexPosition[] {
     })
     .filter((p): p is IbkrFlexPosition => p !== undefined);
   const cashPosition = parseIbkrFlexCashPosition(doc);
-  console.log("Parsed IBKR Flex positions", cashPosition);
 
   return cashPosition ? [...stockPositions, cashPosition] : stockPositions;
 }
@@ -192,7 +192,7 @@ function isFlexStatementPending(xml: string): boolean {
   );
 }
 
-function assertSuccessfulFlexResponse(xml: string) {
+function assertSuccessfulFlexResponse(xml: string, token: string) {
   const err = getFlexResponseError(xml);
   if (!err?.status || err.status.toLowerCase() === "success") {
     return;
@@ -201,7 +201,7 @@ function assertSuccessfulFlexResponse(xml: string) {
   const detail = [err.status, err.errorCode, err.errorMessage]
     .filter(Boolean)
     .join(": ");
-  throw new Error(`IBKR Flex request failed: ${detail}`);
+  throw new Error(`IBKR Flex request failed: ${redactSecrets(detail, [token])}`);
 }
 
 function wait(ms: number): Promise<void> {
@@ -280,7 +280,7 @@ export class IbkrBroker implements StockBroker {
       this.flexXml = sendXml;
       return sendXml;
     }
-    assertSuccessfulFlexResponse(sendXml);
+    assertSuccessfulFlexResponse(sendXml, this.token);
 
     const pollUrl = getIbkrFlexStatementUrl(sendXml, this.token);
 
@@ -303,7 +303,7 @@ export class IbkrBroker implements StockBroker {
         continue;
       }
 
-      assertSuccessfulFlexResponse(statementXml);
+      assertSuccessfulFlexResponse(statementXml, this.token);
       throw new Error("IBKR Flex statement response did not include a report");
     }
 

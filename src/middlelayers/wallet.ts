@@ -11,6 +11,7 @@ import {
 import { generateRandomColors } from "../utils/color";
 import { SUPPORT_CONS } from "./constants";
 import { getAssetType } from "./datafetch/utils/coins";
+import { configuredSecretValues, redactSecrets } from "./security/redact";
 
 export class WalletAnalyzer {
   // key is wallet address md5 hash
@@ -40,6 +41,7 @@ export class WalletAnalyzer {
     if (!config) {
       return {};
     }
+    const secrets = configuredSecretValues(config);
 
     const aliases: {
       // wallet hash
@@ -56,8 +58,8 @@ export class WalletAnalyzer {
         walletType: x.exchangeName,
         // need md5 here, because when we store it in database, it is md5 hashed
         walletMd5: md5(x.identity),
-        wallet: x.identity,
-        alias: x.alias || x.identity,
+        wallet: `${x.exchangeName}-${md5(x.identity).slice(0, 8)}`,
+        alias: redactSecrets(x.alias || x.exchangeName, secrets),
       });
     });
 
@@ -66,8 +68,8 @@ export class WalletAnalyzer {
       aliases.push({
         walletType: x.brokerName,
         walletMd5: md5(x.identity),
-        wallet: x.identity,
-        alias: x.alias || x.identity,
+        wallet: `${x.brokerName}-${md5(x.identity).slice(0, 8)}`,
+        alias: redactSecrets(x.alias || x.brokerName, secrets),
       });
     });
 

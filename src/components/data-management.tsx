@@ -51,6 +51,7 @@ import {
   isRotationCommandError,
   runEncryptionKeyRotation,
 } from "@/middlelayers/encryption-write-gate";
+import { redactSecrets } from "@/middlelayers/security/redact";
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();
@@ -106,7 +107,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         : isRotationCommandError(e)
           ? e.message
           : String(e);
-      toast({ description, variant: "destructive" });
+      toast({ description: redactSecrets(description, [encKeyInput]), variant: "destructive" });
     } finally {
       setEncKeySaving(false);
     }
@@ -176,7 +177,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       })
       .catch((err) => {
         toast({
-          description: err.message || err,
+          description: redactSecrets(err instanceof Error ? err.message : String(err), [encKeyInput]),
           variant: "destructive",
         });
       })

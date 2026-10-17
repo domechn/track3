@@ -32,7 +32,8 @@ export function estimateMessages(messages: ProviderMessage[]): number {
 
 export function truncateText(text: string, tokenBudget: number): string {
   if (estimateTokens(text) <= tokenBudget) return text;
-  const marker = "\n[truncated: text]";
+  const hint = "\n[truncated: text; narrow the query (date range, limit)]";
+  const marker = estimateTokens(hint) < tokenBudget ? hint : "\n[truncated: text]";
   let low = 0;
   let high = text.length;
   while (low < high) {
@@ -86,7 +87,7 @@ function compact(value: unknown, cap: number): unknown {
     return Object.fromEntries(entries.map(([key, item]) => [key, compact(item, cap)]));
   }
   if (typeof value === "string" && value.length > cap * 16) {
-    return `${value.slice(0, cap * 8)}[truncated: text]`;
+    return `${value.slice(0, cap * 8)}[truncated: text; narrow the query (date range, limit)]`;
   }
   return value;
 }
@@ -96,10 +97,11 @@ export function serializeBudgeted(data: unknown, tokenBudget: number): string {
   if (estimateTokens(full, "json") <= tokenBudget) return full;
   for (let cap = 4; cap >= 1; cap--) {
     const shortened = JSON.stringify(compact(data, cap));
-    const marked = `${shortened}\n[truncated: ${full.length} original JSON chars; array head/tail shown with counts]`;
+    const marked = `${shortened}\n[truncated: ${full.length} original JSON chars; array head/tail shown with counts; narrow the query (date range, limit)]`;
     if (estimateTokens(marked, "json") <= tokenBudget) return marked;
   }
-  const marker = `[truncated: ${full.length} JSON chars]`;
+  const hint = `[truncated: ${full.length} JSON chars; narrow the query (date range, limit)]`;
+  const marker = estimateTokens(hint, "json") < tokenBudget ? hint : `[truncated: ${full.length} JSON chars]`;
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const totals = Object.fromEntries(Object.entries(data).filter(([key]) => /total/i.test(key)));
     if (Object.keys(totals).length > 0) {

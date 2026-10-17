@@ -226,7 +226,6 @@ impl CoinGecko {
         if non_exists_symbols.len() == 0 {
             return Ok(());
         }
-        println!("non_exists_symbols: {:?}", non_exists_symbols);
         // need to filter coins with same symbol
         let mut all_coins = self
             .list_all_coin_ids(non_exists_symbols.clone(), None)
@@ -354,10 +353,8 @@ impl CoinGecko {
         download_dir: &Path,
         m: CoinsMarketItem,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("downloading coin logo: {:?}", m.image);
         let mut res = reqwest::get(m.image).await;
         if let Err(_) = res {
-            println!("fallback to download coin logo from github: {:?}", m.symbol);
             let url = format!(
                 "https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/{}.png",
                 m.symbol.to_lowercase()

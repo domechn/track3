@@ -1,6 +1,7 @@
 import type { ProviderFunctionDef } from "./types";
 import type { Skill, SkillArgs, ToolResult } from "./skills/types";
 import { trace } from "./skills/functions/trace";
+import { redactSecrets } from "../security/redact";
 
 // SkillRegistry owns the lookup of every registered AI skill. Skills
 // register themselves at module load time via the side-effect import in
@@ -48,10 +49,10 @@ export async function runSkill(
 > {
   const skill = getSkill(name);
   if (!skill) {
-    return { ok: false, error: `Unknown skill: ${name}` };
+    return { ok: false, error: `Unknown skill: ${redactSecrets(name)}` };
   }
   const validationError = validateArgs(args, skill.parameters);
-  if (validationError) return { ok: false, error: `Invalid arguments for ${name}: ${validationError}` };
+  if (validationError) return { ok: false, error: `Invalid arguments for ${redactSecrets(name)}: ${redactSecrets(validationError)}` };
   const properties = (skill.parameters.properties ?? {}) as Record<string, unknown>;
   const normalizedArgs = Object.fromEntries(
     Object.entries(args)
@@ -69,7 +70,7 @@ export async function runSkill(
     trace("runSkill complete");
     return { ok: true, result };
   } catch (err) {
-    return { ok: false, error: (err as Error).message ?? String(err) };
+    return { ok: false, error: redactSecrets((err as Error).message ?? String(err)) };
   }
 }
 

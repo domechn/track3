@@ -160,6 +160,7 @@ function llmParamsFromOptions(options: OrchestratorOptions): LlmCallParams {
   return {
     endpoint: options.endpoint,
     apiKey: options.apiKey,
+    secrets: options.secrets,
     model: options.model,
     messages: [],
     signal: options.signal,
