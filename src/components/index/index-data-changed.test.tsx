@@ -5,6 +5,7 @@ import App from "./index";
 import { ChartResizeContext } from "@/App";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { processAlerts } from "@/middlelayers/alerts";
 
 let lastDataChangedVersion = 0;
 let lastDateRange: { start: Date; end: Date } | undefined;
@@ -134,6 +135,7 @@ vi.mock("@/middlelayers/data", () => ({
   autoBackupHistoricalData: vi.fn(),
   autoImportHistoricalData: vi.fn(),
 }));
+vi.mock("@/middlelayers/alerts", () => ({ processAlerts: vi.fn() }));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
   invalidateCacheGroups: cacheMocks.invalidateCacheGroups,
@@ -160,6 +162,8 @@ import {
 import { useDataChangedVersion as realUseDataChangedVersion } from "@/contexts/data-changed";
 
 beforeEach(() => {
+  vi.mocked(processAlerts).mockReset();
+  vi.mocked(processAlerts).mockResolvedValue([]);
   lastDataChangedVersion = 0;
   lastDateRange = undefined;
   window.location.hash = "#/summary";
@@ -225,6 +229,12 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it("finishes boot while startup alert evaluation is pending", async () => {
+    vi.mocked(processAlerts).mockImplementation(() => new Promise(() => {}));
+    const view = renderApp();
+    await waitFor(() => expect(view.container.querySelector("[aria-busy]")).toHaveAttribute("aria-busy", "false"));
+    expect(processAlerts).toHaveBeenCalledTimes(1);
+  });
   it("keeps the selected History range when a local delete updates app metadata", async () => {
     window.location.hash = "#/history";
     const view = renderApp();

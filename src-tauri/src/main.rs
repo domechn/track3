@@ -196,6 +196,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         // .plugin(tauri_plugin_context_menu::init())
         .setup(|app| {
             let app_version = app.package_info().version.to_string();

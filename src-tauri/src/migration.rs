@@ -952,6 +952,7 @@ async fn migrate_v8_to_v9(
     resource_dir: &Path,
 ) -> MigrationResult<()> {
     let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
+    let alerts = read_migration_sql(resource_dir, "v09t10/alerts_up.sql")?;
     let mut transaction = connection
         .begin()
         .await
@@ -960,6 +961,10 @@ async fn migrate_v8_to_v9(
         .execute(&mut *transaction)
         .await
         .map_err(|error| format!("failed to create rebalance profiles table: {error}"))?;
+    sqlx::raw_sql(&alerts)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to create alert tables: {error}"))?;
     write_migration_version(&mut transaction, "0.9.0").await?;
     transaction
         .commit()
@@ -977,6 +982,7 @@ async fn repair_required_schema(
     let transactions = read_migration_sql(resource_dir, "init/transactions_up.sql")?;
     let chat_sessions = read_migration_sql(resource_dir, "init/chat_sessions_up.sql")?;
     let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
+    let alerts = read_migration_sql(resource_dir, "v09t10/alerts_up.sql")?;
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
     let mut transaction = connection
         .begin()
@@ -1066,6 +1072,10 @@ async fn repair_required_schema(
             .execute(&mut *transaction)
             .await
             .map_err(|error| format!("failed to ensure rebalance profiles table: {error}"))?;
+        sqlx::raw_sql(&alerts)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to ensure alert tables: {error}"))?;
     }
     repair_index(
         &mut transaction,
@@ -2877,6 +2887,48 @@ mod tests {
             conn.close().await.unwrap();
         });
 
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn v8_to_v9_adds_alert_rules_and_history_and_repairs_existing_v9_databases() {
+        let root = make_temp_dir("goals-alerts");
+        let database_path = root.join("legacy.db");
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            create_legacy_fixture(&database_path, LegacyVersion::V07).await;
+            run_migrations(&database_path, &resource_dir(), "0.9.0").await.unwrap();
+            let mut conn = connect(&database_path).await;
+            assert!(table_exists(&mut conn, "alert_rules").await);
+            assert!(table_exists(&mut conn, "alert_history").await);
+            assert_eq!(configuration(&mut conn, 999).await.as_deref(), Some("0.9.0"));
+            conn.execute(
+                "INSERT INTO alert_rules (kind, comparator, threshold, enabled, cooldown_seconds, armed)
+                 VALUES ('total_value_target', 'gte', 1000, 1, 3600, 1)",
+            ).await.unwrap();
+            assert!(conn.execute(
+                "INSERT INTO alert_rules (kind, comparator, threshold, enabled, cooldown_seconds, armed)
+                 VALUES ('invalid', 'gte', 1, 1, 0, 1)",
+            ).await.is_err());
+            conn.execute(
+                "INSERT INTO alert_rules (kind, comparator, threshold, window, enabled, cooldown_seconds, armed)
+                 VALUES ('period_pnl', 'lte', -100, '7d', 1, 3600, 1)",
+            ).await.unwrap();
+            conn.close().await.unwrap();
+            run_migrations(&database_path, &resource_dir(), "0.9.0").await.unwrap();
+            let mut conn = connect(&database_path).await;
+            assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM alert_rules")
+                .fetch_one(&mut conn).await.unwrap(), 2);
+            conn.execute("DROP TABLE alert_history").await.unwrap();
+            conn.execute("DROP TABLE alert_rules").await.unwrap();
+            conn.close().await.unwrap();
+            run_migrations(&database_path, &resource_dir(), "0.9.0").await.unwrap();
+            let mut conn = connect(&database_path).await;
+            assert!(table_exists(&mut conn, "alert_rules").await);
+            assert!(table_exists(&mut conn, "alert_history").await);
+            assert_eq!(configuration(&mut conn, 999).await.as_deref(), Some("0.9.0"));
+            conn.close().await.unwrap();
+        });
         fs::remove_dir_all(root).unwrap();
     }
 }
