@@ -228,3 +228,11 @@ The following observations still need a real environment:
 - Actual phone and tablet touch accuracy, system text scaling, display contrast, and viewport changes from the on-screen keyboard need physical devices. Chromium viewport tests cover layout and target bounds only.
 - Packaged Tauri WebViews on macOS, Windows, and Linux need a native pass for dialog focus, popover positioning, and reduced motion. Browser E2E uses Chromium and a mocked Tauri bridge.
 - Live S3 sync and refresh status timing need configured accounts and provider responses. Automated tests use deterministic status and network fixtures.
+
+## Sync data-safety closeout: residual P2 (not fixed, safe direction)
+
+- After a state reset, when the local copy matches the original snapshot, a remote edit that is newer than a delete does not stop the delete until the editing device syncs again and publishes a "keep" event. If that device never syncs again, the later edit loses to the earlier delete. Fix idea: also compare the tombstone with `remoteEdits.get(id)?.clock` in the refusal check.
+- After a reset, if the original snapshot object is unreadable while an edit exists, the delete is refused and retried every round; fall back to `edit.snapshot`.
+- Unresolved config conflicts re-read every device's entry each round (extra S3 traffic only).
+- `sessions.ts` imports `../sync/engine` (for mergeSessions); moving it to a shared module would decouple chat from sync.
+- Cross-device clock ordering was reviewed by reading only; a deleting device whose clock runs ahead can still win over a later edit within the 24h skew the code allows.
