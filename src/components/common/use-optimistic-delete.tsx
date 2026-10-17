@@ -1,6 +1,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
+import { recordSnapshotDeleted, recordSnapshotUndone } from "@/middlelayers/sync/delete-hook";
 
 type DeleteOptions<T, Result> = {
   update: (items: T) => T;
@@ -13,6 +14,7 @@ type DeleteOptions<T, Result> = {
   undoLabel: string;
   undoAltText: string;
   undoWindowMs: number;
+  syncSnapshotUuid?: string;
 };
 
 export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
@@ -30,11 +32,22 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
     undoLabel,
     undoAltText,
     undoWindowMs,
+    syncSnapshotUuid,
   }: DeleteOptions<T, Result>) => {
     setIsDeleting(true);
     setItems(update);
     try {
       const result = await commit();
+      if (syncSnapshotUuid) {
+        try {
+          await recordSnapshotDeleted(syncSnapshotUuid);
+        } catch (error) {
+          toast({
+            description: error instanceof Error ? error.message : String(error),
+            variant: "destructive",
+          });
+        }
+      }
       onDeleted?.();
       toast({
         description: successMessage,
@@ -44,9 +57,10 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
             altText={undoAltText}
             onClick={() => {
               void undo(result)
-                .then(() => {
+                .then(async () => {
                   setItems(rollback);
                   onUndone?.();
+                  if (syncSnapshotUuid) await recordSnapshotUndone(syncSnapshotUuid);
                 })
                 .catch((error) => toast({
                   description: error instanceof Error ? error.message : String(error),

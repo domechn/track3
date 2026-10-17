@@ -200,6 +200,87 @@ describe("chat sessions middlelayer", () => {
     await sessions.createSession();
     await sessions.appendMessages("uuid-1", [{ role: "user", content: `Check ${address}` }]);
     expect((await sessions.loadSession("uuid-1"))?.messages[0]).toEqual({ role: "user", content: `Check ${address}` });
+  it("keeps a same-millisecond user and assistant batch in order after sync merge", async () => {
+    const sessions = await import("./sessions");
+    const { mergeSessions } = await import("../sync/engine");
+    await sessions.createSession();
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+      await sessions.appendMessages("uuid-1", [
+        { id: "z-user", role: "user", content: "Question" },
+        { id: "a-assistant", role: "assistant", blocks: [{ kind: "text", text: "Answer" }] },
+      ]);
+      const local = (await sessions.loadSession("uuid-1"))!;
+      const synced = {
+        ...local,
+        messages: local.messages.map((message) => ({ ...message, id: message.id!, at: message.at! })),
+      };
+      const merged = mergeSessions(synced, synced);
+      expect(merged.messages.map((message) => message.id)).toEqual(["z-user", "a-assistant"]);
+      await sessions.saveSyncedSession(local);
+      expect((await sessions.loadSession("uuid-1"))?.messages.map((message) => message.id))
+        .toEqual(["z-user", "a-assistant"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives new messages stable ids and actual append timestamps", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    const before = Date.now();
+    await sessions.appendMessages("uuid-1", [{ role: "user", content: "Hi" }]);
+    const first = (await sessions.loadSession("uuid-1"))!.messages[0];
+    const second = (await sessions.loadSession("uuid-1"))!.messages[0];
+    expect(first.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(first.id).toBe(second.id);
+    expect(Date.parse(first.at!)).toBeGreaterThanOrEqual(before);
+  });
+  it("persists a merged session with message ids for the next sync", async () => {
+    const sessions = await import("./sessions");
+    await sessions.saveSyncedSession({
+      id: "shared", title: "Shared", createdAt: "2026-01-01", updatedAt: "2026-01-02",
+      pinned: 0, messageCount: 2, preview: "Hi",
+      messages: [
+        { id: "one", at: "2026-01-01", role: "user", content: "Hi" },
+        { id: "two", at: "2026-01-02", role: "assistant", blocks: [{ kind: "text", text: "Hello" }] },
+      ],
+    });
+    const loaded = await sessions.loadSession("shared");
+    expect(loaded?.messages.map((message) => message.id)).toEqual(["one", "two"]);
+  });
+  it("does not duplicate legacy file messages when a remote device appends", async () => {
+    const sessions = await import("./sessions");
+    const CryptoJS = (await import("crypto-js")).default;
+    await sessions.createSession();
+    const legacy = { role: "user" as const, content: "Old" };
+    fsFileMap.set("/appdata/ai/sessions/uuid-1.json.ent", `enc:${JSON.stringify({
+      version: 1, messages: [legacy],
+    })}`);
+    const createdAt = (await sessions.listSessions())[0].createdAt;
+    const appendedAt = new Date(Date.parse(createdAt) + 1_000).toISOString();
+    const id = CryptoJS.SHA256(`uuid-1:0:${JSON.stringify(legacy)}`).toString().slice(0, 32);
+    await sessions.saveSyncedSession({
+      id: "uuid-1", title: "Shared", createdAt, updatedAt: appendedAt,
+      pinned: 0, messageCount: 2, preview: "Old",
+      messages: [
+        { ...legacy, id, at: createdAt },
+        { role: "user", content: "New", id: "remote-new", at: appendedAt },
+      ],
+    });
+    expect((await sessions.loadSession("uuid-1"))?.messages.map((message) =>
+      message.role === "user" ? message.content : "assistant"))
+      .toEqual(["Old", "New"]);
+  });
+  it("keeps a local append made after a synced session was listed", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    await sessions.appendMessages("uuid-1", [{ id: "old", at: "2026-01-01", role: "user", content: "Old" }]);
+    const stale = (await sessions.loadSession("uuid-1"))!;
+    await sessions.appendMessages("uuid-1", [{ id: "new", at: "2026-01-02", role: "user", content: "New" }]);
+    await sessions.saveSyncedSession(stale);
+    expect((await sessions.loadSession("uuid-1"))?.messages.map((message) => message.id)).toEqual(["old", "new"]);
   });
   it("persists a rolling summary and usage in the encrypted session file across appends", async () => {
     const sessions = await import("./sessions");
@@ -470,7 +551,7 @@ describe("chat sessions middlelayer", () => {
     const parsed = JSON.parse(decrypted);
     expect(parsed.messages).toEqual([
       { role: "user", content: "old" },
-      { role: "assistant", blocks: [{ kind: "text", text: "new" }] },
+      expect.objectContaining({ role: "assistant", blocks: [{ kind: "text", text: "new" }] }),
     ]);
   });
 
@@ -484,7 +565,7 @@ describe("chat sessions middlelayer", () => {
     expect(payload).toBeDefined();
     const decrypted = String(payload).slice(4);
     const parsed = JSON.parse(decrypted);
-    expect(parsed.messages).toEqual([{ role: "user", content: "first" }]);
+    expect(parsed.messages).toEqual([expect.objectContaining({ role: "user", content: "first" })]);
   });
 
   it("preserves an existing encrypted session when its payload is invalid", async () => {

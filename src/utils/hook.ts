@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { cleanTotalProfitCache } from '@/middlelayers/charts'
 import { Menu, MenuItem } from '@tauri-apps/api/menu'
+import { APP_SOFT_REFRESH_EVENT } from './events'
 
-export const APP_SOFT_REFRESH_EVENT = "track3:soft-refresh"
+export { APP_SOFT_REFRESH_EVENT } from './events'
 
 type WindowSizeState = {
 	width: number | undefined

@@ -9,6 +9,8 @@ import {
 import { ASSET_HANDLER } from "./entities/assets";
 import { selectFromDatabaseWithSql } from "./database";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
+import { invoke } from "@tauri-apps/api/core";
+import { readSnapshot } from "./snapshot";
 
 export type HistoricalPageRow = {
   id: string;
@@ -169,9 +171,7 @@ export async function queryTotalValues(
 
 // delete batch records by uuid
 export async function deleteHistoricalDataByUUID(uuid: string): Promise<void> {
-  await ASSET_HANDLER.deleteAssetsByUUID(uuid);
-  // !also delete assets related transactions
-  await TRANSACTION_HANDLER.deleteTransactionsByUUID(uuid);
+  await invoke("delete_sync_snapshot", { uuid });
 }
 
 // delete single record by id
@@ -188,6 +188,13 @@ export async function restoreHistoricalData(
 ): Promise<void> {
   const { assets, transactions } = data;
 
+  if (data.snapshot) {
+    await invoke("import_sync_snapshot", { snapshot: data.snapshot });
+    const assetIds = new Set(data.snapshot.assets.map((asset) => asset.id));
+    const orphanTransactions = transactions.filter((transaction) => !assetIds.has(transaction.assetID));
+    if (orphanTransactions.length) await TRANSACTION_HANDLER.saveTransactions(orphanTransactions);
+    return;
+  }
   await ASSET_HANDLER.saveAssets(assets);
   // await ASSET_PRICE_HANDLER.savePrices(prices)
   await TRANSACTION_HANDLER.saveTransactions(transactions);
@@ -209,6 +216,7 @@ export async function queryRestoreHistoricalData(
   return {
     assets,
     transactions,
+    ...(isUUID ? { snapshot: await readSnapshot(id) } : {}),
   };
 }
 

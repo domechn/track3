@@ -10,6 +10,7 @@ import {
 } from "@tauri-apps/plugin-fs";
 import { v4 as uuidv4 } from "uuid";
 import md5 from "md5";
+import CryptoJS from "crypto-js";
 
 import {
   deleteFromDatabase,
@@ -64,8 +65,8 @@ export type PersistedBlock =
   | PendingAction;
 
 export type PersistedChatMessage =
-  | { role: "user"; content: string }
-  | { role: "assistant"; blocks: PersistedBlock[]; usage?: TokenUsage; contextTokens?: number };
+  | ({ role: "user"; content: string } & { id?: string; at?: string })
+  | ({ role: "assistant"; blocks: PersistedBlock[]; usage?: TokenUsage; contextTokens?: number } & { id?: string; at?: string });
 
 export type ChatSession = ChatSessionMeta & {
   messages: PersistedChatMessage[];
@@ -197,10 +198,48 @@ function normalizeMessage(message: PersistedChatMessage): PersistedChatMessage {
   return {
     role: "assistant",
     blocks: message.blocks,
+    ...(message.id ? { id: message.id } : {}),
+    ...(message.at ? { at: message.at } : {}),
     ...validUsage(message.usage) ? { usage: message.usage } : {},
     ...Number.isFinite(message.contextTokens) && message.contextTokens! >= 0
       ? { contextTokens: message.contextTokens } : {},
   };
+}
+
+export function stableSyncMessage(
+  sessionId: string, createdAt: string, index: number, message: PersistedChatMessage,
+): PersistedChatMessage & { id: string; at: string } {
+  return {
+    ...message,
+    id: message.id ?? CryptoJS.SHA256(`${sessionId}:${index}:${JSON.stringify(message)}`).toString().slice(0, 32),
+    at: message.at ?? new Date((Date.parse(createdAt) || 0) + index).toISOString(),
+  };
+}
+
+export async function saveSyncedSession(session: ChatSession): Promise<void> {
+  if (!validMessages(session.messages)) throw new Error("Invalid synced chat session");
+  await runWithEncryptionWriteGate(async () => {
+    const current = await loadSession(session.id);
+    const messages = new Map(session.messages.map((message, index) => {
+      const stable = stableSyncMessage(session.id, session.createdAt, index, message);
+      return [stable.id, stable] as const;
+    }));
+    for (const [index, message] of (current?.messages ?? []).entries()) {
+      const stable = stableSyncMessage(session.id, current!.createdAt, index, message);
+      if (!messages.has(stable.id)) messages.set(stable.id, stable);
+    }
+    const merged = [...messages.values()].sort((a, b) => (a.at ?? "").localeCompare(b.at ?? "") ||
+      (a.id ?? "").localeCompare(b.id ?? ""));
+    const metadata = current && current.updatedAt > session.updatedAt ? current : session;
+    await writeSessionPayload(session.id, {
+      version: FILE_VERSION,
+      messages: merged,
+      summary: metadata.summary,
+    });
+    const { messages: _messages, summary: _summary, ...meta } = metadata;
+    await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [{ ...meta, messageCount: merged.length }]);
+    notifySessionUpdate(session.id);
+  });
 }
 
 function validSummary(value: unknown): value is ConversationSummary {
@@ -390,7 +429,14 @@ export async function appendMessages(
 ): Promise<void> {
   await runWithEncryptionWriteGate(async () => {
     const existing = await readSessionPayload(id);
-    const original = [...existing.messages, ...messages];
+    const lastAt = Date.parse(existing.messages.at(-1)?.at ?? "") || 0;
+    const baseAt = Math.max(Date.now(), lastAt + 1);
+    const stamped = messages.map((message, index) => ({
+      ...message,
+      id: message.id ?? crypto.randomUUID(),
+      at: message.at ?? new Date(baseAt + index).toISOString(),
+    }));
+    const original = [...existing.messages, ...stamped];
     const combined = redactForExport(original, secrets);
     const savedSummary = summary ?? existing.summary;
     let throughMessageHash = savedSummary?.throughMessageHash;

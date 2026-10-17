@@ -384,6 +384,7 @@ const App = ({
         undoLabel: t("common.undo"),
         undoAltText: t("history.undoDelete"),
         undoWindowMs: 5000,
+        syncSnapshotUuid: uuid,
       });
     },
     [afterDataChanged, data, latestRow, runDelete, t],
