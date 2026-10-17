@@ -163,7 +163,7 @@ export async function loadAIConfig(): Promise<AIConfig> {
   }
   const cfg = parsed as AIConfig;
   validateAIConfig(cfg);
-  return cfg;
+  return { ...cfg, allowActions: cfg.allowActions !== false };
 }
 
 // saveAIConfig validates the input and persists it encrypted under the
@@ -176,6 +176,7 @@ export async function saveAIConfig(cfg: AIConfig): Promise<void> {
     apiKey: cfg.apiKey,
     model: cfg.model.trim(),
     contextSize: Math.max(1, Math.floor(cfg.contextSize)),
+    allowActions: cfg.allowActions !== false,
     pricePerMillionTokens: cfg.pricePerMillionTokens,
     inputPricePerMillionTokens: cfg.inputPricePerMillionTokens,
     outputPricePerMillionTokens: cfg.outputPricePerMillionTokens,

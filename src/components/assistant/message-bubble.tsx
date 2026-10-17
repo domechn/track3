@@ -9,6 +9,7 @@ import { useTranslation } from "@/i18n";
 import MarkdownRenderer from "./markdown-renderer";
 import type { AssistantBlock, ChatMessage } from "./use-chat";
 import UsageLabel from "./usage-label";
+import ActionCard from "./action-card";
 
 function stripThinkTags(s: string): string {
   return s.replace(/<\/?think\s*>/gi, "").trim();
@@ -127,7 +128,8 @@ function mergeBlocks(blocks: AssistantBlock[]): AssistantBlock[] {
   return merged;
 }
 
-function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: boolean, hasResponseStarted?: boolean) {
+function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: boolean, hasResponseStarted?: boolean,
+  onDecideAction?: (id: string, decision: "approve" | "reject") => void, canDecideAction?: boolean) {
   if (block.kind === "think") {
     return <ThinkBlock key={idx} text={block.text} isStreaming={isStreaming} hasResponseStarted={hasResponseStarted} />;
   }
@@ -160,6 +162,9 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
       </div>
     );
   }
+  if (block.kind === "pending_action") {
+    return <ActionCard key={block.id} action={block} onDecide={onDecideAction} canDecide={canDecideAction} />;
+  }
 }
 
 export default function MessageBubble({
@@ -168,12 +173,16 @@ export default function MessageBubble({
   pricePerMillionTokens,
   inputPricePerMillionTokens,
   outputPricePerMillionTokens,
+  onDecideAction,
+  canDecideAction,
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
   pricePerMillionTokens?: number;
   inputPricePerMillionTokens?: number;
   outputPricePerMillionTokens?: number;
+  onDecideAction?: (id: string, decision: "approve" | "reject") => void;
+  canDecideAction?: boolean;
 }) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
@@ -233,9 +242,11 @@ export default function MessageBubble({
             ) : (
               blocks.map((b, i) => renderAssistantBlock(
                 b, i, isStreaming, blocks.slice(i + 1).some((later) => later.kind === "text"),
+                onDecideAction, canDecideAction,
               ))
             )}
-            {!isStreaming && !blocks.some((block) => block.kind === "text" && stripThinkTags(block.text)) && (
+            {!isStreaming && !blocks.some((block) => block.kind === "pending_action" ||
+              (block.kind === "text" && stripThinkTags(block.text))) && (
               <p className="text-sm italic text-muted-foreground">{t("assistant.chat.noResponse")}</p>
             )}
             {message.usage && <UsageLabel usage={message.usage} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />}

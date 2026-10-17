@@ -43,6 +43,7 @@ vi.mock("@/middlelayers/charts", () => ({
 }));
 
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
+import { COMPARISON_DATES_KEY } from "@/middlelayers/ai/actions";
 
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
@@ -52,6 +53,17 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  it("replaces an assistant date selection when the user chooses a quick comparison", async () => {
+    localStorage.setItem(COMPARISON_DATES_KEY, JSON.stringify({ base: "2024-04-15", head: "2024-04-16" }));
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      { id: "1", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+      { id: "2", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+    ]);
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+    await userEvent.click(await screen.findByRole("radio", { name: "7D" }));
+    expect(localStorage.getItem(COMPARISON_DATES_KEY)).toBeNull();
+  });
   function toLocalDateTimeParts(iso: string) {
     const d = new Date(iso);
     const pad = (n: number) => String(n).padStart(2, "0");

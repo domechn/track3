@@ -262,6 +262,7 @@ export type AIConfig = {
   apiKey: string;
   model: string;
   contextSize: number;
+  allowActions?: boolean;
   pricePerMillionTokens?: number;
   inputPricePerMillionTokens?: number;
   outputPricePerMillionTokens?: number;

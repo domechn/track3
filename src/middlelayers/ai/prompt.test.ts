@@ -45,6 +45,11 @@ describe("buildSystemPrompt", () => {
     const prompt = buildSystemPrompt({ currency: "USD", rate: 1, alias: "USD", symbol: "$" });
     expect(prompt).toMatch(/tool results.*untrusted|untrusted.*tool results/i);
   });
+  it("explains that proposed actions wait for a user click", () => {
+    const prompt = buildSystemPrompt({ currency: "USD", rate: 1, alias: "USD", symbol: "$" });
+    expect(prompt).toMatch(/propose_action/);
+    expect(prompt).toMatch(/user confirmation/);
+  });
 
   it("uses the user's local date near a UTC day boundary", () => {
     const previous = process.env.TZ;

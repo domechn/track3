@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
+import { ASSISTANT_APP_ACTION_EVENT, COMPARISON_DATES_KEY, CURRENT_COMPARISON_DATES_KEY, validateActionArgs } from "@/middlelayers/ai/actions";
 import bluebird from "bluebird";
 import {
   currencyWrapper,
@@ -74,6 +75,32 @@ const App = ({
   const [baseId, setBaseId] = useState<string>("");
   const [headId, setHeadId] = useState<string>("");
   const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
+  useEffect(() => {
+    const base = dateOptions.find((option) => option.value === baseId)?.label;
+    const head = dateOptions.find((option) => option.value === headId)?.label;
+    if (base && head) localStorage.setItem(CURRENT_COMPARISON_DATES_KEY, JSON.stringify({ base, head }));
+  }, [baseId, headId, dateOptions]);
+  useEffect(() => {
+    const applyAssistantDates = () => {
+      try {
+        const raw = localStorage.getItem(COMPARISON_DATES_KEY);
+        if (!raw) return;
+        const dates = validateActionArgs("set_comparison_dates", JSON.parse(raw));
+        const base = dateOptions.find((option) => option.label === dates.base);
+        const head = dateOptions.find((option) => option.label === dates.head);
+        if (base && head) {
+          setCurrentQuickCompare(null);
+          setBaseId(base.value);
+          setHeadId(head.value);
+        }
+      } catch {
+        localStorage.removeItem(COMPARISON_DATES_KEY);
+      }
+    };
+    applyAssistantDates();
+    window.addEventListener(ASSISTANT_APP_ACTION_EVENT, applyAssistantDates);
+    return () => window.removeEventListener(ASSISTANT_APP_ACTION_EVENT, applyAssistantDates);
+  }, [dateOptions]);
   const [currentQuickCompare, setCurrentQuickCompare] =
     useState<QuickCompareType | null>(null);
 
@@ -366,6 +393,7 @@ const App = ({
   }
 
   function onDateChange(id: string, type: "base" | "head") {
+    localStorage.removeItem(COMPARISON_DATES_KEY);
     setCurrentQuickCompare(null);
     if (type === "base") {
       setBaseId(id);
@@ -464,6 +492,7 @@ const App = ({
   }
 
   function onQuickCompareButtonClick(type: QuickCompareType) {
+    localStorage.removeItem(COMPARISON_DATES_KEY);
     setCurrentQuickCompare(type);
   }
 

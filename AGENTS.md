@@ -197,6 +197,7 @@ The user-facing language switcher lives in the **Appearance** tab of Settings (`
 - CI and release behavior are defined in `.github/workflows/`.
 - Stock data from Interactive Brokers (`@stoqey/ibkr` via `stock/ibkr.ts`).
 - Chat sessions are stored in the `chat_sessions` table and managed through `src/components/assistant/use-chat-sessions.ts`.
+- Assistant writes are limited to `src/middlelayers/ai/actions/`. The model may call `propose_action`, but only the chat confirmation card may claim and execute a pending action. Action blocks and audit results live in the existing encrypted session file; the session claim must be persisted before execution. Do not add assistant paths to secrets, sync, history deletion, or refresh with new credentials. Date and comparison selections use the assistant action event and local storage.
 
 ## Security
 

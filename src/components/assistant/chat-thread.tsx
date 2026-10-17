@@ -56,6 +56,8 @@ export default function ChatThread({
   pricePerMillionTokens,
   inputPricePerMillionTokens,
   outputPricePerMillionTokens,
+  onDecideAction,
+  canDecideAction,
 }: {
   messages: ChatMessage[];
   isStreaming: boolean;
@@ -63,6 +65,8 @@ export default function ChatThread({
   pricePerMillionTokens?: number;
   inputPricePerMillionTokens?: number;
   outputPricePerMillionTokens?: number;
+  onDecideAction?: (id: string, decision: "approve" | "reject") => void;
+  canDecideAction?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const userScrolledAwayRef = useRef(false);
@@ -156,7 +160,7 @@ export default function ChatThread({
           <WelcomePanel onPickPrompt={onPickPrompt} />
         ) : (
           messages.map((m, i) => (
-            <MessageBubble key={i} message={m} isStreaming={isStreaming && i === messages.length - 1} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />
+            <MessageBubble key={i} message={m} isStreaming={isStreaming && i === messages.length - 1} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} onDecideAction={onDecideAction} canDecideAction={canDecideAction} />
           ))
         )}
         {isStreaming && messages.at(-1)?.role !== "assistant" && (

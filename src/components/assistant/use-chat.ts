@@ -19,6 +19,11 @@ import { prepareHistory, summaryOffset } from "@/middlelayers/ai/history";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
 import { callLlm } from "@/middlelayers/ai/orchestrator/llm";
 import { useTranslation } from "@/i18n";
+import { executePreparedAction, prepareAction, proposeActionTool } from "@/middlelayers/ai/actions";
+import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
+import { resolveAction } from "@/middlelayers/ai/actions/lifecycle";
+import { claimSessionAction, finishSessionAction } from "@/middlelayers/ai/sessions";
+import { queryPreferCurrency } from "@/middlelayers/configuration";
 
 // Agent-activity block rendered when the orchestrator decomposes a
 // complex query into multiple sub-tasks.
@@ -38,7 +43,8 @@ export type AgentActivityBlock = {
 export type AssistantBlock =
   | { kind: "text"; text: string }
   | { kind: "think"; text: string }
-  | AgentActivityBlock;
+  | AgentActivityBlock
+  | PendingAction;
 
 export type ChatMessage =
   | { role: "user"; content: string }
@@ -51,7 +57,7 @@ export type UseChatOptions = {
   contextSize?: number;
   initialMessages?: ChatMessage[];
   initialSummary?: ConversationSummary;
-  onStreamComplete?: (messages: ChatMessage[], summary?: ConversationSummary) => void;
+  onStreamComplete?: (messages: ChatMessage[], summary?: ConversationSummary) => void | Promise<void>;
   onStreamingChange?: (streaming: boolean) => void;
 };
 
@@ -71,6 +77,19 @@ export type UseChatResult = {
   runQuickAction: (key: string, prompt: string) => Promise<void>;
   probe: () => Promise<string | undefined>;
   clear: () => void;
+  decideAction: (id: string, decision: "approve" | "reject") => Promise<void>;
+};
+type ConsumedStream = {
+  toolCalls: Array<{
+    id: string;
+    name: string;
+    args: unknown;
+    result: ToolResult | null;
+    error?: string;
+  }>;
+  reasoningContent: string;
+  reportedUsage?: TokenUsage;
+  completionText: string;
 };
 
 // Convert a chat history into the flat provider message list. Assistant
@@ -89,11 +108,30 @@ function flattenForProvider(messages: ChatMessage[]): ProviderMessage[] {
         if (b.kind === "text") return b.text;
         if (b.kind === "think") return "";
         if (b.kind === "agent_activity") return "";
+        if (b.kind === "pending_action") return "";
       })
       .join("")
       .trim();
     if (text) {
       out.push({ role: "assistant", content: text });
+    }
+    for (const block of m.blocks) {
+      if (block.kind !== "pending_action") continue;
+      if (block.status === "pending" || block.status === "executing") {
+        out.push({ role: "assistant", content: `Proposed ${block.name}; awaiting confirmation. No action has executed.` });
+        continue;
+      }
+      out.push({
+        role: "assistant", content: null,
+        tool_calls: [{
+          id: block.toolCallId, type: "function",
+          function: { name: "propose_action", arguments: JSON.stringify({ action: block.name, args: block.args }) },
+        }],
+      });
+      out.push({
+        role: "tool", tool_call_id: block.toolCallId,
+        content: JSON.stringify({ status: block.status, result: block.result ?? "" }),
+      });
     }
   }
   return out;
@@ -122,6 +160,8 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const abortRef = useRef<AbortController | null>(null);
   const stoppedControllerRef = useRef<AbortController | null>(null);
   const inFlightRef = useRef(false);
+  const decidingRef = useRef(new Set<string>());
+  const proposalCountRef = useRef(0);
   const mountedRef = useRef(true);
   const messagesRef = useRef<ChatMessage[]>(initialMessages);
   const onStreamCompleteRef = useRef(onStreamComplete);
@@ -166,6 +206,16 @@ export function useChat(options: UseChatOptions): UseChatResult {
       messagesRef.current.length > 0;
 
     if (sessionChanged) {
+      if (syncedSessionIdRef.current) {
+        for (const message of messagesRef.current) {
+          if (message.role !== "assistant") continue;
+          for (const block of message.blocks) {
+            if (block.kind === "pending_action" && block.status === "pending") {
+              void claimSessionAction(syncedSessionIdRef.current, block.id, "expired");
+            }
+          }
+        }
+      }
       if (!preservesDraftForNewSessionId) {
         summaryRef.current = options.initialSummary;
         retryAfterMessageCountRef.current = 0;
@@ -200,6 +250,24 @@ export function useChat(options: UseChatOptions): UseChatResult {
   }, [sessionId]);
 
   useEffect(() => {
+    if (!sessionId) return;
+    const pending = messages.flatMap((message) => message.role === "assistant" ? message.blocks : [])
+      .filter((block): block is PendingAction => block.kind === "pending_action" && block.status === "pending");
+    const timers = pending.map((action) => window.setTimeout(() => {
+      void claimSessionAction(sessionId, action.id, "expired").then((claimed) => {
+        if (!claimed || syncedSessionIdRef.current !== sessionId) return;
+        const next = messagesRef.current.map((message): ChatMessage => message.role === "user" ? message : ({
+          ...message, blocks: message.blocks.map((block) =>
+            block.kind === "pending_action" && block.id === action.id ? { ...block, status: "expired" } : block),
+        }));
+        messagesRef.current = next;
+        if (mountedRef.current) setMessages(next);
+      });
+    }, Math.max(0, Date.parse(action.expiresAt) - Date.now())));
+    return () => timers.forEach(window.clearTimeout);
+  }, [messages, sessionId]);
+
+  useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -208,8 +276,8 @@ export function useChat(options: UseChatOptions): UseChatResult {
   }, []);
 
   const systemPrompt = useMemo(
-    () => buildSystemPrompt(baseCurrency),
-    [baseCurrency],
+    () => buildSystemPrompt(baseCurrency, config.allowActions !== false),
+    [baseCurrency, config.allowActions],
   );
   useEffect(() => {
     if (inFlightRef.current) return;
@@ -252,7 +320,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
   // Consume the provider stream and append events to the trailing
   // assistant message. Tool calls are dispatched only when tools were offered.
   const consumeStream = useCallback(
-    async (events: AsyncGenerator<StreamEvent>, assistantIndex: number, signal: AbortSignal, allowTools = true) => {
+    async (events: AsyncGenerator<StreamEvent>, assistantIndex: number, signal: AbortSignal, allowTools = true): Promise<ConsumedStream | undefined> => {
       // State machine for <think> tag parsing.  When the model bakes
       // reasoning content into the text stream via <think>...</think>
       // tags we split it into separate think/text blocks rather than
@@ -323,6 +391,30 @@ export function useChat(options: UseChatOptions): UseChatResult {
         result: ToolResult | null;
         error?: string;
       }> => {
+        if (ev.name === "propose_action") {
+          if (config.allowActions === false || proposalCountRef.current >= 1) {
+            return { id: ev.id, name: ev.name, args: ev.args, result: null, error: "Action proposals are disabled or rate limited" };
+          }
+          proposalCountRef.current++;
+          try {
+            const outer = ev.args;
+            if (!outer || typeof outer !== "object" || Array.isArray(outer) ||
+              Object.keys(outer).some((key) => key !== "action" && key !== "args")) throw new Error("Invalid proposal");
+            const raw = outer as { action?: unknown; args?: unknown };
+            if (typeof raw.action !== "string") throw new Error("Invalid proposal");
+            const pending = await prepareAction(raw.action, raw.args, ev.id, secrets);
+            const next = messagesRef.current.slice();
+            const target = next[assistantIndex];
+            if (target?.role === "assistant") {
+              next[assistantIndex] = { ...target, blocks: [...target.blocks, pending] };
+              messagesRef.current = next;
+              if (mountedRef.current) setMessages(next);
+            }
+            return { id: ev.id, name: ev.name, args: ev.args, result: null };
+          } catch (error) {
+            return { id: ev.id, name: ev.name, args: ev.args, result: null, error: redactSecrets((error as Error).message, secrets) };
+          }
+        }
         const skillResult = await runSkill(
           ev.name,
           (ev.args as Record<string, unknown>) ?? {},
@@ -416,7 +508,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
       }
       return { toolCalls: toolCallResults, reasoningContent, reportedUsage, completionText };
     },
-    [baseCurrency, secrets],
+    [baseCurrency, secrets, config.allowActions],
   );
 
   // Consume orchestrator events and map them to assistant blocks.
@@ -535,6 +627,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
     async (text?: string) => {
       const content = (text ?? input).trim();
       if (!mountedRef.current || !content || inFlightRef.current) return;
+      proposalCountRef.current = 0;
       const completion = onStreamCompleteRef.current;
       inFlightRef.current = true;
       setInput("");
@@ -560,7 +653,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
       };
       try {
         const history = flattenForProvider([...previous, userMessage]);
-        const tools = toOpenAITools();
+        const tools = [...toOpenAITools(), ...(config.allowActions === false ? [] : [proposeActionTool])];
         const toolTokens = estimateTokens(JSON.stringify(tools), "json");
         const prepared = await prepareHistory(history, summaryRef.current, contextSize,
           async (messages, limit) => callLlm({
@@ -636,15 +729,18 @@ export function useChat(options: UseChatOptions): UseChatResult {
         // can generate natural-language analysis from the returned data.
         const MAX_ROUNDS = 5;
         let roundLimit = MAX_ROUNDS;
+        let previousResultsTruncated: boolean = false;
         for (let round = 0; round < roundLimit; round++) {
           if (controller.signal.aborted) break;
           const messageTokens = estimateMessages(providerMessages);
           // Once the history outgrows the budget (or this is the last round)
           // make one final call WITHOUT tools so the model answers from the
           // data it already has instead of the turn ending silently.
-          const finalRound =
+          const finalRound: boolean =
             round === roundLimit - 1 ||
-            messageTokens + toolTokens > contextSize * 0.8;
+            messageTokens + toolTokens > contextSize * 0.8 ||
+            (history.length > 1 && previousResultsTruncated &&
+              messageTokens + toolTokens > contextSize * 0.73);
           const usedTokens = messageTokens + (finalRound ? 0 : toolTokens);
           setContextTokens(usedTokens);
           lastContextTokens = usedTokens;
@@ -659,7 +755,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
             signal: controller.signal,
           });
 
-          const response =
+          const response: ConsumedStream =
             (await consumeStream(events, idx, controller.signal, !finalRound)) ?? { toolCalls: [], reasoningContent: "", completionText: "", reportedUsage: undefined };
           const { toolCalls, reasoningContent } = response;
           recordUsage(response.reportedUsage ?? {
@@ -672,7 +768,10 @@ export function useChat(options: UseChatOptions): UseChatResult {
             lastContextTokens = response.reportedUsage.promptTokens;
           }
 
-          if (controller.signal.aborted || toolCalls.length === 0 || finalRound) {
+          const currentMessage = messagesRef.current[idx];
+          if (controller.signal.aborted || toolCalls.length === 0 || finalRound ||
+            (currentMessage?.role === "assistant" &&
+              currentMessage.blocks.some((block) => block.kind === "pending_action"))) {
             break;
           }
 
@@ -703,6 +802,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
               secrets,
             ),
           }));
+          previousResultsTruncated = formattedResults.some(({ formatted }) => formatted.budgetTruncated);
           const toolResultMessages: ProviderMessage[] = formattedResults.map(({ tc, formatted }) => ({
             role: "tool",
             tool_call_id: tc.id,
@@ -732,7 +832,8 @@ export function useChat(options: UseChatOptions): UseChatResult {
         if (!controller.signal.aborted) {
           const updated = messagesRef.current.slice();
           const target = updated[idx];
-          if (target?.role === "assistant" && !target.blocks.some((block) => block.kind === "text" && block.text.trim())) {
+          if (target?.role === "assistant" && !target.blocks.some((block) =>
+            block.kind === "pending_action" || (block.kind === "text" && block.text.trim()))) {
             updated[idx] = { ...target, blocks: [...target.blocks, { kind: "text", text: t("assistant.chat.noResponse") }] };
             messagesRef.current = updated;
             if (mountedRef.current) setMessages(updated);
@@ -748,14 +849,17 @@ export function useChat(options: UseChatOptions): UseChatResult {
             if (mountedRef.current) setMessages(updated);
           }
         }
-        if (abortRef.current === controller) {
-          inFlightRef.current = false;
-          if (mountedRef.current) setIsStreaming(false);
-          abortRef.current = null;
-        }
         // A user-stopped turn has spent tokens. Session switches still discard the old turn.
-        if (!controller.signal.aborted || saveStopped) {
-          completion?.(saveStopped ? messagesRef.current.slice(0, idx + 1) : messagesRef.current, summaryRef.current);
+        try {
+          if (!controller.signal.aborted || saveStopped) {
+            await completion?.(saveStopped ? messagesRef.current.slice(0, idx + 1) : messagesRef.current, summaryRef.current);
+          }
+        } finally {
+          if (abortRef.current === controller) {
+            inFlightRef.current = false;
+            if (mountedRef.current) setIsStreaming(false);
+            abortRef.current = null;
+          }
         }
         if (stoppedControllerRef.current === controller) stoppedControllerRef.current = null;
       }
@@ -772,6 +876,69 @@ export function useChat(options: UseChatOptions): UseChatResult {
       t,
     ],
   );
+
+  const decideAction = useCallback(async (id: string, decision: "approve" | "reject") => {
+    if (!sessionId || decidingRef.current.has(id) || inFlightRef.current) return;
+    const action = messagesRef.current.flatMap((message) => message.role === "assistant" ? message.blocks : [])
+      .find((block): block is PendingAction => block.kind === "pending_action" && block.id === id);
+    if (!action || action.status !== "pending") return;
+    decidingRef.current.add(id);
+    inFlightRef.current = true;
+    if (mountedRef.current) setIsStreaming(true);
+    const actionSessionId = sessionId;
+    try {
+      const updated = await resolveAction(action, decision, actionSessionId, () => syncedSessionIdRef.current ?? "",
+        (status) => claimSessionAction(actionSessionId, id, status),
+        (status, result) => finishSessionAction(actionSessionId, id, status as "approved" | "failed", result, secrets),
+        () => executePreparedAction(action),
+      );
+      if (updated === action || syncedSessionIdRef.current !== actionSessionId) return;
+      const next = messagesRef.current.map((message): ChatMessage => message.role === "user" ? message : ({
+        ...message, blocks: message.blocks.map((block) =>
+          block.kind === "pending_action" && block.id === id ? updated : block),
+      }));
+      messagesRef.current = next;
+      if (mountedRef.current) setMessages(next);
+      if (updated.status === "approved" || updated.status === "failed" || updated.status === "rejected") {
+        const continuation: ChatMessage = { role: "assistant", blocks: [] };
+        const withContinuation = [...next, continuation];
+        messagesRef.current = withContinuation;
+        if (mountedRef.current) setMessages(withContinuation);
+        const controller = new AbortController();
+        abortRef.current = controller;
+        try {
+          const continuationCurrency = action.name === "set_base_currency" && updated.status === "approved"
+            ? await queryPreferCurrency() : baseCurrency;
+          const providerMessages = [
+            { role: "system" as const, content: buildSystemPrompt(continuationCurrency, config.allowActions !== false) },
+            ...flattenForProvider(next),
+          ];
+          await consumeStream(streamChatCompletion({
+            endpoint: config.endpoint, apiKey: config.apiKey, model: config.model,
+            messages: providerMessages, advanced: config.advanced, signal: controller.signal,
+          }), withContinuation.length - 1, controller.signal, false);
+          if (!controller.signal.aborted && syncedSessionIdRef.current === actionSessionId) {
+            await onStreamCompleteRef.current?.(messagesRef.current, summaryRef.current);
+          }
+        } finally {
+          abortRef.current = null;
+        }
+      }
+    } catch {
+      const next = messagesRef.current.map((message): ChatMessage => message.role === "user" ? message : ({
+        ...message, blocks: message.blocks.map((block) =>
+          block.kind === "pending_action" && block.id === id
+            ? { ...block, status: "executing", result: "assistant.action.result.unavailable" }
+            : block),
+      }));
+      messagesRef.current = next;
+      if (mountedRef.current) setMessages(next);
+    } finally {
+      decidingRef.current.delete(id);
+      inFlightRef.current = false;
+      if (mountedRef.current) setIsStreaming(false);
+    }
+  }, [sessionId, secrets, config, baseCurrency, consumeStream]);
 
   const runQuickAction = useCallback(
     async (key: string, prompt: string) => {
@@ -804,6 +971,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
     runQuickAction,
     probe,
     clear,
+    decideAction,
   };
 }
 
