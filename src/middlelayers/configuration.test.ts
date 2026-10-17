@@ -7,6 +7,9 @@ import {
   cleanLicense,
   getConfiguration,
   importRawConfiguration,
+  exportConfigurationString,
+  getCostBasisMethod,
+  saveCostBasisMethod,
   saveConfiguration,
   saveLicense,
   saveStableCoins,
@@ -37,7 +40,7 @@ vi.mock("./database", () => ({
 function createTracingDb() {
   const executeCalls: { sql: string; values: unknown[] }[] = [];
   const db = {
-    select: vi.fn(async () => []),
+    select: vi.fn(async (_sql: string, _values?: unknown[]) => []),
     execute: vi.fn(async (sql: string, values: unknown[]) => {
       executeCalls.push({ sql, values });
       return { rowsAffected: 1 };
@@ -91,6 +94,28 @@ beforeEach(() => {
 });
 
 describe("saveConfiguration", () => {
+  it("restores the cost basis method from a configuration export", async () => {
+    const rows = new Map<string, string>([
+      ["12", "configs:\n  groupUSD: false\nothers: []\n"],
+    ]);
+    tracing.db.select.mockImplementation(async (_sql, values) =>
+      (values as string[])
+        .filter((id) => rows.has(id)).map((id) => ({ id, data: rows.get(id)! })) as never,
+    );
+    tracing.db.execute.mockImplementation(async (_sql, values: unknown[]) => {
+      for (let index = 0; index < values.length; index += 2) {
+        rows.set(String(values[index]), String(values[index + 1]));
+      }
+      return { rowsAffected: values.length / 2 };
+    });
+    await saveCostBasisMethod("HIFO");
+    const exported = await exportConfigurationString();
+    expect(yaml.parse(String(exported).replace(/^!ent:/, "")).costBasisMethod).toBe("HIFO");
+    await saveCostBasisMethod("FIFO");
+    await importRawConfiguration(exported!);
+    expect(await getCostBasisMethod()).toBe("HIFO");
+  });
+
   it("reads all four active slots from one SQLite snapshot", async () => {
     tracing.db.select.mockImplementation(
       async () =>

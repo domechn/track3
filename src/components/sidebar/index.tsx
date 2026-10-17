@@ -7,6 +7,7 @@ import {
   MixIcon,
   ActivityLogIcon,
   ClockIcon,
+  LayersIcon,
   GearIcon,
   RocketIcon,
   ChevronLeftIcon,
@@ -21,6 +22,7 @@ const navItems = [
   { to: "/comparison", labelKey: "nav.comparison", icon: MixIcon },
   { to: "/rebalance", labelKey: "nav.rebalance", icon: ActivityLogIcon },
   { to: "/history", labelKey: "nav.history", icon: ClockIcon },
+  { to: "/cost-basis", labelKey: "nav.costBasis", icon: LayersIcon },
   { to: "/settings", labelKey: "nav.settings", icon: GearIcon },
 ];
 

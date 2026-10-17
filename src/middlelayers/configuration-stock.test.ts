@@ -78,7 +78,7 @@ describe("stock configuration", () => {
       ],
     };
 
-    await (configuration as any).saveStockConfig(cfg);
+    await configuration.saveStockConfig(cfg);
 
     expect(invoke).toHaveBeenCalledWith("encrypt", {
       data: expect.stringContaining("token: flex-token"),
@@ -92,7 +92,7 @@ describe("stock configuration", () => {
       '!ent:brokers:\n  - name: ibkr\n    alias: Main IBKR\n    active: true\n    initParams:\n      token: flex-token\n      queryId: "123456"\n',
     );
 
-    await expect((configuration as any).getStockConfig()).resolves.toEqual({
+    await expect(configuration.getStockConfig()).resolves.toEqual({
       brokers: [
         {
           name: "ibkr",
@@ -105,5 +105,13 @@ describe("stock configuration", () => {
         },
       ],
     });
+  });
+});
+
+describe("cost basis method configuration", () => {
+  it("defaults to FIFO and persists the selected method", async () => {
+    expect(await configuration.getCostBasisMethod()).toBe("FIFO");
+    await configuration.saveCostBasisMethod("HIFO");
+    expect(await configuration.getCostBasisMethod()).toBe("HIFO");
   });
 });

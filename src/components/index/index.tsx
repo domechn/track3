@@ -73,6 +73,7 @@ const AssistantSettings = React.lazy(
 );
 const Summary = React.lazy(() => import("../summary"));
 const Appearance = React.lazy(() => import("../appearance"));
+const CostBasis = React.lazy(() => import("../cost-basis"));
 
 ChartJS.register(
   ...registerables,
@@ -424,6 +425,14 @@ function AppRoutes({
                   afterDataChanged={onDataChanged}
                 />
               </PageWrapper>
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="cost-basis"
+          element={
+            <AnimatedPage>
+              <CostBasis />
             </AnimatedPage>
           }
         />

@@ -18,6 +18,7 @@ import { ASSET_HANDLER } from "./entities/assets";
 import { DateRange } from "react-day-picker";
 import { Theme } from "@/components/common/theme";
 import { runWithEncryptionWriteGate } from "./encryption-write-gate";
+import type { CostBasisMethod } from "./cost-basis";
 
 // todo: update to dedicated domain
 export const PRO_API_ENDPOINT = "https://track3-pro-api.domc.me";
@@ -58,6 +59,7 @@ const licenseFixId = "997";
 const stableCoinsId = "996";
 const blacklistCoinsId = "995";
 const aiConfigId = "994";
+const costBasisMethodId = "993";
 const preferCurrencyLocalStorageKey = "track3-prefer-currency";
 
 export const themeLocalStorageKey = "track3-ui-theme";
@@ -275,6 +277,7 @@ export async function getConfiguration(): Promise<GlobalConfig | undefined> {
 type PreparedConfigurationWrite = {
   rows: { id: string; data: string }[];
 };
+type ConfigurationWithCostBasisMethod = GlobalConfig & { costBasisMethod?: CostBasisMethod };
 
 function splitConfiguration(cfg: GlobalConfig) {
   const exchangesData = yaml.stringify({ exchanges: cfg.exchanges });
@@ -295,6 +298,10 @@ function splitConfiguration(cfg: GlobalConfig) {
 async function prepareConfigurationWrite(
   cfg: GlobalConfig,
 ): Promise<PreparedConfigurationWrite> {
+  const costBasisMethod = (cfg as ConfigurationWithCostBasisMethod).costBasisMethod;
+  if (costBasisMethod !== undefined && !["FIFO", "LIFO", "HIFO", "AVERAGE"].includes(costBasisMethod)) {
+    throw new Error("Invalid cost basis method in configuration");
+  }
   const { exchangesData, walletsData, generalData, stockData } =
     splitConfiguration(cfg);
   const [encryptedExchanges, encryptedWallets, encryptedStock] =
@@ -310,6 +317,7 @@ async function prepareConfigurationWrite(
       { id: walletsConfigId, data: encryptedWallets },
       { id: generalConfigId, data: generalData },
       { id: stockConfigId, data: encryptedStock },
+      ...(costBasisMethod ? [{ id: costBasisMethodId, data: costBasisMethod }] : []),
     ],
   };
 }
@@ -386,7 +394,7 @@ export async function parseRawConfiguration(data: string) {
       raw = await invoke<string>("decrypt_with_key", { data: raw, key: customKey });
     }
   }
-  return yaml.parse(raw) as GlobalConfig;
+  return yaml.parse(raw) as ConfigurationWithCostBasisMethod;
 }
 
 // used for import data
@@ -461,7 +469,7 @@ export async function exportConfigurationString(): Promise<string | undefined> {
   if (!cfg) {
     return;
   }
-  const data = yaml.stringify(cfg);
+  const data = yaml.stringify({ ...cfg, costBasisMethod: await getCostBasisMethod() });
   return invoke<string>("encrypt", { data });
 }
 
@@ -528,6 +536,20 @@ export async function queryQuerySize(): Promise<number> {
 
 export async function saveQuerySize(size: number) {
   await saveConfigurationById(querySizeId, size.toString(), false);
+}
+
+export async function getCostBasisMethod(): Promise<CostBasisMethod> {
+  const method = (await getConfigurationById(costBasisMethodId))?.data;
+  return method === "LIFO" || method === "HIFO" || method === "AVERAGE"
+    ? method
+    : "FIFO";
+}
+
+export async function saveCostBasisMethod(method: CostBasisMethod): Promise<void> {
+  if (!["FIFO", "LIFO", "HIFO", "AVERAGE"].includes(method)) {
+    throw new Error("Invalid cost basis method");
+  }
+  await saveConfigurationById(costBasisMethodId, method, false);
 }
 
 export async function updateAllCurrencyRates() {

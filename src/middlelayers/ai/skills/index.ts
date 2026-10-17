@@ -8,6 +8,7 @@ import "./portfolio-value";
 import "./portfolio-comparison";
 import "./transaction-list";
 import "./transaction-stats";
+import "./cost-basis";
 import "./market-price";
 import "./current-context";
 import "./rebalance-status";
