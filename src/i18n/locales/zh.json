@@ -810,6 +810,7 @@
   "goals.ackAll": "全部确认",
   "goals.clearHistory": "清空历史",
   "goals.clearConfirm": "永久删除所有提醒历史？",
+  "goals.deleteConfirm": "删除这条提醒规则？",
   "goals.noHistory": "暂无提醒",
   "goals.unread": "{count} 条未读提醒",
   "goals.alertTriggered": "{kind}已触发：{value}",

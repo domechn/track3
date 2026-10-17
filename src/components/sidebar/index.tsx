@@ -77,12 +77,13 @@ function NavItem({
           {label}
         </span>
       )}
-      {!!unread && <span className={cn(
+      {!!unread && <span aria-hidden="true" className={cn(
         "rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-destructive-foreground",
         collapsed && "absolute -right-1 -top-1",
-      )} aria-label={t("goals.unread").replace("{count}", String(unread))}>
+      )}>
         {unread > 99 ? "99+" : unread}
       </span>}
+      {!!unread && <span className="sr-only">{collapsed ? "" : " "}{t("goals.unread").replace("{count}", String(unread))}</span>}
     </Link>
   );
 }

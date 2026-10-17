@@ -1,4 +1,4 @@
-import { getBlacklistCoins, getStableCoins } from "./configuration";
+import { getStableCoins } from "./configuration";
 import { queryLatestAssets } from "./charts";
 import { executeWrite, getDatabase } from "./database";
 import type { AssetType } from "./datafetch/types";
@@ -61,7 +61,7 @@ const DEFAULT_STABLECOINS = [
 
 const cents = (value: number) => Math.round((value + Number.EPSILON) * 100);
 const fromCents = (value: number) => value / 100;
-const keyOf = (assetType: AssetType, symbol: string) => `${assetType}:${symbol.toUpperCase()}`;
+const keyOf = (assetType: AssetType, symbol: string) => `${assetType}:${symbol.trim().toUpperCase()}`;
 
 /** Normalize positive draft weights by largest remainder to 0.01%. */
 export function normalizeTargets(targets: RebalanceTarget[]): RebalanceTarget[] {
@@ -145,13 +145,12 @@ export async function loadRebalanceHoldings(currency: CurrencyRateDetail): Promi
   holdings: RebalanceHolding[];
   stablecoinSymbols: string[];
 }> {
-  const [assets, stablecoinSymbols, blacklist] = await Promise.all([
-    queryLatestAssets(), getStableCoins(), getBlacklistCoins(),
+  const [assets, stablecoinSymbols] = await Promise.all([
+    queryLatestAssets(), getStableCoins(),
   ]);
-  const excluded = new Set(blacklist.map((symbol) => symbol.toUpperCase()));
   const rate = currency.rate || 1;
   return {
-    holdings: assets.filter((asset) => !excluded.has(asset.symbol.toUpperCase())).map((asset) => ({
+    holdings: assets.map((asset) => ({
       symbol: asset.symbol.toUpperCase(),
       assetType: asset.assetType,
       amount: asset.amount,
@@ -197,7 +196,7 @@ export function calculateRebalance(
     if (target.kind === "asset") {
       const key = keyOf(target.assetType, target.symbol);
       if (!entries.has(key)) {
-        entries.set(key, { symbol: target.symbol.toUpperCase(), assetType: target.assetType, amount: 0, value: 0, price: 0 });
+        entries.set(key, { symbol: target.symbol.trim().toUpperCase(), assetType: target.assetType, amount: 0, value: 0, price: 0 });
       }
     }
   }
@@ -224,7 +223,7 @@ export function calculateRebalance(
   const explicit = new Set<string>();
   for (const target of targets) {
     if (target.kind !== "asset") continue;
-    const row = rows.find((item) => item.assetType === target.assetType && item.symbol === target.symbol.toUpperCase());
+    const row = rows.find((item) => item.assetType === target.assetType && item.symbol === target.symbol.trim().toUpperCase());
     if (row) {
       row.targetPercent = target.percent;
       explicit.add(keyOf(target.assetType, target.symbol));

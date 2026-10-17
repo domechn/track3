@@ -12,6 +12,7 @@ import {
 } from "./alerts";
 import { executeWrite, executeWriteWork, getDatabase } from "./database";
 import { calculateTotalProfit } from "./charts-profit";
+import { getBlacklistCoins, getStableCoins } from "./configuration";
 
 vi.mock("./database", () => ({
   executeWrite: vi.fn(),
@@ -19,6 +20,10 @@ vi.mock("./database", () => ({
   getDatabase: vi.fn(),
 }));
 vi.mock("./charts-profit", () => ({ calculateTotalProfit: vi.fn() }));
+vi.mock("./configuration", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./configuration")>(),
+  getBlacklistCoins: vi.fn(), getStableCoins: vi.fn(),
+}));
 
 const now = new Date("2026-10-17T12:00:00.000Z");
 const latest: AlertSnapshot = {
@@ -34,7 +39,11 @@ const rule = (changes: Partial<AlertRule> = {}): AlertRule => ({
   armed: true, window: null, assetType: null, symbol: null, ...changes,
 });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(getBlacklistCoins).mockResolvedValue([]);
+  vi.mocked(getStableCoins).mockResolvedValue([]);
+});
 
 describe("alert evaluation", () => {
   it("triggers a total value goal at the exact threshold", () => {
@@ -95,6 +104,51 @@ describe("alert evaluation", () => {
 });
 
 describe("alert storage", () => {
+  it("excludes blacklisted holdings from allocation measurements", async () => {
+    vi.mocked(getBlacklistCoins).mockResolvedValue(["btc"]);
+    vi.mocked(getDatabase).mockResolvedValue({
+      select: async (sql: string, values?: unknown[]) => sql.includes("FROM assets_v2") && !values?.length
+        ? [
+          { assetType: "crypto", symbol: "BTC", wallet: "a", value: 60, amount: 1, price: 60, at: now.toISOString() },
+          { assetType: "crypto", symbol: "ETH", wallet: "b", value: 40, amount: 1, price: 40, at: now.toISOString() },
+        ] : [],
+    } as never);
+    const data = await loadAlertEvaluationData(undefined, [], now);
+    const targets = { targets: [
+      { kind: "asset" as const, assetType: "crypto" as const, symbol: "BTC", percent: 50 },
+      { kind: "asset" as const, assetType: "crypto" as const, symbol: "ETH", percent: 50 },
+    ], tolerancePercent: 0 };
+    expect(data.snapshots[0].assets.map((asset) => asset.symbol)).toEqual(["ETH"]);
+    expect(measureRule(rule({ kind: "allocation_deviation", assetType: "crypto", symbol: "ETH" }), data.snapshots, {}, targets).value).toBe(50);
+  });
+
+  it("uses configured stablecoins for allocation measurements", async () => {
+    vi.mocked(getStableCoins).mockResolvedValue(["XYZ"]);
+    vi.mocked(getDatabase).mockResolvedValue({
+      select: async (sql: string, values?: unknown[]) => sql.includes("FROM assets_v2") && !values?.length
+        ? [
+          { assetType: "crypto", symbol: "BTC", wallet: "a", value: 60, amount: 1, price: 60, at: now.toISOString() },
+          { assetType: "crypto", symbol: "XYZ", wallet: "b", value: 40, amount: 40, price: 1, at: now.toISOString() },
+        ] : [],
+    } as never);
+    const data = await loadAlertEvaluationData(undefined, [], now);
+    const targets = { targets: [
+      { kind: "asset" as const, assetType: "crypto" as const, symbol: "BTC", percent: 50 },
+      { kind: "cash" as const, percent: 50 },
+    ], tolerancePercent: 0 };
+    expect(measureRule(rule({ kind: "allocation_deviation", assetType: "crypto", symbol: "XYZ" }), data.snapshots, {}, targets).value).toBe(0);
+  });
+
+  it("loads P&L for a displayed rule with available period records", async () => {
+    vi.mocked(getDatabase).mockResolvedValue({
+      select: async (sql: string, values?: unknown[]) => sql.includes("FROM assets_v2") && !values?.length
+        ? [{ assetType: "crypto", symbol: "BTC", wallet: "a", value: 60, amount: 1, price: 60, at: now.toISOString() }]
+        : [],
+    } as never);
+    vi.mocked(calculateTotalProfit).mockResolvedValue({ total: 12, lastRecordDate: now } as never);
+    const data = await loadAlertEvaluationData(undefined, [], now, ["7d"]);
+    expect(measureRule(rule({ kind: "period_pnl", window: "7d" }), data.snapshots, {}, undefined).value).toBe(12);
+  });
   it("treats unmapped stale sources conservatively after refresh", async () => {
     vi.mocked(getDatabase).mockResolvedValue({
       select: async (sql: string) => sql.includes("FROM assets_v2")

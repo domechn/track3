@@ -98,7 +98,20 @@ describe("RefreshData — currency rates refresh ordering", () => {
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(processAlerts).toHaveBeenCalledWith([], statuses));
-    expect(deliverAlerts).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(deliverAlerts).toHaveBeenCalledTimes(1));
+  });
+
+  it("finishes the refresh before a slow alert evaluation completes", async () => {
+    let finishAlerts: (value: []) => void = () => {};
+    vi.mocked(processAlerts).mockImplementationOnce(() => new Promise((resolve) => { finishAlerts = resolve; }));
+    const afterRefresh = vi.fn();
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} afterRefresh={afterRefresh} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(processAlerts).toHaveBeenCalledOnce());
+    expect(mockSetButtonLoading).toHaveBeenLastCalledWith(false);
+    expect(afterRefresh).toHaveBeenCalledWith(true);
+    finishAlerts([]);
   });
 
   it("does not evaluate alerts when no snapshot was persisted", async () => {

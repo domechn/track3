@@ -7,12 +7,13 @@ import {
   type AlertComparator, type AlertHistory, type AlertKind, type AlertPrices,
   type AlertRule, type AlertSnapshot, type AlertWindow,
 } from "@/middlelayers/alerts";
-import { enableSystemNotifications } from "@/middlelayers/alert-notifications";
+import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlelayers/alert-notifications";
 import { formatAlert } from "@/middlelayers/alert-notifications";
 import type { RebalanceProfile } from "@/middlelayers/rebalance";
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Button } from "./ui/button";
+import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Progress } from "./ui/progress";
@@ -51,9 +52,10 @@ export default function GoalsAlerts() {
 
   async function reload() {
     try {
-      const [nextRules, nextHistory, evaluation] = await Promise.all([
-        listAlertRules(), listAlertHistory(), loadAlertEvaluationData(),
-      ]);
+      const [nextRules, nextHistory] = await Promise.all([listAlertRules(), listAlertHistory()]);
+      const pnlWindows = nextRules.filter((rule) => rule.enabled && rule.kind === "period_pnl" && rule.window)
+        .map((rule) => rule.window as AlertWindow);
+      const evaluation = await loadAlertEvaluationData(undefined, undefined, new Date(), pnlWindows);
       setRules(nextRules);
       setHistory(nextHistory);
       setSnapshots(evaluation.snapshots);
@@ -73,6 +75,10 @@ export default function GoalsAlerts() {
     window.addEventListener(ALERTS_CHANGED_EVENT, onChanged);
     return () => window.removeEventListener(ALERTS_CHANGED_EVENT, onChanged);
   }, [dataChangedVersion]);
+
+  useEffect(() => {
+    void systemNotificationsEnabled().then(setNotificationsEnabled);
+  }, []);
 
   function toRule(): AlertRule {
     const rule: AlertRule = {
@@ -235,7 +241,13 @@ export default function GoalsAlerts() {
                         {t("goals.enabled")}
                       </label>
                       <Button size="sm" variant="outline" onClick={() => edit(rule)}>{t("goals.edit")}</Button>
-                      <Button size="sm" variant="ghost" onClick={() => void mutate(() => deleteAlertRule(rule.id))}>{t("common.delete")}</Button>
+                      <ConfirmDeleteDialog
+                        trigger={<Button size="sm" variant="ghost">{t("common.delete")}</Button>}
+                        title={t("common.delete")}
+                        description={t("goals.deleteConfirm")}
+                        cancelLabel={t("common.cancel")}
+                        actions={[{ label: t("common.delete"), onClick: () => void mutate(() => deleteAlertRule(rule.id)) }]}
+                      />
                     </div>
                   </div>
                   {isGoal && measurement.status === "ready" && <Progress value={progress}
