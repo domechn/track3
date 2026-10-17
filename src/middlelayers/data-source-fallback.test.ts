@@ -1,11 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import md5 from "md5";
-import { loadPortfolios } from "./data";
+import { fetchPortfolios } from "./data";
+import { mergePortfoliosWithBaseline } from "./portfolio-baseline";
 import { AssetModel, UserLicenseInfo } from "./types";
 import { GlobalConfig, WalletCoin } from "./datafetch/types";
 import { isSameWallet } from "../lib/utils";
 
 const mockProgress = vi.fn();
+
+async function fetchAndMerge(
+  config: GlobalConfig,
+  lastAssets: AssetModel[],
+  addProgress: typeof mockProgress,
+  userInfo: UserLicenseInfo,
+) {
+  return mergePortfoliosWithBaseline(
+    await fetchPortfolios(config, addProgress, userInfo),
+    lastAssets,
+  );
+}
 
 const mockAnalyzers = vi.hoisted(() => {
   const scenario = {
@@ -133,7 +146,7 @@ vi.mock("./datafetch/coins/stock/stock-analyzer", () => ({
 
 const config: GlobalConfig = {
   exchanges: [],
-  erc20: { addresses: [] },
+  erc20: { addresses: ["successful-wallet"] },
   trc20: { addresses: [] },
   btc: { addresses: [] },
   sol: { addresses: [] },
@@ -141,7 +154,7 @@ const config: GlobalConfig = {
   ton: { addresses: [] },
   sui: { addresses: [] },
   others: [],
-  stockConfig: { brokers: [] },
+  stockConfig: { brokers: [{ name: "ibkr", initParams: { token: "token", queryId: "query-1" } }] },
   configs: { groupUSD: false },
 };
 
@@ -169,20 +182,19 @@ beforeEach(() => {
   mockAnalyzers.scenario.attachedOthersOverlapsFailedWallet = false;
 });
 
-describe("loadPortfolios data source fallback", () => {
+describe("portfolio data source fallback", () => {
   it("reports failed data sources before applying last-known data", async () => {
-    const result = await loadPortfolios(
+    const result = await fetchPortfolios(
       config,
-      lastAssets,
       mockProgress,
       userInfo,
     );
 
-    expect(result.failedSources).toEqual([
+    expect(result.failedSources).toMatchObject([
       {
-        analyzerName: "Stock Analyzer",
+        sourceId: "stock:0",
         walletIdentities: ["ibkr:query-1"],
-        error: "IBKR maintenance",
+        category: "other",
       },
     ]);
     expect(result.coins).not.toContainEqual(
@@ -191,12 +203,11 @@ describe("loadPortfolios data source fallback", () => {
   });
 
   it("uses last-known assets only for explicitly failed wallets", async () => {
-    const result = await loadPortfolios(
+    const result = await fetchAndMerge(
       config,
       lastAssets,
       mockProgress,
       userInfo,
-      { useLastKnownDataForFailedSources: true },
     );
 
     expect(result.failedSources).toHaveLength(1);
@@ -207,7 +218,6 @@ describe("loadPortfolios data source fallback", () => {
           assetType: "stock",
           amount: 3,
           wallet: "md5:ibkr:query-1",
-          price: { base: "usd", value: 200 },
         },
         {
           symbol: "ETH",
@@ -227,7 +237,7 @@ describe("loadPortfolios data source fallback", () => {
     },
     {
       currentOthersAmount: 12,
-      expectedConservativeAmount: 12,
+      expectedConservativeAmount: 10,
       caseName: "increases",
     },
   ])(
@@ -271,12 +281,11 @@ describe("loadPortfolios data source fallback", () => {
         },
       ];
 
-      const result = await loadPortfolios(
+      const result = await fetchAndMerge(
         overlappingConfig,
         overlappingLastAssets,
         mockProgress,
         userInfo,
-        { useLastKnownDataForFailedSources: true },
       );
 
       expect(

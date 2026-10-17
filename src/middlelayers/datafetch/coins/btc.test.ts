@@ -74,4 +74,18 @@ describe("BTCAnalyzer", () => {
       `https://blockchain.info/q/addressbalance/${wallet}`,
     );
   });
+
+  it("finishes a single wallet without the multi-wallet pacing delay", async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValue({ final_balance: 100_000_000 });
+    const pending = new BTCAnalyzer({ btc: { addresses: ["wallet-a"] } }).loadPortfolio();
+    let settled = false;
+    pending.then(() => { settled = true; });
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(true);
+      await expect(pending).resolves.toEqual([
+        { amount: 1, wallet: "wallet-a", chain: "bitcoin", assetType: "crypto", symbol: "BTC" },
+      ]);
+    } finally { await vi.runAllTimersAsync(); }
+  });
 });

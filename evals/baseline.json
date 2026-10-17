@@ -1,0 +1,7 @@
+{
+  "aggregate": 1,
+  "threshold": 0.05,
+  "caseCount": 31,
+  "calibrated": false,
+  "source": "recorded responses"
+}

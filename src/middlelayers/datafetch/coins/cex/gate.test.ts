@@ -66,6 +66,24 @@ describe("GateExchange", () => {
     await expect(exchange.fetchTotalBalance()).resolves.toEqual({ BTC: 1 });
   });
 
+  it("does not log an API key while handling an unavailable portfolio account", async () => {
+    const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/portfolio/accounts")) {
+        throw new Error("Please open the portfolio account");
+      }
+      if (url.includes("/earn/fixed-term")) {
+        return { code: 0, data: { list: [], total: 0 } } as never;
+      }
+      return [] as never;
+    });
+    const exchange = new GateExchange("private-api-key", "secret");
+
+    await exchange.fetchTotalBalance();
+
+    expect(JSON.stringify(debug.mock.calls)).not.toContain("private-api-key");
+  });
+
   it("maps only positive USDT ticker prices", async () => {
     vi.mocked(sendHttpRequest).mockResolvedValue([
       { currency_pair: "BTC_USDT", last: "65000" },

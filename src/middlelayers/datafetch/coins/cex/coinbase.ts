@@ -1,3 +1,4 @@
+import { recordOptionalSourceFailure, recordSourceFailure } from "../../utils/source-failure";
 import { SignJWT, importPKCS8 } from 'jose'
 import CryptoJS from 'crypto-js'
 import { Exchanger } from './cex'
@@ -93,7 +94,12 @@ export class CoinbaseExchange implements Exchanger {
 						await this.addPerpPortfolioBalances(portfolio.uuid, balances)
 					}
 				} catch (error) {
-					console.warn(`Failed to fetch portfolio ${portfolio.uuid} balances:`, error)
+					console.warn(`Failed to fetch portfolio ${portfolio.uuid} balances:`)
+					if (portfolio.type === 'INTX') {
+						recordOptionalSourceFailure(this, error)
+					} else {
+						recordSourceFailure(this, error)
+					}
 				}
 			})
 		)

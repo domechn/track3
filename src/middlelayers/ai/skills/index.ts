@@ -11,6 +11,8 @@ import "./transaction-stats";
 import "./cost-basis";
 import "./market-price";
 import "./current-context";
+import "./rebalance-status";
+import "./rebalance-suggest";
 
 export { listSkills, toOpenAITools, runSkill } from "../tools";
 export type { Skill, SkillArgs, ToolResult, SkillContext } from "./types";

@@ -7,21 +7,32 @@ import type { ChatSessionMeta } from "@/middlelayers/ai";
 
 // sendSpy is referenced from inside the hoisted vi.mock below; we declare
 // it via vi.hoisted so the factory closure can pick it up.
-const { sendSpy, chatOptions, titleSpy, createNewSpy, removeSpy, refreshSpy, sessionList } = vi.hoisted(() => ({
+const { sendSpy, chatOptions, chatStats, titleSpy, createNewSpy, removeSpy, refreshSpy, sessionList, useActualChat, liveChat } = vi.hoisted(() => ({
   sendSpy: vi.fn(),
   chatOptions: { current: null as any },
+  chatStats: { contextTokens: 0, promptTokens: 0, completionTokens: 0 },
   titleSpy: vi.fn(),
   createNewSpy: vi.fn(),
   removeSpy: vi.fn(),
   refreshSpy: vi.fn(),
   sessionList: { current: [] as any[] },
+  useActualChat: { current: false },
+  liveChat: { current: null as any },
 }));
 
-vi.mock("./use-chat", () => ({
+vi.mock("./use-chat", async () => {
+  const actual = await vi.importActual<typeof import("./use-chat")>("./use-chat");
+  return {
   useChat: (options: any) => {
     chatOptions.current = options;
+    if (useActualChat.current) {
+      liveChat.current = actual.useChat(options);
+      return liveChat.current;
+    }
     return ({
     messages: [],
+    contextTokens: chatStats.contextTokens,
+    sessionUsage: { promptTokens: chatStats.promptTokens, completionTokens: chatStats.completionTokens, source: "reported" },
     input: "",
     setInput: vi.fn(),
     isStreaming: false,
@@ -32,7 +43,10 @@ vi.mock("./use-chat", () => ({
     clear: vi.fn(),
     });
   },
-}));
+  };
+});
+
+vi.mock("@/middlelayers/ai/orchestrator/llm", () => ({ callLlm: vi.fn() }));
 
 vi.mock("./use-chat-sessions", () => ({
   useChatSessions: () => ({
@@ -56,6 +70,8 @@ vi.mock("@/middlelayers/ai", async () => {
     touchSession: vi.fn().mockResolvedValue(undefined),
     buildSessionPreview: vi.fn().mockReturnValue(""),
     generateTitle: titleSpy,
+    streamChatCompletion: vi.fn(),
+    orchestrateQuery: vi.fn(),
   };
 });
 
@@ -73,7 +89,8 @@ vi.mock("@/middlelayers/configuration", async () => {
 
 import { loadAIConfig, queryPreferCurrency } from "@/middlelayers/configuration";
 import ChatPage from "./chat-page";
-import { appendMessages, loadSession } from "@/middlelayers/ai";
+import { appendMessages, loadSession, orchestrateQuery, streamChatCompletion } from "@/middlelayers/ai";
+import { callLlm } from "@/middlelayers/ai/orchestrator/llm";
 
 const baseCurrency: CurrencyRateDetail = {
   currency: "USD",
@@ -108,6 +125,11 @@ const config: AIConfig = {
  }
 
 beforeEach(() => {
+  useActualChat.current = false;
+  liveChat.current = null;
+  chatStats.contextTokens = 0;
+  chatStats.promptTokens = 0;
+  chatStats.completionTokens = 0;
   sendSpy.mockReset();
   vi.mocked(loadAIConfig).mockReset();
   vi.mocked(queryPreferCurrency).mockReset();
@@ -117,6 +139,9 @@ beforeEach(() => {
   vi.mocked(appendMessages).mockResolvedValue(undefined);
   vi.mocked(loadSession).mockReset();
   vi.mocked(loadSession).mockResolvedValue(null);
+  vi.mocked(streamChatCompletion).mockReset();
+  vi.mocked(orchestrateQuery).mockReset();
+  vi.mocked(callLlm).mockReset();
   createNewSpy.mockReset();
   createNewSpy.mockResolvedValue({
     id: "mock-session-id", title: "", createdAt: new Date().toISOString(),
@@ -129,6 +154,47 @@ beforeEach(() => {
 });
 
 describe("ChatPage", () => {
+  it("carries a loaded summary through a real send into the saved exchange", async () => {
+    useActualChat.current = true;
+    vi.mocked(loadAIConfig).mockResolvedValue({ ...config, contextSize: 900 });
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    vi.mocked(loadSession).mockResolvedValue({
+      id: "existing-id", title: "", createdAt: "", updatedAt: "", pinned: 0,
+      messageCount: 12, preview: "", summary: { content: "Prior facts", throughMessageCount: 2 },
+      messages: Array.from({ length: 12 }, (_, i) => i % 2
+        ? { role: "assistant" as const, blocks: [{ kind: "text" as const, text: `${i} answer ${"word ".repeat(30)}` }] }
+        : { role: "user" as const, content: `${i} question ${"word ".repeat(30)}` }),
+    });
+    vi.mocked(callLlm).mockResolvedValue({ ok: true, content: "Updated facts" });
+    vi.mocked(orchestrateQuery).mockImplementation(async function* () {});
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      expect(request.messages.filter((message) => message.role === "system")).toHaveLength(1);
+      expect(request.messages[0].content).toContain("Updated facts");
+      yield { kind: "text", delta: "New answer" };
+      yield { kind: "done" };
+    });
+    renderAt("/assistant/existing-id", true);
+    await waitFor(() => expect(liveChat.current?.messages).toHaveLength(12));
+    await act(async () => { await liveChat.current.send("New question"); });
+    await waitFor(() => expect(appendMessages).toHaveBeenCalledOnce());
+    expect(callLlm).toHaveBeenCalledOnce();
+    expect(appendMessages).toHaveBeenCalledWith("existing-id", [
+      { role: "user", content: "New question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "New answer" }],
+        usage: { promptTokens: expect.any(Number), completionTokens: expect.any(Number), source: "estimated" },
+        contextTokens: expect.any(Number) },
+    ], expect.objectContaining({ content: "Updated facts", throughMessageCount: expect.any(Number) }));
+  });
+  it("shows context occupancy and session token totals in the chat header", async () => {
+    chatStats.contextTokens = 4096;
+    chatStats.promptTokens = 120;
+    chatStats.completionTokens = 30;
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/", true);
+    expect(await screen.findByLabelText(/context usage: 50%/i)).toBeTruthy();
+    expect(screen.getByText(/120.*30/)).toBeTruthy();
+  });
   it("renders the Pro upsell when the user is not Pro", async () => {
     renderAt("/", false);
     await waitFor(() => {

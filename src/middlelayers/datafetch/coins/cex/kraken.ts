@@ -91,7 +91,7 @@ export class KrakenExchange implements Exchanger {
 		}>("GET", this.endpoint + this.apiPrefix + "/public/Ticker")
 
 		if (allPrices.error && allPrices.error.length > 0) {
-			console.error(allPrices.error)
+			console.error("Kraken price query failed")
 			return {}
 		}
 

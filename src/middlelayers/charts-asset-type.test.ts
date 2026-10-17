@@ -4,7 +4,6 @@ import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 
 vi.mock("./data", () => ({
-  loadPortfolios: vi.fn(),
   queryCoinPrices: vi.fn(),
   queryStableCoins: vi.fn(),
 }));

@@ -16,8 +16,9 @@ import {
 } from "./data";
 import type {
   FailedPortfolioSource,
-  LoadPortfoliosOptions,
   LoadPortfoliosResult,
+  PortfolioSourceResult,
+  PortfolioSourceStatus,
 } from "./data";
 import {
   canonicalizePortfolioBaseline,
@@ -33,6 +34,7 @@ import {
 } from "./configuration";
 import {
   calculateTotalValue,
+  combineCoinLists,
   getAssetIdentity,
   getAssetType,
 } from "./datafetch/utils/coins";
@@ -51,12 +53,19 @@ import {
   executeWriteWork,
   getLatestCommittedRefreshCreatedAt,
 } from "./database";
+import { FullRefreshRequiredError } from "./refresh-error";
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
   ASSET_HANDLER.listAssets(size),
 );
 
-export type RefreshAllDataOptions = LoadPortfoliosOptions;
+export type RefreshAllDataOptions = {
+  retrySourceId?: string;
+  previousSourceResults?: PortfolioSourceResult[];
+  previousSourceStatuses?: PortfolioSourceStatus[];
+  previousInputGeneration?: number;
+  previousRefreshCreatedAt?: string;
+};
 export type RefreshRetry = <T>(attempt: () => Promise<T>) => Promise<T>;
 
 export type RefreshOperation = {
@@ -99,6 +108,11 @@ export type RefreshAllDataResult = {
   failedSources: FailedPortfolioSource[];
   requiresDataSourceAction: boolean;
   usedLastKnownData: boolean;
+  sourceResults?: PortfolioSourceResult[];
+  sourceStatuses?: PortfolioSourceStatus[];
+  persisted?: boolean;
+  portfolioInputGeneration?: number;
+  refreshCreatedAt?: string;
 };
 
 type WalletCoinValueContext = {
@@ -109,12 +123,12 @@ type WalletCoinValueContext = {
 type QueryCoinsDataReady = {
   failedSources: FailedPortfolioSource[];
   requiresDataSourceAction: false;
-  usedLastKnownData: boolean;
   blacklistedSymbols: string[];
   config: GlobalConfig;
   portfolioInputGeneration: number;
   portfolioResult: LoadPortfoliosResult;
   valueContext: WalletCoinValueContext;
+  stalePrices: { crypto: Record<string, number>; stock: Record<string, number> };
 };
 
 type QueryCoinsDataResult =
@@ -125,6 +139,7 @@ type QueryCoinsDataResult =
       usedLastKnownData: false;
       blacklistedSymbols: [];
       portfolioInputGeneration: number;
+      sourceResults?: PortfolioSourceResult[];
     };
 
 export function createRefreshOperation(): RefreshOperation {
@@ -213,6 +228,20 @@ export async function refreshAllData(
             failedSources: currentQueryResult.failedSources,
             requiresDataSourceAction: true,
             usedLastKnownData: false,
+            sourceResults: currentQueryResult.sourceResults,
+            sourceStatuses: currentQueryResult.sourceResults?.map((source) => ({
+              sourceId: source.sourceId,
+              label: source.label,
+              status: source.status === "ok"
+                ? "ok" as const
+                : options.previousSourceStatuses?.find(
+                    (previous) => previous.sourceId === source.sourceId,
+                  )?.status ?? "failed" as const,
+              category: source.category,
+            })),
+            persisted: false,
+            portfolioInputGeneration: options.previousInputGeneration,
+            refreshCreatedAt: options.previousRefreshCreatedAt,
           };
         }
         const readyQueryResult = currentQueryResult;
@@ -223,6 +252,12 @@ export async function refreshAllData(
         } = selectLatestPersistedSnapshot(persistedSnapshots);
         const latestCommittedRefreshCreatedAt =
           await getLatestCommittedRefreshCreatedAt(database);
+        if (
+          options.previousRefreshCreatedAt &&
+          options.previousRefreshCreatedAt !== latestCommittedRefreshCreatedAt
+        ) {
+          throw new FullRefreshRequiredError("Portfolio changed. Run a full refresh.");
+        }
         const latestCommittedRefreshTimestamp = Date.parse(
           latestCommittedRefreshCreatedAt ?? "",
         );
@@ -245,17 +280,58 @@ export async function refreshAllData(
           rawLatestBaseline,
           canonicalization,
         );
+        const sourceStatuses = readyQueryResult.portfolioResult.sourceResults?.map(
+          (source): PortfolioSourceStatus => ({
+            sourceId: source.sourceId,
+            label: source.label,
+            status: source.status === "ok"
+              ? "ok"
+              : latestBaseline.some(
+                  (asset) =>
+                    asset.amount !== 0 &&
+                    source.walletIdentities.some((identity) =>
+                      isSameWallet(identity, asset.wallet ?? ""),
+                    ),
+                )
+                ? "stale"
+                : "failed",
+            category: source.category,
+          }),
+        );
+        if (sourceStatuses?.length && sourceStatuses.every((source) => source.status !== "ok")) {
+          return {
+            failedSources: readyQueryResult.failedSources,
+            requiresDataSourceAction: true,
+            usedLastKnownData: sourceStatuses.some((source) => source.status === "stale"),
+            sourceResults: readyQueryResult.portfolioResult.sourceResults,
+            sourceStatuses,
+            persisted: false,
+            portfolioInputGeneration: readyQueryResult.portfolioInputGeneration,
+            refreshCreatedAt: latestCommittedRefreshCreatedAt,
+          };
+        }
         const portfolioResult = mergePortfoliosWithBaseline(
           readyQueryResult.portfolioResult,
           latestBaseline,
-          options,
           canonicalization,
         );
+        if (readyQueryResult.failedSources.length > 0) {
+          updateStalePrices(
+            portfolioResult.coins,
+            latestBaseline,
+            readyQueryResult.portfolioResult.coins,
+            readyQueryResult.failedSources,
+            readyQueryResult.stalePrices,
+            readyQueryResult.valueContext.priceMap,
+          );
+        }
         const coins = resolveWalletCoins(
           portfolioResult.coins,
           latestBaseline,
           readyQueryResult.valueContext,
           canonicalization,
+          undefined,
+          readyQueryResult.failedSources.flatMap((source) => source.walletIdentities),
         );
         const transactions = generateTransactions(
           operation.operationUuid,
@@ -274,7 +350,12 @@ export async function refreshAllData(
           result: {
             failedSources: readyQueryResult.failedSources,
             requiresDataSourceAction: false,
-            usedLastKnownData: readyQueryResult.usedLastKnownData,
+            usedLastKnownData: !!sourceStatuses?.some((source) => source.status === "stale"),
+            sourceResults: readyQueryResult.portfolioResult.sourceResults,
+            sourceStatuses,
+            persisted: true,
+            portfolioInputGeneration: readyQueryResult.portfolioInputGeneration,
+            refreshCreatedAt,
           },
         };
       }
@@ -558,12 +639,71 @@ async function queryWalletCoinValueContext(
   };
 }
 
+async function queryStalePrices(
+  failedSources: FailedPortfolioSource[],
+  userInfo: UserLicenseInfo,
+): Promise<{ crypto: Record<string, number>; stock: Record<string, number> }> {
+  if (!failedSources.length) return { crypto: {}, stock: {} };
+  const identities = failedSources.flatMap((source) => source.walletIdentities);
+  const snapshots = await ASSET_HANDLER.listAssets(1);
+  const staleAssets = selectLatestPersistedSnapshot(snapshots).assets.filter((asset) =>
+    asset.amount > 0 && identities.some((identity) => isSameWallet(identity, asset.wallet ?? "")),
+  );
+  const cryptoSymbols = [...new Set(staleAssets.filter((asset) => getAssetType(asset) === "crypto").map((asset) => asset.symbol))];
+  const stockSymbols = [...new Set(staleAssets.filter((asset) => getAssetType(asset) === "stock").map((asset) => asset.symbol))];
+  const [crypto, stock] = await Promise.all([
+    cryptoSymbols.length ? queryCoinPrices(cryptoSymbols, userInfo).catch(() => ({})) : Promise.resolve({}),
+    stockSymbols.length ? fetchStockPrices(stockSymbols).catch(() => ({})) : Promise.resolve({}),
+  ]);
+  return { crypto, stock };
+}
+
+function updateStalePrices(
+  coins: WalletCoin[],
+  latestBaseline: AssetModel[],
+  freshCoins: WalletCoin[],
+  failedSources: FailedPortfolioSource[],
+  stalePrices: { crypto: Record<string, number>; stock: Record<string, number> },
+  priceMap: Record<string, number>,
+): void {
+  const identities = failedSources.flatMap((source) => source.walletIdentities);
+  const staleAssets = latestBaseline.filter((asset) =>
+    asset.amount > 0 && identities.some((identity) => isSameWallet(identity, asset.wallet ?? "")),
+  );
+  for (const [assetType, prices] of [["crypto", stalePrices.crypto], ["stock", stalePrices.stock]] as const) {
+    for (const [symbol, price] of Object.entries(prices)) {
+      priceMap[getAssetIdentity({ symbol, assetType })] = price;
+      priceMap[symbol] = price;
+    }
+  }
+  for (const fresh of freshCoins) {
+    if (!fresh.price || !staleAssets.some((asset) =>
+      asset.symbol === fresh.symbol && getAssetType(asset) === getAssetType(fresh)
+    )) continue;
+    priceMap[getAssetIdentity(fresh)] = fresh.price.base === "usdt"
+      ? fresh.price.value * (priceMap.USDT ?? 1)
+      : fresh.price.value;
+  }
+  for (const coin of coins) {
+    if (!identities.some((identity) => isSameWallet(identity, coin.wallet))) continue;
+    const key = getAssetIdentity(coin);
+    if (priceMap[key] === undefined) {
+      const baseline = staleAssets.find((asset) =>
+        asset.symbol === coin.symbol && getAssetType(asset) === getAssetType(coin) &&
+        isSameWallet(asset.wallet ?? "", coin.wallet)
+      );
+      if (baseline) priceMap[key] = baseline.price;
+    }
+  }
+}
+
 function resolveWalletCoins(
   assets: WalletCoin[],
   lastAssets: AssetModel[],
   valueContext: WalletCoinValueContext,
   canonicalization: PortfolioCanonicalization,
   addProgress?: AddProgressFunc,
+  staleWalletIdentities: string[] = [],
 ): WalletCoinUSD[] {
   const { priceMap } = valueContext;
   const latestAssets = canonicalizePortfolioCoins(assets, canonicalization);
@@ -581,6 +721,8 @@ function resolveWalletCoins(
     });
   }
   const totals = calculateTotalValue(latestAssets, priceMap);
+  const isStaleWallet = (wallet: string) =>
+    staleWalletIdentities.some((identity) => isSameWallet(identity, wallet));
   // 1. If USD value < 1, consider it sold out, set amount and value to 0
   // 2. If this asset is found both this time and last time (same symbol and wallet)
   // 2.1 If last time was 0, this time is also 0 or < 1, then drop this time
@@ -590,6 +732,9 @@ function resolveWalletCoins(
   // 3. BTC always save regardless
   const filteredTotals = totals
     .filter((t) => {
+      if (isStaleWallet(t.wallet)) {
+        return t.amount > 0;
+      }
       // 3. BTC always save regardless
       if (t.symbol === "BTC") {
         return true;
@@ -641,8 +786,8 @@ function resolveWalletCoins(
     .map((t) => ({
       ...t,
       // If USD value < 1, consider it sold out, set amount and value to 0
-      usdValue: t.usdValue >= 1 ? t.usdValue : 0,
-      amount: t.usdValue >= 1 ? t.amount : 0,
+      usdValue: t.usdValue >= 1 || isStaleWallet(t.wallet) ? t.usdValue : 0,
+      amount: t.usdValue >= 1 || isStaleWallet(t.wallet) ? t.amount : 0,
     }));
 
   if (addProgress) {
@@ -715,26 +860,57 @@ async function queryCoinsData(
   if (!config) {
     throw new Error("no configuration found,\n please add configuration first");
   }
+  if (
+    options.retrySourceId &&
+    options.previousInputGeneration !== undefined &&
+    options.previousInputGeneration !== portfolioInputGeneration
+  ) {
+    throw new FullRefreshRequiredError("Source changed. Run a full refresh.");
+  }
   addProgress(2);
   // check if pro user
   const userProInfo = await isProVersion();
   addProgress(2);
-  const portfolioResult = await fetchPortfolios(
-    config,
-    addProgress,
-    userProInfo,
-  );
+  let portfolioResult = options.retrySourceId
+    ? await fetchPortfolios(config, addProgress, userProInfo, { sourceId: options.retrySourceId })
+    : await fetchPortfolios(config, addProgress, userProInfo);
+  if (options.retrySourceId) {
+    const previous = options.previousSourceResults?.find((source) => source.sourceId === options.retrySourceId);
+    const retried = portfolioResult.sourceResults?.[0];
+    if (!previous || !retried || !previous.walletIdentities.every((identity) =>
+      retried.walletIdentities.some((next) => isSameWallet(identity, next))
+    )) {
+      throw new FullRefreshRequiredError("Source changed. Run a full refresh.");
+    }
+    const sourceResults = options.previousSourceResults!.map((source) =>
+      source.sourceId === options.retrySourceId ? retried : source
+    );
+    const failedSources = sourceResults
+      .filter((source) => source.status === "stale")
+      .map((source) => ({
+        sourceId: source.sourceId,
+        analyzerName: source.label,
+        walletIdentities: source.walletIdentities,
+        error: source.category ?? "other",
+        category: source.category,
+      }));
+    portfolioResult = {
+      coins: combineCoinLists(sourceResults.map((source) => source.coins)),
+      failedSources,
+      sourceResults,
+    };
+  }
 
-  if (
-    portfolioResult.failedSources.length > 0 &&
-    !options.useLastKnownDataForFailedSources
-  ) {
+  if (options.retrySourceId && portfolioResult.sourceResults?.find(
+    (source) => source.sourceId === options.retrySourceId
+  )?.status === "stale") {
     return {
       failedSources: portfolioResult.failedSources,
       requiresDataSourceAction: true,
       usedLastKnownData: false,
       blacklistedSymbols: [],
       portfolioInputGeneration,
+      sourceResults: portfolioResult.sourceResults,
     };
   }
 
@@ -746,17 +922,16 @@ async function queryCoinsData(
     userProInfo,
     addProgress,
   );
+  const stalePrices = await queryStalePrices(portfolioResult.failedSources, userProInfo);
 
   return {
     failedSources: portfolioResult.failedSources,
     requiresDataSourceAction: false,
-    usedLastKnownData:
-      portfolioResult.failedSources.length > 0 &&
-      !!options.useLastKnownDataForFailedSources,
     blacklistedSymbols,
     config,
     portfolioInputGeneration,
     portfolioResult,
     valueContext,
+    stalePrices,
   };
 }

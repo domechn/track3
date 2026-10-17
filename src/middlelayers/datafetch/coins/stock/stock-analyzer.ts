@@ -51,6 +51,7 @@ export class StockAnalyzer implements Analyzer {
     ttl = 600,
   ): Promise<{ [symbol: string]: number }> {
     const cc = getMemoryCacheInstance("data-fetch");
+    const cacheGeneration = cc.getGeneration();
     const cacheKey = `${broker.getIdentity()}_stock_positions`;
     const cacheResult = cc.getCache<{ [symbol: string]: number }>(cacheKey);
     if (cacheResult) {
@@ -58,7 +59,7 @@ export class StockAnalyzer implements Analyzer {
     }
 
     const positions = await broker.fetchPositions();
-    cc.setCache(cacheKey, positions, ttl);
+    cc.setCache(cacheKey, positions, ttl, cacheGeneration);
     return positions;
   }
 

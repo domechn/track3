@@ -11,6 +11,9 @@ vi.mock("@/i18n", () => ({
         "assistant.chat.title": "Assistant",
         "assistant.chat.thinking": "Thinking...",
         "assistant.chat.think.label": "Thinking",
+        "assistant.usage.tokens": "Prompt {prompt} · Completion {completion} tokens",
+        "assistant.usage.cost": "Est. {cost}",
+        "assistant.usage.estimated": "Estimated",
       };
       return map[key] ?? key;
     },
@@ -18,6 +21,26 @@ vi.mock("@/i18n", () => ({
 }));
 
 describe("MessageBubble", () => {
+  it("shows assistant message tokens and hides cost until pricing is configured", () => {
+    const message: ChatMessage = {
+      role: "assistant", blocks: [{ kind: "text", text: "Done" }],
+      usage: { promptTokens: 1200, completionTokens: 300, source: "reported" },
+    };
+    const { rerender } = render(<MessageBubble message={message} />);
+    expect(screen.getByText(/1,200.*300/)).toBeTruthy();
+    expect(screen.queryByText(/\$/)).toBeNull();
+    rerender(<MessageBubble message={message} pricePerMillionTokens={2} />);
+    expect(screen.getByText(/\$0\.003\b/)).toBeTruthy();
+    expect(screen.queryByText(/\$0\.003000/)).toBeNull();
+  });
+
+  it("labels estimated token counts as estimates", () => {
+    render(<MessageBubble message={{
+      role: "assistant", blocks: [{ kind: "text", text: "Done" }],
+      usage: { promptTokens: 10, completionTokens: 4, source: "estimated" },
+    }} />);
+    expect(screen.getByLabelText(/estimated.*prompt 10.*completion 4/i)).toBeTruthy();
+  });
   it("renders a user message with PersonIcon", () => {
     const msg: ChatMessage = { role: "user", content: "Hello" };
     const { container } = render(<MessageBubble message={msg} />);
@@ -41,6 +64,12 @@ describe("MessageBubble", () => {
   it("renders the thinking indicator when blocks are empty", () => {
     const msg: ChatMessage = { role: "assistant", blocks: [] };
     render(<MessageBubble message={msg} />);
+    expect(screen.getByText("Thinking...")).toBeTruthy();
+  });
+
+  it("renders the thinking indicator for a legacy whitespace-only block", () => {
+    const msg: ChatMessage = { role: "assistant", blocks: [{ kind: "text", text: "\n\n" }] };
+    render(<MessageBubble message={msg} isStreaming />);
     expect(screen.getByText("Thinking...")).toBeTruthy();
   });
 
@@ -99,5 +128,33 @@ describe("MessageBubble", () => {
     render(<MessageBubble message={msg} isStreaming />);
     // Think block auto-collapses when response starts; verify response shows
     expect(screen.getByText("Here is the result")).toBeTruthy();
+  });
+
+  it("shows one live thinking row for adjacent reasoning blocks", () => {
+    const msg: ChatMessage = {
+      role: "assistant",
+      blocks: [
+        { kind: "think", text: "Checking " },
+        { kind: "think", text: "holdings" },
+        { kind: "text", text: "\n\n" },
+      ],
+    };
+    const { container } = render(<MessageBubble message={msg} isStreaming />);
+    expect(screen.getAllByRole("button", { name: /Thinking/ })).toHaveLength(1);
+    expect(screen.getByText("Checking holdings")).toBeTruthy();
+    expect(container.querySelector('[data-testid="thinking-stream-indicator"]')).toBeTruthy();
+  });
+
+  it("keeps a later tool round's thinking preview live after earlier text", () => {
+    const msg: ChatMessage = {
+      role: "assistant",
+      blocks: [
+        { kind: "text", text: "Checking transactions." },
+        { kind: "think", text: "Calculating the change" },
+      ],
+    };
+    const { container } = render(<MessageBubble message={msg} isStreaming />);
+    expect(screen.getByText("Calculating the change")).toBeTruthy();
+    expect(container.querySelector('[data-testid="thinking-stream-indicator"]')).toBeTruthy();
   });
 });

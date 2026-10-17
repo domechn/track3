@@ -1,0 +1,6 @@
+{
+  "rows": [
+    {"asset": "BTC", "totalAmount": "2.0"},
+    {"asset": "ETH", "totalAmount": "3.5"}
+  ]
+}

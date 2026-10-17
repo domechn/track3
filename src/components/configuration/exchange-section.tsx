@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import {
   Dialog,
   DialogContent,
@@ -343,15 +344,15 @@ const ExchangeSection = memo(function ExchangeSection({
                             <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
                           </Button>
                         )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => onRemove(ex.type, ex.apiKey)}
-                          title={t("common.delete")}
-                        >
-                          <TrashIcon className="h-4 w-4 text-muted-foreground" />
-                        </Button>
+                        <ConfirmDeleteDialog
+                          trigger={<Button size="icon" variant="ghost" className="h-7 w-7" title={t("common.delete")}>
+                            <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                          </Button>}
+                          title={t("config.removeDialogTitle")}
+                          description={t("config.removeDialogDesc")}
+                          cancelLabel={t("common.cancel")}
+                          actions={[{ label: t("common.delete"), onClick: () => onRemove(ex.type, ex.apiKey) }]}
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

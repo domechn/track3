@@ -35,6 +35,7 @@ export function MainNav({
       <CustomLink to="/summary">{t("nav.summary")}</CustomLink>
       <CustomLink to="/wallets">{t("nav.wallets")}</CustomLink>
       <CustomLink to="/comparison">{t("nav.comparison")}</CustomLink>
+      <CustomLink to="/rebalance">{t("nav.rebalance")}</CustomLink>
       <CustomLink to="/history">{t("nav.history")}</CustomLink>
       <CustomLink to="/settings">{t("nav.settings")}</CustomLink>
     </nav>

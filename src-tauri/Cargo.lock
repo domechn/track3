@@ -6492,7 +6492,7 @@ dependencies = [
 
 [[package]]
 name = "track3"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "aes",
  "aes-gcm-siv",
@@ -6507,6 +6507,7 @@ dependencies = [
  "md-5",
  "percent-encoding",
  "reqwest 0.12.15",
+ "ring",
  "serde",
  "serde_json",
  "sha2",
@@ -6525,6 +6526,28 @@ dependencies = [
  "uuid",
  "version-compare",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "track3-pure-tests"
+version = "0.0.0"
+dependencies = [
+ "aes",
+ "aes-gcm-siv",
+ "base64 0.22.1",
+ "binance-rs-async",
+ "cbc",
+ "coingecko",
+ "indexmap 2.11.4",
+ "reqwest 0.12.15",
+ "ring",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "uuid",
+ "version-compare",
 ]
 
 [[package]]

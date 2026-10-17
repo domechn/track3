@@ -1,3 +1,4 @@
+import { recordOptionalSourceFailure } from "../../utils/source-failure";
 import nacl from 'tweetnacl'
 import { Exchanger } from './cex'
 import { sendHttpRequest } from '../../utils/http'
@@ -86,7 +87,7 @@ export class BackpackExchange implements Exchanger {
 		return this.fetchSpotBalance()
 			.then(() => true)
 			.catch(e => {
-				console.error("Backpack config verification failed:", e)
+				console.error("Backpack config verification failed:")
 				return false
 			})
 	}
@@ -145,7 +146,8 @@ export class BackpackExchange implements Exchanger {
 		try {
 			return await fetcher()
 		} catch (e) {
-			console.error(`Fetch Backpack ${productName} balance failed:`, e)
+			console.error(`Fetch Backpack ${productName} balance failed:`)
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}

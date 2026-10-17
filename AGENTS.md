@@ -30,6 +30,7 @@ Additional wiring:
 - Frontend UI lives in `src/components/`; domain/data orchestration lives in `src/middlelayers/`.
 - App shell uses `ThemeProvider` and `ChartResizeContext` in `src/App.tsx`.
 - Navigation is `react-router-dom` with `HashRouter`/`Routes` in `src/components/index/index.tsx`.
+- Rebalance page is lazy loaded at `#/rebalance`; navigation entries are in `src/components/index/main-nav.tsx` and `src/components/sidebar/index.tsx`. Targets, portfolio loading, CSV formatting, and the pure calculator live in `src/middlelayers/rebalance.ts`.
 - Tauri backend commands/plugins are wired in `src-tauri/src/main.rs`; frontend calls via `invoke()` and Tauri plugins.
 - CEX fetchers follow the `Exchanger` pattern in `src/middlelayers/datafetch/coins/cex/cex.ts`.
 
@@ -46,7 +47,7 @@ Key files: `main.rs` (entry + commands), `binance.rs`, `info.rs` (CoinGecko), `m
 
 ### Database
 
-SQLite with versioned migrations in `src-tauri/migrations/` (`init`, `v01t02`, `v02t03`, `v03t04`, `v04t05`, `v06t07`, `v07t08`). Key tables: `assets_v2`, `asset_prices`, `configuration`, `currency_rates`, `transactions`, `chat_sessions`, `cloud_sync`.
+SQLite with versioned migrations in `src-tauri/migrations/` (`init`, `v01t02`, `v02t03`, `v03t04`, `v04t05`, `v06t07`, `v07t08`, `v08t09`). Key tables: `assets_v2`, `asset_prices`, `configuration`, `currency_rates`, `transactions`, `chat_sessions`, `cloud_sync`, `rebalance_profiles`. The `v08t09` migration stores one validated target profile in `rebalance_profiles`; the calculator keeps any unspent amount in a `CASH` reserve row so signed trade values sum to injected cash at 0.01 base-currency precision.
 
 ## Code Style
 
@@ -90,6 +91,8 @@ corepack yarn update-release   # Release metadata
 ```
 
 Tests run via Vitest (`corepack yarn test` or `corepack yarn test:watch` for watch mode). All new code must include co-located tests.
+
+Assistant prompt, skill, orchestrator, provider, and chat-loop changes should run the offline golden suite in `corepack yarn test`. The optional live model check is `corepack yarn eval` with `EVAL_ENDPOINT`, `EVAL_API_KEY`, and `EVAL_MODEL`; see `docs/assistant-eval.md`.
 
 ## Build Requirements
 
