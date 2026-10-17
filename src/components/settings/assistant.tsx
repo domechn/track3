@@ -20,7 +20,6 @@ import { probeConnection } from "@/middlelayers/ai";
 import type { AIAdvancedOptions, AIConfig } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
 import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
-import { Switch } from "@/components/ui/switch";
 
 const ALLOWED_ADVANCED_KEYS = [
   "temperature",
