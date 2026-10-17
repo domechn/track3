@@ -17,7 +17,7 @@ export type SyncSession = {
 };
 type Kind = "snapshot" | "config" | "session" | "tombstone" | "session-delete" | "edit";
 type Entry = { kind: Kind; id: string; version: string; bytes: number; sha256: string };
-type Manifest = { version: 1; deviceId: string; entries: Entry[] };
+type Manifest = { version: 1; deviceId: string; name?: string; entries: Entry[] };
 type ObjectParts = { multipart: 1; total: number; parts: Array<{ bytes: number; sha256: string }> };
 type ConfigVersion = { value: string | null; clock: Hlc };
 type ConfigMarker = { clock: Hlc; hash: string };
@@ -57,7 +57,11 @@ export type SyncState = {
 };
 
 export function resetSyncState(state: SyncState): SyncState {
-  return { deviceId: state.deviceId, clock: state.clock };
+  return {
+    deviceId: state.deviceId, clock: state.clock,
+    pendingTombstones: state.pendingTombstones,
+    tombstones: { ...state.pendingTombstones },
+  };
 }
 
 export interface SyncRepository {
@@ -82,13 +86,14 @@ export interface SyncRepository {
 export type SyncReport = {
   pulled: number; pushed: number; tombstonesApplied: number; configChanges: number;
   conflicts: string[]; errors: string[]; pulledFrom?: string[];
-  devices?: Array<{ id: string; lastUpload?: string }>;
+  devices?: Array<{ id: string; name?: string; lastUpload?: string }>;
 };
 export type SyncOptions = {
   signal?: AbortSignal;
   onProgress?: (progress: { phase: "pull" | "push"; completed: number; total: number }) => void;
   categories?: Partial<Record<SyncCategory | "chat" | "history", boolean>>;
   dryRun?: boolean;
+  deviceName?: string;
 };
 
 const encoder = new TextEncoder();
@@ -120,7 +125,8 @@ function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") {
     const fields = value as Record<string, unknown>;
-    return `{${Object.keys(fields).sort().map((k) => `${JSON.stringify(k)}:${canonical(fields[k])}`).join(",")}}`;
+    return `{${Object.keys(fields).filter((key) => fields[key] !== undefined).sort()
+      .map((k) => `${JSON.stringify(k)}:${canonical(fields[k])}`).join(",")}}`;
   }
   return JSON.stringify(value);
 }
@@ -415,10 +421,12 @@ export class SyncEngine {
           if (!object || object.body.length > MAX_MANIFEST_BYTES) throw new Error("Invalid sync manifest");
           const manifest = JSON.parse(decoder.decode(await decryptObject(key, item.key, JSON.parse(decoder.decode(object.body))))) as Manifest;
           if (!UUID_PATTERN.test(match[1]) || manifest.version !== 1 || manifest.deviceId !== match[1] ||
+              (manifest.name !== undefined && (typeof manifest.name !== "string" || !manifest.name.trim() ||
+                manifest.name.length > 60)) ||
               !Array.isArray(manifest.entries) || manifest.entries.length > 100_000 ||
               !manifest.entries.every(validEntry)) throw new Error("Invalid sync manifest");
           manifests.push({ owner: match[1], manifest, etag: object.etag });
-          report.devices.push({ id: match[1], lastUpload: item.lastModified });
+          report.devices.push({ id: match[1], name: manifest.name, lastUpload: item.lastModified });
         } catch {
           manifestReadFailed = true;
           report.errors.push("Failed to read sync manifest");
@@ -627,6 +635,10 @@ export class SyncEngine {
           state.assetRows[id] ??= await assetKeys(snapshot);
           state.transactionRows[id] ??= await transactionRows(snapshot);
           continue;
+        }
+        if (old === hash) {
+          state.assetRows[id] ??= await assetKeys(snapshot);
+          state.transactionRows[id] ??= await transactionRows(snapshot);
         }
         if (old !== hash) {
           const clock = this.tick(state, state.snapshotEdits[id]);
@@ -990,7 +1002,8 @@ export class SyncEngine {
       written++;
       options.onProgress?.({ phase: "push", completed: written, total: writes.length });
     }
-    if (written) {
+    const deviceName = options.deviceName?.trim().slice(0, 60) || own?.manifest.name;
+    if (written || own?.manifest.name !== deviceName && deviceName !== undefined) {
       const replacedSessions = new Set(published
         .filter((entry) => entry.kind === "session" || entry.kind === "session-delete")
         .map((entry) => entry.id));
@@ -1009,15 +1022,17 @@ export class SyncEngine {
       const manifestEntries = ownEntries.filter((entry) => !obsolete.includes(entry));
       const path = `devices/${state.deviceId}/manifest`;
       const body = encoder.encode(JSON.stringify(await encryptObject(key, path, encoder.encode(JSON.stringify({
-        version: 1, deviceId: state.deviceId!, entries: manifestEntries,
+        version: 1, deviceId: state.deviceId!, name: deviceName, entries: manifestEntries,
       } satisfies Manifest)))));
-      if (body.length > MAX_MANIFEST_BYTES) report.errors.push("Sync manifest is too large");
+      if (manifestEntries.length > 100_000 || body.length > MAX_MANIFEST_BYTES) report.errors.push("Sync manifest is too large");
       else {
         try {
           await this.store.putObject(path, body, own ? { ifMatch: own.etag } : { ifNoneMatch: "*" }, options.signal);
           const currentDevice = report.devices.find((device) => device.id === state.deviceId);
-          if (currentDevice) currentDevice.lastUpload = new Date(this.now()).toISOString();
-          else report.devices.push({ id: state.deviceId!, lastUpload: new Date(this.now()).toISOString() });
+          if (currentDevice) {
+            currentDevice.lastUpload = new Date(this.now()).toISOString();
+            currentDevice.name = deviceName;
+          } else report.devices.push({ id: state.deviceId!, name: deviceName, lastUpload: new Date(this.now()).toISOString() });
           report.pushed = written;
           for (const entry of published) {
             known.add(entryToken(state.deviceId!, entry));
@@ -1074,6 +1089,11 @@ export class SyncEngine {
       }
       state.trackedSessions = state.trackedSessions.filter((id) =>
         !state.sessionDeletions?.[id] || !!state.pendingSessionDeletions?.[id]);
+      for (const [id, tombstone] of Object.entries(state.tombstones)) {
+        if (!tombstone.deleted || state.pendingSnapshotEdits[id]) continue;
+        delete state.assetRows[id];
+        delete state.transactionRows[id];
+      }
       state.lastSync = this.now();
       await this.saveState(state);
     }

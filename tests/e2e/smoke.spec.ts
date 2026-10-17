@@ -17,6 +17,14 @@ test("connection test uses a fake S3 bucket", async ({ page }) => {
   await page.getByRole("button", { name: "Enable sync" }).click();
   await expect(page.getByRole("button", { name: "Sync idle" })).toBeVisible({ timeout: 15000 });
   await expect(page.getByLabel(/Name for device/)).toBeVisible({ timeout: 15000 });
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.getByRole("button", { name: "Sync idle" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect.poll(async () => (await dialog.boundingBox())?.x).toBeGreaterThanOrEqual(8);
+  const popover = await dialog.boundingBox();
+  expect(popover).not.toBeNull();
+  expect(popover!.x).toBeGreaterThanOrEqual(8);
+  expect(popover!.x + popover!.width).toBeLessThanOrEqual(312);
 });
 
 test("a second device pulls history from the first device", async ({ browser }) => {

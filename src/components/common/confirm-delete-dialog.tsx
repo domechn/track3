@@ -19,6 +19,7 @@ type ConfirmDeleteDialogProps = {
   onOpenChange?: (open: boolean) => void;
   title: string;
   description: ReactNode;
+  children?: ReactNode;
   cancelLabel: string;
   actions: { label: string; onClick: () => void; disabled?: boolean }[];
 };
@@ -29,6 +30,7 @@ export default function ConfirmDeleteDialog({
   onOpenChange,
   title,
   description,
+  children,
   cancelLabel,
   actions,
 }: ConfirmDeleteDialogProps) {
@@ -62,6 +64,7 @@ export default function ConfirmDeleteDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         <AlertDialogFooter>
           <AlertDialogCancel onClick={stopPropagation}>
             {cancelLabel}

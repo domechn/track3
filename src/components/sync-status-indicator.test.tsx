@@ -28,6 +28,10 @@ describe("SyncStatusIndicator", () => {
     state.current.mode = "ready";
     state.current.sync.phase = "error";
     state.current.sync.error = "header";
+    Object.assign(state.current.sync, {
+      report: { pulled: 2, pushed: 1, conflicts: ["a"], errors: ["read failed"], tombstonesApplied: 0, configChanges: 0 },
+      retryStopped: false,
+    });
     vi.mocked(syncRuntime.unlock).mockResolvedValue("ok");
     vi.clearAllMocks();
   });
@@ -49,6 +53,13 @@ describe("SyncStatusIndicator", () => {
     render(<SyncStatusIndicator />);
     fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
     expect(await screen.findByText("The sync header is damaged or unsupported.")).toBeInTheDocument();
+  });
+  it("explains when automatic retries stop", async () => {
+    state.current.sync.error = "sync";
+    Object.assign(state.current.sync, { report: undefined, retryStopped: true });
+    render(<SyncStatusIndicator />);
+    fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
+    expect(await screen.findByText(/retry.*stopped/i)).toBeInTheDocument();
   });
 
   it("shows a distinct conflict state with a translated summary", async () => {

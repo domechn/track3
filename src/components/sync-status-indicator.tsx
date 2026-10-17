@@ -56,7 +56,8 @@ export default function SyncStatusIndicator() {
             {t(`sync.status.${phase}`)}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" side="left" className="space-y-3 text-sm">
+        <PopoverContent align="end" side="top" collisionPadding={16}
+          className="w-72 max-w-[calc(100vw-2rem)] space-y-3 text-sm">
           <h2 className="font-semibold">{t("sync.status.details")}</h2>
           {status.mode === "locked" ? (
             <div className="space-y-2">
@@ -75,7 +76,11 @@ export default function SyncStatusIndicator() {
               {report?.conflicts.length ? <p className="text-amber-600 dark:text-amber-400">
                 {t("sync.status.conflictSummary").replace("{count}", String(report.conflicts.length))}
               </p> : null}
-              {report?.errors.length ? <p className="text-destructive">{t("sync.status.errorsPresent")}</p> : null}
+              {status.sync.retryStopped
+                ? <p className="text-destructive">{t("sync.status.retryStopped")}</p>
+                : report?.errors.length
+                  ? <p className="text-destructive">{t("sync.status.errorsPresent")}</p>
+                  : null}
               {status.sync.error && status.sync.error !== "sync" &&
                 <p className="text-destructive">{t(`sync.connection.${status.sync.error}`)}</p>}
               <Button size="sm" variant="outline" disabled={phase === "syncing"} onClick={() => void syncRuntime.syncNow()}>{t("sync.now")}</Button>

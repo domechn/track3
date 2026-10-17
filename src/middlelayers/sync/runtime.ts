@@ -142,8 +142,12 @@ export class SyncRuntime {
     this.handle?.unregister();
     this.passphrase = passphrase;
     this.handle = this.deps.engine(store, passphrase);
-    this.scheduler = new SyncScheduler((signal) =>
-      this.handle!.engine.syncOnce({ signal, categories: this.settings.categories }));
+    this.scheduler = new SyncScheduler(async (signal) => {
+      const currentId = await this.deps.deviceId?.();
+      return this.handle!.engine.syncOnce({
+        signal, categories: this.settings.categories, deviceName: this.settings.deviceNames[currentId ?? ""],
+      });
+    });
     this.scheduler.subscribe(() => this.publish("ready", this.scheduler!.status()));
     this.publish("ready", this.scheduler.status());
     this.scheduler.trigger("start");
@@ -182,8 +186,8 @@ export class SyncRuntime {
 
   async devices(): Promise<Array<{ id: string; name: string; lastUpload?: string; current: boolean }>> {
     const currentId = await this.deps.deviceId?.();
-    return (this.snapshot.sync.report?.devices ?? []).map(({ id, lastUpload }) => ({
-      id, name: this.settings.deviceNames[id] ?? id.slice(0, 8),
+    return (this.snapshot.sync.report?.devices ?? []).map(({ id, name, lastUpload }) => ({
+      id, name: this.settings.deviceNames[id] ?? name ?? id.slice(0, 8),
       lastUpload, current: id === currentId,
     }));
   }
@@ -193,6 +197,7 @@ export class SyncRuntime {
     await this.deps.save(next);
     this.settings = next;
     this.publish(this.snapshot.mode);
+    if (id === await this.deps.deviceId?.()) this.scheduler?.trigger("refresh");
   }
 
   stop(): void {
