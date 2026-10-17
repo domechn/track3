@@ -8,8 +8,8 @@ const skill: Skill = {
   description:
     "Aggregate transaction statistics over a period. Returns buy, sell, " +
     "deposit, and withdraw totals (count, amount, volume, and weighted " +
-    "average price). Use this for spending, trading volume, average buy " +
-    "price, or cost-basis questions instead of listing every transaction.",
+    "average price). Use this for spending, trading volume, or average buy " +
+    "price instead of listing every transaction. Use cost-basis for realized gains.",
   parameters: {
     type: "object",
     properties: {
