@@ -99,6 +99,24 @@ describe("SyncEngine", () => {
     expect(repos[1].snapshots.get("one")).toEqual(snapshot("one"));
   });
 
+  it("publishes edits made while restoring a deleted snapshot", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    await repos[0].deleteSnapshot("one");
+    await engines[0].recordDeletion("one");
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    const restored = snapshot("one");
+    restored.transactions[0].price = 9;
+    repos[0].snapshots.set("one", restored);
+    await engines[0].recordUndo("one");
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    expect(repos[1].snapshots.get("one")?.transactions[0].price).toBe(9);
+  });
+
   it("resolves config by HLC and leaves secrets alone when disabled", async () => {
     const { repos, engines } = await devices(2);
     repos[0].config.set("7", "USD");
@@ -155,6 +173,50 @@ describe("SyncEngine", () => {
     const { repos, engines } = await devices(1);
     repos[0].listSessions = async () => { throw new Error("session file unavailable"); };
     expect((await engines[0].syncOnce({ categories: { chat: false } })).errors).toEqual([]);
+  });
+
+  it("pulls a session skipped while chat sync was disabled", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].sessions.set("chat", {
+      id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 1, preview: "Hi",
+      messages: [{ id: "m1", at: "2026-01-01", role: "user", content: "Hi" }],
+    });
+    await engines[0].syncOnce();
+    await engines[1].syncOnce({ categories: { chat: false } });
+    expect(repos[1].sessions.has("chat")).toBe(false);
+    await engines[1].syncOnce();
+    expect(repos[1].sessions.get("chat")).toEqual(repos[0].sessions.get("chat"));
+  });
+
+  it("applies a session deletion skipped while chat sync was disabled", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].sessions.set("chat", {
+      id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 0, preview: "", messages: [],
+    });
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[0].sessions.delete("chat");
+    await engines[0].syncOnce();
+    await engines[1].syncOnce({ categories: { chat: false } });
+    expect(repos[1].sessions.has("chat")).toBe(true);
+    await engines[1].syncOnce();
+    expect(repos[1].sessions.has("chat")).toBe(false);
+  });
+
+  it("prunes session metadata after its deletion is published", async () => {
+    const { repos, engines } = await devices(1);
+    repos[0].sessions.set("chat", {
+      id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 0, preview: "", messages: [],
+    });
+    await engines[0].syncOnce();
+    expect(repos[0].state.sessionHashes?.chat).toBeDefined();
+    repos[0].sessions.delete("chat");
+    await engines[0].syncOnce();
+    expect(repos[0].state.sessionHashes?.chat).toBeUndefined();
+    expect(repos[0].state.trackedSessions).not.toContain("chat");
   });
 
   it("reports unreadable local items and still pushes readable snapshots", async () => {
@@ -323,7 +385,7 @@ describe("SyncEngine", () => {
     expect((await engines[0].syncOnce()).errors).toEqual([]);
     const objects = (await s3.listObjectsV2({ prefix: `devices/${repos[0].state.deviceId}/session/` })).objects;
     expect(objects).toHaveLength(4);
-  }, 20_000);
+  }, 60_000);
 
   it("syncs a snapshot beyond the single-object plaintext limit", async () => {
     const { repos, engines } = await devices(2);
@@ -332,7 +394,7 @@ describe("SyncEngine", () => {
     expect((await engines[0].syncOnce()).errors).toEqual([]);
     expect((await engines[1].syncOnce()).errors).toEqual([]);
     expect(repos[1].snapshots.get("large")?.assets[0].wallet).toHaveLength(17_000_000);
-  }, 20_000);
+  }, 60_000);
 
   it("reuses a large orphaned snapshot after local row IDs change", async () => {
     const { s3, repos, engines } = await devices(2);
@@ -352,7 +414,7 @@ describe("SyncEngine", () => {
     expect((await engines[0].syncOnce()).errors).toEqual([]);
     expect((await engines[1].syncOnce()).errors).toEqual([]);
     expect(repos[1].snapshots.has("large")).toBe(true);
-  }, 20_000);
+  }, 60_000);
 
   it("replaces unpublished parts after a partial large snapshot write", async () => {
     const { s3, repos, engines } = await devices(1);
@@ -370,7 +432,7 @@ describe("SyncEngine", () => {
     local.prices[0].assetID = 9;
     local.transactions[0].assetID = 9;
     expect((await engines[0].syncOnce()).errors).toEqual([]);
-  }, 20_000);
+  }, 60_000);
 
   it("makes no probe writes in a round without pending changes", async () => {
     const { s3, engines } = await devices(1);

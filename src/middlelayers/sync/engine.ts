@@ -434,6 +434,7 @@ export class SyncEngine {
       const token = entryToken(owner, entry);
       if (known.has(token)) continue;
       try {
+        if ((entry.kind === "session" || entry.kind === "session-delete") && !enabled("chat")) continue;
         if (entry.kind === "config") {
           if (!syncCategory(entry.id) || !enabled(syncCategory(entry.id)!) || blockedConfig.has(entry.id)) continue;
           const value = await read<ConfigVersion>(owner, entry);
@@ -1020,6 +1021,11 @@ export class SyncEngine {
     }
     aborted();
     if (!report.errors.length) {
+      for (const id of Object.keys(state.sessionDeletions)) {
+        if (!state.pendingSessionDeletions[id]) delete state.sessionHashes[id];
+      }
+      state.trackedSessions = state.trackedSessions.filter((id) =>
+        !state.sessionDeletions?.[id] || !!state.pendingSessionDeletions?.[id]);
       state.lastSync = this.now();
       await this.repo.saveState(state);
     }
