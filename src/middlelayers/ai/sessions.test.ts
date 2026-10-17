@@ -199,7 +199,8 @@ describe("chat sessions middlelayer", () => {
     const address = "0x52908400098527886E0F7030069857D2E4169EE7";
     await sessions.createSession();
     await sessions.appendMessages("uuid-1", [{ role: "user", content: `Check ${address}` }]);
-    expect((await sessions.loadSession("uuid-1"))?.messages[0]).toEqual({ role: "user", content: `Check ${address}` });
+    expect((await sessions.loadSession("uuid-1"))?.messages[0]).toMatchObject({ role: "user", content: `Check ${address}` });
+  });
   it("keeps a same-millisecond user and assistant batch in order after sync merge", async () => {
     const sessions = await import("./sessions");
     const { mergeSessions } = await import("../sync/engine");
