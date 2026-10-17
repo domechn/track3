@@ -7,7 +7,7 @@ name = "track3"
 default-run = "track3"
 repository = "https://gituhb.com/domechn/track3"
 rust-version = "1.94"
-version = "0.8.2"
+version = "0.9.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

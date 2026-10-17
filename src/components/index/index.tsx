@@ -61,6 +61,7 @@ const Setting = React.lazy(() => import("../settings"));
 const HistoricalData = React.lazy(() => import("../historical-data"));
 const Overview = React.lazy(() => import("../overview"));
 const Comparison = React.lazy(() => import("../comparison"));
+const Rebalance = React.lazy(() => import("../rebalance"));
 const WalletAnalysis = React.lazy(() => import("../wallet-analytics"));
 const CoinAnalysis = React.lazy(() => import("../coin-analytics"));
 const Configuration = React.lazy(() => import("@/components/configuration"));
@@ -397,6 +398,14 @@ function AppRoutes({
                   quoteColor={quoteColor}
                 />
               </PageWrapper>
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="rebalance"
+          element={
+            <AnimatedPage>
+              <Rebalance currency={currentCurrency} />
             </AnimatedPage>
           }
         />

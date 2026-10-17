@@ -947,6 +947,26 @@ async fn migrate_v7_to_v8(
         .map_err(|error| format!("failed to commit v0.7 to v0.8 migration: {error}"))
 }
 
+async fn migrate_v8_to_v9(
+    connection: &mut SqliteConnection,
+    resource_dir: &Path,
+) -> MigrationResult<()> {
+    let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
+    let mut transaction = connection
+        .begin()
+        .await
+        .map_err(|error| format!("failed to begin v0.8 to v0.9 migration: {error}"))?;
+    sqlx::raw_sql(&rebalance_profiles)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to create rebalance profiles table: {error}"))?;
+    write_migration_version(&mut transaction, "0.9.0").await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| format!("failed to commit v0.8 to v0.9 migration: {error}"))
+}
+
 async fn repair_required_schema(
     connection: &mut SqliteConnection,
     resource_dir: &Path,
@@ -956,6 +976,7 @@ async fn repair_required_schema(
     let asset_prices = read_migration_sql(resource_dir, "init/asset_prices_up.sql")?;
     let transactions = read_migration_sql(resource_dir, "init/transactions_up.sql")?;
     let chat_sessions = read_migration_sql(resource_dir, "init/chat_sessions_up.sql")?;
+    let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
     let mut transaction = connection
         .begin()
@@ -1040,6 +1061,12 @@ async fn repair_required_schema(
         .execute(&mut *transaction)
         .await
         .map_err(|error| format!("failed to ensure required chat_sessions table: {error}"))?;
+    if !version_is_less(app_version, "0.9.0")? {
+        sqlx::raw_sql(&rebalance_profiles)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to ensure rebalance profiles table: {error}"))?;
+    }
     repair_index(
         &mut transaction,
         "chat_sessions",
@@ -1143,6 +1170,10 @@ pub async fn run_migrations(
     }
     if version_is_less(&previous_version, "0.8.0")? {
         migrate_v7_to_v8(&mut connection, resource_dir).await?;
+        previous_version = load_database_version(&mut connection).await?;
+    }
+    if !version_is_less(app_version, "0.9.0")? && version_is_less(&previous_version, "0.9.0")? {
+        migrate_v8_to_v9(&mut connection, resource_dir).await?;
     }
 
     repair_required_schema(&mut connection, resource_dir, app_version).await?;
@@ -2753,6 +2784,72 @@ mod tests {
             );
             selected.close().await.unwrap();
             decoy.close().await.unwrap();
+        });
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn v8_to_v9_creates_a_single_validated_rebalance_profile_without_changing_assets() {
+        let root = make_temp_dir("rebalance-profile");
+        let database_path = root.join("legacy.db");
+        let rt = Runtime::new().unwrap();
+
+        rt.block_on(async {
+            create_legacy_fixture(&database_path, LegacyVersion::V07).await;
+            run_migrations(&database_path, &resource_dir(), "0.8.1")
+                .await
+                .unwrap();
+            let mut conn = connect(&database_path).await;
+            let assets_before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assets_v2")
+                .fetch_one(&mut conn)
+                .await
+                .unwrap();
+            conn.close().await.unwrap();
+
+            run_migrations(&database_path, &resource_dir(), "0.9.0")
+                .await
+                .unwrap();
+            let mut conn = connect(&database_path).await;
+            assert!(table_exists(&mut conn, "rebalance_profiles").await);
+            assert_eq!(
+                configuration(&mut conn, 999).await.as_deref(),
+                Some("0.9.0")
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM assets_v2")
+                    .fetch_one(&mut conn)
+                    .await
+                    .unwrap(),
+                assets_before
+            );
+            conn.execute(
+                "INSERT INTO rebalance_profiles (id, targets, tolerance_percent)
+                 VALUES (1, '[{\"kind\":\"cash\",\"percent\":100}]', 5)",
+            )
+            .await
+            .unwrap();
+            assert!(conn
+                .execute(
+                    "INSERT INTO rebalance_profiles (id, targets, tolerance_percent)
+                 VALUES (2, '[]', 0)",
+                )
+                .await
+                .is_err());
+            conn.close().await.unwrap();
+
+            run_migrations(&database_path, &resource_dir(), "0.9.0")
+                .await
+                .unwrap();
+            let mut conn = connect(&database_path).await;
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM rebalance_profiles")
+                    .fetch_one(&mut conn)
+                    .await
+                    .unwrap(),
+                1
+            );
+            conn.close().await.unwrap();
         });
 
         fs::remove_dir_all(root).unwrap();
