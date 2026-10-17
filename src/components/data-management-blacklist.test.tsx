@@ -1,7 +1,8 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DataManagement from "@/components/data-management";
+import { Toast, ToastProvider, ToastViewport } from "@/components/ui/toast";
 import {
   I18nProvider,
   localeLocalStorageKey,
@@ -13,6 +14,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
+  addToBlacklist: vi.fn(),
   checkIfDuplicatedHistoricalData: vi.fn(),
   cleanAutoBackupDirectory: vi.fn(),
   exportHistoricalData: vi.fn(),
@@ -47,6 +49,7 @@ vi.mock("@/middlelayers/data", () => ({
 }));
 
 vi.mock("@/middlelayers/configuration", () => ({
+  addToBlacklist: mocks.addToBlacklist,
   cleanAutoBackupDirectory: mocks.cleanAutoBackupDirectory,
   getAutoBackupDirectory: mocks.getAutoBackupDirectory,
   getBlacklistCoins: mocks.getBlacklistCoins,
@@ -70,6 +73,9 @@ beforeEach(() => {
   mocks.getBlacklistCoins.mockResolvedValue(["BTC"]);
   mocks.invoke.mockResolvedValue(undefined);
   mocks.removeFromBlacklist.mockResolvedValue(undefined);
+  mocks.addToBlacklist.mockResolvedValue(undefined);
+  mocks.cleanAutoBackupDirectory.mockResolvedValue(undefined);
+  mocks.saveAutoBackupDirectory.mockResolvedValue(undefined);
 });
 
 describe("Data Management", () => {
@@ -81,15 +87,60 @@ describe("Data Management", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /remove btc from blacklist/i }),
     );
+    expect(mocks.removeFromBlacklist).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("BTC")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /remove btc from blacklist/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
 
     await waitFor(() => {
       expect(mocks.removeFromBlacklist).toHaveBeenCalledWith("BTC");
     });
     expect(screen.queryByText("BTC")).not.toBeInTheDocument();
     expect(screen.getByText("No blacklisted tokens")).toBeInTheDocument();
-    expect(mocks.toast).toHaveBeenCalledWith({
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
       description: '"BTC" removed from blacklist',
-    });
+      duration: 5000,
+    }));
+    const toastView = render(<ToastProvider><Toast defaultOpen>
+      {mocks.toast.mock.lastCall?.[0].action}
+    </Toast><ToastViewport /></ToastProvider>);
+    fireEvent.click(toastView.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(mocks.addToBlacklist).toHaveBeenCalledWith("BTC"));
+    expect(screen.getByText("BTC")).toBeInTheDocument();
+  });
+
+  it("restores a blacklist chip when removal fails", async () => {
+    mocks.removeFromBlacklist.mockRejectedValueOnce(new Error("disk failed"));
+    render(<DataManagement />);
+    await screen.findByText("BTC");
+    fireEvent.click(screen.getByRole("button", { name: /remove btc from blacklist/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
+      description: "disk failed",
+      variant: "destructive",
+    }));
+    expect(screen.getByText("BTC")).toBeInTheDocument();
+  });
+
+  it("confirms clearing the backup folder and can undo it", async () => {
+    mocks.getAutoBackupDirectory.mockResolvedValue("/backups");
+    render(<DataManagement />);
+    await screen.findByText("/backups");
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(mocks.cleanAutoBackupDirectory).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("/backups")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(mocks.cleanAutoBackupDirectory).toHaveBeenCalledOnce());
+    expect(screen.queryByText("/backups")).not.toBeInTheDocument();
+    const toastView = render(<ToastProvider><Toast defaultOpen>
+      {mocks.toast.mock.lastCall?.[0].action}
+    </Toast><ToastViewport /></ToastProvider>);
+    fireEvent.click(toastView.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(mocks.saveAutoBackupDirectory).toHaveBeenCalledWith("/backups"));
+    expect(screen.getByText("/backups")).toBeInTheDocument();
   });
 
   it.each([

@@ -44,6 +44,12 @@ describe("MessageBubble", () => {
     expect(screen.getByText("Thinking...")).toBeTruthy();
   });
 
+  it("renders the thinking indicator for a legacy whitespace-only block", () => {
+    const msg: ChatMessage = { role: "assistant", blocks: [{ kind: "text", text: "\n\n" }] };
+    render(<MessageBubble message={msg} isStreaming />);
+    expect(screen.getByText("Thinking...")).toBeTruthy();
+  });
+
   it("renders multiple text blocks in sequence", () => {
     const msg: ChatMessage = {
       role: "assistant",
@@ -99,5 +105,33 @@ describe("MessageBubble", () => {
     render(<MessageBubble message={msg} isStreaming />);
     // Think block auto-collapses when response starts; verify response shows
     expect(screen.getByText("Here is the result")).toBeTruthy();
+  });
+
+  it("shows one live thinking row for adjacent reasoning blocks", () => {
+    const msg: ChatMessage = {
+      role: "assistant",
+      blocks: [
+        { kind: "think", text: "Checking " },
+        { kind: "think", text: "holdings" },
+        { kind: "text", text: "\n\n" },
+      ],
+    };
+    const { container } = render(<MessageBubble message={msg} isStreaming />);
+    expect(screen.getAllByRole("button", { name: /Thinking/ })).toHaveLength(1);
+    expect(screen.getByText("Checking holdings")).toBeTruthy();
+    expect(container.querySelector('[data-testid="thinking-stream-indicator"]')).toBeTruthy();
+  });
+
+  it("keeps a later tool round's thinking preview live after earlier text", () => {
+    const msg: ChatMessage = {
+      role: "assistant",
+      blocks: [
+        { kind: "text", text: "Checking transactions." },
+        { kind: "think", text: "Calculating the change" },
+      ],
+    };
+    const { container } = render(<MessageBubble message={msg} isStreaming />);
+    expect(screen.getByText("Calculating the change")).toBeTruthy();
+    expect(container.querySelector('[data-testid="thinking-stream-indicator"]')).toBeTruthy();
   });
 });

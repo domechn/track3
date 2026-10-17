@@ -243,13 +243,24 @@ export function useChat(options: UseChatOptions): UseChatResult {
       let thinkState: "outside" | "inside" = "outside";
       let pendingBuf = "";
       let hasReasoningContent = false;
+      let reasoningContent = "";
+      let thinkBlockIndex: number | null = null;
+      const roundStartMessage = messagesRef.current[assistantIndex];
+      const roundStartBlockIndex = roundStartMessage?.role === "assistant"
+        ? roundStartMessage.blocks.length
+        : 0;
       // Each model call (tool-loop round) starts its own text block so the
       // pre-tool-call sentence and the post-result answer are not glued
       // together mid-sentence.
       let freshTextBlock = true;
+      let hasVisibleText = false;
 
-      const addToBlock = (kind: "text" | "think", delta: string) => {
+      const addToBlock = (kind: "text" | "think", delta: string, beforeRoundText = false) => {
         if (!delta) return;
+        if (kind === "text") {
+          if (!hasVisibleText && !delta.trim()) return;
+          hasVisibleText = true;
+        }
         const next = messagesRef.current.slice();
         const target = { ...next[assistantIndex] };
         if (target.role !== "assistant") return;
@@ -257,10 +268,21 @@ export function useChat(options: UseChatOptions): UseChatResult {
         const last = blocks[blocks.length - 1];
         const startNew = kind === "text" && freshTextBlock;
         if (kind === "text") freshTextBlock = false;
-        if (last && last.kind === kind && !startNew) {
+        if (kind === "think" && thinkBlockIndex !== null) {
+          const block = blocks[thinkBlockIndex];
+          if (block?.kind === "think") {
+            blocks[thinkBlockIndex] = { kind: "think", text: block.text + delta };
+          }
+        } else if (kind === "think") {
+          const firstRoundText = beforeRoundText
+            ? blocks.findIndex((block, index) => index >= roundStartBlockIndex && block.kind === "text")
+            : -1;
+          thinkBlockIndex = firstRoundText >= 0 ? firstRoundText : blocks.length;
+          blocks.splice(thinkBlockIndex, 0, { kind: "think", text: delta });
+        } else if (last?.kind === "text" && !startNew) {
           blocks[blocks.length - 1] = { ...last, text: last.text + delta };
         } else {
-          blocks.push({ kind, text: delta });
+          blocks.push({ kind: "text", text: delta });
         }
         next[assistantIndex] = { ...target, blocks };
         messagesRef.current = next;
@@ -293,29 +315,13 @@ export function useChat(options: UseChatOptions): UseChatResult {
       for await (const ev of events) {
         if (signal.aborted) break;
         if (ev.kind === "think") {
-          hasReasoningContent = true;
-          const next = messagesRef.current.slice();
-          const target = { ...next[assistantIndex] };
-          if (target.role !== "assistant") return;
-          const blocks = target.blocks.slice();
-          const last = blocks[blocks.length - 1];
-          if (last && last.kind === "think") {
-            blocks[blocks.length - 1] = {
-              kind: "think",
-              text: last.text + ev.delta,
-            };
-          } else {
-            // Insert the think block before any text blocks
-            const textIdx = blocks.findIndex((b) => b.kind === "text");
-            if (textIdx >= 0) {
-              blocks.splice(textIdx, 0, { kind: "think", text: ev.delta });
-            } else {
-              blocks.push({ kind: "think", text: ev.delta });
-            }
+          if (pendingBuf) {
+            addToBlock(thinkState === "outside" ? "text" : "think", pendingBuf);
+            pendingBuf = "";
           }
-          next[assistantIndex] = { ...target, blocks };
-          messagesRef.current = next;
-          if (mountedRef.current) setMessages(next);
+          hasReasoningContent = true;
+          reasoningContent += ev.delta;
+          addToBlock("think", ev.delta, !hasVisibleText);
         } else if (ev.kind === "text") {
           if (hasReasoningContent) {
             addToBlock("text", ev.delta);
@@ -376,12 +382,12 @@ export function useChat(options: UseChatOptions): UseChatResult {
         addToBlock(thinkState === "outside" ? "text" : "think", pendingBuf);
         pendingBuf = "";
       }
-      if (failed || signal.aborted) return [];
+      if (failed || signal.aborted) return { toolCalls: [], reasoningContent };
       const toolCallResults: Awaited<ReturnType<typeof dispatchToolCall>>[] = [];
       for (let i = 0; i < toolCalls.length; i += 4) {
         toolCallResults.push(...await Promise.all(toolCalls.slice(i, i + 4).map(dispatchToolCall)));
       }
-      return toolCallResults;
+      return { toolCalls: toolCallResults, reasoningContent };
     },
     [baseCurrency],
   );
@@ -398,6 +404,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
     ): Promise<boolean> => {
       let yielded = false;
       const agentActivityMap = new Map<string, AgentActivity>();
+      let progressThinkIndex: number | null = null;
 
       for await (const ev of events) {
         if (signal.aborted) break;
@@ -445,22 +452,23 @@ export function useChat(options: UseChatOptions): UseChatResult {
             break;
           }
           case "synthesizing": {
-            blocks.push({ kind: "think", text: t("assistant.chat.synthesizing") });
+            const progress = { kind: "think" as const, text: t("assistant.chat.synthesizing") };
+            if (progressThinkIndex === null) {
+              progressThinkIndex = blocks.length;
+              blocks.push(progress);
+            } else {
+              blocks[progressThinkIndex] = progress;
+            }
             break;
           }
           case "optimizing": {
             const msg = t("assistant.chat.refining")
               .replace("{round}", String(ev.round))
               .replace("{total}", String(ev.totalRounds));
-            const thinkIdx = (() => {
-              for (let i = blocks.length - 1; i >= 0; i--) {
-                if (blocks[i]!.kind === "think") return i;
-              }
-              return -1;
-            })();
-            if (thinkIdx >= 0) {
-              blocks[thinkIdx] = { kind: "think", text: msg };
+            if (progressThinkIndex !== null) {
+              blocks[progressThinkIndex] = { kind: "think", text: msg };
             } else {
+              progressThinkIndex = blocks.length;
               blocks.push({ kind: "think", text: msg });
             }
             break;
@@ -574,7 +582,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
           if (controller.signal.aborted) break;
           const usedChars = providerMessages.reduce((sum, m) => {
             const content = typeof m.content === "string" ? m.content : "";
-            return sum + content.length + (m.role ?? "").length + 100;
+            return sum + content.length + (m.reasoning_content?.length ?? 0) + (m.role ?? "").length + 100;
           }, 0);
           // Once the history outgrows the budget (or this is the last round)
           // make one final call WITHOUT tools so the model answers from the
@@ -592,7 +600,8 @@ export function useChat(options: UseChatOptions): UseChatResult {
             signal: controller.signal,
           });
 
-          const toolCalls = (await consumeStream(events, idx, controller.signal)) ?? [];
+          const { toolCalls, reasoningContent } =
+            (await consumeStream(events, idx, controller.signal)) ?? { toolCalls: [], reasoningContent: "" };
 
           if (controller.signal.aborted || toolCalls.length === 0 || finalRound) {
             break;
@@ -602,6 +611,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
           const assistantToolCallMsg: ProviderMessage = {
             role: "assistant",
             content: null,
+            ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
             tool_calls: toolCalls.map((tc) => ({
               id: tc.id,
               type: "function" as const,

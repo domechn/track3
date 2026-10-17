@@ -19,6 +19,7 @@ export type ChatRole = "user" | "assistant" | "system" | "tool";
 export type ProviderMessage = {
   role: ChatRole;
   content?: string | null;
+  reasoning_content?: string;
   name?: string;
   tool_call_id?: string;
   tool_calls?: ProviderToolCall[];
