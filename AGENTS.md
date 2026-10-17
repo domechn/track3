@@ -49,7 +49,7 @@ Key files: `main.rs` (entry + commands), `binance.rs`, `info.rs` (CoinGecko), `m
 
 ### Database
 
-SQLite with versioned migrations in `src-tauri/migrations/` (`init`, `v01t02`, `v02t03`, `v03t04`, `v04t05`, `v06t07`, `v07t08`, `v08t09`, `v10t11`). Key tables: `assets_v2`, `asset_prices`, `configuration`, `currency_rates`, `transactions`, `chat_sessions`, `rebalance_profiles`, `sync_state`, and `sync_applied_objects`. The `v10t11` sync SQL runs within the 0.9.0 migration and repair step. The `v08t09` migration stores one validated target profile in `rebalance_profiles`; the calculator keeps any unspent amount in a `CASH` reserve row so signed trade values sum to injected cash at 0.01 base-currency precision.
+SQLite with versioned migrations in `src-tauri/migrations/` (`init`, `v01t02`, `v02t03`, `v03t04`, `v04t05`, `v06t07`, `v07t08`, `v08t09`). Key tables: `assets_v2`, `asset_prices`, `configuration`, `currency_rates`, `transactions`, `chat_sessions`, `rebalance_profiles`, `alert_rules`/`alert_history`, `history_snapshots`, `sync_state`, and `sync_applied_objects`. All 0.9.0 SQL (rebalance, alerts, history snapshots, sync state) lives in `v08t09` and runs inside the single 0.9.0 migration and repair step; there is no later migration directory until the next release. The `v08t09` migration stores one validated target profile in `rebalance_profiles`; the calculator keeps any unspent amount in a `CASH` reserve row so signed trade values sum to injected cash at 0.01 base-currency precision.
 
 ## Code Style
 

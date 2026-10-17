@@ -952,8 +952,8 @@ async fn migrate_v8_to_v9(
     resource_dir: &Path,
 ) -> MigrationResult<()> {
     let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
-    let alerts = read_migration_sql(resource_dir, "v09t10/alerts_up.sql")?;
-    let sync_state = read_migration_sql(resource_dir, "v10t11/sync_state_up.sql")?;
+    let alerts = read_migration_sql(resource_dir, "v08t09/alerts_up.sql")?;
+    let sync_state = read_migration_sql(resource_dir, "v08t09/sync_state_up.sql")?;
     let history_snapshots = read_migration_sql(resource_dir, "v08t09/history_snapshots_up.sql")?;
     let mut transaction = connection
         .begin()
@@ -992,8 +992,8 @@ async fn repair_required_schema(
     let transactions = read_migration_sql(resource_dir, "init/transactions_up.sql")?;
     let chat_sessions = read_migration_sql(resource_dir, "init/chat_sessions_up.sql")?;
     let rebalance_profiles = read_migration_sql(resource_dir, "v08t09/rebalance_profiles_up.sql")?;
-    let alerts = read_migration_sql(resource_dir, "v09t10/alerts_up.sql")?;
-    let sync_state = read_migration_sql(resource_dir, "v10t11/sync_state_up.sql")?;
+    let alerts = read_migration_sql(resource_dir, "v08t09/alerts_up.sql")?;
+    let sync_state = read_migration_sql(resource_dir, "v08t09/sync_state_up.sql")?;
     let history_snapshots = read_migration_sql(resource_dir, "v08t09/history_snapshots_up.sql")?;
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
     let mut transaction = connection

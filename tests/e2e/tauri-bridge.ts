@@ -51,7 +51,7 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
   }
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/history_snapshots_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/rebalance_profiles_up.sql"), "utf8"));
-  db.run(readFileSync(resolve("src-tauri/migrations/v10t11/sync_state_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/v08t09/sync_state_up.sql"), "utf8"));
   const config = JSON.stringify({
     endpoint: "https://assistant.test/v1",
     apiKey: "sk-e2e",
