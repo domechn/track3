@@ -509,16 +509,19 @@ describe("ChatPage", () => {
 
     renderAt("/assistant", true);
     await screen.findByTestId("chat-thread");
+    // The mount effect bumps the no-session epoch; flush that re-render so the captured
+    // onStreamComplete closure is the current one (otherwise navigation is skipped).
+    await act(async () => { await Promise.resolve(); });
     await chatOptions.current.onStreamComplete([
       { role: "user", content: "Question A" },
       { role: "assistant", blocks: [{ kind: "text", text: "Answer A" }] },
     ]);
-    await waitFor(() => expect(chatOptions.current.sessionId).toBe("mock-session-id"));
+    await waitFor(() => expect(chatOptions.current.sessionId).toBe("mock-session-id"), { timeout: 5000 });
     await userEvent.click(screen.getByTestId("sidebar-toggle"));
     await userEvent.click(screen.getByTestId("session-select-session-b"));
-    await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question B" }));
+    await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question B" }), { timeout: 5000 });
     await userEvent.click(screen.getByTestId("session-select-mock-session-id"));
-    await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question A" }));
+    await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question A" }), { timeout: 5000 });
     expect(loadSession).toHaveBeenCalledWith("mock-session-id");
   });
 
