@@ -23,6 +23,7 @@ import type { ConversationSummary } from "./history";
 import { configuredSecretValues, redactForExport, redactSecrets } from "../security/redact";
 import type { ActionStatus, PendingAction } from "./actions/lifecycle";
 import { callLlm } from "./orchestrator/llm";
+import { mergeSessions, type SyncSession } from "../sync/engine";
 
 const SESSIONS_TABLE = "chat_sessions" as const;
 const FILE_VERSION = 1;
@@ -220,23 +221,18 @@ export async function saveSyncedSession(session: ChatSession): Promise<void> {
   if (!validMessages(session.messages)) throw new Error("Invalid synced chat session");
   await runWithEncryptionWriteGate(async () => {
     const current = await loadSession(session.id);
-    const messages = new Map(session.messages.map((message, index) => {
-      const stable = stableSyncMessage(session.id, session.createdAt, index, message);
-      return [stable.id, stable] as const;
-    }));
-    for (const [index, message] of (current?.messages ?? []).entries()) {
-      const stable = stableSyncMessage(session.id, current!.createdAt, index, message);
-      if (!messages.has(stable.id)) messages.set(stable.id, stable);
-    }
-    const merged = [...messages.values()].sort((a, b) => (a.at ?? "").localeCompare(b.at ?? "") ||
-      (a.id ?? "").localeCompare(b.id ?? ""));
-    const metadata = current && current.updatedAt > session.updatedAt ? current : session;
+    const stable = (value: ChatSession): SyncSession => ({
+      ...value, messages: value.messages.map((message, index) =>
+        stableSyncMessage(value.id, value.createdAt, index, message)),
+    });
+    const mergedSession = mergeSessions(current ? stable(current) : undefined, stable(session));
+    const merged = mergedSession.messages as Array<PersistedChatMessage & { id: string; at: string }>;
     await writeSessionPayload(session.id, {
       version: FILE_VERSION,
       messages: merged,
-      summary: metadata.summary,
+      summary: mergedSession.summary as ConversationSummary | undefined,
     });
-    const { messages: _messages, summary: _summary, ...meta } = metadata;
+    const { messages: _messages, summary: _summary, ...meta } = mergedSession;
     await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [{ ...meta, messageCount: merged.length }]);
     notifySessionUpdate(session.id);
   });
@@ -269,6 +265,14 @@ function validMessages(value: unknown): value is PersistedChatMessage[] {
   );
 }
 
+async function advanceSessionUpdatedAt(id: string): Promise<void> {
+  const rows = await selectFromDatabase<Record<string, unknown>>(SESSIONS_TABLE, { id });
+  if (!rows[0]) throw new Error("Chat session metadata is missing");
+  const meta = normalizeMeta(rows[0]);
+  const updatedAt = new Date(Math.max(Date.now(), Date.parse(meta.updatedAt) + 1)).toISOString();
+  await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [{ ...meta, updatedAt }]);
+}
+
 export async function claimSessionAction(id: string, actionId: string, status: ActionStatus): Promise<boolean> {
   return runWithEncryptionWriteGate(async () => {
     const payload = await readSessionPayload(id);
@@ -279,6 +283,7 @@ export async function claimSessionAction(id: string, actionId: string, status: A
       const action = message.blocks[index] as PendingAction;
       if (action.status !== "pending") return false;
       if (status === "executing" && Date.now() >= Date.parse(action.expiresAt)) return false;
+      await advanceSessionUpdatedAt(id);
       message.blocks[index] = { ...action, status };
       await writeSessionPayload(id, payload);
       notifySessionUpdate(id);
@@ -297,6 +302,7 @@ export async function finishSessionAction(id: string, actionId: string, status: 
       if (index < 0) continue;
       const action = message.blocks[index] as PendingAction;
       if (action.status !== "executing") return;
+      await advanceSessionUpdatedAt(id);
       message.blocks[index] = { ...action, status, result: redactSecrets(result, secrets) };
       await writeSessionPayload(id, payload);
       notifySessionUpdate(id);

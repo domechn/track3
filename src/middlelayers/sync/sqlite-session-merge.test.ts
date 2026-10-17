@@ -4,6 +4,9 @@ import { createSyncHeader } from "./crypto";
 import { SyncEngine, type SyncSession } from "./engine";
 import { FakeS3, writeSyncHeader } from "./object-store";
 import { SqliteSyncRepository } from "./sqlite-repository";
+import { claimSessionAction, finishSessionAction } from "../ai/sessions";
+
+vi.setConfig({ testTimeout: 20_000 });
 
 const storage = vi.hoisted(() => ({
   active: "a" as "a" | "b",
@@ -121,6 +124,63 @@ it("converges SQLite backed session merges on two devices without ping pong", as
       expect(await engines[device].syncOnce({ categories: { history: false } }))
         .toMatchObject({ pulled: 0, pushed: 0, errors: [] });
     }
+  } finally {
+    storage.databases.a.close();
+    storage.databases.b.close();
+  }
+});
+
+it("does not execute an action again on another device after its approval syncs", async () => {
+  const SQL = await initSqlJs();
+  for (const device of ["a", "b"] as const) {
+    const db = new SQL.Database();
+    db.run(`CREATE TABLE chat_sessions (
+      id TEXT PRIMARY KEY, title TEXT, createdAt TEXT, updatedAt TEXT, pinned INTEGER,
+      messageCount INTEGER, preview TEXT
+    );
+    CREATE TABLE sync_state (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
+    CREATE TABLE assets_v2 (uuid TEXT);
+    CREATE TABLE transactions (uuid TEXT);
+    CREATE TABLE configuration (id INTEGER PRIMARY KEY, data TEXT);
+    CREATE TABLE rebalance_profiles (id INTEGER PRIMARY KEY, targets TEXT, tolerance_percent REAL);
+    CREATE TABLE sync_snapshot_revision_counter (id INTEGER PRIMARY KEY, revision INTEGER);
+    INSERT INTO sync_snapshot_revision_counter VALUES (1, 0);
+    CREATE TABLE sync_snapshot_revisions (uuid TEXT, revision INTEGER);`);
+    storage.databases[device] = db;
+  }
+  storage.files.clear();
+  const store = new FakeS3();
+  await writeSyncHeader(store, (await createSyncHeader("correct horse battery staple")).header);
+  const repositories = { a: new SqliteSyncRepository(), b: new SqliteSyncRepository() };
+  const engines = {
+    a: new SyncEngine(store, repositories.a, "correct horse battery staple"),
+    b: new SyncEngine(store, repositories.b, "correct horse battery staple"),
+  };
+  try {
+    storage.active = "a";
+    await repositories.a.writeSession({
+      id: "chat", title: "Chat", createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z", pinned: 0, messageCount: 1, preview: "",
+      messages: [{ id: "message", at: "2026-01-01T00:00:00Z", role: "assistant", blocks: [{
+        kind: "pending_action", id: "action", toolCallId: "call", name: "blacklist_add",
+        args: {}, preview: { before: "", after: "BTC" }, risk: "low", status: "pending",
+        createdAt: "2026-01-01T00:00:00Z", expiresAt: "2099-01-01T00:00:00Z",
+      }] }],
+    });
+    await engines.a.syncOnce({ categories: { history: false } });
+    storage.active = "b";
+    await engines.b.syncOnce({ categories: { history: false } });
+    await repositories.b.listSessions();
+    storage.active = "a";
+    expect(await claimSessionAction("chat", "action", "executing")).toBe(true);
+    await finishSessionAction("chat", "action", "approved", "Added BTC");
+    await engines.a.syncOnce({ categories: { history: false } });
+    storage.active = "b";
+    await engines.b.syncOnce({ categories: { history: false } });
+    expect((await repositories.b.listSessions())[0].messages[0].blocks).toMatchObject([
+      { status: "approved", result: "Added BTC" },
+    ]);
+    expect(await claimSessionAction("chat", "action", "executing")).toBe(false);
   } finally {
     storage.databases.a.close();
     storage.databases.b.close();

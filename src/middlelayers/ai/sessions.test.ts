@@ -182,6 +182,60 @@ describe("chat sessions middlelayer", () => {
     const loaded = await sessions.loadSession("uuid-1");
     expect(loaded?.messages[0]).toMatchObject({ blocks: [{ status: "approved", result: "Added BTC" }] });
   });
+  it("advances session metadata when an action changes state", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    await sessions.appendMessages("uuid-1", [{ role: "assistant", blocks: [{
+      kind: "pending_action", id: "action-1", toolCallId: "call-1", name: "blacklist_add",
+      args: {}, preview: { before: "", after: "BTC" }, risk: "low", status: "pending",
+      createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 300000).toISOString(),
+    }] }]);
+    const before = (await sessions.listSessions())[0].updatedAt;
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(Date.parse(before) + 1000));
+      expect(await sessions.claimSessionAction("uuid-1", "action-1", "executing")).toBe(true);
+      const claimedAt = (await sessions.listSessions())[0].updatedAt;
+      expect(Date.parse(claimedAt)).toBeGreaterThan(Date.parse(before));
+      vi.setSystemTime(new Date(Date.parse(before) + 2000));
+      await sessions.finishSessionAction("uuid-1", "action-1", "approved", "Done");
+      expect(Date.parse((await sessions.listSessions())[0].updatedAt)).toBeGreaterThan(Date.parse(claimedAt));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("leaves an action pending when its session metadata is missing", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    await sessions.appendMessages("uuid-1", [{ role: "assistant", blocks: [{
+      kind: "pending_action", id: "action-1", toolCallId: "call-1", name: "blacklist_add",
+      args: {}, preview: { before: "", after: "BTC" }, risk: "low", status: "pending",
+      createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 300000).toISOString(),
+    }] }]);
+    mocks.dbState.rows.length = 0;
+    await expect(sessions.claimSessionAction("uuid-1", "action-1", "executing"))
+      .rejects.toThrow("Chat session metadata is missing");
+    expect((await sessions.loadSession("uuid-1"))).toBeNull();
+    const raw = fsFileMap.get("/appdata/ai/sessions/uuid-1.json.ent") ?? "";
+    expect(raw).toContain('"status":"pending"');
+  });
+  it("does not make an approved action executable after saving a stale synced copy", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    await sessions.appendMessages("uuid-1", [{ role: "assistant", blocks: [{
+      kind: "pending_action", id: "action-1", toolCallId: "call-1", name: "blacklist_add",
+      args: {}, preview: { before: "", after: "BTC" }, risk: "low", status: "pending",
+      createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 300000).toISOString(),
+    }] }]);
+    const stale = (await sessions.loadSession("uuid-1"))!;
+    expect(await sessions.claimSessionAction("uuid-1", "action-1", "executing")).toBe(true);
+    await sessions.finishSessionAction("uuid-1", "action-1", "approved", "Done");
+    await sessions.saveSyncedSession(stale);
+    expect((await sessions.loadSession("uuid-1"))?.messages[0]).toMatchObject({
+      blocks: [{ status: "approved", result: "Done" }],
+    });
+    expect(await sessions.claimSessionAction("uuid-1", "action-1", "executing")).toBe(false);
+  });
   it("never writes configured secrets into a session payload or preview", async () => {
     const sessions = await import("./sessions");
     await sessions.createSession();

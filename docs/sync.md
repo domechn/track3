@@ -48,7 +48,8 @@ ignores write conditions cannot safely host multi-device sync.
 Each installation stores a random device UUID and hybrid logical clock in its
 local `sync_state` table. The state also stores the header salt; when the
 configured bucket has a different header, the device keeps its UUID, clock,
-and pending snapshot deletions, but clears publication markers so it can upload
+pending snapshot deletions, tracked chat sessions, and pending chat deletions,
+but clears publication markers so it can upload
 its local data again without losing unpublished deletions. It writes
 only to `devices/<device UUID>/`. A snapshot
 object contains one refresh UUID and its `assets_v2`, `asset_prices`, and
@@ -68,10 +69,22 @@ local. Rebalance targets use the `rebalance` category. Goals and alert rules
 stay on each device; there is no Goals sync switch.
 
 If a joining device already has a different value for the same config key,
-the remote LWW value replaces its local value and the sync report names the
-key in `conflicts`. This applies to whole exchange, wallet, and stock config
-rows: local entries in that row are lost unless the user saved a backup before
-joining. Snapshot rows remain local when their UUID is unique.
+sync keeps the local value and records a persistent conflict by key ID. In
+Sync settings, **Keep local** publishes that value with a clock newer than
+the conflicting remote version; **Use remote** applies the remote value. No
+secret value appears in the conflict state or UI. This uses an explicit
+choice instead of a local backup: the original value remains in place until
+the user chooses. The choice applies to the whole exchange, wallet, stock, or
+assistant config row. Snapshot rows remain local when their UUID is unique.
+
+Before applying a remote snapshot deletion, sync reads the local snapshot
+even if the revision index reports no change. An unpushed content change or
+a newer local edit keeps the snapshot and publishes a newer keep event.
+After a store reset, a missing local hash alone does not count as a change:
+sync compares available remote content first and rebuilds the baseline used
+to publish later edits. Chat deletions similarly retain a newer local session
+or unpushed change, and a retained session gets a newer timestamp so other
+devices can pull it.
 
 Config LWW compares `(physical milliseconds, counter, device UUID)` from
 the HLC. A local value gets its clock when an enabled sync round first detects
@@ -222,9 +235,8 @@ upload. Sync also stores S3 credentials in this device's encrypted
 configuration row `991`; it never uploads that row. If that row cannot be
 read, the status indicator and Sync settings ask for the S3 settings again;
 sync remains off until those settings are saved. Licenses, local backup
-paths, and machine IDs stay local. A first join can replace conflicting
-settings according to the protocol's last writer rule, so save a backup
-before joining a populated bucket.
+paths, and machine IDs stay local. A first join with differing local settings
+waits for a choice in Sync settings before applying either value.
 
 Sync runs after unlock at app start, after a successful refresh, when the
 window regains focus, and on **Sync now**. A change during a running round

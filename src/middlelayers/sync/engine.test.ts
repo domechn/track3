@@ -59,7 +59,7 @@ async function devices(count: number, pageSize = 1000) {
   await writeSyncHeader(s3, header);
   const repos = Array.from({ length: count }, () => new MemoryRepository());
   const engines = repos.map((repo, i) => new SyncEngine(s3, repo, "passphrase", {
-    now: () => 1_000 + i * 100,
+    now: () => Date.parse("2026-01-02T00:00:00.000Z") + i * 100,
   }));
   return { s3, repos, engines };
 }
@@ -177,6 +177,93 @@ describe("SyncEngine", () => {
     const pending = { one: { deleted: true, clock: { ms: 10, counter: 0, deviceId: "device" } } };
     expect(resetSyncState({ deviceId: "device", pendingTombstones: pending }).pendingTombstones).toEqual(pending);
   });
+  it("keeps a locally deleted session deleted after joining a replaced store", async () => {
+    const { s3, repos, engines } = await devices(2);
+    const chat: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 0, preview: "", messages: [] };
+    repos[0].sessions.set("chat", chat);
+    await engines[0].syncOnce();
+    repos[0].sessions.delete("chat");
+    const put = s3.putObject.bind(s3);
+    s3.putObject = async (key, body, conditions, signal) => {
+      if (key.includes("/session-delete/")) throw new Error("network");
+      return put(key, body, conditions, signal);
+    };
+    expect((await engines[0].syncOnce()).errors).toContain("Failed to push session-delete object");
+    expect(repos[0].state.pendingSessionDeletions?.chat).toBeDefined();
+    s3.putObject = put;
+    for (const item of (await s3.listObjectsV2()).objects) await s3.deleteObject(item.key);
+    await writeSyncHeader(s3, (await createSyncHeader("passphrase")).header);
+    repos[1].sessions.set("chat", chat);
+    await engines[1].syncOnce();
+    await engines[0].syncOnce();
+    expect(repos[0].sessions.has("chat")).toBe(false);
+    expect(repos[0].state.pendingSessionDeletions?.chat ?? repos[0].state.sessionDeletions?.chat).toBeDefined();
+  });
+  it("keeps an unpublished snapshot deletion when its device joins a replaced store first", async () => {
+    const { s3, repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[0].snapshots.delete("one");
+    await engines[0].recordDeletion("one");
+    const put = s3.putObject.bind(s3);
+    s3.putObject = async (key, body, conditions, signal) => {
+      if (key.includes("/tombstone/")) throw new Error("network");
+      return put(key, body, conditions, signal);
+    };
+    expect((await engines[0].syncOnce()).errors).toContain("Failed to push tombstone object");
+    s3.putObject = put;
+    for (const item of (await s3.listObjectsV2()).objects) await s3.deleteObject(item.key);
+    await writeSyncHeader(s3, (await createSyncHeader("passphrase")).header);
+    await engines[0].syncOnce();
+    const report = await engines[1].syncOnce();
+    expect(report.conflicts).not.toContain("snapshot:one");
+    expect(repos[1].snapshots.has("one")).toBe(false);
+  });
+  it("keeps an unpublished chat deletion when its device joins a replaced store first", async () => {
+    const { s3, repos, engines } = await devices(2);
+    const chat: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 0, preview: "", messages: [] };
+    repos[0].sessions.set("chat", chat);
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[0].sessions.delete("chat");
+    const put = s3.putObject.bind(s3);
+    s3.putObject = async (key, body, conditions, signal) => {
+      if (key.includes("/session-delete/")) throw new Error("network");
+      return put(key, body, conditions, signal);
+    };
+    expect((await engines[0].syncOnce()).errors).toContain("Failed to push session-delete object");
+    s3.putObject = put;
+    for (const item of (await s3.listObjectsV2()).objects) await s3.deleteObject(item.key);
+    await writeSyncHeader(s3, (await createSyncHeader("passphrase")).header);
+    await engines[0].syncOnce();
+    const report = await engines[1].syncOnce();
+    expect(report.conflicts).not.toContain("session:chat");
+    expect(repos[1].sessions.has("chat")).toBe(false);
+  });
+  it("publishes later edits to a snapshot kept during a store reset conflict", async () => {
+    const { s3, repos, engines } = await devices(3);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    await engines[2].syncOnce();
+    repos[0].snapshots.delete("one");
+    await engines[0].recordDeletion("one");
+    const localEdit = snapshot("one", 2);
+    repos[1].snapshots.set("one", localEdit);
+    for (const item of (await s3.listObjectsV2()).objects) await s3.deleteObject(item.key);
+    await writeSyncHeader(s3, (await createSyncHeader("passphrase")).header);
+    await engines[2].syncOnce();
+    await engines[0].syncOnce();
+    expect((await engines[1].syncOnce()).conflicts).toContain("snapshot:one");
+    const laterEdit = snapshot("one", 3);
+    repos[1].snapshots.set("one", laterEdit);
+    await engines[1].syncOnce();
+    await engines[2].syncOnce();
+    expect(repos[2].snapshots.get("one")).toEqual(laterEdit);
+  });
   it("prunes deleted snapshot row caches and rebuilds them after Undo", async () => {
     const { repos, engines } = await devices(1);
     repos[0].snapshots.set("one", snapshot("one"));
@@ -226,6 +313,68 @@ describe("SyncEngine", () => {
     await engines[1].syncOnce();
     expect(repos[1].snapshots.get("one")).toEqual(snapshot("one"));
   });
+  it("keeps and republishes a snapshot edited after a remote delete clock", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    const edited = snapshot("one", 3);
+    repos[1].snapshots.set("one", edited);
+    await engines[1].syncOnce();
+    repos[0].snapshots.delete("one");
+    await engines[0].recordDeletion("one");
+    await engines[0].syncOnce();
+    const report = await engines[1].syncOnce();
+    expect(repos[1].snapshots.get("one")).toEqual(edited);
+    expect(report.conflicts).toContain("snapshot:one");
+    await engines[0].syncOnce();
+    expect(repos[0].snapshots.get("one")).toEqual(edited);
+  });
+  it("keeps an unsynced local snapshot edit even when its device clock trails the delete", async () => {
+    const { repos, engines } = await devices(2);
+    repos[1].snapshots.set("one", snapshot("one"));
+    await engines[1].syncOnce();
+    await engines[0].syncOnce();
+    const edited = snapshot("one", 4);
+    repos[0].snapshots.set("one", edited);
+    repos[1].snapshots.delete("one");
+    await engines[1].recordDeletion("one");
+    await engines[1].syncOnce();
+    expect((await engines[0].syncOnce()).conflicts).toContain("snapshot:one");
+    expect(repos[0].snapshots.get("one")).toEqual(edited);
+  });
+  it("checks a snapshot's content before deletion even when the revision index missed its edit", async () => {
+    const { repos, engines } = await devices(2);
+    repos[1].snapshots.set("one", snapshot("one"));
+    await engines[1].syncOnce();
+    Object.assign(repos[0], { listChangedSnapshotIds: async (since?: number) => ({
+      ids: since === undefined ? ["one"] : [], revision: 1,
+    }) });
+    await engines[0].syncOnce();
+    const edited = snapshot("one", 5);
+    repos[0].snapshots.set("one", edited);
+    repos[1].snapshots.delete("one");
+    await engines[1].recordDeletion("one");
+    await engines[1].syncOnce();
+    expect((await engines[0].syncOnce()).conflicts).toContain("snapshot:one");
+    expect(repos[0].snapshots.get("one")).toEqual(edited);
+  });
+  it("retries a tombstone after a local snapshot read failure", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[1].snapshots.delete("one");
+    await engines[1].recordDeletion("one");
+    await engines[1].syncOnce();
+    const read = repos[0].readSnapshot.bind(repos[0]);
+    repos[0].readSnapshot = async () => { throw new Error("disk unavailable"); };
+    expect((await engines[0].syncOnce()).errors).toContain("Failed to read local snapshot");
+    expect(repos[0].snapshots.has("one")).toBe(true);
+    repos[0].readSnapshot = read;
+    await engines[0].syncOnce();
+    expect(repos[0].snapshots.has("one")).toBe(false);
+  });
 
   it("publishes edits made while restoring a deleted snapshot", async () => {
     const { repos, engines } = await devices(2);
@@ -254,10 +403,12 @@ describe("SyncEngine", () => {
     await engines[1].syncOnce({ categories: { secrets: false } });
     await engines[0].syncOnce();
     expect(repos[0].config.get("7")).toBe("USD");
-    expect(repos[1].config.get("7")).toBe("USD");
+    expect(repos[1].config.get("7")).toBe("EUR");
     expect(JSON.stringify(repos[0].state)).not.toContain("secret-a");
     expect(repos[1].config.has("10")).toBe(false);
+    await engines[1].resolveConfigConflict("7", "remote");
     await engines[1].syncOnce();
+    expect(repos[1].config.get("7")).toBe("USD");
     expect(repos[1].config.get("10")).toBe("!ent:secret-a");
   });
 
@@ -268,7 +419,128 @@ describe("SyncEngine", () => {
     await engines[0].syncOnce();
     const report = await engines[1].syncOnce();
     expect(report.conflicts).toContain("7");
-    expect(repos[1].config.get("7")).toBe("USD");
+    expect(repos[1].config.get("7")).toBe("EUR");
+    expect((await engines[1].configConflicts()).map((item) => item.id)).toContain("7");
+  });
+  it("keeps a joining device's secret until its conflict is resolved", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].config.set("10", "remote-secret");
+    repos[1].config.set("10", "local-secret");
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    expect(repos[1].config.get("10")).toBe("local-secret");
+    await engines[1].resolveConfigConflict("10", "remote");
+    await engines[1].syncOnce();
+    expect(repos[1].config.get("10")).toBe("remote-secret");
+  });
+  it("publishes a chosen local config over the conflicting remote version", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].config.set("7", "USD");
+    repos[1].config.set("7", "EUR");
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    await engines[1].resolveConfigConflict("7", "local");
+    const resolved = await engines[1].syncOnce();
+    expect(resolved.conflicts).not.toContain("7");
+    await engines[0].syncOnce();
+    expect(repos[0].config.get("7")).toBe("EUR");
+  });
+  it("honors a local deletion chosen while a config conflict is open", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].config.set("7", "USD");
+    repos[1].config.set("7", "EUR");
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[1].config.delete("7");
+    await engines[1].resolveConfigConflict("7", "local");
+    await engines[1].syncOnce();
+    expect(repos[1].config.has("7")).toBe(false);
+    await engines[0].syncOnce();
+    expect(repos[0].config.has("7")).toBe(false);
+  });
+  it("rejects a session delete older than a local update", async () => {
+    const { repos, engines } = await devices(2);
+    const chat: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 1, preview: "Hi",
+      messages: [{ id: "m1", at: "2026-01-01", role: "user", content: "Hi" }] };
+    repos[0].sessions.set("chat", chat);
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[1].sessions.set("chat", { ...chat, updatedAt: "2026-01-02T00:00:00.200Z", title: "Updated" });
+    repos[0].sessions.delete("chat");
+    await engines[0].syncOnce();
+    const report = await engines[1].syncOnce();
+    expect(report.conflicts).toContain("session:chat");
+    expect(repos[1].sessions.get("chat")?.title).toBe("Updated");
+    await engines[0].syncOnce();
+    expect(repos[0].sessions.get("chat")?.title).toBe("Updated");
+  });
+  it("republishes an unchanged chat when its timestamp is newer than a deletion clock", async () => {
+    const { s3, repos, engines } = await devices(2);
+    const chat: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01",
+      updatedAt: "2026-01-01", pinned: 0, messageCount: 0, preview: "", messages: [] };
+    repos[0].sessions.set("chat", chat);
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[1].sessions.set("chat", { ...chat, updatedAt: "2026-01-02T00:00:00.200Z" });
+    await engines[1].syncOnce();
+    await s3.deleteObject(`devices/${repos[1].state.deviceId}/manifest`);
+    repos[0].sessions.delete("chat");
+    await engines[0].syncOnce();
+    expect((await engines[1].syncOnce()).conflicts).toContain("session:chat");
+    await engines[0].syncOnce();
+    expect(repos[0].sessions.get("chat")).toEqual(repos[1].sessions.get("chat"));
+  });
+  it("keeps an unsynced chat update despite a faster deleter clock", async () => {
+    const { repos, engines } = await devices(2);
+    const chat: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 0, preview: "", messages: [] };
+    repos[0].sessions.set("chat", chat);
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[0].sessions.set("chat", { ...chat, title: "Updated", updatedAt: "2026-01-02T00:00:00.000Z" });
+    repos[1].sessions.delete("chat");
+    await engines[1].syncOnce();
+    expect((await engines[0].syncOnce()).conflicts).toContain("session:chat");
+    expect(repos[0].sessions.get("chat")?.title).toBe("Updated");
+    await engines[1].syncOnce();
+    expect(repos[1].sessions.get("chat")?.title).toBe("Updated");
+  });
+  it("reports a failed chat keep write without applying the competing delete", async () => {
+    const { repos, engines } = await devices(2);
+    const chat: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 0, preview: "", messages: [] };
+    repos[0].sessions.set("chat", chat);
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[0].sessions.set("chat", { ...chat, title: "Updated", updatedAt: "2026-01-02T00:00:00.000Z" });
+    repos[1].sessions.delete("chat");
+    await engines[1].syncOnce();
+    repos[0].writeSession = async () => { throw new Error("disk unavailable"); };
+    const report = await engines[0].syncOnce();
+    expect(report.errors).toContain("Failed to retain local session");
+    expect(repos[0].sessions.get("chat")?.title).toBe("Updated");
+  });
+  it("preserves an approved action while merging a stale pending copy", () => {
+    const base: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 1, preview: "", messages: [{ id: "m1", at: "2026-01-01", role: "assistant",
+        blocks: [{ kind: "pending_action", id: "action", status: "pending" }] }] };
+    const approved: SyncSession = { ...base, updatedAt: "2026-01-02", messages: [{
+      ...base.messages[0], blocks: [{ kind: "pending_action", id: "action", status: "approved", result: "Done" }],
+    }] };
+    expect(mergeSessions(base, approved).messages[0].blocks).toEqual(approved.messages[0].blocks);
+    expect(mergeSessions(approved, base).messages[0].blocks).toEqual(approved.messages[0].blocks);
+  });
+  it("preserves a completed action over a newer expired or rejected copy", () => {
+    const base: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 1, preview: "", messages: [{ id: "m1", at: "2026-01-01", role: "assistant",
+        blocks: [{ kind: "pending_action", id: "action", status: "approved", result: "Done" }] }] };
+    for (const status of ["expired", "rejected"]) {
+      const stale = { ...base, updatedAt: "2026-01-03", messages: [{
+        ...base.messages[0], blocks: [{ kind: "pending_action", id: "action", status }],
+      }] };
+      expect(mergeSessions(base, stale).messages[0].blocks).toEqual(base.messages[0].blocks);
+    }
   });
 
   it("does not store an unsalted digest of a secret in sync state", async () => {

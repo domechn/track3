@@ -176,6 +176,27 @@ Approval follow-ups now discard late summaries after a session switch, retain su
 
 Checked the P2 lists in sync `s1/round1` and `s3/round4` against this worktree. No version or migration changed.
 
+Acceptance safety follow-up: stale snapshot tombstones now compare with local
+edit clocks after scanning current content and republish a newer keep event
+when an edit wins. Session deletions compare against `updatedAt`; action
+claims and results advance that timestamp, and same-message merges retain
+terminal action states. Chat deletion tracking survives a store reset. First
+join config differences remain local until the user chooses **Keep local** or
+**Use remote** in Sync settings. This explicit choice replaces the review's
+backup alternative because no local config value is overwritten before a
+choice. No SQL or version change was needed.
+
+The follow-up reviewer found that a missing hash after store reset could
+undo an unpublished snapshot or chat deletion. The engine now compares
+available remote content before treating a hashless local copy as changed,
+and rebuilds the snapshot baseline for subsequent edits. A kept chat session
+gets a new timestamp even if its content hash was unchanged. Completed
+actions win over expired or rejected copies; claiming an action requires
+session metadata before the payload changes. The config choice round no
+longer reports the conflict it just resolved, and the choice card names the
+affected setting. The SQLite session merge tests use a 20-second timeout to
+allow for full-suite load. No migration or version changed.
+
 | Finding | Disposition |
 | --- | --- |
 | S1: 409 conditional conflict, unsafe conditional PUT retry, unread response bodies | Already fixed in the S3 client and covered by its tests. |
