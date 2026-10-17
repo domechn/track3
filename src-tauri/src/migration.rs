@@ -1092,6 +1092,27 @@ async fn repair_required_schema(
             .execute(&mut *transaction)
             .await
             .map_err(|error| format!("failed to ensure sync state tables: {error}"))?;
+        // If the table exists but any of its triggers is gone, the index may have drifted
+        // (rows added or deleted while untracked): rebuild it fully before re-creating them.
+        if migration_table_exists(&mut transaction, "history_snapshots").await? {
+            let trigger_count: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN \
+                 ('history_snapshots_insert', 'history_snapshots_delete', 'history_snapshots_update')",
+            )
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to inspect history snapshot triggers: {error}"))?;
+            if trigger_count < 3 {
+                sqlx::raw_sql(
+                    "INSERT OR REPLACE INTO history_snapshots (uuid, createdAt) \
+                     SELECT uuid, MAX(createdAt) FROM assets_v2 GROUP BY uuid; \
+                     DELETE FROM history_snapshots WHERE uuid NOT IN (SELECT uuid FROM assets_v2);",
+                )
+                .execute(&mut *transaction)
+                .await
+                .map_err(|error| format!("failed to rebuild history snapshot index: {error}"))?;
+            }
+        }
         sqlx::raw_sql(&history_snapshots)
             .execute(&mut *transaction)
             .await
@@ -3005,14 +3026,31 @@ mod tests {
             conn.execute("DROP TRIGGER history_snapshots_insert").await.unwrap();
             conn.execute("DROP TRIGGER history_snapshots_delete").await.unwrap();
             conn.execute("DROP TRIGGER history_snapshots_update").await.unwrap();
-            let before = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM history_snapshots")
-                .fetch_one(&mut conn).await.unwrap();
+            conn.execute(
+                "INSERT INTO assets_v2 (uuid, createdAt, wallet, symbol, amount, value, price)
+                 VALUES ('added-while-untracked', '2024-05-01T00:00:00.000Z', 'wallet', 'BTC', 1, 1, 1)",
+            ).await.unwrap();
+            let stale_uuid: Option<String> = sqlx::query_scalar(
+                "SELECT uuid FROM history_snapshots WHERE uuid != 'added-while-untracked' LIMIT 1",
+            ).fetch_optional(&mut conn).await.unwrap();
+            if let Some(uuid) = &stale_uuid {
+                conn.execute(sqlx::query("DELETE FROM assets_v2 WHERE uuid = ?").bind(uuid)).await.unwrap();
+            }
             conn.close().await.unwrap();
 
             run_migrations(&database_path, &resource_dir(), "0.9.0").await.unwrap();
             let mut conn = connect(&database_path).await;
+            assert_eq!(sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM history_snapshots WHERE uuid = 'added-while-untracked'"
+            ).fetch_one(&mut conn).await.unwrap(), 1);
+            if let Some(uuid) = &stale_uuid {
+                assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM history_snapshots WHERE uuid = ?")
+                    .bind(uuid).fetch_one(&mut conn).await.unwrap(), 0);
+            }
+            let assets: i64 = sqlx::query_scalar("SELECT COUNT(DISTINCT uuid) FROM assets_v2")
+                .fetch_one(&mut conn).await.unwrap();
             assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM history_snapshots")
-                .fetch_one(&mut conn).await.unwrap(), before);
+                .fetch_one(&mut conn).await.unwrap(), assets);
             conn.execute(
                 "INSERT INTO assets_v2 (uuid, createdAt, wallet, symbol, amount, value, price)
                  VALUES ('repaired-snapshot', '2024-04-16T12:00:00.000Z', 'wallet', 'BTC', 1, 1, 1)",
