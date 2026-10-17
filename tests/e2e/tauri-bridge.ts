@@ -64,6 +64,30 @@ export async function installTauriBridge(page: Page) {
     if (cmd === "plugin:sql|load") return args.db;
     if (cmd === "plugin:sql|select") return select(args.query, args.values);
     if (cmd === "plugin:sql|execute") return execute(args.query, args.values);
+    if (cmd === "delete_sync_snapshot") {
+      // Mirrors the Rust command: remove the snapshot's rows from every snapshot-scoped table.
+      for (const table of ["asset_prices", "transactions", "assets_v2", "history_snapshots"]) {
+        try { db.run(`DELETE FROM ${table} WHERE uuid = ?`, [args.uuid]); } catch { /* table absent in this fixture */ }
+      }
+      return null;
+    }
+    if (cmd === "import_sync_snapshot") {
+      // Mirrors the Rust command: insert the snapshot's rows verbatim (idempotent by uuid).
+      const snapshot = args.snapshot as { uuid: string; assets: any[]; prices: any[]; transactions: any[] };
+      const existing = select("SELECT COUNT(*) AS n FROM assets_v2 WHERE uuid = ?", [snapshot.uuid])[0]?.n ?? 0;
+      if (Number(existing) > 0) return false;
+      const insert = (table: string, rows: Array<Record<string, unknown>>) => {
+        for (const row of rows) {
+          const columns = Object.keys(row);
+          db.run(`INSERT INTO ${table} (${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`,
+            columns.map((column) => row[column] as any));
+        }
+      };
+      insert("assets_v2", snapshot.assets);
+      insert("asset_prices", snapshot.prices);
+      insert("transactions", snapshot.transactions);
+      return true;
+    }
     if (cmd === "plugin:path|resolve_directory") return "/e2e/app";
     if (cmd === "plugin:app|version") return "0.8.2";
     if (cmd === "plugin:app|tauri_version") return "2.11.1";
