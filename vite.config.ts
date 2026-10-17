@@ -1,4 +1,5 @@
 import path from "path";
+import fs from "fs";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
@@ -17,6 +18,9 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    fs: {
+      allow: [__dirname, fs.realpathSync(path.resolve(__dirname, "node_modules"))],
+    },
   },
   // to make use of `TAURI_DEBUG` and other env variables
   // https://tauri.studio/v1/api/config#buildconfig.beforedevcommand
