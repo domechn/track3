@@ -53,7 +53,7 @@ export default function AISetupCard({
       </form>}
       {configured && <div className="flex flex-wrap gap-1.5" aria-label={t("aiSetup.suggestions")}>
         {suggestions.map((suggestion) => <button key={suggestion} type="button" data-ai-setup-suggestion
-          className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-foreground hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="touch:min-h-11 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-foreground hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onClick={() => send(suggestion)}>{suggestion}</button>)}
       </div>}
     </CardContent>

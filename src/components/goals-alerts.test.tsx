@@ -41,7 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listAlertRules).mockResolvedValue([]);
   vi.mocked(listAlertHistory).mockResolvedValue([]);
-  vi.mocked(loadAlertEvaluationData).mockResolvedValue({ snapshots: [], prices: {} });
+  vi.mocked(loadAlertEvaluationData).mockResolvedValue({ snapshots: [], prices: {}, excludedSymbols: [] });
   vi.mocked(systemNotificationsEnabled).mockResolvedValue(false);
   vi.mocked(queryPNLChartValue).mockResolvedValue([]);
 });
@@ -53,6 +53,21 @@ it("shows stored portfolio values as a line chart", async () => {
   ]);
   render(<GoalsAlerts />);
   expect(await screen.findByRole("img", { name: /2025-01-01: 100.00.*2025-01-02: 120.00/ })).toBeInTheDocument();
+});
+it("uses the evaluator's blacklist for the goal line and ETA", async () => {
+  vi.mocked(queryPNLChartValue).mockResolvedValue([
+    { timestamp: Date.parse("2025-01-01"), totalValue: 100 },
+    { timestamp: Date.parse("2025-01-02"), totalValue: 120 },
+  ]);
+  vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, threshold: 140 }]);
+  vi.mocked(loadAlertEvaluationData).mockResolvedValue({
+    snapshots: [{ at: "2025-01-02T00:00:00.000Z", assets: [{ assetType: "crypto", symbol: "BTC", value: 120, price: 120, wallet: "wallet-a" }] }],
+    prices: {}, excludedSymbols: ["SCAM"],
+  });
+  render(<GoalsAlerts />);
+  expect(await screen.findByRole("img", { name: /2025-01-01: 100.00.*2025-01-02: 120.00/ })).toBeInTheDocument();
+  expect(queryPNLChartValue).toHaveBeenCalledWith(expect.anything(), 80, ["SCAM"]);
+  expect(screen.getByText(/about 1 days/)).toBeInTheDocument();
 });
 
 it("has no axe violations in the goals summary", async () => {
@@ -199,7 +214,7 @@ it("confirms before clearing alert history", async () => {
 it("labels a rule with stale portfolio data", async () => {
   vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
   vi.mocked(loadAlertEvaluationData).mockResolvedValue({
-    snapshots: [{ at: "2026-10-17T12:00:00.000Z", assets: [], hasStaleSources: true }], prices: {},
+    snapshots: [{ at: "2026-10-17T12:00:00.000Z", assets: [], hasStaleSources: true }], prices: {}, excludedSymbols: [],
   });
   render(<GoalsAlerts />);
   expect(await screen.findByText(/Data stale/)).toBeInTheDocument();
@@ -211,7 +226,7 @@ it("shows the available P&L for a displayed period rule", async () => {
     snapshots: [{
       at: "2026-10-17T12:00:00.000Z", assets: [],
       pnl: ((args as unknown[])[3] as string[] | undefined)?.includes("7d") ? { "7d": 12 } : undefined,
-    }], prices: {},
+    }], prices: {}, excludedSymbols: [],
   }));
   render(<GoalsAlerts />);
   expect(await screen.findByText(/Current: 12.00/)).toBeInTheDocument();

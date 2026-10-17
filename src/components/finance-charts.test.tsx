@@ -14,6 +14,18 @@ vi.mock("react-chartjs-2", () => ({
 
 beforeEach(() => vi.clearAllMocks());
 
+it("shows zero cost basis gains with a neutral value and no plus sign", () => {
+  const report: CostBasisReport = {
+    method: "FIFO", totals: { proceeds: 0, costBasis: 0, gainLoss: 0, shortTerm: 0, longTerm: 0 },
+    assets: [], disposals: [], openLots: [], unrealized: [], warnings: [],
+  };
+  const { getByText } = render(<CostCharts report={report} quoteColor="green-up-red-down" />);
+  const gain = getByText("Gain/loss").parentElement?.querySelector(".tabular-nums");
+  expect(gain).toHaveTextContent("0 USD");
+  expect(gain).not.toHaveTextContent("+0");
+  expect(gain).not.toHaveStyle({ color: "#10b981" });
+});
+
 it("shows a compact loading placeholder with an accessible status", () => {
   const { getByRole, container } = render(<FinanceChartSkeleton />);
   expect(getByRole("status")).toHaveTextContent("Loading");

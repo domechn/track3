@@ -69,6 +69,19 @@ describe("large time-series queries", () => {
     expect(sqlSelect).toHaveBeenCalledTimes(2);
     expect(readCount.rows).toBeLessThanOrEqual(86);
   });
+  it("excludes blacklisted symbols from every goal portfolio value", async () => {
+    const values = await queryPNLChartValue(range, 80, ["asset0"]);
+    expect(values).toHaveLength(43);
+    expect(values[0].totalValue).toBe(20099);
+    expect(values.at(-1)?.totalValue).toBe(28457);
+    expect(sqlSelect).toHaveBeenCalledTimes(1);
+    expect(readCount.rows).toBeLessThanOrEqual(43);
+  });
+  it("uses the evaluator's exact symbol matching for blacklist filtering", async () => {
+    addRows("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES ('snapshot-000000', '2022-01-01T00:00:00.000Z', 'wallet', 'crypto', ' ASSET0 ', 1, 100, 100)");
+    const values = await queryPNLChartValue(range, 80, ["asset0"]);
+    expect(values[0].totalValue).toBe(20199);
+  });
 
   it("gets a full-resolution coin series without reading every matching asset model", async () => {
     const coin = await queryCoinsAmountChange("ASSET0", range);

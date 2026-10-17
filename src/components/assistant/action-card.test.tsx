@@ -5,6 +5,7 @@ import ActionCard from "./action-card";
 import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
 import axe from "axe-core";
 import { MemoryRouter } from "react-router-dom";
+import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 
 const action: PendingAction = {
   kind: "pending_action", id: "one", toolCallId: "tool-one", name: "blacklist_add",
@@ -93,6 +94,26 @@ it("shows the percentage alert threshold as a readable confirmation diff", () =>
   }} />);
   expect(screen.getByText("Threshold")).toBeVisible();
   expect(screen.getByText("-5% → -10%")).toBeVisible();
+});
+it("shows each new alert field in the confirmation card", () => {
+  render(<ActionCard action={{
+    ...action, name: "create_alert",
+    preview: { before: "{}", after: '{"kind":"asset_price_target","symbol":"BTC","threshold":100000}' },
+  }} />);
+  expect(screen.getByText("Threshold")).toBeVisible();
+  expect(screen.getByText("— → 100000")).toBeVisible();
+});
+it("translates the acknowledge-all preview into Chinese with its count", () => {
+  localStorage.setItem(localeLocalStorageKey, "zh");
+  try {
+    render(<I18nProvider><ActionCard action={{
+      ...action, name: "acknowledge_all_alerts",
+      preview: { before: "[]", after: "assistant.action.preview.acknowledgedAll:2" },
+    }} /></I18nProvider>);
+    expect(screen.getByText("已确认 2 条提醒")).toBeVisible();
+  } finally {
+    localStorage.removeItem(localeLocalStorageKey);
+  }
 });
 it("uses each alert kind's unit when a threshold changes from percent to currency", () => {
   render(<ActionCard action={{

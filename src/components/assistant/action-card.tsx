@@ -70,7 +70,9 @@ export default function ActionCard({
   }, [action.expiresAt]);
   const pending = action.status === "pending" && !expired;
   const status = action.status === "pending" && expired ? "expired" : action.status;
-  const preview = (value: string) => value.startsWith("assistant.action.") ? t(value, value) : value;
+  const preview = (value: string) => value.startsWith("assistant.action.preview.acknowledgedAll:")
+    ? t("assistant.action.preview.acknowledgedAll").replace("{count}", value.split(":")[1])
+    : value.startsWith("assistant.action.") ? t(value, value) : value;
   const readable = (value: string) => {
     try { return JSON.stringify(JSON.parse(value), null, 2); } catch { return preview(value); }
   };

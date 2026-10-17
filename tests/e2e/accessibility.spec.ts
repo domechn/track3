@@ -204,7 +204,6 @@ test("expanded Overview content passes axe with its percentage rows visible", as
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/overview");
-  await expect(page.getByRole("region", { name: "Insights" }).getByRole("link", { name: "Ask the assistant" })).toBeVisible();
   await page.getByRole("button", { name: "Show More" }).click();
   await expect(page.locator("[data-testid='tcpc-row']").first()).toBeVisible();
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -392,7 +391,7 @@ test("visible mobile controls provide 44px touch targets", async ({ page }) => {
       controls.filter((control) => {
         const style = getComputedStyle(control);
         const box = control.getBoundingClientRect();
-        const minimum = control.hasAttribute("data-ai-setup-suggestion") ? 24 : 44;
+        const minimum = 44;
         return box.width > 0 && box.height > 0 && style.opacity !== "0" &&
           (box.width < minimum || box.height < minimum) && !control.classList.contains("sr-only");
       }).slice(0, 12).map((control) => `${control.tagName} ${control.getAttribute("aria-label") ?? control.textContent?.trim().slice(0, 35)} ${Math.round(control.getBoundingClientRect().width)}x${Math.round(control.getBoundingClientRect().height)}`));

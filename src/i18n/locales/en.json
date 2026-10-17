@@ -103,6 +103,7 @@
   "assistant.action.preview.current": "Current selection",
   "assistant.action.preview.noFile": "No file",
   "assistant.action.preview.noRule": "No new rule",
+  "assistant.action.preview.acknowledgedAll": "{count} alerts acknowledged",
   "assistant.action.preview.deleted": "Deleted",
   "assistant.action.preview.export": "Save through the file dialog",
   "assistant.action.result.done": "Done",

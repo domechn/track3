@@ -22,10 +22,12 @@ import {
 export async function queryPNLChartValue(
   dateRange: TDateRange,
   maxSize = Infinity,
+  excludedSymbols: string[] = [],
 ): Promise<PNLChartData> {
   const data = await ASSET_HANDLER.listTotalValueRecords(
     dateRange.start,
     dateRange.end,
+    excludedSymbols,
   );
   return downsampleIndices([data.map((record) => record.totalValue)], maxSize)
     .map((index) => ({

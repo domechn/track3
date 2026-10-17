@@ -119,6 +119,7 @@ describe("alert evaluation", () => {
     expect(measureRule(priceRule, [stale], { "24h": { "crypto:BTC": 50 } }, undefined).status).toBe("data-stale");
     expect(evaluate([priceRule], [stale], { "24h": { "crypto:BTC": 50 } }, undefined, now)).toEqual([]);
     expect(measureRule(rule({ kind: "period_pnl", window: "7d" }), [stale], {}, undefined).status).toBe("data-stale");
+    expect(measureRule(rule({ kind: "asset_value_target", symbol: "*", assetType: "crypto" }), [stale], {}, undefined).status).toBe("data-stale");
   });
 });
 
@@ -138,6 +139,7 @@ describe("alert storage", () => {
       { kind: "asset" as const, assetType: "crypto" as const, symbol: "ETH", percent: 50 },
     ], tolerancePercent: 0 };
     expect(data.snapshots[0].assets.map((asset) => asset.symbol)).toEqual(["ETH"]);
+    expect(data.excludedSymbols).toEqual(["btc"]);
     expect(measureRule(rule({ kind: "allocation_deviation", assetType: "crypto", symbol: "ETH" }), data.snapshots, {}, targets).value).toBe(50);
   });
 

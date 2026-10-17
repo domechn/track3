@@ -68,10 +68,10 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
       ].map(({ key, value, rate, rateKey }) => <Card key={key} className="min-w-0">
         <CardContent className="space-y-1 p-3">
           <p className="text-xs text-muted-foreground">{t(key)}</p>
-          <p className="truncate text-lg font-semibold tabular-nums" style={{ color: tone(value >= 0, quoteColor) }}>
-            {value >= 0 ? "+" : ""}{value.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
+          <p className="truncate text-lg font-semibold tabular-nums" style={{ color: value === 0 ? undefined : tone(value > 0, quoteColor) }}>
+            {value > 0 ? "+" : ""}{value.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
           </p>
-          <p className="text-[11px] text-muted-foreground tabular-nums">{rate === null ? "—" : `${rate >= 0 ? "+" : ""}${rate.toFixed(1)}%`} {t(rateKey)}</p>
+          <p className="text-[11px] text-muted-foreground tabular-nums">{rate === null ? "—" : `${rate > 0 ? "+" : ""}${rate.toFixed(1)}%`} {t(rateKey)}</p>
         </CardContent>
       </Card>)}
     </div>

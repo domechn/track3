@@ -180,7 +180,7 @@ export function measureRule(
   const assetKey = rule.assetType && rule.symbol ? `${rule.assetType}:${rule.symbol.toUpperCase()}` : "";
   const assetStale = !!latest.staleAssetKeys?.includes(assetKey);
   const portfolioStale = !!latest.hasStaleSources;
-  const stale = rule.kind === "total_value_target" || rule.kind === "period_pnl" || rule.kind === "portfolio_value_change" || rule.kind === "allocation_deviation"
+  const stale = rule.symbol === "*" || rule.kind === "total_value_target" || rule.kind === "period_pnl" || rule.kind === "portfolio_value_change" || rule.kind === "allocation_deviation"
     ? portfolioStale : assetStale;
   if (stale) return { status: "data-stale", rearmed: false };
 
@@ -281,7 +281,7 @@ export async function loadAlertEvaluationData(
   sourceStatuses?: PortfolioSourceStatus[],
   now = new Date(),
   pnlWindows: AlertWindow[] = [],
-): Promise<{ snapshots: AlertSnapshot[]; prices: AlertPrices; targets?: RebalanceProfile }> {
+): Promise<{ snapshots: AlertSnapshot[]; prices: AlertPrices; targets?: RebalanceProfile; excludedSymbols: string[] }> {
   const db = await getDatabase();
   const selectAssets = "SELECT asset_type AS assetType, symbol, wallet, amount, value, price, createdAt AS at FROM assets_v2 WHERE uuid = ";
   const [rawLatestRows, blacklist, stablecoinSymbols] = await Promise.all([
@@ -345,7 +345,7 @@ export async function loadAlertEvaluationData(
     snapshots[0].pnl = pnl;
   }
   const targets = await getRebalanceProfile();
-  return { snapshots, prices, targets };
+  return { snapshots, prices, targets, excludedSymbols: blacklist };
 }
 
 function readStoredSourceStatuses(): PortfolioSourceStatus[] {
