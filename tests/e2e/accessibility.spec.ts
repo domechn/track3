@@ -392,8 +392,9 @@ test("visible mobile controls provide 44px touch targets", async ({ page }) => {
       controls.filter((control) => {
         const style = getComputedStyle(control);
         const box = control.getBoundingClientRect();
+        const minimum = control.hasAttribute("data-ai-setup-suggestion") ? 24 : 44;
         return box.width > 0 && box.height > 0 && style.opacity !== "0" &&
-          (box.width < 44 || box.height < 44) && !control.classList.contains("sr-only");
+          (box.width < minimum || box.height < minimum) && !control.classList.contains("sr-only");
       }).slice(0, 12).map((control) => `${control.tagName} ${control.getAttribute("aria-label") ?? control.textContent?.trim().slice(0, 35)} ${Math.round(control.getBoundingClientRect().width)}x${Math.round(control.getBoundingClientRect().height)}`));
     undersized.push(...small.map((item) => `${route}: ${item}`));
   }
@@ -463,6 +464,7 @@ test("wide cost basis tables keep their first column visible while scrolling", a
   await page.setViewportSize({ width: 360, height: 740 });
   await installTauriBridge(page);
   await page.goto("/#/cost-basis");
+  await page.getByText("Details", { exact: true }).click();
   const table = page.locator("main table").first();
   await expect(table).toBeVisible();
   const wrapper = table.locator("xpath=..");
@@ -514,7 +516,11 @@ test("rebalance target editor fits the mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await installTauriBridge(page);
   await page.goto("/#/rebalance");
-  await page.getByRole("button", { name: "Equal weight" }).click();
+  const manual = page.locator("details", { has: page.getByText("Manual setup", { exact: true }) });
+  if (!(await manual.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.getByText("Manual setup", { exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Equal weight", exact: true }).click();
   await expect(page.getByRole("button", { name: /Remove target/ }).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });

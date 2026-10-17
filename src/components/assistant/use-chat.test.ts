@@ -72,6 +72,24 @@ afterEach(() => {
 });
 
 describe("useChat", () => {
+  it("sends action argument shapes and private page context to the model without saving the hint in chat", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("Set BTC to 40%", "Rebalance targets: BTC 50%"); });
+    expect(result.current.messages[0]).toMatchObject({ role: "user", content: "Set BTC to 40%" });
+    expect(requests[0].messages[0].content).toContain("Rebalance targets: BTC 50%");
+    const proposal = requests[0].tools?.find((tool) => tool.name === "propose_action");
+    expect(proposal?.description).toContain("{symbol}");
+    expect(proposal?.description).toContain("{from,to}");
+    expect(proposal?.description).toContain("{base,head}");
+    expect(proposal?.description).toContain("{currency}");
+    expect(proposal?.description).toContain("{value}");
+    expect(proposal?.description).toContain("{kind,assetType,symbol,percent}");
+  });
   it("shows context occupancy for a loaded conversation before sending", () => {
     const initialMessages: ChatMessage[] = [{ role: "user", content: "Earlier portfolio question" }];
     const { result } = renderHook(() => useChat({

@@ -12,9 +12,20 @@ import {
 } from "@/middlelayers/rebalance";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { REBALANCE_OPTIONS_KEY } from "@/middlelayers/ai/actions/page-settings";
+import axe from "axe-core";
+vi.mock("@/middlelayers/configuration", async (original) => ({
+  ...await original<typeof import("@/middlelayers/configuration")>(),
+  loadAIConfig: vi.fn().mockResolvedValue({ endpoint: "http://localhost", apiKey: "", model: "test", contextSize: 8192 }),
+}));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ writeTextFile: vi.fn() }));
+vi.mock("react-chartjs-2", () => ({
+  Bar: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
+  Line: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
+  Doughnut: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
+}));
 
 vi.mock("@/middlelayers/rebalance", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/middlelayers/rebalance")>(),
@@ -32,6 +43,8 @@ const assets = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.removeItem(REBALANCE_OPTIONS_KEY);
+  sessionStorage.removeItem(REBALANCE_OPTIONS_KEY);
   localStorage.removeItem(localeLocalStorageKey);
   vi.mocked(getRebalanceProfile).mockResolvedValue(undefined);
   vi.mocked(loadRebalanceHoldings).mockResolvedValue({ holdings: assets, stablecoinSymbols: ["USDC"] });
@@ -44,6 +57,48 @@ beforeEach(() => {
 afterEach(() => localStorage.removeItem(localeLocalStorageKey));
 
 describe("Rebalance page", () => {
+  it("has no axe violations with a saved target profile", async () => {
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }],
+      tolerancePercent: 0,
+    });
+    const { container } = render(<Rebalance currency={currency} />);
+    await screen.findByText("Current vs target allocation");
+    const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+    expect(results.violations.map(({ id }) => id)).toEqual([]);
+  });
+  it("shows the largest suggested trades as action cards", async () => {
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [
+        { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+        { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 50 },
+      ],
+      tolerancePercent: 0,
+    });
+    render(<Rebalance currency={currency} />);
+    expect(await screen.findByText(/Sell 0.66666667 BTC/)).toBeInTheDocument();
+    expect(screen.getByText(/Buy 1 ETH/)).toBeInTheDocument();
+  });
+  it("leads with AI setup and opens manual setup for an empty profile", async () => {
+    render(<Rebalance currency={currency} />);
+    expect(await screen.findByText("Let the assistant set this up")).toBeInTheDocument();
+    expect(screen.getByText("Set BTC 40%, ETH 30%, USDT 30%")).toBeInTheDocument();
+    expect(screen.getByText("Manual setup").closest("details")).toHaveAttribute("open");
+  });
+  it("keeps manual setup open across a profile reload", async () => {
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }], tolerancePercent: 0,
+    });
+    const { rerender } = render(<DataChangedContext.Provider value={0}><Rebalance currency={currency} /></DataChangedContext.Provider>);
+    await screen.findByText("Current vs target allocation");
+    const panel = screen.getByText("Manual setup").closest("details");
+    await waitFor(() => expect(panel).not.toHaveAttribute("open"));
+    fireEvent.click(screen.getByText("Manual setup"));
+    window.dispatchEvent(new Event("track3-assistant-app-action"));
+    rerender(<DataChangedContext.Provider value={1}><Rebalance currency={currency} /></DataChangedContext.Provider>);
+    await waitFor(() => expect(loadRebalanceHoldings).toHaveBeenCalledTimes(2));
+    expect(panel).toHaveAttribute("open");
+  });
   it("guides an empty profile into a current holdings preset that can be saved", async () => {
     render(<Rebalance currency={currency} />);
     expect(await screen.findByText("Set targets to see suggestions.")).toBeInTheDocument();

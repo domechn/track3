@@ -45,7 +45,37 @@ const plain = (id: string, question: string, locale: "en" | "zh", answer: string
   recordedPlan: [], recordedCalls: [], recordedAnswer: answer,
 });
 
+const actionCase = (id: string, question: string, action: string, args: Record<string, unknown>): GoldenCase => {
+  const proposal = tool("propose_action", { action, args });
+  return {
+    id, question, locale: "en", mustPass: false,
+    expectedPlan: [], expectedTools: [proposal], expectedFacts: [],
+    forbiddenTools: noForbidden, rubric: { mustContain: [], mustNotContain: unsafeText },
+    recordedPlan: [], recordedCalls: [proposal], recordedAnswer: "",
+  };
+};
+
 export const goldenCases: GoldenCase[] = [
+  actionCase("setup-cost-fifo", "Use FIFO and show my 2025 realized gains", "set_cost_basis_settings",
+    { method: "FIFO", from: "2025-01-01", to: "2025-12-31" }),
+  actionCase("setup-cost-average", "Switch cost basis to weighted average", "set_cost_basis_settings",
+    { method: "AVERAGE" }),
+  actionCase("setup-cost-export", "Export the realized gains report as CSV", "export_report",
+    { report: "realized_gains", format: "csv" }),
+  actionCase("setup-alert-drop", "Alert me if my total value drops 10% in 7 days", "create_alert",
+    { kind: "portfolio_value_change", comparator: "lte", threshold: -10, window: "7d" }),
+  actionCase("setup-alert-price", "Tell me when BTC goes above 100k", "create_alert",
+    { kind: "asset_price_target", assetType: "crypto", symbol: "BTC", comparator: "gte", threshold: 100000 }),
+  actionCase("setup-alert-any-coin", "Notify me when any coin is more than 5 points off target", "create_alert",
+    { kind: "allocation_deviation", assetType: "crypto", symbol: "*", comparator: "gte", threshold: 5 }),
+  actionCase("setup-rebalance-weights", "Set BTC 40%, ETH 30%, USDT 30%", "save_rebalance_targets",
+    { targets: [
+      { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 40 },
+      { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 30 },
+      { kind: "asset", assetType: "crypto", symbol: "USDT", percent: 30 },
+    ], tolerancePercent: 0 }),
+  actionCase("setup-rebalance-cash", "Rebalance using only new cash of 1000 USD", "set_rebalance_options",
+    { mode: "buys", injectedCash: 1000 }),
   multi("change-30d-en", "How did my portfolio change over the last 30 days?", "en",
     [tool("portfolio_comparison", { left: "2026-09-17", right: "latest" }), tool("portfolio_value", { from: "2026-09-17", to: "2026-10-17" })],
     [fact("portfolio_comparison", "totalDeltaUsd", 3200), fact("portfolio_value", "summary.endValue", 16200)],

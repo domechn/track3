@@ -48,6 +48,10 @@ describe("buildSystemPrompt", () => {
   it("explains that proposed actions wait for a user click", () => {
     const prompt = buildSystemPrompt({ currency: "USD", rate: 1, alias: "USD", symbol: "$" });
     expect(prompt).toMatch(/propose_action/);
+    expect(prompt).toContain("set_cost_basis_settings");
+    expect(prompt).toContain("apply_rebalance_preset");
+    expect(prompt).toContain("delete_rebalance_targets");
+    expect(prompt).toContain("edit_alert");
     expect(prompt).toMatch(/user confirmation/);
   });
 

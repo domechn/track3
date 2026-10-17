@@ -30,7 +30,9 @@ describe("assistant action registry", () => {
     expect(actionNames).toEqual([
       "blacklist_add", "blacklist_remove", "set_date_range", "set_comparison_dates",
       "export_report", "save_rebalance_targets", "create_alert", "set_alert_enabled",
-      "delete_alert", "set_base_currency", "set_quote_color",
+      "delete_alert", "set_base_currency", "set_quote_color", "set_cost_basis_settings",
+      "edit_alert", "acknowledge_alert", "acknowledge_all_alerts", "clear_alert_history",
+      "set_rebalance_options", "apply_rebalance_preset", "export_rebalance", "delete_rebalance_targets",
     ]);
     expect(() => validateActionArgs("delete_history", {})).toThrow(/unknown action/i);
     expect(() => validateActionArgs("set_api_key", { apiKey: "secret" })).toThrow(/unknown action/i);
@@ -54,5 +56,18 @@ describe("assistant action registry", () => {
     expect(() => validateActionArgs("create_alert", {
       kind: "total_value_target", threshold: -5, comparator: "gte",
     })).toThrow();
+  });
+  it("validates cost basis settings, alert edits and rebalance options", () => {
+    expect(validateActionArgs("set_cost_basis_settings", {
+      method: "HIFO", holdingPeriodDays: 400, from: "2025-01-01", to: "2025-12-31",
+    })).toMatchObject({ method: "HIFO", holdingPeriodDays: 400 });
+    expect(() => validateActionArgs("set_cost_basis_settings", { method: "FIFO", holdingPeriodDays: 0 })).toThrow();
+    expect(() => validateActionArgs("set_cost_basis_settings", { method: "FIFO", from: "2025-12-31", to: "2025-01-01" })).toThrow();
+    expect(validateActionArgs("set_cost_basis_settings", { from: "", to: "" })).toEqual({ from: "", to: "" });
+    expect(validateActionArgs("edit_alert", { id: 3, kind: "period_pnl", comparator: "lte", threshold: -10, window: "7d", cooldownSeconds: 60 })).toHaveProperty("id", 3);
+    expect(() => validateActionArgs("edit_alert", { id: 0, kind: "period_pnl", comparator: "lte", threshold: -10, window: "7d" })).toThrow();
+    expect(validateActionArgs("set_rebalance_options", { mode: "buys", injectedCash: 1000, minimumTradeValue: 10 })).toHaveProperty("injectedCash", 1000);
+    expect(() => validateActionArgs("set_rebalance_options", { mode: "buys", injectedCash: -1 })).toThrow();
+    expect(validateActionArgs("apply_rebalance_preset", { preset: "equal_weight" })).toHaveProperty("preset", "equal_weight");
   });
 });

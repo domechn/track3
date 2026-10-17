@@ -417,7 +417,7 @@ function AppRoutes({
           path="rebalance"
           element={
             <AnimatedPage>
-              <Rebalance currency={currentCurrency} />
+              <Rebalance currency={currentCurrency} quoteColor={quoteColor} />
             </AnimatedPage>
           }
         />
@@ -444,7 +444,7 @@ function AppRoutes({
           path="cost-basis"
           element={
             <AnimatedPage>
-              <CostBasis />
+              <CostBasis quoteColor={quoteColor} />
             </AnimatedPage>
           }
         />

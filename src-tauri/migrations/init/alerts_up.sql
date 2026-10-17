@@ -1,10 +1,10 @@
 CREATE TABLE IF NOT EXISTS alert_rules (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  kind TEXT NOT NULL CHECK (kind IN ('total_value_target', 'asset_value_target', 'asset_price_move', 'allocation_deviation', 'period_pnl')),
+  kind TEXT NOT NULL CHECK (kind IN ('total_value_target', 'asset_value_target', 'asset_price_target', 'asset_price_move', 'allocation_deviation', 'period_pnl', 'portfolio_value_change')),
   asset_type TEXT CHECK (asset_type IS NULL OR asset_type IN ('crypto', 'stock')),
   symbol TEXT,
   comparator TEXT NOT NULL CHECK (comparator IN ('gte', 'lte')),
-  threshold REAL NOT NULL CHECK (kind IN ('asset_price_move', 'period_pnl') OR threshold >= 0),
+  threshold REAL NOT NULL CHECK (kind IN ('asset_price_move', 'period_pnl', 'portfolio_value_change') OR threshold >= 0),
   window TEXT CHECK (window IS NULL OR window IN ('24h', '7d', '30d')),
   enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
   cooldown_seconds INTEGER NOT NULL DEFAULT 3600 CHECK (cooldown_seconds >= 0),
@@ -12,11 +12,11 @@ CREATE TABLE IF NOT EXISTS alert_rules (
   last_value REAL,
   armed INTEGER NOT NULL DEFAULT 1 CHECK (armed IN (0, 1)),
   CHECK (
-    (kind IN ('asset_value_target', 'asset_price_move', 'allocation_deviation')) =
+    (kind IN ('asset_value_target', 'asset_price_target', 'asset_price_move', 'allocation_deviation')) =
     (asset_type IS NOT NULL AND symbol IS NOT NULL AND length(trim(symbol)) > 0)
   ),
   CHECK (
-    (kind IN ('asset_price_move', 'period_pnl')) =
+    (kind IN ('asset_price_move', 'period_pnl', 'portfolio_value_change')) =
     (window IS NOT NULL)
   )
 );

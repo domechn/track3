@@ -81,7 +81,7 @@ describe("InsightsCard", () => {
     const link = await screen.findByRole("link", { name: "Ask the assistant" });
     fireEvent.click(link);
     expect(link).toHaveAttribute("href", "#/assistant");
-    expect(sessionStorage.getItem("track3-insight-question")).toContain("BTC");
+    expect(JSON.parse(sessionStorage.getItem("track3-pending-assistant-question") ?? "{}").question).toContain("BTC");
   });
 
   it("hides a summary when its insight is dismissed", async () => {

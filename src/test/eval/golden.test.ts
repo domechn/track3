@@ -12,6 +12,14 @@ import { runSkill } from "@/middlelayers/ai/tools";
 import type { ActualCase, ActualTool, ExpectedTool } from "./scoring";
 import { compareBaseline, countToolRounds, parseJudgeScore, parsePlannedTools, scoreGoldenCase } from "./scoring";
 import { goldenCases, type GoldenCase } from "./cases";
+vi.mock("@/middlelayers/configuration", async (original) => ({
+  ...await original<typeof import("@/middlelayers/configuration")>(),
+  getCostBasisMethod: vi.fn().mockResolvedValue("FIFO"),
+}));
+vi.mock("@/middlelayers/rebalance", async (original) => ({
+  ...await original<typeof import("@/middlelayers/rebalance")>(),
+  getRebalanceProfile: vi.fn().mockResolvedValue(undefined),
+}));
 import { EVAL_NOW, prices, snapshots, transactions } from "./portfolio";
 
 vi.mock("@tauri-apps/plugin-http", () => ({ fetch: vi.fn() }));

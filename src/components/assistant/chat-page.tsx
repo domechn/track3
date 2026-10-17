@@ -48,6 +48,7 @@ import type { ConversationSummary } from "@/middlelayers/ai/history";
 import UsageLabel from "./usage-label";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
 import { INSIGHT_QUESTION_STORAGE_KEY } from "@/middlelayers/insights-service";
+import { takePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
 
 type LoadState =
   | { status: "loading" }
@@ -170,7 +171,7 @@ function ReadyChat({
   const [sessionVersion, setSessionVersion] = useState(0);
   const [noSessionEpoch, setNoSessionEpoch] = useState(0);
   const noSessionEpochRef = useRef(0);
-  const inNoSessionRef = useRef(false);
+  const inNoSessionRef = useRef(!sessionId);
   const newSessionRef = useRef<Promise<string> | null>(null);
   const createdSessionIdRef = useRef<string | null>(null);
   const currentSessionIdRef = useRef(sessionId);
@@ -448,6 +449,19 @@ function ChatContent({
   });
   useEffect(() => {
     try {
+      if (!sessionId) {
+        const pending = takePendingAssistantQuestion();
+        if (pending) {
+          if ("page" in pending) {
+            void chat.send(pending.question, t("aiSetup.modelContext")
+              .replace("{page}", t(`aiSetup.page.${pending.page}`))
+              .replace("{summary}", pending.summary));
+          } else {
+            chat.setInput(pending.question);
+          }
+          return;
+        }
+      }
       const question = sessionStorage.getItem(INSIGHT_QUESTION_STORAGE_KEY);
       if (question) {
         sessionStorage.removeItem(INSIGHT_QUESTION_STORAGE_KEY);
@@ -456,7 +470,7 @@ function ChatContent({
     } catch {
       // Assistant remains usable when session storage is unavailable.
     }
-  }, [chat.setInput]);
+  }, [chat.setInput, chat.send, sessionId, t]);
 
   return (
     <Card

@@ -72,7 +72,7 @@ export type UseChatResult = {
   input: string;
   setInput: (next: string) => void;
   isStreaming: boolean;
-  send: (text?: string) => Promise<void>;
+  send: (text?: string, pageContext?: string) => Promise<void>;
   stop: () => void;
   runQuickAction: (key: string, prompt: string) => Promise<void>;
   probe: () => Promise<string | undefined>;
@@ -646,7 +646,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
   );
 
   const send = useCallback(
-    async (text?: string) => {
+    async (text?: string, pageContext?: string) => {
       const content = (text ?? input).trim();
       if (!mountedRef.current || !content || inFlightRef.current) return;
       proposalCountRef.current = 0;
@@ -675,12 +675,15 @@ export function useChat(options: UseChatOptions): UseChatResult {
       };
       try {
         const history = flattenForProvider([...previous, userMessage]);
-        const tools = [
+        let tools = [
           ...toOpenAITools().map((tool) => compactTools
             ? { ...tool, description: compactToolDescription(tool.description) } : tool),
-          ...(config.allowActions === false ? [] : [proposeActionTool]),
+          ...(config.allowActions === false ? [] : [{
+            ...proposeActionTool,
+            description: compactTools ? compactToolDescription(proposeActionTool.description) : proposeActionTool.description,
+          }]),
         ];
-        const toolTokens = estimateTokens(JSON.stringify(tools), "json");
+        let toolTokens = estimateTokens(JSON.stringify(tools), "json");
         const previousSummary = summaryRef.current;
         const prepared = await prepareHistory(history, previousSummary, contextSize,
           async (messages, limit) => callLlm({
@@ -711,7 +714,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
           .map((m) => `${m.role}: ${(m.content ?? "").slice(0, 200)}`)
           .join("\n");
         const snapshotWithSummary = truncateText(
-          `${prepared.summary ? `Earlier: ${prepared.summary.content}\n` : ""}${historySnapshot}`,
+          `${pageContext ? `${pageContext}\n` : ""}${prepared.summary ? `Earlier: ${prepared.summary.content}\n` : ""}${historySnapshot}`,
           Math.max(64, Math.floor(contextSize * 0.1)),
         );
 
@@ -748,7 +751,8 @@ export function useChat(options: UseChatOptions): UseChatResult {
           {
             role: "system",
             content: trimmed[0]?.role === "system"
-              ? `${systemPrompt}\n\n${trimmed[0].content ?? ""}` : systemPrompt,
+              ? `${systemPrompt}\n\n${trimmed[0].content ?? ""}${pageContext ? `\n\n${pageContext}` : ""}`
+              : `${systemPrompt}${pageContext ? `\n\n${pageContext}` : ""}`,
           },
           ...trimmed.slice(trimmed[0]?.role === "system" ? 1 : 0),
         ];
@@ -798,6 +802,11 @@ export function useChat(options: UseChatOptions): UseChatResult {
             (currentMessage?.role === "assistant" &&
               currentMessage.blocks.some((block) => block.kind === "pending_action"))) {
             break;
+          }
+          if (!compactTools && round === 0) {
+            tools = tools.map((tool) => tool.name === "propose_action" ? tool :
+              { ...tool, description: compactToolDescription(tool.description) });
+            toolTokens = estimateTokens(JSON.stringify(tools), "json");
           }
 
           // Build the assistant tool_calls message for the provider history

@@ -1088,6 +1088,40 @@ async fn repair_required_schema(
             .execute(&mut *transaction)
             .await
             .map_err(|error| format!("failed to ensure alert tables: {error}"))?;
+        let alert_rules_sql: String = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_rules'",
+        )
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to inspect alert rules schema: {error}"))?;
+        if !alert_rules_sql.contains("'portfolio_value_change'") {
+            let upgraded_rules = alerts
+                .split("CREATE TABLE IF NOT EXISTS alert_history")
+                .next()
+                .unwrap_or_default()
+                .replacen(
+                    "CREATE TABLE IF NOT EXISTS alert_rules",
+                    "CREATE TABLE alert_rules_upgrade",
+                    1,
+                );
+            sqlx::raw_sql(&upgraded_rules)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|error| format!("failed to create upgraded alert rules: {error}"))?;
+            sqlx::raw_sql(
+                "CREATE TEMP TABLE track3_alert_history_refs AS SELECT id, rule_id FROM alert_history; \
+                 INSERT INTO alert_rules_upgrade SELECT * FROM alert_rules; \
+                 DROP TABLE alert_rules; \
+                 ALTER TABLE alert_rules_upgrade RENAME TO alert_rules; \
+                 UPDATE alert_history SET rule_id = ( \
+                   SELECT rule_id FROM track3_alert_history_refs WHERE track3_alert_history_refs.id=alert_history.id \
+                 ) WHERE id IN (SELECT id FROM track3_alert_history_refs); \
+                 DROP TABLE track3_alert_history_refs;",
+            )
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to upgrade alert rules: {error}"))?;
+        }
         sqlx::raw_sql(&sync_state)
             .execute(&mut *transaction)
             .await
@@ -2996,11 +3030,36 @@ mod tests {
                 "INSERT INTO alert_rules (kind, comparator, threshold, window, enabled, cooldown_seconds, armed)
                  VALUES ('period_pnl', 'lte', -100, '7d', 1, 3600, 1)",
             ).await.unwrap();
+            conn.execute("DROP TABLE alert_history; DROP TABLE alert_rules;").await.unwrap();
+            let previous_sql = read_migration_sql(&resource_dir(), "v08t09/alerts_up.sql")
+                .unwrap()
+                .replace(", 'asset_price_target'", "")
+                .replace(", 'portfolio_value_change'", "");
+            sqlx::raw_sql(&previous_sql).execute(&mut conn).await.unwrap();
+            conn.execute(
+                "INSERT INTO alert_rules (id, kind, comparator, threshold, window) VALUES
+                 (1, 'total_value_target', 'gte', 1000, NULL),
+                 (2, 'period_pnl', 'lte', -100, '7d')",
+            ).await.unwrap();
+            conn.execute(
+                "INSERT INTO alert_history (id, rule_id, kind, title, message, value, triggered_at)
+                 VALUES (1, 1, 'total_value_target', 'Reached', 'Reached', 1000, '2026-01-01')",
+            ).await.unwrap();
             conn.close().await.unwrap();
             run_migrations(&database_path, &resource_dir(), "0.9.0").await.unwrap();
             let mut conn = connect(&database_path).await;
             assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM alert_rules")
                 .fetch_one(&mut conn).await.unwrap(), 2);
+            conn.execute(
+                "INSERT INTO alert_rules (kind, asset_type, symbol, comparator, threshold)
+                 VALUES ('asset_price_target', 'crypto', 'BTC', 'gte', 100000)",
+            ).await.unwrap();
+            conn.execute(
+                "INSERT INTO alert_rules (kind, comparator, threshold, window)
+                 VALUES ('portfolio_value_change', 'lte', -10, '7d')",
+            ).await.unwrap();
+            assert_eq!(sqlx::query_scalar::<_, i64>("SELECT rule_id FROM alert_history WHERE id=1")
+                .fetch_one(&mut conn).await.unwrap(), 1);
             conn.execute("DROP TABLE alert_history").await.unwrap();
             conn.execute("DROP TABLE alert_rules").await.unwrap();
             conn.close().await.unwrap();

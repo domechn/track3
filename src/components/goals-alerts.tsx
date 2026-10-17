@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/i18n";
 import {
   ALERTS_CHANGED_EVENT, acknowledgeAlert, acknowledgeAllAlerts, clearAlertHistory,
@@ -13,6 +13,11 @@ import type { RebalanceProfile } from "@/middlelayers/rebalance";
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Button } from "./ui/button";
+import AISetupCard from "./common/ai-setup-card";
+import { FinanceChartSkeleton, GoalChart } from "./finance-charts";
+import { alertSentence, goalEtaDays } from "./finance-visuals";
+import { queryPNLChartValue } from "@/middlelayers/charts-timeseries";
+import { BarChartIcon, ClockIcon, DashboardIcon, MagicWandIcon, MixIcon, PieChartIcon } from "@radix-ui/react-icons";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -32,9 +37,20 @@ const emptyDraft: Draft = {
   id: 0, kind: "total_value_target", assetType: "crypto", symbol: "",
   comparator: "gte", threshold: "", window: "24h", cooldownMinutes: "60",
 };
-const needsAsset = (kind: AlertKind) => ["asset_value_target", "asset_price_move", "allocation_deviation"].includes(kind);
-const needsWindow = (kind: AlertKind) => kind === "asset_price_move" || kind === "period_pnl";
-const templates: AlertKind[] = ["total_value_target", "asset_value_target", "asset_price_move", "allocation_deviation", "period_pnl"];
+const needsAsset = (kind: AlertKind) => ["asset_value_target", "asset_price_target", "asset_price_move", "allocation_deviation"].includes(kind);
+const needsWindow = (kind: AlertKind) => kind === "asset_price_move" || kind === "period_pnl" || kind === "portfolio_value_change";
+const templates: AlertKind[] = ["total_value_target", "asset_value_target", "asset_price_target", "asset_price_move", "allocation_deviation", "period_pnl", "portfolio_value_change"];
+const ruleIcons = {
+  total_value_target: DashboardIcon,
+  asset_value_target: PieChartIcon,
+  asset_price_target: MagicWandIcon,
+  asset_price_move: BarChartIcon,
+  allocation_deviation: MixIcon,
+  period_pnl: ClockIcon,
+  portfolio_value_change: ClockIcon,
+};
+const historySeverity = (kind: AlertKind) =>
+  kind === "period_pnl" || kind === "portfolio_value_change" ? "high" : kind === "allocation_deviation" || kind === "asset_price_move" ? "medium" : "low";
 
 export default function GoalsAlerts() {
   const { t } = useTranslation();
@@ -43,6 +59,7 @@ export default function GoalsAlerts() {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [history, setHistory] = useState<AlertHistory[]>([]);
   const [snapshots, setSnapshots] = useState<AlertSnapshot[]>([]);
+  const [portfolioValues, setPortfolioValues] = useState<Array<{ date: string; value: number }>>([]);
   const [prices, setPrices] = useState<AlertPrices>({});
   const [targets, setTargets] = useState<RebalanceProfile>();
   const [loading, setLoading] = useState(true);
@@ -50,16 +67,26 @@ export default function GoalsAlerts() {
   const [status, setStatus] = useState("");
   const [validationField, setValidationField] = useState<"threshold" | "cooldown" | "symbol" | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [manualOpen, setManualOpen] = useState(true);
+  const manualInitialized = useRef(false);
 
   async function reload() {
     try {
       const [nextRules, nextHistory] = await Promise.all([listAlertRules(), listAlertHistory()]);
       const pnlWindows = nextRules.filter((rule) => rule.enabled && rule.kind === "period_pnl" && rule.window)
         .map((rule) => rule.window as AlertWindow);
-      const evaluation = await loadAlertEvaluationData(undefined, undefined, new Date(), pnlWindows);
+      const [evaluation, series] = await Promise.all([
+        loadAlertEvaluationData(undefined, undefined, new Date(), pnlWindows),
+        queryPNLChartValue({ start: new Date(0), end: new Date() }, 80).catch(() => []),
+      ]);
       setRules(nextRules);
+      if (!manualInitialized.current) {
+        setManualOpen(nextRules.length === 0);
+        manualInitialized.current = true;
+      }
       setHistory(nextHistory);
       setSnapshots(evaluation.snapshots);
+      setPortfolioValues(series.map((point) => ({ date: new Date(point.timestamp).toISOString().slice(0, 10), value: point.totalValue })));
       setPrices(evaluation.prices);
       setTargets(evaluation.targets);
       setError("");
@@ -136,13 +163,16 @@ export default function GoalsAlerts() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 pb-8">
+    <div className="mx-auto flex max-w-5xl flex-col gap-4 pb-8">
       <div>
         <h1 className="text-2xl font-semibold">{t("goals.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("goals.subtitle")}</p>
       </div>
+      <AISetupCard page="goals"
+        summary={rules.length ? rules.map((rule) => `${rule.id}: ${rule.kind} ${rule.symbol ?? ""} ${rule.comparator} ${rule.threshold} ${rule.window ?? ""} ${rule.enabled ? "enabled" : "disabled"}`).join("; ") : "No alert rules"}
+        suggestions={["goals.ai.drop", "goals.ai.btc", "goals.ai.deviation"].map((key) => t(key))} />
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Card>
+      <Card className="order-last">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.notifications")}</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-2xl text-sm text-muted-foreground">{t("goals.notificationExplanation")}</p>
@@ -153,7 +183,9 @@ export default function GoalsAlerts() {
           }}>{notificationsEnabled ? t("goals.notificationEnabled") : t("goals.enableNotifications")}</Button>
         </CardContent>
       </Card>
-      <Card id="goal-rule-editor">
+      <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)} className="order-last rounded-lg border bg-card">
+        <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
+      <Card id="goal-rule-editor" className="border-0 shadow-none">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t(draft.id ? "goals.editRule" : "goals.newRule")}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2" aria-label={t("goals.templates")}>
@@ -223,31 +255,40 @@ export default function GoalsAlerts() {
           {!validationField && status && <p role="status" className="text-sm">{status}</p>}
         </CardContent>
       </Card>
+      </details>
+      {loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.rules")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {loading ? <p className="text-sm text-muted-foreground">{t("goals.loading")}</p>
             : rules.length === 0 ? <p className="text-sm text-muted-foreground">{t("goals.empty")}</p>
               : rules.map((rule) => {
+                const RuleIcon = ruleIcons[rule.kind];
                 const measurement = measureRule(rule, snapshots, prices, targets);
                 const isGoal = rule.kind === "total_value_target" || rule.kind === "asset_value_target";
                 const progress = isGoal && measurement.value !== undefined
                   ? Math.max(0, Math.min(100, rule.comparator === "gte"
                     ? rule.threshold > 0 ? measurement.value / rule.threshold * 100 : 100
                     : measurement.value <= rule.threshold ? 100 : rule.threshold / measurement.value * 100)) : 0;
+                const eta = rule.kind === "total_value_target" && rule.comparator === "gte"
+                  ? goalEtaDays(portfolioValues, rule.threshold) : null;
                 return <div key={rule.id} className="rounded-md border p-3 space-y-2">
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <div className="font-medium text-sm">{t(`goals.kind.${rule.kind}`)} {rule.symbol ?? ""}</div>
+                    <div className="flex min-w-0 items-start gap-2">
+                      <RuleIcon aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <div>
+                      <div className="font-medium text-sm">{alertSentence(rule, t)}</div>
                       <div className="text-xs text-muted-foreground">
-                        {t(rule.comparator === "gte" ? "goals.atLeast" : "goals.atMost")} {rule.threshold}
-                        {rule.window ? ` · ${rule.window}` : ""}
-                        {measurement.status === "data-stale" ? ` · ${t("goals.dataStale")}` :
-                          measurement.status === "unavailable" ? ` · ${t("goals.unavailable")}` :
-                            ` · ${t("goals.current")}: ${measurement.value?.toFixed(2)}`}
+                        {measurement.status === "data-stale" ? t("goals.dataStale") :
+                          measurement.status === "unavailable" ? t("goals.unavailable") :
+                            `${t("goals.current")}: ${measurement.value?.toFixed(2)}`}
+                      </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] ${rule.enabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        {t(rule.enabled ? "goals.enabled" : "finance.paused")}
+                      </span>
                       <label className="flex items-center gap-1 text-xs">
                         <input type="checkbox" checked={rule.enabled} aria-label={t("goals.enableRule").replace("{kind}", t(`goals.kind.${rule.kind}`))}
                           onChange={(e) => void mutate(() => setAlertRuleEnabled(rule.id, e.target.checked))} />
@@ -263,8 +304,20 @@ export default function GoalsAlerts() {
                       />
                     </div>
                   </div>
-                  {isGoal && measurement.status === "ready" && <Progress value={progress}
-                    aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))} />}
+                  {isGoal && measurement.status === "ready" && <div className="flex items-center gap-3">
+                    <div role="img" aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`)) + `: ${progress.toFixed(0)}%`}
+                      className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
+                      style={{ background: `conic-gradient(hsl(var(--primary)) ${progress}%, hsl(var(--muted)) 0)` }}>
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-card text-[10px] font-semibold">{progress.toFixed(0)}%</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Progress value={progress} aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))} />
+                      <p className="pt-1 text-xs text-muted-foreground">{measurement.value?.toLocaleString()} / {rule.threshold.toLocaleString()} USD · {eta === null
+                        ? t("finance.etaUnavailable")
+                        : eta === 0 ? t("finance.goalReached")
+                          : t("finance.etaDays").replace("{days}", String(eta))}</p>
+                    </div>
+                  </div>}
                 </div>;
               })}
         </CardContent>
@@ -291,14 +344,22 @@ export default function GoalsAlerts() {
           </div>
           {!loading && !history.length && <p className="text-sm text-muted-foreground">{t("goals.noHistory")}</p>}
           <ol className="space-y-2">
-            {history.map((alert) => <li key={alert.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+            {history.map((alert) => {
+              const severity = historySeverity(alert.kind);
+              const HistoryIcon = ruleIcons[alert.kind];
+              return <li key={alert.id} data-severity={severity} className={`flex flex-wrap items-center justify-between gap-2 rounded-md border border-l-4 p-3 ${
+                severity === "high" ? "border-l-rose-500" : severity === "medium" ? "border-l-amber-500" : "border-l-primary/50"
+              }`}>
               <div className="min-w-0">
-                <p className="text-sm font-medium">{formatAlert(alert, t).title}</p>
+                <p className="flex items-center gap-1.5 text-sm font-medium"><HistoryIcon aria-hidden className={`h-3.5 w-3.5 ${
+                  severity === "high" ? "text-rose-500" : severity === "medium" ? "text-amber-500" : "text-primary"
+                }`} />{formatAlert(alert, t).title}</p>
                 <p className="break-words text-xs text-muted-foreground">{formatAlert(alert, t).message}</p>
                 <time className="text-xs text-muted-foreground" dateTime={alert.triggeredAt}>{new Date(alert.triggeredAt).toLocaleString()}</time>
               </div>
               {!alert.acknowledgedAt && <Button size="sm" variant="outline" onClick={() => void mutate(() => acknowledgeAlert(alert.id))}>{t("goals.ack")}</Button>}
-            </li>)}
+            </li>;
+            })}
           </ol>
         </CardContent>
       </Card>

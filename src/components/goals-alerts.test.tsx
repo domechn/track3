@@ -6,6 +6,15 @@ import { beforeEach, expect, it, vi } from "vitest";
 import GoalsAlerts from "./goals-alerts";
 import { listAlertRules, listAlertHistory, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
 import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlelayers/alert-notifications";
+import { queryPNLChartValue } from "@/middlelayers/charts-timeseries";
+vi.mock("@/middlelayers/charts-timeseries", async (original) => ({
+  ...await original<typeof import("@/middlelayers/charts-timeseries")>(),
+  queryPNLChartValue: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("@/middlelayers/configuration", async (original) => ({
+  ...await original<typeof import("@/middlelayers/configuration")>(),
+  loadAIConfig: vi.fn().mockResolvedValue({ endpoint: "http://localhost", apiKey: "", model: "test", contextSize: 8192 }),
+}));
 
 vi.mock("@/middlelayers/alerts", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/middlelayers/alerts")>(),
@@ -18,6 +27,11 @@ vi.mock("@/middlelayers/alert-notifications", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/middlelayers/alert-notifications")>(),
   enableSystemNotifications: vi.fn(), systemNotificationsEnabled: vi.fn(),
 }));
+vi.mock("react-chartjs-2", () => ({
+  Bar: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
+  Line: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
+  Doughnut: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
+}));
 const savedRule: AlertRule = {
   id: 7, kind: "total_value_target", assetType: null, symbol: null, comparator: "gte",
   threshold: 100, window: null, enabled: true, cooldownSeconds: 3600,
@@ -29,6 +43,23 @@ beforeEach(() => {
   vi.mocked(listAlertHistory).mockResolvedValue([]);
   vi.mocked(loadAlertEvaluationData).mockResolvedValue({ snapshots: [], prices: {} });
   vi.mocked(systemNotificationsEnabled).mockResolvedValue(false);
+  vi.mocked(queryPNLChartValue).mockResolvedValue([]);
+});
+
+it("shows stored portfolio values as a line chart", async () => {
+  vi.mocked(queryPNLChartValue).mockResolvedValue([
+    { timestamp: Date.parse("2025-01-01"), totalValue: 100 },
+    { timestamp: Date.parse("2025-01-02"), totalValue: 120 },
+  ]);
+  render(<GoalsAlerts />);
+  expect(await screen.findByRole("img", { name: /2025-01-01: 100.00.*2025-01-02: 120.00/ })).toBeInTheDocument();
+});
+
+it("has no axe violations in the goals summary", async () => {
+  const { container } = render(<GoalsAlerts />);
+  await screen.findByText("No rules yet");
+  const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+  expect(results.violations.map(({ id }) => id)).toEqual([]);
 });
 
 it("shows the empty state and a clear explanation before notification permission", async () => {
@@ -36,6 +67,13 @@ it("shows the empty state and a clear explanation before notification permission
   expect(await screen.findByText("No rules yet")).toBeInTheDocument();
   expect(screen.getByText(/Allow system notifications/i)).toBeInTheDocument();
   expect(enableSystemNotifications).not.toHaveBeenCalled();
+});
+
+it("shows an AI setup entry before manual rule editing", async () => {
+  render(<GoalsAlerts />);
+  expect(await screen.findByText("Let the assistant set this up")).toBeInTheDocument();
+  expect(await screen.findByText("Alert me if my total value drops 10% in 7 days")).toBeInTheDocument();
+  expect(screen.getByText("Manual setup").closest("details")).toHaveAttribute("open");
 });
 
 it("validates a new goal before saving", async () => {
@@ -81,6 +119,16 @@ it("shows an unread alert and acknowledges it", async () => {
   expect(await screen.findByText(/Portfolio value goal triggered/)).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Acknowledge all" }));
   expect(acknowledgeAllAlerts).toHaveBeenCalledTimes(1);
+});
+
+it("marks a portfolio loss in the history timeline as high severity", async () => {
+  vi.mocked(listAlertHistory).mockResolvedValue([{
+    id: 2, ruleId: 2, kind: "period_pnl", title: "Portfolio P&L",
+    message: "Portfolio P&L -10%", value: -10,
+    triggeredAt: "2026-10-17T12:00:00.000Z", acknowledgedAt: null,
+  }]);
+  render(<GoalsAlerts />);
+  expect((await screen.findByText(/Period P&L triggered/)).closest("li")).toHaveAttribute("data-severity", "high");
 });
 
 it("shows an already granted notification permission on opening the page", async () => {
