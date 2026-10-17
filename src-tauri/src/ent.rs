@@ -343,4 +343,21 @@ mod tests {
 
         assert_eq!(ent.decrypt_with_key(encrypted, TEST_KEY).unwrap(), "legacy");
     }
+
+    #[test]
+    fn empty_and_unicode_payloads_round_trip() {
+        let ent = make_ent();
+        for plaintext in ["", "资产 🔐 café"] {
+            let encrypted = ent.encrypt(plaintext.to_string()).unwrap();
+            assert_eq!(ent.decrypt(encrypted).unwrap(), plaintext);
+        }
+    }
+
+    #[test]
+    fn wrong_key_and_truncated_payload_are_rejected() {
+        let ent = make_ent();
+        let encrypted = ent.encrypt("secret".to_string()).unwrap();
+        assert!(ent.decrypt_with_key(encrypted, "wrong-key").is_err());
+        assert!(ent.decrypt("!ent:v2:AAAA".to_string()).is_err());
+    }
 }

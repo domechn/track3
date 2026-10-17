@@ -452,7 +452,7 @@ const App = ({
   const latestRow = dataRows[0] ?? null;
 
   return (
-    <div aria-busy={pageLoading}>
+    <div aria-busy={pageLoading} data-testid="history-content">
       <h1 className="sr-only">{t("history.h1")}</h1>
       <StaggerContainer className="space-y-4">
         <Dialog
@@ -910,6 +910,7 @@ const App = ({
                                     <button
                                       className="hidden group-hover:inline-block opacity-80 hover:opacity-100 transition-opacity"
                                       disabled={deleting}
+                                      data-testid="history-delete-latest"
                                     >
                                       <img
                                         src={DeleteIcon}

@@ -1157,7 +1157,7 @@ pub async fn run_migrations(
 
 #[cfg(test)]
 mod tests {
-    use super::run_migrations;
+    use super::{read_migration_sql, run_migrations, version_is_greater, version_is_less};
     use sqlx::{sqlite::SqliteConnectOptions, Connection, Executor, Row, SqliteConnection};
     use std::{
         fs,
@@ -1178,7 +1178,32 @@ mod tests {
     }
 
     fn resource_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        if manifest.join("migrations").exists() {
+            manifest
+        } else {
+            manifest.join("..")
+        }
+    }
+
+    #[test]
+    fn migration_versions_are_numeric_and_required_scripts_are_present() {
+        assert!(version_is_less("0.7.0", "0.8.0").unwrap());
+        assert!(!version_is_less("0.8.0", "0.7.0").unwrap());
+        assert!(version_is_greater("0.10.0", "0.9.0").unwrap());
+        for path in [
+            "v01t02/assets_v2_up.sql",
+            "v03t04/asset_prices_up.sql",
+            "v04t05/transactions_up.sql",
+            "v06t07/transactions_asset_type_up.sql",
+            "v07t08/chat_sessions_up.sql",
+        ] {
+            assert!(!read_migration_sql(&resource_dir(), path)
+                .unwrap()
+                .trim()
+                .is_empty());
+        }
+        assert!(read_migration_sql(&resource_dir(), "v07t08/missing_up.sql").is_err());
     }
 
     #[derive(Clone, Copy, Debug)]

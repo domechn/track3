@@ -37,9 +37,31 @@ jobs:
       - name: test Rust
         run: cargo test --locked --all-targets
         working-directory: src-tauri
+      - name: test Rust without GTK
+        run: cargo test --locked -p track3-pure-tests --lib
+        working-directory: src-tauri
       - name: check Rust
         run: cargo check --locked
         working-directory: src-tauri
+
+  e2e:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: enable corepack
+        run: |
+          corepack enable
+          corepack prepare yarn@4.9.2 --activate
+      - name: install frontend dependencies
+        run: corepack yarn install --immutable
+      - name: install Chromium
+        run: corepack yarn playwright install --with-deps chromium
+      - name: smoke test
+        run: corepack yarn test:e2e
 
   test-tauri:
     needs: quality
