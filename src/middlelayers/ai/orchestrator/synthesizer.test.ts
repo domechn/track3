@@ -118,6 +118,18 @@ describe("orchestrator.synthesizer", () => {
     expect(prompt.length).toBeLessThan(JSON.stringify(big).length);
   });
 
+  it("preserves aggregate totals and the end of a truncated result array", async () => {
+    mockCallLlm.mockResolvedValue({ content: "ok", ok: true });
+    await synthesizeResults(baseParams, dummyPlan, [{
+      id: "t1", skillName: "x", status: "completed", description: "d",
+      data: { total: 200, rows: Array.from({ length: 200 }, (_, id) => ({ id, note: "abcdefghij" })) }, text: "t",
+    }], { contextSize: 1024 });
+    const prompt = mockCallLlm.mock.calls[0]![0].messages[1]?.content ?? "";
+    expect(prompt).toContain('"total":200');
+    expect(prompt).toContain('"id":199');
+    expect(prompt).toContain("[truncated:");
+  });
+
   it("does not truncate when the data fits the budget", async () => {
     mockCallLlm.mockResolvedValue({ content: "ok", ok: true });
     const results: SubTaskResult[] = [
@@ -140,7 +152,8 @@ describe("orchestrator.synthesizer", () => {
     }));
     await synthesizeResults(baseParams, dummyPlan, results, { contextSize: 1024 });
     const prompt = mockCallLlm.mock.calls[0]![0].messages[1]?.content ?? "";
-    expect(prompt.split("end-of-detail")).toHaveLength(9);
+    expect(prompt.match(/\[Agent \d:/g)).toHaveLength(8);
+    expect(prompt).toContain("[truncated:");
   });
 
   it("keeps a long skill summary when it fits the context budget", async () => {

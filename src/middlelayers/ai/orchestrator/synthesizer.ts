@@ -10,6 +10,7 @@
 // shot instead of incrementally.
 
 import { callLlm } from "./llm";
+import { estimateTokens, serializeBudgeted, truncateText } from "../budget";
 import type { AnalysisPlan, LlmCallParams, SubTaskResult } from "./types";
 
 // ── Prompt template ──
@@ -22,25 +23,20 @@ export type SynthesisOptions = {
 };
 
 const DEFAULT_CONTEXT_SIZE = 8192;
-// Compact JSON tokenizes densely (~2.5 chars/token measured on transaction
-// rows); give data 60% of the window and leave the rest for prompt + answer.
-export const JSON_CHARS_PER_TOKEN = 2.5;
 const DATA_SHARE_OF_CONTEXT = 0.6;
-const MIN_CHARS_PER_AGENT = 1500;
+const MIN_TOKENS_PER_AGENT = 48;
 
-/** Character budget for one agent's raw data when n agents share the window. */
-export function perAgentDataChars(contextSize: number | undefined, n: number): number {
+/** Token budget for one agent's result when n agents share the window. */
+export function perAgentDataTokens(contextSize: number | undefined, n: number): number {
   const ctx = contextSize ?? DEFAULT_CONTEXT_SIZE;
   return Math.max(
-    MIN_CHARS_PER_AGENT,
-    Math.floor((ctx * JSON_CHARS_PER_TOKEN * DATA_SHARE_OF_CONTEXT) / Math.max(1, n)),
+    MIN_TOKENS_PER_AGENT,
+    Math.floor((ctx * DATA_SHARE_OF_CONTEXT) / Math.max(1, n)),
   );
 }
 
-export function serializeData(data: unknown, maxChars: number): string {
-  const json = JSON.stringify(data) ?? "null";
-  if (json.length <= maxChars) return json;
-  return `${json.slice(0, maxChars)}\n[truncated: showing ${maxChars} of ${json.length} chars — narrow the query (date range, limit) if the missing part matters]`;
+export function serializeData(data: unknown, maxTokens: number): string {
+  return serializeBudgeted(data, maxTokens);
 }
 
 function buildSynthesisContext(
@@ -48,17 +44,17 @@ function buildSynthesisContext(
   tasks: SubTaskResult[],
   options: SynthesisOptions,
 ): string {
-  const perAgentChars = perAgentDataChars(options.contextSize, tasks.length);
+  const perAgentTokens = perAgentDataTokens(options.contextSize, tasks.length);
 
   const resultsBlock = tasks
     .map(
       (r, i) => {
         const dataText = r.status === "completed" && r.data
-          ? serializeData(r.data, Math.floor(perAgentChars * 3 / 4))
+          ? serializeData(r.data, Math.floor(perAgentTokens * 3 / 4))
           : "";
-        const summaryLimit = Math.max(Math.floor(perAgentChars / 4), perAgentChars - dataText.length);
+        const summaryLimit = Math.max(Math.floor(perAgentTokens / 4), perAgentTokens - estimateTokens(dataText, "json"));
         return `[Agent ${i + 1}: ${r.description} — ${r.skillName}]
-${r.status === "failed" ? `Failed: ${r.error ?? "unknown error"}` : (r.text ?? "(no text summary)").slice(0, summaryLimit)}
+${r.status === "failed" ? `Failed: ${r.error ?? "unknown error"}` : truncateText(r.text ?? "(no text summary)", summaryLimit)}
 ${dataText ? `\nData: ${dataText}` : ""}`;
       },
     )
@@ -66,10 +62,10 @@ ${dataText ? `\nData: ${dataText}` : ""}`;
 
   return [
     "Recent conversation:",
-    (options.historySnapshot ?? "(none)").slice(0, 1200),
+    truncateText(options.historySnapshot ?? "(none)", Math.max(64, Math.floor((options.contextSize ?? DEFAULT_CONTEXT_SIZE) * 0.1))),
     "",
     "User query:",
-    query,
+    truncateText(query, Math.max(64, Math.floor((options.contextSize ?? DEFAULT_CONTEXT_SIZE) * 0.1))),
     "",
     "Analysis results:",
     resultsBlock,

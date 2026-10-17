@@ -163,5 +163,6 @@ function llmParamsFromOptions(options: OrchestratorOptions): LlmCallParams {
     model: options.model,
     messages: [],
     signal: options.signal,
+    onUsage: options.onUsage,
   };
 }

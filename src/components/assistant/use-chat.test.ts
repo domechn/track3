@@ -19,6 +19,7 @@ vi.mock("@/middlelayers/ai", async () => {
     orchestrateQuery: vi.fn(),
   };
 });
+vi.mock("@/middlelayers/ai/orchestrator/llm", () => ({ callLlm: vi.fn() }));
 
 import { formatToolResult, useChat } from "./use-chat";
 import type { ChatMessage } from "./use-chat";
@@ -30,6 +31,8 @@ import {
 } from "@/middlelayers/ai";
 import type { OrchestratorEvent } from "@/middlelayers/ai/orchestrator/types";
 import { I18nProvider, localeLocalStorageKey } from "@/i18n";
+import { callLlm } from "@/middlelayers/ai/orchestrator/llm";
+import { estimateTokens } from "@/middlelayers/ai/budget";
 
 const baseCurrency: CurrencyRateDetail = {
   currency: "USD",
@@ -56,6 +59,7 @@ beforeEach(() => {
   vi.mocked(runSkill).mockReset();
   vi.mocked(probeConnection).mockReset();
   vi.mocked(orchestrateQuery).mockReset();
+  vi.mocked(callLlm).mockReset();
   // Default: the planner decides the query is simple, so the normal
   // tool-calling loop handles it.
   vi.mocked(orchestrateQuery).mockImplementation(async function* () {});
@@ -66,6 +70,100 @@ afterEach(() => {
 });
 
 describe("useChat", () => {
+  it("shows context occupancy for a loaded conversation before sending", () => {
+    const initialMessages: ChatMessage[] = [{ role: "user", content: "Earlier portfolio question" }];
+    const { result } = renderHook(() => useChat({
+      config, baseCurrency,
+      initialMessages,
+    }));
+    expect(result.current.contextTokens).toBeGreaterThan(0);
+  });
+  it("shows the saved provider prompt usage after a session reload", () => {
+    const initialMessages: ChatMessage[] = [
+      { role: "user", content: "Earlier question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "Answer" }],
+        usage: { promptTokens: 31, completionTokens: 7, source: "reported" }, contextTokens: 31 },
+    ];
+    const { result } = renderHook(() => useChat({ config, baseCurrency, initialMessages }));
+    expect(result.current.contextTokens).toBe(31);
+  });
+  it("uses provider usage for the assistant reply and estimates when usage is absent", async () => {
+    let round = 0;
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "Hello" };
+      if (round++ === 0) yield { kind: "usage", usage: { promptTokens: 31, completionTokens: 7, source: "reported" } };
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("first"); });
+    expect(result.current.messages[1]).toMatchObject({ usage: { promptTokens: 31, completionTokens: 7, source: "reported" } });
+    expect(result.current.contextTokens).toBe(31);
+    await act(async () => { await result.current.send("second"); });
+    expect(result.current.messages[3]).toMatchObject({ usage: { source: "estimated" } });
+    expect(result.current.sessionUsage.promptTokens).toBeGreaterThan(31);
+  });
+  it("resumes a saved summary, advances it, and gives the next request the new summary", async () => {
+    const initialMessages: ChatMessage[] = Array.from({ length: 12 }, (_, i) => i % 2
+      ? { role: "assistant", blocks: [{ kind: "text", text: `${i} answer ${"word ".repeat(30)}` }] }
+      : { role: "user", content: `${i} question ${"word ".repeat(30)}` });
+    const initialSummary = { content: "Earlier BTC discussion", throughMessageCount: 2 };
+    vi.mocked(callLlm).mockResolvedValue({ ok: true, content: "Updated BTC discussion", usage: { promptTokens: 12, completionTokens: 3, source: "reported" } });
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      yield { kind: "text", delta: "Current answer" };
+      yield { kind: "done" };
+    });
+    const onStreamComplete = vi.fn();
+    const { result } = renderHook(() => useChat({
+      config, baseCurrency, contextSize: 900, initialMessages, initialSummary, onStreamComplete,
+    }));
+    await act(async () => { await result.current.send("Current question"); });
+    expect(callLlm).toHaveBeenCalledOnce();
+    expect(onStreamComplete).toHaveBeenCalledOnce();
+    const savedSummary = onStreamComplete.mock.calls[0][1];
+    expect(savedSummary.content).toBe("Updated BTC discussion");
+    expect(savedSummary.throughMessageCount).toBeGreaterThan(2);
+    expect(requests[0].messages[0].content).toContain("Updated BTC discussion");
+    expect(result.current.messages.at(-1)).toMatchObject({ usage: { promptTokens: expect.any(Number) } });
+  });
+
+  it("does not send after Stop while a summary call is pending", async () => {
+    const initialMessages: ChatMessage[] = Array.from({ length: 12 }, (_, i) => i % 2
+      ? { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(30) }] }
+      : { role: "user", content: "word ".repeat(30) });
+    let finish!: (result: { ok: boolean; content: string }) => void;
+    vi.mocked(callLlm).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const onStreamComplete = vi.fn();
+    const { result } = renderHook(() => useChat({ config, baseCurrency, contextSize: 900, initialMessages, onStreamComplete }));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.send("New question"); });
+    await waitFor(() => expect(callLlm).toHaveBeenCalledOnce());
+    act(() => { result.current.stop(); });
+    await act(async () => { finish({ ok: true, content: "Should be ignored" }); await pending; });
+    expect(streamChatCompletion).not.toHaveBeenCalled();
+    expect(onStreamComplete).not.toHaveBeenCalled();
+  });
+
+  it("keeps summary failure backoff when the same session reloads saved messages", async () => {
+    const initialMessages: ChatMessage[] = Array.from({ length: 12 }, (_, i) => i % 2
+      ? { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(30) }] }
+      : { role: "user", content: "word ".repeat(30) });
+    vi.mocked(callLlm).mockResolvedValue({ ok: false, content: "", error: "timeout" });
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "Reply" };
+      yield { kind: "done" };
+    });
+    const { result, rerender } = renderHook(
+      ({ initialMessages }) => useChat({ config, baseCurrency, contextSize: 900, sessionId: "same", initialMessages }),
+      { initialProps: { initialMessages } },
+    );
+    await act(async () => { await result.current.send("First"); });
+    expect(callLlm).toHaveBeenCalledOnce();
+    rerender({ initialMessages: result.current.messages });
+    await act(async () => { await result.current.send("Second"); });
+    expect(callLlm).toHaveBeenCalledOnce();
+  });
   it("appends a user message and an empty assistant message on send", async () => {
     vi.mocked(streamChatCompletion).mockImplementation(async function* () {
       yield { kind: "text", delta: "Hello" };
@@ -86,6 +184,8 @@ describe("useChat", () => {
     expect(result.current.messages[1]).toEqual({
       role: "assistant",
       blocks: [{ kind: "text", text: "Hello" }],
+      usage: { promptTokens: expect.any(Number), completionTokens: expect.any(Number), source: "estimated" },
+      contextTokens: expect.any(Number),
     });
     expect(result.current.isStreaming).toBe(false);
   });
@@ -223,8 +323,12 @@ describe("useChat", () => {
     await pending;
     expect(onStreamComplete).toHaveBeenCalledWith([
       { role: "user", content: "question" },
-      { role: "assistant", blocks: [{ kind: "text", text: "partial response complete" }] },
-    ]);
+      {
+        role: "assistant", blocks: [{ kind: "text", text: "partial response complete" }],
+        usage: { promptTokens: expect.any(Number), completionTokens: expect.any(Number), source: "estimated" },
+        contextTokens: expect.any(Number),
+      },
+    ], undefined);
   });
 
   it("does not flush buffered stream text after Stop", async () => {
@@ -344,6 +448,8 @@ describe("useChat", () => {
     expect(msgs[1]).toEqual({
       role: "assistant",
       blocks: [{ kind: "text", text: "Final answer" }],
+      usage: { promptTokens: expect.any(Number), completionTokens: expect.any(Number), source: "estimated" },
+      contextTokens: expect.any(Number),
     });
     // Verify the hook state directly after act flushes updates
     expect(result.current.messages).toHaveLength(2);
@@ -570,6 +676,8 @@ describe("useChat", () => {
     expect(msgs[1]).toEqual({
       role: "assistant",
       blocks: [{ kind: "text", text: "Final answer" }],
+      usage: { promptTokens: expect.any(Number), completionTokens: expect.any(Number), source: "estimated" },
+      contextTokens: expect.any(Number),
     });
   });
 
@@ -729,8 +837,12 @@ describe("useChat", () => {
       },
     });
 
+    const initialMessages: ChatMessage[] = [
+      { role: "user", content: "word ".repeat(900) },
+      { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(900) }] },
+    ];
     const { result } = renderHook(() =>
-      useChat({ config, baseCurrency, contextSize: 512 }),
+      useChat({ config, baseCurrency, contextSize: 7300, initialMessages }),
     );
     await act(async () => {
       await result.current.send("average buy price?");
@@ -745,7 +857,7 @@ describe("useChat", () => {
     expect(toolMsg.content).toContain("[truncated:");
     expect(toolMsg.content).not.toContain('{\n  "rows"');
 
-    const assistant = result.current.messages[1] as { role: "assistant"; blocks: any[] };
+    const assistant = result.current.messages.at(-1) as { role: "assistant"; blocks: any[] };
     expect(assistant.blocks.some((b) => b.kind === "text" && b.text.includes("Final answer"))).toBe(true);
   });
 
@@ -929,8 +1041,8 @@ describe("useChat", () => {
       yield { kind: "done" };
     });
     const initialMessages: ChatMessage[] = [
-      { role: "user", content: "Earlier question" },
-      { role: "assistant", blocks: [{ kind: "text", text: "Earlier answer" }] },
+      { role: "user", content: "Earlier question ".repeat(100) },
+      { role: "assistant", blocks: [{ kind: "text", text: "Earlier answer ".repeat(100) }] },
     ];
     const { result } = renderHook(() => useChat({ config, baseCurrency, contextSize: 512, initialMessages }));
     await act(async () => { await result.current.send("Current question"); });
@@ -980,6 +1092,35 @@ describe("useChat", () => {
     const result = formatToolResult({ text: "A".repeat(10_000), data: { count: 1 } }, 200);
     expect(result.length).toBeLessThan(500);
     expect(result).toContain("[truncated:");
+  });
+
+  it("limits CJK tool summary text by tokens", () => {
+    const result = formatToolResult({ text: "投资".repeat(2000), data: undefined }, 100);
+    expect(estimateTokens(result)).toBeLessThanOrEqual(100);
+    expect(result).toContain("[truncated:");
+  });
+
+  it("divides the remaining tool context across results", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      if (requests.length === 1) {
+        yield { kind: "tool_call", id: "a", name: "asset_snapshot", args: {} };
+        yield { kind: "tool_call", id: "b", name: "asset_snapshot", args: {} };
+      } else yield { kind: "text", delta: "Done" };
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({
+      ok: true, result: { data: { rows: Array.from({ length: 100 }, (_, i) => ({ id: i, value: "x".repeat(100) })) } },
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("Show holdings"); });
+    const toolMessages = requests[1].messages.filter((message) => message.role === "tool");
+    expect(toolMessages).toHaveLength(2);
+    expect(toolMessages[0].content).toContain("[truncated:");
+    expect(toolMessages[1].content).toContain("[truncated:");
+    expect(estimateTokens(toolMessages[0].content ?? "", "json")).toBeLessThan(1600);
+    expect(estimateTokens(toolMessages[1].content ?? "", "json")).toBeLessThan(1600);
   });
 
   it("does not replace an active reply with a stale session reload", async () => {

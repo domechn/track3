@@ -109,6 +109,13 @@ describe("AI configuration storage", () => {
     expect(loaded.contextSize).toBe(validConfig.contextSize);
   });
 
+  it("round-trips optional token pricing and rejects a negative price", async () => {
+    await saveAIConfig({ ...validConfig, pricePerMillionTokens: 2.5 });
+    expect((await loadAIConfig()).pricePerMillionTokens).toBe(2.5);
+    await expect(saveAIConfig({ ...validConfig, pricePerMillionTokens: -1 }))
+      .rejects.toBeInstanceOf(AIConfigMissingError);
+  });
+
   it("drains an active config write before rotation and delays late writes until activation", async () => {
     const events: string[] = [];
     let activeKey = "old";

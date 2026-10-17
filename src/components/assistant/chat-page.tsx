@@ -43,6 +43,8 @@ import SessionSidebar from "./session-sidebar";
 import { useChatSessions } from "./use-chat-sessions";
 import type { AIConfig, CurrencyRateDetail } from "@/middlelayers/types";
 import type { ChatMessage, AssistantBlock } from "./use-chat";
+import type { ConversationSummary } from "@/middlelayers/ai/history";
+import UsageLabel from "./usage-label";
 
 type LoadState =
   | { status: "loading" }
@@ -110,6 +112,8 @@ function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {
   }
   return {
     role: "assistant",
+    ...(msg.usage ? { usage: msg.usage } : {}),
+    ...(msg.contextTokens !== undefined ? { contextTokens: msg.contextTokens } : {}),
     blocks: msg.blocks
       .filter((b): b is { kind: "text"; text: string } => b.kind === "text")
       .map((b): AssistantBlock => ({ kind: "text", text: b.text })),
@@ -122,6 +126,8 @@ function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
   }
   return {
     role: "assistant",
+    ...(msg.usage ? { usage: msg.usage } : {}),
+    ...(msg.contextTokens !== undefined ? { contextTokens: msg.contextTokens } : {}),
     blocks: msg.blocks
       .filter(
         (b): b is { kind: "text"; text: string } =>
@@ -146,6 +152,7 @@ function ReadyChat({
   const { sessions, isLoading, refresh, createNew, remove, pin } =
     useChatSessions();
   const [initialMsgs, setInitialMsgs] = useState<ChatMessage[]>([]);
+  const [initialSummary, setInitialSummary] = useState<ConversationSummary | undefined>();
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -182,6 +189,7 @@ function ReadyChat({
       // and cause an unwanted auto-scroll from top to bottom.
       if (sessionId !== loadedSessionId) {
         setInitialMsgs([]);
+        setInitialSummary(undefined);
       }
       let cancelled = false;
       (async () => {
@@ -195,10 +203,12 @@ function ReadyChat({
         if (cancelled) return;
         if (session) {
           setInitialMsgs(session.messages.map(persistedToRuntime));
+          setInitialSummary(session.summary);
         } else {
           // New or empty session — always reset so the previous session's
           // messages don't leak into the new chat.
           setInitialMsgs([]);
+          setInitialSummary(undefined);
         }
         setLoadedSessionId(sessionId);
       })();
@@ -215,6 +225,7 @@ function ReadyChat({
       // session.  A new session is created lazily when the user sends
       // their first message (see handleStreamComplete).
       setInitialMsgs([]);
+      setInitialSummary(undefined);
       setLoadedSessionId(null);
     }
   }, [sessionId, sessionVersion]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -234,7 +245,7 @@ function ReadyChat({
   // The useChat hook's initialMessages watcher picks up the new
   // messages via reference comparison when loading completes.
   const handleStreamComplete = useCallback(
-    async (newMessages: ChatMessage[]) => {
+    async (newMessages: ChatMessage[], summary?: ConversationSummary) => {
       try {
         if (newMessages.length < 2) return;
         const exchange = [
@@ -258,7 +269,8 @@ function ReadyChat({
           }
         }
 
-        await appendMessages(targetId, persistedExchange);
+        if (summary) await appendMessages(targetId, persistedExchange, summary);
+        else await appendMessages(targetId, persistedExchange);
         if (mountedRef.current) setSaveError(null);
         const msgCount = newMessages.length;
 
@@ -381,6 +393,7 @@ function ReadyChat({
        config={config}
        baseCurrency={baseCurrency}
        initialMessages={initialMsgs}
+       initialSummary={initialSummary}
        onStreamComplete={handleStreamComplete}
        saveError={saveError}
         onStreamingChange={handleStreamingChange}
@@ -396,6 +409,7 @@ function ChatContent({
   baseCurrency,
   sessionId,
   initialMessages,
+  initialSummary,
   onStreamComplete,
   saveError,
   onStreamingChange,
@@ -406,7 +420,8 @@ function ChatContent({
   baseCurrency: CurrencyRateDetail;
   sessionId?: string | null;
   initialMessages: ChatMessage[];
-  onStreamComplete?: (messages: ChatMessage[]) => void;
+  initialSummary?: ConversationSummary;
+  onStreamComplete?: (messages: ChatMessage[], summary?: ConversationSummary) => void;
   saveError?: string | null;
   onStreamingChange?: (streaming: boolean) => void;
   sidebarOpen: boolean;
@@ -419,6 +434,7 @@ function ChatContent({
     contextSize: config.contextSize,
     sessionId,
     initialMessages,
+    initialSummary,
     onStreamComplete,
     onStreamingChange,
   });
@@ -428,7 +444,7 @@ function ChatContent({
       data-testid="chat-card"
       className="flex min-w-0 flex-1 flex-col overflow-hidden"
     >
-      <ChatHeader config={config} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />
+      <ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />
       {saveError && (
         <p role="alert" className="px-4 py-2 text-sm text-destructive">
           {t("assistant.chat.saveFailed")}: {saveError}
@@ -437,6 +453,7 @@ function ChatContent({
       <ChatThread
         messages={chat.messages}
         isStreaming={chat.isStreaming}
+        pricePerMillionTokens={config.pricePerMillionTokens}
         onPickPrompt={(text) => void chat.send(text)}
       />
       {chat.messages.length > 0 && (
@@ -460,8 +477,17 @@ function ChatContent({
   );
 }
 
-function ChatHeader({ config, sidebarOpen, onToggleSidebar }: { config: AIConfig; sidebarOpen: boolean; onToggleSidebar: () => void }) {
+function ChatHeader({
+  config, contextTokens, sessionUsage, sidebarOpen, onToggleSidebar,
+}: {
+  config: AIConfig;
+  contextTokens: number;
+  sessionUsage: import("@/middlelayers/ai/budget").TokenUsage;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+}) {
   const { t } = useTranslation();
+  const percent = Math.min(100, Math.round(contextTokens / config.contextSize * 100));
   return (
     <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b border-[var(--glass-border)] bg-card/40 px-5 py-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -494,6 +520,18 @@ function ChatHeader({ config, sidebarOpen, onToggleSidebar }: { config: AIConfig
             <span className="font-mono">{config.endpoint}</span>
           </p>
         </div>
+      </div>
+      <div className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
+        {contextTokens > 0 && (
+          <span role="progressbar" aria-label={t("assistant.usage.context").replace("{percent}", String(percent))}
+            aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}
+            className="text-[11px] text-muted-foreground">
+            {t("assistant.usage.context").replace("{percent}", String(percent))}
+          </span>
+        )}
+        {(sessionUsage.promptTokens > 0 || sessionUsage.completionTokens > 0) && (
+          <UsageLabel usage={sessionUsage} pricePerMillionTokens={config.pricePerMillionTokens} />
+        )}
       </div>
       <Button
         asChild

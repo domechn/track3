@@ -17,6 +17,15 @@ beforeEach(() => {
 });
 
 describe("orchestrator LLM requests", () => {
+  it("returns reported usage from a JSON completion", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: "ok" } }],
+      usage: { prompt_tokens: 13, completion_tokens: 2 },
+    }), { status: 200 }) as any);
+    expect(await callLlm(params)).toMatchObject({
+      usage: { promptTokens: 13, completionTokens: 2, source: "reported" },
+    });
+  });
   it("cancels an in-flight planner call when the chat is stopped", async () => {
     const controller = new AbortController();
     vi.mocked(fetch).mockImplementation(async (_url, init) => new Promise((_resolve, reject) => {

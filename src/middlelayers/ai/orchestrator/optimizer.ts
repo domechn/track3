@@ -10,7 +10,8 @@
 // it lets the assistant refine its own answer before presenting it.
 
 import { callLlm } from "./llm";
-import { perAgentDataChars, serializeData } from "./synthesizer";
+import { perAgentDataTokens, serializeData } from "./synthesizer";
+import { estimateTokens, truncateText } from "../budget";
 import type { SynthesisOptions } from "./synthesizer";
 import type { AnalysisPlan, LlmCallParams, SubTaskResult } from "./types";
 
@@ -22,29 +23,29 @@ function buildOptimizerContext(
   results: SubTaskResult[],
   options: SynthesisOptions,
 ): string {
-  const perAgentChars = perAgentDataChars(options.contextSize, results.length);
+  const perAgentTokens = perAgentDataTokens(options.contextSize, results.length);
   const resultsBlock = results
     .map(
       (r) => {
         if (r.status === "failed") {
           return `[${r.skillName}]\nFailed: ${r.error ?? "unknown error"}`;
         }
-        const dataText = serializeData(r.data, Math.floor(perAgentChars * 3 / 4));
-        const summaryLimit = Math.max(Math.floor(perAgentChars / 4), perAgentChars - dataText.length);
-        return `[${r.skillName}]\n${(r.text ?? "(no text)").slice(0, summaryLimit)}\nData: ${dataText}`;
+        const dataText = serializeData(r.data, Math.floor(perAgentTokens * 3 / 4));
+        const summaryLimit = Math.max(Math.floor(perAgentTokens / 4), perAgentTokens - estimateTokens(dataText, "json"));
+        return `[${r.skillName}]\n${truncateText(r.text ?? "(no text)", summaryLimit)}\nData: ${dataText}`;
       },
     )
     .join("\n\n");
 
   return [
     "Recent conversation:",
-    (options.historySnapshot ?? "(none)").slice(0, 1200),
+    truncateText(options.historySnapshot ?? "(none)", Math.max(64, Math.floor((options.contextSize ?? 8192) * 0.1))),
     "",
     "User query:",
-    query,
+    truncateText(query, Math.max(64, Math.floor((options.contextSize ?? 8192) * 0.1))),
     "",
     "Draft answer:",
-    draft,
+    truncateText(draft, Math.max(64, Math.floor((options.contextSize ?? 8192) * 0.2))),
     "",
     "Raw data available:",
     resultsBlock,

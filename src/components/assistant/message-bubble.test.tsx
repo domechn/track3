@@ -11,6 +11,9 @@ vi.mock("@/i18n", () => ({
         "assistant.chat.title": "Assistant",
         "assistant.chat.thinking": "Thinking...",
         "assistant.chat.think.label": "Thinking",
+        "assistant.usage.tokens": "Prompt {prompt} · Completion {completion} tokens",
+        "assistant.usage.cost": "Est. {cost}",
+        "assistant.usage.estimated": "Estimated",
       };
       return map[key] ?? key;
     },
@@ -18,6 +21,26 @@ vi.mock("@/i18n", () => ({
 }));
 
 describe("MessageBubble", () => {
+  it("shows assistant message tokens and hides cost until pricing is configured", () => {
+    const message: ChatMessage = {
+      role: "assistant", blocks: [{ kind: "text", text: "Done" }],
+      usage: { promptTokens: 1200, completionTokens: 300, source: "reported" },
+    };
+    const { rerender } = render(<MessageBubble message={message} />);
+    expect(screen.getByText(/1,200.*300/)).toBeTruthy();
+    expect(screen.queryByText(/\$/)).toBeNull();
+    rerender(<MessageBubble message={message} pricePerMillionTokens={2} />);
+    expect(screen.getByText(/\$0\.003\b/)).toBeTruthy();
+    expect(screen.queryByText(/\$0\.003000/)).toBeNull();
+  });
+
+  it("labels estimated token counts as estimates", () => {
+    render(<MessageBubble message={{
+      role: "assistant", blocks: [{ kind: "text", text: "Done" }],
+      usage: { promptTokens: 10, completionTokens: 4, source: "estimated" },
+    }} />);
+    expect(screen.getByLabelText(/estimated.*prompt 10.*completion 4/i)).toBeTruthy();
+  });
   it("renders a user message with PersonIcon", () => {
     const msg: ChatMessage = { role: "user", content: "Hello" };
     const { container } = render(<MessageBubble message={msg} />);

@@ -4,6 +4,7 @@
 
 import { fetch } from "@tauri-apps/plugin-http";
 import { getCurrentUA } from "@/middlelayers/datafetch/utils/http";
+import { estimateMessages, estimateTokens, parseUsage } from "../budget";
 import type { LlmCallParams, LlmCallResult } from "./types";
 
 /**
@@ -81,7 +82,13 @@ export async function callLlm(
     if (typeof content !== "string") {
       return { content: "", ok: false, error: "LLM response did not contain text" };
     }
-    return { content, ok: true };
+    const usage = parseUsage(json?.usage) ?? {
+      promptTokens: estimateMessages(params.messages as import("../types").ProviderMessage[]),
+      completionTokens: estimateTokens(content),
+      source: "estimated" as const,
+    };
+    params.onUsage?.(usage);
+    return { content, ok: true, usage };
   } catch (err: any) {
     if (timedOut) {
       return { content: "", ok: false, error: "LLM call timed out" };
