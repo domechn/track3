@@ -57,7 +57,7 @@ const GeneralSettings = memo(function GeneralSettings({
             checked={groupUSD}
             onCheckedChange={(v) => onGroupUSDChange(!!v)}
           />
-          <Label htmlFor="groupUSD" className="flex min-h-11 items-center text-sm">
+          <Label htmlFor="groupUSD" className="text-sm touch:flex touch:min-h-11 touch:items-center">
             Group stable coins into USDT (USDC, TUSD, DAI...)
           </Label>
         </div>
@@ -67,12 +67,12 @@ const GeneralSettings = memo(function GeneralSettings({
             checked={hideInactive}
             onCheckedChange={(v) => onHideInactiveChange(!!v)}
           />
-          <Label htmlFor="hideInactive" className="flex min-h-11 items-center text-sm">
+          <Label htmlFor="hideInactive" className="text-sm touch:flex touch:min-h-11 touch:items-center">
             Hide inactive exchanges, brokers, and wallets
           </Label>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="min-w-0 space-y-2">
+          <div className="space-y-2 touch:min-w-0">
             <div className="text-sm font-medium text-muted-foreground">
               {t("config.countOfResults")}
             </div>
@@ -92,11 +92,11 @@ const GeneralSettings = memo(function GeneralSettings({
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-0 space-y-2">
+          <div className="space-y-2 touch:min-w-0">
             <div className="text-sm font-medium text-muted-foreground">
               {t("config.baseCurrency")}
             </div>
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="flex items-center gap-2 touch:min-w-0">
               {preferCurrencyLoading ? (
                 <Skeleton className="h-10 w-[280px]" />
               ) : (
@@ -104,7 +104,7 @@ const GeneralSettings = memo(function GeneralSettings({
                   onValueChange={onPreferCurrencyChange}
                   value={preferCurrency}
                 >
-                  <SelectTrigger aria-label={t("config.baseCurrency")} className="min-w-0 w-full max-w-[280px]">
+                  <SelectTrigger aria-label={t("config.baseCurrency")} className="w-[280px] touch:min-w-0 touch:w-full touch:max-w-[280px]">
                     <SelectValue placeholder={t("config.preferCurrency")} />
                   </SelectTrigger>
                   <SelectContent className="overflow-y-auto max-h-[20rem]">
@@ -124,7 +124,7 @@ const GeneralSettings = memo(function GeneralSettings({
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-11 w-11 shrink-0"
+                className="h-8 w-8 touch:h-11 touch:w-11 shrink-0"
                 aria-label={t("config.updateCurrencyRates")}
                 onClick={onUpdateCurrencyRatesClick}
                 disabled={preferCurrencyLoading || refreshCurrencyLoading}

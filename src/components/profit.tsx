@@ -213,10 +213,10 @@ const App = ({
         <TableCell className="w-[36px] py-1.5 text-xs text-muted-foreground font-mono">
           #{rankStart + idx}
         </TableCell>
-        <TableCell className="py-0 sm:py-1.5">
+        <TableCell className="py-1.5 touch:py-0">
           <Link
             to={buildAssetDetailsPath(d)}
-            className="group inline-flex min-h-11 flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
+            className="group inline-flex touch:min-h-11 flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="sr-only">{t("common.openAssetDetails").replace(
               "{asset}",
@@ -270,8 +270,8 @@ const App = ({
               .replace("{down}", String(negativeCount))}
           </div>}
           <ButtonGroup value={view} onValueChange={(value) => setView(value as "summary" | "attribution")} aria-label={t("profit.title")} className="h-auto">
-            <ButtonGroupItem value="summary" className="min-h-11 px-2 text-xs sm:px-3">{t("profit.attribution.summary")}</ButtonGroupItem>
-            <ButtonGroupItem value="attribution" className="min-h-11 px-2 text-xs sm:px-3">{t("profit.attribution.tab")}</ButtonGroupItem>
+            <ButtonGroupItem value="summary" className="touch:min-h-11 px-2 text-xs sm:px-3">{t("profit.attribution.summary")}</ButtonGroupItem>
+            <ButtonGroupItem value="attribution" className="touch:min-h-11 px-2 text-xs sm:px-3">{t("profit.attribution.tab")}</ButtonGroupItem>
           </ButtonGroup>
         </div>
         {view === "summary" && <>

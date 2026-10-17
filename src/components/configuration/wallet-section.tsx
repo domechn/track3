@@ -73,7 +73,7 @@ const WalletSection = memo(function WalletSection({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 touch:flex-wrap">
           <div>
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {t("config.wallet")}
@@ -120,7 +120,7 @@ const WalletSection = memo(function WalletSection({
                     }
                     value={addWalletConfig?.type ?? ""}
                   >
-                    <SelectTrigger id="name" aria-label={t("config.formType")} className="w-full max-w-[180px]">
+                    <SelectTrigger id="name" aria-label={t("config.formType")} className="w-[180px] touch:w-full touch:max-w-[180px]">
                       <SelectValue placeholder={t("config.selectWallet")} />
                     </SelectTrigger>
                     <SelectContent>

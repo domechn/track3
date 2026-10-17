@@ -548,7 +548,9 @@ const App = () => {
   // Single mount guard reused by both boot and background effects.
   const activeRef = useRef(true);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 640);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 640,
+  );
   const sidebarResizeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {

@@ -96,7 +96,7 @@ describe("Historical Data page", () => {
       transactions: [],
     }]);
     render(<HistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
-    const trigger = await screen.findByRole("button", { name: /view snapshot/i });
+    const trigger = await screen.findByRole("button", { name: "View snapshot from 2024-4-16 12:00:00" });
     expect(trigger).toHaveAccessibleName("View snapshot from 2024-4-16 12:00:00");
     trigger.focus();
     await userEvent.keyboard("{Enter}");

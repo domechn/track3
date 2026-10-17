@@ -193,7 +193,7 @@ const App = ({
       <Popover onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger asChild>
           <button type="button" aria-label={t("realtime.open")}
-            className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            className="flex h-5 w-5 touch:h-11 touch:w-11 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <LightningBoltIcon aria-hidden="true" height={20} width={20} />
           </button>
         </PopoverTrigger>
