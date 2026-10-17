@@ -33,6 +33,7 @@ import {
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { downsampleIndices } from "@/middlelayers/chart-downsample";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -192,6 +193,7 @@ const App = ({
   const [showPercentageInChart, setShowPercentageInChart] = useState(false);
 
   const [showValue, setShowValue] = useState(false);
+  const [chartWidth, setChartWidth] = useState(600);
   const loadGenRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
@@ -335,6 +337,14 @@ const App = ({
       .map((d) => currencyWrapper(currency)(d.usdValue))
       .map((d) => (showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d));
   }, [assetChangeData, btcAsBase, currency, showPercentageInChart]);
+  const plottedIndices = useMemo(
+    () => downsampleIndices([lineValues], Math.max(40, Math.floor(chartWidth / 2))),
+    [lineValues, chartWidth],
+  );
+  const plottedTimestamps = useMemo(
+    () => plottedIndices.map((index) => assetChangeData.timestamps[index]),
+    [plottedIndices, assetChangeData.timestamps],
+  );
 
   function changePercentageColorClass(
     ts: TotalValueShower,
@@ -349,6 +359,7 @@ const App = ({
     () => ({
       maintainAspectRatio: false,
       responsive: true,
+      onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
       hover: {
         mode: "index",
         intersect: false,
@@ -397,7 +408,7 @@ const App = ({
             align: "center",
             autoSkip: false,
             callback: function (val: number, index: number) {
-              const data = assetChangeData.timestamps;
+              const data = plottedTimestamps;
 
               const size = data.length;
               const start = 0;
@@ -446,17 +457,17 @@ const App = ({
       btcAsBase,
       currency.symbol,
       currency.currency,
-      assetChangeData.timestamps,
+      plottedTimestamps,
     ],
   );
 
   const lineDataMemo = useMemo(() => {
     return {
-      labels: assetChangeData.timestamps.map((x) => timeToDateStr(x)),
+      labels: plottedTimestamps.map((x) => timeToDateStr(x)),
       datasets: [
         {
           label: "Value",
-          data: lineValues,
+          data: plottedIndices.map((index) => lineValues[index]),
           borderColor: lineColor,
           backgroundColor: (context: any) => {
             const { chart } = context;
@@ -474,7 +485,7 @@ const App = ({
         },
       ],
     };
-  }, [assetChangeData.timestamps, lineValues, lineColor]);
+  }, [plottedTimestamps, plottedIndices, lineValues, lineColor]);
 
   return (
     <div className="h-full">

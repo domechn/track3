@@ -17,6 +17,7 @@ import { timeToDateStr } from "@/utils/date";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { downsampleIndices } from "@/middlelayers/chart-downsample";
 
 const chartName = "PNL of Asset";
 
@@ -33,6 +34,31 @@ const App = ({
 }) => {
   const { needResize } = useContext(ChartResizeContext);
   const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
+  const [chartWidth, setChartWidth] = useState(600);
+  const pnlChanges = useMemo(
+    () => pnlChartData.slice(1).map((point, index) =>
+      point.totalValue - pnlChartData[index].totalValue,
+    ),
+    [pnlChartData],
+  );
+  const plottedPNL = useMemo(() => {
+    const indices = downsampleIndices([pnlChanges], Math.max(40, Math.floor(chartWidth / 2)));
+    let largestGain = -1;
+    let largestLoss = -1;
+    pnlChanges.forEach((change, index) => {
+      if (largestGain < 0 || change > pnlChanges[largestGain]) largestGain = index;
+      if (largestLoss < 0 || change < pnlChanges[largestLoss]) largestLoss = index;
+    });
+    const boundaries = [...new Set([...indices, largestGain - 1, largestLoss - 1]
+      .filter((index) => index >= 0))].sort((a, b) => a - b);
+    return boundaries.map((index, position) => ({
+      change: currencyWrapper(currency)(
+        pnlChartData[index + 1].totalValue
+        - pnlChartData[position ? boundaries[position - 1] + 1 : 0].totalValue,
+      ),
+      timestamp: pnlChartData[index + 1].timestamp,
+    }));
+  }, [pnlChanges, pnlChartData, chartWidth, currency]);
 
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
@@ -59,6 +85,7 @@ const App = ({
   const options = {
     maintainAspectRatio: false,
     responsive: true,
+    onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
     hover: {
       mode: "index",
       intersect: false,
@@ -107,20 +134,16 @@ const App = ({
           align: "center",
           autoSkip: false,
           callback: function (val: number, index: number) {
-            const data = pnlChartData;
-
-            // -1, because we remove first element in labels, but not in pnlData.data
-            const size = data.length - 1;
-            // both add 1, because the first one is the title
+            const data = plottedPNL;
             const start = 0;
-            const end = size - 1;
+            const end = data.length - 1;
             // only show start and end date
             if (index === start) {
-              return timeToDateStr(data[index + 1].timestamp);
+              return timeToDateStr(data[index].timestamp);
             }
 
             if (index === end) {
-              return timeToDateStr(data[index + 1].timestamp);
+              return timeToDateStr(data[index].timestamp);
             }
 
             return "";
@@ -152,19 +175,11 @@ const App = ({
   };
 
   function formatPositiveLineData() {
-    return pnlChartData
-      .map((x, idx) => x.totalValue - (pnlChartData[idx - 1]?.totalValue || 0))
-      .map(currencyWrapper(currency))
-      .map((x) => (x < 0 ? undefined : x))
-      .slice(1);
+    return plottedPNL.map(({ change }) => change < 0 ? undefined : change);
   }
 
   function formatNegativeLineData() {
-    return pnlChartData
-      .map((x, idx) => x.totalValue - (pnlChartData[idx - 1]?.totalValue || 0))
-      .map(currencyWrapper(currency))
-      .map((x) => (x >= 0 ? undefined : x))
-      .slice(1);
+    return plottedPNL.map(({ change }) => change >= 0 ? undefined : change);
   }
 
   function pnlBackgroundColor(val: "positive" | "negative"): string {
@@ -174,10 +189,7 @@ const App = ({
 
   function lineData() {
     return {
-      labels: pnlChartData
-        // !remove the first element, because it is the comparison of the first and second element
-        .slice(1)
-        .map((x) => timeToDateStr(x.timestamp)),
+      labels: plottedPNL.map((x) => timeToDateStr(x.timestamp)),
       // two datasets for different colors
       datasets: [
         {

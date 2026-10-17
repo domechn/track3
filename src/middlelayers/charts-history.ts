@@ -10,6 +10,88 @@ import { ASSET_HANDLER } from "./entities/assets";
 import { selectFromDatabaseWithSql } from "./database";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 
+export type HistoricalPageRow = {
+  id: string;
+  createdAt: string;
+  total: number;
+  change: number | null;
+  assetCount: number;
+  topAssets: Pick<AssetModel, "symbol" | "assetType" | "price" | "value">[];
+};
+export type HistoricalLatest = Pick<HistoricalPageRow, "id" | "createdAt" | "total">;
+
+export async function queryHistoricalPage(
+  dateRange: TDateRange,
+  pageSize: number,
+  page: number,
+): Promise<{ totalCount: number; rows: HistoricalPageRow[]; latest: HistoricalLatest | null }> {
+  if (!Number.isInteger(pageSize) || pageSize < 1 || !Number.isInteger(page) || page < 0) {
+    throw new Error("Invalid history page");
+  }
+  const bounds = [dateRange.start.toISOString(), dateRange.end.toISOString()];
+  const records = await selectFromDatabaseWithSql<{
+    id: string | null;
+    createdAt: string;
+    total: number;
+    assetCount: number;
+    topAssets: string;
+    latest: string | null;
+    totalCount: number;
+  }>(
+    `WITH snapshots AS (
+       SELECT uuid AS id, MAX(createdAt) AS createdAt, SUM(value) AS total,
+              COUNT(DISTINCT asset_type || ':' || symbol) AS assetCount
+       FROM assets_v2 WHERE createdAt >= ? AND createdAt <= ?
+       GROUP BY uuid
+     ), page AS (
+       SELECT * FROM snapshots ORDER BY createdAt DESC, id DESC LIMIT ? OFFSET ?
+     )
+     SELECT page.*, (SELECT COUNT(*) FROM snapshots) AS totalCount,
+       (SELECT json_object('id', id, 'createdAt', createdAt, 'total', total)
+        FROM snapshots ORDER BY createdAt DESC, id DESC LIMIT 1) AS latest,
+       (SELECT json_group_array(json_object(
+         'symbol', symbol, 'assetType', asset_type, 'price', price, 'value', value
+       )) FROM (
+         SELECT symbol, asset_type, price, SUM(value) AS value FROM assets_v2
+         WHERE uuid = page.id
+         GROUP BY asset_type, symbol
+         HAVING SUM(value) > 0
+         ORDER BY value DESC LIMIT 7
+       )) AS topAssets
+     FROM (SELECT 1) AS seed LEFT JOIN page ON 1 = 1
+     ORDER BY page.createdAt DESC, page.id DESC`,
+    [...bounds, pageSize + 1, page * pageSize],
+  );
+  const pageRecords = records.filter((record): record is typeof record & { id: string } => record.id !== null);
+  const rows = pageRecords.slice(0, pageSize).map((record, index) => ({
+    id: record.id,
+    createdAt: record.createdAt,
+    total: record.total,
+    change: pageRecords[index + 1] ? record.total - pageRecords[index + 1].total : null,
+    assetCount: record.assetCount,
+    topAssets: JSON.parse(record.topAssets || "[]") as HistoricalPageRow["topAssets"],
+  }));
+  return {
+    totalCount: records[0]?.totalCount ?? 0,
+    rows,
+    latest: records[0]?.latest ? JSON.parse(records[0].latest) as HistoricalLatest : null,
+  };
+}
+
+export async function queryHistoricalDetail(uuid: string, includeTransactions = false): Promise<HistoricalData> {
+  const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByUUID(uuid);
+  const transactions = includeTransactions
+    ? await TRANSACTION_HANDLER.listTransactionsByUUIDs([uuid])
+    : [];
+  return {
+    id: uuid,
+    createdAt: assets[0]?.createdAt ?? "",
+    assets,
+    transactions,
+    total: assets.reduce((sum, asset) => sum + asset.value, 0),
+  };
+}
+
 // return dates which has data
 export async function getAvailableDates(): Promise<Date[]> {
   const dates = await ASSET_HANDLER.getHasDataCreatedAtDates();

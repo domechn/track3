@@ -39,6 +39,8 @@ export {
 export {
   getAvailableDates,
   queryHistoricalData,
+  queryHistoricalPage,
+  queryHistoricalDetail,
   queryTotalValues,
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,

@@ -3,6 +3,8 @@ import { getBlacklistCoins } from "./configuration";
 import { ASSET_HANDLER } from "./entities/assets";
 import { queryLatestAssets, queryLatestAssetsPercentage } from "./charts";
 
+const sqlSelect = vi.hoisted(() => vi.fn());
+vi.mock("./database", () => ({ selectFromDatabaseWithSql: sqlSelect }));
 vi.mock("./data", () => ({
   queryCoinPrices: vi.fn(),
   queryStableCoins: vi.fn(),
@@ -113,21 +115,17 @@ describe("charts blacklist filtering", () => {
       end: new Date("2024-04-30T00:00:00.000Z"),
     };
     vi.mocked(getBlacklistCoins).mockResolvedValue(["eth"]);
-    vi.mocked(
-      ASSET_HANDLER.listSymbolGroupedAssetsByDateRange,
-    ).mockResolvedValue([
-      [
-        { symbol: "BTC", amount: 1, value: 80 },
-        { symbol: "ETH", amount: 2, value: 20 },
-        { symbol: "USDT", amount: 20, value: 20 },
-      ],
-    ] as never);
+    sqlSelect.mockResolvedValue([
+      { symbol: "BTC", assetType: "crypto", amount: 1, value: 80 },
+      { symbol: "ETH", assetType: "crypto", amount: 2, value: 20 },
+      { symbol: "USDT", assetType: "crypto", amount: 20, value: 20 },
+    ]);
 
     const result = await queryLatestAssetsPercentage(dateRange);
 
     expect(
-      ASSET_HANDLER.listSymbolGroupedAssetsByDateRange,
-    ).toHaveBeenCalledWith(dateRange.start, dateRange.end);
+      sqlSelect,
+    ).toHaveBeenCalledWith(expect.any(String), [dateRange.start.toISOString(), dateRange.end.toISOString()]);
     expect(result.map((item) => item.coin)).toEqual(["BTC", "USDT"]);
     expect(result[0].percentage).toBeCloseTo(80);
     expect(result[1].percentage).toBeCloseTo(20);

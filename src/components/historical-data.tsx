@@ -3,10 +3,12 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
-  queryHistoricalData,
+  queryHistoricalDetail,
+  queryHistoricalPage,
   queryRestoreHistoricalData,
   restoreHistoricalData,
 } from "@/middlelayers/charts";
+import type { HistoricalLatest, HistoricalPageRow } from "@/middlelayers/charts-history";
 import { addToBlacklist } from "@/middlelayers/configuration";
 import {
   CurrencyRateDetail,
@@ -65,14 +67,6 @@ import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
 import { useTranslation } from "@/i18n";
 
-type HistoricalListRow = {
-  id: string;
-  createdAt: string;
-  total: number;
-  change: number | null;
-  assets: HistoricalData["assets"];
-};
-
 type RankData = {
   id: number;
   assetId: number;
@@ -103,24 +97,33 @@ const App = ({
 }) => {
   const { t } = useTranslation();
 
-  const [data, setData] = useState([] as HistoricalData[]);
+  const [data, setData] = useState<HistoricalPageRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [latestRow, setLatestRow] = useState<HistoricalLatest | null>(null);
+  const [selectedData, setSelectedData] = useState<HistoricalData | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const [selectedDataId, setSelectedDataId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
   const [detailSearch, setDetailSearch] = useState("");
+  const [detailScrollTop, setDetailScrollTop] = useState(0);
   const [pageLoading, setPageLoading] = useState(true);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   const { run: runDelete, isDeleting: deleting } = useOptimisticDelete(setData);
+  const { run: runDetailDelete, isDeleting: deletingDetail } = useOptimisticDelete(setSelectedData);
 
   const [dataPage, setDataPage] = useState(0);
+  const [pageInput, setPageInput] = useState("1");
   const [pageSize, setPageSize] = useState(20);
 
   const loadGenRef = useRef(0);
   // Set right before calling `afterDataChanged` from a local mutation
   // (delete/undo) so the next dataChangedVersion bump skips the loading
-  // overlay. Keep the current list visible while `loadAllData` refreshes it.
+  // overlay. Keep the current list visible while `loadPage` refreshes it.
   const skipNextLoadingRef = useRef(false);
+  const localMutationRef = useRef(false);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
@@ -133,34 +136,28 @@ const App = ({
       return;
     }
     setPageLoading(true);
-  }, [rangeKey, dataChangedVersion]);
+  }, [rangeKey, dataChangedVersion, dataPage, pageSize]);
 
-  const dataRows = useMemo<HistoricalListRow[]>(() => {
-    return data.map((item, idx) => ({
-      id: item.id,
-      createdAt: item.createdAt,
-      total: item.total,
-      change:
-        idx < data.length - 1 ? item.total - (data[idx + 1]?.total ?? 0) : null,
-      assets: item.assets,
-    }));
-  }, [data]);
+  const dataRows = data;
 
   const symbolPricePairs = useMemo(() => {
     const latestBySymbol = new Map<string, number>();
     for (const item of dataRows) {
-      for (const asset of item.assets) {
+      for (const asset of item.topAssets) {
         if (!latestBySymbol.has(asset.symbol)) {
           latestBySymbol.set(asset.symbol, asset.price);
         }
       }
+    }
+    for (const asset of selectedData?.assets ?? []) {
+      if (!latestBySymbol.has(asset.symbol)) latestBySymbol.set(asset.symbol, asset.price);
     }
 
     return Array.from(latestBySymbol.entries()).map(([symbol, price]) => ({
       symbol,
       price,
     }));
-  }, [dataRows]);
+  }, [dataRows, selectedData]);
 
   const uniqueSymbols = useMemo(() => {
     return symbolPricePairs.map((item) => item.symbol);
@@ -205,60 +202,93 @@ const App = ({
     loadMissingLogos();
   }, [uniqueSymbols, logoMap]);
 
-  const loadAllData = useCallback(async () => {
+  const loadPage = useCallback(async () => {
     const currentGen = ++loadGenRef.current;
 
     try {
-      const records = await queryHistoricalData(-1, true, {
-        dateRange,
-        includeTransactions: false,
-      });
+      const result = await queryHistoricalPage(dateRange, pageSize, dataPage);
       if (currentGen !== loadGenRef.current) {
         return;
       }
-      setData(records);
+      if (localMutationRef.current) {
+        if (dataPage > Math.max(Math.ceil(result.totalCount / pageSize) - 1, 0)) {
+          skipNextLoadingRef.current = true;
+        }
+      }
+      setData(result.rows);
+      setTotalCount(result.totalCount);
+      setLatestRow(result.latest);
     } finally {
       if (currentGen === loadGenRef.current) {
+        localMutationRef.current = false;
         setPageLoading(false);
       }
     }
-  }, [rangeKey, dateRange, dataChangedVersion]);
+  }, [rangeKey, dateRange, dataChangedVersion, dataPage, pageSize]);
 
   useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+    loadPage();
+  }, [loadPage]);
+
+  useEffect(() => {
+    if (!isModalOpen || !selectedDataId) return;
+    let active = true;
+    setDetailLoading(selectedData?.id !== selectedDataId);
+    setDetailError(false);
+    void queryHistoricalDetail(selectedDataId).then((detail) => {
+      if (active) {
+        setSelectedData(detail);
+        setDetailLoading(false);
+      }
+    }).catch(() => {
+      if (active) {
+        setSelectedData(null);
+        setDetailError(true);
+        setDetailLoading(false);
+      }
+    });
+    return () => { active = false; };
+  }, [isModalOpen, selectedDataId, dataChangedVersion]);
 
   useEffect(() => {
     setDataPage(0);
     setSelectedDataId(null);
+    setSelectedData(null);
     setIsModalOpen(false);
   }, [rangeKey]);
 
   const maxDataPage = useMemo(() => {
-    const pageCount = Math.ceil(dataRows.length / pageSize);
+    const pageCount = Math.ceil(totalCount / pageSize);
     return Math.max(pageCount - 1, 0);
-  }, [dataRows.length, pageSize]);
+  }, [totalCount, pageSize]);
 
   useEffect(() => {
-    setDataPage((prev) => Math.min(prev, maxDataPage));
-  }, [maxDataPage]);
+    if (dataPage > maxDataPage) {
+      if (localMutationRef.current) {
+        skipNextLoadingRef.current = true;
+      }
+      setDataPage(maxDataPage);
+    }
+  }, [dataPage, maxDataPage]);
+  useEffect(() => setPageInput(String(dataPage + 1)), [dataPage]);
 
-  const pagedRows = useMemo(() => {
-    const start = dataPage * pageSize;
-    const end = start + pageSize;
-    return dataRows.slice(start, end);
-  }, [dataRows, dataPage, pageSize]);
+  const applyPageInput = () => {
+    const value = Number(pageInput);
+    if (Number.isInteger(value) && value >= 1 && value <= totalPages) {
+      setDataPage(value - 1);
+    } else {
+      setPageInput(String(dataPage + 1));
+    }
+  };
 
-  const selectedData = useMemo(() => {
-    return data.find((item) => item.id === selectedDataId) ?? null;
-  }, [data, selectedDataId]);
+  const pagedRows = dataRows;
 
   useEffect(() => {
-    if (isModalOpen && selectedDataId && !selectedData) {
+    if (isModalOpen && selectedDataId && !data.some((item) => item.id === selectedDataId) && !pageLoading) {
       setIsModalOpen(false);
       setSelectedDataId(null);
     }
-  }, [isModalOpen, selectedDataId, selectedData]);
+  }, [isModalOpen, selectedDataId, data, pageLoading]);
 
   const rankData = useMemo<RankData[]>(() => {
     if (!selectedData) {
@@ -287,6 +317,12 @@ const App = ({
       : rankData;
     return filtered.slice(0, detailLimit);
   }, [rankData, detailLimit, detailSearch]);
+  const detailWindowSize = Math.max(16, Math.ceil((typeof window === "undefined" ? 700 : window.innerHeight * 0.7) / 42) + 8);
+  const detailStart = Math.min(
+    Math.max(0, Math.floor(detailScrollTop / 42) - 4),
+    Math.max(0, visibleRankData.length - detailWindowSize),
+  );
+  const virtualRankData = visibleRankData.slice(detailStart, detailStart + detailWindowSize);
 
   const filteredRankDataCount = useMemo(() => {
     const keyword = detailSearch.trim().toUpperCase();
@@ -303,6 +339,8 @@ const App = ({
       const index = data.findIndex((record) => record.id === uuid);
       const removed = data[index];
       if (!removed) return;
+      const wasLatest = latestRow?.id === uuid;
+      if (wasLatest) setLatestRow(data[index + 1] ?? null);
       void runDelete({
         update: (prev) => prev.filter((record) => record.id !== uuid),
         rollback: (prev) => {
@@ -312,23 +350,33 @@ const App = ({
           return next;
         },
         commit: async () => {
-          const rhd = await queryRestoreHistoricalData(uuid);
-          await deleteHistoricalDataByUUID(uuid);
-          return rhd;
+          try {
+            const rhd = await queryRestoreHistoricalData(uuid);
+            await deleteHistoricalDataByUUID(uuid);
+            return rhd;
+          } catch (error) {
+            if (wasLatest) setLatestRow(removed);
+            throw error;
+          }
         },
         undo: restoreHistoricalData,
         onDeleted: () => {
+          setTotalCount((count) => Math.max(0, count - 1));
           if (afterDataChanged) {
             skipNextLoadingRef.current = true;
+            localMutationRef.current = true;
             afterDataChanged("delete", uuid, undefined);
           }
           setSelectedDataId(null);
           setIsModalOpen(false);
         },
         onUndone: () => {
+          setLatestRow((prev) => !prev || removed.createdAt >= prev.createdAt ? removed : prev);
+          setTotalCount((count) => count + 1);
           setIsModalOpen(false);
           if (afterDataChanged) {
             skipNextLoadingRef.current = true;
+            localMutationRef.current = true;
             afterDataChanged("undoDeletion", uuid, undefined);
           }
         },
@@ -338,26 +386,26 @@ const App = ({
         undoWindowMs: 5000,
       });
     },
-    [afterDataChanged, data, runDelete, t],
+    [afterDataChanged, data, latestRow, runDelete, t],
   );
 
   const onHistoricalDataDetailDeleteClick = useCallback(
     (id: number) => {
-      const owner = data.find((record) => record.assets.some((asset) => asset.id === id));
+      const owner = selectedData;
       const index = owner?.assets.findIndex((asset) => asset.id === id) ?? -1;
       const removed = owner?.assets[index];
       if (!owner || !removed) return;
-      void runDelete({
-        update: (prev) => prev.map((record) => ({
-          ...record,
-          assets: record.assets.filter((asset) => asset.id !== id),
-        })),
-        rollback: (prev) => prev.map((record) => {
-          if (record.id !== owner.id || record.assets.some((asset) => asset.id === id)) return record;
-          const assets = [...record.assets];
+      void runDetailDelete({
+        update: (prev) => prev ? ({
+          ...prev,
+          assets: prev.assets.filter((asset) => asset.id !== id),
+        }) : prev,
+        rollback: (prev) => {
+          if (!prev || prev.id !== owner.id || prev.assets.some((asset) => asset.id === id)) return prev;
+          const assets = [...prev.assets];
           assets.splice(index, 0, removed);
-          return { ...record, assets };
-        }),
+          return { ...prev, assets };
+        },
         commit: async () => {
           const rhd = await queryRestoreHistoricalData(id);
           await deleteHistoricalDataDetailById(id);
@@ -367,6 +415,7 @@ const App = ({
         onDeleted: () => {
           if (afterDataChanged) {
             skipNextLoadingRef.current = true;
+            localMutationRef.current = true;
             afterDataChanged("delete", undefined, id);
           }
         },
@@ -374,6 +423,7 @@ const App = ({
           setIsModalOpen(false);
           if (afterDataChanged) {
             skipNextLoadingRef.current = true;
+            localMutationRef.current = true;
             afterDataChanged("undoDeletion", undefined, id);
           }
         },
@@ -383,7 +433,7 @@ const App = ({
         undoWindowMs: 5000,
       });
     },
-    [afterDataChanged, data, runDelete, t],
+    [afterDataChanged, selectedData, runDetailDelete, t],
   );
 
   const onHistoricalDataDetailDeleteAndBlacklistClick = useCallback(
@@ -396,17 +446,20 @@ const App = ({
   );
 
   const onRowClick = useCallback((id: string) => {
+    setSelectedData(null);
+    setDetailLoading(true);
+    setDetailError(false);
     setSelectedDataId(id);
     setDetailLimit(DETAIL_PAGE_SIZE);
     setDetailSearch("");
+    setDetailScrollTop(0);
     setIsModalOpen(true);
   }, []);
 
-  const emptyState = !pageLoading && dataRows.length === 0;
-  const loadedRangeStart = dataRows.length ? dataPage * pageSize + 1 : 0;
-  const loadedRangeEnd = Math.min((dataPage + 1) * pageSize, dataRows.length);
+  const emptyState = !pageLoading && totalCount === 0;
+  const loadedRangeStart = totalCount ? dataPage * pageSize + 1 : 0;
+  const loadedRangeEnd = Math.min((dataPage + 1) * pageSize, totalCount);
   const totalPages = maxDataPage + 1;
-  const latestRow = dataRows[0] ?? null;
 
   return (
     <div aria-busy={pageLoading} data-testid="history-content">
@@ -418,6 +471,7 @@ const App = ({
             setIsModalOpen(open);
             if (!open) {
               setSelectedDataId(null);
+              setSelectedData(null);
             }
           }}
         >
@@ -441,6 +495,8 @@ const App = ({
                 </p>
               ) : null}
             </DialogHeader>
+            {detailLoading ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p> : null}
+            {detailError ? <p role="alert" className="text-sm text-destructive">{t("history.detailLoadFailed")}</p> : null}
             <div className="grid gap-2 md:grid-cols-3">
               <div className="rounded-lg border border-border/40 bg-background/30 p-3">
                 <p className="text-sm font-medium text-muted-foreground">
@@ -478,10 +534,16 @@ const App = ({
                 />
               </div>
             </div>
-            <ScrollArea className="w-full max-h-[70vh]">
-              <Table>
+            <div
+              className="w-full max-h-[70vh] overflow-auto"
+              role="region"
+              aria-label={t("history.assets")}
+              tabIndex={0}
+              onScroll={(event) => setDetailScrollTop(event.currentTarget.scrollTop)}
+            >
+              <Table aria-rowcount={filteredRankDataCount + 1}>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow aria-rowindex={1}>
                     <TableHead className="h-[42px]">{t("history.rank")}</TableHead>
                     <TableHead className="h-[42px]">{t("history.asset")}</TableHead>
                     <TableHead className="h-[42px] text-right">{t("common.priceLabel")}</TableHead>
@@ -493,7 +555,7 @@ const App = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {visibleRankData.length === 0 ? (
+                  {!detailLoading && !detailError && visibleRankData.length === 0 ? (
                     <TableRow>
                       <TableCell
                         className="py-6 text-center text-sm text-muted-foreground"
@@ -503,7 +565,10 @@ const App = ({
                       </TableCell>
                     </TableRow>
                   ) : null}
-                  {visibleRankData.map((item) => {
+                  {detailStart > 0 ? (
+                    <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: detailStart * 42, padding: 0 }} /></TableRow>
+                  ) : null}
+                  {virtualRankData.map((item, virtualIndex) => {
                     const apiPath = resolveAssetLogoSrc(
                       item,
                       logoMap[item.symbol],
@@ -511,7 +576,9 @@ const App = ({
                     return (
                       <TableRow
                         key={"historical-data-detail-row-" + item.assetId}
-                        className="hover:bg-muted/40 transition-colors"
+                        data-testid="history-detail-row"
+                        aria-rowindex={detailStart + virtualIndex + 2}
+                        className="h-[42px] hover:bg-muted/40 transition-colors"
                       >
                         <TableCell className="py-1.5 text-sm">
                           # {item.rank}
@@ -549,7 +616,7 @@ const App = ({
                             trigger={
                               <button
                                 className="opacity-80 hover:opacity-100 transition-opacity"
-                                disabled={deleting}
+                                disabled={deletingDetail}
                                 aria-label={t("common.delete")}
                               >
                                 <img
@@ -577,9 +644,12 @@ const App = ({
                       </TableRow>
                     );
                   })}
+                  {detailStart + virtualRankData.length < visibleRankData.length ? (
+                    <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: (visibleRankData.length - detailStart - virtualRankData.length) * 42, padding: 0 }} /></TableRow>
+                  ) : null}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
             {filteredRankDataCount > DETAIL_PAGE_SIZE ? (
               <Button
                 variant="ghost"
@@ -613,7 +683,7 @@ const App = ({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xl font-semibold">{dataRows.length}</p>
+                <p className="text-xl font-semibold">{totalCount}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {t("history.snapshotsStored")}
                 </p>
@@ -678,8 +748,8 @@ const App = ({
                 <div>
                   {pageLoading
                     ? t("common.loading")
-                    : t("history.totalRecordsLabel").replace("{n}", String(dataRows.length))}
-                  {dataRows.length
+                    : t("history.totalRecordsLabel").replace("{n}", String(totalCount))}
+                  {totalCount
                     ? ` · ${t("history.showing").replace("{start}", String(loadedRangeStart)).replace("{end}", String(loadedRangeEnd))}`
                     : ""}
                 </div>
@@ -715,28 +785,45 @@ const App = ({
                   >
                     <ChevronLeftIcon />
                   </Button>
-                  <Select
-                    value={String(dataPage)}
-                    onValueChange={(v) => {
-                      setDataPage(Number(v));
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-[120px] text-sm">
-                      <SelectValue placeholder={t("history.selectPage")} />
-                    </SelectTrigger>
-                    <SelectContent className="overflow-y-auto max-h-[20rem]">
-                      <SelectGroup>
-                        {Array.from({length: maxDataPage + 1}, (_, i) => i).map((pageIdx) => (
-                          <SelectItem
-                            key={"historical-idx-" + pageIdx}
-                            value={String(pageIdx)}
-                          >
-                            {pageIdx + 1} / {maxDataPage + 1}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  {totalPages > 100 ? (
+                    <div className="flex items-center gap-1 text-xs">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        aria-label={t("history.selectPage")}
+                        className="h-8 w-[72px] text-sm"
+                        value={pageInput}
+                        onChange={(event) => setPageInput(event.target.value)}
+                        onBlur={applyPageInput}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") applyPageInput();
+                        }}
+                      />
+                      <span>/ {totalPages}</span>
+                    </div>
+                  ) : (
+                    <Select
+                      value={String(dataPage)}
+                      onValueChange={(v) => setDataPage(Number(v))}
+                    >
+                      <SelectTrigger className="h-8 w-[120px] text-sm">
+                        <SelectValue placeholder={t("history.selectPage")} />
+                      </SelectTrigger>
+                      <SelectContent className="overflow-y-auto max-h-[20rem]">
+                        <SelectGroup>
+                          {Array.from({length: maxDataPage + 1}, (_, i) => i).map((pageIdx) => (
+                            <SelectItem
+                              key={"historical-idx-" + pageIdx}
+                              value={String(pageIdx)}
+                            >
+                              {pageIdx + 1} / {maxDataPage + 1}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -771,14 +858,12 @@ const App = ({
                     <TableBody>
                       {pagedRows.map((row, idx) => {
                         const isLatest = dataPage === 0 && idx === 0;
-                        const topAssets = row.assets
-                          .filter((asset) => asset.value > 0)
-                          .sort((a, b) => b.value - a.value)
-                          .slice(0, 7);
+                        const topAssets = row.topAssets;
 
                         return (
                           <TableRow
                             key={"historical-row-" + row.id}
+                            data-testid="history-snapshot-row"
                             className="group cursor-pointer hover:bg-muted/40 transition-colors"
                             onClick={() => onRowClick(row.id)}
                           >
@@ -831,7 +916,7 @@ const App = ({
                                   imageHeight={18}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                  {t("history.assetCount").replace("{n}", String(row.assets.length))}
+                                  {t("history.assetCount").replace("{n}", String(row.assetCount))}
                                 </span>
                               </div>
                             </TableCell>

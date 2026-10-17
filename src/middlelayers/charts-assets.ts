@@ -14,6 +14,7 @@ import { timeToDateStr } from "../utils/date";
 import { ASSET_HANDLER } from "./entities/assets";
 import { AssetType } from "./datafetch/types";
 import { filterByAssetType, toAssetReference } from "./charts-shared";
+import { selectFromDatabaseWithSql } from "./database";
 
 // listAllowedSymbols return all symbol names
 // returns sort by latest value desc
@@ -187,10 +188,14 @@ export async function queryLatestAssetsPercentage(
   dateRange?: TDateRange,
 ): Promise<LatestAssetsPercentageData> {
   const assets = dateRange
-    ? await ASSET_HANDLER.listSymbolGroupedAssetsByDateRange(
-        dateRange.start,
-        dateRange.end,
-      )
+    ? [await selectFromDatabaseWithSql<Pick<AssetModel, "symbol" | "assetType" | "amount" | "value">>(
+        `SELECT symbol, asset_type AS assetType, SUM(amount) AS amount, SUM(value) AS value
+         FROM assets_v2 WHERE uuid = (
+           SELECT uuid FROM assets_v2 WHERE createdAt >= ? AND createdAt <= ?
+           ORDER BY createdAt DESC, id DESC LIMIT 1
+         ) GROUP BY asset_type, symbol`,
+        [dateRange.start.toISOString(), dateRange.end.toISOString()],
+      )]
     : await ASSET_HANDLER.listSymbolGroupedAssets(1);
   if (assets.length === 0) {
     return [];

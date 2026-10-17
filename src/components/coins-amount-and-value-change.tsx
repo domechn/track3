@@ -27,6 +27,7 @@ import AssetLabel from "./common/asset-label";
 import { formatAssetLabel } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { downsampleIndices } from "@/middlelayers/chart-downsample";
 
 const chartName = "Trend of Coin";
 
@@ -53,6 +54,20 @@ const App = ({
       amounts: [],
       values: [],
     });
+  const [chartWidth, setChartWidth] = useState(600);
+  const plottedData = useMemo(() => {
+    const source = coinsAmountAndValueChangeData;
+    const indices = downsampleIndices(
+      [source.values, source.amounts],
+      Math.max(40, Math.floor(chartWidth / 2)),
+    );
+    return {
+      coin: source.coin,
+      timestamps: indices.map((index) => source.timestamps[index]),
+      values: indices.map((index) => source.values[index]),
+      amounts: indices.map((index) => source.amounts[index]),
+    };
+  }, [coinsAmountAndValueChangeData, chartWidth]);
 
   const chartHasData = useMemo(
     () => coinsAmountAndValueChangeData.timestamps.length > 0,
@@ -86,7 +101,7 @@ const App = ({
       undefined,
       selectedAssetType,
     );
-    if (!cac) {
+    if (!cac || gen !== loadGenRef.current) {
       return;
     }
     setCoinsAmountAndValueChangeData(cac);
@@ -95,6 +110,7 @@ const App = ({
   const options = {
     maintainAspectRatio: false,
     responsive: true,
+    onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
     hover: {
       mode: "index",
       intersect: false,
@@ -234,7 +250,7 @@ const App = ({
             {chartHasData ? (
               <Line
                 options={options as any}
-                data={chartDataByCoin(coinsAmountAndValueChangeData)}
+                data={chartDataByCoin(plottedData)}
                 plugins={[
                   {
                     id: "gradientFill",

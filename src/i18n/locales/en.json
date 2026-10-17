@@ -133,6 +133,7 @@
   "history.h1": "Historical Data",
   "history.detailTitle": "Historical Data Detail",
   "history.detailDescription": "Review assets in the selected historical snapshot.",
+  "history.detailLoadFailed": "Could not load snapshot details. Close and reopen to try again.",
   "history.assets": "Assets",
   "history.assetsNote": "Value greater than $1",
   "history.visibleRows": "Visible Rows",
