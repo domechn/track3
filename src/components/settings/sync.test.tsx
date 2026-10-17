@@ -19,6 +19,8 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
     disable: vi.fn(),
     forgetRemote: vi.fn(),
     syncNow: vi.fn(),
+    configConflicts: vi.fn(async () => [] as Array<{ id: string }>),
+    resolveConfigConflict: vi.fn(async () => {}),
     hasHeader: vi.fn(async () => false),
   },
 }));
@@ -30,6 +32,7 @@ afterEach(() => {
   configuredEndpoint = "";
   status.mode = "disabled";
   vi.mocked(syncRuntime.devices).mockResolvedValue([]);
+  vi.mocked(syncRuntime.configConflicts).mockResolvedValue([]);
   vi.mocked(syncRuntime.configure).mockClear();
   vi.mocked(syncRuntime.forgetRemote).mockClear();
 });
@@ -98,6 +101,22 @@ describe("Sync settings page", () => {
     vi.mocked(syncRuntime.devices).mockResolvedValue([{ id: "device-one", name: "Laptop", current: true }]);
     render(<SyncSettingsPage />);
     expect(await screen.findByText("This device")).toBeInTheDocument();
+  });
+  it("shows a joining secret conflict and lets the user keep the local value", async () => {
+    status.mode = "ready";
+    vi.mocked(syncRuntime.configConflicts).mockResolvedValue([{ id: "10" }]);
+    render(<SyncSettingsPage />);
+    expect(await screen.findByText(/local value.*safe/i)).toBeInTheDocument();
+    expect(screen.getByText(/exchanges/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep local" }));
+    await waitFor(() => expect(syncRuntime.resolveConfigConflict).toHaveBeenCalledWith("10", "local"));
+  });
+  it("names wallet and assistant key conflicts without displaying their values", async () => {
+    status.mode = "ready";
+    vi.mocked(syncRuntime.configConflicts).mockResolvedValue([{ id: "11" }, { id: "994" }]);
+    render(<SyncSettingsPage />);
+    expect(await screen.findByText(/wallets/i)).toBeInTheDocument();
+    expect(screen.getByText("AI assistant")).toBeInTheDocument();
   });
   it("saves changed categories while sync is ready", async () => {
     status.mode = "ready";

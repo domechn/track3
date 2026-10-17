@@ -20,6 +20,31 @@ describe("SyncRuntime", () => {
     await runtime.initialize();
     expect(runtime.status().mode).toBe("unreadable");
   });
+  it("starts a new round when a config choice is made during sync", async () => {
+    let finishFirst!: () => void;
+    let rounds = 0;
+    const report = { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] };
+    const runtime = new SyncRuntime({
+      load: async () => configured, save: async () => {}, store: () => new FakeS3(),
+      engine: () => ({ engine: {
+        syncOnce: async () => {
+          rounds++;
+          if (rounds === 1) await new Promise<void>((resolve) => { finishFirst = resolve; });
+          return report;
+        },
+        resolveConfigConflict: async () => {},
+      }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.configure(configured, "correct horse battery staple");
+    const first = runtime.syncNow();
+    await vi.waitFor(() => expect(rounds).toBe(1));
+    const choice = runtime.resolveConfigConflict("7", "local");
+    finishFirst();
+    await Promise.all([first, choice]);
+    await vi.waitFor(() => expect(rounds).toBe(2));
+    runtime.stop();
+  });
   it("uses a shared device name when no local alias exists", async () => {
     const runtime = new SyncRuntime({
       load: async () => configured, save: async () => {}, store: () => new FakeS3(),

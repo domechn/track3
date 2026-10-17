@@ -38,6 +38,8 @@ export type SyncState = {
   published?: string[];
   config?: Record<string, ConfigMarker>;
   pendingConfig?: Record<string, ConfigMarker>;
+  configConflicts?: Record<string, string>;
+  configResolutions?: Record<string, { token: string; choice: "local" | "remote" }>;
   applyingConfig?: Record<string, { owner: string; entry: Entry }>;
   tombstones?: Record<string, Tombstone>;
   pendingTombstones?: Record<string, Tombstone>;
@@ -61,6 +63,9 @@ export function resetSyncState(state: SyncState): SyncState {
     deviceId: state.deviceId, clock: state.clock,
     pendingTombstones: state.pendingTombstones,
     tombstones: { ...state.pendingTombstones },
+    trackedSessions: state.trackedSessions,
+    pendingSessionDeletions: state.pendingSessionDeletions,
+    sessionDeletions: { ...state.pendingSessionDeletions },
   };
 }
 
@@ -152,14 +157,33 @@ export function mergeSessions(local: SyncSession | undefined, remote: SyncSessio
         message.role === "assistant" && Array.isArray(message.blocks)));
   if (!valid(remote) || local && !valid(local)) throw new Error("Invalid sync session messages");
   if (!local) return remote;
-  const messages = new Map(local.messages.map((message) => [message.id, message]));
-  for (const message of remote.messages) if (!messages.has(message.id)) messages.set(message.id, message);
   const metadata = (session: SyncSession) => {
     const { messages: _messages, messageCount: _count, ...meta } = session;
     return canonical(meta);
   };
   const latest = remote.updatedAt > local.updatedAt ||
     remote.updatedAt === local.updatedAt && metadata(remote) > metadata(local) ? remote : local;
+  const messages = new Map(local.messages.map((message) => [message.id, message]));
+  const actionRank = (status: unknown) => status === "pending" ? 0 : status === "executing" ? 1 :
+    ["expired", "rejected"].includes(String(status)) ? 2 :
+      ["approved", "failed"].includes(String(status)) ? 3 : -1;
+  for (const message of remote.messages) {
+    const previous = messages.get(message.id);
+    if (!previous) { messages.set(message.id, message); continue; }
+    const preferred = latest === remote ? message : previous;
+    const other = latest === remote ? previous : message;
+    if (preferred.role !== "assistant" || other.role !== "assistant") {
+      messages.set(message.id, preferred);
+      continue;
+    }
+    const blocks = (preferred.blocks as Array<Record<string, unknown>>).map((block) => {
+      if (block.kind !== "pending_action") return block;
+      const alternative = (other.blocks as Array<Record<string, unknown>>).find((candidate) =>
+        candidate.kind === "pending_action" && candidate.id === block.id);
+      return alternative && actionRank(alternative.status) > actionRank(block.status) ? alternative : block;
+    });
+    messages.set(message.id, { ...preferred, blocks });
+  }
   return { ...latest, messages: orderedMessages([...messages.values()]), messageCount: messages.size };
 }
 
@@ -297,6 +321,21 @@ export class SyncEngine {
     return this.syncOnce({ ...options, dryRun: true });
   }
 
+  configConflicts(): Promise<Array<{ id: string }>> {
+    return this.repo.loadState().then((state) => Object.keys(state.configConflicts ?? {}).map((id) => ({ id })));
+  }
+
+  resolveConfigConflict(id: string, choice: "local" | "remote"): Promise<void> {
+    return this.exclusive(async () => {
+      const state = await this.repo.loadState();
+      const token = state.configConflicts?.[id];
+      if (!token) throw new Error("Config conflict is no longer available");
+      (state.configResolutions ??= {})[id] = { token, choice };
+      state.known = state.known?.filter((known) => known !== token);
+      await this.repo.saveState(state);
+    });
+  }
+
   syncOnce(options: SyncOptions = {}): Promise<SyncReport> {
     return this.exclusive(async () => {
       try { return await this.syncRound(options); }
@@ -336,6 +375,8 @@ export class SyncEngine {
     state.published ??= [];
     state.config ??= {};
     state.pendingConfig ??= {};
+    state.configConflicts ??= {};
+    state.configResolutions ??= {};
     state.applyingConfig ??= {};
     state.tombstones ??= {};
     state.pendingTombstones ??= {};
@@ -564,24 +605,136 @@ export class SyncEngine {
       }
     }
     aborted();
-    for (const id of new Set([...Object.keys(localConfig), ...Object.keys(state.config)])) {
+    const resolvedLocalConfig = new Set<string>();
+    for (const id of new Set([...Object.keys(localConfig), ...Object.keys(state.config), ...Object.keys(state.configConflicts)])) {
       const category = syncCategory(id);
       if (!category || !enabled(category) || blockedConfig.has(id)) continue;
       const value = localConfig[id] ?? null;
       const hash = await configHash(value);
       if (state.config[id]?.hash === hash) continue;
+      if (state.configConflicts[id] && !remoteConfig.has(id)) continue;
       if (!state.config[id] && remoteConfig.has(id)) {
-        const remoteValue = remoteConfig.get(id)!.value.value;
-        if (value !== null && value !== remoteValue) report.conflicts.push(id);
+        const source = remoteConfig.get(id)!;
+        const token = entryToken(source.owner, source.entry);
+        if ((value !== null || !!state.configConflicts[id]) && value !== source.value.value) {
+          const resolution = state.configResolutions[id];
+          if (resolution?.token === token && resolution.choice === "remote") continue;
+          if (resolution?.token !== token || resolution.choice !== "local") {
+            state.configConflicts[id] = token;
+            delete state.configResolutions[id];
+            report.conflicts.push(id);
+            continue;
+          }
+          const version = { clock: this.tick(state, source.value.clock), hash };
+          state.config[id] = version;
+          state.pendingConfig[id] = version;
+          delete state.configConflicts[id];
+          delete state.configResolutions[id];
+          resolvedLocalConfig.add(id);
+          continue;
+        }
         continue;
       }
       const version = { clock: this.tick(state, state.config[id]?.clock), hash };
       state.config[id] = version;
       state.pendingConfig[id] = version;
     }
+    const changes = enabled("history") ? await this.repo.listChangedSnapshotIds?.(state.snapshotRevision) : undefined;
+    let snapshotScanFailed = false;
+    const failedSnapshotIds = new Set<string>();
+    const locallyChanged = new Set<string>();
+    for (const id of enabled("history") ? remoteTombstones.keys() : []) {
+      if (!localIdsBeforePull.has(id) || state.snapshotHashes[id]) continue;
+      const edit = remoteEdits.get(id);
+      const source = entries.find(({ entry }) => entry.kind === "snapshot" && entry.id === id);
+      if (!edit && !source) continue;
+      try {
+        const baseline = edit?.snapshot ?? await read<Snapshot>(source!.owner, source!.entry);
+        state.snapshotHashes[id] = await snapshotHash(baseline);
+        state.assetRows[id] = await assetKeys(baseline);
+        state.transactionRows[id] = await transactionRows(baseline);
+        if (edit) state.snapshotEdits[id] = edit.clock;
+      } catch {
+        failedSnapshotIds.add(id);
+        report.errors.push("Failed to read remote snapshot");
+      }
+    }
+    const snapshotIdsToScan = enabled("history") ? new Set([
+      ...(changes?.ids ?? await this.repo.listSnapshotIds()),
+      ...[...remoteTombstones.keys()].filter((id) => localIdsBeforePull.has(id)),
+    ]) : new Set<string>();
+    for (const id of snapshotIdsToScan) {
+      if (state.tombstones[id]?.deleted) continue;
+      try {
+        const snapshot = await this.repo.readSnapshot(id);
+        const hash = await snapshotHash(snapshot);
+        const old = state.snapshotHashes[id];
+        if (!old) {
+          if (publishedSnapshotIds.has(id)) state.snapshotHashes[id] = hash;
+          state.assetRows[id] ??= await assetKeys(snapshot);
+          state.transactionRows[id] ??= await transactionRows(snapshot);
+          continue;
+        }
+        if (old === hash) {
+          state.assetRows[id] ??= await assetKeys(snapshot);
+          state.transactionRows[id] ??= await transactionRows(snapshot);
+        }
+        if (old !== hash) {
+          locallyChanged.add(id);
+          const clock = this.tick(state, state.snapshotEdits[id]);
+          const currentKeys = await assetKeys(snapshot);
+          const events = state.rowEvents[id] ??= {};
+          for (const rowKey of state.assetRows[id] ?? []) {
+            if (!currentKeys.includes(rowKey)) events[rowKey] = { deleted: true, clock };
+          }
+          for (const rowKey of currentKeys) {
+            if (events[rowKey]?.deleted) events[rowKey] = { deleted: false, clock };
+          }
+          const currentTransactions = await transactionRows(snapshot);
+          const transactionEvents = state.transactionEvents[id] ??= {};
+          for (const [rowKey, current] of Object.entries(currentTransactions)) {
+            const previous = state.transactionRows[id]?.[rowKey];
+            if (!previous) continue;
+            const fields = transactionEvents[rowKey] ??= {};
+            if (current.price !== previous.price) fields.price = { value: current.price, clock };
+            if (current.txnType !== previous.txnType) fields.txnType = { value: current.txnType, clock };
+          }
+          state.assetRows[id] = currentKeys;
+          state.transactionRows[id] = currentTransactions;
+          state.snapshotHashes[id] = hash;
+          state.snapshotEdits[id] = clock;
+          state.pendingSnapshotEdits[id] = clock;
+        }
+      } catch {
+        snapshotScanFailed = true;
+        failedSnapshotIds.add(id);
+        report.errors.push("Failed to read local snapshot");
+      }
+    }
+    if (changes && !snapshotScanFailed && !options.dryRun) state.snapshotRevision = changes.revision;
     for (const [id, value] of remoteTombstones) {
       const old = state.tombstones[id];
       if (old && compareClock(value.clock, old.clock) <= 0) continue;
+      if (value.deleted && localIdsBeforePull.has(id) &&
+          (failedSnapshotIds.has(id) || locallyChanged.has(id) ||
+            state.snapshotEdits[id] && compareClock(value.clock, state.snapshotEdits[id]) < 0)) {
+        if (failedSnapshotIds.has(id)) {
+          for (const { owner, entry } of entries) {
+            if (entry.kind === "tombstone" && entry.id === id) known.delete(entryToken(owner, entry));
+          }
+          continue;
+        }
+        report.conflicts.push(`snapshot:${id}`);
+        if (!options.dryRun) {
+          const clock = this.tick(state, value.clock);
+          const undo = { deleted: false, clock };
+          state.tombstones[id] = undo;
+          state.pendingTombstones[id] = undo;
+          state.snapshotEdits[id] = clock;
+          state.pendingSnapshotEdits[id] = clock;
+        }
+        continue;
+      }
       try {
         if (!options.dryRun) {
           if (value.deleted) await this.repo.deleteSnapshot(id);
@@ -622,55 +775,6 @@ export class SyncEngine {
         report.errors.push("Failed to apply tombstone object");
       }
     }
-    const changes = enabled("history") ? await this.repo.listChangedSnapshotIds?.(state.snapshotRevision) : undefined;
-    let snapshotScanFailed = false;
-    for (const id of enabled("history") ? changes?.ids ?? await this.repo.listSnapshotIds() : []) {
-      if (state.tombstones[id]?.deleted) continue;
-      try {
-        const snapshot = await this.repo.readSnapshot(id);
-        const hash = await snapshotHash(snapshot);
-        const old = state.snapshotHashes[id];
-        if (!old) {
-          if (publishedSnapshotIds.has(id)) state.snapshotHashes[id] = hash;
-          state.assetRows[id] ??= await assetKeys(snapshot);
-          state.transactionRows[id] ??= await transactionRows(snapshot);
-          continue;
-        }
-        if (old === hash) {
-          state.assetRows[id] ??= await assetKeys(snapshot);
-          state.transactionRows[id] ??= await transactionRows(snapshot);
-        }
-        if (old !== hash) {
-          const clock = this.tick(state, state.snapshotEdits[id]);
-          const currentKeys = await assetKeys(snapshot);
-          const events = state.rowEvents[id] ??= {};
-          for (const rowKey of state.assetRows[id] ?? []) {
-            if (!currentKeys.includes(rowKey)) events[rowKey] = { deleted: true, clock };
-          }
-          for (const rowKey of currentKeys) {
-            if (events[rowKey]?.deleted) events[rowKey] = { deleted: false, clock };
-          }
-          const currentTransactions = await transactionRows(snapshot);
-          const transactionEvents = state.transactionEvents[id] ??= {};
-          for (const [rowKey, current] of Object.entries(currentTransactions)) {
-            const previous = state.transactionRows[id]?.[rowKey];
-            if (!previous) continue;
-            const fields = transactionEvents[rowKey] ??= {};
-            if (current.price !== previous.price) fields.price = { value: current.price, clock };
-            if (current.txnType !== previous.txnType) fields.txnType = { value: current.txnType, clock };
-          }
-          state.assetRows[id] = currentKeys;
-          state.transactionRows[id] = currentTransactions;
-          state.snapshotHashes[id] = hash;
-          state.snapshotEdits[id] = clock;
-          state.pendingSnapshotEdits[id] = clock;
-        }
-      } catch {
-        snapshotScanFailed = true;
-        report.errors.push("Failed to read local snapshot");
-      }
-    }
-    if (changes && !snapshotScanFailed && !options.dryRun) state.snapshotRevision = changes.revision;
     for (const [id, events] of remoteRowEvents) {
       const local = state.rowEvents[id] ??= {};
       for (const [rowKey, event] of Object.entries(events)) {
@@ -746,10 +850,14 @@ export class SyncEngine {
     const configApplies: Array<[string, { value: ConfigVersion; owner: string; entry: Entry }]> = [];
     for (const [id, source] of remoteConfig) {
       if (blockedConfig.has(id)) continue;
+      if (state.configConflicts[id] && state.configResolutions[id]?.choice !== "remote") {
+        if (!report.conflicts.includes(id)) report.conflicts.push(id);
+        continue;
+      }
       const { value } = source;
       const old = state.config[id];
       if (old && compareClock(value.clock, old.clock) <= 0) {
-        if (compareClock(value.clock, old.clock) < 0) report.conflicts.push(id);
+        if (compareClock(value.clock, old.clock) < 0 && !resolvedLocalConfig.has(id)) report.conflicts.push(id);
         continue;
       }
       if (options.dryRun) {
@@ -780,6 +888,8 @@ export class SyncEngine {
             const hash = await configHash(value.value);
             state.config[id] = { clock: value.clock, hash };
             delete state.pendingConfig[id];
+            delete state.configConflicts[id];
+            delete state.configResolutions[id];
             this.tick(state, value.clock);
             delete state.applyingConfig[id];
             report.configChanges++;
@@ -797,6 +907,7 @@ export class SyncEngine {
     }
     const localSessions = new Map(enabled("chat")
       ? (await this.repo.listSessions()).map((session) => [session.id, session]) : []);
+    const blockedSessions = new Set<string>();
     if (enabled("chat")) {
       for (const _id of this.repo.takeReadErrors?.().sessionIds ?? []) {
         report.errors.push("Failed to read local session");
@@ -814,6 +925,28 @@ export class SyncEngine {
       for (const [id, clock] of remoteSessionDeletions) {
         const old = state.sessionDeletions[id];
         if (old && compareClock(clock, old) <= 0) continue;
+        const local = localSessions.get(id);
+        const changed = local && (state.sessionHashes[id]
+          ? await digest(encoder.encode(canonical(local))) !== state.sessionHashes[id]
+          : !!remoteSessions.get(id) && canonical(local) !== canonical(remoteSessions.get(id)));
+        if (local && (Date.parse(local.updatedAt) > clock.ms || changed)) {
+          report.conflicts.push(`session:${id}`);
+          try {
+            if (!options.dryRun) {
+              const retained = { ...local, updatedAt: new Date(Math.max(clock.ms, Date.parse(local.updatedAt)) + 1).toISOString() };
+              await this.repo.writeSession(retained);
+              localSessions.set(id, retained);
+            }
+          } catch {
+            blockedSessions.add(id);
+            for (const { owner, entry } of entries) {
+              if (entry.kind === "session-delete" && entry.id === id) known.delete(entryToken(owner, entry));
+            }
+            report.errors.push("Failed to retain local session");
+          }
+          this.tick(state, clock);
+          continue;
+        }
         try {
           if (!options.dryRun) {
             await this.repo.deleteSession(id);
@@ -831,7 +964,12 @@ export class SyncEngine {
       }
     }
     for (const [id, remote] of remoteSessions) {
-      if (state.sessionDeletions[id] || remoteSessionDeletions.has(id)) continue;
+      const deletion = state.sessionDeletions[id] ?? remoteSessionDeletions.get(id);
+      if (deletion && Date.parse(remote.updatedAt) <= deletion.ms) continue;
+      if (deletion && !options.dryRun) {
+        delete state.sessionDeletions[id];
+        delete state.pendingSessionDeletions[id];
+      }
       try {
         const merged = mergeSessions(localSessions.get(id), remote);
         if (canonical(merged) !== canonical(localSessions.get(id))) {
@@ -879,7 +1017,7 @@ export class SyncEngine {
       writes.push({ kind: "session-delete", id, version: `${clock.ms}-${clock.counter}`, value: { clock } });
     }
     if (enabled("chat")) for (const session of localSessions.values()) {
-      if (state.sessionDeletions[session.id]) continue;
+      if (state.sessionDeletions[session.id] || blockedSessions.has(session.id)) continue;
       const hash = await digest(encoder.encode(canonical(session)));
       if (hash !== state.sessionHashes[session.id]) {
         writes.push({ kind: "session", id: session.id, version: hash, value: session });

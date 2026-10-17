@@ -14,6 +14,11 @@ import {
 const categories: SyncCategoryName[] = ["history", "settings", "secrets", "rebalance", "chat"];
 const fields = ["endpoint", "region", "bucket", "prefix", "accessKeyId", "secretAccessKey"] as const;
 type Field = typeof fields[number];
+const configConflictNames: Record<string, string> = {
+  "6": "querySize", "7": "currency", "8": "quoteColor", "10": "exchanges",
+  "11": "wallets", "12": "general", "20": "stockBroker", "993": "costBasis",
+  "994": "assistant", "995": "blacklist", rebalance: "rebalance",
+};
 
 function invalidConfigurationFields(form: SyncSettings): Set<Field> {
   const invalid = new Set<Field>();
@@ -46,6 +51,7 @@ export default function SyncSettingsPage() {
   const [message, setMessage] = useState<string>();
   const [configurationInvalid, setConfigurationInvalid] = useState<Set<Field>>(() => new Set());
   const [devices, setDevices] = useState<Awaited<ReturnType<typeof syncRuntime.devices>>>([]);
+  const [configConflicts, setConfigConflicts] = useState<Array<{ id: string }>>([]);
 
   useEffect(() => {
     if (awaitingSettings.current && status.mode !== "loading") {
@@ -59,7 +65,20 @@ export default function SyncSettingsPage() {
 
   useEffect(() => {
     if (status.sync.report?.devices) void syncRuntime.devices().then(setDevices).catch(() => {});
-  }, [status.sync.report]);
+    if (status.mode === "ready") void syncRuntime.configConflicts().then(setConfigConflicts).catch(() => {});
+  }, [status.mode, status.sync.report]);
+
+  async function resolveConfigConflict(id: string, choice: "local" | "remote") {
+    setBusy(true);
+    try {
+      await syncRuntime.resolveConfigConflict(id, choice);
+      setConfigConflicts(await syncRuntime.configConflicts());
+    } catch {
+      setMessage(t("sync.configConflict.failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function updateField(name: typeof fields[number], value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -244,6 +263,30 @@ export default function SyncSettingsPage() {
           {status.mode === "ready" && <Button variant="outline" disabled={busy} onClick={() => void enable()}>{t("sync.save")}</Button>}
         </CardContent>
       </Card>
+
+      {status.mode === "ready" && configConflicts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("sync.configConflict.title")}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t("sync.configConflict.description")}</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {configConflicts.map(({ id }) => (
+              <div key={id} className="flex flex-wrap items-center justify-between gap-3">
+                <span>{configConflictNames[id]
+                  ? t(`sync.configConflict.name.${configConflictNames[id]}`)
+                  : t("sync.configConflict.key").replace("{id}", id)}</span>
+                <div className="flex gap-2">
+                  <Button variant="outline" disabled={busy}
+                    onClick={() => void resolveConfigConflict(id, "local")}>{t("sync.configConflict.local")}</Button>
+                  <Button variant="outline" disabled={busy}
+                    onClick={() => void resolveConfigConflict(id, "remote")}>{t("sync.configConflict.remote")}</Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {(status.mode !== "disabled" || !!syncRuntime.getSettings().endpoint) && (
         <Card>

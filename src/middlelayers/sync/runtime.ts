@@ -12,7 +12,11 @@ import { resetSyncState } from "./engine";
 import { SqliteSyncRepository } from "./sqlite-repository";
 
 type EngineHandle = {
-  engine: { syncOnce(options?: SyncOptions): Promise<SyncReport> };
+  engine: {
+    syncOnce(options?: SyncOptions): Promise<SyncReport>;
+    configConflicts?(): Promise<Array<{ id: string }>>;
+    resolveConfigConflict?(id: string, choice: "local" | "remote"): Promise<void>;
+  };
   unregister(): void;
 };
 
@@ -156,6 +160,17 @@ export class SyncRuntime {
   trigger(kind: "refresh" | "focus"): void { this.scheduler?.trigger(kind); }
 
   async syncNow(): Promise<void> { await this.scheduler?.syncNow(); }
+
+  async configConflicts(): Promise<Array<{ id: string }>> {
+    return this.handle?.engine.configConflicts?.() ?? [];
+  }
+
+  async resolveConfigConflict(id: string, choice: "local" | "remote"): Promise<void> {
+    if (!this.handle?.engine.resolveConfigConflict) throw new Error("Sync is locked");
+    await this.handle.engine.resolveConfigConflict(id, choice);
+    this.scheduler?.trigger("refresh");
+    await this.syncNow();
+  }
 
   async disable(): Promise<void> {
     const next = { ...this.settings, enabled: false };
