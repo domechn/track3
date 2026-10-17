@@ -23,7 +23,6 @@ import AssetsPercentageChange from "./assets-percentage-change";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
-import InsightsCard from "./insights-card";
 
 const MAIN_COMPONENT_COUNT = 4;
 
@@ -63,7 +62,6 @@ const App = ({
     <OverviewLoadingContext.Provider value={loadingContextValue}>
       <div className="relative min-h-[400px]" aria-busy={pageLoading}>
         <h1 className="sr-only">{t("overview.h1")}</h1>
-        <div className="mb-3"><InsightsCard currency={currency} /></div>
         <Collapsible open={isShowMore} onOpenChange={setIsShowMore}>
           <StaggerContainer className="space-y-3">
             <div className="grid gap-5 grid-cols-2">

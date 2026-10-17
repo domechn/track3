@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
+import InsightsCard from "@/components/insights-card";
+import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ArrowRightIcon,
@@ -53,6 +55,7 @@ export default function ChatThread({
   messages,
   isStreaming,
   onPickPrompt,
+  currency,
   pricePerMillionTokens,
   inputPricePerMillionTokens,
   outputPricePerMillionTokens,
@@ -62,6 +65,7 @@ export default function ChatThread({
   messages: ChatMessage[];
   isStreaming: boolean;
   onPickPrompt?: (prompt: string) => void;
+  currency?: CurrencyRateDetail;
   pricePerMillionTokens?: number;
   inputPricePerMillionTokens?: number;
   outputPricePerMillionTokens?: number;
@@ -157,7 +161,7 @@ export default function ChatThread({
         data-testid="chat-thread"
       >
         {isEmpty ? (
-          <WelcomePanel onPickPrompt={onPickPrompt} />
+          <WelcomePanel onPickPrompt={onPickPrompt} currency={currency} />
         ) : (
           messages.map((m, i) => (
             <MessageBubble key={i} message={m} isStreaming={isStreaming && i === messages.length - 1} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} onDecideAction={onDecideAction} canDecideAction={canDecideAction} />
@@ -179,8 +183,10 @@ export default function ChatThread({
 
 function WelcomePanel({
   onPickPrompt,
+  currency,
 }: {
   onPickPrompt?: (prompt: string) => void;
+  currency?: CurrencyRateDetail;
 }) {
   const { t } = useTranslation();
 
@@ -197,6 +203,8 @@ function WelcomePanel({
           {t("assistant.chat.welcome")}
         </p>
       </div>
+
+      <InsightsCard currency={currency} />
 
       <div>
         <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">

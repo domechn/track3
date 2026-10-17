@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import ChatThread from "./chat-thread";
 import type { ChatMessage } from "./use-chat";
 
+vi.mock("@/components/insights-card", () => ({ default: () => <div data-testid="insights-card" /> }));
+
 vi.mock("@/i18n", () => ({
   useTranslation: () => ({
     t: (key: string) => {
@@ -102,5 +104,14 @@ describe("ChatThread", () => {
     );
     // Should show a small animated dots indicator
     expect(container.textContent).toBeTruthy();
+  });
+});
+
+describe("ChatThread insights placement", () => {
+  it("shows the insights card on the empty welcome screen, not once messages exist", () => {
+    const view = render(<ChatThread messages={[]} isStreaming={false} />);
+    expect(screen.getByTestId("insights-card")).toBeInTheDocument();
+    view.rerender(<ChatThread messages={[{ role: "user", content: "hi" } as ChatMessage]} isStreaming={false} />);
+    expect(screen.queryByTestId("insights-card")).not.toBeInTheDocument();
   });
 });

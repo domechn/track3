@@ -128,29 +128,4 @@ describe("Overview loading state", () => {
 
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
-
-  it("keeps the insight card and its minimum height while overview loading toggles", async () => {
-    mockReportCounts.totalValue = 1;
-    mockReportCounts.pnl = 1;
-    mockReportCounts.latestAssets = 1;
-    mockReportCounts.profit = 1;
-    const renderPage = (end: string) => (
-      <Overview currency={usdCurrency}
-        dateRange={{ start: new Date("2024-04-15"), end: new Date(end) }}
-        quoteColor="green-up-red-down" />
-    );
-    const view = render(renderPage("2024-04-16"));
-    const insight = await screen.findByText("A saved insight");
-    const card = screen.getByRole("region", { name: "Insights" });
-    await waitFor(() => expect(card.closest('[aria-busy="false"]')).toBeInTheDocument());
-    expect(card).toHaveClass("min-h-[104px]");
-    mockReportCounts.totalValue = 0;
-    mockReportCounts.pnl = 0;
-    mockReportCounts.latestAssets = 0;
-    mockReportCounts.profit = 0;
-    view.rerender(renderPage("2024-04-17"));
-    expect(card.closest('[aria-busy="true"]')).toBeInTheDocument();
-    expect(screen.getByText("A saved insight")).toBe(insight);
-    expect(card).toHaveClass("min-h-[104px]");
-  });
 });
