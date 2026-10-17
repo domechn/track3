@@ -1,0 +1,60 @@
+import { describe, expect, it } from "vitest";
+import { createSyncHeader } from "./crypto";
+import { EncryptedStore, FakeS3, S3Error, readSyncHeader, writeSyncHeader } from "./object-store";
+
+describe("FakeS3", () => {
+  it("enforces create only and If-Match writes against ETags", async () => {
+    const s3 = new FakeS3();
+    const first = await s3.putObject("manifest", new Uint8Array([1]), { ifNoneMatch: "*" });
+    await expect(s3.putObject("manifest", new Uint8Array([2]), { ifNoneMatch: "*" })).rejects.toMatchObject({ status: 412 });
+    await expect(s3.putObject("manifest", new Uint8Array([2]), { ifMatch: '"stale"' })).rejects.toMatchObject({ status: 412 });
+    const second = await s3.putObject("manifest", new Uint8Array([2]), { ifMatch: first.etag });
+    expect(second.etag).not.toBe(first.etag);
+    expect((await s3.getObject("manifest"))?.body).toEqual(new Uint8Array([2]));
+  });
+
+  it("paginates by prefix and continuation token", async () => {
+    const s3 = new FakeS3(2);
+    for (const key of ["snap/a", "snap/b", "snap/c", "other/d"]) {
+      await s3.putObject(key, new Uint8Array([1]));
+    }
+    const first = await s3.listObjectsV2({ prefix: "snap/" });
+    expect(first.objects.map((object) => object.key)).toEqual(["snap/a", "snap/b"]);
+    const second = await s3.listObjectsV2({ prefix: "snap/", continuationToken: first.nextContinuationToken });
+    expect(second.objects.map((object) => object.key)).toEqual(["snap/c"]);
+  });
+});
+
+describe("EncryptedStore", () => {
+  it("persists the plaintext header once for future passphrase checks", async () => {
+    const s3 = new FakeS3();
+    const { header } = await createSyncHeader("a long passphrase");
+    expect(await readSyncHeader(s3)).toBeNull();
+    await writeSyncHeader(s3, header);
+    expect(await readSyncHeader(s3)).toEqual(header);
+    await expect(writeSyncHeader(s3, header)).rejects.toMatchObject({ status: 412 });
+  });
+
+  it("round trips listed JSON using opaque remote keys", async () => {
+    const s3 = new FakeS3();
+    const { key } = await createSyncHeader("a long passphrase");
+    const store = new EncryptedStore(s3, key);
+    await store.putJson("snap/uuid-one", { balance: 12 });
+    expect(await store.getJson("snap/uuid-one")).toEqual({ value: { balance: 12 }, etag: expect.any(String) });
+    expect(await store.listJson("snap/")).toEqual([{ path: "snap/uuid-one", value: { balance: 12 }, etag: expect.any(String) }]);
+    expect((await s3.listObjectsV2({ prefix: "snap/" })).objects[0].key).not.toContain("uuid");
+    await store.deleteJson("snap/uuid-one");
+    expect(await store.getJson("snap/uuid-one")).toBeNull();
+  });
+
+  it("uses conditional manifest writes and preserves the prior value on conflict", async () => {
+    const s3 = new FakeS3();
+    const { key } = await createSyncHeader("a long passphrase");
+    const store = new EncryptedStore(s3, key);
+    const first = await store.putManifest("manifest", { revision: 1 });
+    await expect(store.putManifest("manifest", { revision: 2 }, '"stale"')).rejects.toBeInstanceOf(S3Error);
+    expect(await store.getJson("manifest")).toEqual({ value: { revision: 1 }, etag: first.etag });
+    await store.putManifest("manifest", { revision: 2 }, first.etag);
+    expect((await store.getJson("manifest"))?.value).toEqual({ revision: 2 });
+  });
+});
