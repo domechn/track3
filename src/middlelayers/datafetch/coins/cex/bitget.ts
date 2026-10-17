@@ -1,3 +1,4 @@
+import { recordOptionalSourceFailure } from "../../utils/source-failure";
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
@@ -138,7 +139,8 @@ export class BitgetExchange implements Exchanger {
 			return balances
 
 		} catch (e) {
-			console.error("Fetch future balance failed", e)
+			console.error("Fetch future balance failed")
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}
@@ -163,7 +165,8 @@ export class BitgetExchange implements Exchanger {
 			})
 			return balances
 		} catch (e) {
-			console.error("Fetch earn balance failed", e)
+			console.error("Fetch earn balance failed")
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}
@@ -185,7 +188,8 @@ export class BitgetExchange implements Exchanger {
 			})
 			return balances
 		} catch (e) {
-			console.error("Fetch cross margin balance failed", e)
+			console.error("Fetch cross margin balance failed")
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}
@@ -242,7 +246,7 @@ export class BitgetExchange implements Exchanger {
 		return this.fetchSpotBalance()
 			.then(() => true)
 			.catch(e => {
-				console.error("Bitget config verification failed:", e)
+				console.error("Bitget config verification failed:")
 				return false
 			})
 	}

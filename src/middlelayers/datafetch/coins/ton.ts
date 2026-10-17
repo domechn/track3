@@ -38,8 +38,9 @@ export class TonAnalyzer implements Analyzer {
   }
 
   async loadPortfolio(): Promise<WalletCoin[]> {
+    const addresses = getAddressList(this.config.ton);
     const coinLists = await asyncMap(
-      getAddressList(this.config.ton) || [],
+      addresses,
       async (wallet) => {
         const amount = await this.query(wallet);
         return {
@@ -48,7 +49,7 @@ export class TonAnalyzer implements Analyzer {
         };
       },
       1,
-      1000,
+      addresses.length > 1 ? 1000 : 0,
     );
     return coinLists.map((c) => ({
       ...c,

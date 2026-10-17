@@ -1,3 +1,4 @@
+import { recordOptionalSourceFailure } from "../../utils/source-failure";
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
@@ -107,15 +108,18 @@ export class HtxExchange implements Exchanger {
 		const [spotBalance, earnBalance, futuresBalance, crossMarginBalance] = await Promise.all([
 			this.fetchSpotBalance(accounts),
 			this.fetchEarnBalance(accounts).catch(e => {
-				console.error("Fetch HTX earn balance failed:", e)
+				console.error("Fetch HTX earn balance failed:")
+				recordOptionalSourceFailure(this, e)
 				return {}
 			}),
 			this.fetchFuturesBalance().catch(e => {
-				console.error("Fetch HTX futures balance failed:", e)
+				console.error("Fetch HTX futures balance failed:")
+				recordOptionalSourceFailure(this, e)
 				return {}
 			}),
 			this.fetchCrossMarginBalance(accounts).catch(e => {
-				console.error("Fetch HTX cross margin balance failed:", e)
+				console.error("Fetch HTX cross margin balance failed:")
+				recordOptionalSourceFailure(this, e)
 				return {}
 			})
 		])
@@ -230,15 +234,18 @@ export class HtxExchange implements Exchanger {
 	private async fetchFuturesBalance(): Promise<{ [k: string]: number }> {
 		const [usdtIsolated, usdtCross, coinSwap] = await Promise.all([
 			this.fetchUsdtSwapIsolatedBalance().catch(e => {
-				console.error("Fetch HTX USDT isolated swap balance failed:", e)
+				console.error("Fetch HTX USDT isolated swap balance failed:")
+				recordOptionalSourceFailure(this, e)
 				return {}
 			}),
 			this.fetchUsdtSwapCrossBalance().catch(e => {
-				console.error("Fetch HTX USDT cross swap balance failed:", e)
+				console.error("Fetch HTX USDT cross swap balance failed:")
+				recordOptionalSourceFailure(this, e)
 				return {}
 			}),
 			this.fetchCoinSwapBalance().catch(e => {
-				console.error("Fetch HTX coin swap balance failed:", e)
+				console.error("Fetch HTX coin swap balance failed:")
+				recordOptionalSourceFailure(this, e)
 				return {}
 			})
 		])
@@ -316,7 +323,7 @@ export class HtxExchange implements Exchanger {
 		return this.fetchAccounts()
 			.then(() => true)
 			.catch(e => {
-				console.error("HTX config verification failed:", e)
+				console.error("HTX config verification failed:")
 				return false
 			})
 	}

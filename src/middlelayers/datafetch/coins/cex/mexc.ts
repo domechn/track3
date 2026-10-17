@@ -1,3 +1,4 @@
+import { recordOptionalSourceFailure } from "../../utils/source-failure";
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import qs from 'qs'
@@ -116,7 +117,7 @@ export class MexcExchange implements Exchanger {
 		return this.fetchSpotBalance()
 			.then(() => true)
 			.catch(e => {
-				console.error("MEXC config verification failed:", e)
+				console.error("MEXC config verification failed:")
 				return false
 			})
 	}
@@ -190,7 +191,8 @@ export class MexcExchange implements Exchanger {
 				console.debug(`MEXC ${productName} endpoint is unavailable for this account`)
 				return {}
 			}
-			console.error(`Fetch MEXC ${productName} balance failed:`, e)
+			console.error(`Fetch MEXC ${productName} balance failed:`)
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}

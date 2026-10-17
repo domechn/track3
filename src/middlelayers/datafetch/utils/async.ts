@@ -5,6 +5,7 @@ import { getMemoryCacheInstance } from './cache'
 export async function asyncMap<K, V>(items: K[], fn: (item: K) => Promise<V>, concurrency = 1, delay = 0, ttl = 600): Promise<V[]> {
 	const cc = getMemoryCacheInstance("data-fetch")
 	return bluebird.map(items, async item => {
+		const cacheGeneration = cc.getGeneration()
 		let cacheKey: string
 		if (typeof item === "string") {
 			cacheKey = item as string
@@ -20,7 +21,7 @@ export async function asyncMap<K, V>(items: K[], fn: (item: K) => Promise<V>, co
 
 		const res = await fn(item)
 
-		cc.setCache(cacheKey, res, ttl)
+		cc.setCache(cacheKey, res, ttl, cacheGeneration)
 		await bluebird.delay(delay)
 		return res
 	}, { concurrency })
