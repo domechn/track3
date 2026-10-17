@@ -47,6 +47,7 @@ import type { ChatMessage, AssistantBlock } from "./use-chat";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
 import UsageLabel from "./usage-label";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
+import { INSIGHT_QUESTION_STORAGE_KEY } from "@/middlelayers/insights-service";
 
 type LoadState =
   | { status: "loading" }
@@ -445,6 +446,17 @@ function ChatContent({
     onStreamComplete,
     onStreamingChange,
   });
+  useEffect(() => {
+    try {
+      const question = sessionStorage.getItem(INSIGHT_QUESTION_STORAGE_KEY);
+      if (question) {
+        sessionStorage.removeItem(INSIGHT_QUESTION_STORAGE_KEY);
+        chat.setInput(question);
+      }
+    } catch {
+      // Assistant remains usable when session storage is unavailable.
+    }
+  }, [chat.setInput]);
 
   return (
     <Card

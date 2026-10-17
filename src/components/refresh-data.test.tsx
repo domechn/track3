@@ -10,6 +10,7 @@ import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
 import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts } from "@/middlelayers/alert-notifications";
+import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 
 // Hoist mock fn references so they're available inside vi.mock factories
 const mockSetButtonLoading = vi.hoisted(() => vi.fn());
@@ -52,6 +53,10 @@ vi.mock("@/middlelayers/alerts", () => ({
   processAlerts: vi.fn(),
 }));
 vi.mock("@/middlelayers/alert-notifications", () => ({ deliverAlerts: vi.fn() }));
+vi.mock("@/middlelayers/insights-service", () => ({
+  cancelInsightRefresh: vi.fn(),
+  refreshInsights: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -67,9 +72,22 @@ beforeEach(() => {
   } as never);
   vi.mocked(processAlerts).mockResolvedValue([]);
   vi.mocked(deliverAlerts).mockResolvedValue();
+  vi.mocked(refreshInsights).mockResolvedValue();
 });
 
 describe("RefreshData — currency rates refresh ordering", () => {
+  it("starts insights after refresh without waiting for insight generation", async () => {
+    let finish: () => void = () => {};
+    vi.mocked(refreshInsights).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const afterRefresh = vi.fn();
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} afterRefresh={afterRefresh} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(refreshInsights).toHaveBeenCalledOnce());
+    expect(cancelInsightRefresh).toHaveBeenCalledOnce();
+    expect(afterRefresh).toHaveBeenCalledWith(true);
+    finish();
+  });
   it("evaluates alerts after a persisted refresh using source freshness", async () => {
     const statuses = [{ sourceId: "btc:0", label: "BTC wallet 1", status: "stale" as const }];
     vi.mocked(refreshAllData).mockResolvedValue({

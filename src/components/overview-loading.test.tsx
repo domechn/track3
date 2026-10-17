@@ -3,8 +3,18 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Overview from "@/components/overview";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { loadInsightCard } from "@/middlelayers/insights-service";
 
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
+
+vi.mock("@/middlelayers/insights-service", () => ({
+  INSIGHTS_CHANGED_EVENT: "track3-insights-changed",
+  INSIGHT_QUESTION_STORAGE_KEY: "track3-insight-question",
+  loadInsightCard: vi.fn(),
+  dismissInsight: vi.fn(),
+  refreshInsights: vi.fn(),
+  formatInsight: () => "A saved insight",
+}));
 
 const mockReportCounts = {
   totalValue: 0,
@@ -69,6 +79,11 @@ vi.mock("@/components/motion", () => ({
 
 beforeEach(() => {
   vi.useRealTimers();
+  vi.mocked(loadInsightCard).mockResolvedValue({
+    snapshotUuid: "saved", dismissedIds: [], insights: [
+      { id: "concentration", severity: "warning", messageKey: "insights.concentration", data: { top1Percent: 70 } },
+    ],
+  });
   Object.keys(mockReportCounts).forEach((key) => {
     mockReportCounts[key as keyof typeof mockReportCounts] = 0;
   });
@@ -112,5 +127,30 @@ describe("Overview loading state", () => {
     });
 
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("keeps the insight card and its minimum height while overview loading toggles", async () => {
+    mockReportCounts.totalValue = 1;
+    mockReportCounts.pnl = 1;
+    mockReportCounts.latestAssets = 1;
+    mockReportCounts.profit = 1;
+    const renderPage = (end: string) => (
+      <Overview currency={usdCurrency}
+        dateRange={{ start: new Date("2024-04-15"), end: new Date(end) }}
+        quoteColor="green-up-red-down" />
+    );
+    const view = render(renderPage("2024-04-16"));
+    const insight = await screen.findByText("A saved insight");
+    const card = screen.getByRole("region", { name: "Insights" });
+    await waitFor(() => expect(card.closest('[aria-busy="false"]')).toBeInTheDocument());
+    expect(card).toHaveClass("min-h-[104px]");
+    mockReportCounts.totalValue = 0;
+    mockReportCounts.pnl = 0;
+    mockReportCounts.latestAssets = 0;
+    mockReportCounts.profit = 0;
+    view.rerender(renderPage("2024-04-17"));
+    expect(card.closest('[aria-busy="true"]')).toBeInTheDocument();
+    expect(screen.getByText("A saved insight")).toBe(insight);
+    expect(card).toHaveClass("min-h-[104px]");
   });
 });

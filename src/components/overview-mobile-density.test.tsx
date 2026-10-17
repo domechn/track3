@@ -7,6 +7,15 @@ import LatestAssetsPercentage from "@/components/latest-assets-percentage";
 import { ChartResizeContext } from "@/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
+vi.mock("@/middlelayers/insights-service", () => ({
+  INSIGHTS_CHANGED_EVENT: "track3-insights-changed",
+  INSIGHT_QUESTION_STORAGE_KEY: "track3-insight-question",
+  loadInsightCard: vi.fn().mockResolvedValue(undefined),
+  dismissInsight: vi.fn(),
+  refreshInsights: vi.fn(),
+  formatInsight: vi.fn(),
+}));
+
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
 vi.mock("@/components/pnl-chart", () => ({
