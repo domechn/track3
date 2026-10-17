@@ -13,6 +13,7 @@ import {
   ArchiveIcon,
   InfoCircledIcon,
   RocketIcon,
+  UpdateIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import AssistantSettings from "./assistant";
@@ -42,6 +43,11 @@ const settingsTabs = [
     titleKey: "settings.tab.assistant",
     href: "/settings/assistant",
     icon: RocketIcon,
+  },
+  {
+    titleKey: "settings.tab.sync",
+    href: "/settings/sync",
+    icon: UpdateIcon,
   },
 ];
 

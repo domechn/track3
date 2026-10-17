@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetch } from "@tauri-apps/plugin-http";
-import { S3Client, signV4 } from "./s3-client";
+import { S3Client, parseListObjectsV2, signV4 } from "./s3-client";
 
 vi.mock("@tauri-apps/plugin-http", () => ({ fetch: vi.fn() }));
 const http = vi.mocked(fetch);
@@ -66,6 +66,90 @@ describe("SigV4", () => {
 });
 
 describe("S3Client", () => {
+  it("signs If-Match on manifest updates", async () => {
+    http.mockResolvedValueOnce(new Response(null, { status: 200, headers: { ETag: '"next"' } }));
+    await new S3Client(config).putObject("manifest", new Uint8Array([1]), { ifMatch: '"prior"' });
+    const headers = http.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers["if-match"]).toBe('"prior"');
+    expect(headers.authorization).toContain("SignedHeaders=host;if-match;");
+  });
+
+  it("signs the virtual bucket host", async () => {
+    const signed = await signV4({
+      method: "GET", url: new URL("https://private-bucket.s3.example.test/snap/one"),
+      body: new Uint8Array(), region: "us-east-1", accessKeyId: "AKIDEXAMPLE",
+      secretAccessKey: "secret-value", date: new Date("2015-08-30T12:36:00Z"),
+    });
+    expect(signed.authorization).toContain("Signature=24717e30e66e58c0d5dd987c256096cb2abe2475ee0649a5322c24d8e86497e4");
+  });
+
+  it("does not retry a conditional PUT after a server failure", async () => {
+    http.mockResolvedValueOnce(new Response("unknown outcome", { status: 503 }));
+    const client = new S3Client({ ...config, retryBaseMs: 1 });
+    await expect(client.putObject("manifest", new Uint8Array([1]), { ifMatch: '"prior"' }))
+      .rejects.toMatchObject({ status: 503 });
+    expect(http).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a throttled conditional PUT", async () => {
+    http.mockResolvedValueOnce(new Response("throttled", { status: 429 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200, headers: { ETag: '"next"' } }));
+    const client = new S3Client({ ...config, retryBaseMs: 1 });
+    await expect(client.putObject("manifest", new Uint8Array([1]), { ifMatch: '"prior"' }))
+      .resolves.toEqual({ etag: '"next"' });
+    expect(http).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels failed response bodies before retry or throw", async () => {
+    const cancelled: string[] = [];
+    const failure = (status: number, label: string) => {
+      const response = new Response(new ReadableStream({
+        cancel: () => { cancelled.push(label); },
+      }), { status });
+      return response;
+    };
+    http.mockResolvedValueOnce(failure(503, "retry"))
+      .mockResolvedValueOnce(new Response("ok", { status: 200, headers: { ETag: '"good"' } }))
+      .mockResolvedValueOnce(failure(403, "throw"));
+    const client = new S3Client({ ...config, retryBaseMs: 1 });
+    await client.getObject("a");
+    await expect(client.getObject("b")).rejects.toMatchObject({ status: 403 });
+    expect(cancelled).toEqual(["retry", "throw"]);
+  });
+
+  it("stops retrying after the fourth failed read", async () => {
+    for (let index = 0; index < 4; index++) http.mockResolvedValueOnce(new Response(null, { status: 503 }));
+    await expect(new S3Client({ ...config, retryBaseMs: 1 }).getObject("a")).rejects.toMatchObject({ status: 503 });
+    expect(http).toHaveBeenCalledTimes(4);
+  });
+
+  it("rejects dot and encoded dot path segments", async () => {
+    const client = new S3Client(config);
+    for (const path of ["snap/./a", "snap/../a", "snap/%2e/a", "snap/%2E%2e/a"]) {
+      await expect(client.getObject(path)).rejects.toThrow(/path/i);
+    }
+    expect(http).not.toHaveBeenCalled();
+  });
+
+  it("decodes plus as space in URL encoded list keys", () => {
+    expect(parseListObjectsV2("<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>snap/a+b</Key><Size>1</Size></Contents></ListBucketResult>").objects[0].key)
+      .toBe("snap/a b");
+  });
+
+  it("reads device manifest modification time for the device list", () => {
+    const page = parseListObjectsV2("<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>devices/a/manifest</Key><ETag>\"a\"</ETag><Size>1</Size><LastModified>2026-01-02T03:04:05.000Z</LastModified></Contents></ListBucketResult>");
+    expect(page.objects[0].lastModified).toBe("2026-01-02T03:04:05.000Z");
+  });
+
+  it("keeps an optional remote prefix outside logical object keys", async () => {
+    http.mockResolvedValueOnce(new Response(null, { status: 200, headers: { ETag: '"a"' } }))
+      .mockResolvedValueOnce(new Response("<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>team/one/sync-header</Key><ETag>\"a\"</ETag><Size>2</Size></Contents></ListBucketResult>", { status: 200 }));
+    const client = new S3Client({ ...config, prefix: "team/one" });
+    await client.putObject("sync-header", new Uint8Array([1]));
+    expect(http.mock.calls[0][0]).toBe("https://storage.example.test:9443/base/private-bucket/team/one/sync-header");
+    expect((await client.listObjectsV2()).objects[0].key).toBe("sync-header");
+    expect(http.mock.calls[1][0]).toContain("prefix=team%2Fone%2F");
+  });
   it("sends path-style conditional writes and returns the ETag", async () => {
     http.mockResolvedValueOnce(new Response(null, { status: 200, headers: { ETag: '"rev-1"' } }));
     const client = new S3Client({ ...config, addressingStyle: "path" });
@@ -161,6 +245,8 @@ describe("S3Client", () => {
 
   it("does not expose errors from reading a response body", async () => {
     const response = new Response("irrelevant", { status: 200, headers: { ETag: '"one"' } });
+    let cancelled = false;
+    response.body!.cancel = async () => { cancelled = true; };
     response.arrayBuffer = async () => { throw new Error("secret-value token-value"); };
     http.mockResolvedValueOnce(response);
     try {
@@ -170,12 +256,17 @@ describe("S3Client", () => {
       expect(String(error)).toContain("S3");
       expect(String(error)).not.toMatch(/secret-value|token-value/);
     }
+    expect(cancelled).toBe(true);
   });
 
   it("rejects a successful write without an ETag needed for compare-and-swap", async () => {
-    http.mockResolvedValueOnce(new Response(null, { status: 200 }));
+    const response = new Response("unneeded", { status: 200 });
+    let cancelled = false;
+    response.body!.cancel = async () => { cancelled = true; };
+    http.mockResolvedValueOnce(response);
     await expect(new S3Client(config).putObject("manifest", new Uint8Array([1])))
       .rejects.toThrow(/ETag/);
+    expect(cancelled).toBe(true);
   });
 
   it("rejects a read without the ETag needed for compare-and-swap", async () => {

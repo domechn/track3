@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type ReactElement } from "react";
+import { useState, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,9 +16,9 @@ const stopPropagation = (event: MouseEvent) => event.stopPropagation();
 type ConfirmDeleteDialogProps = {
   trigger?: ReactElement;
   title: string;
-  description: string;
+  description: ReactNode;
   cancelLabel: string;
-  actions: { label: string; onClick: () => void }[];
+  actions: { label: string; onClick: () => void; disabled?: boolean }[];
 };
 
 export default function ConfirmDeleteDialog({
@@ -55,9 +55,10 @@ export default function ConfirmDeleteDialog({
           <AlertDialogCancel onClick={stopPropagation}>
             {cancelLabel}
           </AlertDialogCancel>
-          {actions.map(({ label, onClick }, index) => (
+          {actions.map(({ label, onClick, disabled }, index) => (
             <AlertDialogAction
               key={index}
+              disabled={disabled}
               onClick={(event) => {
                 event.stopPropagation();
                 onClick();

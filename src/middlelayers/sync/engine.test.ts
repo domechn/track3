@@ -1,14 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createSyncHeader, decryptObject, encryptObject, unlockSyncHeader } from "./crypto";
-import { FakeS3, readSyncHeader, writeSyncHeader } from "./object-store";
+import { FakeS3, S3Error, readSyncHeader, writeSyncHeader } from "./object-store";
 import {
   SyncEngine,
   mergeSessions,
+  resetSyncState,
   type SyncRepository,
   type Snapshot,
   type SyncState,
   type SyncSession,
 } from "./engine";
+import { SyncRuntime } from "./runtime";
+import { defaultSyncSettings, type SyncSettings } from "./settings";
+
+vi.setConfig({ testTimeout: 20_000 });
 
 class MemoryRepository implements SyncRepository {
   state: SyncState = {};
@@ -60,6 +65,90 @@ async function devices(count: number, pageSize = 1000) {
 }
 
 describe("SyncEngine", () => {
+  it("leaves snapshot history local when history sync is disabled", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("a", snapshot("a"));
+    repos[1].snapshots.set("b", snapshot("b"));
+    await engines[0].syncOnce({ categories: { history: false } });
+    await engines[1].syncOnce({ categories: { history: false } });
+    expect([...repos[0].snapshots.keys()]).toEqual(["a"]);
+    expect([...repos[1].snapshots.keys()]).toEqual(["b"]);
+    expect((await engines[0].syncOnce({ categories: { history: false } })).pushed).toBe(0);
+  });
+  it("reports the device that supplied newly pulled snapshots", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("a", snapshot("a"));
+    await engines[0].syncOnce();
+    const report = await engines[1].syncOnce();
+    expect(report.pulledFrom).toEqual([repos[0].state.deviceId]);
+    expect(report.devices).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: repos[0].state.deviceId, lastUpload: expect.any(String) }),
+    ]));
+  });
+  it("does not use the root key directly for configuration fingerprints", async () => {
+    const { s3, repos, engines } = await devices(1);
+    repos[0].config.set("7", "USD");
+    await engines[0].syncOnce();
+    const root = await unlockSyncHeader((await readSyncHeader(s3))!, "passphrase");
+    const rawHmac = await crypto.subtle.importKey("raw", root, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const rawHash = Array.from(new Uint8Array(await crypto.subtle.sign(
+      "HMAC", rawHmac, new TextEncoder().encode("USD"),
+    )), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    expect(repos[0].state.config?.["7"].hash).not.toBe(rawHash);
+  });
+  it("republishes local history after the remote header is replaced", async () => {
+    const { s3, repos, engines } = await devices(2);
+    repos[0].snapshots.set("a", snapshot("a"));
+    await engines[0].syncOnce();
+    for (const item of (await s3.listObjectsV2()).objects) await s3.deleteObject(item.key);
+    await writeSyncHeader(s3, (await createSyncHeader("passphrase")).header);
+    await engines[0].syncOnce();
+    const report = await engines[1].syncOnce();
+    expect(report.pulled).toBe(1);
+    expect(repos[1].snapshots.has("a")).toBe(true);
+    expect(repos[0].state.deviceId).toBeDefined();
+  });
+  it("uploads local history again after Forget remote data and re-enable", async () => {
+    const s3 = new FakeS3();
+    const firstRepo = new MemoryRepository();
+    const secondRepo = new MemoryRepository();
+    firstRepo.snapshots.set("a", snapshot("a"));
+    const secret = "correct horse battery staple";
+    const firstEngine = new SyncEngine(s3, firstRepo, secret);
+    const secondEngine = new SyncEngine(s3, secondRepo, secret);
+    let saved: SyncSettings = { ...defaultSyncSettings, endpoint: "https://s3.example.test",
+      region: "us-east-1", bucket: "track3", accessKeyId: "key", secretAccessKey: "secret" };
+    const runtime = new SyncRuntime({
+      load: async () => saved,
+      save: async (next) => { saved = next; },
+      store: () => s3,
+      engine: () => ({ engine: firstEngine, unregister: () => {} }),
+      resetState: async () => firstRepo.saveState(resetSyncState(await firstRepo.loadState())),
+    });
+    await runtime.initialize();
+    expect(await runtime.configure(saved, secret)).toBe("ok");
+    await runtime.syncNow();
+    await runtime.forgetRemote();
+    expect(await runtime.configure(saved, secret)).toBe("ok");
+    await runtime.syncNow();
+    expect((await secondEngine.syncOnce()).pulled).toBe(1);
+    expect(secondRepo.snapshots.has("a")).toBe(true);
+    runtime.stop();
+  });
+  it("accepts S3 conditional conflict status 409 during probes and immutable reuse", async () => {
+    const { s3, repos, engines } = await devices(1);
+    repos[0].snapshots.set("a", snapshot("a"));
+    const put = s3.putObject.bind(s3);
+    s3.putObject = async (key, body, conditions, signal) => {
+      try {
+        return await put(key, body, conditions, signal);
+      } catch (error) {
+        if (error instanceof S3Error && error.status === 412) throw new S3Error("ConditionalRequestConflict", 409);
+        throw error;
+      }
+    };
+    expect((await engines[0].syncOnce()).errors).toEqual([]);
+  });
   it("chooses the same session metadata on equal timestamps regardless of merge order", () => {
     const a: SyncSession = { id: "chat", title: "Alpha", createdAt: "2026-01-01", updatedAt: "2026-01-02", pinned: 0, messageCount: 0, preview: "", messages: [] };
     const b = { ...a, title: "Beta" };
@@ -506,6 +595,32 @@ describe("SyncEngine", () => {
     expect(repos[1].snapshots.get("one")?.transactions[0].price).toBe(9);
   });
 
+  it("keeps an undo recorded while a round is loading state", async () => {
+    const { repos, engines } = await devices(1);
+    const load = repos[0].loadState.bind(repos[0]);
+    let entered!: () => void;
+    const roundLoading = new Promise<void>((resolve) => { entered = resolve; });
+    let release!: () => void;
+    const loaded = new Promise<void>((resolve) => { release = resolve; });
+    let first = true;
+    repos[0].loadState = async () => {
+      const state = await load();
+      if (first) {
+        first = false;
+        entered();
+        await loaded;
+      }
+      return state;
+    };
+    const round = engines[0].syncOnce();
+    await roundLoading;
+    const undo = engines[0].recordUndo("one");
+    await Promise.race([undo, new Promise<void>((resolve) => setTimeout(resolve, 50))]);
+    release();
+    await Promise.all([undo, round]);
+    expect(repos[0].state.tombstones?.one?.deleted).toBe(false);
+  });
+
   it("publishes a snapshot deletion made while no engine was registered", async () => {
     const { repos, engines } = await devices(2);
     repos[0].snapshots.set("one", snapshot("one"));
@@ -915,6 +1030,32 @@ describe("SyncEngine", () => {
     release();
     await Promise.all([sync, deletion]);
     expect(repos[0].state.tombstones?.one.deleted).toBe(true);
+  });
+  it("records a delete before a slow sync round finishes", async () => {
+    const { s3, repos, engines } = await devices(1);
+    repos[0].snapshots.set("one", snapshot("one"));
+    const put = s3.putObject.bind(s3);
+    let release!: () => void;
+    let entered!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const reached = new Promise<void>((resolve) => { entered = resolve; });
+    s3.putObject = async (key, body, conditions, signal) => {
+      if (key.endsWith("/manifest")) { entered(); await blocked; }
+      return put(key, body, conditions, signal);
+    };
+    const sync = engines[0].syncOnce();
+    await reached;
+    const deletion = engines[0].recordDeletion("one");
+    try {
+      expect(await Promise.race([
+        deletion.then(() => true),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 50)),
+      ])).toBe(true);
+    } finally {
+      release();
+      await Promise.all([sync, deletion]);
+    }
+    expect(repos[0].state.pendingTombstones?.one.deleted).toBe(true);
   });
 
   it("honors cancellation after the last downloaded object", async () => {

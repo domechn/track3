@@ -3,6 +3,12 @@ import { createSyncHeader } from "./crypto";
 import { EncryptedStore, FakeS3, S3Error, readSyncHeader, writeSyncHeader } from "./object-store";
 
 describe("FakeS3", () => {
+  it("can model a concurrent conditional request conflict", async () => {
+    const s3 = new FakeS3(1000, 409);
+    await s3.putObject("manifest", new Uint8Array([1]), { ifNoneMatch: "*" });
+    await expect(s3.putObject("manifest", new Uint8Array([2]), { ifNoneMatch: "*" }))
+      .rejects.toMatchObject({ status: 409 });
+  });
   it("enforces create only and If-Match writes against ETags", async () => {
     const s3 = new FakeS3();
     const first = await s3.putObject("manifest", new Uint8Array([1]), { ifNoneMatch: "*" });
@@ -56,5 +62,40 @@ describe("EncryptedStore", () => {
     expect(await store.getJson("manifest")).toEqual({ value: { revision: 1 }, etag: first.etag });
     await store.putManifest("manifest", { revision: 2 }, first.etag);
     expect((await store.getJson("manifest"))?.value).toEqual({ revision: 2 });
+  });
+
+  it("rejects swapped encrypted objects", async () => {
+    const s3 = new FakeS3();
+    const { key } = await createSyncHeader("a long passphrase");
+    const store = new EncryptedStore(s3, key);
+    await store.putJson("snap/one", { balance: 1 });
+    await store.putJson("snap/two", { balance: 2 });
+    const listed = await s3.listObjectsV2({ prefix: "snap/" });
+    const first = await s3.getObject(listed.objects[0].key);
+    const second = await s3.getObject(listed.objects[1].key);
+    await s3.putObject(listed.objects[0].key, second!.body);
+    await s3.putObject(listed.objects[1].key, first!.body);
+    await expect(store.getJson("snap/one")).rejects.toThrow();
+  });
+
+  it("lists encrypted JSON across pages", async () => {
+    const s3 = new FakeS3(1);
+    const { key } = await createSyncHeader("a long passphrase");
+    const store = new EncryptedStore(s3, key);
+    await store.putJson("snap/one", 1);
+    await store.putJson("snap/two", 2);
+    expect((await store.listJson("snap/")).map((item) => item.path).sort()).toEqual(["snap/one", "snap/two"]);
+  });
+
+  it("passes cancellation through encrypted store operations", async () => {
+    const s3 = new FakeS3();
+    const { key } = await createSyncHeader("a long passphrase");
+    const store = new EncryptedStore(s3, key);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(store.putJson("snap/one", 1, undefined, controller.signal)).rejects.toThrow(/abort/i);
+    await expect(store.getJson("snap/one", controller.signal)).rejects.toThrow(/abort/i);
+    await expect(store.listJson("snap/", controller.signal)).rejects.toThrow(/abort/i);
+    await expect(store.deleteJson("snap/one", controller.signal)).rejects.toThrow(/abort/i);
   });
 });

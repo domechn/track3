@@ -1,5 +1,71 @@
 import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
+import { FakeS3 } from "../../src/middlelayers/sync/object-store";
+
+test("connection test uses a fake S3 bucket", async ({ page }) => {
+  await installTauriBridge(page, new FakeS3());
+  await page.goto("/#/settings/sync");
+  await page.getByLabel("S3 endpoint").fill("https://s3.example.test");
+  await page.getByLabel("Region").fill("us-east-1");
+  await page.getByLabel("Bucket").fill("track3");
+  await page.getByLabel("Access key ID").fill("key");
+  await page.getByLabel("Secret access key").fill("secret");
+  await page.getByRole("button", { name: "Test connection" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Connection successful.");
+  await page.getByLabel("Sync passphrase", { exact: true }).fill("correct horse battery staple");
+  await page.getByLabel("Confirm sync passphrase").fill("correct horse battery staple");
+  await page.getByRole("button", { name: "Enable sync" }).click();
+  await expect(page.getByRole("button", { name: "Sync idle" })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByLabel(/Name for device/)).toBeVisible({ timeout: 15000 });
+});
+
+test("a second device pulls history from the first device", async ({ browser }) => {
+  const s3 = new FakeS3();
+  const firstContext = await browser.newContext();
+  const secondContext = await browser.newContext();
+  try {
+    const first = await firstContext.newPage();
+    const second = await secondContext.newPage();
+    await installTauriBridge(first, s3);
+    await installTauriBridge(second, s3);
+
+    await second.goto("/#/history");
+    await expect(second.getByText("Total 2 records")).toBeVisible();
+    await second.getByTestId("history-delete-latest").locator("xpath=ancestor::tr").hover();
+    await second.getByTestId("history-delete-latest").click();
+    await second.getByRole("button", { name: "Confirm" }).click();
+    await expect(second.getByText("Total 1 records")).toBeVisible();
+
+    const enable = async (page: typeof first) => {
+      await page.goto("/#/settings/sync");
+      await page.getByLabel("S3 endpoint").fill("https://s3.example.test");
+      await page.getByLabel("Region").fill("us-east-1");
+      await page.getByLabel("Bucket").fill("track3");
+      await page.getByLabel("Access key ID").fill("key");
+      await page.getByLabel("Secret access key").fill("secret");
+      await page.getByLabel("Sync passphrase", { exact: true }).fill("correct horse battery staple");
+      await page.getByLabel("Confirm sync passphrase").fill("correct horse battery staple");
+      await page.getByRole("button", { name: "Enable sync" }).click();
+      await expect(page.getByRole("button", { name: "Sync idle" })).toBeVisible({ timeout: 15000 });
+    };
+    await enable(first);
+    await expect(first.getByLabel(/Name for device/)).toBeVisible({ timeout: 15000 });
+    await enable(second);
+    await second.goto("/#/history");
+    await expect(second.getByText("Total 2 records")).toBeVisible({ timeout: 15000 });
+  } finally {
+    await firstContext.close();
+    await secondContext.close();
+  }
+});
+
+test("sync settings are reachable and explain passphrase recovery", async ({ page }) => {
+  await installTauriBridge(page);
+  await page.goto("/#/settings/sync");
+  await expect(page.getByRole("heading", { name: "Sync", exact: true })).toBeVisible();
+  await expect(page.getByText(/never be recovered/i)).toBeVisible();
+  await expect(page.getByLabel("Secret access key")).toHaveAttribute("type", "password");
+});
 
 test("portfolio, refresh, history undo, and assistant SSE work in a browser", async ({ page }) => {
   const bridge = await installTauriBridge(page);

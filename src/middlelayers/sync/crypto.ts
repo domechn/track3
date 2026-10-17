@@ -46,7 +46,7 @@ function decode64(value: string): Uint8Array {
   }
 }
 
-async function deriveKey(passphrase: string, salt: Uint8Array): Promise<Uint8Array> {
+export async function deriveKey(passphrase: string, salt: Uint8Array): Promise<Uint8Array> {
   if (!passphrase || salt.length !== 16) throw new Error("Invalid sync format");
   return argon2id({
     password: encoder.encode(passphrase),
@@ -59,6 +59,17 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<Uint8Arr
   });
 }
 
+async function encryptionKey(root: Uint8Array): Promise<CryptoKey> {
+  const hkdf = await crypto.subtle.importKey("raw", root, "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: encoder.encode("track3-sync-v1"), info: encoder.encode("object-encryption") },
+    hkdf,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
 function aad(path: string): Uint8Array {
   if (!path || path.startsWith("/") || path.includes("..")) throw new Error("Invalid sync path");
   return encoder.encode(`track3-sync-object-v${VERSION}:${path}`);
@@ -66,7 +77,7 @@ function aad(path: string): Uint8Array {
 
 export async function encryptObject(key: Uint8Array, path: string, plaintext: Uint8Array): Promise<Envelope> {
   const nonce = crypto.getRandomValues(new Uint8Array(12));
-  const aes = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["encrypt"]);
+  const aes = await encryptionKey(key);
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: nonce, additionalData: aad(path), tagLength: 128 },
     aes,
@@ -80,7 +91,7 @@ export async function decryptObject(key: Uint8Array, path: string, envelope: Env
   const nonce = decode64(envelope.nonce);
   const ciphertext = decode64(envelope.ciphertext);
   if (nonce.length !== 12 || ciphertext.length < 16) throw new Error("Invalid sync format");
-  const aes = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["decrypt"]);
+  const aes = await encryptionKey(key);
   return new Uint8Array(await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: nonce, additionalData: aad(path), tagLength: 128 },
     aes,
