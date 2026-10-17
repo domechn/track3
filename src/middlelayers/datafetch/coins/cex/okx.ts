@@ -1,3 +1,4 @@
+import { recordOptionalSourceFailure } from "../../utils/source-failure";
 import CryptoJS from 'crypto-js'
 import { Exchanger } from './cex'
 import { sendHttpRequest } from '../../utils/http'
@@ -260,7 +261,8 @@ export class OkxExchange implements Exchanger {
 		try {
 			return await fetcher()
 		} catch (error) {
-			console.error(`Fetch OKX ${productName} balance failed`, error)
+			console.error(`Fetch OKX ${productName} balance failed`)
+			recordOptionalSourceFailure(this, error)
 			return {}
 		}
 	}

@@ -8,18 +8,40 @@ import type { WalletCoin } from "./datafetch/types";
 import type { AssetModel } from "./types";
 
 export type FailedPortfolioSource = {
+  sourceId?: string;
   analyzerName: string;
   walletIdentities: string[];
   error: string;
+  category?: SourceErrorCategory;
 };
 
-export type LoadPortfoliosOptions = {
-  useLastKnownDataForFailedSources?: boolean;
+export type SourceErrorCategory =
+  | "auth"
+  | "network"
+  | "rateLimit"
+  | "unsupported"
+  | "other";
+
+export type PortfolioSourceResult = {
+  sourceId: string;
+  label: string;
+  walletIdentities: string[];
+  status: "ok" | "stale";
+  coins: WalletCoin[];
+  category?: SourceErrorCategory;
+};
+
+export type PortfolioSourceStatus = {
+  sourceId: string;
+  label: string;
+  status: "ok" | "failed" | "stale";
+  category?: SourceErrorCategory;
 };
 
 export type LoadPortfoliosResult = {
   coins: WalletCoin[];
   failedSources: FailedPortfolioSource[];
+  sourceResults?: PortfolioSourceResult[];
 };
 
 export type PortfolioCanonicalization = {
@@ -165,10 +187,6 @@ function assetModelToLastKnownWalletCoin(asset: AssetModel): WalletCoin {
     symbol: asset.symbol,
     assetType: getAssetType(asset),
     amount: asset.amount,
-    price: {
-      base: "usd",
-      value: asset.price,
-    },
     wallet: addMD5PrefixToWallet(asset.wallet || ""),
   };
 }
@@ -176,7 +194,6 @@ function assetModelToLastKnownWalletCoin(asset: AssetModel): WalletCoin {
 export function mergePortfoliosWithBaseline(
   portfolioResult: LoadPortfoliosResult,
   lastAssets: AssetModel[],
-  options: LoadPortfoliosOptions = {},
   canonicalization?: PortfolioCanonicalization,
 ): LoadPortfoliosResult {
   const { failedSources } = portfolioResult;
@@ -185,39 +202,32 @@ export function mergePortfoliosWithBaseline(
       ? canonicalizePortfolioCoins(coins, canonicalization)
       : coins.map((coin) => ({ ...coin }));
   const currentCoins = canonicalize(portfolioResult.coins);
-  if (failedSources.length > 0 && !options.useLastKnownDataForFailedSources) {
-    return {
-      coins: currentCoins,
-      failedSources,
-    };
-  }
-
   const failedWalletIdentities = getFailedWalletIdentities(failedSources);
-  const baselineCoins = (
+  const baselineAssets = (
     canonicalization
       ? canonicalizePortfolioBaseline(lastAssets, canonicalization)
       : lastAssets
-  ).map(assetModelToLastKnownWalletCoin);
+  );
+  const baselineCoins = baselineAssets.map(assetModelToLastKnownWalletCoin);
   const lastKnownCoins: WalletCoin[] = [];
-  if (options.useLastKnownDataForFailedSources) {
-    baselineCoins
-      .filter((coin) => isFailedWallet(coin.wallet, failedWalletIdentities))
-      .forEach((lastKnown) => {
-        const current = currentCoins.find(
-          (coin) =>
-            coin.symbol === lastKnown.symbol &&
-            getAssetType(coin) === getAssetType(lastKnown) &&
-            isSameWallet(coin.wallet, lastKnown.wallet),
-        );
-        if (current) {
-          // The stored row already aggregates all sources for this identity.
-          // Without source provenance, max avoids both double-counting and an unproven sell.
-          current.amount = Math.max(current.amount, lastKnown.amount);
-          return;
-        }
-        lastKnownCoins.push(lastKnown);
-      });
-  }
+  baselineCoins
+    .filter((coin) => isFailedWallet(coin.wallet, failedWalletIdentities))
+    .forEach((lastKnown) => {
+      const current = currentCoins.find(
+        (coin) =>
+          coin.symbol === lastKnown.symbol &&
+          getAssetType(coin) === getAssetType(lastKnown) &&
+          isSameWallet(coin.wallet, lastKnown.wallet),
+      );
+      if (current) {
+        // The stored row aggregates attached sources. Their old contributions
+        // cannot be separated, so retain the exact aggregate until retry.
+        current.amount = lastKnown.amount;
+        delete current.price;
+        return;
+      }
+      lastKnownCoins.push(lastKnown);
+    });
   const currentCoinsWithFallback = [...currentCoins, ...lastKnownCoins];
 
   const missingCoins = baselineCoins
@@ -240,7 +250,14 @@ export function mergePortfoliosWithBaseline(
         assetType: getAssetType(lastKnown),
         price: currentCoinsWithFallback.find(
           (coin) => coin.symbol === lastKnown.symbol,
-        )?.price ?? lastKnown.price,
+        )?.price ?? {
+          base: "usd",
+          value: baselineAssets.find((asset) =>
+            asset.symbol === lastKnown.symbol &&
+            getAssetType(asset) === getAssetType(lastKnown) &&
+            isSameWallet(asset.wallet ?? "", lastKnown.wallet ?? "")
+          )?.price ?? 0,
+        },
         amount: 0,
         value: 0,
         wallet: lastKnown.wallet,
@@ -251,5 +268,6 @@ export function mergePortfoliosWithBaseline(
   return {
     coins: [...currentCoinsWithFallback, ...missingCoins],
     failedSources,
+    sourceResults: portfolioResult.sourceResults,
   };
 }

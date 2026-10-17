@@ -1,3 +1,4 @@
+import { recordOptionalSourceFailure } from "../../utils/source-failure";
 import { Exchanger } from "./cex";
 import CryptoJS from "crypto-js";
 import { sendHttpRequest } from "../../utils/http";
@@ -95,11 +96,13 @@ export class BybitExchange implements Exchanger {
     const [walletBalance, earnBalance, advanceEarnBalance] = await Promise.all([
       this.fetchWalletBalance(),
       this.fetchEarnBalance().catch((e) => {
-        console.error("Fetch Bybit earn balance failed:", e);
+        console.error("Fetch Bybit earn balance failed:");
+        recordOptionalSourceFailure(this, e);
         return {};
       }),
       this.fetchAdvanceEarnBalance().catch((e) => {
-        console.error("Fetch Bybit advance earn balance failed:", e);
+        console.error("Fetch Bybit advance earn balance failed:");
+        recordOptionalSourceFailure(this, e);
         return {};
       }),
     ]);
@@ -135,7 +138,8 @@ export class BybitExchange implements Exchanger {
     // Fetch both FlexibleSaving and OnChain positions
     const [flexibleResp, onchainResp] = await Promise.all([
       this.fetchEarnPosition("FlexibleSaving").catch((e) => {
-        console.error("Fetch Bybit FlexibleSaving failed:", e);
+        console.error("Fetch Bybit FlexibleSaving failed:");
+        recordOptionalSourceFailure(this, e);
         return {
           retCode: 0,
           retMsg: "",
@@ -143,7 +147,8 @@ export class BybitExchange implements Exchanger {
         } as EarnPositionResp;
       }),
       this.fetchEarnPosition("OnChain").catch((e) => {
-        console.error("Fetch Bybit OnChain failed:", e);
+        console.error("Fetch Bybit OnChain failed:");
+        recordOptionalSourceFailure(this, e);
         return {
           retCode: 0,
           retMsg: "",
@@ -232,7 +237,7 @@ export class BybitExchange implements Exchanger {
     return this.fetchTotalBalance()
       .then(() => true)
       .catch((e) => {
-        console.error("Bybit config verification failed:", e);
+        console.error("Bybit config verification failed:");
         return false;
       });
   }

@@ -1,3 +1,4 @@
+import { recordOptionalSourceFailure } from "../../utils/source-failure";
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
@@ -203,7 +204,8 @@ export class GateExchange implements Exchanger {
 
 			return balances
 		} catch (e) {
-			console.error("Fetch fixed-term balance failed", e)
+			console.error("Fetch fixed-term balance failed")
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}
@@ -225,7 +227,8 @@ export class GateExchange implements Exchanger {
 
 			return balances
 		} catch (e) {
-			console.error("Fetch staking balance failed", e)
+			console.error("Fetch staking balance failed")
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}
@@ -238,7 +241,8 @@ export class GateExchange implements Exchanger {
 			addToBalanceMap(balances, "USDT", toNumber(resp.user_total_interest_usdt))
 			return balances
 		} catch (e) {
-			console.error("Fetch dual investment balance failed", e)
+			console.error("Fetch dual investment balance failed")
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}
@@ -255,9 +259,10 @@ export class GateExchange implements Exchanger {
 
 		} catch (e) {
 			if (e instanceof Error && e.message.includes("Please open the portfolio account")) {
-				console.debug("No portfolio account", this.apiKey)
+				console.debug("No portfolio account")
 				return {}
 			}
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}
@@ -285,7 +290,8 @@ export class GateExchange implements Exchanger {
 
 			return balances
 		} catch (e) {
-			console.error("Fetch margin balance failed", e)
+			console.error("Fetch margin balance failed")
+			recordOptionalSourceFailure(this, e)
 			return {}
 		}
 	}
@@ -311,7 +317,8 @@ export class GateExchange implements Exchanger {
 		try {
 			return await fetcher()
 		} catch (error) {
-			console.error(`Fetch Gate ${productName} balance failed`, error)
+			console.error(`Fetch Gate ${productName} balance failed`)
+			recordOptionalSourceFailure(this, error)
 			return {}
 		}
 	}

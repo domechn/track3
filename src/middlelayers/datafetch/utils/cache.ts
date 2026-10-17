@@ -187,13 +187,19 @@ export function getLocalStorageCacheInstance(groupKey?: string) {
 }
 
 export class CacheCenter {
+	private generation = 0
 	private provider: CacheProvider
 	constructor(p: CacheProvider) {
 		this.provider = p
 	}
 
 	// ttl is second
-	public setCache<T>(key: string, value: T, ttl = 0) {
+	public getGeneration() {
+		return this.generation
+	}
+
+	public setCache<T>(key: string, value: T, ttl = 0, generation = this.generation) {
+		if (generation !== this.generation) return
 		const vu = ttl > 0 ? Date.now() + ttl * 1000 : 0
 		try {
 			this.provider.set(key, {
@@ -232,6 +238,7 @@ export class CacheCenter {
 	public clearCache() {
 		console.debug("clear cache")
 
+		this.generation += 1
 		this.provider.clear()
 	}
 }

@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import bluebird from "bluebird";
 import { Analyzer, GlobalConfig, WalletCoin } from "./datafetch/types";
 import { BTCAnalyzer } from "./datafetch/coins/btc";
 import { combineCoinLists, getAssetType } from "./datafetch/utils/coins";
@@ -9,7 +8,7 @@ import { SOLAnalyzer } from "./datafetch/coins/sol";
 import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from "./datafetch/coins/erc20";
 import { CexAnalyzer } from "./datafetch/coins/cex/cex";
 import { save, open } from "@tauri-apps/plugin-dialog";
-import { AddProgressFunc, AssetModel, UserLicenseInfo } from "./types";
+import { AddProgressFunc, UserLicenseInfo } from "./types";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRC20ProUserAnalyzer } from "./datafetch/coins/trc20";
 import { DATA_MANAGER, ExportData } from "./datamanager";
@@ -39,25 +38,28 @@ import {
 import { SUIAnalyzer } from "./datafetch/coins/sui";
 import { StockAnalyzer } from "./datafetch/coins/stock/stock-analyzer";
 import { getAddressList } from "./datafetch/utils/address";
+import { classifySourceError, takeSourceFailure } from "./datafetch/utils/source-failure";
+import { getMemoryCacheInstance } from "./datafetch/utils/cache";
+import { FullRefreshRequiredError } from "./refresh-error";
 import {
-  mergePortfoliosWithBaseline,
   type FailedPortfolioSource,
-  type LoadPortfoliosOptions,
   type LoadPortfoliosResult,
+  type PortfolioSourceResult,
+  type PortfolioSourceStatus,
 } from "./portfolio-baseline";
 
 export {
-  mergePortfoliosWithBaseline,
   type FailedPortfolioSource,
-  type LoadPortfoliosOptions,
   type LoadPortfoliosResult,
+  type PortfolioSourceResult,
+  type PortfolioSourceStatus,
 } from "./portfolio-baseline";
 
 export async function queryStableCoins(): Promise<string[]> {
   try {
     return await new RemoteStableCoinsQuery().listAllStableCoins();
   } catch (e) {
-    console.error("failed to query stable coins", e);
+    console.error("failed to query stable coins");
     return new StableCoinsQuery().listAllStableCoins();
   }
 }
@@ -85,71 +87,114 @@ export async function downloadCoinLogos(
   return invoke("download_coins_logos", { coins });
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
-
-export async function loadPortfolios(
-  config: GlobalConfig,
-  lastAssets: AssetModel[],
-  addProgress: AddProgressFunc,
-  userInfo: UserLicenseInfo,
-  options: LoadPortfoliosOptions = {},
-): Promise<LoadPortfoliosResult> {
-  // all coins currently owned ( amount > 0 )
-  const portfolioResult = await fetchPortfolios(config, addProgress, userInfo);
-  return mergePortfoliosWithBaseline(portfolioResult, lastAssets, options);
-}
-
 function uniqueIdentities(identities: string[]): string[] {
   return Array.from(new Set(identities));
 }
 
-export function resolveFailedAnalyzerWalletIdentities(
-  analyzer: Analyzer,
-  config: GlobalConfig,
-): string[] {
-  if (analyzer.getWalletIdentities) {
-    return uniqueIdentities(analyzer.getWalletIdentities());
-  }
+const sourceTimeoutMs = 30_000;
+const supportedExchanges = new Set([
+  "binance", "okex", "okx", "bitget", "gate", "kraken", "coinbase",
+  "bybit", "htx", "mexc", "backpack",
+]);
 
-  const sourceMetadata = analyzer as Analyzer & {
-    listExchangeIdentities?: () => { identity: string }[];
-  };
-  if (sourceMetadata.listExchangeIdentities) {
-    return uniqueIdentities(
-      sourceMetadata.listExchangeIdentities().map(({ identity }) => identity),
-    );
-  }
-
-  if (analyzer instanceof ERC20NormalAnalyzer) {
-    return getAddressList(config.erc20);
-  }
-  if (analyzer instanceof BTCAnalyzer) {
-    return getAddressList(config.btc);
-  }
-  if (analyzer instanceof SOLAnalyzer) {
-    return getAddressList(config.sol);
-  }
-  if (analyzer instanceof DOGEAnalyzer) {
-    return getAddressList(config.doge);
-  }
-  if (analyzer instanceof TRC20ProUserAnalyzer) {
-    return getAddressList(config.trc20);
-  }
-  if (analyzer instanceof TonAnalyzer) {
-    return getAddressList(config.ton);
-  }
-  if (analyzer instanceof SUIAnalyzer) {
-    return getAddressList(config.sui);
-  }
-
-  throw new Error(
-    `Cannot determine wallet identities for failed analyzer ${analyzer.getAnalyzeName()}`,
+function hasValidHoldings(coins: unknown): coins is WalletCoin[] {
+  return Array.isArray(coins) && coins.every((coin) =>
+    coin &&
+    typeof coin.wallet === "string" &&
+    coin.wallet.length > 0 &&
+    typeof coin.symbol === "string" &&
+    coin.symbol.trim().length > 0 &&
+    (coin.assetType === "crypto" || coin.assetType === "stock") &&
+    typeof coin.amount === "number" &&
+    Number.isFinite(coin.amount) &&
+    (!coin.price || (
+      (coin.price.base === "usd" || coin.price.base === "usdt") &&
+      Number.isFinite(coin.price.value) &&
+      coin.price.value >= 0
+    ))
   );
+}
+
+async function withinSourceTimeout<T>(task: () => Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(task),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error("Source timed out")), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+type SourceSpec = {
+  sourceId: string;
+  label: string;
+  walletIdentities: string[];
+  config: GlobalConfig;
+  AnalyzerClass: new (config: GlobalConfig, license?: string) => Analyzer;
+  unsupported?: boolean;
+};
+
+function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): SourceSpec[] {
+  const sources: SourceSpec[] = [];
+  const addAddresses = (
+    kind: "erc20" | "sol" | "btc" | "doge" | "trc20" | "ton" | "sui",
+    AnalyzerClass: SourceSpec["AnalyzerClass"],
+  ) => {
+    getAddressList(config[kind] ?? { addresses: [] }).forEach((address, index) => {
+      const alias = config[kind]?.addresses?.find((entry) =>
+        typeof entry !== "string" && entry.address === address,
+      );
+      sources.push({
+        sourceId: `${kind}:${index}`,
+        label: typeof alias === "object" && alias.alias?.trim()
+          ? alias.alias.trim()
+          : `${kind.toUpperCase()} wallet ${index + 1}`,
+        walletIdentities: [address],
+        config: { ...config, [kind]: { addresses: [address] } },
+        AnalyzerClass,
+      });
+    });
+  };
+  addAddresses("erc20", (userInfo.isPro ? ERC20ProAnalyzer : ERC20NormalAnalyzer) as SourceSpec["AnalyzerClass"]);
+  (config.exchanges ?? []).filter((exchange) => exchange.active !== false).forEach((exchange, index) => {
+    sources.push({
+      sourceId: `cex:${index}`,
+      label: exchange.alias?.trim() || `${exchange.name} ${index + 1}`,
+      walletIdentities: [`${exchange.name === "okx" ? "okex" : exchange.name}-${exchange.initParams.apiKey}`],
+      config: { ...config, exchanges: [exchange] },
+      AnalyzerClass: CexAnalyzer,
+      unsupported: !supportedExchanges.has(exchange.name),
+    });
+  });
+  addAddresses("sol", SOLAnalyzer);
+  if ((config.others ?? []).length > 0) {
+    sources.push({
+      sourceId: "others",
+      label: "Others",
+      walletIdentities: [OthersAnalyzer.wallet],
+      config,
+      AnalyzerClass: OthersAnalyzer,
+    });
+  }
+  addAddresses("btc", BTCAnalyzer);
+  addAddresses("doge", DOGEAnalyzer);
+  if (userInfo.isPro) addAddresses("trc20", TRC20ProUserAnalyzer as SourceSpec["AnalyzerClass"]);
+  addAddresses("ton", TonAnalyzer);
+  addAddresses("sui", SUIAnalyzer);
+  (config.stockConfig?.brokers ?? []).filter((broker) => broker.active !== false).forEach((broker, index) => {
+    sources.push({
+      sourceId: `stock:${index}`,
+      label: broker.alias?.trim() || `${broker.name.toUpperCase()} ${index + 1}`,
+      walletIdentities: [`${broker.name}:${broker.initParams.queryId}`],
+      config: { ...config, stockConfig: { brokers: [broker] } },
+      AnalyzerClass: StockAnalyzer,
+    });
+  });
+  return sources;
 }
 
 // progress percent is 70
@@ -157,75 +202,87 @@ export async function fetchPortfolios(
   config: GlobalConfig,
   addProgress: AddProgressFunc,
   userInfo: UserLicenseInfo,
+  options: { sourceId?: string } = {},
 ): Promise<LoadPortfoliosResult> {
-  const progressPercent = 70;
-  const erc20Ana = userInfo.isPro ? ERC20ProAnalyzer : ERC20NormalAnalyzer;
-  if (userInfo.isPro) {
-    console.debug("pro license, use pro analyzers");
-  } else {
-    console.debug("not pro license, fallback to normal analyzers");
+  const allSources = listPortfolioSources(config, userInfo);
+  const sources = options.sourceId
+    ? allSources.filter((source) => source.sourceId === options.sourceId)
+    : allSources;
+  if (options.sourceId && sources.length === 0) {
+    throw new FullRefreshRequiredError("Source no longer exists. Run a full refresh.");
   }
-  const anas = [
-    erc20Ana,
-    CexAnalyzer,
-    SOLAnalyzer,
-    OthersAnalyzer,
-    BTCAnalyzer,
-    DOGEAnalyzer,
-    ...(userInfo.isPro
-      ? [TRC20ProUserAnalyzer as typeof TRC20ProUserAnalyzer]
-      : []),
-    TonAnalyzer,
-    SUIAnalyzer,
-    StockAnalyzer,
-  ];
-  const perProgressPer = progressPercent / anas.length;
-  const failedSources: FailedPortfolioSource[] = [];
-  const coinLists = await bluebird.map(
-    anas,
-    async (ana) => {
-      // Pro license variants (ERC20ProAnalyzer, TRC20ProUserAnalyzer)
-      // take the pro license as the second constructor argument; the other
-      // analyzers do not. The pro list only contains the pro variants, so
-      // the presence of the license is keyed on userInfo.isPro.
-      const a = userInfo.isPro
-        ? new (ana as unknown as new (
-            cfg: GlobalConfig,
-            license: string,
-          ) => Analyzer)(config, userInfo.license!)
-        : new (ana as unknown as new (cfg: GlobalConfig) => Analyzer)(config);
-      const anaName = a.getAnalyzeName();
-      console.debug("loading portfolio from ", anaName);
-      try {
-        await a.preLoad();
-        const portfolio = await a.loadPortfolio();
-        console.debug("loaded portfolio from ", anaName);
-        await a.postLoad();
-        addProgress(perProgressPer);
-        return portfolio;
-      } catch (e) {
-        console.error("failed to load portfolio from ", anaName, e);
-        const walletIdentities = resolveFailedAnalyzerWalletIdentities(
-          a,
-          config,
-        );
-        failedSources.push({
-          analyzerName: anaName,
-          walletIdentities,
-          error: getErrorMessage(e),
-        });
-        addProgress(perProgressPer);
-        return [];
+  if (options.sourceId) {
+    getMemoryCacheInstance("data-fetch").clearCache();
+  }
+  const perProgressPer = sources.length ? 70 / sources.length : 70;
+  const chainTasks = new Map<string, Promise<PortfolioSourceResult>>();
+  const sourceResults: PortfolioSourceResult[] = await Promise.all(sources.map(async (source) => {
+    const kind = source.sourceId.split(":")[0];
+    const previous = chainTasks.get(kind);
+    const run = async (): Promise<PortfolioSourceResult> => {
+      if (previous) {
+        await previous;
+        if (["btc", "doge", "ton", "erc20", "trc20"].includes(kind)) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
       }
-    },
-    {
-      concurrency: anas.length,
-    },
-  );
-  const assets = combineCoinLists(coinLists);
+      let walletIdentities = source.walletIdentities;
+      try {
+        const portfolio = await withinSourceTimeout(async () => {
+          if (source.unsupported) throw new Error("Unsupported exchange");
+          const analyzer = new source.AnalyzerClass(source.config, userInfo.license);
+          if (analyzer.getWalletIdentities) {
+            walletIdentities = uniqueIdentities([...walletIdentities, ...analyzer.getWalletIdentities()]);
+          } else if ("listExchangeIdentities" in analyzer) {
+            walletIdentities = uniqueIdentities([...walletIdentities, ...(analyzer as CexAnalyzer).listExchangeIdentities().map(({ identity }) => identity)]);
+          }
+          await analyzer.preLoad();
+          const coins = await analyzer.loadPortfolio();
+          if (!hasValidHoldings(coins)) {
+            getMemoryCacheInstance("data-fetch").clearCache();
+            throw new Error("Invalid source holdings");
+          }
+          const partialFailure = takeSourceFailure(analyzer);
+          if (partialFailure) {
+            getMemoryCacheInstance("data-fetch").clearCache();
+            throw partialFailure;
+          }
+          await analyzer.postLoad();
+          return coins;
+        }, kind === "cex" || kind === "sol" ? 120_000 : sourceTimeoutMs);
+        return { sourceId: source.sourceId, label: source.label, walletIdentities, status: "ok" as const, coins: portfolio };
+      } catch (error) {
+        // Upstream messages can contain credentials and request URLs. Keep only a category.
+        if (error instanceof Error && error.message === "Source timed out") {
+          getMemoryCacheInstance("data-fetch").clearCache();
+        }
+        const category = classifySourceError(error);
+        return { sourceId: source.sourceId, label: source.label, walletIdentities, status: "stale" as const, coins: [], category };
+      } finally {
+        addProgress(perProgressPer);
+      }
+    };
+    if (!["erc20", "sol", "btc", "doge", "trc20", "ton", "sui"].includes(kind)) {
+      return run();
+    }
+    const task = run();
+    chainTasks.set(kind, task);
+    return task;
+  }));
+  const failedSources: FailedPortfolioSource[] = sourceResults
+    .filter((source) => source.status === "stale")
+    .map((source) => ({
+      sourceId: source.sourceId,
+      analyzerName: source.label,
+      walletIdentities: source.walletIdentities,
+      error: source.category ?? "other",
+      category: source.category,
+    }));
+  const assets = combineCoinLists(sourceResults.map((source) => source.coins));
   return {
     coins: assets,
     failedSources,
+    sourceResults,
   };
 }
 

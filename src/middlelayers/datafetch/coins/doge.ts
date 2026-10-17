@@ -38,15 +38,16 @@ export class DOGEAnalyzer implements Analyzer {
         const res = await q.query(address);
         return res;
       } catch (e) {
-        console.error(e);
+        console.error("Source provider failed");
       }
     }
     throw new Error("All DOGE queriers failed");
   }
 
   async loadPortfolio(): Promise<WalletCoin[]> {
+    const addresses = getAddressList(this.config.doge);
     const coinLists = await asyncMap(
-      getAddressList(this.config.doge),
+      addresses,
       async (wallet) => {
         const amount = await this.query(wallet);
         return {
@@ -55,7 +56,7 @@ export class DOGEAnalyzer implements Analyzer {
         };
       },
       1,
-      1000,
+      addresses.length > 1 ? 1000 : 0,
     );
     return coinLists.map((c) => ({
       ...c,

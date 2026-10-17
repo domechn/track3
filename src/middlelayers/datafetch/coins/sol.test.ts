@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendHttpRequest } from "../utils/http";
 import { getMemoryCacheInstance } from "../utils/cache";
 import { SOLAnalyzer } from "./sol";
+import { takeSourceFailure } from "../utils/source-failure";
 
 vi.mock("../utils/http", async () => {
   const actual = await vi.importActual<typeof import("../utils/http")>(
@@ -125,6 +126,38 @@ describe("SOLAnalyzer", () => {
       `https://lite-api.jup.ag/ultra/v1/search?query=TokenMint,UnderlyingMint`,
       5000,
     );
+  });
+
+  it("skips an unknown mint while retaining priced holdings", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/holdings/")) return { uiAmount: 1, tokens: { MissingMint: [{ uiAmount: 3 }], PricedMint: [{ uiAmount: 2 }] } };
+      if (url.includes("/search?")) return [{ id: "PricedMint", name: "Priced", symbol: "GOOD", usdPrice: 4 }];
+      return [];
+    });
+    const analyzer = new SOLAnalyzer({ sol: { addresses: [SOL_ADDRESS] } });
+
+    const portfolio = analyzer.loadPortfolio();
+    await vi.runAllTimersAsync();
+    await expect(portfolio).resolves.toEqual([
+      { symbol: "GOOD", assetType: "crypto", amount: 2, price: { value: 4, base: "usd" }, wallet: SOL_ADDRESS, chain: "sol" },
+      { symbol: "SOL", assetType: "crypto", amount: 1, wallet: SOL_ADDRESS, chain: "sol" },
+    ]);
+    expect(takeSourceFailure(analyzer)).toBeUndefined();
+  });
+
+  it("skips an unpriced listed mint without failing the wallet", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/holdings/")) return { uiAmount: 1, tokens: { UnpricedMint: [{ uiAmount: 3 }] } };
+      if (url.includes("/search?")) return [{ id: "UnpricedMint", name: "Unpriced", symbol: "DUST", usdPrice: 0 }];
+      return [];
+    });
+    const analyzer = new SOLAnalyzer({ sol: { addresses: [SOL_ADDRESS] } });
+    const portfolio = analyzer.loadPortfolio();
+    await vi.runAllTimersAsync();
+    await expect(portfolio).resolves.toEqual([
+      { symbol: "SOL", assetType: "crypto", amount: 1, wallet: SOL_ADDRESS, chain: "sol" },
+    ]);
+    expect(takeSourceFailure(analyzer)).toBeUndefined();
   });
 
   it("keeps core holdings when the optional earn endpoint fails", async () => {

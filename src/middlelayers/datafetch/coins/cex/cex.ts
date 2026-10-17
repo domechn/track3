@@ -12,6 +12,7 @@ import { BybitExchange } from "./bybit";
 import { HtxExchange } from "./htx";
 import { MexcExchange } from "./mexc";
 import { BackpackExchange } from "./backpack";
+import { takeSourceFailure } from "../../utils/source-failure";
 
 export interface Exchanger {
   getExchangeName(): string;
@@ -137,6 +138,7 @@ export class CexAnalyzer implements Analyzer {
     ttl = 600,
   ): Promise<{ [k: string]: number }> {
     const cc = getMemoryCacheInstance("data-fetch");
+    const cacheGeneration = cc.getGeneration();
     const cacheKey = `${ex.getIdentity()}_total_balance`;
 
     const cacheResult = cc.getCache<{ [k: string]: number }>(cacheKey);
@@ -146,7 +148,9 @@ export class CexAnalyzer implements Analyzer {
     }
 
     const portfolio = await ex.fetchTotalBalance();
-    cc.setCache(cacheKey, portfolio, ttl);
+    const partialFailure = takeSourceFailure(ex);
+    if (partialFailure) throw partialFailure;
+    cc.setCache(cacheKey, portfolio, ttl, cacheGeneration);
     return portfolio;
   }
 

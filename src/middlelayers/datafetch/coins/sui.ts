@@ -1,3 +1,4 @@
+import { recordSourceFailure } from "../utils/source-failure";
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
@@ -32,7 +33,8 @@ export class SUIAnalyzer implements Analyzer {
     const positions = await Promise.all([
       this.queryHolding(this.endpoint, address),
       this.queryDefiPositions(this.endpoint, address).catch((error) => {
-        console.error("Failed to query SUI DeFi positions", error);
+        console.error("Failed to query SUI DeFi positions");
+        recordSourceFailure(this, error);
         return [];
       }),
     ]);
@@ -122,7 +124,7 @@ export class SUIAnalyzer implements Analyzer {
       );
       return coinLists.flat();
     } catch (e) {
-      console.error(e);
+      console.error("Source provider failed");
     }
 
     throw new Error(
