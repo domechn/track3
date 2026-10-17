@@ -89,6 +89,7 @@ const App = ({
         const base = dateOptions.find((option) => option.label === dates.base);
         const head = dateOptions.find((option) => option.label === dates.head);
         if (base && head) {
+          localStorage.removeItem(COMPARISON_DATES_KEY);
           setCurrentQuickCompare(null);
           setBaseId(base.value);
           setHeadId(head.value);

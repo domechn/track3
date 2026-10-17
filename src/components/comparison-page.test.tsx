@@ -53,6 +53,17 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  it("consumes an assistant comparison date selection after applying it", async () => {
+    localStorage.setItem(COMPARISON_DATES_KEY, JSON.stringify({ base: "2024-04-15", head: "2024-04-16" }));
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      { id: "1", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+      { id: "2", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+    ]);
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /choose base date/i })).toHaveTextContent("2024-04-15"));
+    expect(localStorage.getItem(COMPARISON_DATES_KEY)).toBeNull();
+  });
   it("replaces an assistant date selection when the user chooses a quick comparison", async () => {
     localStorage.setItem(COMPARISON_DATES_KEY, JSON.stringify({ base: "2024-04-15", head: "2024-04-16" }));
     vi.mocked(queryAllDataDates).mockResolvedValue([

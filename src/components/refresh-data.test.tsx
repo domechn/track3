@@ -72,13 +72,13 @@ beforeEach(() => {
   } as never);
   vi.mocked(processAlerts).mockResolvedValue([]);
   vi.mocked(deliverAlerts).mockResolvedValue();
-  vi.mocked(refreshInsights).mockResolvedValue();
+  vi.mocked(refreshInsights).mockResolvedValue(true);
 });
 
 describe("RefreshData — currency rates refresh ordering", () => {
   it("starts insights after refresh without waiting for insight generation", async () => {
     let finish: () => void = () => {};
-    vi.mocked(refreshInsights).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    vi.mocked(refreshInsights).mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(true); }));
     const afterRefresh = vi.fn();
     const user = userEvent.setup();
     render(<RefreshData loading={false} afterRefresh={afterRefresh} />);

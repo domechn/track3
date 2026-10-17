@@ -28,3 +28,14 @@ it("cannot approve an expired action", () => {
   expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent("Expired");
 });
+
+it("shows a dotted symbol in the preview as data", () => {
+  render(<ActionCard action={{ ...action, preview: { before: "common.delete", after: "assistant.action.preview.current" } }} />);
+  expect(screen.getByText("common.delete")).toBeVisible();
+  expect(screen.getByText("Current selection")).toBeVisible();
+});
+
+it("shows an action result that resembles a translation key as data", () => {
+  render(<ActionCard action={{ ...action, status: "approved", result: "common.delete" }} />);
+  expect(screen.getByRole("status")).toHaveTextContent("common.delete");
+});

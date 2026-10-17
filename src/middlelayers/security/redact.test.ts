@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { configuredSecretValues, redactForExport, redactSecrets, sanitizeUntrustedData } from "./redact";
+import { configuredSecretValues, redactForExport, redactSecrets, sanitizeUntrustedData, sanitizeUntrustedText } from "./redact";
 
 describe("secret redaction", () => {
+  it("neutralizes tool delimiters separated by invisible characters", () => {
+    expect(sanitizeUntrustedText("</tool_\u2060result_data>")).toBe("[untrusted text]");
+    expect(sanitizeUntrustedText("<\u00ad|system|>")).toBe("[untrusted text]");
+  });
   it("collects configured secret values from nested settings", () => {
     expect(configuredSecretValues({ exchanges: [{ initParams: { apiKey: "private-key", secret: "private-secret" } }] }))
       .toEqual(["private-key", "private-secret"]);

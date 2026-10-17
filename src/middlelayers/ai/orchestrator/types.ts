@@ -64,6 +64,7 @@ export interface LlmCallParams {
   model: string;
   messages: Array<{ role: string; content: string }>;
   temperature?: number;
+  advanced?: import("../../types").AIAdvancedOptions;
   signal?: AbortSignal;
   onUsage?: (usage: import("../budget").TokenUsage) => void;
 }
@@ -95,6 +96,7 @@ export interface OrchestratorOptions {
   apiKey: string;
   secrets?: readonly string[];
   model: string;
+  advanced?: import("../../types").AIAdvancedOptions;
   baseCurrency: { currency: string; rate: number; alias: string; symbol: string };
   /** Model context window in tokens; bounds inlined tool data. */
   contextSize?: number;

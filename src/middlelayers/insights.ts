@@ -63,6 +63,7 @@ function reference(snapshots: InsightSnapshot[], at: number, days: number): Insi
 
 export function signature(insight: Insight): string {
   const { data } = insight;
+  if (insight.id === "stale") return `${insight.id}:${data.count}`;
   if (insight.id === "concentration") return `${insight.id}:${Math.round(Number(data.top1Percent) / 5)}:${Math.round(Number(data.hhi) * 20)}:${Math.round(Number(data.stablecoinPercent) / 5)}`;
   if (insight.id === "drift") return `${insight.id}:${data.symbol}:${Math.round(Number(data.deviationPercent) / 5)}`;
   if (insight.id.startsWith("goal:")) return `${insight.id}:${data.reached}:${Math.round(Number(data.value) / Math.max(1, Number(data.threshold) * 0.05))}`;

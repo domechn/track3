@@ -24,6 +24,7 @@ export default function InsightsCard({ currency }: { currency?: CurrencyRateDeta
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState(false);
+  const [summaryError, setSummaryError] = useState(false);
   const reload = useCallback(async () => {
     try {
       const loaded = await loadInsightCard();
@@ -45,12 +46,16 @@ export default function InsightsCard({ currency }: { currency?: CurrencyRateDeta
 
   const visible = card?.insights.filter((insight) =>
     !card.dismissedIds.includes(insight.id) && !card.repeatedIds?.includes(insight.id)) ?? [];
-  const summaryRepeatsInsight = visible.some((insight) => card?.summary?.includes(formatInsight(insight, t, locale, currency)));
+  const summaryRepeatsInsight = visible.some((insight) =>
+    card?.summary?.includes(formatInsight(insight, t, locale, currency)) ||
+    card?.summary?.includes(formatInsight(insight, t, locale)));
   const regenerate = async () => {
     setRegenerating(true);
+    setSummaryError(false);
     try {
-      await refreshInsights(undefined, locale, true);
+      const refreshed = await refreshInsights(undefined, locale, true);
       await reload();
+      setSummaryError(refreshed === false);
     } catch {
       setError(true);
     } finally {
@@ -70,7 +75,8 @@ export default function InsightsCard({ currency }: { currency?: CurrencyRateDeta
       </CardHeader>
       <CardContent className="space-y-2 px-4 pb-4 sm:px-6">
         {error && <p role="alert" className="text-sm text-destructive">{t("insights.error")}</p>}
-        {loading && !card && <p className="text-sm text-muted-foreground">{t("insights.loading")}</p>}
+        {summaryError && <p role="alert" className="text-sm text-destructive">{t("insights.summaryError")}</p>}
+        {loading && !card && <p aria-live="polite" className="text-sm text-muted-foreground">{t("insights.loading")}</p>}
         {!loading && !error && visible.length === 0 && <p className="text-sm text-muted-foreground">{t("insights.empty")}</p>}
         {card?.summary && card.summaryLocale === locale && card.summarySnapshotUuid === card.snapshotUuid &&
           visible.length > 0 && !summaryRepeatsInsight && (

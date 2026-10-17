@@ -625,6 +625,7 @@ const App = () => {
         const raw = localStorage.getItem(DATE_RANGE_KEY);
         if (!raw) return;
         const dates = validateActionArgs("set_date_range", JSON.parse(raw));
+        localStorage.removeItem(DATE_RANGE_KEY);
         setDateRange({ from: parseISO(String(dates.from)), to: parseISO(String(dates.to)) });
       } catch {
         localStorage.removeItem(DATE_RANGE_KEY);
@@ -781,16 +782,19 @@ const App = () => {
 
       const { dr, size } = queryInfo;
       if (!preserveDateRange) {
-        setDateRange((prev) => {
-          try {
-            const stored = localStorage.getItem(DATE_RANGE_KEY);
-            if (stored) {
-              const dates = validateActionArgs("set_date_range", JSON.parse(stored));
-              return { from: parseISO(String(dates.from)), to: parseISO(String(dates.to)) };
-            }
-          } catch {
+        let assistantDates: DateRange | undefined;
+        try {
+          const stored = localStorage.getItem(DATE_RANGE_KEY);
+          if (stored) {
+            const dates = validateActionArgs("set_date_range", JSON.parse(stored));
+            assistantDates = { from: parseISO(String(dates.from)), to: parseISO(String(dates.to)) };
             localStorage.removeItem(DATE_RANGE_KEY);
           }
+        } catch {
+          localStorage.removeItem(DATE_RANGE_KEY);
+        }
+        setDateRange((prev) => {
+          if (assistantDates) return assistantDates;
           const prevFrom = prev?.from?.getTime() ?? 0;
           const prevTo = prev?.to?.getTime() ?? 0;
           const nextFrom = dr?.from?.getTime() ?? 0;

@@ -51,7 +51,7 @@ export function redactSecrets(text: string, configured: readonly string[] = [], 
 }
 
 export function sanitizeUntrustedText(value: string, configured: readonly string[] = [], preserveIdentifier = false): string {
-  return redactSecrets(value.replace(/[\u200b-\u200d\ufeff]/g, ""), configured, preserveIdentifier)
+  return redactSecrets(value.replace(/[\u00ad\u180e\u200b-\u200d\u2060-\u2064\ufeff]/g, ""), configured, preserveIdentifier)
     .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ")
     .replace(/<\/?tool_result[^>]*>|<\/?think\b[^>]*>|<\|(?:im_start|im_end|system|assistant|user|developer|tool|eot_id|eom_id|start_header_id|end_header_id|begin_of_text|end_of_text)\|>|\[(?:\/?INST|im_start|im_end)\]|<\/?(?:start_of_turn|end_of_turn)>|<<\/?SYS>>/gi, "[untrusted text]");
 }

@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { appDataDir } from "@tauri-apps/api/path";
-import { fetch } from "@tauri-apps/plugin-http";
 import {
   exists,
   mkdir,
@@ -23,6 +22,7 @@ import type { TokenUsage } from "./budget";
 import type { ConversationSummary } from "./history";
 import { configuredSecretValues, redactForExport, redactSecrets } from "../security/redact";
 import type { ActionStatus, PendingAction } from "./actions/lifecycle";
+import { callLlm } from "./orchestrator/llm";
 
 const SESSIONS_TABLE = "chat_sessions" as const;
 const FILE_VERSION = 1;
@@ -493,43 +493,24 @@ async function callTitleLLM(
   const secrets = configuredSecretValues(config);
   const endpoint = (config.endpoint ?? "").trim().replace(/\/+$/, "");
   if (!endpoint) return null;
-  const url = endpoint.endsWith("/chat/completions")
-    ? endpoint
-    : `${endpoint}/chat/completions`;
   const trimmedUser = redactSecrets(firstUserMsg, secrets).slice(0, LLM_PROMPT_CHAR_LIMIT);
   const trimmedAssistant = redactSecrets(firstAssistantMsg, secrets).slice(0, LLM_PROMPT_CHAR_LIMIT);
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
-  const body = {
-    model: config.model,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You generate concise chat titles. Output only the title in 2-6 words, in the user's language. Do not answer or continue the conversation. No quotes, no trailing punctuation.",
-      },
-      {
-        role: "user",
-        content: `First user message: ${trimmedUser}\nFirst assistant reply: ${trimmedAssistant}`,
-      },
-    ],
-    stream: false,
-  };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10_000);
   try {
-    const resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!resp.ok) return null;
-    const json: any = await resp.json();
-    const choice = json?.choices?.[0];
-    const content = choice?.message?.content;
-    if (typeof content !== "string") return null;
-    const cleaned = content
+    const response = await callLlm({
+      endpoint, apiKey: config.apiKey, model: config.model, advanced: config.advanced, secrets,
+      messages: [
+        {
+          role: "system",
+          content: "You generate concise chat titles. Output only the title in 2-6 words, in the user's language. Do not answer or continue the conversation. No quotes, no trailing punctuation.",
+        },
+        {
+          role: "user",
+          content: `First user message: ${trimmedUser}\nFirst assistant reply: ${trimmedAssistant}`,
+        },
+      ],
+    }, 10_000);
+    if (!response.ok) return null;
+    const cleaned = response.content
       // Strip <think> reasoning blocks that some models emit even for
       // simple title generation prompts.
       .replace(/<think>[\s\S]*?<\/think>/gi, "")
@@ -542,8 +523,6 @@ async function callTitleLLM(
     return redactSecrets(cleaned, secrets);
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
