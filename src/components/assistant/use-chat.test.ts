@@ -842,7 +842,7 @@ describe("useChat", () => {
       { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(900) }] },
     ];
     const { result } = renderHook(() =>
-      useChat({ config, baseCurrency, contextSize: 7300, initialMessages }),
+      useChat({ config, baseCurrency, contextSize: 5650, initialMessages }),
     );
     await act(async () => {
       await result.current.send("average buy price?");
