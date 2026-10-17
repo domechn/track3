@@ -62,7 +62,7 @@ export function serializeRealizedGains(report: CostBasisReport, format: "csv" | 
     return /[",\n\r]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
   };
   const usd = (value: number) => (Math.abs(value) < 0.005 ? 0 : value).toFixed(2);
-  const quantity = (value: number) => String(Number(value.toFixed(8)));
+  const quantity = (value: number) => String(value !== 0 && Math.abs(value) < 1e-8 ? value : Number(value.toFixed(8)));
   return [
     "Asset,Acquired Date,Disposed Date,Quantity,Proceeds,Cost Basis,Gain/Loss,Term,Method",
     ...report.disposals.map((row) => {

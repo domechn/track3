@@ -103,12 +103,12 @@ export function attributeSnapshots(snapshots: AttributionSnapshot[], blacklist: 
   };
 }
 
-export function groupAttribution(entries: AttributionEntry[], dimension: AttributionDimension, aliases: Record<string, WalletAlias | undefined> = {}): AttributionGroup[] {
+export function groupAttribution(entries: AttributionEntry[], dimension: AttributionDimension, aliases: Record<string, WalletAlias | undefined> = {}, stockLabel = "stock"): AttributionGroup[] {
   const groups = new Map<string, AttributionGroup>();
   for (const entry of entries) {
     const alias = aliases[entry.wallet];
     const [key, label] = dimension === "coin"
-      ? [`${entry.assetType}:${entry.symbol}`, entry.assetType === "stock" ? `${entry.symbol} · stock` : entry.symbol]
+      ? [`${entry.assetType}:${entry.symbol}`, entry.assetType === "stock" ? `${entry.symbol} · ${stockLabel}` : entry.symbol]
       : dimension === "source"
         ? [alias?.type ?? "unknown", alias?.type ?? "unknown"]
         : dimension === "wallet"

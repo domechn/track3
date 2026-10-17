@@ -65,6 +65,16 @@ describe("calculateCostBasis", () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("matches transfer legs with normalized symbols", () => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 1, 100),
+      event("out", "2024-05-01", "transfer-out", 1, 120, { symbol: " BTC ", wallet: "a", transferId: "move" }),
+      event("in", "2024-05-01", "transfer-in", 1, 120, { symbol: "btc", wallet: "b", transferId: "move" }),
+    ], { method: "FIFO" });
+    expect(result.warnings).toEqual([]);
+    expect(result.openLots).toEqual([expect.objectContaining({ id: "buy", amount: 1 })]);
+  });
+
   it("removes a transfer network fee without realizing a gain or resetting acquisition", () => {
     const stored: Parameters<typeof fromStoredTransactions>[0] = [
       { id: 1, uuid: "buy", assetType: "crypto", symbol: "BTC", wallet: "a", amount: 1, price: 100, txnType: "buy", txnCreatedAt: at("2023-01-01") },
@@ -110,6 +120,14 @@ describe("calculateCostBasis", () => {
     const result = calculateCostBasis(fromStoredTransactions(stored), { method: "FIFO" });
     expect(result.openLots).toEqual([]);
     expect(result.warnings.map((warning) => warning.code)).toEqual(["unknown-disposal", "unknown-basis"]);
+  });
+
+  it("does not pair a deposit that precedes a withdrawal in actual time", () => {
+    const stored: Parameters<typeof fromStoredTransactions>[0] = [
+      { id: 1, uuid: "out", assetType: "crypto", symbol: "BTC", wallet: "a", amount: 1, price: 100, txnType: "withdraw", txnCreatedAt: "2024-01-01T00:00:00Z" },
+      { id: 2, uuid: "in", assetType: "crypto", symbol: "BTC", wallet: "b", amount: 1, price: 100, txnType: "deposit", txnCreatedAt: "2024-01-01T01:00:00+05:00" },
+    ];
+    expect(fromStoredTransactions(stored).map((item) => item.type)).toEqual(["withdraw", "deposit"]);
   });
 
   it("warns about a matching sale and buy in different wallets on the next refresh", () => {
@@ -267,6 +285,70 @@ describe("calculateCostBasis", () => {
     expect(result.disposals[0]).toMatchObject({ amount: 1, proceeds: 200, costBasis: 100 });
     expect(result.openLots).toEqual([]);
     expect(result.warnings).toContainEqual(expect.objectContaining({ code: "missing-lots", eventId: "sell", amount: 1 }));
+  });
+
+  it("warns when a sale has a tiny quantity with no matching lot", () => {
+    const result = calculateCostBasis([
+      event("sell", "2024-02-01", "sell", 5e-11, 200),
+    ], { method: "FIFO" });
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "missing-lots", eventId: "sell", amount: 5e-11 }));
+  });
+
+  it.each(["FIFO", "AVERAGE"] as const)("fully closes a lot sold in 100 ordinary %s pieces", (method) => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 1, 100),
+      ...Array.from({ length: 100 }, (_, index) => event(`sell-${index}`, "2024-02-01", "sell", 0.01, 200)),
+    ], { method });
+    expect(result.warnings).toEqual([]);
+    expect(result.openLots).toEqual([]);
+    expect(result.disposals).toHaveLength(100);
+  });
+
+  it.each(["FIFO", "AVERAGE"] as const)("does not retain a rounding dust lot after %s partial sales", (method) => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 0.999, 100),
+      ...Array.from({ length: 30 }, (_, index) => event(`sell-${index}`, "2024-02-01", "sell", 0.0333, 200)),
+    ], { method });
+    expect(result.warnings).toEqual([]);
+    expect(result.openLots).toEqual([]);
+  });
+
+  it("keeps a tiny purchased amount in open lots", () => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 5e-11, 100),
+    ], { method: "FIFO" });
+    expect(result.openLots).toEqual([expect.objectContaining({ amount: 5e-11 })]);
+  });
+
+  it("processes a sale according to its actual instant across time zones", () => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 1, 100, { date: "2024-01-01T00:00:00Z" }),
+      event("sell", "2024-01-01", "sell", 1, 200, { date: "2024-01-01T01:00:00+05:00" }),
+    ], { method: "FIFO" });
+    expect(result.disposals).toEqual([]);
+    expect(result.warnings).toContainEqual(expect.objectContaining({ code: "missing-lots", eventId: "sell" }));
+    expect(result.openLots).toEqual([expect.objectContaining({ id: "buy", amount: 1 })]);
+  });
+
+  it("sorts valid events chronologically when an invalid date is present", () => {
+    const result = calculateCostBasis([
+      event("sale", "2024-02-01", "sell", 1, 200),
+      event("invalid", "2024-02-01", "buy", 1, 100, { date: "invalid" }),
+      event("late", "2024-03-01", "buy", 1, 300),
+      event("early", "2024-01-01", "buy", 1, 100),
+    ], { method: "FIFO" });
+    expect(result.disposals).toEqual([expect.objectContaining({ eventId: "sale", lotId: "early" })]);
+    expect(result.warnings).toEqual([expect.objectContaining({ code: "invalid-event", eventId: "invalid" })]);
+  });
+
+  it("does not pair an earlier deposit after a withdrawal when another date is invalid", () => {
+    const stored: Parameters<typeof fromStoredTransactions>[0] = [
+      { id: 1, uuid: "out", assetType: "crypto", symbol: "BTC", wallet: "a", amount: 1, price: 100, txnType: "withdraw", txnCreatedAt: at("2024-02-01") },
+      { id: 2, uuid: "invalid", assetType: "crypto", symbol: "BTC", wallet: "a", amount: 1, price: 100, txnType: "buy", txnCreatedAt: "invalid" },
+      { id: 3, uuid: "later", assetType: "crypto", symbol: "BTC", wallet: "a", amount: 1, price: 100, txnType: "buy", txnCreatedAt: at("2024-03-01") },
+      { id: 4, uuid: "in", assetType: "crypto", symbol: "BTC", wallet: "b", amount: 1, price: 100, txnType: "deposit", txnCreatedAt: at("2024-01-01") },
+    ];
+    expect(fromStoredTransactions(stored).map(({ type }) => type)).toEqual(["withdraw", "buy", "buy", "deposit"]);
   });
 
   it("calculates unrealized gain from latest asset price", () => {

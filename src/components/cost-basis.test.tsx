@@ -69,6 +69,18 @@ it("lets holding days be cleared while editing and waits before reloading", asyn
   await waitFor(() => expect(loadCostBasisReport).toHaveBeenCalledWith(expect.objectContaining({ holdingPeriodDays: 400 })));
 });
 
+it("flags a reversed date range and does not load or export it", async () => {
+  render(<CostBasisPage />);
+  await screen.findAllByText("BTC");
+  const calls = vi.mocked(loadCostBasisReport).mock.calls.length;
+  fireEvent.change(screen.getByLabelText("From"), { target: { value: "2025-12-31" } });
+  fireEvent.change(screen.getByLabelText("To"), { target: { value: "2025-01-01" } });
+  expect(screen.getByRole("alert")).toHaveTextContent("From must be on or before To.");
+  expect(screen.getByRole("button", { name: "Export CSV" })).toBeDisabled();
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  expect(loadCostBasisReport).toHaveBeenCalledTimes(calls);
+});
+
 it("pages large realized and open-lot tables", async () => {
   vi.mocked(loadCostBasisReport).mockResolvedValue({
     ...report,
@@ -98,4 +110,13 @@ it("pages warnings so a long history renders only the current page", async () =>
   expect(screen.queryByText(/GAP-50/)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Next page of Data gaps to review" }));
   expect(screen.getByText(/GAP-50/)).toBeInTheDocument();
+});
+
+it("shows the actual amount of a tiny missing-lots warning", async () => {
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report,
+    warnings: [{ ...report.warnings[0], amount: 5e-11 }],
+  } as never);
+  render(<CostBasisPage />);
+  expect(await screen.findByText(/5e-11 ETH/)).toBeInTheDocument();
 });

@@ -15,19 +15,19 @@ const dimensions: AttributionDimension[] = ["coin", "source", "wallet", "assetTy
 
 export default function ProfitAttribution({ currency, dateRange, quoteColor }: { currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor }) {
   const { t } = useTranslation();
-  const [data, setData] = useState<Data | null>(null);
+  const [loaded, setLoaded] = useState<{ rangeKey: string; result: Data } | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [dimension, setDimension] = useState<AttributionDimension>("coin");
   const dataChangedVersion = useDataChangedVersion();
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
+  const data = loaded?.rangeKey === rangeKey ? loaded.result : null;
 
   useEffect(() => {
     let active = true;
     setStatus("loading");
-    setData(null);
     queryAttribution(dateRange).then((result) => {
       if (!active) return;
-      setData(result);
+      setLoaded({ rangeKey, result });
       setStatus("ready");
     }).catch(() => {
       if (active) setStatus("error");
@@ -35,16 +35,17 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
     return () => { active = false; };
   }, [rangeKey, dataChangedVersion]);
 
-  const groups = useMemo(() => data ? groupAttribution(data.attribution.entries, dimension, data.aliases) : [], [data, dimension]);
+  const groups = useMemo(() => data ? groupAttribution(data.attribution.entries, dimension, data.aliases, t("profit.attribution.stock")) : [], [data, dimension, t]);
   const format = (value: number) => `${value > 0 ? "+" : value < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(value)))}`;
   const tone = (value: number) => positiveNegativeTextClass(value, quoteColor, 500);
   const barTone = (value: number) => positiveNegativeColor(value, quoteColor) === "green" ? "bg-emerald-500" : "bg-rose-500";
   const label = (key: string) => t(`profit.attribution.${key}`);
   const displayGroup = (group: { key: string; label: string }) =>
     (dimension === "source" || dimension === "wallet") && group.label === "unknown" ? t("common.unknown") : group.label;
+  const error = <div role="alert" className="py-8 text-center text-sm text-muted-foreground">{label("error")}</div>;
 
-  if (status === "loading") return <div role="status" aria-live="polite" className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (status === "error") return <div role="alert" className="py-8 text-center text-sm text-muted-foreground">{label("error")}</div>;
+  if (status === "loading" && !data) return <div role="status" aria-live="polite" className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (status === "error" && (!data || data.attribution.entries.length === 0)) return error;
   if (!data || data.attribution.entries.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{label("empty")}</p>;
 
   const totals = data.attribution.totals;
@@ -52,6 +53,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   const contributors = groups.filter((group) => group.priceEffect > 0).sort((a, b) => b.priceEffect - a.priceEffect).slice(0, 5);
   const detractors = groups.filter((group) => group.priceEffect < 0).sort((a, b) => a.priceEffect - b.priceEffect).slice(0, 5);
   const bars = (items: typeof groups) => (
+    items.length === 0 ? <p className="text-xs text-muted-foreground">{label("noMarketChange")}</p> :
     <ol className="space-y-2">
       {items.map((group) => (
         <li key={group.key} className="grid grid-cols-[minmax(5rem,1fr)_minmax(4rem,2fr)_auto] items-center gap-2 text-xs sm:text-sm">
@@ -64,6 +66,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   );
 
   return <div className="space-y-4">
+    {status === "error" && error}
     <p className="text-xs text-muted-foreground">{label("method")}</p>
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {(["totalChange", "priceEffect", "flowEffect", "residual"] as const).map((key) => (

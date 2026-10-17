@@ -20,7 +20,7 @@ export async function loadCostBasisReport(
   const latest = snapshots[0] ?? [];
   const grouped = new Map<string, { amount: number; value: number }>();
   for (const asset of latest) {
-    const key = `${asset.assetType ?? "crypto"}:${asset.symbol.toUpperCase()}`;
+    const key = `${asset.assetType ?? "crypto"}:${asset.symbol.trim().toUpperCase()}`;
     const group = grouped.get(key) ?? { amount: 0, value: 0 };
     if (Number.isFinite(asset.price) && asset.price > 0 && asset.amount > 0) {
       group.amount += asset.amount;

@@ -52,7 +52,8 @@ export default function CostBasisPage() {
   const [pages, setPages] = useState({ warnings: 0, assets: 0, disposals: 0, unrealized: 0 });
   const validHoldingDays = /^[1-9]\d*$/.test(holdingDaysInput) &&
     Number.isSafeInteger(Number(holdingDaysInput));
-  const filtersCurrent = validHoldingDays && appliedFilters.from === from &&
+  const validRange = !from || !to || from <= to;
+  const filtersCurrent = validHoldingDays && validRange && appliedFilters.from === from &&
     appliedFilters.to === to && appliedFilters.holdingPeriodDays === Number(holdingDaysInput);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function CostBasisPage() {
   }, [t]);
 
   useEffect(() => {
-    if (!validHoldingDays) return;
+    if (!validHoldingDays || !validRange) return;
     const timeout = setTimeout(() => {
       const holdingPeriodDays = Number(holdingDaysInput);
       setAppliedFilters((previous) =>
@@ -74,7 +75,7 @@ export default function CostBasisPage() {
       );
     }, 300);
     return () => clearTimeout(timeout);
-  }, [from, to, holdingDaysInput, validHoldingDays]);
+  }, [from, to, holdingDaysInput, validHoldingDays, validRange]);
 
   useEffect(() => {
     if (!ready) return;
@@ -116,7 +117,8 @@ export default function CostBasisPage() {
   }
 
   const money = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  const qty = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 8 });
+  const qty = (value: number) => value !== 0 && Math.abs(value) < 1e-8
+    ? String(value) : value.toLocaleString(undefined, { maximumFractionDigits: 8 });
 
   return (
     <div className="space-y-5">
@@ -167,8 +169,9 @@ export default function CostBasisPage() {
           </div>
         </CardContent>
       </Card>
+      {!validRange && <p role="alert" className="text-sm text-destructive">{t("cost.invalidRange")}</p>}
       {loading && <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p>}
-      {report && <>
+      {report && validRange && <>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {(["proceeds", "costBasis", "gainLoss", "shortTerm", "longTerm"] as const).map((key) => (
             <Card key={key}><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t(`cost.${key}`)}</CardTitle></CardHeader><CardContent className="text-xl font-semibold tabular-nums">{money(report.totals[key])} USD</CardContent></Card>
