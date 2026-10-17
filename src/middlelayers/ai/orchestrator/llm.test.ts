@@ -36,6 +36,19 @@ describe("orchestrator LLM requests", () => {
       usage: { promptTokens: 13, completionTokens: 2, source: "reported" },
     });
   });
+  it("applies configured advanced headers and temperature to a nonstreaming call", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: "ok" } }],
+    }), { status: 200 }) as any);
+    await callLlm({ ...params, temperature: 0.1,
+      advanced: { headers: { authorization: "Custom access-value", "x-model-access": "access-value" }, temperature: 0.4,
+        top_p: 0.8, extraBody: { response_format: { type: "text" }, model: "forged" } } });
+    const request = vi.mocked(fetch).mock.calls[0][1]!;
+    expect(request.headers).toMatchObject({ authorization: "Custom access-value", "x-model-access": "access-value" });
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      model: "test", temperature: 0.1, top_p: 0.8, response_format: { type: "text" },
+    });
+  });
   it("cancels an in-flight planner call when the chat is stopped", async () => {
     const controller = new AbortController();
     vi.mocked(fetch).mockImplementation(async (_url, init) => new Promise((_resolve, reject) => {

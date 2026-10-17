@@ -41,15 +41,23 @@ export async function callLlm(
   if (params.apiKey) {
     headers.authorization = `Bearer ${params.apiKey}`;
   }
+  for (const [key, value] of Object.entries(params.advanced?.headers ?? {})) {
+    if (typeof value === "string" && !["cookie", "host", "content-length", "connection"].includes(key.toLowerCase())) {
+      headers[key] = value;
+    }
+  }
 
   const body: Record<string, unknown> = {
     model: params.model,
     messages: params.messages,
     stream: false,
   };
-  if (typeof params.temperature === "number") {
-    body.temperature = params.temperature;
+  if (typeof params.advanced?.top_p === "number") body.top_p = params.advanced.top_p;
+  for (const [key, value] of Object.entries(params.advanced?.extraBody ?? {})) {
+    if (!["model", "messages", "stream", "stream_options", "tools", "tool_choice"].includes(key)) body[key] = value;
   }
+  const temperature = params.temperature ?? params.advanced?.temperature;
+  if (typeof temperature === "number") body.temperature = temperature;
 
   const controller = new AbortController();
   let timedOut = false;

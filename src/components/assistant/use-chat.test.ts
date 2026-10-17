@@ -34,6 +34,7 @@ import type { OrchestratorEvent } from "@/middlelayers/ai/orchestrator/types";
 import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 import { callLlm } from "@/middlelayers/ai/orchestrator/llm";
 import { estimateMessages, estimateTokens } from "@/middlelayers/ai/budget";
+import md5 from "md5";
 
 const baseCurrency: CurrencyRateDetail = {
   currency: "USD",
@@ -192,6 +193,23 @@ describe("useChat", () => {
     await act(async () => { await result.current.send("Second"); });
     expect(callLlm).toHaveBeenCalledOnce();
   });
+  it("keeps summary failure backoff across turns after a saved summary", async () => {
+    const initialMessages: ChatMessage[] = Array.from({ length: 12 }, (_, i) => i % 2
+      ? { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(30) }] }
+      : { role: "user", content: "word ".repeat(30) });
+    const initialSummary = { content: "Prior facts", throughMessageCount: 2,
+      throughMessageHash: md5(JSON.stringify({ role: "assistant", content: "word ".repeat(30).trim() })) };
+    vi.mocked(callLlm).mockResolvedValue({ ok: false, content: "", error: "timeout" });
+    vi.mocked(streamChatCompletion).mockImplementation(() => makeStream([
+      { kind: "text", delta: "Reply" }, { kind: "done" },
+    ]));
+    const { result } = renderHook(() => useChat({ config, baseCurrency, contextSize: 900,
+      initialMessages, initialSummary }));
+    await act(async () => { await result.current.send("First"); });
+    await act(async () => { await result.current.send("Second"); });
+    await act(async () => { await result.current.send("Third"); });
+    expect(callLlm).toHaveBeenCalledOnce();
+  });
   it("appends a user message and an empty assistant message on send", async () => {
     vi.mocked(streamChatCompletion).mockImplementation(async function* () {
       yield { kind: "text", delta: "Hello" };
@@ -238,6 +256,18 @@ describe("useChat", () => {
     expect(assistant.blocks).toHaveLength(1);
     expect(assistant.blocks[0]?.text).toBe("Hello world");
   });
+  it("preserves leading indentation split across stream chunks", async () => {
+    vi.mocked(streamChatCompletion).mockImplementation(() => makeStream([
+      { kind: "text", delta: " ".repeat(20) },
+      { kind: "text", delta: "code" },
+      { kind: "done" },
+    ]));
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("Show code"); });
+    expect(result.current.messages[1]).toMatchObject({
+      blocks: [{ kind: "text", text: `${" ".repeat(20)}code` }],
+    });
+  });
 
   it("still runs the skill but does not append a chart block when a tool_call dispatches to a skill that returns a chart", async () => {
     let callCount = 0;
@@ -271,7 +301,7 @@ describe("useChat", () => {
       role: "assistant";
       blocks: { kind: string }[];
     };
-    expect(assistant.blocks).toEqual([{ kind: "text", text: "(No response)" }]);
+    expect(assistant.blocks).toEqual([]);
   });
 
   it("emits an error block when the stream reports an error", async () => {
@@ -911,50 +941,6 @@ describe("useChat", () => {
     expect(result.current.input).toBe("");
   });
 
-  it("asks the model to answer without tools once tool results exceed the context budget", async () => {
-    const requests: any[] = [];
-    vi.mocked(streamChatCompletion).mockImplementation(async function* (req) {
-      requests.push(req);
-      if (requests.length === 1) {
-        yield { kind: "tool_call", id: "c1", name: "transaction_list", args: {} };
-        yield { kind: "done" };
-        return;
-      }
-      yield { kind: "text", delta: "Final answer" };
-      yield { kind: "done" };
-    });
-    vi.mocked(runSkill).mockResolvedValue({
-      ok: true,
-      result: {
-        data: { rows: Array.from({ length: 500 }, (_, i) => ({ i, symbol: "BTC" })) },
-        text: "Returned 500 transaction(s).",
-      },
-    });
-
-    const initialMessages: ChatMessage[] = [
-      { role: "user", content: "word ".repeat(365) },
-      { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(365) }] },
-    ];
-    const { result } = renderHook(() =>
-      useChat({ config, baseCurrency, contextSize: 7000, initialMessages }),
-    );
-    await act(async () => {
-      await result.current.send("average buy price?");
-    });
-
-    // Round 1 issued tools; the over-budget follow-up must still happen,
-    // but without tools so the model has to answer from what it has.
-    expect(requests).toHaveLength(2);
-    expect(requests[1].tools).toBeUndefined();
-
-    const toolMsg = requests[1].messages.find((m: any) => m.role === "tool");
-    expect(toolMsg.content).toContain("[truncated:");
-    expect(toolMsg.content).not.toContain('{\n  "rows"');
-
-    const assistant = result.current.messages.at(-1) as { role: "assistant"; blocks: any[] };
-    expect(assistant.blocks.some((b) => b.kind === "text" && b.text.includes("Final answer"))).toBe(true);
-  });
-
   it("gives a final tool-free answer after the narrower result fits", async () => {
     const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
     vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
@@ -997,9 +983,7 @@ describe("useChat", () => {
     await act(async () => { await result.current.send("Show the history"); });
     expect(requests).toHaveLength(6);
     expect(requests[5].tools).toBeUndefined();
-    expect(result.current.messages.at(-1)).toMatchObject({
-      blocks: [{ kind: "text", text: "(No response)" }],
-    });
+    expect(result.current.messages.at(-1)).toMatchObject({ blocks: [] });
   });
 
   it("does not execute a tool call hallucinated in the final tool-free response", async () => {
@@ -1017,9 +1001,7 @@ describe("useChat", () => {
     expect(requests).toHaveLength(6);
     expect(requests[5].tools).toBeUndefined();
     expect(runSkill).toHaveBeenCalledTimes(5);
-    expect(result.current.messages.at(-1)).toMatchObject({
-      blocks: [{ kind: "text", text: "(No response)" }],
-    });
+    expect(result.current.messages.at(-1)).toMatchObject({ blocks: [] });
   });
 
   it("does not mark tool results as truncated when they fit", async () => {
@@ -1370,6 +1352,71 @@ describe("useChat", () => {
     expect(requests[1].tools).toBeDefined();
     expect(estimateMessages(requests[1].messages) + estimateTokens(JSON.stringify(requests[1].tools), "json"))
       .toBeLessThan(7000 * 0.8 - 64);
+  });
+
+  it("asks for an answer without tools when accumulated tool results exhaust context", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      if (request.tools) {
+        for (let i = 0; i < 7; i++) {
+          yield { kind: "tool_call", id: `call-${requests.length}-${i}`, name: "asset_history", args: {} };
+        }
+      } else {
+        yield { kind: "text", delta: "Partial answer from the available data" };
+      }
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({ ok: true, result: {
+      data: { rows: Array.from({ length: 100 }, (_, i) => ({ index: i, note: "x".repeat(100) })) },
+    } });
+    const { result } = renderHook(() => useChat({ config, baseCurrency, contextSize: 5000 }));
+    await act(async () => { await result.current.send("Review the full history"); });
+    expect(requests[0].tools).toBeDefined();
+    expect(requests.length).toBeLessThan(5);
+    expect(requests.at(-1)?.tools).toBeUndefined();
+    expect(result.current.messages.at(-1)).toMatchObject({
+      blocks: expect.arrayContaining([{ kind: "text", text: "Partial answer from the available data" }]),
+    });
+  });
+
+  it("offers tools after truncation when the normal context limit still has room", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      if (requests.length === 1) yield { kind: "tool_call", id: "a1", name: "asset_history", args: {} };
+      else yield { kind: "text", delta: "Answer" };
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({ ok: true, result: {
+      data: { rows: Array.from({ length: 1000 }, (_, i) => ({ index: i, note: "x".repeat(200) })) },
+    } });
+    const initialMessages: ChatMessage[] = [
+      { role: "user", content: "word ".repeat(140) },
+      { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(140) }] },
+    ];
+    const { result } = renderHook(() => useChat({ config, baseCurrency, contextSize: 7000, initialMessages }));
+    await act(async () => { await result.current.send("Show more history"); });
+    expect(requests[1].messages.find((message) => message.role === "tool")?.content).toContain("[truncated:");
+    expect(requests[1].tools).toBeDefined();
+  });
+
+  it("offers the read tool catalog in a 4096-token context when it fits after shortening descriptions", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      yield { kind: "text", delta: "Answer" };
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency, contextSize: 4096 }));
+    await act(async () => { await result.current.send("Show my balance"); });
+    expect(requests[0].tools).toBeDefined();
+    expect(estimateMessages(requests[0].messages) + estimateTokens(JSON.stringify(requests[0].tools), "json"))
+      .toBeLessThan(4096 * 0.8);
+    const tools = requests[0].tools ?? [];
+    expect(tools.find((tool) => tool.name === "transaction_list")?.description).toContain("prefer transaction_stats");
+    expect(tools.find((tool) => tool.name === "cost-basis")?.description).toContain("USD estimates");
+    expect(tools.find((tool) => tool.name === "rebalance-suggest")?.description).toContain("never executes trades");
   });
 
   it("does not replace an active reply with a stale session reload", async () => {

@@ -713,7 +713,7 @@ describe("chat sessions middlelayer", () => {
     const sessions = await import("./sessions");
     const config: AIConfig = {
       endpoint: "https://example.com/v1", apiKey: "main-key", model: "test", contextSize: 8192,
-      advanced: { headers: { "x-custom-auth": "custom-header-secret" } },
+      advanced: { headers: { "x-custom-auth": "custom-header-secret" }, temperature: 0.4 },
     };
     mocks.fetch.mockResolvedValue(new Response(JSON.stringify({
       choices: [{ message: { content: "custom-header-secret portfolio" } }],
@@ -721,6 +721,8 @@ describe("chat sessions middlelayer", () => {
     const title = await sessions.generateTitle(config, "check custom-header-secret", "done");
     const request = JSON.parse(String(mocks.fetch.mock.calls[0]?.[1]?.body));
     expect(JSON.stringify(request)).not.toContain("custom-header-secret");
+    expect(mocks.fetch.mock.calls[0]?.[1]?.headers).toMatchObject({ "x-custom-auth": "custom-header-secret" });
+    expect(request.temperature).toBe(0.4);
     expect(title).not.toContain("custom-header-secret");
   });
 

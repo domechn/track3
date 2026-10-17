@@ -9,14 +9,14 @@ import { listSkills } from "./tools";
 export function buildSystemPrompt(
   baseCurrency: CurrencyRateDetail,
   allowActions = true,
+  includeToolDocs = true,
 ): string {
-  const skills = listSkills();
-  const toolDocs = skills
+  const toolDocs = includeToolDocs ? listSkills()
     .map(
       (s) =>
         `- ${s.name}: ${s.description}\n  args: ${JSON.stringify(s.parameters)}`,
     )
-    .join("\n");
+    .join("\n") : "";
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -35,8 +35,6 @@ export function buildSystemPrompt(
     `Current date: ${today}. Use this date as a reference when computing date ranges for tool calls.`,
     "Be concise. Default to short paragraphs or compact lists. Use the user's language.",
     "If a question cannot be answered with the available tools, say so plainly.",
-    "",
-    "Available tools:",
-    toolDocs,
+    ...(includeToolDocs ? ["", "Available tools:", toolDocs] : []),
   ].join("\n");
 }

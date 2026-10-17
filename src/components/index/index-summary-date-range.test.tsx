@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChartResizeContext } from "@/App";
+import { DATE_RANGE_KEY } from "@/middlelayers/ai/actions";
 
 const lazySummary = vi.hoisted(() => {
   let shouldHold = false;
@@ -54,7 +55,8 @@ vi.mock("../coin-analytics", () => ({
 }));
 
 vi.mock("../date-picker", () => ({
-  default: () => <div>date picker</div>,
+  default: ({ value }: { value?: { from?: Date; to?: Date } }) =>
+    <div data-testid="selected-range">{value?.from?.toISOString()}|{value?.to?.toISOString()}</div>,
 }));
 
 vi.mock("../realtime-total-value", () => ({
@@ -244,5 +246,16 @@ describe("Summary route date range", () => {
         "2024-04-01T00:00:00.000Z|2024-04-04T00:00:00.000Z"
       );
     });
+  });
+  it("consumes an assistant date selection on startup", async () => {
+    localStorage.setItem(DATE_RANGE_KEY, JSON.stringify({ from: "2024-04-01", to: "2024-04-04" }));
+    render(
+      <ChartResizeContext.Provider value={{ needResize: 0, setNeedResize: vi.fn() }}>
+        <App />
+      </ChartResizeContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("selected-range")).toHaveTextContent(
+      "2024-04-01T00:00:00.000Z|2024-04-04T00:00:00.000Z"));
+    expect(localStorage.getItem(DATE_RANGE_KEY)).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import InsightsCard from "./insights-card";
-import { dismissInsight, loadInsightCard, refreshInsights, INSIGHTS_CHANGED_EVENT } from "@/middlelayers/insights-service";
+import { dismissInsight, formatInsight, loadInsightCard, refreshInsights, INSIGHTS_CHANGED_EVENT } from "@/middlelayers/insights-service";
 import type { InsightCard } from "@/middlelayers/insights-service";
 
 vi.mock("@/middlelayers/insights-service", () => ({
@@ -10,7 +10,7 @@ vi.mock("@/middlelayers/insights-service", () => ({
   loadInsightCard: vi.fn(),
   dismissInsight: vi.fn(),
   refreshInsights: vi.fn(),
-  formatInsight: (insight: { messageKey: string; data: { symbol: string } }) => `${insight.messageKey} ${insight.data.symbol}`,
+  formatInsight: vi.fn((insight: { messageKey: string; data: { symbol: string } }) => `${insight.messageKey} ${insight.data.symbol}`),
 }));
 
 const card: InsightCard = { snapshotUuid: "snapshot-a", dismissedIds: [], insights: [
@@ -21,7 +21,8 @@ beforeEach(() => {
   vi.mocked(loadInsightCard).mockReset();
   vi.mocked(refreshInsights).mockReset();
   vi.mocked(dismissInsight).mockReset();
-  vi.mocked(refreshInsights).mockResolvedValue();
+  vi.mocked(formatInsight).mockImplementation((insight) => `${insight.messageKey} ${insight.data.symbol}`);
+  vi.mocked(refreshInsights).mockResolvedValue(true);
   vi.mocked(dismissInsight).mockResolvedValue();
   sessionStorage.clear();
 });
@@ -32,6 +33,7 @@ describe("InsightsCard", () => {
     vi.mocked(loadInsightCard).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     const { unmount } = render(<InsightsCard />);
     expect(screen.getByText("Loading insights...")).toBeVisible();
+    expect(screen.getByText("Loading insights...")).toHaveAttribute("aria-live", "polite");
     await act(async () => finish(undefined));
     expect(screen.getByText(/No significant changes yet/)).toBeVisible();
     unmount();
@@ -85,6 +87,15 @@ describe("InsightsCard", () => {
     expect(screen.getByText(/Regenerate to update the summary/)).toBeVisible();
   });
 
+  it("shows a summary error when Regenerate cannot get a model reply", async () => {
+    vi.mocked(loadInsightCard).mockResolvedValue(card);
+    vi.mocked(refreshInsights).mockResolvedValue(false);
+    render(<InsightsCard />);
+    expect(await screen.findByText(/insights.newAsset BTC/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not regenerate the insight summary");
+  });
+
   it("explains how to update a summary saved in another language", async () => {
     vi.mocked(loadInsightCard).mockResolvedValue({ ...card, summary: "Summary in Chinese",
       summaryLocale: "zh", summarySnapshotUuid: "snapshot-a" });
@@ -98,5 +109,15 @@ describe("InsightsCard", () => {
       summaryLocale: "en", summarySnapshotUuid: "snapshot-a" });
     render(<InsightsCard />);
     expect(await screen.findAllByText("insights.newAsset BTC")).toHaveLength(1);
+  });
+
+  it("hides an older USD fallback summary when displaying insights in another currency", async () => {
+    vi.mocked(formatInsight).mockImplementation((insight, _t, _locale, currency) =>
+      `${insight.messageKey} ${insight.data.symbol} ${currency?.currency ?? "USD"}`);
+    vi.mocked(loadInsightCard).mockResolvedValue({ ...card, summary: "insights.newAsset BTC USD",
+      summaryLocale: "en", summarySnapshotUuid: "snapshot-a" });
+    render(<InsightsCard currency={{ currency: "EUR", symbol: "€", rate: 0.9, alias: "Euro" }} />);
+    expect(await screen.findByText("insights.newAsset BTC EUR")).toBeVisible();
+    expect(screen.queryByText("insights.newAsset BTC USD")).toBeNull();
   });
 });

@@ -477,7 +477,7 @@ function ChatContent({
         outputPricePerMillionTokens={config.outputPricePerMillionTokens}
         onPickPrompt={(text) => void chat.send(text)}
         onDecideAction={(id, decision) => void chat.decideAction(id, decision)}
-        canDecideAction={!!sessionId && !chat.isStreaming && !saveError}
+        canDecideAction={!!sessionId && config.allowActions !== false && !chat.isStreaming && !saveError}
       />
       {chat.messages.length > 0 && (
         <QuickActions

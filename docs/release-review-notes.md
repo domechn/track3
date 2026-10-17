@@ -109,3 +109,55 @@ Two additional history defects surfaced while checking the touched delete flow. 
 - Real Windows and macOS packaging need those machines and their native toolchains. No packaging or updater behavior was changed in this pass.
 - Real model and judge output needs `EVAL_ENDPOINT`, `EVAL_API_KEY`, and a model; the offline golden suite and fake-provider paths run without those credentials.
 - Real full-size SQLite timings need a production-scale database and desktop I/O. The 2,000 snapshot SQL test and query plan guard against a full asset-range scan but do not measure wall-clock latency.
+
+## Assistant leftovers pass for 0.9.0
+
+Checked the six reports named in the PR request against this worktree. Statuses below describe current code after this pass. No version or migration was changed.
+
+| Report | Finding | Status |
+| --- | --- | --- |
+| Actions | A successful write could revert to “executing” if its follow-up failed. | Fixed: the approved state stays approved; a follow-up error is shown and saved separately. |
+| Actions | A 0.73 context threshold could end the tool loop early. | Fixed: removed that extra cutoff. |
+| Actions | Approval follow-up sent unbounded history. | Fixed: it uses `prepareHistory` and keeps the rolling summary. |
+| Actions | Preview data was treated as an i18n key. | Fixed: only `assistant.action.*` strings are translated; the same rule now covers result text. |
+| Actions | Hook tests missed two proposals, timer expiry, and forbidden names through `send`. | Fixed: all three paths have hook tests. |
+| Actions | Pending cards remained approvable after actions were disabled. | Fixed: controls and the approval handler honor the toggle. |
+| Actions | Assistant date selections overrode defaults on later starts. | Fixed: date and comparison selections are consumed after application. |
+| Insights | Failed LLM summaries were saved as USD fallback text and prompt currency was unclear. | Fixed: failed summaries are not saved, the prompt identifies USD amounts, and old fallback text is hidden when a different currency is displayed. |
+| Insights | A corrupt or undecryptable row 992 prevented future insight refreshes. | Fixed: an unreadable card is ignored so refresh can replace it. |
+| Insights | Stale source counts were absent from deduplication signatures. | Fixed: a changed count appears again. |
+| Insights | Abort and successful opt-in summary saving lacked end-to-end tests. | Fixed: refresh tests cover cancellation, saving, and dismissal during an LLM call. |
+| Insights | Nonstreaming LLM calls ignored advanced headers and temperature. | Fixed: `callLlm`, insights, orchestration, and title generation now use advanced options. Planner temperatures still take priority over chat temperature. |
+| Insights | Chinese mover windows, loading announcement, dismissal race. | Fixed: localized window labels, `aria-live`, and serialized card writes with cancellation. |
+| Context budget | Summary failure backoff reset when an existing summary was reused. | Fixed: it resets only for a new summary. |
+| Context budget | Truncated results used too much of the remaining context, blocking a narrower follow-up. | Fixed: tool results use half the available space, with a regression test. The narrowing hint was already present. |
+| Context budget | The full prompt duplicated tool schemas and could disable tools at a 4096-token setting. | Fixed for 4096 tokens: the fallback omits duplicate tool documentation and shortens read-tool descriptions while retaining their schemas. Smaller windows may still be too small for the full catalog. |
+| Context budget | Context percentage could reflect an internal request. | Already fixed: `recordUsage` only adds cost; the main chat stream sets occupancy. |
+| Context budget | Stopped turns lost token usage. | Already fixed: explicitly stopped turns save their usage. |
+| Context budget | One price covered both input and output tokens. | Already fixed: separate prices are supported in settings and `UsageLabel`. |
+| Security | Truncated final round, empty reply, and zero-width sanitation. | Already fixed in the reviewed security pass; current tests cover the round limit and empty reply. |
+| Security | U+2060–U+2064, U+00AD, and U+180E could split a tool delimiter. | Fixed: sanitation removes them before delimiter filtering. |
+| Security | “No response” was saved as assistant text. | Fixed: the bubble displays the note for an empty finished reply; the session keeps empty blocks. |
+| Security | Two tool-round tests overlapped. | Left as coverage; duplicate tests do not change behavior. |
+| Thinking | Per-round block collection, whitespace handling, DeepSeek reasoning, and progress display. | Already fixed in the reviewed thinking pass. |
+| Thinking | Dead block-index code, joined think text, stuck placeholder, and live dot on old messages. | Already fixed in current code. |
+| Thinking | Split leading whitespace could lose code indentation. | Fixed: whitespace is held until real text arrives. |
+| Harness audit | All rows marked Fixed, including message trimming, validation, session safety, stream parsing, and redaction. | Already fixed in current code; existing tests cover these paths. |
+
+### Environment-dependent checks deferred
+
+| Check | Why it remains |
+| --- | --- |
+| Live `yarn eval` and real model conversations, including DeepSeek reasoning and providers that reject usage stream options. | Requires a real model endpoint and key; mocked HTTP and offline golden tests cover the local contracts. |
+| Real exchange, stock-price, and Rust `invoke` cancellation for long price fetches. | Requires live upstream requests and coordinated cancellation support in the fetch helpers and backend. |
+| Encrypted session `.tmp` replacement and crash recovery on Windows and macOS. | Requires platform file-system behavior and crash testing on each target OS before changing recovery semantics. |
+| Skipping the analyzer for simple follow-ups. | A provider-compatible combined planning and answer protocol needs real model evaluation to avoid misrouting conversation context. |
+| Strict limits for very large user messages and inline images. | Provider-specific token counts and multimodal image behavior need evaluation with real models; the current request is preserved intact. |
+| Automatic retry of transient model HTTP failures. | Real provider failure classes and idempotency behavior are needed to avoid duplicate billable completions and replayed tool decisions. |
+| Running the full desktop UI against exchange accounts or S3 and checking Windows/macOS packaging. | Those services, credentials, and machines are not available in this worktree. |
+
+At configured contexts below 4096 tokens, the full tool schema may exceed the budget. The fallback leaves tools off when they cannot fit safely; supporting the complete catalog there needs a tool selection protocol.
+
+### Reviewer follow-up
+
+Approval follow-ups now discard late summaries after a session switch, retain summary retry backoff, and save summary and reply token usage. Action errors attach only to that follow-up. The restored tool-context test covers a budget-forced answer without tools, and compact tool descriptions retain the transaction, USD, and read-only hints. Dismissing an insight during the load phase now allows the refreshed snapshot to be saved. A failed Regenerate request shows an error, and the Chinese mover window reads naturally.

@@ -90,6 +90,18 @@ describe("computeInsights", () => {
     expect(changed.some((item) => item.id === "concentration")).toBe(true);
   });
 
+  it("shows a stale-source insight again when the stale count changes", () => {
+    const snapshots = [snapshot("a", at, { BTC: 100 })];
+    const one = computeInsights({ snapshots,
+      sourceStatuses: [{ sourceId: "one", label: "one", status: "stale" }] });
+    const changed = computeInsights({ snapshots, previous: one,
+      sourceStatuses: [
+        { sourceId: "one", label: "one", status: "stale" },
+        { sourceId: "two", label: "two", status: "failed" },
+      ] });
+    expect(changed.find((item) => item.id === "stale")?.data.count).toBe(2);
+  });
+
   it("distinguishes crypto and stock holdings with the same symbol in movers and unusual changes", () => {
     const assets = (crypto: number, stock: number) => [
       { assetType: "crypto" as const, symbol: "ABC", value: crypto, amount: crypto, price: 1 },

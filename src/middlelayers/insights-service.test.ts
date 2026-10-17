@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { formatInsight, summarizeInsights, type InsightCard } from "./insights-service";
+import { formatInsight, loadInsightCard, summarizeInsights, type InsightCard } from "./insights-service";
 import type { Insight } from "./insights";
 import en from "@/i18n/locales/en.json";
+import zh from "@/i18n/locales/zh.json";
+import { loadInsightCardData } from "./configuration";
+
+vi.mock("./configuration", async () => ({
+  ...await vi.importActual<typeof import("./configuration")>("./configuration"),
+  loadInsightCardData: vi.fn(),
+}));
 
 const insights: Insight[] = [{
   id: "mover:value:24h", severity: "warning", messageKey: "insights.mover",
@@ -12,6 +19,17 @@ const config = { endpoint: "https://example.test/v1", apiKey: "secret-key-1234",
 const card: InsightCard = { snapshotUuid: "snapshot-a", insights, dismissedIds: [] };
 
 describe("summarizeInsights", () => {
+  it("ignores a corrupt or undecryptable saved card", async () => {
+    vi.mocked(loadInsightCardData).mockResolvedValueOnce("{bad json").mockRejectedValueOnce(new Error("decrypt failed"));
+    expect(await loadInsightCard()).toBeUndefined();
+    expect(await loadInsightCard()).toBeUndefined();
+  });
+  it("ignores a saved card with corrupt insight entries", async () => {
+    vi.mocked(loadInsightCardData).mockResolvedValueOnce(JSON.stringify({
+      snapshotUuid: "snap", insights: [null], dismissedIds: [],
+    }));
+    expect(await loadInsightCard()).toBeUndefined();
+  });
   it("uses translated alert kind names in displayed text", () => {
     const text = formatInsight({
       id: "alert:1", severity: "warning", messageKey: "insights.alert",
@@ -30,11 +48,14 @@ describe("summarizeInsights", () => {
       { currency: "EUR", symbol: "€", rate: 0.9, alias: "Euro" });
     expect(text).toBe("BTC changed by 1,080 EUR (40%) over 24h.");
   });
-  it("keeps opt-in off by default and returns deterministic fallback without an LLM call", async () => {
+  it("localizes the mover window in a Chinese insight", () => {
+    const text = formatInsight(insights[0], (key) => zh[key as keyof typeof zh] ?? key, "zh");
+    expect(text).toBe("BTC 在过去24小时内变化 200 USD（40%）。");
+  });
+  it("keeps opt-in off by default without an LLM call", async () => {
     const fake = vi.fn();
     const summary = await summarizeInsights(card, { ...config, proactiveInsightsSummary: undefined }, "en", fake);
-    expect(summary).toContain("BTC");
-    expect(summary).toContain("USD");
+    expect(summary).toBeUndefined();
     expect(fake).not.toHaveBeenCalled();
   });
 
@@ -59,16 +80,36 @@ describe("summarizeInsights", () => {
     expect(fake).toHaveBeenCalledTimes(2);
   });
 
-  it("falls back on timeout or failure and permits regeneration", async () => {
+  it("does not cache timeout or failure and permits regeneration", async () => {
     const fake = vi.fn().mockResolvedValue({ ok: false, content: "", error: "timeout" });
     const summary = await summarizeInsights(card, config, "en", fake, true);
-    expect(summary).toContain("BTC");
+    expect(summary).toBeUndefined();
     expect(fake.mock.calls[0]?.[1]).toBeLessThanOrEqual(10000);
+  });
+
+  it("does not return a deterministic fallback as a cached model summary", async () => {
+    const fake = vi.fn().mockResolvedValue({ ok: false, content: "", error: "timeout" });
+    expect(await summarizeInsights(card, config, "en", fake)).toBeUndefined();
+  });
+
+  it("tells the model that aggregate monetary amounts are USD", async () => {
+    const fake = vi.fn().mockResolvedValue({ ok: true, content: "First fact.\nSecond fact.\nThird fact." });
+    await summarizeInsights(card, config, "en", fake);
+    expect(fake.mock.calls[0][0].messages[0].content).toContain("USD");
+  });
+
+  it("passes advanced provider headers and temperature to the summary call", async () => {
+    const fake = vi.fn().mockResolvedValue({ ok: true, content: "First fact.\nSecond fact.\nThird fact." });
+    await summarizeInsights(card, { ...config, advanced: { headers: { "x-access": "private-value" }, temperature: 0.4 } },
+      "en", fake);
+    expect(fake.mock.calls[0][0].advanced).toMatchObject({
+      headers: { "x-access": "private-value" }, temperature: 0.4,
+    });
   });
 
   it("rejects a model response that is not a 3-5 line summary", async () => {
     const fake = vi.fn().mockResolvedValue({ ok: true, content: "A single unsupported claim." });
-    expect(await summarizeInsights(card, config, "en", fake)).toContain("BTC");
+    expect(await summarizeInsights(card, config, "en", fake)).toBeUndefined();
   });
 
   it("omits dismissed insights from the model prompt", async () => {
