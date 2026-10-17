@@ -27,7 +27,7 @@ mod sync_tests {
             db.execute(include_str!("../../migrations/init/assets_v2_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/init/asset_prices_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
-            db.execute(include_str!("../../migrations/v10t11/sync_state_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/v08t09/sync_state_up.sql")).await.unwrap();
             db.execute("INSERT INTO assets_v2 (uuid, wallet, symbol, amount, value, price) VALUES ('one', '', 'BTC', 1, 1, 1)").await.unwrap();
             let first: i64 = sqlx::query_scalar("SELECT revision FROM sync_snapshot_revisions WHERE uuid = 'one'")
                 .fetch_one(&mut db).await.unwrap();
@@ -53,7 +53,7 @@ mod sync_tests {
             db.execute(include_str!("../../migrations/init/assets_v2_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/init/asset_prices_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
-            db.execute(include_str!("../../migrations/v10t11/sync_state_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/v08t09/sync_state_up.sql")).await.unwrap();
             db.execute("INSERT INTO assets_v2 (uuid, wallet, symbol, amount, value, price) VALUES ('local', '', 'BTC', 1, 1, 1)").await.unwrap();
             db.close().await.unwrap();
 
