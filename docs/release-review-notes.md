@@ -184,3 +184,16 @@ Checked the P2 lists in sync `s1/round1` and `s3/round4` against this worktree. 
 - S3, R2, and MinIO conditional PUT and ETag behavior need live buckets and credentials. Fake S3 and S3 client tests cover local request and conflict behavior.
 - Tauri WebView URL scope, plugin HTTP header behavior, `beforeunload` on quit, and native narrow-window popover placement need a packaged desktop run. Browser and component tests cover the local code paths.
 - The review's goals and alerts evaluation beyond the sync `dataChanged` event needs that evaluator and a live multi-device setup.
+
+## Accessibility and mobile density review (0.9.0)
+
+Automated checks cover rendered routes at 360 × 740 and 768 × 740 in Chromium with the Tauri bridge, including axe rules, page overflow, and mobile control sizes. Dialog checks cover focus restoration and Escape, viewport fit, and the virtualized History table's row metadata. Vitest runs axe in jsdom for configuration and Assistant controls. Light and dark muted-text contrast is calculated from the theme tokens. The jsdom contrast rule is disabled because jsdom does not resolve the CSS colors needed by axe; browser axe and the token test cover those checks.
+
+The route sweep also exposed a System Info crash when a plan response lacked a `plans` array. The page now keeps its controls available for that response, and the browser fixture returns the expected subscription data.
+
+The following observations still need a real environment:
+
+- Screen reader announcements, reading order, and focus behavior need a manual pass with VoiceOver, NVDA, and a mobile screen reader. Axe and keyboard tests cannot confirm spoken output.
+- Actual phone and tablet touch accuracy, system text scaling, display contrast, and viewport changes from the on-screen keyboard need physical devices. Chromium viewport tests cover layout and target bounds only.
+- Packaged Tauri WebViews on macOS, Windows, and Linux need a native pass for dialog focus, popover positioning, and reduced motion. Browser E2E uses Chromium and a mocked Tauri bridge.
+- Live S3 sync and refresh status timing need configured accounts and provider responses. Automated tests use deterministic status and network fixtures.

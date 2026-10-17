@@ -291,7 +291,9 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
               height: Math.max((wsize.height || 100) / 2, 350),
             }}
           >
-            <Bar options={options as any} data={barDataMemo} />
+            <Bar role="img" aria-label={t("assetsPercentage.chartSummary")
+              .replace("{assets}", legendRows.map((row) => `${row.label} ${row.current.toFixed(1)}%`).join(", "))}
+              options={options as any} data={barDataMemo} />
           </div>
         </CardContent>
       </Card>

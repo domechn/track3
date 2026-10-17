@@ -260,7 +260,7 @@ function Layout({
         />
 
         {/* Main content */}
-        <main className="p-5">
+        <main id="app-main-content" tabIndex={-1} className="p-5">
           <div className="relative min-h-[400px]" aria-busy={initializing}>
             <React.Suspense
               fallback={<RouteLoadingFallback hidden={initializing} />}
@@ -548,7 +548,7 @@ const App = () => {
   // Single mount guard reused by both boot and background effects.
   const activeRef = useRef(true);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 640);
   const sidebarResizeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {

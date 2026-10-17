@@ -142,6 +142,20 @@ describe("Sync settings page", () => {
     expect(screen.getByText(/repeated|predictable/i)).toBeInTheDocument();
   });
 
+  it("associates invalid S3 settings with the visible error", async () => {
+    render(<SyncSettingsPage />);
+    fireEvent.change(screen.getByLabelText("Region"), { target: { value: "us-east-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    const endpoint = screen.getByLabelText("S3 endpoint");
+    expect(endpoint).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Region")).toHaveAttribute("aria-invalid", "false");
+    const error = await screen.findByRole("alert");
+    expect(endpoint).toHaveAttribute("aria-describedby", error.id);
+    expect(screen.getByLabelText("Region")).not.toHaveAttribute("aria-describedby");
+    fireEvent.change(endpoint, { target: { value: "https://s3.example.test" } });
+    expect(endpoint).toHaveAttribute("aria-invalid", "false");
+  });
+
   it("classifies a denied header check without showing the underlying error", async () => {
     vi.mocked(syncRuntime.hasHeader).mockRejectedValueOnce(new S3Error("secret denied", 403));
     render(<SyncSettingsPage />);

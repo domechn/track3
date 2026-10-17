@@ -66,6 +66,8 @@ describe("Rebalance page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Equal weight" }));
     fireEvent.change(screen.getByLabelText("Target percentage for BTC"), { target: { value: "40" } });
     expect(screen.getByRole("alert")).toHaveTextContent("Targets must sum to 100%");
+    expect(screen.getByLabelText("Target percentage for BTC")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Target percentage for BTC")).toHaveAttribute("aria-describedby", screen.getByRole("alert").id);
     expect(screen.getByRole("button", { name: "Save targets" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Normalize to 100%" }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

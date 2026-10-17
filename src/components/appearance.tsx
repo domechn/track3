@@ -187,7 +187,7 @@ const App = ({
           <RadioGroup value={quoteColor} onValueChange={handleQuoteColorValueChange}>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="green-up-red-down" id="green-up-red-down" />
-              <Label htmlFor="green-up-red-down">
+              <Label htmlFor="green-up-red-down" className="flex min-h-11 min-w-11 cursor-pointer items-center">
                 <div className="flex items-center gap-2 text-sm">
                   <span>{t("appearance.quoteColorGreenUp")}</span>
                   <ArrowTopRightIcon className="w-4 h-4 text-green-600" />
@@ -197,7 +197,7 @@ const App = ({
             </div>
             <div className="flex items-center space-x-2 mt-2">
               <RadioGroupItem value="red-up-green-down" id="red-up-green-down" />
-              <Label htmlFor="red-up-green-down">
+              <Label htmlFor="red-up-green-down" className="flex min-h-11 min-w-11 cursor-pointer items-center">
                 <div className="flex items-center gap-2 text-sm">
                   <span>{t("appearance.quoteColorRedUp")}</span>
                   <ArrowTopRightIcon className="w-4 h-4 text-red-600" />
@@ -226,7 +226,7 @@ const App = ({
             {SUPPORTED_LOCALES.map((loc) => (
               <div key={loc} className="flex items-center space-x-2">
                 <RadioGroupItem value={loc} id={`language-${loc}`} />
-                <Label htmlFor={`language-${loc}`}>
+                <Label htmlFor={`language-${loc}`} className="flex min-h-11 min-w-11 cursor-pointer items-center">
                   <span className="text-sm">{LOCALE_LABELS[loc]}</span>
                 </Label>
               </div>

@@ -185,8 +185,9 @@ export default function ChatComposer({
                 />
                 <button
                   type="button"
+                  aria-label={t("assistant.chat.removeAttachment")}
                   onClick={() => removeAttachment(a.id)}
-                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                  className="absolute -right-2 -top-2 flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                 >
                   <Cross2Icon className="h-3 w-3" />
                 </button>
@@ -197,6 +198,7 @@ export default function ChatComposer({
         <div className="flex items-end gap-2 p-2">
           <textarea
             ref={textareaRef}
+            aria-label={t("assistant.chat.placeholder")}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onPaste={handlePaste}
@@ -222,7 +224,7 @@ export default function ChatComposer({
             placeholder={t("assistant.chat.placeholder")}
             rows={1}
             disabled={disabled}
-            className="min-h-[36px] max-h-40 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-0 disabled:opacity-50"
+            className="min-h-11 max-h-40 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             data-testid="chat-input"
             autoCorrect="off"
             autoCapitalize="off"
@@ -235,7 +237,7 @@ export default function ChatComposer({
               onClick={onStop}
               aria-label={t("assistant.chat.stop")}
               data-testid="chat-stop"
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground transition-all duration-200 ease-out hover:bg-destructive/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground transition-all duration-200 ease-out hover:bg-destructive/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:h-9"
             >
               <StopIcon className="h-3.5 w-3.5" />
               {t("assistant.chat.stop")}
@@ -247,7 +249,7 @@ export default function ChatComposer({
               disabled={!canSend}
               aria-label={t("assistant.chat.send")}
               data-testid="chat-send"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-all duration-200 ease-out hover:bg-primary/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-all duration-200 ease-out hover:bg-primary/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 sm:h-9 sm:w-9"
             >
               <PaperPlaneIcon className="h-3.5 w-3.5" />
             </button>

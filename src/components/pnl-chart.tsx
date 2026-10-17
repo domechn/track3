@@ -18,6 +18,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
+import { useTranslation } from "@/i18n";
 
 const chartName = "PNL of Asset";
 
@@ -32,6 +33,7 @@ const App = ({
   quoteColor: QuoteColor;
   className?: string;
 }) => {
+  const { t } = useTranslation();
   const { needResize } = useContext(ChartResizeContext);
   const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
   const [chartWidth, setChartWidth] = useState(600);
@@ -215,7 +217,17 @@ const App = ({
 
   return (
     <div className={className}>
-      <Bar options={options as any} data={lineData()} />
+      <Bar role="img" aria-label={t("pnl.chartSummary")
+        .replace("{count}", String(pnlChanges.length))
+        .replace("{net}", `${currency.symbol}${currencyWrapper(currency)(pnlChanges.reduce((sum, change) => sum + change, 0)).toFixed(2)}`)}
+        options={options as any} data={lineData()} />
+      {plottedPNL.length > 0 && <table className="sr-only" aria-label={t("pnl.chartData")}>
+        <thead><tr><th scope="col">{t("profitMetrics.date")}</th><th scope="col">{t("history.change")}</th></tr></thead>
+        <tbody>{plottedPNL.map(({ change, timestamp }, index) => <tr key={`${timestamp}-${index}`}>
+          <td>{timeToDateStr(timestamp)}</td>
+          <td>{change < 0 ? "-" : "+"}{currency.symbol}{Math.abs(change).toFixed(2)}</td>
+        </tr>)}</tbody>
+      </table>}
     </div>
   );
 };

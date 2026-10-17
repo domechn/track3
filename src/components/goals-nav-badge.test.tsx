@@ -14,6 +14,6 @@ it("announces unread alerts in the main navigation without reading a bare count"
 
 it("announces unread alerts in the collapsed sidebar", () => {
   render(<MemoryRouter><Sidebar collapsed onToggle={() => {}} isProUser={false} /></MemoryRouter>);
-  expect(screen.getByRole("link", { name: "3 unread alerts" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Goals & Alerts 3 unread alerts" })).toBeInTheDocument();
   expect(screen.getByText("3")).toHaveAttribute("aria-hidden", "true");
 });

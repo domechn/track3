@@ -9,6 +9,7 @@ vi.mock("@/i18n", () => ({
         "assistant.chat.placeholder": "Ask about your portfolio...",
         "assistant.chat.stop": "Stop",
         "assistant.chat.send": "Send",
+        "assistant.chat.removeAttachment": "Remove image attachment",
         "assistant.chat.streaming": "Streaming...",
         "assistant.chat.composer.hint":
           "Enter to send, Shift+Enter for new line",
@@ -62,6 +63,7 @@ describe("ChatComposer", () => {
       />,
     );
     expect(screen.getByTestId("chat-input")).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Ask about your portfolio..." })).toBeInTheDocument();
     expect(screen.getByTestId("chat-send")).toBeTruthy();
   });
 
@@ -215,6 +217,7 @@ describe("ChatComposer", () => {
       clipboardData: { items: [{ type: "image/png", getAsFile: () => file }] },
     });
     await waitFor(() => expect(document.querySelector('img[src="blob:test-image"]')).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Remove image attachment" })).toBeInTheDocument();
     expect(writeFile).not.toHaveBeenCalled();
     expect((screen.getByTestId("chat-send") as HTMLButtonElement).disabled).toBe(false);
     createUrl.mockRestore();

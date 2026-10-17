@@ -101,6 +101,14 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("keeps subscription controls available when plan data is malformed", async () => {
+    mocks.getSubscriptionPlans.mockResolvedValueOnce({});
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Upgrade to Pro" })).toBeInTheDocument();
+    await waitFor(() => expect(mocks.getSubscriptionPlans).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: /view pro benefits/i })).toBeInTheDocument();
+  });
+
   it("loads plan prices from the subscription plan API", async () => {
     render(<SystemInfo onProStatusChange={vi.fn()} />);
 

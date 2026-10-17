@@ -59,7 +59,6 @@ import {
   TableRow,
 } from "./ui/table";
 import { resolveAssetLogoSrc } from "@/utils/assets";
-import { ScrollArea } from "./ui/scroll-area";
 import { positiveNegativeColor } from "@/utils/color";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
@@ -563,7 +562,7 @@ const App = ({
             }
           }}
         >
-          <DialogContent className="min-w-[80%]">
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-[1200px] max-h-[calc(100dvh-1rem)] overflow-auto">
             <DialogHeader>
               <DialogTitle>{t("history.detailTitle")}</DialogTitle>
               <DialogDescription className="sr-only">
@@ -836,7 +835,7 @@ const App = ({
                 {t("history.recordsCardSubtitle")}
               </p>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                 <div>
                   {pageLoading
@@ -846,7 +845,7 @@ const App = ({
                     ? ` · ${t("history.showing").replace("{start}", String(loadedRangeStart)).replace("{end}", String(loadedRangeEnd))}`
                     : ""}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">{t("history.rowsLabel")}</span>
                   <Select
                     value={String(pageSize)}
@@ -855,7 +854,7 @@ const App = ({
                       setDataPage(0);
                     }}
                   >
-                    <SelectTrigger className="h-8 w-[84px] text-sm">
+                    <SelectTrigger aria-label={`${t("history.rowsLabel")} ${pageSize}`} className="h-8 w-[84px] text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -900,7 +899,7 @@ const App = ({
                       value={String(dataPage)}
                       onValueChange={(v) => setDataPage(Number(v))}
                     >
-                      <SelectTrigger className="h-8 w-[120px] text-sm">
+                      <SelectTrigger aria-label={`${t("history.selectPage")} ${dataPage + 1} / ${maxDataPage + 1}`} className="h-8 w-[120px] text-sm">
                         <SelectValue placeholder={t("history.selectPage")} />
                       </SelectTrigger>
                       <SelectContent className="overflow-y-auto max-h-[20rem]">
@@ -932,12 +931,11 @@ const App = ({
                 </div>
               </div>
 
-              <div className="relative">
-                <ScrollArea className="w-full rounded-lg border border-border/40 bg-background/20">
-                  <Table>
+              <div className="relative min-w-0 max-w-full rounded-lg border border-border/40 bg-background/20">
+                  <Table className="min-w-[600px]">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="h-[42px]">{t("profitMetrics.date")}</TableHead>
+                        <TableHead className="sticky left-0 z-10 h-[42px] bg-card">{t("profitMetrics.date")}</TableHead>
                         <TableHead className="h-[42px] text-right">
                           {t("history.total")}
                         </TableHead>
@@ -960,18 +958,18 @@ const App = ({
                             className="group cursor-pointer hover:bg-muted/40 transition-colors"
                             onClick={() => onRowClick(row.id)}
                           >
-                            <TableCell className="py-1.5 text-sm">
-                              <div className="flex flex-col">
+                            <TableCell className="sticky left-0 z-10 bg-card py-1.5 text-sm group-hover:bg-muted">
+                              <button type="button"
+                                aria-label={t("history.viewSnapshot").replace("{date}", timeToDateStr(new Date(row.createdAt).getTime(), true))}
+                                className="flex min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <span>
                                   {timeToDateStr(
                                     new Date(row.createdAt).getTime(),
                                     true,
                                   )}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {row.id.slice(0, 8)}
-                                </span>
-                              </div>
+                              </button>
+                              <span className="text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
                             </TableCell>
                             <TableCell className="py-1.5 text-right text-sm font-semibold">
                               {currency.symbol}
@@ -1048,7 +1046,6 @@ const App = ({
                       })}
                     </TableBody>
                   </Table>
-                </ScrollArea>
 
                 {pageLoading && (
                   <PageLoadingOverlay

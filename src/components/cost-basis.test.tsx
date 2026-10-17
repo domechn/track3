@@ -76,6 +76,11 @@ it("flags a reversed date range and does not load or export it", async () => {
   fireEvent.change(screen.getByLabelText("From"), { target: { value: "2025-12-31" } });
   fireEvent.change(screen.getByLabelText("To"), { target: { value: "2025-01-01" } });
   expect(screen.getByRole("alert")).toHaveTextContent("From must be on or before To.");
+  for (const label of ["From", "To"]) {
+    const input = screen.getByLabelText(label);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-describedby", screen.getByRole("alert").id);
+  }
   expect(screen.getByRole("button", { name: "Export CSV" })).toBeDisabled();
   await new Promise((resolve) => setTimeout(resolve, 350));
   expect(loadCostBasisReport).toHaveBeenCalledTimes(calls);

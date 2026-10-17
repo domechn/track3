@@ -33,8 +33,9 @@ const QuickLookDialog = memo(function QuickLookDialog({
         </DialogHeader>
         <div className="max-h-[400px] overflow-y-auto">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <ReloadIcon className="h-6 w-6 animate-spin" />
+            <div role="status" className="flex items-center justify-center py-8">
+              <ReloadIcon aria-hidden="true" className="h-6 w-6 animate-spin" />
+              <span className="sr-only">{t("common.loading")}</span>
             </div>
           ) : data.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">

@@ -48,6 +48,7 @@ export default function GoalsAlerts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [validationField, setValidationField] = useState<"threshold" | "cooldown" | "symbol" | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   async function reload() {
@@ -100,9 +101,14 @@ export default function GoalsAlerts() {
     try {
       await saveAlertRule(toRule());
       setDraft(emptyDraft);
+      setValidationField(null);
       setStatus(t("goals.saved"));
       await reload();
     } catch (cause) {
+      setValidationField(cause instanceof Error
+        ? cause.message === "Invalid threshold" ? "threshold"
+          : cause.message === "Invalid cooldown" ? "cooldown"
+            : cause.message === "Invalid asset" ? "symbol" : null : null);
       setStatus(cause instanceof Error && cause.message.startsWith("Invalid")
         ? t("goals.validation") : t("goals.saveError"));
     }
@@ -174,7 +180,9 @@ export default function GoalsAlerts() {
               </label>
               <label className="space-y-1 text-sm">
                 <span>{t("goals.symbol")}</span>
-                <Input value={draft.symbol} onChange={(e) => setDraft({ ...draft, symbol: e.target.value })} />
+                <Input value={draft.symbol} aria-invalid={validationField === "symbol"}
+                  aria-describedby={validationField === "symbol" ? "goal-rule-status" : undefined}
+                  onChange={(e) => { setValidationField(null); setDraft({ ...draft, symbol: e.target.value }); }} />
               </label>
             </>}
             <label className="space-y-1 text-sm">
@@ -187,7 +195,9 @@ export default function GoalsAlerts() {
             <label className="space-y-1 text-sm">
               <span>{t("goals.threshold")}</span>
               <Input type="number" min={needsWindow(draft.kind) ? undefined : "0"} step="any" value={draft.threshold}
-                onChange={(e) => setDraft({ ...draft, threshold: e.target.value })} />
+                aria-invalid={validationField === "threshold"}
+                aria-describedby={validationField === "threshold" ? "goal-rule-status" : undefined}
+                onChange={(e) => { setValidationField(null); setDraft({ ...draft, threshold: e.target.value }); }} />
             </label>
             {needsWindow(draft.kind) && <label className="space-y-1 text-sm">
               <span>{t("goals.window")}</span>
@@ -199,7 +209,9 @@ export default function GoalsAlerts() {
             <label className="space-y-1 text-sm">
               <span>{t("goals.cooldown")}</span>
               <Input type="number" min="0" step="1" value={draft.cooldownMinutes}
-                onChange={(e) => setDraft({ ...draft, cooldownMinutes: e.target.value })} />
+                aria-invalid={validationField === "cooldown"}
+                aria-describedby={validationField === "cooldown" ? "goal-rule-status" : undefined}
+                onChange={(e) => { setValidationField(null); setDraft({ ...draft, cooldownMinutes: e.target.value }); }} />
             </label>
           </div>
           <p className="text-xs text-muted-foreground">{t("goals.units")}</p>
@@ -207,7 +219,8 @@ export default function GoalsAlerts() {
             <Button onClick={() => void save()}>{t("goals.saveRule")}</Button>
             {draft.id > 0 && <Button variant="outline" onClick={() => setDraft(emptyDraft)}>{t("common.cancel")}</Button>}
           </div>
-          {status && <p role="status" className="text-sm">{status}</p>}
+          {validationField && status && <p id="goal-rule-status" role="alert" className="text-sm">{status}</p>}
+          {!validationField && status && <p role="status" className="text-sm">{status}</p>}
         </CardContent>
       </Card>
       <Card>

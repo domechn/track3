@@ -9,7 +9,7 @@ const schemaFiles = [
   "currency_rates", "configuration",
 ];
 
-export async function installTauriBridge(page: Page, s3?: FakeS3) {
+export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewContent = false) {
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
   });
@@ -35,6 +35,20 @@ export async function installTauriBridge(page: Page, s3?: FakeS3) {
   db.run("INSERT INTO configuration (id, data) VALUES (11, ?)", [
     "btc: {addresses: []}\nerc20: {addresses: []}\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
   ]);
+  if (seedReviewContent) {
+    db.run(`INSERT INTO chat_sessions (id, title, createdAt, updatedAt, pinned, messageCount, preview)
+      VALUES ('pinned-e2e', 'Pinned portfolio review', '2026-01-01', '2026-01-02', 1, 0, ''),
+        ('recent-e2e', 'Recent portfolio review', '2026-01-01', '2026-01-03', 0, 0, '')`);
+    db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+      VALUES ('snapshot-old', 1, 'crypto', 'wallet-1', 'BTC', 1, 40000, 'BUY', '2024-01-01T00:00:00.000Z')`);
+    db.run("INSERT INTO configuration (id, data) VALUES (992, ?)", [
+      `!ent:e2e:${JSON.stringify({
+        snapshotUuid: "snapshot-new", dismissedIds: [],
+        insights: [{ id: "new:crypto:BTC", severity: "info", messageKey: "insights.newAsset",
+          data: { symbol: "BTC", value: 42000 } }],
+      })}`,
+    ]);
+  }
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/history_snapshots_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/rebalance_profiles_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v10t11/sync_state_up.sql"), "utf8"));
@@ -231,6 +245,11 @@ export async function installTauriBridge(page: Page, s3?: FakeS3) {
       let body = "{}";
       if (request.url.endsWith("/api/license/isPro")) {
         body = '{"isPro":true}';
+      } else if (request.url.endsWith("/api/license")) {
+        const action = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? []))).action;
+        body = action === "subscription-plans"
+          ? '{"plans":[{"planType":"monthly","currency":"usd","unitAmountCents":1299,"interval":"month"},{"planType":"yearly","currency":"usd","unitAmountCents":9999,"interval":"year"}]}'
+          : '{"planType":"yearly","status":"active","currentPeriodEnd":"2026-12-01T00:00:00.000Z","cancelAtPeriodEnd":false,"isLegacy":false}';
       } else if (request.url.endsWith("/api/coins/price")) {
         body = '{"data":{"BTC":42000,"USDT":1}}';
       } else if (request.url.endsWith("/chat/completions")) {

@@ -85,10 +85,13 @@ const App = ({
   return (
     <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
       <PopoverTrigger asChild>
-        <CalendarIcon className="h-6 w-6 font-normal cursor-pointer text-muted-foreground" />
+        <button type="button" aria-label={t("datePicker.open")}
+          className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <CalendarIcon aria-hidden="true" className="h-6 w-6" />
+        </button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex">
+      <PopoverContent className="w-[calc(100vw-1rem)] max-w-max max-h-[calc(100dvh-1rem)] overflow-auto p-0" align="end" collisionPadding={8}>
+        <div className="flex flex-col sm:flex-row">
           <Calendar
             mode="range"
             defaultMonth={date?.to}
@@ -102,36 +105,36 @@ const App = ({
               {t("datePicker.predefined")}
             </div>
             <div className="text-xs">
-              <div
-                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
+              <button type="button"
+                className="min-h-11 py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors sm:min-h-0"
                 onClick={() => handlePredefinedTimesClick(10)}
               >
                 {t("datePicker.last10")}
-              </div>
-              <div
-                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
+              </button>
+              <button type="button"
+                className="min-h-11 py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors sm:min-h-0"
                 onClick={() => handlePredefinedTimesClick(30)}
               >
                 {t("datePicker.last30")}
-              </div>
-              <div
-                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
+              </button>
+              <button type="button"
+                className="min-h-11 py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors sm:min-h-0"
                 onClick={() => handlePredefinedTimesClick(50)}
               >
                 {t("datePicker.last50")}
-              </div>
-              <div
-                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
+              </button>
+              <button type="button"
+                className="min-h-11 py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors sm:min-h-0"
                 onClick={() => handlePredefinedTimesClick(100)}
               >
                 {t("datePicker.last100")}
-              </div>
-              <div
-                className="py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors"
+              </button>
+              <button type="button"
+                className="min-h-11 py-3 px-5 rounded-md hover:bg-accent/60 cursor-pointer transition-colors sm:min-h-0"
                 onClick={() => handlePredefinedTimesClick(-1)}
               >
                 {t("datePicker.all")}
-              </div>
+              </button>
             </div>
           </div>
         </div>

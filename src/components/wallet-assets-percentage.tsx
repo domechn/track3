@@ -632,16 +632,6 @@ const App = ({
                         height: item.height,
                       }}
                       onClick={handleClick}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          handleClick(
-                            e as unknown as React.MouseEvent<HTMLDivElement>,
-                          );
-                        }
-                      }}
                     >
                       <button
                         type="button"
@@ -649,7 +639,6 @@ const App = ({
                         data-testid="wallet-treemap-tile"
                         data-tile-key={item.wallet.wallet}
                         data-tile-category={item.category}
-                        aria-label={ariaLabel}
                         className={
                           "absolute inset-0 overflow-hidden text-left rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-card animate-in fade-in duration-200 " +
                           (textTone === "foreground"
@@ -667,6 +656,7 @@ const App = ({
                           padding: "6px 8px",
                         }}
                       >
+                        <span className="sr-only">{ariaLabel}</span>
                         {contentLevel === "full" && (
                           <div className="flex h-full flex-col justify-between">
                             <div className="text-[11px] font-medium leading-tight line-clamp-2">

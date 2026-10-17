@@ -7,6 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import HistoricalData from "@/components/historical-data";
 
 vi.mock("@/components/motion", () => ({
@@ -84,6 +85,26 @@ beforeEach(() => {
 });
 
 describe("Historical Data page", () => {
+  it("opens snapshot details from a named keyboard control", async () => {
+    vi.mocked(queryHistoricalData).mockResolvedValue([{
+      id: "snapshot-1",
+      createdAt: "2024-04-16T12:00:00.000Z",
+      total: 1200,
+      assets: [{ id: 7, uuid: "snapshot-1", createdAt: "2024-04-16T12:00:00.000Z",
+        assetType: "crypto", symbol: "BTC", amount: 1, value: 1200, price: 1200 }],
+      transactions: [],
+    }]);
+    render(<HistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    const trigger = await screen.findByRole("button", { name: /view snapshot/i });
+    expect(trigger).toHaveAccessibleName("View snapshot from 2024-4-16 12:00:00");
+    trigger.focus();
+    await userEvent.keyboard("{Enter}");
+    const dialog = await screen.findByRole("dialog", { name: /historical data detail/i });
+    const table = within(dialog).getByRole("table");
+    expect(table).toHaveAttribute("aria-rowcount", "2");
+    expect(within(table).getByRole("columnheader", { name: "Asset" })).toHaveAttribute("scope", "col");
+    expect(within(table).getByTestId("history-detail-row")).toHaveAttribute("aria-rowindex", "2");
+  });
   it("shows a heading and keeps the loading status visible while records are unresolved", () => {
     vi.useFakeTimers();
     vi.mocked(queryHistoricalData).mockReturnValue(

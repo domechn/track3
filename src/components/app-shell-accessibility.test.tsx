@@ -8,7 +8,7 @@ import Overview from "@/components/overview";
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
 vi.mock("@/components/index", () => ({
-  default: () => <div>index app</div>,
+  default: () => <main id="app-main-content" tabIndex={-1}>index app</main>,
 }));
 
 vi.mock("@/components/auto-updater", () => ({
@@ -65,12 +65,12 @@ vi.mock("@/components/motion", () => ({
 }));
 
 describe("App shell accessibility", () => {
-  it("provides a skip link that focuses the main content wrapper", async () => {
+  it("provides a skip link that focuses the main landmark", async () => {
     const user = userEvent.setup();
     render(<App />);
 
     const skipLink = screen.getByRole("link", { name: /skip to main content/i });
-    const mainContent = screen.getByText("index app").closest("#app-main-content");
+    const mainContent = screen.getByRole("main");
 
     expect(mainContent).not.toBeNull();
 

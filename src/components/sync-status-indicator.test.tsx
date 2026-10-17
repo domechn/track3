@@ -44,6 +44,7 @@ describe("SyncStatusIndicator", () => {
 
   it("shows sync errors and last round counts in an accessible details popover", async () => {
     render(<SyncStatusIndicator />);
+    expect(screen.getByRole("status")).toHaveTextContent("Sync error");
     fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
     expect(await screen.findByText(/Pulled 2, pushed 1, conflicts 1, errors 1/)).toBeInTheDocument();
     expect(screen.getByText("Some sync data could not be processed. Track3 will retry automatically.")).toBeInTheDocument();

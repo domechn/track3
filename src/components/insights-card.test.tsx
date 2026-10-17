@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import InsightsCard from "./insights-card";
 import { dismissInsight, formatInsight, loadInsightCard, refreshInsights, INSIGHTS_CHANGED_EVENT } from "@/middlelayers/insights-service";
 import type { InsightCard } from "@/middlelayers/insights-service";
+import axe from "axe-core";
 
 vi.mock("@/middlelayers/insights-service", () => ({
   INSIGHTS_CHANGED_EVENT: "track3-insights-changed",
@@ -28,6 +29,15 @@ beforeEach(() => {
 });
 
 describe("InsightsCard", () => {
+  it("names the populated insight controls and passes axe", async () => {
+    vi.mocked(loadInsightCard).mockResolvedValue(card);
+    const { container } = render(<InsightsCard />);
+    expect(await screen.findByRole("region", { name: "Insights" })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Ask the assistant/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Dismiss insight/ })).toBeVisible();
+    const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+    expect(results.violations.map(({ id }) => id)).toEqual([]);
+  });
   it("renders loading, empty, and error states", async () => {
     let finish: (value: InsightCard | undefined) => void = () => {};
     vi.mocked(loadInsightCard).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));

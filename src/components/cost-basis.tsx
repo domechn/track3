@@ -156,11 +156,15 @@ export default function CostBasisPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="cost-from">{t("cost.from")}</Label>
-            <Input id="cost-from" type="date" value={from} onChange={(e) => { setFrom(e.target.value); setYear(""); }} />
+            <Input id="cost-from" type="date" aria-invalid={!validRange}
+              aria-describedby={!validRange ? "cost-range-error" : undefined}
+              value={from} onChange={(e) => { setFrom(e.target.value); setYear(""); }} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="cost-to">{t("cost.to")}</Label>
-            <Input id="cost-to" type="date" value={to} onChange={(e) => { setTo(e.target.value); setYear(""); }} />
+            <Input id="cost-to" type="date" aria-invalid={!validRange}
+              aria-describedby={!validRange ? "cost-range-error" : undefined}
+              value={to} onChange={(e) => { setTo(e.target.value); setYear(""); }} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="cost-days">{t("cost.holdingDays")}</Label>
@@ -169,7 +173,7 @@ export default function CostBasisPage() {
           </div>
         </CardContent>
       </Card>
-      {!validRange && <p role="alert" className="text-sm text-destructive">{t("cost.invalidRange")}</p>}
+      {!validRange && <p id="cost-range-error" role="alert" className="text-sm text-destructive">{t("cost.invalidRange")}</p>}
       {loading && <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p>}
       {report && validRange && <>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -186,7 +190,7 @@ export default function CostBasisPage() {
         <Card>
           <CardHeader><CardTitle>{t("cost.byAsset")}</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto">
-            <Table><TableHeader><TableRow><TableHead>{t("cost.asset")}</TableHead><TableHead className="text-right">{t("cost.proceeds")}</TableHead><TableHead className="text-right">{t("cost.costBasis")}</TableHead><TableHead className="text-right">{t("cost.gainLoss")}</TableHead></TableRow></TableHeader>
+            <Table className="sticky-first-column"><TableHeader><TableRow><TableHead>{t("cost.asset")}</TableHead><TableHead className="text-right">{t("cost.proceeds")}</TableHead><TableHead className="text-right">{t("cost.costBasis")}</TableHead><TableHead className="text-right">{t("cost.gainLoss")}</TableHead></TableRow></TableHeader>
               <TableBody>{report.assets.slice(pages.assets * pageSize, (pages.assets + 1) * pageSize).map((asset) => <TableRow key={`${asset.assetType}:${asset.symbol}`}><TableCell>{asset.symbol}</TableCell><TableCell className="text-right">{money(asset.proceeds)}</TableCell><TableCell className="text-right">{money(asset.costBasis)}</TableCell><TableCell className="text-right">{money(asset.gainLoss)}</TableCell></TableRow>)}</TableBody>
             </Table>
             {report.assets.length === 0 && <p className="py-4 text-sm text-muted-foreground">{t("cost.noDisposals")}</p>}
@@ -195,14 +199,14 @@ export default function CostBasisPage() {
           </CardContent>
         </Card>
         <Card><CardHeader><CardTitle>{t("cost.realized")}</CardTitle></CardHeader><CardContent className="overflow-x-auto">
-          <Table><TableHeader><TableRow>{["asset", "acquired", "disposed", "quantity", "proceeds", "costBasis", "gainLoss", "term", "lot"].map((key) => <TableHead key={key}>{t(`cost.${key}`)}</TableHead>)}</TableRow></TableHeader><TableBody>{report.disposals.slice(pages.disposals * pageSize, (pages.disposals + 1) * pageSize).map((row, index) => (
+          <Table className="sticky-first-column"><TableHeader><TableRow>{["asset", "acquired", "disposed", "quantity", "proceeds", "costBasis", "gainLoss", "term", "lot"].map((key) => <TableHead key={key}>{t(`cost.${key}`)}</TableHead>)}</TableRow></TableHeader><TableBody>{report.disposals.slice(pages.disposals * pageSize, (pages.disposals + 1) * pageSize).map((row, index) => (
             <TableRow key={`${row.eventId}:${row.lotId}:${index}`}><TableCell>{row.symbol}</TableCell><TableCell>{format(new Date(row.acquiredAt), "yyyy-MM-dd")}</TableCell><TableCell>{format(new Date(row.disposedAt), "yyyy-MM-dd")}</TableCell><TableCell>{qty(row.amount)}</TableCell><TableCell>{money(row.proceeds)}</TableCell><TableCell>{money(row.costBasis)}</TableCell><TableCell>{money(row.gainLoss)}</TableCell><TableCell>{t(`cost.term.${row.term}`)}</TableCell><TableCell>{row.lotId}</TableCell></TableRow>
           ))}</TableBody></Table>
           <PageControls label={t("cost.realized")} page={pages.disposals} count={report.disposals.length}
             onPageChange={(page) => setPages((previous) => ({ ...previous, disposals: page }))} />
         </CardContent></Card>
         <Card><CardHeader><CardTitle>{t("cost.unrealized")}</CardTitle></CardHeader><CardContent className="overflow-x-auto">
-          <Table><TableHeader><TableRow>{["asset", "lot", "acquired", "quantity", "costBasis", "marketValue", "gainLoss"].map((key) => <TableHead key={key}>{t(`cost.${key}`)}</TableHead>)}</TableRow></TableHeader><TableBody>{report.unrealized.slice(pages.unrealized * pageSize, (pages.unrealized + 1) * pageSize).map((asset) => (
+          <Table className="sticky-first-column"><TableHeader><TableRow>{["asset", "lot", "acquired", "quantity", "costBasis", "marketValue", "gainLoss"].map((key) => <TableHead key={key}>{t(`cost.${key}`)}</TableHead>)}</TableRow></TableHeader><TableBody>{report.unrealized.slice(pages.unrealized * pageSize, (pages.unrealized + 1) * pageSize).map((asset) => (
             <TableRow key={`${asset.assetType}:${asset.symbol}:${asset.id}`}><TableCell>{asset.symbol}</TableCell><TableCell>{asset.id}</TableCell><TableCell>{format(new Date(asset.acquiredAt), "yyyy-MM-dd")}</TableCell><TableCell>{qty(asset.amount)}</TableCell><TableCell>{money(asset.costBasis)}</TableCell><TableCell>{money(asset.marketValue)}</TableCell><TableCell>{money(asset.gainLoss)}</TableCell></TableRow>
           ))}</TableBody></Table>
           <PageControls label={t("cost.unrealized")} page={pages.unrealized} count={report.unrealized.length}

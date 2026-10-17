@@ -208,8 +208,9 @@ const App = ({
 
   return (
     <div className="flex items-center gap-2">
-      <Button variant="outline" onClick={() => runRefresh()} disabled={refreshLoading}>
-        <UpdateIcon className={`mr-2 h-4 w-4 ${refreshLoading ? "animate-spin" : ""}`} />
+      <span role="status" className="sr-only">{refreshLoading ? t("refresh.inProgress") : ""}</span>
+      <Button variant="outline" aria-label={t("common.refresh")} onClick={() => runRefresh()} disabled={refreshLoading}>
+        <UpdateIcon aria-hidden="true" className={`sm:mr-2 h-4 w-4 ${refreshLoading ? "animate-spin motion-reduce:animate-none" : ""}`} />
         <p className="hidden sm:inline-block">{t("common.refresh")}</p>
       </Button>
       {sourceStatuses.length > 0 && (

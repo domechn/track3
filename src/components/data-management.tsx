@@ -297,13 +297,13 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
                 checked={exportConfiguration}
                 onCheckedChange={(v) => setExportConfiguration(!!v)}
               />
-              <Label htmlFor="exportConfigurationCheckbox" className="text-sm">
+              <Label htmlFor="exportConfigurationCheckbox" className="flex min-h-11 items-center text-sm">
                 {t("data.includeConfig")}
               </Label>
             </div>
             <div className="flex items-center space-x-2">
               <Checkbox id="exportDataCheckbox" checked={true} disabled />
-              <Label htmlFor="exportDataCheckbox" className="text-sm">
+              <Label htmlFor="exportDataCheckbox" className="flex min-h-11 items-center text-sm">
                 {t("data.includeHistory")}
               </Label>
             </div>

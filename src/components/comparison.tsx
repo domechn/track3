@@ -507,14 +507,14 @@ const App = ({
           <Card>
             <CardContent className="pt-5 pb-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
                   <Button
                     type="button"
                     onClick={onViewOrHideClick}
                     variant="ghost"
                     size="icon"
                     className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-9 sm:w-9"
-                    aria-label={shouldMaskValue ? "show values" : "hide values"}
+                    aria-label={t(shouldMaskValue ? "comparison.showValues" : "comparison.hideValues")}
                     aria-pressed={shouldMaskValue}
                   >
                     {shouldMaskValue ? (
@@ -529,7 +529,7 @@ const App = ({
                       />
                     )}
                   </Button>
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <ComparisonDatePicker
                       label={t("comparison.baseDate")}
                       value={baseId}
@@ -545,7 +545,7 @@ const App = ({
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="text-muted-foreground text-sm">
                     {t("comparison.quick")}
                   </span>
@@ -775,11 +775,11 @@ function ComparisonDatePicker({
         <Button
           type="button"
           variant="outline"
-          className="w-[150px] justify-start gap-2 px-3 font-normal"
-          aria-label={`Choose ${label.toLowerCase()}`}
+          className="w-[min(150px,100%)] justify-start gap-2 px-3 font-normal"
           disabled={dateOptions.length === 0}
         >
           <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="sr-only">{label}: </span>
           <span className="truncate">
             {selectedOption?.displayLabel || label}
           </span>
@@ -819,9 +819,9 @@ function ComparisonDatePicker({
                   variant={option.value === value ? "secondary" : "ghost"}
                   size="sm"
                   className="h-8 justify-start px-2 text-xs font-normal"
-                  aria-label={`Select ${option.displayLabel} snapshot`}
                   onClick={() => onSnapshotSelect(option)}
                 >
+                  <span className="sr-only">{t("comparison.selectSnapshot").replace("{date}", option.displayLabel)}</span>
                   <span>{option.snapshotLabel}</span>
                   {option.value === value && (
                     <span className="ml-auto text-[11px] text-muted-foreground">

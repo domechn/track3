@@ -353,6 +353,8 @@ const App = () => {
           <Label htmlFor="assistant-input-price">{t("settings.assistant.inputPrice")}</Label>
           <Input
             id="assistant-input-price"
+            aria-invalid={priceError}
+            aria-describedby={priceError ? "assistant-price-error" : undefined}
             type="number"
             min={0}
             step="any"
@@ -364,6 +366,8 @@ const App = () => {
           <Label htmlFor="assistant-output-price">{t("settings.assistant.outputPrice")}</Label>
           <Input
             id="assistant-output-price"
+            aria-invalid={priceError}
+            aria-describedby={priceError ? "assistant-price-error" : undefined}
             type="number"
             min={0}
             step="any"
@@ -374,7 +378,7 @@ const App = () => {
           />
           <p className="text-xs text-muted-foreground">{t("settings.assistant.priceHint")}</p>
           {priceError && (
-            <p role="alert" className="text-xs text-destructive">{t("settings.assistant.invalidPrice")}</p>
+            <p id="assistant-price-error" role="alert" className="text-xs text-destructive">{t("settings.assistant.invalidPrice")}</p>
           )}
         </CardContent>
       </Card>
@@ -389,6 +393,8 @@ const App = () => {
           <Label htmlFor="assistant-advanced">{t("settings.assistant.advancedJson")}</Label>
           <textarea
             id="assistant-advanced"
+            aria-invalid={!!advancedError}
+            aria-describedby={advancedError ? "assistant-advanced-error" : undefined}
             ref={advancedRef}
             placeholder='{"temperature": 0.7, "top_p": 0.9}'
             rows={5}
@@ -401,6 +407,8 @@ const App = () => {
           </p>
           {advancedError && (
             <p
+              id="assistant-advanced-error"
+              role="alert"
               className="text-xs text-destructive"
               data-testid="assistant-advanced-error"
             >
@@ -440,6 +448,7 @@ const App = () => {
       </Card>
 
       <div className="flex items-center justify-between gap-2">
+        <span role="status" className="sr-only">{testing ? t("settings.assistant.testingStatus") : saving ? t("settings.assistant.savingStatus") : ""}</span>
         <Button
           variant="outline"
           onClick={onTest}

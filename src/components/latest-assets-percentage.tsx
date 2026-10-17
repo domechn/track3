@@ -230,7 +230,10 @@ const App = ({
 
   function renderDoughnut() {
     return (
-      <Doughnut ref={chartRef} options={options as any} data={lineData()} />
+      <Doughnut ref={chartRef} role="img"
+        aria-label={t("latestAssets.chartSummary").replace("{assets}",
+          percentageData.map((asset) => `${asset.coin} ${asset.percentage.toFixed(1)}%`).join(", "))}
+        options={options as any} data={lineData()} />
     );
   }
 
@@ -278,21 +281,18 @@ const App = ({
                 })}
                 className="h-[42px]"
               >
-                <TableCell className="py-1.5">
+                <TableCell className="py-0 sm:py-1.5">
                   <Link
                     to={buildAssetDetailsPath({
                       symbol: d.coin,
                       assetType: d.assetType,
                     })}
-                    aria-label={t("common.openAssetDetails").replace(
-                      "{asset}",
-                      formatAssetLabel({
-                        symbol: d.coin,
-                        assetType: d.assetType,
-                      }),
-                    )}
-                    className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="group inline-flex min-h-11 flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
                   >
+                    <span className="sr-only">{t("common.openAssetDetails").replace(
+                      "{asset}",
+                      formatAssetLabel({ symbol: d.coin, assetType: d.assetType }),
+                    )}</span>
                     <img
                       className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
                       src={resolveAssetLogoSrc(
@@ -304,10 +304,7 @@ const App = ({
                           })
                         ],
                       )}
-                      alt={formatAssetLabel({
-                        symbol: d.coin,
-                        assetType: d.assetType,
-                      })}
+                      alt=""
                     />
                     <div
                       className="mr-1 font-medium text-sm"

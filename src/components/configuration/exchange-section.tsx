@@ -74,7 +74,7 @@ const ExchangeSection = memo(function ExchangeSection({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {t("config.exchanges")}
@@ -124,7 +124,7 @@ const ExchangeSection = memo(function ExchangeSection({
                     }
                     value={addExchangeConfig?.type ?? ""}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger id="name" aria-label={t("config.formType")} className="w-full max-w-[180px]">
                       <SelectValue placeholder={t("config.selectCex")} />
                     </SelectTrigger>
                     <SelectContent>

@@ -190,7 +190,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
   ) => (
     <label htmlFor={id} className="space-y-1 text-xs text-muted-foreground">
       <span>{label}</span>
-      <Input id={id} className="h-8 text-xs tabular-nums" type="number" min="0" step="0.01"
+      <Input id={id} className="h-11 text-xs tabular-nums sm:h-8" type="number" min="0" step="0.01"
         value={Number.isNaN(value) ? "" : value}
         onChange={(event) => setter(numberOrZero(event.target.value))} />
     </label>
@@ -227,10 +227,10 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
             </CardHeader>
             <CardContent className="space-y-3 px-4 pb-4">
               {targets.map((target, index) => (
-                <div key={target.id} className="grid grid-cols-[minmax(90px,1fr)_minmax(85px,1fr)_72px_32px] items-end gap-1.5 sm:grid-cols-[150px_minmax(120px,1fr)_110px_32px]">
+                <div key={target.id} className="grid grid-cols-2 items-end gap-1.5 sm:grid-cols-[150px_minmax(120px,1fr)_110px_44px]">
                   <label className="space-y-1 text-xs text-muted-foreground">
                     <span>{t("rebalance.targetKind")}</span>
-                    <select className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                    <select className="h-11 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground sm:h-8"
                       value={target.kind} onChange={(event) => {
                         const percent = target.percent;
                         const previousAsset = target.kind === "asset"
@@ -250,7 +250,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
                     target.kind === "type" ? (
                       <label className="space-y-1 text-xs text-muted-foreground">
                         <span>{t("rebalance.targetType")}</span>
-                        <select className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        <select className="h-11 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground sm:h-8"
                           value={target.assetType}
                           onChange={(event) => updateTarget(index, { ...target, assetType: event.target.value as AssetType })}>
                           <option value="crypto">{t("rebalance.crypto")}</option>
@@ -260,19 +260,21 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
                     ) : (
                       <label className="space-y-1 text-xs text-muted-foreground">
                         <span>{t("rebalance.symbol")}</span>
-                        <Input className="h-8 text-xs" value={target.symbol} placeholder={t("rebalance.symbolPlaceholder")}
+                        <Input className="h-11 text-xs sm:h-8" value={target.symbol} placeholder={t("rebalance.symbolPlaceholder")}
                           onChange={(event) => updateTarget(index, { ...target, symbol: event.target.value.toUpperCase() })}
                           aria-label={t("rebalance.symbol")} />
                       </label>
                     )}
                   <label className="space-y-1 text-xs text-muted-foreground">
                     <span>{t("rebalance.percent")}</span>
-                    <Input className="h-8 px-1.5 text-xs tabular-nums" type="number" min="0" max="100" step="0.01"
+                    <Input className="h-11 px-1.5 text-xs tabular-nums sm:h-8" type="number" min="0" max="100" step="0.01"
                       aria-label={t("rebalance.percentFor").replace("{asset}", labelFor(target))}
+                      aria-invalid={!!validation || normalizeError}
+                      aria-describedby={validation || normalizeError ? "rebalance-target-error" : undefined}
                       value={Number.isNaN(target.percent) ? "" : target.percent}
                       onChange={(event) => updateTarget(index, { ...target, percent: numberOrZero(event.target.value) })} />
                   </label>
-                  <Button className="h-8 w-8 p-0" size="sm" variant="ghost"
+                  <Button className="h-11 w-11 p-0 sm:h-8 sm:w-8" size="sm" variant="ghost"
                     aria-label={t("rebalance.remove").replace("{asset}", labelFor(target))}
                     onClick={() => setTargets((previous) => previous.filter((_, i) => i !== index))}>×</Button>
                 </div>
@@ -288,7 +290,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
                   {t("rebalance.total").replace("{total}", total.toFixed(2))}
                 </span>
               </div>
-              {(normalizeError || validation) && <p role="alert" className="text-xs text-destructive">{normalizeError ? t("rebalance.validationOther") : validation}</p>}
+              {(normalizeError || validation) && <p id="rebalance-target-error" role="alert" className="text-xs text-destructive">{normalizeError ? t("rebalance.validationOther") : validation}</p>}
               {status && <p role="status" className="text-xs text-muted-foreground">{status}</p>}
               <div className="flex gap-2">
                 <Button size="sm" disabled={!targets.length || !!validation} onClick={() => void save()}>{t("rebalance.saveTargets")}</Button>
@@ -317,7 +319,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
             <CardContent className="grid grid-cols-2 gap-2 px-4 pb-4 md:grid-cols-4">
               <label htmlFor="rebalance-mode" className="space-y-1 text-xs text-muted-foreground">
                 <span>{t("rebalance.mode")}</span>
-                <select id="rebalance-mode" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                <select id="rebalance-mode" className="h-11 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground sm:h-8"
                   value={mode} onChange={(event) => setMode(event.target.value as "full" | "buys")}>
                   <option value="full">{t("rebalance.modeFull")}</option>
                   <option value="buys">{t("rebalance.modeBuys")}</option>

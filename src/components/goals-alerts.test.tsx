@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import axe from "axe-core";
 import { beforeEach, expect, it, vi } from "vitest";
 import GoalsAlerts from "./goals-alerts";
 import { listAlertRules, listAlertHistory, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
@@ -43,11 +44,30 @@ it("validates a new goal before saving", async () => {
   await screen.findByText("No rules yet");
   await user.click(screen.getByRole("button", { name: "Save rule" }));
   expect(saveAlertRule).not.toHaveBeenCalled();
-  await user.type(screen.getByLabelText("Threshold"), "1000");
+  const threshold = screen.getByLabelText("Threshold");
+  const error = screen.getByText(/enter a valid threshold/i);
+  expect(threshold).toHaveAttribute("aria-invalid", "true");
+  expect(threshold).toHaveAttribute("aria-describedby", error.id);
+  await user.type(threshold, "1000");
   await user.click(screen.getByRole("button", { name: "Save rule" }));
   await waitFor(() => expect(saveAlertRule).toHaveBeenCalledWith(expect.objectContaining({
     kind: "total_value_target", threshold: 1000,
   })));
+});
+
+it("keeps success and validation feedback in separate live regions", async () => {
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByText("No rules yet");
+  await user.click(screen.getByRole("button", { name: "Save rule" }));
+  const alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent(/enter a valid threshold/i);
+  await user.type(screen.getByLabelText("Threshold"), "1000");
+  await user.click(screen.getByRole("button", { name: "Save rule" }));
+  const status = await screen.findByRole("status");
+  expect(status).toHaveTextContent(/saved/i);
+  expect(status).not.toBe(alert);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 it("shows an unread alert and acknowledges it", async () => {
@@ -78,6 +98,8 @@ it("asks before deleting a rule", async () => {
   await user.click(screen.getByRole("button", { name: "Delete" }));
   const dialog = await screen.findByRole("alertdialog");
   expect(dialog).toBeInTheDocument();
+  const results = await axe.run(dialog, { rules: { "color-contrast": { enabled: false } } });
+  expect(results.violations).toEqual([]);
   expect(deleteAlertRule).not.toHaveBeenCalled();
   await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(deleteAlertRule).not.toHaveBeenCalled();

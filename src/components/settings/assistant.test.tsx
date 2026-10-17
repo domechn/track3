@@ -47,6 +47,22 @@ beforeEach(() => {
 });
 
 describe("AssistantSettings", () => {
+  it("announces saving while settings are being persisted", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,
+    });
+    let finishSave = () => {};
+    vi.mocked(saveAIConfig).mockImplementationOnce(() => new Promise<void>((resolve) => {
+      finishSave = () => resolve();
+    }));
+    render(<AssistantSettings />);
+    await screen.findByLabelText(/endpoint/i);
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(screen.getByRole("status")).toHaveTextContent("Saving assistant settings");
+    finishSave();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(""));
+  });
+
   it("lets the user disable action proposals while keeping confirmation required", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue({
       endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,
@@ -110,6 +126,9 @@ describe("AssistantSettings", () => {
     fireEvent.change(screen.getByLabelText(/advanced options/i), { target: { value: "{}" } });
     await userEvent.click(screen.getByTestId("assistant-save"));
     expect(await screen.findByText(/enter a nonnegative token price/i)).toBeTruthy();
+    const priceError = screen.getByRole("alert");
+    expect(price).toHaveAttribute("aria-invalid", "true");
+    expect(price).toHaveAttribute("aria-describedby", priceError.id);
     fireEvent.change(price, { target: { value: "2" } });
     expect(screen.queryByText(/enter a nonnegative token price/i)).toBeNull();
   });
@@ -369,6 +388,7 @@ describe("AssistantSettings", () => {
     const testBtn = screen.getByTestId("assistant-test-connection") as HTMLButtonElement;
     await userEvent.click(testBtn);
     expect(testBtn.disabled).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent("Testing connection");
 
     resolveProbe?.(undefined);
     await waitFor(() => {
