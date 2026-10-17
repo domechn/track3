@@ -10,7 +10,7 @@ import { TRANSACTION_HANDLER } from "@/middlelayers/entities/transactions";
 import { useChat } from "@/components/assistant/use-chat";
 import { runSkill } from "@/middlelayers/ai/tools";
 import type { ActualCase, ActualTool, ExpectedTool } from "./scoring";
-import { compareBaseline, scoreGoldenCase } from "./scoring";
+import { compareBaseline, countToolRounds, parseJudgeScore, parsePlannedTools, scoreGoldenCase } from "./scoring";
 import { goldenCases, type GoldenCase } from "./cases";
 import { EVAL_NOW, prices, snapshots, transactions } from "./portfolio";
 
@@ -51,6 +51,7 @@ const liveResults: Array<{
 let currentCase: GoldenCase;
 let requests: RequestBody[];
 let tokenUsage: Usage;
+let plannerReply: string;
 
 function completion(content: string, calls: ExpectedTool[] = []): Response {
   return new Response(JSON.stringify({
@@ -86,7 +87,7 @@ function scriptedResponse(body: RequestBody): Response {
   }
   if (system.includes("Track3 portfolio assistant")) {
     const priorCalls = body.messages.filter((message) => message.role === "assistant" && message.tool_calls).length;
-    if (currentCase.id === "budget" && body.tools?.length) {
+    if (currentCase.alwaysCallTools && body.tools?.length) {
       return completion("", currentCase.recordedCalls);
     }
     return priorCalls === 0 && currentCase.recordedCalls.length > 0 && body.tools?.length
@@ -141,6 +142,7 @@ async function runCase(golden: GoldenCase): Promise<{ actual: ActualCase; latenc
   currentCase = golden;
   requests = [];
   tokenUsage = {};
+  plannerReply = "";
   configureData(golden);
   vi.mocked(runSkill).mockClear();
   vi.mocked(tauriFetch).mockImplementation(async (url, options) => {
@@ -150,7 +152,12 @@ async function runCase(golden: GoldenCase): Promise<{ actual: ActualCase; latenc
       ? await globalThis.fetch(url, options as RequestInit)
       : scriptedResponse(body);
     if (response.headers.get("content-type")?.includes("application/json")) {
-      const json = await response.clone().json() as { usage?: Usage };
+      const json = await response.clone().json() as {
+        usage?: Usage; choices?: Array<{ message?: { content?: string } }>;
+      };
+      if (body.messages[0]?.content?.includes("portfolio-analysis planner")) {
+        plannerReply = json.choices?.[0]?.message?.content ?? "";
+      }
       for (const key of ["prompt_tokens", "completion_tokens", "total_tokens"] as const) {
         tokenUsage[key] = (tokenUsage[key] ?? 0) + (json.usage?.[key] ?? 0);
       }
@@ -173,9 +180,6 @@ async function runCase(golden: GoldenCase): Promise<{ actual: ActualCase; latenc
   const answer = assistant?.role === "assistant"
     ? assistant.blocks.flatMap((block) => block.kind === "text" ? [block.text] : []).join("")
     : "";
-  const activity = assistant?.role === "assistant"
-    ? assistant.blocks.find((block) => block.kind === "agent_activity")
-    : undefined;
   const calls = vi.mocked(runSkill).mock.calls;
   const results = await Promise.all(vi.mocked(runSkill).mock.results.map((entry) => entry.value));
   const tools: ActualTool[] = calls.map(([name, args], index) => {
@@ -192,15 +196,10 @@ async function runCase(golden: GoldenCase): Promise<{ actual: ActualCase; latenc
       }
     }
   }
-  const plan = activity?.kind === "agent_activity"
-    ? activity.activities.map((entry) => {
-      const call = tools.find((item) => item.name === entry.skillName);
-      return { name: entry.skillName, args: call?.args ?? {} };
-    })
-    : [];
+  const plan = parsePlannedTools(plannerReply);
   const actual: ActualCase = {
     plan, tools, answer,
-    rounds: requests.filter((request) => request.messages[0]?.content?.includes("Track3 portfolio assistant")).length,
+    rounds: countToolRounds(requests.map((request) => request.messages[0]?.content ?? "")),
   };
   unmount();
   return {
@@ -230,9 +229,7 @@ async function judgeCase(golden: GoldenCase, answer: string): Promise<number | u
   });
   if (!response.ok) throw new Error(`Judge request failed: ${response.status}`);
   const json = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const parsed = JSON.parse(json.choices?.[0]?.message?.content ?? "") as { score?: number };
-  if (typeof parsed.score !== "number" || parsed.score < 0 || parsed.score > 1) throw new Error("Invalid judge score");
-  return parsed.score;
+  return parseJudgeScore(json.choices?.[0]?.message?.content ?? "");
 }
 
 beforeAll(() => {
@@ -331,6 +328,7 @@ describe("assistant golden questions", () => {
     const sample: GoldenCase = {
       ...goldenCases.find((entry) => entry.id === "hello-en")!,
       id: "budget",
+      alwaysCallTools: true,
       recordedCalls: [{ name: "current_context", args: {} }],
       recordedAnswer: "Stopped after the tool budget.",
     };
@@ -359,7 +357,7 @@ afterAll(async () => {
   };
   await mkdir("evals", { recursive: true });
   await writeFile("evals/report.json", `${JSON.stringify(report, null, 2)}\n`);
-  const baseline = JSON.parse(await readFile("evals/baseline.json", "utf8")) as { aggregate: number; threshold: number };
+  const baseline = JSON.parse(await readFile("evals/baseline.json", "utf8")) as { aggregate: number; threshold: number; calibrated?: boolean };
   const updating = process.env.EVAL_UPDATE_BASELINE === "1";
   if (updating && !mustPassFailed && liveResults.length === goldenCases.length) {
     await writeFile("evals/baseline.json", `${JSON.stringify({
@@ -367,7 +365,13 @@ afterAll(async () => {
       model: process.env.EVAL_MODEL, updatedAt: report.generatedAt, calibrated: true,
     }, null, 2)}\n`);
   }
-  expect(liveResults).toHaveLength(goldenCases.length);
-  expect(compareBaseline(report, updating ? aggregate : baseline.aggregate, baseline.threshold, mustPassFailed))
+  const failingMustPassIds = goldenCases.filter((golden) =>
+    golden.mustPass && !liveResults.find((item) => item.id === golden.id)?.passed,
+  ).map((golden) => golden.id);
+  expect(liveResults, `Completed ${liveResults.length}/${goldenCases.length} cases`).toHaveLength(goldenCases.length);
+  expect(
+    compareBaseline(report, updating ? aggregate : baseline.aggregate, baseline.threshold, mustPassFailed, updating || baseline.calibrated !== false),
+    `Aggregate ${aggregate.toFixed(3)}, baseline ${baseline.aggregate.toFixed(3)} (threshold ${baseline.threshold}); failing must-pass: ${failingMustPassIds.join(", ") || "none"}`,
+  )
     .toBe(true);
 });

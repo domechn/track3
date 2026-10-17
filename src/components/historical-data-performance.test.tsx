@@ -126,6 +126,32 @@ it("refreshes an open detail dialog after an external data change", async () => 
   expect(queryHistoricalDetail).toHaveBeenCalledTimes(2);
 });
 
+it("keeps an open snapshot detail when new history pushes it off the current page", async () => {
+  vi.mocked(queryHistoricalPage).mockResolvedValueOnce({
+    totalCount: 1, latest: { id: "old", createdAt: "2024-01-01T00:00:00.000Z", total: 10 },
+    rows: [{ id: "old", createdAt: "2024-01-01T00:00:00.000Z", total: 10, change: null, assetCount: 1, topAssets: [] }],
+  }).mockResolvedValue({
+    totalCount: 2, latest: { id: "new", createdAt: "2024-01-02T00:00:00.000Z", total: 20 },
+    rows: [{ id: "new", createdAt: "2024-01-02T00:00:00.000Z", total: 20, change: null, assetCount: 1, topAssets: [] }],
+  });
+  vi.mocked(queryHistoricalDetail).mockResolvedValue({
+    id: "old", createdAt: "2024-01-01T00:00:00.000Z", total: 10, transactions: [],
+    assets: [{ id: 1, uuid: "old", createdAt: "2024-01-01T00:00:00.000Z",
+      symbol: "BTC", assetType: "crypto", amount: 1, value: 10, price: 10 }],
+  });
+  const props = {
+    dateRange: { start: new Date("2022-01-01"), end: new Date("2025-01-01") },
+    currency: { currency: "USD", symbol: "$", rate: 1, alias: "usd" },
+    quoteColor: "green-up-red-down" as const,
+  };
+  const view = render(<DataChangedContext.Provider value={0}><HistoricalData {...props} /></DataChangedContext.Provider>);
+  fireEvent.click(await screen.findByText("old"));
+  expect(await screen.findByRole("dialog", { name: /historical data detail/i })).toBeVisible();
+  view.rerender(<DataChangedContext.Provider value={1}><HistoricalData {...props} /></DataChangedContext.Provider>);
+  await screen.findByText("new");
+  expect(screen.getByRole("dialog", { name: /historical data detail/i })).toBeVisible();
+});
+
 it("shows a loading status while a snapshot detail query is pending", async () => {
   const snapshot = hourlyHistory(1, 1).next().value!;
   vi.mocked(queryHistoricalPage).mockResolvedValue({
@@ -196,4 +222,81 @@ it("shows a loading status while a different SQL page is pending", async () => {
       change: null, assetCount: 1, topAssets: [] }],
   });
   expect(await screen.findByText("next-pag")).toBeInTheDocument();
+});
+
+it("uses measured detail row heights when positioning the scroll window", async () => {
+  vi.mocked(queryHistoricalPage).mockResolvedValue({
+    totalCount: 1, latest: { id: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z", total: 2000 },
+    rows: [{ id: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z", total: 2000,
+      change: null, assetCount: 200, topAssets: [] }],
+  });
+  vi.mocked(queryHistoricalDetail).mockResolvedValue({
+    id: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z", total: 2000, transactions: [],
+    assets: Array.from({ length: 200 }, (_, i) => ({
+      id: i + 1, uuid: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z",
+      symbol: `ASSET${i}`, assetType: "crypto" as const, amount: 1, value: 10, price: 10,
+    })),
+  });
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private callback: ResizeObserverCallback) {}
+    observe(target: Element) {
+      if (target.getAttribute("data-asset-id") !== "1") return;
+      queueMicrotask(() => this.callback([{
+        target, contentRect: { height: 84 },
+      } as ResizeObserverEntry], this as unknown as ResizeObserver));
+    }
+    disconnect() {}
+    unobserve() {}
+  });
+  try {
+    render(<HistoricalData
+      dateRange={{ start: new Date("2022-01-01"), end: new Date("2025-01-01") }}
+      currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
+      quoteColor="green-up-red-down"
+    />);
+    fireEvent.click(await screen.findByText("snapshot"));
+    const dialog = await screen.findByRole("dialog", { name: /historical data detail/i });
+    await within(dialog).findAllByTestId("history-detail-row");
+    const region = within(dialog).getByRole("region", { name: "Assets" });
+    Object.defineProperty(region, "scrollTop", { configurable: true, value: 1000 });
+    fireEvent.scroll(region);
+    await waitFor(() => {
+      const table = within(dialog).getByRole("table");
+      const first = within(dialog).getAllByTestId("history-detail-row")[0];
+      const start = Number(first.getAttribute("aria-rowindex")) - 2;
+      const spacer = table.querySelector<HTMLTableCellElement>('tr[aria-hidden="true"] td');
+      expect(start).toBeGreaterThan(0);
+      expect(spacer?.style.height).toBe(`${start * 42 + 42}px`);
+    });
+  } finally { vi.unstubAllGlobals(); }
+});
+
+it("updates the visible snapshot total after deleting one detail asset", async () => {
+  vi.mocked(queryHistoricalPage).mockResolvedValue({
+    totalCount: 1, latest: { id: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z", total: 30 },
+    rows: [{ id: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z", total: 30,
+      change: null, assetCount: 2, topAssets: [] }],
+  });
+  vi.mocked(queryHistoricalDetail).mockResolvedValue({
+    id: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z", total: 30, transactions: [],
+    assets: [
+      { id: 1, uuid: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z",
+        symbol: "BTC", assetType: "crypto", amount: 1, value: 20, price: 20 },
+      { id: 2, uuid: "snapshot-0", createdAt: "2024-01-01T00:00:00.000Z",
+        symbol: "ETH", assetType: "crypto", amount: 1, value: 10, price: 10 },
+    ],
+  });
+  render(<HistoricalData
+    dateRange={{ start: new Date("2022-01-01"), end: new Date("2025-01-01") }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
+    quoteColor="green-up-red-down"
+  />);
+  fireEvent.click(await screen.findByText("snapshot"));
+  const dialog = await screen.findByRole("dialog", { name: /historical data detail/i });
+  const eth = within(dialog).getByText("ETH").closest("tr")!;
+  fireEvent.click(within(eth).getByRole("button", { name: "Delete" }));
+  fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+  const row = screen.getByTestId("history-snapshot-row");
+  await waitFor(() => expect(row).toHaveTextContent("$20.00"));
+  expect(row).toHaveTextContent("1 assets");
 });

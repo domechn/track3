@@ -15,8 +15,6 @@ const stopPropagation = (event: MouseEvent) => event.stopPropagation();
 
 type ConfirmDeleteDialogProps = {
   trigger?: ReactElement;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
   title: string;
   description: string;
   cancelLabel: string;
@@ -25,21 +23,14 @@ type ConfirmDeleteDialogProps = {
 
 export default function ConfirmDeleteDialog({
   trigger,
-  open,
-  onOpenChange,
   title,
   description,
   cancelLabel,
   actions,
 }: ConfirmDeleteDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const changeOpen = (next: boolean) => {
-    setInternalOpen(next);
-    onOpenChange?.(next);
-  };
-
   return (
-    <AlertDialog open={open ?? internalOpen} onOpenChange={changeOpen}>
+    <AlertDialog open={internalOpen} onOpenChange={setInternalOpen}>
       {trigger && (
         <AlertDialogTrigger
           asChild
@@ -52,12 +43,9 @@ export default function ConfirmDeleteDialog({
         </AlertDialogTrigger>
       )}
       <AlertDialogContent
-        overlayProps={{ onClick: stopPropagation }}
+        overlayProps={{ onClick: stopPropagation, "data-testid": "delete-dialog-overlay" } as React.ComponentPropsWithoutRef<typeof AlertDialogContent>["overlayProps"]}
         onClick={stopPropagation}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-          if (event.key === "Escape") changeOpen(false);
-        }}
+        onKeyDown={(event) => event.stopPropagation()}
       >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

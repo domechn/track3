@@ -19,6 +19,7 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     fs: {
+      // The worktree may symlink node_modules outside the Vite project root.
       allow: [__dirname, fs.realpathSync(path.resolve(__dirname, "node_modules"))],
     },
   },

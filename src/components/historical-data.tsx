@@ -108,6 +108,7 @@ const App = ({
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
   const [detailSearch, setDetailSearch] = useState("");
   const [detailScrollTop, setDetailScrollTop] = useState(0);
+  const [measuredDetailHeights, setMeasuredDetailHeights] = useState<Map<number, number>>(() => new Map());
   const [pageLoading, setPageLoading] = useState(true);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
@@ -115,10 +116,13 @@ const App = ({
   const { run: runDetailDelete, isDeleting: deletingDetail } = useOptimisticDelete(setSelectedData);
 
   const [dataPage, setDataPage] = useState(0);
+  const dataPageRef = useRef(dataPage);
+  dataPageRef.current = dataPage;
   const [pageInput, setPageInput] = useState("1");
   const [pageSize, setPageSize] = useState(20);
 
   const loadGenRef = useRef(0);
+  const detailRegionRef = useRef<HTMLDivElement>(null);
   // Set right before calling `afterDataChanged` from a local mutation
   // (delete/undo) so the next dataChangedVersion bump skips the loading
   // overlay. Keep the current list visible while `loadPage` refreshes it.
@@ -138,11 +142,9 @@ const App = ({
     setPageLoading(true);
   }, [rangeKey, dataChangedVersion, dataPage, pageSize]);
 
-  const dataRows = data;
-
   const symbolPricePairs = useMemo(() => {
     const latestBySymbol = new Map<string, number>();
-    for (const item of dataRows) {
+    for (const item of data) {
       for (const asset of item.topAssets) {
         if (!latestBySymbol.has(asset.symbol)) {
           latestBySymbol.set(asset.symbol, asset.price);
@@ -157,7 +159,7 @@ const App = ({
       symbol,
       price,
     }));
-  }, [dataRows, selectedData]);
+  }, [data, selectedData]);
 
   const uniqueSymbols = useMemo(() => {
     return symbolPricePairs.map((item) => item.symbol);
@@ -237,6 +239,10 @@ const App = ({
     setDetailError(false);
     void queryHistoricalDetail(selectedDataId).then((detail) => {
       if (active) {
+        if (detail.assets.length === 0) {
+          setIsModalOpen(false);
+          setSelectedDataId(null);
+        }
         setSelectedData(detail);
         setDetailLoading(false);
       }
@@ -281,15 +287,6 @@ const App = ({
     }
   };
 
-  const pagedRows = dataRows;
-
-  useEffect(() => {
-    if (isModalOpen && selectedDataId && !data.some((item) => item.id === selectedDataId) && !pageLoading) {
-      setIsModalOpen(false);
-      setSelectedDataId(null);
-    }
-  }, [isModalOpen, selectedDataId, data, pageLoading]);
-
   const rankData = useMemo<RankData[]>(() => {
     if (!selectedData) {
       return [];
@@ -317,12 +314,43 @@ const App = ({
       : rankData;
     return filtered.slice(0, detailLimit);
   }, [rankData, detailLimit, detailSearch]);
+  const detailOffsets = useMemo(() => {
+    const offsets = [0];
+    for (const item of visibleRankData) {
+      offsets.push(offsets[offsets.length - 1] + (measuredDetailHeights.get(item.assetId) ?? 42));
+    }
+    return offsets;
+  }, [visibleRankData, measuredDetailHeights]);
   const detailWindowSize = Math.max(16, Math.ceil((typeof window === "undefined" ? 700 : window.innerHeight * 0.7) / 42) + 8);
+  const firstVisibleDetail = detailOffsets.findIndex((offset, index) =>
+    index > 0 && offset > detailScrollTop,
+  );
   const detailStart = Math.min(
-    Math.max(0, Math.floor(detailScrollTop / 42) - 4),
+    Math.max(0, (firstVisibleDetail < 0 ? visibleRankData.length : firstVisibleDetail - 1) - 4),
     Math.max(0, visibleRankData.length - detailWindowSize),
   );
   const virtualRankData = visibleRankData.slice(detailStart, detailStart + detailWindowSize);
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const sizes = entries.map((entry) => ({
+        id: Number((entry.target as HTMLElement).dataset.assetId),
+        height: entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height,
+      }));
+      setMeasuredDetailHeights((previous) => {
+        const next = new Map(previous);
+        let changed = false;
+        for (const { id, height } of sizes) {
+          if (!Number.isFinite(id) || !height || next.get(id) === height) continue;
+          next.set(id, height);
+          changed = true;
+        }
+        return changed ? next : previous;
+      });
+    });
+    detailRegionRef.current?.querySelectorAll("[data-asset-id]").forEach((row) => observer.observe(row));
+    return () => observer.disconnect();
+  }, [detailStart, virtualRankData.length, selectedDataId]);
 
   const filteredRankDataCount = useMemo(() => {
     const keyword = detailSearch.trim().toUpperCase();
@@ -336,6 +364,7 @@ const App = ({
 
   const onHistoricalDataDeleteClick = useCallback(
     (uuid: string) => {
+      const deletedPage = dataPage;
       const index = data.findIndex((record) => record.id === uuid);
       const removed = data[index];
       if (!removed) return;
@@ -344,6 +373,7 @@ const App = ({
       void runDelete({
         update: (prev) => prev.filter((record) => record.id !== uuid),
         rollback: (prev) => {
+          if (dataPageRef.current !== deletedPage) return prev;
           if (prev.some((record) => record.id === uuid)) return prev;
           const next = [...prev];
           next.splice(index, 0, removed);
@@ -387,7 +417,7 @@ const App = ({
         syncSnapshotUuid: uuid,
       });
     },
-    [afterDataChanged, data, latestRow, runDelete, t],
+    [afterDataChanged, data, dataPage, latestRow, runDelete, t],
   );
 
   const onHistoricalDataDetailDeleteClick = useCallback(
@@ -396,6 +426,10 @@ const App = ({
       const index = owner?.assets.findIndex((asset) => asset.id === id) ?? -1;
       const removed = owner?.assets[index];
       if (!owner || !removed) return;
+      const previousRowIndex = data.findIndex((row) => row.id === owner.id);
+      const previousRow = data[previousRowIndex];
+      const deletedPage = dataPage;
+      let remainingAssets = owner.assets.filter((asset) => asset.id !== id);
       void runDetailDelete({
         update: (prev) => prev ? ({
           ...prev,
@@ -408,12 +442,51 @@ const App = ({
           return { ...prev, assets };
         },
         commit: async () => {
-          const rhd = await queryRestoreHistoricalData(id);
+          const backup = await queryRestoreHistoricalData(id);
           await deleteHistoricalDataDetailById(id);
-          return rhd;
+          const detail = backup?.assets.length
+            ? await queryHistoricalDetail(owner.id).catch(() => null)
+            : null;
+          return { backup, detail };
         },
-        undo: restoreHistoricalData,
-        onDeleted: () => {
+        undo: ({ backup }) => restoreHistoricalData(backup),
+        onDeleted: ({ detail }) => {
+          if (detail) {
+            remainingAssets = detail.assets;
+            setSelectedData(detail);
+          }
+          const updatedTotal = remainingAssets.reduce((sum, asset) => sum + asset.value, 0);
+          setData((previous) => {
+            const position = previous.findIndex((row) => row.id === owner.id);
+            if (position < 0) return previous;
+            const next = remainingAssets.length
+              ? previous.map((row, rowIndex) => rowIndex === position ? {
+                  ...row,
+                  total: updatedTotal,
+                  assetCount: new Set(remainingAssets.map((asset) => `${asset.assetType}:${asset.symbol}`)).size,
+                  topAssets: remainingAssets.filter((asset) => asset.value > 0)
+                    .sort((left, right) => right.value - left.value).slice(0, 7),
+                  change: previous[position + 1] ? updatedTotal - previous[position + 1].total : null,
+                } : row)
+              : previous.filter((row) => row.id !== owner.id);
+            if (position > 0) {
+              next[position - 1] = {
+                ...next[position - 1],
+                change: next[position] ? next[position - 1].total - next[position].total : null,
+              };
+            }
+            return next;
+          });
+          if (latestRow?.id === owner.id) {
+            setLatestRow(remainingAssets.length
+              ? { ...latestRow, total: updatedTotal }
+              : data[1] ?? null);
+          }
+          if (!remainingAssets.length) {
+            setTotalCount((count) => Math.max(0, count - 1));
+            setIsModalOpen(false);
+            setSelectedDataId(null);
+          }
           if (afterDataChanged) {
             skipNextLoadingRef.current = true;
             localMutationRef.current = true;
@@ -421,6 +494,19 @@ const App = ({
           }
         },
         onUndone: () => {
+          if (previousRow) {
+            setData((previous) => {
+              if (previous.some((row) => row.id === owner.id)) {
+                return previous.map((row) => row.id === owner.id ? previousRow : row);
+              }
+              if (remainingAssets.length || dataPageRef.current !== deletedPage) return previous;
+              const next = [...previous];
+              next.splice(previousRowIndex, 0, previousRow);
+              return next;
+            });
+            if (latestRow?.id === owner.id) setLatestRow(latestRow);
+          }
+          if (!remainingAssets.length) setTotalCount((count) => count + 1);
           setIsModalOpen(false);
           if (afterDataChanged) {
             skipNextLoadingRef.current = true;
@@ -434,7 +520,7 @@ const App = ({
         undoWindowMs: 5000,
       });
     },
-    [afterDataChanged, selectedData, runDetailDelete, t],
+    [afterDataChanged, data, dataPage, latestRow, selectedData, runDetailDelete, t],
   );
 
   const onHistoricalDataDetailDeleteAndBlacklistClick = useCallback(
@@ -454,6 +540,7 @@ const App = ({
     setDetailLimit(DETAIL_PAGE_SIZE);
     setDetailSearch("");
     setDetailScrollTop(0);
+    setMeasuredDetailHeights(new Map());
     setIsModalOpen(true);
   }, []);
 
@@ -536,6 +623,7 @@ const App = ({
               </div>
             </div>
             <div
+              ref={detailRegionRef}
               className="w-full max-h-[70vh] overflow-auto"
               role="region"
               aria-label={t("history.assets")}
@@ -567,7 +655,7 @@ const App = ({
                     </TableRow>
                   ) : null}
                   {detailStart > 0 ? (
-                    <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: detailStart * 42, padding: 0 }} /></TableRow>
+                    <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: detailOffsets[detailStart], padding: 0 }} /></TableRow>
                   ) : null}
                   {virtualRankData.map((item, virtualIndex) => {
                     const apiPath = resolveAssetLogoSrc(
@@ -578,6 +666,7 @@ const App = ({
                       <TableRow
                         key={"historical-data-detail-row-" + item.assetId}
                         data-testid="history-detail-row"
+                        data-asset-id={item.assetId}
                         aria-rowindex={detailStart + virtualIndex + 2}
                         className="h-[42px] hover:bg-muted/40 transition-colors"
                       >
@@ -646,7 +735,10 @@ const App = ({
                     );
                   })}
                   {detailStart + virtualRankData.length < visibleRankData.length ? (
-                    <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: (visibleRankData.length - detailStart - virtualRankData.length) * 42, padding: 0 }} /></TableRow>
+                    <TableRow aria-hidden="true"><TableCell colSpan={6} style={{
+                      height: detailOffsets[visibleRankData.length] - detailOffsets[detailStart + virtualRankData.length],
+                      padding: 0,
+                    }} /></TableRow>
                   ) : null}
                 </TableBody>
               </Table>
@@ -857,7 +949,7 @@ const App = ({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {pagedRows.map((row, idx) => {
+                      {data.map((row, idx) => {
                         const isLatest = dataPage === 0 && idx === 0;
                         const topAssets = row.topAssets;
 

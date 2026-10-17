@@ -54,3 +54,58 @@ Current-branch review of the attribution and cost basis reports:
 
 - Tauri desktop layout and interaction density still need a running desktop window. Component tests and code review cannot verify native WebView rendering.
 - Native cost basis CSV and JSON save dialogs still need a running Tauri app and a real filesystem. Automated tests cover the generated content and mocked dialog/file calls, but cannot verify the operating system dialog or completed file write.
+
+## 0.9.0 leftovers pass (2026-10-17)
+
+The five review reports under `/home/ubuntu/.hermes/track3-opt/runs/` were checked against this worktree. Statuses below refer to this pass.
+
+| Report | Finding | Resolution |
+| --- | --- | --- |
+| Refresh 1 | IBKR exceeded the 30 second source deadline during normal polling | Fixed: stock brokers use the 120 second group; timeout test added. |
+| Refresh 2 | Supported exchange names were duplicated | Fixed: source detection and the exchange factory share one registry; unknown names stay unsupported. |
+| Refresh 3 | Stale stock prices could replace a crypto ticker's bare price | Fixed in both price-map paths; collision test added. |
+| Refresh 4 | Retry missed imports/deletes and the first refresh | Fixed: retry compares the committed refresh marker plus the latest persisted snapshot ID and contents; tests cover first import, deletion, and replacement. |
+| Refresh 5 | Serial chain address requests can take longer | Behavior remains intentional rate limiting; the one second gaps are documented in `docs/refresh-fault-tolerance.md`. Live provider pacing is deferred below. |
+| History 1 | Each page aggregated all asset rows in the date range | Fixed: a snapshot time summary, maintained by SQLite triggers, bounds the page query to its displayed snapshots. The summary is installed in the 0.9.0 migration and schema repair. |
+| History 2 | SQL fixtures were too small | Fixed: a 2,000 snapshot SQL fixture checks page bounds and the query plan. |
+| History 3 | Import could close an open detail dialog by moving its row off page | Fixed: detail remains open while that snapshot still has assets. |
+| History 4 | Undo could insert a row on a different page | Fixed: rollback insertion is limited to the page where deletion started; a data change reload follows undo. |
+| History 5 | Detail asset delete left the list total and count stale | Fixed: the visible row and latest total update immediately; tests cover a remaining asset. |
+| History 6 | Rank and percentage timestamps used asset rows rather than snapshot time | Fixed: ranked values use the snapshot timestamp; mixed timestamp test added. |
+| History 7 | Two top coin views sampled at a fixed point limit | Percentage change sparkline now samples to its 96 px display width. Rank is currently a table with no plotted point series, so that part of the finding no longer applies. |
+| History 8 | `dataRows` and `pagedRows` aliases were dead | Removed. |
+| History 9 | Windowed detail assumed all rows were 42 px high | Fixed: rendered row heights feed window offsets and spacer sizes. |
+| Delete 1 | Configuration removal description implied a manual save | Fixed in English and Chinese; copy test added. |
+| Delete 2 | Escape handling fired twice and controlled dialog props had no callers | Removed the duplicate handler and unused props. |
+| Delete 3 | Concurrent deletes could clear `isDeleting` early | Fixed with a pending operation count; overlap test added. |
+| Delete 4 | Blacklist rollback and undo used inconsistent ordering | Fixed: rollback preserves the original position and undo follows persisted append order. |
+| Delete 5 | Toast expiry, undo failure, history undo, section confirmations, and two action dialog lacked tests | Added focused tests for each path. |
+| Delete 6 | Session delete failure was unhandled | Already fixed by the current `chat-page.tsx` error handler; the sidebar indentation has no behavior effect. Session delete remains a direct action with no undo. |
+| Delete 7 | Overlay test depended on CSS classes | Fixed: test selects a stable overlay test ID. |
+| Rust 1 | E2E loading text check did not match the UI | Fixed to match the actual string. |
+| Rust 2–3 | E2E refresh mock ignored assets and Overview assertions were weak | Fixed: the mock persists refresh assets and the test checks totals before and after refresh. |
+| Rust 4 | E2E TypeScript was not checked | Fixed with a dedicated config and CI command. |
+| Rust 5 | Pure test crate repeated dependency versions | Kept the pinned versions with an explicit synchronization note in the manifest. |
+| Rust 6 | Export binary argument parsing had no unit test | Deferred below because its binary target needs native Tauri dependencies absent on this host. |
+| Rust 7 | Vite `node_modules` symlink allowance lacked context | Added a comment explaining the local workspace path. |
+| Rust 8 | Binance signature test mostly checked the library | Behavior to know: its app-specific query assembly remains covered; live Binance validation is deferred below. |
+| Eval 1 | Scores were diluted by automatic passes | Fixed: aggregate score counts positive requirements while forbidden actions remain pass/fail gates. |
+| Eval 2 | Live gate failure lacked details | Fixed: assertion reports aggregate, baseline, and failing must-pass IDs. |
+| Eval 3 | Synthesis inflated tool rounds | Fixed: only tool-loop prompts count. |
+| Eval 4 | Fenced judge JSON crashed parsing | Fixed: score is extracted when present; invalid judge output yields no judge score. |
+| Eval 5 | Streaming endpoints reported no token usage | Documented `tokens: null` when SSE provides no usage. |
+| Eval 6–7 | Some rubric fragments were weak and Chinese coverage was thin | Strengthened phrases and added Chinese chit-chat, injection, empty-data, and out-of-scope cases. |
+| Eval 8 | Budget test used a case ID inside the shared driver | Fixed with an explicit per-case flag. |
+| Eval 9 | Planner arguments were copied from executed tools | Fixed: plan arguments are parsed from the planner response. |
+| Eval 10 | Uncalibrated baseline blocked the first live run | Fixed: initial live run still enforces must-pass cases and skips only the aggregate comparison until calibration. |
+
+Two additional history defects surfaced while checking the touched delete flow. Undoing deletion of a snapshot's last asset restored the record count but left its list row missing when no reload callback was supplied; the row now returns on the same page. A grouped detail row can represent the same ticker in multiple wallets, while deleting its displayed ID removes only one wallet's asset; the displayed total now uses the saved detail after deletion. Regression tests cover both.
+
+### Checks needing an external environment
+
+- Real CEX, chain, and IBKR calls need credentials and provider availability. The timeout, stale-price, and retry behavior is covered with deterministic mocks; actual rate limiting and the serial-address delay need a live account.
+- Native Tauri WebView behavior, including dialog focus and real disk persistence, needs a desktop host. Chromium E2E covers renderer and SQL bridge behavior.
+- Full Tauri crate tests and a direct test of the export binary need GTK/GLib development libraries (`gobject-2.0.pc` is missing on this host). The GTK-free Rust pure test crate covers the shared migration, encryption, price, and Binance logic.
+- Real Windows and macOS packaging need those machines and their native toolchains. No packaging or updater behavior was changed in this pass.
+- Real model and judge output needs `EVAL_ENDPOINT`, `EVAL_API_KEY`, and a model; the offline golden suite and fake-provider paths run without those credentials.
+- Real full-size SQLite timings need a production-scale database and desktop I/O. The 2,000 snapshot SQL test and query plan guard against a full asset-range scan but do not measure wall-clock latency.

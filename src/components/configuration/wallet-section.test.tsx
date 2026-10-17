@@ -63,6 +63,7 @@ describe("WalletSection", () => {
     render(<WalletSection {...baseProps} onRemove={onRemove} />);
     const row = screen.getByText("1abc").closest("tr")!;
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    expect(screen.getByRole("alertdialog")).toHaveAccessibleDescription("This removes it from your configuration.");
     expect(onRemove).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onRemove).not.toHaveBeenCalled();

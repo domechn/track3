@@ -30,10 +30,11 @@ export async function installTauriBridge(page: Page) {
       (998, 'e2e-client');
   `);
   db.run("INSERT INTO configuration (id, data) VALUES (12, ?)",
-    ["configs:\n  groupUSD: false\nothers: []\n"]);
+    ["configs:\n  groupUSD: false\nothers:\n  - symbol: BTC\n    amount: 2\n"]);
   db.run("INSERT INTO configuration (id, data) VALUES (11, ?)", [
     "btc: {addresses: []}\nerc20: {addresses: []}\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
   ]);
+  db.run(readFileSync(resolve("src-tauri/migrations/v08t09/history_snapshots_up.sql"), "utf8"));
   const config = JSON.stringify({
     endpoint: "https://assistant.test/v1",
     apiKey: "sk-e2e",
@@ -79,6 +80,16 @@ export async function installTauriBridge(page: Page) {
     if (cmd === "persist_refresh") {
       refreshes++;
       if (!args.operationUuid || !args.createdAt) throw new Error("invalid refresh payload");
+      for (const asset of args.assets as Array<{
+        wallet: string; assetType: string; symbol: string; amount: number; value: number; price: number;
+      }>) {
+        execute(`INSERT INTO assets_v2
+          (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+          args.operationUuid, args.createdAt, asset.wallet, asset.assetType,
+          asset.symbol, asset.amount, asset.value, asset.price,
+        ]);
+      }
       execute("INSERT INTO refresh_operations (operation_uuid, created_at) VALUES (?, ?)",
         [args.operationUuid, args.createdAt]);
       return null;

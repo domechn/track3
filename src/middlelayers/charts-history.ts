@@ -40,17 +40,21 @@ export async function queryHistoricalPage(
     latest: string | null;
     totalCount: number;
   }>(
-    `WITH snapshots AS (
-       SELECT uuid AS id, MAX(createdAt) AS createdAt, SUM(value) AS total,
-              COUNT(DISTINCT asset_type || ':' || symbol) AS assetCount
-       FROM assets_v2 WHERE createdAt >= ? AND createdAt <= ?
-       GROUP BY uuid
-     ), page AS (
-       SELECT * FROM snapshots ORDER BY createdAt DESC, id DESC LIMIT ? OFFSET ?
+    `WITH page AS (
+       SELECT uuid AS id, createdAt FROM history_snapshots
+       WHERE createdAt >= ? AND createdAt <= ?
+       ORDER BY createdAt DESC, uuid DESC LIMIT ? OFFSET ?
      )
-     SELECT page.*, (SELECT COUNT(*) FROM snapshots) AS totalCount,
-       (SELECT json_object('id', id, 'createdAt', createdAt, 'total', total)
-        FROM snapshots ORDER BY createdAt DESC, id DESC LIMIT 1) AS latest,
+     SELECT page.*,
+       (SELECT SUM(value) FROM assets_v2 WHERE uuid = page.id) AS total,
+       (SELECT COUNT(DISTINCT asset_type || ':' || symbol)
+        FROM assets_v2 WHERE uuid = page.id) AS assetCount,
+       (SELECT COUNT(*) FROM history_snapshots
+        WHERE createdAt >= ? AND createdAt <= ?) AS totalCount,
+       (SELECT json_object('id', uuid, 'createdAt', createdAt,
+         'total', (SELECT SUM(value) FROM assets_v2 WHERE uuid = newest.uuid))
+        FROM history_snapshots newest WHERE createdAt >= ? AND createdAt <= ?
+        ORDER BY createdAt DESC, uuid DESC LIMIT 1) AS latest,
        (SELECT json_group_array(json_object(
          'symbol', symbol, 'assetType', asset_type, 'price', price, 'value', value
        )) FROM (
@@ -62,7 +66,7 @@ export async function queryHistoricalPage(
        )) AS topAssets
      FROM (SELECT 1) AS seed LEFT JOIN page ON 1 = 1
      ORDER BY page.createdAt DESC, page.id DESC`,
-    [...bounds, pageSize + 1, page * pageSize],
+    [...bounds, pageSize + 1, page * pageSize, ...bounds, ...bounds],
   );
   const pageRecords = records.filter((record): record is typeof record & { id: string } => record.id !== null);
   const rows = pageRecords.slice(0, pageSize).map((record, index) => ({

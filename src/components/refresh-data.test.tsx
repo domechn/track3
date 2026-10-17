@@ -185,6 +185,8 @@ describe("RefreshData — currency rates refresh ordering", () => {
     sourceResults: [failedSource],
     sourceStatuses: [{ sourceId: "btc:0", label: "BTC wallet 1", status: "stale", category: "network" }],
     requiresDataSourceAction: false, usedLastKnownData: true, persisted: true,
+    snapshotId: "previous",
+    snapshotKey: "snapshot-key",
   };
 
   it("shows a stale source and its reason after saving a partial refresh", async () => {
@@ -215,6 +217,8 @@ describe("RefreshData — currency rates refresh ordering", () => {
         retrySourceId: "btc:0",
         previousSourceResults: [failedSource],
         previousSourceStatuses: partialResult.sourceStatuses,
+        previousSnapshotId: "previous",
+        previousSnapshotKey: "snapshot-key",
       },
       expect.any(Object), expect.any(Function),
     );

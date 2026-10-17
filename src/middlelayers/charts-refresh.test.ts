@@ -1772,6 +1772,27 @@ describe("partial source snapshots", () => {
     ]));
   });
 
+  it("does not use a stale stock quote for an unpriced crypto with the same ticker", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 1, uuid: "previous", createdAt: "2026-07-13T01:02:03.000Z", assetType: "stock",
+      wallet: md5("ibkr:one"), symbol: "ABC", amount: 3, value: 600, price: 200,
+    }]] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 100, USDT: 1 });
+    vi.mocked(fetchStockPrices).mockResolvedValue({ ABC: 200 });
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ symbol: "ABC", assetType: "crypto", amount: 2, wallet: "wallet-b" }],
+      sourceResults: [
+        { sourceId: "stock:0", label: "IBKR 1", walletIdentities: ["ibkr:one"], status: "stale", coins: [], category: "network" },
+        { sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-b"], status: "ok", coins: [{ symbol: "ABC", assetType: "crypto", amount: 2, wallet: "wallet-b" }] },
+      ],
+      failedSources: [{ sourceId: "stock:0", analyzerName: "IBKR 1", walletIdentities: ["ibkr:one"], error: "network", category: "network" }],
+    } as never);
+    await refreshAllData(vi.fn(), {}, operation);
+    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; assetType: string; value: number }> };
+    expect(payload.assets.some((asset) => asset.assetType === "crypto" && asset.symbol === "ABC")).toBe(false);
+    expect(payload.assets.find((asset) => asset.assetType === "stock" && asset.symbol === "ABC")?.value).toBe(600);
+  });
+
   it("uses the saved price when the stale crypto price lookup rejects", async () => {
     vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
       id: 1, uuid: "previous", createdAt: "2026-07-13T01:02:03.000Z", assetType: "crypto",
@@ -1838,7 +1859,10 @@ describe("partial source snapshots", () => {
       sourceResults: [{ sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-a"], status: "ok", coins: [{ symbol: "BTC", assetType: "crypto", amount: 4, wallet: "wallet-a", price: { base: "usd", value: 100 } }] }],
       failedSources: [],
     } as never);
-    const result = await refreshAllData(vi.fn(), { retrySourceId: "btc:0", previousSourceResults: previous }, operation);
+    const result = await refreshAllData(vi.fn(), {
+      retrySourceId: "btc:0", previousSourceResults: previous, previousSnapshotId: "previous",
+      previousSnapshotKey: JSON.stringify([["crypto", md5("wallet-a"), "BTC", 3, 300, 100]]),
+    }, operation);
     expect(fetchPortfolios).toHaveBeenCalledWith(expect.anything(), expect.any(Function), expect.anything(), { sourceId: "btc:0" });
     const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; amount: number }> };
     expect(payload.assets).toEqual(expect.arrayContaining([
@@ -1904,6 +1928,64 @@ describe("partial source snapshots", () => {
       retrySourceId: "btc:0",
       previousSourceResults: previous,
       previousRefreshCreatedAt: "2026-07-14T00:00:00.000Z",
+      previousSnapshotId: null,
+    }, operation)).rejects.toThrow("Portfolio changed");
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("rejects a retry after the latest snapshot is deleted without a new refresh operation", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 1, uuid: "older", createdAt: "2026-07-13T00:00:00.000Z", assetType: "crypto",
+      wallet: md5("wallet-a"), symbol: "BTC", amount: 1, value: 100, price: 100,
+    }]] as never);
+    vi.mocked(getLatestCommittedRefreshCreatedAt).mockResolvedValue("2026-07-14T00:00:00.000Z");
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ symbol: "BTC", assetType: "crypto", amount: 4, wallet: "wallet-a" }],
+      sourceResults: [{ sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-a"], status: "ok",
+        coins: [{ symbol: "BTC", assetType: "crypto", amount: 4, wallet: "wallet-a" }] }],
+      failedSources: [],
+    } as never);
+    await expect(refreshAllData(vi.fn(), {
+      retrySourceId: "btc:0", previousSourceResults: previous,
+      previousRefreshCreatedAt: "2026-07-14T00:00:00.000Z",
+      previousSnapshotId: "deleted",
+    }, operation)).rejects.toThrow("Portfolio changed");
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("rejects a retry after an import when there was no earlier committed refresh", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 1, uuid: "imported", createdAt: "2026-07-13T00:00:00.000Z", assetType: "crypto",
+      wallet: md5("wallet-a"), symbol: "BTC", amount: 1, value: 100, price: 100,
+    }]] as never);
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ symbol: "BTC", assetType: "crypto", amount: 4, wallet: "wallet-a" }],
+      sourceResults: [{ sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-a"], status: "ok",
+        coins: [{ symbol: "BTC", assetType: "crypto", amount: 4, wallet: "wallet-a" }] }],
+      failedSources: [],
+    } as never);
+    await expect(refreshAllData(vi.fn(), {
+      retrySourceId: "btc:0", previousSourceResults: previous,
+      previousSnapshotId: null,
+    }, operation)).rejects.toThrow("Portfolio changed");
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("rejects a retry after an import replaces the latest snapshot in place", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 1, uuid: "previous", createdAt: "2026-07-13T00:00:00.000Z", assetType: "crypto",
+      wallet: md5("wallet-a"), symbol: "BTC", amount: 5, value: 500, price: 100,
+    }]] as never);
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ symbol: "BTC", assetType: "crypto", amount: 4, wallet: "wallet-a" }],
+      sourceResults: [{ sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-a"], status: "ok",
+        coins: [{ symbol: "BTC", assetType: "crypto", amount: 4, wallet: "wallet-a" }] }],
+      failedSources: [],
+    } as never);
+    await expect(refreshAllData(vi.fn(), {
+      retrySourceId: "btc:0", previousSourceResults: previous,
+      previousSnapshotId: "previous",
+      previousSnapshotKey: JSON.stringify([["crypto", md5("wallet-a"), "BTC", 3, 300, 100]]),
     }, operation)).rejects.toThrow("Portfolio changed");
     expect(invoke).not.toHaveBeenCalled();
   });

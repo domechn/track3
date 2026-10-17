@@ -122,6 +122,8 @@ const App = ({
               ...(lastResult?.refreshCreatedAt
                 ? { previousRefreshCreatedAt: lastResult.refreshCreatedAt }
                 : {}),
+              previousSnapshotId: lastResult?.snapshotId ?? null,
+              previousSnapshotKey: lastResult?.snapshotKey,
             }
           : {},
         operation,

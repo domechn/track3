@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { StockBrokerSection } from "./stock-broker-section";
 import type { StockBrokerRow } from "./types";
@@ -57,5 +57,14 @@ describe("StockBrokerSection", () => {
     render(<StockBrokerSection {...baseProps} />);
 
     expect(screen.getByText("Add Stock Broker")).toBeInTheDocument();
+  });
+
+  it("requires confirmation before removing a broker", () => {
+    const onRemove = vi.fn();
+    render(<StockBrokerSection {...baseProps} onRemove={onRemove} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onRemove).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    expect(onRemove).toHaveBeenCalledOnce();
   });
 });

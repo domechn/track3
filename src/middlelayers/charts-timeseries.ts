@@ -238,11 +238,13 @@ async function querySampledTopAssets(dateRange: TDateRange, maxSize: number, inc
     .map((index) => snapshots[index]);
   if (sampled.length === 0) return { snapshots: sampled, assets: [] as TopAssetRow[] };
   const assets = await selectFromDatabaseWithSql<TopAssetRow>(
-    `WITH grouped AS (
-       SELECT uuid, MAX(createdAt) AS createdAt, symbol, asset_type AS assetType,
-              SUM(value) AS value, MIN(id) AS firstId
-       FROM assets_v2 WHERE uuid IN (${sampled.map(() => "?").join(",")})
-       GROUP BY uuid, asset_type, symbol
+    `WITH snapshots(uuid, createdAt) AS (
+       VALUES ${sampled.map(() => "(?, ?)").join(",")}
+     ), grouped AS (
+       SELECT a.uuid, snapshots.createdAt, a.symbol, a.asset_type AS assetType,
+              SUM(a.value) AS value, MIN(a.id) AS firstId
+       FROM assets_v2 a JOIN snapshots ON snapshots.uuid = a.uuid
+       GROUP BY a.uuid, a.asset_type, a.symbol
      ), ranked AS (
        SELECT grouped.uuid, grouped.createdAt, grouped.symbol, grouped.assetType,
               grouped.value, first.price, ROW_NUMBER() OVER (
@@ -252,7 +254,7 @@ async function querySampledTopAssets(dateRange: TDateRange, maxSize: number, inc
      SELECT * FROM ranked WHERE rank <= 10
        ${includeTopCoinHistory ? "OR (assetType, symbol) IN (SELECT assetType, symbol FROM ranked WHERE rank <= 10)" : ""}
      ORDER BY createdAt ASC, uuid ASC, rank ASC`,
-    sampled.map((snapshot) => snapshot.uuid),
+    sampled.flatMap((snapshot) => [snapshot.uuid, snapshot.createdAt]),
   );
   return { snapshots: sampled, assets };
 }

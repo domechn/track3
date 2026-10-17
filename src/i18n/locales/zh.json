@@ -429,7 +429,7 @@
   "system.loadingPlan": "加载中...",
   "config.title": "配置",
   "config.removeDialogTitle": "移除此配置？",
-  "config.removeDialogDesc": "保存配置后此更改才会生效。",
+  "config.removeDialogDesc": "这会将其从你的配置中移除。",
   "config.exchange": "交易所",
   "config.alias": "别名",
   "config.apiKey": "API Key",

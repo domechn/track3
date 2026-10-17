@@ -97,6 +97,10 @@ describe("TopCoinsPercentageChange", () => {
     await waitFor(() => {
       expect(getAllByTestId("tcpc-row")).toHaveLength(3);
     });
+    expect(queryTopCoinsPercentageChangeData).toHaveBeenCalledWith({
+      start: new Date("2024-04-15"),
+      end: new Date("2024-04-17"),
+    }, 96);
 
     const rows = getAllByTestId("tcpc-row");
     const labels = rows.map((r) => within(r).getByTestId("tcpc-symbol").textContent);

@@ -19,6 +19,7 @@ import {
 } from "@/utils/assets";
 
 type SortBy = "value" | "price";
+const SPARKLINE_WIDTH = 96;
 
 type RowData = {
   coin: string;
@@ -47,7 +48,7 @@ function formatPercent(value: number): string {
 function Sparkline({
   data,
   color,
-  width = 96,
+  width = SPARKLINE_WIDTH,
   height = 24,
 }: {
   data: number[];
@@ -131,7 +132,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   }, [rangeKey, dataChangedVersion]);
 
   async function loadData(dr: TDateRange, gen: number) {
-    const tcpcd = await queryTopCoinsPercentageChangeData(dr);
+    const tcpcd = await queryTopCoinsPercentageChangeData(dr, SPARKLINE_WIDTH);
     if (gen !== loadGenRef.current) {
       return;
     }

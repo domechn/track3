@@ -209,11 +209,14 @@ describe("Historical-data — delete does not flash loading overlay", () => {
         assetType: "crypto",
         symbol: "BTC",
         amount: 1,
-        value: 1200,
-        price: 1200,
+        value: 1000,
+        price: 1000,
+      }, {
+        id: 8, uuid: "snapshot-1", createdAt: sampleRows[0].createdAt,
+        assetType: "crypto", symbol: "ETH", amount: 1, value: 200, price: 200,
       }],
     }, sampleRows[1]];
-    const refreshedRows = [{ ...rows[0], assets: [] }, rows[1]];
+    const refreshedRows = [{ ...rows[0], assets: [rows[0].assets[1]] }, rows[1]];
     vi.mocked(queryHistoricalDetail)
       .mockResolvedValueOnce(rows[0] as never)
       .mockImplementationOnce(() => new Promise((resolve) =>
@@ -234,7 +237,7 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     fireEvent.click((await screen.findAllByText("snapshot"))[0]);
     const detailDialog = await screen.findByRole("dialog", { name: /historical data detail/i });
     expect(within(detailDialog).getByText("BTC")).toBeInTheDocument();
-    fireEvent.click(within(detailDialog).getByRole("button", { name: /delete/i }));
+    fireEvent.click(within(within(detailDialog).getByText("BTC").closest("tr")!).getByRole("button", { name: /delete/i }));
     fireEvent.click(await screen.findByRole("button", { name: /^delete$/i }));
 
     await waitFor(() => expect(onAfterDataChanged).toHaveBeenCalledWith("delete", undefined, 7));
@@ -344,6 +347,62 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     await waitFor(() => expect(screen.getByText("1 assets")).toBeInTheDocument());
   });
 
+  it("restores the list row after undoing deletion of its last asset without a reload callback", async () => {
+    const asset = {
+      id: 7, uuid: "snapshot-1", createdAt: sampleRows[0].createdAt,
+      assetType: "crypto", symbol: "BTC", amount: 1, value: 1200, price: 1200,
+    };
+    vi.mocked(queryHistoricalData).mockResolvedValue([
+      { ...sampleRows[0], assets: [asset] }, sampleRows[1],
+    ] as never);
+    vi.mocked(queryHistoricalDetail)
+      .mockResolvedValueOnce({ ...sampleRows[0], assets: [asset] } as never)
+      .mockResolvedValueOnce({ ...sampleRows[0], assets: [] } as never);
+    vi.mocked(queryRestoreHistoricalData).mockResolvedValue({ assets: [asset], transactions: [] } as never);
+
+    render(<HistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    fireEvent.click((await screen.findAllByText("snapshot"))[0]);
+    const dialog = await screen.findByRole("dialog", { name: /historical data detail/i });
+    fireEvent.click(within(dialog).getByRole("button", { name: /delete/i }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: /^delete$/i }));
+    await waitFor(() => expect(screen.getAllByTestId("history-snapshot-row")).toHaveLength(1));
+
+    const undoAction = toastMock.mock.lastCall?.[0].action;
+    const toastView = render(<ToastProvider><Toast defaultOpen>{undoAction}</Toast><ToastViewport /></ToastProvider>);
+    fireEvent.click(toastView.getByRole("button", { name: /undo/i }));
+    await waitFor(() => expect(restoreHistoricalData).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getAllByTestId("history-snapshot-row")).toHaveLength(2));
+    expect(screen.getAllByTestId("history-snapshot-row")[0]).toHaveTextContent("$1,200.00");
+  });
+
+  it("keeps the other wallet's value when deleting a grouped detail asset", async () => {
+    const grouped = {
+      id: 7, uuid: "snapshot-1", createdAt: sampleRows[0].createdAt,
+      assetType: "crypto", symbol: "BTC", amount: 3, value: 30, price: 10,
+    };
+    const remaining = { ...grouped, id: 8, amount: 2, value: 20 };
+    const rawDeleted = { ...grouped, amount: 1, value: 10 };
+    vi.mocked(queryHistoricalData).mockResolvedValue([
+      { ...sampleRows[0], total: 30, assets: [grouped] }, sampleRows[1],
+    ] as never);
+    vi.mocked(queryHistoricalDetail)
+      .mockResolvedValueOnce({ ...sampleRows[0], total: 30, assets: [grouped] } as never)
+      .mockResolvedValueOnce({ ...sampleRows[0], total: 20, assets: [remaining] } as never);
+    vi.mocked(queryRestoreHistoricalData).mockResolvedValue({
+      assets: [rawDeleted], transactions: [],
+    } as never);
+
+    render(<HistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    fireEvent.click((await screen.findAllByText("snapshot"))[0]);
+    const dialog = await screen.findByRole("dialog", { name: /historical data detail/i });
+    fireEvent.click(within(dialog).getByRole("button", { name: /delete/i }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: /^delete$/i }));
+
+    await waitFor(() => expect(deleteHistoricalDataDetailById).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(screen.getAllByTestId("history-snapshot-row")[0]).toHaveTextContent("$20.00"));
+    expect(screen.getByRole("dialog", { name: /historical data detail/i })).toHaveTextContent("BTC");
+  });
+
   it("keeps the current table page and row mounted after a local asset delete", async () => {
     const asset = {
       id: 20,
@@ -352,20 +411,24 @@ describe("Historical-data — delete does not flash loading overlay", () => {
       assetType: "crypto",
       symbol: "BTC",
       amount: 1,
-      value: 1200,
-      price: 1200,
+      value: 1000,
+      price: 1000,
+    };
+    const retained = {
+      id: 21, uuid: "rec-0020", createdAt: sampleRows[0].createdAt,
+      assetType: "crypto", symbol: "ETH", amount: 1, value: 200, price: 200,
     };
     const rows = Array.from({ length: 21 }, (_, idx) => ({
       id: `rec-${String(idx).padStart(4, "0")}`,
       createdAt: sampleRows[0].createdAt,
       total: 1200,
-      assets: idx === 20 ? [asset] : [],
+      assets: idx === 20 ? [asset, retained] : [],
       transactions: [],
     }));
     vi.mocked(queryHistoricalData).mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve(
         (vi.mocked(deleteHistoricalDataDetailById).mock.calls.length
-          ? [...rows.slice(0, 20), { ...rows[20], assets: [] }]
+          ? [...rows.slice(0, 20), { ...rows[20], assets: [retained] }]
           : rows) as never,
       ), 80)),
     );
@@ -381,12 +444,45 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     const row = (await screen.findByText("rec-0020")).closest("tr");
     fireEvent.click(screen.getByText("rec-0020"));
     const detailDialog = await screen.findByRole("dialog", { name: /historical data detail/i });
-    fireEvent.click(within(detailDialog).getByRole("button", { name: /delete/i }));
+    fireEvent.click(within(within(detailDialog).getByText("BTC").closest("tr")!).getByRole("button", { name: /delete/i }));
     fireEvent.click(await screen.findByRole("button", { name: /^delete$/i }));
 
     await waitFor(() => expect(queryHistoricalData).toHaveBeenCalledTimes(2));
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(screen.getByText("rec-0020").closest("tr")).toBe(row);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("does not insert an undone snapshot into a different page before reload", async () => {
+    const rows = Array.from({ length: 22 }, (_, index) => ({
+      id: `rec-${String(index).padStart(4, "0")}`,
+      createdAt: sampleRows[0].createdAt,
+      total: 100 + index,
+      assets: [],
+      transactions: [],
+    }));
+    let deleted = false;
+    vi.mocked(queryHistoricalData).mockImplementation(
+      () => new Promise((resolve) => setTimeout(
+        () => resolve((deleted ? rows.slice(1) : rows) as never), 80,
+      )),
+    );
+    vi.mocked(deleteHistoricalDataByUUID).mockImplementation(async () => { deleted = true; });
+    vi.mocked(restoreHistoricalData).mockImplementation(async () => { deleted = false; });
+    const onAfterDataChanged = vi.fn();
+    render(<VersionHarness onAfterDataChanged={onAfterDataChanged} currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    const first = await screen.findByText("rec-0000");
+    fireEvent.click(within(first.closest("tr")!).getByRole("button", { name: "Delete" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(deleteHistoricalDataByUUID).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: /next page/i }));
+    await screen.findByText("rec-0021");
+    const undoAction = toastMock.mock.lastCall?.[0].action;
+    const toastView = render(<ToastProvider><Toast defaultOpen>{undoAction}</Toast><ToastViewport /></ToastProvider>);
+    fireEvent.click(toastView.getByRole("button", { name: /undo/i }));
+    await waitFor(() => expect(restoreHistoricalData).toHaveBeenCalledOnce());
+    expect(screen.queryByText("rec-0000")).not.toBeInTheDocument();
+    await waitFor(() => expect(onAfterDataChanged).toHaveBeenCalledWith("undoDeletion", "rec-0000", undefined));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 

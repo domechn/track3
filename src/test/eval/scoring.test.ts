@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scoreGoldenCase, compareBaseline } from "./scoring";
+import { scoreGoldenCase, compareBaseline, parseJudgeScore, countToolRounds, parsePlannedTools } from "./scoring";
 
 describe("assistant eval scoring", () => {
   const golden = {
@@ -54,5 +54,35 @@ describe("assistant eval scoring", () => {
       plan: [], tools: [{ name: "portfolio_value", args: {}, result: { prices: {} } }],
       answer: "16,000 USD", rounds: 1,
     }).passed).toBe(true);
+  });
+
+  it("scores a generic answer with no required tool or facts below the baseline tolerance", () => {
+    const result = scoreGoldenCase(golden, {
+      plan: [], tools: [], answer: "Your portfolio is in USD.", rounds: 0,
+    });
+    expect(result.score).toBeLessThan(0.5);
+  });
+
+  it("does not apply a recorded-response baseline to an uncalibrated live model", () => {
+    expect(compareBaseline({ aggregate: 0.6 }, 1, 0.05, false, false)).toBe(true);
+    expect(compareBaseline({ aggregate: 0.6 }, 1, 0.05, true, false)).toBe(false);
+  });
+
+  it("reads a fenced judge score without dropping the case", () => {
+    expect(parseJudgeScore("```json\n{\"score\":0.75}\n```")).toBe(0.75);
+    expect(parseJudgeScore("not JSON")).toBeUndefined();
+  });
+
+  it("does not count synthesis as a tool loop round", () => {
+    expect(countToolRounds([
+      "You are the Track3 portfolio assistant.",
+      "You are the Track3 portfolio assistant synthesising analysis results into a final answer.",
+    ])).toBe(1);
+  });
+
+  it("keeps planner arguments from the planner reply", () => {
+    expect(parsePlannedTools('{"tasks":[{"skillName":"asset_history","args":{"symbol":"BTC","from":"2026-09-17"}}]}')).toEqual([
+      { name: "asset_history", args: { symbol: "BTC", from: "2026-09-17" } },
+    ]);
   });
 });

@@ -114,6 +114,7 @@ vi.mock("./datafetch/coins/erc20", () => ({
 
 vi.mock("./datafetch/coins/cex/cex", () => ({
   CexAnalyzer: mockAnalyzers.ConfigurableCexAnalyzer,
+  supportedExchanges: new Set(["binance", "kraken"]),
 }));
 
 vi.mock("./datafetch/coins/sol", () => ({

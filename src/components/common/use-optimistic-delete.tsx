@@ -6,9 +6,10 @@ import { recordSnapshotDeleted, recordSnapshotUndone } from "@/middlelayers/sync
 type DeleteOptions<T, Result> = {
   update: (items: T) => T;
   rollback: (items: T) => T;
+  undoUpdate?: (items: T) => T;
   commit: () => Promise<Result>;
   undo: (result: Result) => Promise<void>;
-  onDeleted?: () => void;
+  onDeleted?: (result: Result) => void;
   onUndone?: () => void;
   successMessage: string;
   undoLabel: string;
@@ -19,11 +20,12 @@ type DeleteOptions<T, Result> = {
 
 export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
   const { toast } = useToast();
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingDeletes, setPendingDeletes] = useState(0);
 
   const run = useCallback(async <Result,>({
     update,
     rollback,
+    undoUpdate,
     commit,
     undo,
     onDeleted,
@@ -34,7 +36,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
     undoWindowMs,
     syncSnapshotUuid,
   }: DeleteOptions<T, Result>) => {
-    setIsDeleting(true);
+    setPendingDeletes((count) => count + 1);
     setItems(update);
     const showError = (error: unknown) => toast({
       description: error instanceof Error ? error.message : String(error),
@@ -45,7 +47,8 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
       if (syncSnapshotUuid) {
         void recordSnapshotDeleted(syncSnapshotUuid).catch(showError);
       }
-      onDeleted?.();
+      
+      onDeleted?.(result);
       toast({
         description: successMessage,
         duration: undoWindowMs,
@@ -55,7 +58,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
             onClick={() => {
               void undo(result)
                 .then(() => {
-                  setItems(rollback);
+                  setItems(undoUpdate ?? rollback);
                   onUndone?.();
                   if (syncSnapshotUuid) void recordSnapshotUndone(syncSnapshotUuid).catch(showError);
                 })
@@ -70,9 +73,9 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
       setItems(rollback);
       showError(error);
     } finally {
-      setIsDeleting(false);
+      setPendingDeletes((count) => count - 1);
     }
   }, [setItems, toast]);
 
-  return { run, isDeleting };
+  return { run, isDeleting: pendingDeletes > 0 };
 }

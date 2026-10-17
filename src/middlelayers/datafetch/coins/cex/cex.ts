@@ -31,6 +31,28 @@ export interface Exchanger {
   verifyConfig(): Promise<boolean>;
 }
 
+type ExchangeConfig = CexConfig["exchanges"][number];
+const exchangeFactories: Record<string, (config: ExchangeConfig) => Exchanger> = {
+  binance: ({ initParams, alias }) => new BinanceExchange(initParams.apiKey, initParams.secret, alias),
+  okex: ({ initParams, alias }) => {
+    if (!initParams.password) throw new Error("okex password is required");
+    return new OkxExchange(initParams.apiKey, initParams.secret, initParams.password, alias);
+  },
+  bitget: ({ initParams, alias }) => {
+    if (!initParams.passphrase) throw new Error("bitget passphrase is required");
+    return new BitgetExchange(initParams.apiKey, initParams.secret, initParams.passphrase, alias);
+  },
+  gate: ({ initParams, alias }) => new GateExchange(initParams.apiKey, initParams.secret, alias),
+  kraken: ({ initParams, alias }) => new KrakenExchange(initParams.apiKey, initParams.secret, alias),
+  coinbase: ({ initParams, alias }) => new CoinbaseExchange(initParams.apiKey, initParams.secret, alias),
+  bybit: ({ initParams, alias }) => new BybitExchange(initParams.apiKey, initParams.secret, alias),
+  htx: ({ initParams, alias }) => new HtxExchange(initParams.apiKey, initParams.secret, alias),
+  mexc: ({ initParams, alias }) => new MexcExchange(initParams.apiKey, initParams.secret, alias),
+  backpack: ({ initParams, alias }) => new BackpackExchange(initParams.apiKey, initParams.secret, alias),
+};
+exchangeFactories.okx = exchangeFactories.okex;
+export const supportedExchanges = new Set(Object.keys(exchangeFactories));
+
 export class CexAnalyzer implements Analyzer {
   private readonly config: CexConfig;
 
@@ -45,84 +67,10 @@ export class CexAnalyzer implements Analyzer {
         if (exCfg.active === false) {
           return;
         }
-        switch (exCfg.name) {
-          case "binance":
-            return new BinanceExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.alias,
-            );
-          case "okex":
-          case "okx":
-            if (!exCfg.initParams.password) {
-              throw new Error("okex password is required");
-            }
-            return new OkxExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.initParams.password,
-              exCfg.alias,
-            );
-          case "bitget":
-            if (!exCfg.initParams.passphrase) {
-              throw new Error("bitget passphrase is required");
-            }
-            return new BitgetExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.initParams.passphrase,
-              exCfg.alias,
-            );
-          case "gate":
-            return new GateExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.alias,
-            );
-          case "kraken":
-            return new KrakenExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.alias,
-            );
-          case "coinbase":
-            return new CoinbaseExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.alias,
-            );
-          case "bybit":
-            return new BybitExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.alias,
-            );
-          case "htx":
-            return new HtxExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.alias,
-            );
-          case "mexc":
-            return new MexcExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.alias,
-            );
-          case "backpack":
-            return new BackpackExchange(
-              exCfg.initParams.apiKey,
-              exCfg.initParams.secret,
-              exCfg.alias,
-            );
-          default:
-            new OtherCexExchanges(
-              exCfg.name,
-              exCfg.initParams,
-              exCfg.alias,
-            );
-            return;
-        }
+        const factory = Object.hasOwn(exchangeFactories, exCfg.name) ? exchangeFactories[exCfg.name] : undefined;
+        if (factory) return factory(exCfg);
+        new OtherCexExchanges(exCfg.name, exCfg.initParams, exCfg.alias);
+        return;
       })
       .filter((ex): ex is Exchanger => !!ex);
   }
