@@ -15,6 +15,8 @@ const stopPropagation = (event: MouseEvent) => event.stopPropagation();
 
 type ConfirmDeleteDialogProps = {
   trigger?: ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   title: string;
   description: ReactNode;
   cancelLabel: string;
@@ -23,14 +25,23 @@ type ConfirmDeleteDialogProps = {
 
 export default function ConfirmDeleteDialog({
   trigger,
+  open,
+  onOpenChange,
   title,
   description,
   cancelLabel,
   actions,
 }: ConfirmDeleteDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const controlled = open !== undefined;
   return (
-    <AlertDialog open={internalOpen} onOpenChange={setInternalOpen}>
+    <AlertDialog
+      open={controlled ? open : internalOpen}
+      onOpenChange={(next) => {
+        if (!controlled) setInternalOpen(next);
+        onOpenChange?.(next);
+      }}
+    >
       {trigger && (
         <AlertDialogTrigger
           asChild
