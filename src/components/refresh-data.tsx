@@ -103,6 +103,7 @@ const App = ({
     const operation: RefreshOperation = { operationUuid: uuidv4() };
     let succeeded = false;
     let insightStatuses = sourceStatuses;
+    let alertResult: RefreshAllDataResult | undefined;
     try {
       if (!sourceId) {
         await updateAllCurrencyRates().catch(() => {});
@@ -128,6 +129,7 @@ const App = ({
       );
       succeeded = result.persisted !== false && !result.requiresDataSourceAction;
       if (succeeded) {
+        alertResult = result;
         getMemoryCacheInstance("data-fetch").clearCache();
       }
       if (result.sourceStatuses) {
@@ -160,17 +162,6 @@ const App = ({
       trackEventWithClientID("data_refreshed", {
         failedSources: result.sourceStatuses?.filter((source) => source.status !== "ok").map((source) => source.sourceId).join(",") ?? "",
       });
-      if (succeeded) {
-        try {
-          const alerts = await processAlerts(result.sourceResults, result.sourceStatuses);
-          await deliverAlerts(alerts, (alert) => {
-            const text = formatAlert(alert, t);
-            toast({ title: text.title, description: text.message });
-          }, t);
-        } catch {
-          console.warn("alert evaluation failed");
-        }
-      }
     } catch (error) {
       const messageKey = error instanceof FullRefreshRequiredError
         ? "refresh.runFullRefresh"
@@ -184,6 +175,17 @@ const App = ({
       setProgress(0);
       afterRefresh?.(succeeded);
       if (succeeded) {
+        if (alertResult) {
+          const resultForAlerts = alertResult;
+          queueMicrotask(() => {
+            void processAlerts(resultForAlerts.sourceResults, resultForAlerts.sourceStatuses)
+              .then((alerts) => deliverAlerts(alerts, (alert) => {
+                const text = formatAlert(alert, t);
+                toast({ title: text.title, description: text.message });
+              }, t))
+              .catch(() => console.warn("alert evaluation failed"));
+          });
+        }
         queueMicrotask(() => {
           void refreshInsights(insightStatuses, locale).catch(() => console.warn("insight generation failed"));
         });

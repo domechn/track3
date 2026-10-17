@@ -1,5 +1,6 @@
 import { isSameWallet } from "@/lib/utils";
 import { calculateTotalProfit } from "./charts-profit";
+import { getBlacklistCoins, getStableCoins } from "./configuration";
 import { executeWrite, executeWriteWork, getDatabase } from "./database";
 import type { AssetType } from "./datafetch/types";
 import type { PortfolioSourceResult, PortfolioSourceStatus } from "./portfolio-baseline";
@@ -33,6 +34,7 @@ export type AlertAsset = {
 export type AlertSnapshot = {
   at: string;
   assets: AlertAsset[];
+  stablecoinSymbols?: string[];
   pnl?: Partial<Record<AlertWindow, number>>;
   staleAssetKeys?: string[];
   hasStaleSources?: boolean;
@@ -46,7 +48,6 @@ export type TriggeredAlert = {
   symbol?: string | null;
   value: number;
   at: string;
-  rearmed: boolean;
 };
 export type AlertHistory = {
   id: number;
@@ -201,7 +202,7 @@ export function measureRule(
         value: asset.value, price: asset.price,
       })),
       targets.targets,
-      { tolerancePercent: targets.tolerancePercent },
+      { tolerancePercent: targets.tolerancePercent, stablecoinSymbols: latest.stablecoinSymbols },
     );
     const row = result.rows.find((row) => row.kind === "asset" && `${row.assetType}:${row.symbol.toUpperCase()}` === assetKey);
     if (row) value = Math.abs(row.deviationPercent);
@@ -236,7 +237,7 @@ export function evaluate(
     return [{
       ruleId: rule.id, kind: rule.kind, title, symbol: rule.symbol,
       message: `${title}: ${value.toFixed(2)} (${rule.comparator === "gte" ? "at least" : "at most"} ${rule.threshold.toFixed(2)})`,
-      value, at: now.toISOString(), rearmed: false,
+      value, at: now.toISOString(),
     }];
   });
 }
@@ -266,13 +267,22 @@ export async function loadAlertEvaluationData(
   sourceResults?: PortfolioSourceResult[],
   sourceStatuses?: PortfolioSourceStatus[],
   now = new Date(),
+  pnlWindows: AlertWindow[] = [],
 ): Promise<{ snapshots: AlertSnapshot[]; prices: AlertPrices; targets?: RebalanceProfile }> {
   const db = await getDatabase();
   const selectAssets = "SELECT asset_type AS assetType, symbol, wallet, amount, value, price, createdAt AS at FROM assets_v2 WHERE uuid = ";
-  const latestRows = await db.select<Array<AlertAsset & { at: string }>>(
-    selectAssets + "(SELECT uuid FROM assets_v2 ORDER BY createdAt DESC, id DESC LIMIT 1)",
-  );
-  const snapshots: AlertSnapshot[] = latestRows.length ? [{ at: latestRows[0].at, assets: latestRows }] : [];
+  const [rawLatestRows, blacklist, stablecoinSymbols] = await Promise.all([
+    db.select<Array<AlertAsset & { at: string }>>(
+      selectAssets + "(SELECT uuid FROM assets_v2 ORDER BY createdAt DESC, id DESC LIMIT 1)",
+    ),
+    getBlacklistCoins(),
+    getStableCoins(),
+  ]);
+  const excluded = new Set(blacklist.map((symbol) => symbol.toUpperCase()));
+  const latestRows = rawLatestRows.filter((asset) => !excluded.has(asset.symbol.toUpperCase()));
+  const snapshots: AlertSnapshot[] = rawLatestRows.length
+    ? [{ at: rawLatestRows[0].at, assets: latestRows, stablecoinSymbols: stablecoinSymbols.length ? stablecoinSymbols : undefined }]
+    : [];
   const statuses = sourceStatuses ?? readStoredSourceStatuses();
   if (snapshots[0]) {
     const oldSnapshot = now.getTime() - Date.parse(snapshots[0].at) > 86400000;
@@ -304,6 +314,16 @@ export async function loadAlertEvaluationData(
     prices[window] = Object.fromEntries([...grouped].filter(([, item]) => item.amount > 0)
       .map(([key, item]) => [key, item.value / item.amount]));
   }
+  if (snapshots[0] && !snapshots[0].hasStaleSources && pnlWindows.length) {
+    const pnl: Partial<Record<AlertWindow, number>> = {};
+    for (const window of [...new Set(pnlWindows)]) {
+      const result = await calculateTotalProfit({
+        start: new Date(now.getTime() - windowMs[window]), end: now,
+      });
+      if (result.lastRecordDate) pnl[window] = result.total;
+    }
+    snapshots[0].pnl = pnl;
+  }
   const targets = await getRebalanceProfile();
   return { snapshots, prices, targets };
 }
@@ -327,19 +347,10 @@ export async function processAlerts(
 ): Promise<TriggeredAlert[]> {
   const rules = await listAlertRules();
   if (!rules.some((rule) => rule.enabled)) return [];
-  const { snapshots, prices, targets } = await loadAlertEvaluationData(sourceResults, sourceStatuses, now);
+  const pnlWindows = rules.filter((rule) => rule.enabled && rule.kind === "period_pnl" && rule.window)
+    .map((rule) => rule.window as AlertWindow);
+  const { snapshots, prices, targets } = await loadAlertEvaluationData(sourceResults, sourceStatuses, now, pnlWindows);
   if (!snapshots.length) return [];
-  const pnlRules = rules.filter((rule) => rule.enabled && rule.kind === "period_pnl" && rule.window);
-  if (!snapshots[0].hasStaleSources && pnlRules.length) {
-    const pnl: Partial<Record<AlertWindow, number>> = {};
-    for (const window of [...new Set(pnlRules.map((rule) => rule.window as AlertWindow))]) {
-      const result = await calculateTotalProfit({
-        start: new Date(now.getTime() - windowMs[window]), end: now,
-      });
-      if (result.lastRecordDate) pnl[window] = result.total;
-    }
-    snapshots[0].pnl = pnl;
-  }
   const triggered = evaluate(rules, snapshots, prices, targets, now);
   await executeWriteWork(async (db) => {
     for (const rule of rules) {

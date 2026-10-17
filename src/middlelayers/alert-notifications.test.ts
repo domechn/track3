@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { deliverAlerts, enableSystemNotifications, formatAlert } from "./alert-notifications";
+import { deliverAlerts, enableSystemNotifications, formatAlert, systemNotificationsEnabled } from "./alert-notifications";
 import { isTauri } from "@tauri-apps/api/core";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import type { TriggeredAlert } from "./alerts";
@@ -12,9 +12,16 @@ vi.mock("@tauri-apps/plugin-notification", () => ({
 const alert: TriggeredAlert = {
   ruleId: 1, kind: "total_value_target", title: "Portfolio goal reached",
   message: "Portfolio goal reached: 1000.00", value: 1000,
-  at: "2026-10-17T12:00:00.000Z", rearmed: false,
+  at: "2026-10-17T12:00:00.000Z",
 };
 beforeEach(() => vi.clearAllMocks());
+
+it("reads an existing OS notification grant without requesting permission", async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  vi.mocked(isPermissionGranted).mockResolvedValue(true);
+  expect(await systemNotificationsEnabled()).toBe(true);
+  expect(requestPermission).not.toHaveBeenCalled();
+});
 
 it("falls back in a browser without asking for permission", async () => {
   vi.mocked(isTauri).mockReturnValue(false);

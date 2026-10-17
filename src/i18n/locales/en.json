@@ -810,6 +810,7 @@
   "goals.ackAll": "Acknowledge all",
   "goals.clearHistory": "Clear history",
   "goals.clearConfirm": "Permanently remove all alert history?",
+  "goals.deleteConfirm": "Delete this alert rule?",
   "goals.noHistory": "No alerts yet",
   "goals.unread": "{count} unread alerts",
   "goals.alertTriggered": "{kind} triggered: {value}",

@@ -38,7 +38,7 @@ export function MainNav({
       <CustomLink to="/wallets">{t("nav.wallets")}</CustomLink>
       <CustomLink to="/comparison">{t("nav.comparison")}</CustomLink>
       <CustomLink to="/rebalance">{t("nav.rebalance")}</CustomLink>
-      <CustomLink to="/goals">{t("nav.goals")}{unread > 0 && <span className="ml-1 rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground" aria-label={t("goals.unread").replace("{count}", String(unread))}>{unread}</span>}</CustomLink>
+      <CustomLink to="/goals">{t("nav.goals")}{unread > 0 && <><span aria-hidden="true" className="ml-1 rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground">{unread}</span>{" "}<span className="sr-only">{t("goals.unread").replace("{count}", String(unread))}</span></>}</CustomLink>
       <CustomLink to="/history">{t("nav.history")}</CustomLink>
       <CustomLink to="/settings">{t("nav.settings")}</CustomLink>
     </nav>

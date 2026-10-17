@@ -19,6 +19,18 @@ const half: RebalanceTarget[] = [
 ];
 
 describe("rebalance calculator", () => {
+  it("matches a target with draft whitespace to its existing holding", () => {
+    const result = calculateRebalance([
+      { symbol: "BTC", assetType: "crypto", amount: 1, value: 60, price: 60 },
+      { symbol: "ETH", assetType: "crypto", amount: 1, value: 40, price: 40 },
+    ], [
+      { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+      { kind: "asset", assetType: "crypto", symbol: "ETH ", percent: 50 },
+    ]);
+    expect(result.rows.map((row) => [row.symbol, row.tradeValue])).toEqual([
+      ["BTC", -10], ["ETH", 10],
+    ]);
+  });
   it("funds hand-computed full rebalance trades and accounts for injected cash exactly", () => {
     const result = calculateRebalance(holdings, half, { mode: "full", injectedCash: 20 });
     expect(result.rows.filter((row) => row.kind === "asset").map((row) => ({

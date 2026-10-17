@@ -13,6 +13,15 @@ export function formatAlert(alert: AlertText, t?: (key: string) => string): { ti
   };
 }
 
+export async function systemNotificationsEnabled(): Promise<boolean> {
+  if (!isTauri()) return false;
+  try {
+    return await isPermissionGranted();
+  } catch {
+    return false;
+  }
+}
+
 export async function enableSystemNotifications(): Promise<boolean> {
   if (!isTauri()) return false;
   try {
@@ -28,14 +37,7 @@ export async function deliverAlerts(
   t?: (key: string) => string,
 ): Promise<void> {
   if (!alerts.length) return;
-  let allowed = false;
-  if (isTauri()) {
-    try {
-      allowed = await isPermissionGranted();
-    } catch {
-      // In-app messages remain available if the OS notification service fails.
-    }
-  }
+  const allowed = await systemNotificationsEnabled();
   for (const alert of alerts) {
     if (allowed) {
       try {

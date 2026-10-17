@@ -1,10 +1,10 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import GoalsAlerts from "./goals-alerts";
-import { listAlertRules, listAlertHistory, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts } from "@/middlelayers/alerts";
-import { enableSystemNotifications } from "@/middlelayers/alert-notifications";
+import { listAlertRules, listAlertHistory, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
+import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlelayers/alert-notifications";
 
 vi.mock("@/middlelayers/alerts", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/middlelayers/alerts")>(),
@@ -15,12 +15,19 @@ vi.mock("@/middlelayers/alerts", async (importOriginal) => ({
 }));
 vi.mock("@/middlelayers/alert-notifications", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/middlelayers/alert-notifications")>(),
-  enableSystemNotifications: vi.fn(),
+  enableSystemNotifications: vi.fn(), systemNotificationsEnabled: vi.fn(),
 }));
+const savedRule: AlertRule = {
+  id: 7, kind: "total_value_target", assetType: null, symbol: null, comparator: "gte",
+  threshold: 100, window: null, enabled: true, cooldownSeconds: 3600,
+  lastTriggeredAt: null, lastValue: null, armed: true,
+};
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listAlertRules).mockResolvedValue([]);
   vi.mocked(listAlertHistory).mockResolvedValue([]);
+  vi.mocked(loadAlertEvaluationData).mockResolvedValue({ snapshots: [], prices: {} });
+  vi.mocked(systemNotificationsEnabled).mockResolvedValue(false);
 });
 
 it("shows the empty state and a clear explanation before notification permission", async () => {
@@ -54,4 +61,88 @@ it("shows an unread alert and acknowledges it", async () => {
   expect(await screen.findByText(/Portfolio value goal triggered/)).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Acknowledge all" }));
   expect(acknowledgeAllAlerts).toHaveBeenCalledTimes(1);
+});
+
+it("shows an already granted notification permission on opening the page", async () => {
+  vi.mocked(systemNotificationsEnabled).mockResolvedValue(true);
+  render(<GoalsAlerts />);
+  expect(await screen.findByRole("button", { name: "System notifications enabled" })).toBeInTheDocument();
+  expect(enableSystemNotifications).not.toHaveBeenCalled();
+});
+
+it("asks before deleting a rule", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByRole("checkbox", { name: "Enable Portfolio value goal" });
+  await user.click(screen.getByRole("button", { name: "Delete" }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toBeInTheDocument();
+  expect(deleteAlertRule).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  expect(deleteAlertRule).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Delete" }));
+  await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+  await waitFor(() => expect(deleteAlertRule).toHaveBeenCalledWith(7));
+});
+
+it("toggles a rule off and back on", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  vi.mocked(setAlertRuleEnabled).mockImplementation(async (_id, enabled) => {
+    vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, enabled }]);
+  });
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  const toggle = await screen.findByRole("checkbox", { name: "Enable Portfolio value goal" });
+  expect(toggle).toBeChecked();
+  await user.click(toggle);
+  await waitFor(() => expect(toggle).not.toBeChecked());
+  expect(setAlertRuleEnabled).toHaveBeenCalledWith(7, false);
+  await user.click(toggle);
+  await waitFor(() => expect(toggle).toBeChecked());
+  expect(setAlertRuleEnabled).toHaveBeenCalledWith(7, true);
+});
+
+it("confirms before clearing alert history", async () => {
+  vi.mocked(listAlertHistory).mockResolvedValue([{
+    id: 1, ruleId: 7, kind: "total_value_target", title: "Portfolio goal reached",
+    message: "Portfolio goal reached: 100.00", value: 100,
+    triggeredAt: "2026-10-17T12:00:00.000Z", acknowledgedAt: null,
+  }]);
+  vi.mocked(clearAlertHistory).mockImplementation(async () => {
+    vi.mocked(listAlertHistory).mockResolvedValue([]);
+  });
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByText(/Portfolio value goal triggered/);
+  await user.click(screen.getByRole("button", { name: "Clear history" }));
+  expect(await screen.findByRole("alertdialog")).toHaveTextContent("Permanently remove all alert history?");
+  expect(clearAlertHistory).not.toHaveBeenCalled();
+  await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+  expect(clearAlertHistory).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Clear history" }));
+  await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Clear history" }));
+  await waitFor(() => expect(clearAlertHistory).toHaveBeenCalledOnce());
+  expect(await screen.findByText("No alerts yet")).toBeInTheDocument();
+});
+
+it("labels a rule with stale portfolio data", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  vi.mocked(loadAlertEvaluationData).mockResolvedValue({
+    snapshots: [{ at: "2026-10-17T12:00:00.000Z", assets: [], hasStaleSources: true }], prices: {},
+  });
+  render(<GoalsAlerts />);
+  expect(await screen.findByText(/Data stale/)).toBeInTheDocument();
+});
+
+it("shows the available P&L for a displayed period rule", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, kind: "period_pnl", window: "7d" }]);
+  vi.mocked(loadAlertEvaluationData).mockImplementation(async (...args) => ({
+    snapshots: [{
+      at: "2026-10-17T12:00:00.000Z", assets: [],
+      pnl: ((args as unknown[])[3] as string[] | undefined)?.includes("7d") ? { "7d": 12 } : undefined,
+    }], prices: {},
+  }));
+  render(<GoalsAlerts />);
+  expect(await screen.findByText(/Current: 12.00/)).toBeInTheDocument();
 });
