@@ -25,7 +25,7 @@ const SQLITE_PATH_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b'`')
     .add(b'{')
     .add(b'}');
-const INITIALIZATION_SCRIPTS: [&str; 7] = [
+const INITIALIZATION_SCRIPTS: [&str; 11] = [
     "configuration_up.sql",
     "assets_v2_up.sql",
     "currency_rates_up.sql",
@@ -33,6 +33,10 @@ const INITIALIZATION_SCRIPTS: [&str; 7] = [
     "transactions_up.sql",
     "chat_sessions_up.sql",
     "cloud_sync_up.sql",
+    "rebalance_profiles_up.sql",
+    "alerts_up.sql",
+    "history_snapshots_up.sql",
+    "sync_state_up.sql",
 ];
 
 #[derive(Clone, Debug)]
@@ -655,6 +659,10 @@ mod tests {
             ("transactions_up.sql", "SELECT 1;"),
             ("chat_sessions_up.sql", "SELECT 1;"),
             ("cloud_sync_up.sql", "SELECT 1;"),
+            ("rebalance_profiles_up.sql", "SELECT 1;"),
+            ("alerts_up.sql", "SELECT 1;"),
+            ("history_snapshots_up.sql", "SELECT 1;"),
+            ("sync_state_up.sql", "SELECT 1;"),
         ] {
             fs::write(init_dir.join(name), sql).unwrap();
         }

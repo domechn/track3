@@ -160,3 +160,63 @@ mod sync_tests {
         std::fs::remove_file(path).unwrap();
     }
 }
+
+#[cfg(test)]
+mod init_schema_tests {
+    use super::migration::run_migrations;
+    use sqlx::{Connection, Executor, SqliteConnection};
+    use std::path::PathBuf;
+
+    const NEW_TABLE_SCRIPTS: [(&str, &str, &str); 4] = [
+        ("rebalance_profiles_up.sql", include_str!("../../migrations/init/rebalance_profiles_up.sql"), include_str!("../../migrations/v08t09/rebalance_profiles_up.sql")),
+        ("alerts_up.sql", include_str!("../../migrations/init/alerts_up.sql"), include_str!("../../migrations/v08t09/alerts_up.sql")),
+        ("history_snapshots_up.sql", include_str!("../../migrations/init/history_snapshots_up.sql"), include_str!("../../migrations/v08t09/history_snapshots_up.sql")),
+        ("sync_state_up.sql", include_str!("../../migrations/init/sync_state_up.sql"), include_str!("../../migrations/v08t09/sync_state_up.sql")),
+    ];
+
+    #[test]
+    fn init_and_v08t09_copies_of_the_new_tables_are_identical_and_registered() {
+        let database_path_rs = include_str!("../../src/database_path.rs");
+        for (name, init, versioned) in NEW_TABLE_SCRIPTS {
+            assert_eq!(init, versioned, "{name} differs between init and v08t09");
+            assert!(database_path_rs.contains(&format!("\"{name}\"")), "{name} missing from INITIALIZATION_SCRIPTS");
+        }
+    }
+
+    #[test]
+    fn fresh_install_scripts_create_every_table_and_survive_the_0_9_0_migration() {
+        let root = std::env::temp_dir().join(format!("track3-fresh-init-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let db_path: PathBuf = root.join("fresh.db");
+        let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            for sql in [
+                include_str!("../../migrations/init/configuration_up.sql"),
+                include_str!("../../migrations/init/assets_v2_up.sql"),
+                include_str!("../../migrations/init/currency_rates_up.sql"),
+                include_str!("../../migrations/init/asset_prices_up.sql"),
+                include_str!("../../migrations/init/transactions_up.sql"),
+                include_str!("../../migrations/init/chat_sessions_up.sql"),
+                include_str!("../../migrations/init/cloud_sync_up.sql"),
+            ] {
+                db.execute(sql).await.unwrap();
+            }
+            for (_, init, _) in NEW_TABLE_SCRIPTS {
+                db.execute(init).await.unwrap();
+            }
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.0").await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.0").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            for table in ["rebalance_profiles", "alert_rules", "alert_history", "history_snapshots", "sync_state", "sync_applied_objects", "sync_snapshot_revisions"] {
+                let found: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?")
+                    .bind(table).fetch_one(&mut db).await.unwrap();
+                assert_eq!(found, 1, "{table} missing after a fresh install");
+            }
+            db.close().await.unwrap();
+        });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
