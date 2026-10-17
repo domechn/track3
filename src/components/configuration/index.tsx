@@ -45,6 +45,7 @@ import {
   WALLET_OPTIONS,
 } from "@/middlelayers/constants";
 import { useTranslation } from "@/i18n";
+import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
 
 import { SummaryCards } from "./summary-cards";
 import { GeneralSettings } from "./general-settings";
@@ -186,6 +187,11 @@ const App = ({
   const [exchanges, setExchanges] = useState<ExchangeRow[]>([]);
   const [stockBrokers, setStockBrokers] = useState<StockBrokerRow[]>([]);
   const [others, setOthers] = useState<OtherRow[]>([]);
+  const safeError = (error: unknown) => redactSecrets(
+    error instanceof Error ? error.message : String(error),
+    [...configuredSecretValues({ exchanges, stockBrokers, addExchangeConfig, addStockBrokerConfig, proLicense }),
+      ...wallets.map((wallet) => wallet.address)],
+  );
   const [otherAmountDraftMap, setOtherAmountDraftMap] = useState<
     Record<number, string>
   >({});
@@ -363,7 +369,7 @@ const App = ({
         .then((c) => setPreferCurrency(c.currency))
         .catch((e) => {
           toast({
-            description: t("config.getPreferCurrencyFailed") + (e.message || e),
+            description: t("config.getPreferCurrencyFailed") + safeError(e),
             variant: "destructive",
           });
         })
@@ -428,7 +434,7 @@ const App = ({
       })
       .catch((e) => {
         toast({
-          description: t("config.getConfigFailed") + (e.message || e),
+          description: t("config.getConfigFailed") + safeError(e),
           variant: "destructive",
         });
       });
@@ -457,7 +463,7 @@ const App = ({
       .finally(() => {
         if (saveError) {
           toast({
-            description: saveError.message ?? saveError,
+            description: safeError(saveError),
             variant: "destructive",
           });
         }
@@ -558,7 +564,7 @@ const App = ({
       buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
-        description: t("config.failedFetchBalances") + (e.message || e),
+        description: t("config.failedFetchBalances") + safeError(e),
         variant: "destructive",
       });
       setQuickLookOpen(false);
@@ -616,7 +622,7 @@ const App = ({
       buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
-        description: t("config.failedFetchBalances") + (e.message || e),
+        description: t("config.failedFetchBalances") + safeError(e),
         variant: "destructive",
       });
       setQuickLookOpen(false);
@@ -658,7 +664,7 @@ const App = ({
       buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
-        description: t("config.failedFetchPositions") + (e.message || e),
+        description: t("config.failedFetchPositions") + safeError(e),
         variant: "destructive",
       });
       setQuickLookOpen(false);
@@ -716,7 +722,7 @@ const App = ({
       .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
-          description: e.message ?? e,
+          description: safeError(e),
           variant: "destructive",
         });
       });
@@ -728,7 +734,7 @@ const App = ({
       .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
-          description: e.message ?? e,
+          description: safeError(e),
           variant: "destructive",
         });
       });
@@ -739,7 +745,7 @@ const App = ({
       .then(() => notifyConfigurationSaved())
       .catch((e) => {
         toast({
-          description: e.message ?? e,
+          description: safeError(e),
           variant: "destructive",
         });
       });
@@ -851,7 +857,7 @@ const App = ({
       })
       .catch((e) => {
         toast({
-          description: e.message ?? e,
+          description: safeError(e),
           variant: "destructive",
         });
       })
@@ -938,7 +944,7 @@ const App = ({
       })
       .catch((e) => {
         toast({
-          description: e.message ?? e,
+          description: safeError(e),
           variant: "destructive",
         });
       })
@@ -1045,7 +1051,7 @@ const App = ({
       })
       .catch((e) => {
         toast({
-          description: e.message ?? e,
+          description: safeError(e),
           variant: "destructive",
         });
       })

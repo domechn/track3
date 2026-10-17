@@ -646,7 +646,7 @@ const App = () => {
         }
       }
     } catch (e) {
-      console.error("auto import failed", e);
+      console.error("auto import failed");
     }
 
     try {
@@ -654,7 +654,7 @@ const App = () => {
       // no page refresh is needed.
       await autoBackupHistoricalData();
     } catch (e) {
-      console.error("auto backup failed", e);
+      console.error("auto backup failed");
     } finally {
       if (activeRef.current) {
         setAutoBackupStatus("idle");

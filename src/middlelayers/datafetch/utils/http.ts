@@ -1,4 +1,5 @@
 import { fetch } from "@tauri-apps/plugin-http";
+import { redactSecrets } from "../../security/redact";
 
 const ERROR_DETAIL_MAX_LENGTH = 200;
 
@@ -17,22 +18,10 @@ export class HttpRequestError extends Error {
 function getSafeEndpoint(url: string): string {
   try {
     const parsed = new URL(url);
-    return `${parsed.origin}${parsed.pathname}`;
+    return redactSecrets(`${parsed.origin}${parsed.pathname}`);
   } catch {
-    return url.split("?")[0];
+    return redactSecrets(url.split("?")[0]);
   }
-}
-
-function redactSensitiveText(text: string): string {
-  return text
-    .replace(
-      /(api[-_]?key|secret|signature|passphrase|token|authorization|password)=([^\s&,;]+)/gi,
-      "$1=<REDACTED>",
-    )
-    .replace(
-      /(api[-_]?key|secret|signature|passphrase|token|authorization|password)\s*:\s*([^\s&,;]+)/gi,
-      "$1: <REDACTED>",
-    );
 }
 
 function truncateText(
@@ -66,10 +55,10 @@ function extractErrorDetail(rawText: string): string | undefined {
 
       const details: string[] = [];
       if (msg) {
-        details.push(redactSensitiveText(msg.trim()));
+        details.push(redactSecrets(msg.trim()));
       }
       if (code !== undefined) {
-        details.push(`code ${code}`);
+        details.push(`code ${redactSecrets(String(code))}`);
       }
 
       if (details.length > 0) {
@@ -80,7 +69,7 @@ function extractErrorDetail(rawText: string): string | undefined {
     // keep fallback for plain text responses
   }
 
-  return truncateText(redactSensitiveText(trimmed));
+  return truncateText(redactSecrets(trimmed));
 }
 
 function createHttpErrorMessage(

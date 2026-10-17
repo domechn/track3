@@ -155,6 +155,15 @@ beforeEach(() => {
 });
 
 describe("DATA_MANAGER historical data import/export", () => {
+  it("preserves long symbols in exported portfolio data", async () => {
+    const symbol = "0123456789abcdef0123456789abcdef";
+    mocks.queryHistoricalData.mockResolvedValue([{ ...makeHistoricalData(),
+      assets: [{ ...makeHistoricalData().assets[0], symbol }],
+    }]);
+    await DATA_MANAGER.exportHistoricalData("/tmp/export.json", false);
+    const content = JSON.parse(String(mocks.writeTextFile.mock.calls[0]?.[1])) as ExportData;
+    expect(content.historicalData[0].assets[0].symbol).toBe(symbol);
+  });
   it("exports historical data with client metadata, configuration, and checksum", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-04-16T13:00:00.000Z"));

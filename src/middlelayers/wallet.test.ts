@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
 import type { AssetModel } from "@/middlelayers/types";
+import { getConfiguration } from "@/middlelayers/configuration";
+import md5 from "md5";
 
 vi.mock("@/middlelayers/configuration", () => ({
   getConfiguration: vi.fn().mockResolvedValue(undefined),
@@ -67,4 +69,18 @@ describe("WalletAnalyzer.queryWalletAssetsChange", () => {
       },
     ]);
   });
+});
+
+it("does not expose an exchange API key through the wallet alias lookup", async () => {
+  vi.mocked(getConfiguration).mockResolvedValue({
+    configs: { groupUSD: true },
+    exchanges: [{ name: "binance", initParams: { apiKey: "custom-private-key", secret: "private-secret" }, active: true }],
+    stockConfig: { brokers: [] },
+    btc: { addresses: [] }, doge: { addresses: [] }, sol: { addresses: [] },
+    erc20: { addresses: [] }, trc20: { addresses: [] }, ton: { addresses: [] }, sui: { addresses: [] },
+    others: [],
+  } as never);
+  const aliases = await new WalletAnalyzer(async () => []).listWalletAliases([md5("binance-custom-private-key")]);
+  expect(JSON.stringify(aliases)).not.toContain("custom-private-key");
+  expect(aliases[md5("binance-custom-private-key")]?.alias).toBe("Binance");
 });

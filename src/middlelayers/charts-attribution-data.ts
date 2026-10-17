@@ -5,12 +5,12 @@ import { getBlacklistCoins } from "./configuration";
 import { WalletAnalyzer } from "./wallet";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
-import { getCacheGroupEpoch, getLocalStorageCacheInstance } from "./datafetch/utils/cache";
+import { getCacheGroupEpoch, getMemoryCacheInstance } from "./datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "./consts";
 
 export async function queryAttribution(dateRange: TDateRange): Promise<{ attribution: AttributionResult; aliases: Record<string, WalletAlias | undefined> }> {
   const groupKey = CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY;
-  const cache = getLocalStorageCacheInstance(groupKey);
+  const cache = getMemoryCacheInstance(groupKey);
   const key = `attribution-v2-${getCacheGroupEpoch(groupKey)}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   let attribution = cache.getCache<AttributionResult>(key);
 

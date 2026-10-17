@@ -63,3 +63,37 @@ it("writes the displayed realized rows through the Tauri dialog and file API", a
   expect(await exportCostBasisReport(report, "csv")).toBe(true);
   expect(vi.mocked(writeTextFile).mock.calls[0][1]).toContain("BTC,2024-01-01,2025-01-01,1,200.00,100.00,100.00,long,FIFO");
 });
+
+it("redacts embedded credentials from exported CSV", async () => {
+  vi.mocked(save).mockResolvedValue("/tmp/gains.csv");
+  const report = {
+    method: "FIFO", from: "2025-01-01", to: "2025-12-31",
+    disposals: [{ symbol: "sk-abcdefghijklmnop1234567890", assetType: "crypto", acquiredAt: "2024-01-01", disposedAt: "2025-01-01",
+      amount: 1, proceeds: 200, costBasis: 100, gainLoss: 100, term: "long", method: "FIFO", eventId: "x", lotId: "a" }],
+    warnings: [], openLots: [], unrealized: [], assets: [],
+    totals: { proceeds: 200, costBasis: 100, gainLoss: 100, shortTerm: 0, longTerm: 100 },
+  } as unknown as import("./cost-basis-report").CostBasisReport;
+  await exportCostBasisReport(report, "csv");
+  expect(String(vi.mocked(writeTextFile).mock.calls[0]?.[1])).not.toContain("sk-abcdefghijklmnop1234567890");
+});
+
+it("preserves JSON event and lot IDs while redacting embedded credentials", async () => {
+  vi.mocked(save).mockResolvedValue("/tmp/gains.json");
+  const eventId = "0123456789abcdef0123456789abcdef";
+  const lotId = "abcdef0123456789abcdef0123456789";
+  const report = {
+    method: "FIFO", from: "2025-01-01", to: "2025-12-31",
+    disposals: [{ symbol: "LONGCRYPTOSYMBOL0123456789ABCDEF012345", assetType: "crypto",
+      acquiredAt: "2024-01-01", disposedAt: "2025-01-01", amount: 1,
+      proceeds: 200, costBasis: 100, gainLoss: 100, term: "long", method: "FIFO", eventId, lotId },
+    { symbol: "sk-abcdefghijklmnop1234567890", assetType: "crypto",
+      acquiredAt: "2024-01-01", disposedAt: "2025-01-01", amount: 1,
+      proceeds: 200, costBasis: 100, gainLoss: 100, term: "long", method: "FIFO", eventId: "other", lotId: "other" }],
+    warnings: [], openLots: [], unrealized: [], assets: [],
+    totals: { proceeds: 200, costBasis: 100, gainLoss: 100, shortTerm: 0, longTerm: 100 },
+  } as unknown as import("./cost-basis-report").CostBasisReport;
+  await exportCostBasisReport(report, "json");
+  const exported = JSON.parse(String(vi.mocked(writeTextFile).mock.calls[0]?.[1]));
+  expect(exported.disposals[0]).toMatchObject({ eventId, lotId, symbol: "LONGCRYPTOSYMBOL0123456789ABCDEF012345" });
+  expect(exported.disposals[1].symbol).toBe("<REDACTED>");
+});

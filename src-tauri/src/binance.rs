@@ -153,10 +153,7 @@ impl Binance {
                 }
             });
         } else {
-            println!(
-                "Failed to fetch cross margin account balances, error: {:?}",
-                margin_details.err()
-            );
+            eprintln!("Failed to fetch cross margin account balances");
         }
 
         // futures
@@ -175,10 +172,7 @@ impl Binance {
                     }
                 });
         } else {
-            println!(
-                "Failed to fetch futures account balances, error: {:?}",
-                futures_balances.err()
-            );
+            eprintln!("Failed to fetch futures account balances");
         }
 
         Ok(res)

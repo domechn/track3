@@ -82,6 +82,11 @@ describe("IBKR Flex parser", () => {
     expect(sendHttpTextRequest).not.toHaveBeenCalled();
   });
 
+  it("does not put the Flex token into a provider error", async () => {
+    vi.mocked(sendHttpTextRequest).mockResolvedValue(`<FlexStatementResponse><Status>Fail</Status><ErrorMessage>bad token custom-private-key</ErrorMessage></FlexStatementResponse>`);
+    await expect(new IbkrBroker("custom-private-key", "query-1").fetchPositions()).rejects.not.toThrow("custom-private-key");
+  });
+
   it("polls GetStatement until the Flex report is ready", async () => {
     vi.mocked(sendHttpTextRequest)
       .mockResolvedValueOnce(`<?xml version="1.0" encoding="UTF-8"?>

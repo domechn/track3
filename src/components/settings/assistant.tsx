@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   EyeClosedIcon,
   EyeOpenIcon,
@@ -18,6 +18,7 @@ import {
 import { probeConnection } from "@/middlelayers/ai";
 import type { AIAdvancedOptions, AIConfig } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
+import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
 
 const ALLOWED_ADVANCED_KEYS = [
   "temperature",
@@ -45,14 +46,14 @@ function parseAdvanced(
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);
-  } catch (err) {
+  } catch {
     return {
-      error: (err as Error).message ?? String(err),
+      error: "settings.assistant.invalidJson",
       warnings: [],
     };
   }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { error: "Advanced options must be a JSON object.", warnings: [] };
+    return { error: "settings.assistant.invalidAdvancedObject", warnings: [] };
   }
   const warnings: string[] = [];
   const value: Record<string, unknown> = {};
@@ -78,12 +79,23 @@ const App = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [endpoint, setEndpoint] = useState("");
-  const [apiKey, setApiKey] = useState("");
+  const apiKeyRef = useRef<HTMLInputElement>(null);
+  const currentKey = () => apiKeyRef.current?.value ?? "";
   const [model, setModel] = useState("");
   const [contextSize, setContextSize] = useState<number>(DEFAULT_AI_CONTEXT_SIZE);
-  const [price, setPrice] = useState("");
+  const [inputPrice, setInputPrice] = useState("");
+  const [outputPrice, setOutputPrice] = useState("");
   const [priceError, setPriceError] = useState(false);
-  const [advancedJson, setAdvancedJson] = useState("");
+  const advancedRef = useRef<HTMLTextAreaElement>(null);
+  const currentAdvanced = () => advancedRef.current?.value ?? "";
+  const settingsSecrets = () => {
+    try {
+      const value = JSON.parse(currentAdvanced()) as { headers?: Record<string, unknown> };
+      return [...configuredSecretValues(value), ...Object.values(value.headers ?? {}).filter((item): item is string => typeof item === "string")];
+    } catch {
+      return [];
+    }
+  };
   const [advancedWarnings, setAdvancedWarnings] = useState<string[]>([]);
   const [advancedError, setAdvancedError] = useState<string | undefined>();
   const [showKey, setShowKey] = useState(false);
@@ -99,15 +111,18 @@ const App = () => {
         const cfg = await loadAIConfig();
         if (!active) return;
         setEndpoint(cfg.endpoint);
-        setApiKey(cfg.apiKey);
+        if (apiKeyRef.current) apiKeyRef.current.value = cfg.apiKey;
         setModel(cfg.model);
         setContextSize(cfg.contextSize);
-        setPrice(cfg.pricePerMillionTokens === undefined ? "" : String(cfg.pricePerMillionTokens));
-        setAdvancedJson(serializeAdvanced(cfg.advanced));
+        const input = cfg.inputPricePerMillionTokens ?? cfg.pricePerMillionTokens;
+        const output = cfg.outputPricePerMillionTokens ?? cfg.pricePerMillionTokens;
+        setInputPrice(input === undefined ? "" : String(input));
+        setOutputPrice(output === undefined ? "" : String(output));
+        if (advancedRef.current) advancedRef.current.value = serializeAdvanced(cfg.advanced);
       } catch (err) {
         if (!(err instanceof AIConfigMissingError) && active) {
           toast({
-            description: (err as Error).message,
+            description: redactSecrets((err as Error).message ?? String(err), [currentKey()]),
             variant: "destructive",
           });
         }
@@ -124,26 +139,28 @@ const App = () => {
 
   async function onSave() {
     if (saving) return;
-    const tokenPrice = price.trim() === "" ? undefined : Number(price);
-    const invalidPrice = tokenPrice !== undefined && (!Number.isFinite(tokenPrice) || tokenPrice < 0);
+    const inputTokenPrice = inputPrice.trim() === "" ? undefined : Number(inputPrice);
+    const outputTokenPrice = outputPrice.trim() === "" ? undefined : Number(outputPrice);
+    const invalidPrice = [inputTokenPrice, outputTokenPrice].some((price) => price !== undefined && (!Number.isFinite(price) || price < 0));
     setPriceError(invalidPrice);
-    const parsed = parseAdvanced(advancedJson);
+    const parsed = parseAdvanced(currentAdvanced());
     if (parsed.error) {
       setAdvancedError(parsed.error);
       return;
     }
     setAdvancedError(undefined);
     if (invalidPrice) return;
-    setAdvancedWarnings(parsed.warnings);
+    setAdvancedWarnings(parsed.warnings.map((warning) => redactSecrets(warning, [currentKey(), ...settingsSecrets()])));
 
     const cfg: AIConfig = {
       endpoint: endpoint.trim(),
-      apiKey,
+      apiKey: currentKey(),
       model: model.trim(),
       contextSize: Number.isFinite(contextSize)
         ? Math.max(1, Math.floor(contextSize))
         : DEFAULT_AI_CONTEXT_SIZE,
-      pricePerMillionTokens: tokenPrice,
+      inputPricePerMillionTokens: inputTokenPrice,
+      outputPricePerMillionTokens: outputTokenPrice,
       advanced: parsed.value,
     };
 
@@ -153,7 +170,7 @@ const App = () => {
       toast({ description: t("settings.assistant.saved") });
     } catch (err) {
       toast({
-        description: (err as Error).message,
+        description: redactSecrets((err as Error).message ?? String(err), [currentKey(), ...settingsSecrets()]),
         variant: "destructive",
       });
     } finally {
@@ -168,12 +185,12 @@ const App = () => {
     try {
       const err = await probeConnection({
         endpoint: endpoint.trim(),
-        apiKey,
+        apiKey: currentKey(),
         model: model.trim(),
         messages: [{ role: "user", content: "ping" }],
       });
       if (err) {
-        setProbeError(t(err, err));
+        setProbeError(redactSecrets(t(err, err), [currentKey()]));
         toast({
           description: t("settings.assistant.testFailed"),
           variant: "destructive",
@@ -182,7 +199,7 @@ const App = () => {
         toast({ description: t("settings.assistant.testSuccess") });
       }
     } catch (err) {
-      const message = (err as Error).message ?? String(err);
+      const message = redactSecrets((err as Error).message ?? String(err), [currentKey()]);
       setProbeError(message);
       toast({
         description: message,
@@ -239,9 +256,8 @@ const App = () => {
           <div className="flex gap-2">
             <Input
               id="assistant-api-key"
+              ref={apiKeyRef}
               type={showKey ? "text" : "password"}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
               data-testid="assistant-api-key"
               autoComplete="off"
               spellCheck={false}
@@ -327,14 +343,25 @@ const App = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <Label htmlFor="assistant-price">{t("settings.assistant.price")}</Label>
+          <Label htmlFor="assistant-input-price">{t("settings.assistant.inputPrice")}</Label>
           <Input
-            id="assistant-price"
+            id="assistant-input-price"
             type="number"
             min={0}
             step="any"
-            value={price}
-            onChange={(event) => { setPrice(event.target.value); setPriceError(false); }}
+            value={inputPrice}
+            onChange={(event) => { setInputPrice(event.target.value); setPriceError(false); }}
+            disabled={!loaded}
+            className="max-w-[200px]"
+          />
+          <Label htmlFor="assistant-output-price">{t("settings.assistant.outputPrice")}</Label>
+          <Input
+            id="assistant-output-price"
+            type="number"
+            min={0}
+            step="any"
+            value={outputPrice}
+            onChange={(event) => { setOutputPrice(event.target.value); setPriceError(false); }}
             disabled={!loaded}
             className="max-w-[200px]"
           />
@@ -355,8 +382,7 @@ const App = () => {
           <Label htmlFor="assistant-advanced">{t("settings.assistant.advancedJson")}</Label>
           <textarea
             id="assistant-advanced"
-            value={advancedJson}
-            onChange={(e) => setAdvancedJson(e.target.value)}
+            ref={advancedRef}
             placeholder='{"temperature": 0.7, "top_p": 0.9}'
             rows={5}
             disabled={!loaded}
@@ -371,9 +397,7 @@ const App = () => {
               className="text-xs text-destructive"
               data-testid="assistant-advanced-error"
             >
-              {advancedError === "settings.assistant.invalidAdvancedValue"
-                ? t(advancedError)
-                : `${t("settings.assistant.invalidJson")} ${advancedError}`}
+              {t(advancedError)}
             </p>
           )}
           {advancedWarnings.length > 0 && (

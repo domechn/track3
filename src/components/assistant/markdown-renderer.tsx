@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
+import { redactSecrets } from "@/middlelayers/security/redact";
 
 /**
  * Renders AI assistant reply text as styled Markdown.
@@ -23,27 +24,35 @@ function LinkRenderer({
   href?: string;
   children?: React.ReactNode;
 }) {
+  const safeHref = (() => {
+    try {
+      const url = new URL(href ?? "");
+      return (url.protocol === "http:" || url.protocol === "https:") &&
+        !url.username && !url.password &&
+        redactSecrets(url.href) === url.href ? url.href : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>) => {
-      if (!href) return;
-      // Only intercept absolute HTTP links — relative/internal anchors
-      // (<a name>, #hash) should behave normally.
-      if (!href.startsWith("http://") && !href.startsWith("https://")) return;
+      if (!safeHref) return;
       e.preventDefault();
       import("@tauri-apps/plugin-opener")
-        .then((mod) => mod.openUrl(href))
+        .then((mod) => mod.openUrl(safeHref))
         .catch(() => {
           // Fallback when not in Tauri (e.g. in-browser dev, tests):
           // let the browser handle the link natively.
-          window.open(href, "_blank", "noopener");
+          window.open(safeHref, "_blank", "noopener");
         });
     },
-    [href],
+    [safeHref],
   );
 
+  if (!safeHref) return <span>{children}</span>;
   return (
     <a
-      href={href}
+      href={safeHref}
       onClick={handleClick}
       className="font-medium text-primary underline underline-offset-2 decoration-primary/30 hover:decoration-primary transition-colors"
       target="_blank"
@@ -83,6 +92,7 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
 
 const components: Components = {
   a: LinkRenderer,
+  img: ({ alt }) => <span>{alt}</span>,
   code: CodeBlock,
   p: ({ children }) => (
     <p className="mb-3 last:mb-0 text-sm leading-relaxed text-foreground/90">

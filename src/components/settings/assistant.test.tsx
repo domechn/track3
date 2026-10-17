@@ -47,22 +47,40 @@ beforeEach(() => {
 });
 
 describe("AssistantSettings", () => {
-  it("saves an optional nonnegative price per million tokens", async () => {
+  it("shows malformed advanced JSON errors in Chinese", async () => {
+    localStorage.setItem(localeLocalStorageKey, "zh");
+    vi.mocked(loadAIConfig).mockRejectedValue(new AIConfigMissingError());
+    render(<I18nProvider><AssistantSettings /></I18nProvider>);
+    fireEvent.change(await screen.findByTestId("assistant-advanced"), { target: { value: "{bad" } });
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(screen.getByTestId("assistant-advanced-error")).not.toHaveTextContent("Invalid JSON");
+  });
+  it("saves distinct input and output prices", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue({
       endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,
     });
     render(<AssistantSettings />);
-    const price = await screen.findByLabelText(/price per 1m tokens/i);
-    await waitFor(() => expect((price as HTMLInputElement).disabled).toBe(false));
-    fireEvent.change(price, { target: { value: "2.5" } });
-    expect((price as HTMLInputElement).value).toBe("2.5");
+    fireEvent.change(await screen.findByLabelText("Input price per 1M tokens"), { target: { value: "1.5" } });
+    fireEvent.change(screen.getByLabelText("Output price per 1M tokens"), { target: { value: "4" } });
     await userEvent.click(screen.getByTestId("assistant-save"));
-    expect(vi.mocked(saveAIConfig).mock.calls[0]?.[0].pricePerMillionTokens).toBe(2.5);
+    expect(vi.mocked(saveAIConfig).mock.calls[0]?.[0]).toMatchObject({
+      inputPricePerMillionTokens: 1.5, outputPricePerMillionTokens: 4,
+    });
+  });
+  it("loads a legacy single price into both inputs", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192, pricePerMillionTokens: 2.5,
+    });
+    render(<AssistantSettings />);
+    const price = await screen.findByLabelText("Input price per 1M tokens");
+    await waitFor(() => expect((price as HTMLInputElement).disabled).toBe(false));
+    expect((price as HTMLInputElement).value).toBe("2.5");
+    expect((screen.getByLabelText("Output price per 1M tokens") as HTMLInputElement).value).toBe("2.5");
   });
   it("shows a price error beside price without hiding an advanced options error", async () => {
     vi.mocked(loadAIConfig).mockRejectedValue(new AIConfigMissingError());
     render(<AssistantSettings />);
-    const price = await screen.findByLabelText(/price per 1m tokens/i);
+    const price = await screen.findByLabelText("Input price per 1M tokens");
     fireEvent.change(price, { target: { value: "-2" } });
     fireEvent.change(screen.getByLabelText(/advanced options/i), { target: { value: "{bad" } });
     await userEvent.click(screen.getByTestId("assistant-save"));
@@ -87,6 +105,9 @@ describe("AssistantSettings", () => {
       /endpoint/i,
     )) as HTMLInputElement;
     expect(endpointInput.value).toBe("https://api.openai.com/v1");
+    const keyInput = screen.getByLabelText(/api key/i) as HTMLInputElement;
+    expect(keyInput.type).toBe("password");
+    expect(keyInput.value).toBe("sk-test-123");
 
     const modelInput = screen.getByLabelText(/model/i) as HTMLInputElement;
     expect(modelInput.value).toBe("gpt-4o-mini");
@@ -98,6 +119,17 @@ describe("AssistantSettings", () => {
       /advanced options/i,
     ) as HTMLTextAreaElement;
     expect(advanced.value).toContain("temperature");
+  });
+
+  it("does not display a secret returned in a connection error", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      endpoint: "https://api.example.com/v1", apiKey: "sk-private123456789012345", model: "test", contextSize: 8192,
+    });
+    vi.mocked(probeConnection).mockRejectedValue(new Error("failed: sk-private123456789012345"));
+    render(<AssistantSettings />);
+    await screen.findByDisplayValue("sk-private123456789012345");
+    await userEvent.click(screen.getByTestId("assistant-test-connection"));
+    expect(await screen.findByTestId("assistant-probe-error")).not.toHaveTextContent("sk-private123456789012345");
   });
 
   it("falls back to empty fields when no AI configuration is saved", async () => {
@@ -174,6 +206,15 @@ describe("AssistantSettings", () => {
     expect(
       await screen.findByText(/advanced options must be valid json/i),
     ).toBeTruthy();
+  });
+
+  it("does not echo an invalid advanced header secret in validation text", async () => {
+    vi.mocked(loadAIConfig).mockRejectedValue(new AIConfigMissingError());
+    render(<AssistantSettings />);
+    const advanced = await screen.findByTestId("assistant-advanced");
+    fireEvent.change(advanced, { target: { value: '{"headers":{"Authorization":sk-abcdefghijklmnop1234567890}}' } });
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(await screen.findByTestId("assistant-advanced-error")).not.toHaveTextContent("sk-abcdef");
   });
 
   it("warns but does not block unknown advanced keys", async () => {

@@ -26,6 +26,7 @@ import { useTranslation } from "@/i18n";
 import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
 import { ALERT_SOURCE_STATUS_STORAGE_KEY, processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
+import { redactSecrets } from "@/middlelayers/security/redact";
 
 const retries = 3;
 const retryInterval = 3000;
@@ -33,17 +34,22 @@ const sourceStatusStorageKey = ALERT_SOURCE_STATUS_STORAGE_KEY;
 
 function readStoredStatuses(): PortfolioSourceStatus[] {
   try {
-    const value = JSON.parse(localStorage.getItem(sourceStatusStorageKey) ?? "[]");
-    return Array.isArray(value)
-      ? value.filter((source): source is PortfolioSourceStatus =>
-          source &&
-          typeof source.sourceId === "string" &&
-          typeof source.label === "string" &&
-          ["ok", "stale", "failed"].includes(source.status) &&
-          (source.category === undefined ||
-            ["auth", "network", "rateLimit", "unsupported", "other"].includes(source.category)),
-        )
-      : [];
+    const stored = localStorage.getItem(sourceStatusStorageKey);
+    if (!stored) return [];
+    const value: unknown = JSON.parse(stored);
+    if (!Array.isArray(value)) return [];
+    const statuses = value.filter((source): source is PortfolioSourceStatus =>
+      source && typeof source.sourceId === "string" && typeof source.label === "string" &&
+      ["ok", "stale", "failed"].includes(source.status) &&
+      (source.category === undefined || ["auth", "network", "rateLimit", "unsupported", "other"].includes(source.category)),
+    ).map((source) => ({
+      sourceId: source.sourceId,
+      label: redactSecrets(source.label),
+      status: source.status,
+      ...(source.category ? { category: source.category } : {}),
+    }));
+    if (stored !== JSON.stringify(statuses)) localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
+    return statuses;
   } catch {
     return [];
   }
@@ -59,7 +65,7 @@ const App = ({
   const { toast } = useToast();
   const { t } = useTranslation();
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [sourceStatuses, setSourceStatuses] = useState(readStoredStatuses);
+  const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult>();
 
   const {
@@ -122,13 +128,19 @@ const App = ({
         getMemoryCacheInstance("data-fetch").clearCache();
       }
       if (result.sourceStatuses) {
-        setSourceStatuses(result.sourceStatuses);
+        const statuses = result.sourceStatuses.map((source) => ({
+          sourceId: source.sourceId,
+          label: redactSecrets(source.label),
+          status: source.status,
+          ...(source.category ? { category: source.category } : {}),
+        }));
+        setSourceStatuses(statuses);
+        setStatusDialogOpen(result.sourceStatuses.some((source) => source.status !== "ok"));
         try {
-          localStorage.setItem(sourceStatusStorageKey, JSON.stringify(result.sourceStatuses));
+          localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
         } catch {
           // The current session still shows the warning when storage is unavailable.
         }
-        setStatusDialogOpen(result.sourceStatuses.some((source) => source.status !== "ok"));
       }
       setLastResult(result);
       if (succeeded) {

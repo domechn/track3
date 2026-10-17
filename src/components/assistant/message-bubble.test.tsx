@@ -34,6 +34,13 @@ describe("MessageBubble", () => {
     expect(screen.queryByText(/\$0\.003000/)).toBeNull();
   });
 
+  it("uses separate input and output rates for estimated cost", () => {
+    render(<MessageBubble message={{ role: "assistant", blocks: [{ kind: "text", text: "Done" }],
+      usage: { promptTokens: 1_000_000, completionTokens: 1_000_000, source: "reported" } }}
+      inputPricePerMillionTokens={1} outputPricePerMillionTokens={3} />);
+    expect(screen.getByText(/\$4\.00\b/)).toBeTruthy();
+  });
+
   it("labels estimated token counts as estimates", () => {
     render(<MessageBubble message={{
       role: "assistant", blocks: [{ kind: "text", text: "Done" }],
@@ -63,7 +70,7 @@ describe("MessageBubble", () => {
 
   it("renders the thinking indicator when blocks are empty", () => {
     const msg: ChatMessage = { role: "assistant", blocks: [] };
-    render(<MessageBubble message={msg} />);
+    render(<MessageBubble message={msg} isStreaming />);
     expect(screen.getByText("Thinking...")).toBeTruthy();
   });
 
@@ -71,6 +78,18 @@ describe("MessageBubble", () => {
     const msg: ChatMessage = { role: "assistant", blocks: [{ kind: "text", text: "\n\n" }] };
     render(<MessageBubble message={msg} isStreaming />);
     expect(screen.getByText("Thinking...")).toBeTruthy();
+  });
+
+  it("does not leave a finished empty reply thinking forever", () => {
+    render(<MessageBubble message={{ role: "assistant", blocks: [{ kind: "text", text: " \n " }] }} />);
+    expect(screen.queryByText("Thinking...")).toBeNull();
+  });
+
+  it("separates adjacent think rounds", () => {
+    render(<MessageBubble message={{ role: "assistant", blocks: [
+      { kind: "think", text: "First" }, { kind: "think", text: "Second" },
+    ] }} />);
+    expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent === "First\n\nSecond")).toBeTruthy();
   });
 
   it("renders multiple text blocks in sequence", () => {

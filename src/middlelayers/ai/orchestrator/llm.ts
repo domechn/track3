@@ -5,6 +5,7 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import { getCurrentUA } from "@/middlelayers/datafetch/utils/http";
 import { estimateMessages, estimateTokens, parseUsage } from "../budget";
+import { redactSecrets } from "../../security/redact";
 import type { LlmCallParams, LlmCallResult } from "./types";
 
 /**
@@ -72,7 +73,7 @@ export async function callLlm(
       return {
         content: "",
         ok: false,
-        error: `LLM call failed (${resp.status}): ${text}`,
+        error: redactSecrets(`LLM call failed (${resp.status}): ${text}`, [params.apiKey, ...(params.secrets ?? [])]),
       };
     }
 
@@ -93,7 +94,7 @@ export async function callLlm(
     if (timedOut) {
       return { content: "", ok: false, error: "LLM call timed out" };
     }
-    return { content: "", ok: false, error: err?.message ?? String(err) };
+    return { content: "", ok: false, error: redactSecrets(err?.message ?? String(err), [params.apiKey, ...(params.secrets ?? [])]) };
   } finally {
     clearTimeout(timer);
     params.signal?.removeEventListener("abort", onAbort);

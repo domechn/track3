@@ -1,6 +1,7 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import { getCurrentUA } from "../datafetch/utils/http";
 import { parseUsage } from "./budget";
+import { configuredSecretValues, redactSecrets } from "../security/redact";
 import type {
   ProviderFunctionDef,
   ProviderMessage,
@@ -210,6 +211,7 @@ export async function* streamChatCompletion(
     yield { kind: "done" };
     return;
   }
+  const secrets = configuredSecretValues({ apiKey: req.apiKey, advanced: req.advanced });
 
   const url = buildUrl(req.endpoint, "/chat/completions");
   const headers = buildHeaders(req.apiKey, req.advanced);
@@ -249,7 +251,7 @@ export async function* streamChatCompletion(
         yield { kind: "done" };
         return;
       }
-      yield { kind: "error", message: timedOut ? "AI request timed out" : (err as Error).message ?? String(err) };
+      yield { kind: "error", message: redactSecrets(timedOut ? "AI request timed out" : (err as Error).message ?? String(err), secrets) };
       yield { kind: "done" };
       return;
     }
@@ -259,7 +261,7 @@ export async function* streamChatCompletion(
       const text = await safeReadText(resp);
       yield {
         kind: "error",
-        message: `Request failed with status ${resp.status}: ${text}`,
+        message: redactSecrets(`Request failed with status ${resp.status}: ${text}`, secrets),
       };
       yield { kind: "done" };
       return;
@@ -295,7 +297,7 @@ export async function* streamChatCompletion(
         const usage = parseUsage(json?.usage);
         if (usage) yield { kind: "usage", usage };
       } catch (err) {
-        yield { kind: "error", message: timedOut ? "AI request timed out" : (err as Error).message ?? String(err) };
+        yield { kind: "error", message: redactSecrets(timedOut ? "AI request timed out" : (err as Error).message ?? String(err), secrets) };
       }
       yield { kind: "done" };
       return;
@@ -342,7 +344,7 @@ export async function* streamChatCompletion(
       }
     } catch (err) {
       if (!req.signal?.aborted) {
-        yield { kind: "error", message: timedOut ? "AI request timed out" : (err as Error).message ?? String(err) };
+        yield { kind: "error", message: redactSecrets(timedOut ? "AI request timed out" : (err as Error).message ?? String(err), secrets) };
       }
       failed = true;
     }

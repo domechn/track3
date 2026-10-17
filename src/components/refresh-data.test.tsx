@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RefreshData from "@/components/refresh-data";
@@ -272,6 +272,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     expect(await screen.findByText("Cold vault")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry Cold vault" })).toBeTruthy();
+    expect(localStorage.getItem("track3-refresh-source-statuses")).toContain("Cold vault");
   });
 
   it("ignores malformed saved source statuses", () => {
@@ -279,6 +280,37 @@ describe("RefreshData — currency rates refresh ordering", () => {
     render(<RefreshData loading={false} />);
     expect(screen.getByRole("button", { name: "Refresh" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Source status" })).toBeNull();
+  });
+
+  it("restores a failed source indicator from saved statuses", () => {
+    localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
+      { sourceId: "btc:0", label: "Private wallet", status: "failed", category: "network" },
+    ]));
+    render(<RefreshData loading={false} />);
+    expect(screen.getByRole("button", { name: "Source status" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    expect(screen.getByText("Private wallet")).toBeInTheDocument();
+  });
+
+  it("redacts credential-like text from persisted source labels", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult,
+      sourceStatuses: [{ sourceId: "btc:0", label: "Wallet sk-abcdefghijklmnop1234567890", status: "stale", category: "network" }],
+    } as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(localStorage.getItem("track3-refresh-source-statuses")).not.toContain("sk-abcdefghijklmnop1234567890");
+  });
+
+  it("cleans a credential in an older saved source label on load", () => {
+    localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
+      { sourceId: "btc:0", label: "Wallet sk-abcdefghijklmnop1234567890", status: "stale", category: "network", error: "upstream detail" },
+    ]));
+    render(<RefreshData loading={false} />);
+    expect(screen.getByRole("button", { name: "Source status" })).toBeInTheDocument();
+    expect(localStorage.getItem("track3-refresh-source-statuses")).not.toContain("sk-abcdefghijklmnop1234567890");
+    expect(localStorage.getItem("track3-refresh-source-statuses")).not.toContain("upstream detail");
   });
 
   it("passes automatic retries into one refresh operation call", async () => {

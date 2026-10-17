@@ -117,7 +117,7 @@ function mergeBlocks(blocks: AssistantBlock[]): AssistantBlock[] {
       }
       const last = merged[merged.length - 1];
       if (b.kind === "think" && last?.kind === "think") {
-        merged[merged.length - 1] = { kind: "think", text: last.text + b.text };
+        merged[merged.length - 1] = { kind: "think", text: last.text + "\n\n" + b.text };
       } else {
         merged.push(b);
       }
@@ -166,10 +166,14 @@ export default function MessageBubble({
   message,
   isStreaming,
   pricePerMillionTokens,
+  inputPricePerMillionTokens,
+  outputPricePerMillionTokens,
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
   pricePerMillionTokens?: number;
+  inputPricePerMillionTokens?: number;
+  outputPricePerMillionTokens?: number;
 }) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
@@ -209,7 +213,7 @@ export default function MessageBubble({
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {t("assistant.chat.title")}
             </div>
-            {blocks.length === 0 ? (
+            {blocks.length === 0 && isStreaming ? (
               <p className="flex items-center gap-1 text-sm italic text-muted-foreground">
                 <span className="inline-flex gap-1">
                   <span aria-hidden className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground" />
@@ -231,7 +235,7 @@ export default function MessageBubble({
                 b, i, isStreaming, blocks.slice(i + 1).some((later) => later.kind === "text"),
               ))
             )}
-            {message.usage && <UsageLabel usage={message.usage} pricePerMillionTokens={pricePerMillionTokens} />}
+            {message.usage && <UsageLabel usage={message.usage} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />}
           </div>
         )}
       </div>

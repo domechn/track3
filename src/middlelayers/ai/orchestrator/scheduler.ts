@@ -10,6 +10,7 @@
 import { runSkill } from "../tools";
 import type { SkillContext } from "../skills/types";
 import { trace } from "../skills/functions/trace";
+import { redactSecrets } from "../../security/redact";
 import type {
   AnalysisPlan,
   OrchestratorEvent,
@@ -112,7 +113,7 @@ export async function* executePlan(
             };
           }
         } else {
-          const err = settled.reason?.message ?? String(settled.reason);
+          const err = redactSecrets(settled.reason?.message ?? String(settled.reason));
           results.set(task.id, {
             id: task.id,
             skillName: task.skillName,
@@ -173,7 +174,7 @@ async function executeSingleTask(
       skillName: task.skillName,
       status: "failed",
       description: task.description,
-      error: err?.message ?? String(err),
+      error: redactSecrets(err?.message ?? String(err)),
     };
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -42,6 +42,7 @@ import type { PersistedBlock, PersistedChatMessage } from "@/middlelayers/ai";
 import SessionSidebar from "./session-sidebar";
 import { useChatSessions } from "./use-chat-sessions";
 import type { AIConfig, CurrencyRateDetail } from "@/middlelayers/types";
+import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
 import type { ChatMessage, AssistantBlock } from "./use-chat";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
 import UsageLabel from "./usage-label";
@@ -73,7 +74,7 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
         }
         setState({
           status: "error",
-          message: (err as Error).message ?? String(err),
+          message: redactSecrets((err as Error).message ?? String(err)),
         });
       }
     })();
@@ -145,6 +146,7 @@ function ReadyChat({
   baseCurrency: CurrencyRateDetail;
 }) {
   const { t } = useTranslation();
+  const secrets = useMemo(() => configuredSecretValues(config), [config]);
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -197,7 +199,7 @@ function ReadyChat({
         try {
           session = await loadSession(sessionId);
         } catch (error) {
-          if (!cancelled) setSessionLoadError((error as Error).message ?? String(error));
+          if (!cancelled) setSessionLoadError(redactSecrets((error as Error).message ?? String(error), secrets));
           return;
         }
         if (cancelled) return;
@@ -269,8 +271,8 @@ function ReadyChat({
           }
         }
 
-        if (summary) await appendMessages(targetId, persistedExchange, summary);
-        else await appendMessages(targetId, persistedExchange);
+        if (summary) await appendMessages(targetId, persistedExchange, summary, secrets);
+        else await appendMessages(targetId, persistedExchange, undefined, secrets);
         if (mountedRef.current) setSaveError(null);
         const msgCount = newMessages.length;
 
@@ -298,14 +300,14 @@ function ReadyChat({
             const titleSessionId = targetId;
             void generateTitle(config, userContent, assistantText)
               .then(async (title) => {
-                if (title) await renameSession(titleSessionId, title);
+                if (title) await renameSession(titleSessionId, title, secrets);
                 if (mountedRef.current) await refresh();
               })
-              .catch((error) => console.error("Failed to name chat session:", error));
+              .catch((error) => console.error("Failed to name chat session:", redactSecrets(String(error), secrets)));
           }
         }
       } catch (err) {
-        if (mountedRef.current) setSaveError((err as Error).message ?? String(err));
+        if (mountedRef.current) setSaveError(redactSecrets((err as Error).message ?? String(err), secrets));
       }
     },
     [sessionId, noSessionEpoch, navigate, refresh, config, createNew],
@@ -348,10 +350,10 @@ function ReadyChat({
           navigate(`/assistant`, { replace: true });
         }
       } catch (error) {
-        setDeleteError((error as Error).message ?? String(error));
+        setDeleteError(redactSecrets((error as Error).message ?? String(error), secrets));
       }
     },
-    [remove, sessionId, navigate],
+    [remove, sessionId, navigate, secrets],
   );
 
   return (
@@ -454,6 +456,8 @@ function ChatContent({
         messages={chat.messages}
         isStreaming={chat.isStreaming}
         pricePerMillionTokens={config.pricePerMillionTokens}
+        inputPricePerMillionTokens={config.inputPricePerMillionTokens}
+        outputPricePerMillionTokens={config.outputPricePerMillionTokens}
         onPickPrompt={(text) => void chat.send(text)}
       />
       {chat.messages.length > 0 && (
@@ -530,7 +534,7 @@ function ChatHeader({
           </span>
         )}
         {(sessionUsage.promptTokens > 0 || sessionUsage.completionTokens > 0) && (
-          <UsageLabel usage={sessionUsage} pricePerMillionTokens={config.pricePerMillionTokens} />
+          <UsageLabel usage={sessionUsage} pricePerMillionTokens={config.pricePerMillionTokens} inputPricePerMillionTokens={config.inputPricePerMillionTokens} outputPricePerMillionTokens={config.outputPricePerMillionTokens} />
         )}
       </div>
       <Button

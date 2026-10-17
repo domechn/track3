@@ -9,6 +9,7 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import type { HistoricalData } from "./types";
+import { redactSecrets } from "./security/redact";
 
 export type BackupRecords = Pick<
   HistoricalData,
@@ -58,7 +59,7 @@ export function groupByMonth(
   for (const record of records) {
     const date = new Date(record.createdAt);
     if (!Number.isFinite(date.getTime())) {
-      console.error("skipping historical record with invalid createdAt", record.createdAt);
+      console.error("skipping historical record with invalid createdAt", redactSecrets(record.createdAt));
       continue;
     }
     const month = date.toISOString().slice(0, 7);
@@ -216,7 +217,7 @@ export async function writeBackupV2(
     try {
       current = parseMetadata(await readTextFile(metadataPath), client);
     } catch (error) {
-      console.error("failed to read existing backup metadata", error);
+      console.error("failed to read existing backup metadata", redactSecrets(String(error)));
     }
   }
   const files = new Set(
@@ -257,12 +258,12 @@ export async function writeBackupV2(
         try {
           await remove(`${dataDirectory}/${entry.name}`);
         } catch (error) {
-          console.error("failed to remove old backup part", error);
+          console.error("failed to remove old backup part", redactSecrets(String(error)));
         }
       }
     }
   } catch (error) {
-    console.error("failed to list old backup parts", error);
+    console.error("failed to list old backup parts", redactSecrets(String(error)));
   }
 }
 
@@ -283,7 +284,7 @@ export async function importBackupV2(
   try {
     entries = await readDir(root);
   } catch (error) {
-    console.error("failed to list backup clients", error);
+    console.error("failed to list backup clients", redactSecrets(String(error)));
     return { imported, clientsWithV2 };
   }
   for (const entry of entries) {
@@ -303,10 +304,10 @@ export async function importBackupV2(
         entry.name,
       );
     } catch (error) {
-      console.error("failed to read backup metadata", entry.name, error);
+      console.error("failed to read backup metadata", redactSecrets(entry.name), redactSecrets(String(error)));
     }
     if (!metadata) {
-      console.error("invalid backup metadata", entry.name);
+      console.error("invalid backup metadata", redactSecrets(entry.name));
       continue;
     }
     clientsWithV2.add(entry.name);
@@ -319,7 +320,7 @@ export async function importBackupV2(
         imported = true;
         await saveHash(entry.name, part.month, part.sha256);
       } catch (error) {
-        console.error("failed to import backup part", entry.name, part.month, error);
+        console.error("failed to import backup part", redactSecrets(entry.name), part.month, redactSecrets(String(error)));
       }
     }
   }

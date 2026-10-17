@@ -189,6 +189,23 @@ describe("System Info subscription management", () => {
     });
   });
 
+  it("redacts the configured license from activation errors", async () => {
+    mocks.activeLicense.mockResolvedValue({
+      success: false,
+      error: "license custom-private-license was rejected",
+    });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByText(/Enter existing license key/i));
+    fireEvent.change(screen.getByPlaceholderText(/license key/i), {
+      target: { value: "custom-private-license" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /activate/i }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ description: expect.stringContaining("<REDACTED>") }),
+    ));
+    expect(JSON.stringify(mocks.toast.mock.calls)).not.toContain("custom-private-license");
+  });
+
   it("shows active subscription details and opens the customer portal", async () => {
     mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
     mocks.getSubscriptionInfo.mockResolvedValue({

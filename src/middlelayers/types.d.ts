@@ -263,6 +263,8 @@ export type AIConfig = {
   model: string;
   contextSize: number;
   pricePerMillionTokens?: number;
+  inputPricePerMillionTokens?: number;
+  outputPricePerMillionTokens?: number;
   advanced?: AIAdvancedOptions;
 };
 

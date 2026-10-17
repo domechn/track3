@@ -42,9 +42,7 @@ export class CexAnalyzer implements Analyzer {
 
     this.exchanges = (config.exchanges ?? [])
       .map((exCfg): Exchanger | undefined => {
-        console.log("loading exchange", exCfg.name);
         if (exCfg.active === false) {
-          console.log("exchange is not active, skip");
           return;
         }
         switch (exCfg.name) {

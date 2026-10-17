@@ -119,9 +119,8 @@ function validateAIConfig(cfg: AIConfig): void {
   ) {
     throw new AIConfigMissingError("AI configuration is missing contextSize");
   }
-  if (cfg.pricePerMillionTokens !== undefined &&
-      (typeof cfg.pricePerMillionTokens !== "number" ||
-       !Number.isFinite(cfg.pricePerMillionTokens) || cfg.pricePerMillionTokens < 0)) {
+  if ([cfg.pricePerMillionTokens, cfg.inputPricePerMillionTokens, cfg.outputPricePerMillionTokens].some((price) =>
+      price !== undefined && (typeof price !== "number" || !Number.isFinite(price) || price < 0))) {
     throw new AIConfigMissingError("AI configuration has an invalid token price");
   }
 }
@@ -178,6 +177,8 @@ export async function saveAIConfig(cfg: AIConfig): Promise<void> {
     model: cfg.model.trim(),
     contextSize: Math.max(1, Math.floor(cfg.contextSize)),
     pricePerMillionTokens: cfg.pricePerMillionTokens,
+    inputPricePerMillionTokens: cfg.inputPricePerMillionTokens,
+    outputPricePerMillionTokens: cfg.outputPricePerMillionTokens,
     advanced: cfg.advanced ? sanitizeAIAdvanced(cfg.advanced) : undefined,
   };
   await saveConfigurationById(aiConfigId, JSON.stringify(sanitized), true);

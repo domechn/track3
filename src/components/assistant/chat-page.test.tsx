@@ -154,6 +154,20 @@ beforeEach(() => {
 });
 
 describe("ChatPage", () => {
+  it("passes advanced header secrets into session persistence", async () => {
+    titleSpy.mockResolvedValueOnce("");
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      ...config, advanced: { headers: { "x-custom-auth": "custom-header-secret" } },
+    });
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant/existing-id", true);
+    await waitFor(() => expect(chatOptions.current?.onStreamComplete).toBeTypeOf("function"));
+    await act(async () => { await chatOptions.current.onStreamComplete([
+      { role: "user", content: "question" },
+      { role: "assistant", blocks: [{ kind: "text", text: "answer" }] },
+    ]); });
+    expect(appendMessages).toHaveBeenCalledWith("existing-id", expect.any(Array), undefined, ["sk-test", "custom-header-secret"]);
+  });
   it("carries a loaded summary through a real send into the saved exchange", async () => {
     useActualChat.current = true;
     vi.mocked(loadAIConfig).mockResolvedValue({ ...config, contextSize: 900 });
@@ -183,7 +197,7 @@ describe("ChatPage", () => {
       { role: "assistant", blocks: [{ kind: "text", text: "New answer" }],
         usage: { promptTokens: expect.any(Number), completionTokens: expect.any(Number), source: "estimated" },
         contextTokens: expect.any(Number) },
-    ], expect.objectContaining({ content: "Updated facts", throughMessageCount: expect.any(Number) }));
+    ], expect.objectContaining({ content: "Updated facts", throughMessageCount: expect.any(Number) }), ["sk-test"]);
   });
   it("shows context occupancy and session token totals in the chat header", async () => {
     chatStats.contextTokens = 4096;
@@ -373,7 +387,7 @@ describe("ChatPage", () => {
     });
     expect(chatOptions.current.sessionId).toBe("session-b");
     expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question B" });
-    expect(appendMessages).toHaveBeenCalledWith("mock-session-id", expect.any(Array));
+    expect(appendMessages).toHaveBeenCalledWith("mock-session-id", expect.any(Array), undefined, ["sk-test"]);
     sessionList.current = [
       { id: "mock-session-id", title: "Session A", createdAt: "", updatedAt: "", pinned: 0, messageCount: 2, preview: "" },
       ...sessionList.current,
@@ -545,7 +559,7 @@ describe("ChatPage", () => {
       { role: "user", content: "Question" },
       { role: "assistant", blocks: [{ kind: "text", text: "Answer" }] },
     ]);
-    expect(appendMessages).toHaveBeenCalledWith("mock-session-id", expect.any(Array));
+    expect(appendMessages).toHaveBeenCalledWith("mock-session-id", expect.any(Array), undefined, ["sk-test"]);
     await waitFor(() => expect(chatOptions.current.sessionId).toBe("mock-session-id"));
     expect(screen.queryByRole("alert")).toBeNull();
   });

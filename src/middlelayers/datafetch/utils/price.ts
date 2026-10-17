@@ -79,7 +79,7 @@ async function convertEntriesToUsd(
     const rate = rateMap[currency];
     if (!rate || rate <= 0) {
       console.warn(
-        `Missing currency rate for ${currency}, skipping price update for ${symbol}`,
+        "Missing currency rate, skipping price update",
       );
       continue;
     }

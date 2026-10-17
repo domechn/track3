@@ -54,11 +54,15 @@ export default function ChatThread({
   isStreaming,
   onPickPrompt,
   pricePerMillionTokens,
+  inputPricePerMillionTokens,
+  outputPricePerMillionTokens,
 }: {
   messages: ChatMessage[];
   isStreaming: boolean;
   onPickPrompt?: (prompt: string) => void;
   pricePerMillionTokens?: number;
+  inputPricePerMillionTokens?: number;
+  outputPricePerMillionTokens?: number;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const userScrolledAwayRef = useRef(false);
@@ -152,7 +156,7 @@ export default function ChatThread({
           <WelcomePanel onPickPrompt={onPickPrompt} />
         ) : (
           messages.map((m, i) => (
-            <MessageBubble key={i} message={m} isStreaming={isStreaming} pricePerMillionTokens={pricePerMillionTokens} />
+            <MessageBubble key={i} message={m} isStreaming={isStreaming && i === messages.length - 1} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />
           ))
         )}
         {isStreaming && messages.at(-1)?.role !== "assistant" && (

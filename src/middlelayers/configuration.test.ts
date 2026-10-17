@@ -94,6 +94,22 @@ beforeEach(() => {
 });
 
 describe("saveConfiguration", () => {
+  it("keeps exchange and broker credentials in the encrypted configuration export", async () => {
+    tracing.db.select.mockResolvedValue([
+      { id: "10", data: yaml.stringify({ exchanges: makeConfig().exchanges }) },
+      { id: "11", data: yaml.stringify({ btc: makeConfig().btc }) },
+      { id: "12", data: yaml.stringify({ configs: makeConfig().configs, others: [] }) },
+      { id: "20", data: yaml.stringify({ brokers: [{ type: "ibkr", token: "broker-private-token" }] }) },
+    ] as never);
+
+    const exported = await exportConfigurationString();
+    const parsed = yaml.parse(String(exported).replace(/^!ent:/, ""));
+    expect(parsed.exchanges[0].initParams.apiKey).toBe("k1");
+    expect(parsed.exchanges[0].initParams.secret).toBe("s1");
+    expect(parsed.stockConfig.brokers[0].token).toBe("broker-private-token");
+    expect(parsed.btc.addresses[0].address).toBe("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
+  });
+
   it("restores the cost basis method from a configuration export", async () => {
     const rows = new Map<string, string>([
       ["12", "configs:\n  groupUSD: false\nothers: []\n"],

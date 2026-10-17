@@ -90,11 +90,19 @@ async fn query_binance_balance(
     api_key: String,
     api_secret: String,
 ) -> Result<HashMap<String, f64>, String> {
-    let b = Binance::new(api_key, api_secret);
+    let b = Binance::new(api_key.clone(), api_secret.clone());
     let res = b.query_balance().await;
     match res {
         Ok(balances) => Ok(balances),
-        Err(e) => Err(sanitize_upstream_error(&e.to_string())),
+        Err(e) => {
+            let mut message = sanitize_upstream_error(&e.to_string());
+            for secret in [&api_key, &api_secret] {
+                if !secret.is_empty() {
+                    message = message.replace(secret, "<REDACTED>");
+                }
+            }
+            Err(message)
+        }
     }
 }
 
@@ -219,10 +227,6 @@ fn main() {
             ))
             .map_err(io::Error::other)?;
             app.manage(DatabasePath(database_path.clone()));
-            println!(
-                "database_path: {:?}, resource_dir: {:?}",
-                database_path, resource_dir
-            );
 
             let key_path = app_data_dir.join(".ent-key");
             let enc_key = load_encryption_key(&key_path).map_err(io::Error::other)?;

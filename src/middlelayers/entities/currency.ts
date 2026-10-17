@@ -41,7 +41,7 @@ class CurrencyRateHandler {
       currency,
     });
     if (!rows || rows.length === 0) {
-      console.error("find currency rate failed, not found:", currency);
+      console.error("find currency rate failed, not found");
       return this.getDefaultCurrencyRate();
     }
 

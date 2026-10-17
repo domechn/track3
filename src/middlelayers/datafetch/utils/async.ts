@@ -15,7 +15,7 @@ export async function asyncMap<K, V>(items: K[], fn: (item: K) => Promise<V>, co
 
 		const cacheResult = cc.getCache<V>(cacheKey)
 		if (cacheResult) {
-			console.debug(`cache hit for ${cacheKey}`)
+			console.debug("cache hit for data fetch")
 			return cacheResult
 		}
 

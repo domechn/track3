@@ -21,6 +21,7 @@ import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { getVersion, trackEventWithClientID } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/i18n";
+import { redactSecrets } from "@/middlelayers/security/redact";
 
 type SubscriptionInfo = {
   planType: "monthly" | "yearly" | null;
@@ -52,6 +53,8 @@ const App = ({
   const [portalLoading, setPortalLoading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] =
     useState<SubscriptionPlansResponse | null>(null);
+  const safeError = (error: unknown) =>
+    redactSecrets(error instanceof Error ? error.message : String(error), [activeLicense ?? "", inputLicense ?? ""]);
 
   useEffect(() => {
     loadVersion();
@@ -146,7 +149,7 @@ const App = ({
       })
       .catch((err) => {
         toast({
-          description: err.message,
+          description: safeError(err),
           variant: "destructive",
         });
       })
@@ -170,7 +173,7 @@ const App = ({
       })
       .catch((err) => {
         toast({
-          description: err.message,
+          description: safeError(err),
           variant: "destructive",
         });
       })
@@ -241,7 +244,7 @@ const App = ({
     } catch (err) {
       toast({
         description:
-          err instanceof Error ? err.message : t("system.openPortalFailed"),
+          err instanceof Error ? safeError(err) : t("system.openPortalFailed"),
         variant: "destructive",
       });
     } finally {

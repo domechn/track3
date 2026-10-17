@@ -235,4 +235,12 @@ describe("rebalance calculator", () => {
     const csv = suggestionsToCsv(result, "USD", (key) => (en as Record<string, string>)[key] ?? key);
     expect(csv).toContain('"BTC","10.00","0.00","10.00","Sell","-10.00","-0.00000010"');
   });
+
+  it("redacts embedded credentials from trade CSV", () => {
+    const result = calculateRebalance([
+      { symbol: "sk-abcdefghijklmnop1234567890", assetType: "crypto", amount: 1, value: 100, price: 100 },
+    ], [{ kind: "asset", assetType: "crypto", symbol: "sk-abcdefghijklmnop1234567890", percent: 100 }]);
+    const csv = suggestionsToCsv(result, "USD", (key) => (en as Record<string, string>)[key] ?? key);
+    expect(csv.toLowerCase()).not.toContain("sk-abcdefghijklmnop1234567890");
+  });
 });

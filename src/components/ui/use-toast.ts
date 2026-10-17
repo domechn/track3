@@ -1,5 +1,6 @@
 // Inspired by react-hot-toast library
 import * as React from "react"
+import { redactSecrets } from "@/middlelayers/security/redact"
 
 import type {
   ToastActionElement,
@@ -142,18 +143,23 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
+  const clean = (value: Toast) => ({
+    ...value,
+    title: typeof value.title === "string" ? redactSecrets(value.title) : value.title,
+    description: typeof value.description === "string" ? redactSecrets(value.description) : value.description,
+  })
 
   const update = (props: ToasterToast) =>
     dispatch({
       type: "UPDATE_TOAST",
-      toast: { ...props, id },
+      toast: { ...clean(props), id },
     })
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
   dispatch({
     type: "ADD_TOAST",
     toast: {
-      ...props,
+      ...clean(props),
       id,
       open: true,
       onOpenChange: (open) => {
