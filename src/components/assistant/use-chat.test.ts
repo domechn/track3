@@ -24,6 +24,7 @@ vi.mock("@/middlelayers/ai/orchestrator/llm", () => ({ callLlm: vi.fn() }));
 import { formatToolResult, useChat } from "./use-chat";
 import type { ChatMessage } from "./use-chat";
 import {
+  buildSystemPrompt,
   orchestrateQuery,
   probeConnection,
   runSkill,
@@ -115,6 +116,19 @@ describe("useChat", () => {
     await act(async () => { await result.current.send("balance"); });
     expect(result.current.contextTokens).toBe(73);
     expect(result.current.sessionUsage).toEqual({ promptTokens: 573, completionTokens: 25, source: "reported" });
+  });
+  it("reports history context without unused tool schemas when the orchestrator answers", async () => {
+    vi.mocked(orchestrateQuery).mockImplementation(async function* () {
+      yield { kind: "text", delta: "Your balance is ready." };
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("balance"); });
+    expect(result.current.contextTokens).toBe(estimateMessages([
+      { role: "system", content: buildSystemPrompt(baseCurrency) },
+      { role: "user", content: "balance" },
+    ]));
+    expect(streamChatCompletion).not.toHaveBeenCalled();
   });
   it("resumes a saved summary, advances it, and gives the next request the new summary", async () => {
     const initialMessages: ChatMessage[] = Array.from({ length: 12 }, (_, i) => i % 2
@@ -257,7 +271,7 @@ describe("useChat", () => {
       role: "assistant";
       blocks: { kind: string }[];
     };
-    expect(assistant.blocks).toHaveLength(0);
+    expect(assistant.blocks).toEqual([{ kind: "text", text: "(No response)" }]);
   });
 
   it("emits an error block when the stream reports an error", async () => {
@@ -918,11 +932,11 @@ describe("useChat", () => {
     });
 
     const initialMessages: ChatMessage[] = [
-      { role: "user", content: "word ".repeat(900) },
-      { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(900) }] },
+      { role: "user", content: "word ".repeat(365) },
+      { role: "assistant", blocks: [{ kind: "text", text: "word ".repeat(365) }] },
     ];
     const { result } = renderHook(() =>
-      useChat({ config, baseCurrency, contextSize: 5700, initialMessages }),
+      useChat({ config, baseCurrency, contextSize: 7000, initialMessages }),
     );
     await act(async () => {
       await result.current.send("average buy price?");
@@ -939,6 +953,73 @@ describe("useChat", () => {
 
     const assistant = result.current.messages.at(-1) as { role: "assistant"; blocks: any[] };
     expect(assistant.blocks.some((b) => b.kind === "text" && b.text.includes("Final answer"))).toBe(true);
+  });
+
+  it("gives a final tool-free answer after the narrower result fits", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      if (requests.length <= 5) {
+        yield { kind: "tool_call", id: `a${requests.length}`, name: "asset_history", args: {} };
+      } else {
+        yield { kind: "text", delta: "Here is the result." };
+      }
+      yield { kind: "done" };
+    });
+    let call = 0;
+    vi.mocked(runSkill).mockImplementation(async () => ({
+      ok: true,
+      result: { data: ++call === 4
+        ? { rows: Array.from({ length: 1000 }, (_, i) => ({ index: i, note: "x".repeat(200) })) }
+        : { rows: [1] } },
+    }));
+    const { result } = renderHook(() => useChat({ config: { ...config, contextSize: 32768 }, baseCurrency }));
+    await act(async () => { await result.current.send("Show the history"); });
+    expect(requests).toHaveLength(6);
+    expect(requests[4].tools).toBeDefined();
+    expect(requests[5].tools).toBeUndefined();
+    expect(result.current.messages.at(-1)).toMatchObject({
+      blocks: [{ kind: "text", text: "Here is the result." }],
+    });
+  });
+
+  it("shows a fallback when the final tool-free request returns no answer", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      if (requests.length <= 5) yield { kind: "tool_call", id: `a${requests.length}`, name: "asset_history", args: {} };
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({ ok: true, result: { data: {
+      rows: Array.from({ length: 1000 }, (_, i) => ({ index: i, note: "x".repeat(200) })),
+    } } });
+    const { result } = renderHook(() => useChat({ config: { ...config, contextSize: 32768 }, baseCurrency }));
+    await act(async () => { await result.current.send("Show the history"); });
+    expect(requests).toHaveLength(6);
+    expect(requests[5].tools).toBeUndefined();
+    expect(result.current.messages.at(-1)).toMatchObject({
+      blocks: [{ kind: "text", text: "(No response)" }],
+    });
+  });
+
+  it("does not execute a tool call hallucinated in the final tool-free response", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
+      requests.push(request);
+      yield { kind: "tool_call", id: `a${requests.length}`, name: "asset_history", args: {} };
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({ ok: true, result: { data: {
+      rows: Array.from({ length: 1000 }, (_, i) => ({ index: i, note: "x".repeat(200) })),
+    } } });
+    const { result } = renderHook(() => useChat({ config: { ...config, contextSize: 32768 }, baseCurrency }));
+    await act(async () => { await result.current.send("Show the history"); });
+    expect(requests).toHaveLength(6);
+    expect(requests[5].tools).toBeUndefined();
+    expect(runSkill).toHaveBeenCalledTimes(5);
+    expect(result.current.messages.at(-1)).toMatchObject({
+      blocks: [{ kind: "text", text: "(No response)" }],
+    });
   });
 
   it("does not mark tool results as truncated when they fit", async () => {
@@ -1175,6 +1256,12 @@ describe("useChat", () => {
     const result = formatToolResult({ text: "A".repeat(10_000), data: { count: 1 } }, 200);
     expect(result.length).toBeLessThan(500);
     expect(result).toContain("[truncated:");
+  });
+  it("keeps a long tool summary when the token budget can hold it", () => {
+    const text = "A".repeat(700);
+    const result = formatToolResult({ text, data: undefined }, 1000);
+    expect(result).toContain(text);
+    expect(result).not.toContain("[truncated:");
   });
 
   it("marks poisoned asset data as untrusted without forwarding a secret", () => {

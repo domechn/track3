@@ -10,6 +10,7 @@ vi.mock("@/i18n", () => ({
       const map: Record<string, string> = {
         "assistant.chat.title": "Assistant",
         "assistant.chat.thinking": "Thinking...",
+        "assistant.chat.noResponse": "(No response)",
         "assistant.chat.think.label": "Thinking",
         "assistant.usage.tokens": "Prompt {prompt} · Completion {completion} tokens",
         "assistant.usage.cost": "Est. {cost}",
@@ -83,6 +84,7 @@ describe("MessageBubble", () => {
   it("does not leave a finished empty reply thinking forever", () => {
     render(<MessageBubble message={{ role: "assistant", blocks: [{ kind: "text", text: " \n " }] }} />);
     expect(screen.queryByText("Thinking...")).toBeNull();
+    expect(screen.getByText("(No response)")).toBeTruthy();
   });
 
   it("separates adjacent think rounds", () => {

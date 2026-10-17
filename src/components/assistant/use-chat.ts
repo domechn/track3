@@ -13,7 +13,7 @@ import type { ProviderMessage, StreamEvent } from "@/middlelayers/ai/types";
 import type { ToolResult } from "@/middlelayers/ai/skills/types";
 import type { OrchestratorEvent } from "@/middlelayers/ai/orchestrator/types";
 import { addUsage, estimateMessages, estimateTokens, serializeBudgeted, truncateText } from "@/middlelayers/ai/budget";
-import { configuredSecretValues, redactSecrets, sanitizeUntrustedData } from "@/middlelayers/security/redact";
+import { configuredSecretValues, redactSecrets, sanitizeUntrustedData, sanitizeUntrustedText } from "@/middlelayers/security/redact";
 import type { TokenUsage } from "@/middlelayers/ai/budget";
 import { prepareHistory, summaryOffset } from "@/middlelayers/ai/history";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
@@ -250,10 +250,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
   }, [stop]);
 
   // Consume the provider stream and append events to the trailing
-  // assistant message. Any `tool_call` is dispatched against the skill
-  // registry.
+  // assistant message. Tool calls are dispatched only when tools were offered.
   const consumeStream = useCallback(
-    async (events: AsyncGenerator<StreamEvent>, assistantIndex: number, signal: AbortSignal) => {
+    async (events: AsyncGenerator<StreamEvent>, assistantIndex: number, signal: AbortSignal, allowTools = true) => {
       // State machine for <think> tag parsing.  When the model bakes
       // reasoning content into the text stream via <think>...</think>
       // tags we split it into separate think/text blocks rather than
@@ -386,7 +385,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
               }
             }
           }
-        } else if (ev.kind === "tool_call") {
+        } else if (ev.kind === "tool_call" && allowTools) {
           toolCalls.push(ev);
           completionText += JSON.stringify(ev.args);
         } else if (ev.kind === "usage") {
@@ -581,7 +580,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         else if (prepared.summary?.throughMessageHash) retryAfterMessageCountRef.current = 0;
         if (prepared.usage) turnUsage = addUsage(turnUsage, prepared.usage);
         const trimmed = prepared.messages;
-        const mainContextTokens = estimateMessages([{ role: "system", content: systemPrompt }, ...trimmed]) + toolTokens;
+        const mainContextTokens = estimateMessages([{ role: "system", content: systemPrompt }, ...trimmed]);
         setContextTokens(mainContextTokens);
         lastContextTokens = mainContextTokens;
 
@@ -636,15 +635,15 @@ export function useChat(options: UseChatOptions): UseChatResult {
         // Multi-round tool calling: loop tool results back to the model so it
         // can generate natural-language analysis from the returned data.
         const MAX_ROUNDS = 5;
-        let allowNarrowFollowUp = false;
-        for (let round = 0; round < MAX_ROUNDS + Number(allowNarrowFollowUp); round++) {
+        let roundLimit = MAX_ROUNDS;
+        for (let round = 0; round < roundLimit; round++) {
           if (controller.signal.aborted) break;
           const messageTokens = estimateMessages(providerMessages);
           // Once the history outgrows the budget (or this is the last round)
           // make one final call WITHOUT tools so the model answers from the
           // data it already has instead of the turn ending silently.
           const finalRound =
-            round === MAX_ROUNDS + Number(allowNarrowFollowUp) - 1 ||
+            round === roundLimit - 1 ||
             messageTokens + toolTokens > contextSize * 0.8;
           const usedTokens = messageTokens + (finalRound ? 0 : toolTokens);
           setContextTokens(usedTokens);
@@ -661,7 +660,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
           });
 
           const response =
-            (await consumeStream(events, idx, controller.signal)) ?? { toolCalls: [], reasoningContent: "", completionText: "", reportedUsage: undefined };
+            (await consumeStream(events, idx, controller.signal, !finalRound)) ?? { toolCalls: [], reasoningContent: "", completionText: "", reportedUsage: undefined };
           const { toolCalls, reasoningContent } = response;
           recordUsage(response.reportedUsage ?? {
             promptTokens: usedTokens,
@@ -709,7 +708,8 @@ export function useChat(options: UseChatOptions): UseChatResult {
             tool_call_id: tc.id,
             content: formatted.content,
           }));
-          allowNarrowFollowUp = formattedResults.some(({ formatted }) => formatted.budgetTruncated);
+          if (roundLimit === MAX_ROUNDS && round === roundLimit - 2 &&
+              formattedResults.some(({ formatted }) => formatted.budgetTruncated)) roundLimit++;
 
           // Extend provider messages for the next round
           providerMessages = [
@@ -729,6 +729,15 @@ export function useChat(options: UseChatOptions): UseChatResult {
           }
         }
       } finally {
+        if (!controller.signal.aborted) {
+          const updated = messagesRef.current.slice();
+          const target = updated[idx];
+          if (target?.role === "assistant" && !target.blocks.some((block) => block.kind === "text" && block.text.trim())) {
+            updated[idx] = { ...target, blocks: [...target.blocks, { kind: "text", text: t("assistant.chat.noResponse") }] };
+            messagesRef.current = updated;
+            if (mountedRef.current) setMessages(updated);
+          }
+        }
         const saveStopped = stoppedControllerRef.current === controller && !!turnUsage;
         if (turnUsage && (!controller.signal.aborted || saveStopped)) {
           const updated = messagesRef.current.slice();
@@ -760,6 +769,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
       consumeStream,
       consumeOrchestrator,
       baseCurrency,
+      t,
     ],
   );
 
@@ -809,7 +819,7 @@ export function formatToolResult(result: ToolResult, maxTokens: number, secrets:
 }
 
 function formatToolResultWithBudget(result: ToolResult, maxTokens: number, secrets: readonly string[]) {
-  const sanitizedText = String(sanitizeUntrustedData(result.text ?? "", secrets));
+  const sanitizedText = sanitizeUntrustedText(result.text ?? "", secrets);
   const text = truncateText(sanitizedText, Math.max(0, Math.floor(maxTokens / 3)));
   const data = sanitizeUntrustedData(result.data, secrets);
   const body = data === undefined ? "" : serializeBudgeted(data, Math.max(12, maxTokens - estimateTokens(text) - 42));

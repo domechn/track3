@@ -534,6 +534,7 @@
   "assistant.chat.stop": "Stop",
   "assistant.chat.streaming": "Streaming...",
   "assistant.chat.thinking": "Thinking...",
+  "assistant.chat.noResponse": "(No response)",
   "assistant.chat.empty": "No messages yet. Send a prompt to start the conversation.",
   "assistant.chat.quickActions.recentAnalysis": "Recent financial analysis",
   "assistant.chat.quickActions.recentOperations": "Recent operations",

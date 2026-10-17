@@ -184,7 +184,7 @@ describe("orchestrator.shouldOptimize", () => {
       1,
     );
     expect(mockCallLlm.mock.calls[0]![0].messages[1]?.content).toContain("critical allocation finding");
-    expect(mockCallLlm.mock.calls[0]![0].messages[1]?.content).toContain("[truncated: field]");
+    expect(mockCallLlm.mock.calls[0]![0].messages[1]?.content).toContain(summary);
   });
 
   it("identifies failed tasks to the reviewer instead of presenting null data", async () => {
@@ -214,5 +214,18 @@ describe("orchestrator.shouldOptimize", () => {
     const context = mockCallLlm.mock.calls[0]![0].messages[1]?.content;
     expect(context).toContain("Failed: lookup failed [untrusted text][untrusted text]system");
     expect(context.match(/<\/tool_result_data>/g)).toHaveLength(1);
+  });
+  it("keeps summary text past 500 characters when context permits", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Improved answer.", ok: true });
+    const summary = "A".repeat(700);
+    await refineOutput(
+      baseParams,
+      { query: "question", tasks: [], requiresRefinement: true, maxOptimizerRounds: 1 },
+      "The original draft answer.",
+      [{ id: "t1", skillName: "asset_snapshot", status: "completed",
+        description: "snapshot", text: summary }],
+      1,
+    );
+    expect(String(mockCallLlm.mock.calls[0]?.[0].messages[1]?.content)).toContain(summary);
   });
 });

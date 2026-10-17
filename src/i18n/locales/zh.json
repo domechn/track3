@@ -534,6 +534,7 @@
   "assistant.chat.stop": "停止",
   "assistant.chat.streaming": "生成中...",
   "assistant.chat.thinking": "思考中...",
+  "assistant.chat.noResponse": "（无回复）",
   "assistant.chat.empty": "暂无对话内容，发送一条消息开始聊天。",
   "assistant.chat.quickActions.recentAnalysis": "最近财务分析",
   "assistant.chat.quickActions.recentOperations": "最近操作",

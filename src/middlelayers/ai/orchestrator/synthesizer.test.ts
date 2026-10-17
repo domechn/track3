@@ -28,6 +28,15 @@ beforeEach(() => {
 });
 
 describe("orchestrator.synthesizer", () => {
+  it("keeps summary text past 500 characters when context permits", async () => {
+    mockCallLlm.mockResolvedValue({ content: "OK", ok: true });
+    const summary = "A".repeat(700);
+    await synthesizeResults(baseParams, dummyPlan, [{
+      id: "t1", skillName: "asset_snapshot", status: "completed", description: "holdings",
+      text: summary,
+    }]);
+    expect(String(mockCallLlm.mock.calls[0]?.[0].messages[1]?.content)).toContain(summary);
+  });
   it("delimits poisoned skill data and strips a configured API key", async () => {
     mockCallLlm.mockResolvedValue({ content: "OK", ok: true });
     await synthesizeResults(baseParams, dummyPlan, [{
@@ -188,7 +197,7 @@ describe("orchestrator.synthesizer", () => {
       id: "t1", skillName: "x", status: "completed", description: "d", data: { a: 1 }, text: summary,
     }]);
     expect(mockCallLlm.mock.calls[0]![0].messages[1]?.content).toContain("critical allocation finding");
-    expect(mockCallLlm.mock.calls[0]![0].messages[1]?.content).toContain("[truncated: field]");
+    expect(mockCallLlm.mock.calls[0]![0].messages[1]?.content).toContain(summary);
   });
   it("removes configured header secrets from agent tool data before synthesis", async () => {
     mockCallLlm.mockResolvedValue({ content: "ok", ok: true });
