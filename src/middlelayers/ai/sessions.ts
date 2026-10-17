@@ -17,6 +17,8 @@ import {
 } from "@/middlelayers/database";
 import type { AIConfig } from "@/middlelayers/types";
 import { runWithEncryptionWriteGate } from "@/middlelayers/encryption-write-gate";
+import type { TokenUsage } from "./budget";
+import type { ConversationSummary } from "./history";
 
 const SESSIONS_TABLE = "chat_sessions" as const;
 const FILE_VERSION = 1;
@@ -59,11 +61,13 @@ export type PersistedBlock =
 
 export type PersistedChatMessage =
   | { role: "user"; content: string }
-  | { role: "assistant"; blocks: PersistedBlock[] };
+  | { role: "assistant"; blocks: PersistedBlock[]; usage?: TokenUsage; contextTokens?: number };
 
 export type ChatSession = ChatSessionMeta & {
   messages: PersistedChatMessage[];
+  summary?: ConversationSummary;
 };
+type SessionPayload = { version: number; messages: PersistedChatMessage[]; summary?: ConversationSummary };
 
 async function resolveSessionDir(): Promise<string> {
   const base = await appDataDir();
@@ -153,7 +157,7 @@ export async function loadSession(
   }
   const encrypted = await readTextFile(path);
   const decrypted = await invoke<string>("decrypt", { data: encrypted });
-  let parsed: { version: number; messages: PersistedChatMessage[] };
+  let parsed: SessionPayload;
   try {
     parsed = JSON.parse(decrypted);
   } catch (err) {
@@ -169,7 +173,38 @@ export async function loadSession(
   if (!validMessages(parsed.messages)) {
     throw new Error("chat session payload has invalid messages");
   }
-  return { ...meta, messages: parsed.messages };
+  return {
+    ...meta,
+    messages: parsed.messages.map(normalizeMessage),
+    summary: validSummary(parsed.summary) ? parsed.summary : undefined,
+  };
+}
+
+function validUsage(value: unknown): value is TokenUsage {
+  if (!value || typeof value !== "object") return false;
+  const usage = value as TokenUsage;
+  return Number.isFinite(usage.promptTokens) && usage.promptTokens >= 0 &&
+    Number.isFinite(usage.completionTokens) && usage.completionTokens >= 0 &&
+    (usage.source === "reported" || usage.source === "estimated");
+}
+
+function normalizeMessage(message: PersistedChatMessage): PersistedChatMessage {
+  if (message.role === "user") return message;
+  return {
+    role: "assistant",
+    blocks: message.blocks,
+    ...validUsage(message.usage) ? { usage: message.usage } : {},
+    ...Number.isFinite(message.contextTokens) && message.contextTokens! >= 0
+      ? { contextTokens: message.contextTokens } : {},
+  };
+}
+
+function validSummary(value: unknown): value is ConversationSummary {
+  if (!value || typeof value !== "object") return false;
+  const summary = value as ConversationSummary;
+  return typeof summary.content === "string" &&
+    Number.isInteger(summary.throughMessageCount) && summary.throughMessageCount >= 0 &&
+    (summary.throughMessageHash === undefined || /^[a-f0-9]{32}$/.test(summary.throughMessageHash));
 }
 
 function validMessages(value: unknown): value is PersistedChatMessage[] {
@@ -249,9 +284,9 @@ export async function deleteSession(id: string): Promise<void> {
   });
 }
 
-async function readSessionMessages(
+async function readSessionPayload(
   id: string,
-): Promise<PersistedChatMessage[]> {
+): Promise<SessionPayload> {
   const path = await fullPathFor(id);
   // Recovery: if there is an orphaned .tmp file from a previous crash,
   // promote it to the main file so session data is not lost.
@@ -267,14 +302,14 @@ async function readSessionMessages(
     }
   } catch {}
   if (!(await exists(path))) {
-    return [];
+    return { version: FILE_VERSION, messages: [] };
   }
   const encrypted = await readTextFile(path);
   const decrypted = await invoke<string>("decrypt", { data: encrypted });
   try {
     const parsed = JSON.parse(decrypted);
     if (parsed && parsed.version === FILE_VERSION && validMessages(parsed.messages)) {
-      return parsed.messages as PersistedChatMessage[];
+      return { ...parsed, messages: parsed.messages.map(normalizeMessage) } as SessionPayload;
     }
     throw new Error(`unsupported chat session payload for ${id}`);
   } catch (err) {
@@ -282,15 +317,14 @@ async function readSessionMessages(
   }
 }
 
-async function writeSessionMessages(
+async function writeSessionPayload(
   id: string,
-  messages: PersistedChatMessage[],
+  payload: SessionPayload,
 ): Promise<void> {
   const dir = await ensureSessionDir();
   const path = `${dir}/${id}.json.ent`;
   const tmpPath = `${path}.tmp`;
-  const payload = JSON.stringify({ version: FILE_VERSION, messages });
-  const encrypted = await invoke<string>("encrypt", { data: payload });
+  const encrypted = await invoke<string>("encrypt", { data: JSON.stringify(payload) });
   // Write to temp first, then overwrite — this keeps the window for data loss
   // on crash or concurrent write as narrow as possible.
   await writeTextFile(tmpPath, encrypted);
@@ -301,11 +335,16 @@ async function writeSessionMessages(
 export async function appendMessages(
   id: string,
   messages: PersistedChatMessage[],
+  summary?: ConversationSummary,
 ): Promise<void> {
   await runWithEncryptionWriteGate(async () => {
-    const existing = await readSessionMessages(id);
-    const combined = [...existing, ...messages];
-    await writeSessionMessages(id, combined);
+    const existing = await readSessionPayload(id);
+    const combined = [...existing.messages, ...messages];
+    await writeSessionPayload(id, {
+      version: FILE_VERSION,
+      messages: combined,
+      summary: summary ?? existing.summary,
+    });
     const rows = await selectFromDatabase<Record<string, unknown>>(SESSIONS_TABLE, { id });
     if (rows[0]) {
       await saveModelsToDatabase<ChatSessionMeta>(SESSIONS_TABLE, [{

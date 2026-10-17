@@ -163,6 +163,34 @@ afterEach(() => {
 });
 
 describe("chat sessions middlelayer", () => {
+  it("persists a rolling summary and usage in the encrypted session file across appends", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    const summary = { content: "Prior BTC discussion", throughMessageCount: 2, throughMessageHash: "a".repeat(32) };
+    await sessions.appendMessages("uuid-1", [
+      { role: "user", content: "old" },
+      { role: "assistant", blocks: [{ kind: "text", text: "answer" }],
+        usage: { promptTokens: 12, completionTokens: 4, source: "reported" }, contextTokens: 12 },
+    ], summary);
+    await sessions.appendMessages("uuid-1", [{ role: "user", content: "new" }]);
+    const loaded = await sessions.loadSession("uuid-1");
+    expect(loaded?.summary).toEqual(summary);
+    expect(loaded?.messages[1]).toMatchObject({ usage: { promptTokens: 12, completionTokens: 4 } });
+    expect(loaded?.messages[1]).toMatchObject({ contextTokens: 12 });
+  });
+  it("drops malformed saved usage and context counts on load", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    fsFileMap.set("/appdata/ai/sessions/uuid-1.json.ent", `enc:${JSON.stringify({
+      version: 1,
+      messages: [
+        { role: "user", content: "hello" },
+        { role: "assistant", blocks: [{ kind: "text", text: "world" }], usage: { promptTokens: "bad", completionTokens: 2 }, contextTokens: -5 },
+      ],
+    })}`);
+    const loaded = await sessions.loadSession("uuid-1");
+    expect(loaded?.messages[1]).toEqual({ role: "assistant", blocks: [{ kind: "text", text: "world" }] });
+  });
   it("creates a session and persists it to the DB without writing a file", async () => {
     const sessions = await import("./sessions");
     const meta = await sessions.createSession();

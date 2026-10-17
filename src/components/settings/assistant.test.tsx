@@ -25,9 +25,10 @@ vi.mock("@/middlelayers/ai", async () => {
   };
 });
 
-vi.mock("@/components/ui/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
-}));
+vi.mock("@/components/ui/use-toast", () => {
+  const toast = vi.fn();
+  return { useToast: () => ({ toast }) };
+});
 
 import {
   cleanAIConfig,
@@ -46,6 +47,32 @@ beforeEach(() => {
 });
 
 describe("AssistantSettings", () => {
+  it("saves an optional nonnegative price per million tokens", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,
+    });
+    render(<AssistantSettings />);
+    const price = await screen.findByLabelText(/price per 1m tokens/i);
+    await waitFor(() => expect((price as HTMLInputElement).disabled).toBe(false));
+    fireEvent.change(price, { target: { value: "2.5" } });
+    expect((price as HTMLInputElement).value).toBe("2.5");
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(vi.mocked(saveAIConfig).mock.calls[0]?.[0].pricePerMillionTokens).toBe(2.5);
+  });
+  it("shows a price error beside price without hiding an advanced options error", async () => {
+    vi.mocked(loadAIConfig).mockRejectedValue(new AIConfigMissingError());
+    render(<AssistantSettings />);
+    const price = await screen.findByLabelText(/price per 1m tokens/i);
+    fireEvent.change(price, { target: { value: "-2" } });
+    fireEvent.change(screen.getByLabelText(/advanced options/i), { target: { value: "{bad" } });
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(await screen.findByTestId("assistant-advanced-error")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/advanced options/i), { target: { value: "{}" } });
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(await screen.findByText(/enter a nonnegative token price/i)).toBeTruthy();
+    fireEvent.change(price, { target: { value: "2" } });
+    expect(screen.queryByText(/enter a nonnegative token price/i)).toBeNull();
+  });
   it("hydrates the form with persisted values on mount", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue({
       endpoint: "https://api.openai.com/v1",

@@ -81,6 +81,8 @@ const App = () => {
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [contextSize, setContextSize] = useState<number>(DEFAULT_AI_CONTEXT_SIZE);
+  const [price, setPrice] = useState("");
+  const [priceError, setPriceError] = useState(false);
   const [advancedJson, setAdvancedJson] = useState("");
   const [advancedWarnings, setAdvancedWarnings] = useState<string[]>([]);
   const [advancedError, setAdvancedError] = useState<string | undefined>();
@@ -100,6 +102,7 @@ const App = () => {
         setApiKey(cfg.apiKey);
         setModel(cfg.model);
         setContextSize(cfg.contextSize);
+        setPrice(cfg.pricePerMillionTokens === undefined ? "" : String(cfg.pricePerMillionTokens));
         setAdvancedJson(serializeAdvanced(cfg.advanced));
       } catch (err) {
         if (!(err instanceof AIConfigMissingError) && active) {
@@ -121,12 +124,16 @@ const App = () => {
 
   async function onSave() {
     if (saving) return;
+    const tokenPrice = price.trim() === "" ? undefined : Number(price);
+    const invalidPrice = tokenPrice !== undefined && (!Number.isFinite(tokenPrice) || tokenPrice < 0);
+    setPriceError(invalidPrice);
     const parsed = parseAdvanced(advancedJson);
     if (parsed.error) {
       setAdvancedError(parsed.error);
       return;
     }
     setAdvancedError(undefined);
+    if (invalidPrice) return;
     setAdvancedWarnings(parsed.warnings);
 
     const cfg: AIConfig = {
@@ -136,6 +143,7 @@ const App = () => {
       contextSize: Number.isFinite(contextSize)
         ? Math.max(1, Math.floor(contextSize))
         : DEFAULT_AI_CONTEXT_SIZE,
+      pricePerMillionTokens: tokenPrice,
       advanced: parsed.value,
     };
 
@@ -309,6 +317,31 @@ const App = () => {
           <p className="text-xs text-muted-foreground">
             {t("settings.assistant.contextSizeHint")}
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            {t("settings.assistant.price")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="assistant-price">{t("settings.assistant.price")}</Label>
+          <Input
+            id="assistant-price"
+            type="number"
+            min={0}
+            step="any"
+            value={price}
+            onChange={(event) => { setPrice(event.target.value); setPriceError(false); }}
+            disabled={!loaded}
+            className="max-w-[200px]"
+          />
+          <p className="text-xs text-muted-foreground">{t("settings.assistant.priceHint")}</p>
+          {priceError && (
+            <p role="alert" className="text-xs text-destructive">{t("settings.assistant.invalidPrice")}</p>
+          )}
         </CardContent>
       </Card>
 

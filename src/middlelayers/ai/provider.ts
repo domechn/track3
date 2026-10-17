@@ -1,5 +1,6 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import { getCurrentUA } from "../datafetch/utils/http";
+import { parseUsage } from "./budget";
 import type {
   ProviderFunctionDef,
   ProviderMessage,
@@ -53,7 +54,7 @@ function buildBody(
     stream,
   };
   if (stream) {
-    body.stream_options = { include_usage: false };
+    body.stream_options = { include_usage: true };
   }
   if (req.tools && req.tools.length > 0 && !req.probe) {
     body.tools = req.tools.map((t) => ({
@@ -291,6 +292,8 @@ export async function* streamChatCompletion(
             args: safeParseArgs(fn.arguments ?? "{}"),
           };
         }
+        const usage = parseUsage(json?.usage);
+        if (usage) yield { kind: "usage", usage };
       } catch (err) {
         yield { kind: "error", message: timedOut ? "AI request timed out" : (err as Error).message ?? String(err) };
       }
@@ -309,6 +312,8 @@ export async function* streamChatCompletion(
         if (req.signal?.aborted) {
           break;
         }
+        const usage = parseUsage((chunk as { usage?: unknown })?.usage);
+        if (usage) yield { kind: "usage", usage };
         const choice = pickChoice(chunk);
         if (!choice) {
           continue;

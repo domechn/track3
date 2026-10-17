@@ -64,12 +64,14 @@ export interface LlmCallParams {
   messages: Array<{ role: string; content: string }>;
   temperature?: number;
   signal?: AbortSignal;
+  onUsage?: (usage: import("../budget").TokenUsage) => void;
 }
 
 export interface LlmCallResult {
   content: string;
   ok: boolean;
   error?: string;
+  usage?: import("../budget").TokenUsage;
 }
 
 // ── Events yielded by the orchestrator ──
@@ -95,6 +97,7 @@ export interface OrchestratorOptions {
   /** Model context window in tokens; bounds inlined tool data. */
   contextSize?: number;
   signal?: AbortSignal;
+  onUsage?: (usage: import("../budget").TokenUsage) => void;
   // Whether to skip the LLM-based analyzer (useful for tests or fixed plans).
   skipAnalyzer?: boolean;
   // Override plan (used when skipAnalyzer is true or plan is pre-computed).

@@ -75,6 +75,26 @@ describe("provider.normalizeEndpoint", () => {
 });
 
 describe("provider.streamChatCompletion", () => {
+  it("requests and parses usage from a final SSE chunk without choices", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeSseResponse([
+      'data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15}}\n\n',
+      "data: [DONE]\n\n",
+    ]) as any);
+    const events = await collect(streamChatCompletion(baseReq));
+    expect(events).toContainEqual({ kind: "usage", usage: { promptTokens: 12, completionTokens: 3, source: "reported" } });
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)).stream_options).toEqual({ include_usage: true });
+  });
+
+  it("parses usage from a JSON fallback response", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeJsonResponse({
+      choices: [{ message: { content: "Hi" } }],
+      usage: { prompt_tokens: 12, completion_tokens: 3 },
+    }) as any);
+    expect(await collect(streamChatCompletion(baseReq))).toContainEqual({
+      kind: "usage", usage: { promptTokens: 12, completionTokens: 3, source: "reported" },
+    });
+  });
   it("sends tool-call reasoning back in the next request without changing other messages", async () => {
     vi.mocked(fetch).mockResolvedValue(makeSseResponse(["data: [DONE]\n\n"]) as any);
     await collect(streamChatCompletion({

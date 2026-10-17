@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n";
 import MarkdownRenderer from "./markdown-renderer";
 import type { AssistantBlock, ChatMessage } from "./use-chat";
+import UsageLabel from "./usage-label";
 
 function stripThinkTags(s: string): string {
   return s.replace(/<\/?think\s*>/gi, "").trim();
@@ -164,9 +165,11 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
 export default function MessageBubble({
   message,
   isStreaming,
+  pricePerMillionTokens,
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
+  pricePerMillionTokens?: number;
 }) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
@@ -228,6 +231,7 @@ export default function MessageBubble({
                 b, i, isStreaming, blocks.slice(i + 1).some((later) => later.kind === "text"),
               ))
             )}
+            {message.usage && <UsageLabel usage={message.usage} pricePerMillionTokens={pricePerMillionTokens} />}
           </div>
         )}
       </div>
