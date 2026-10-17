@@ -31,6 +31,8 @@ Additional wiring:
 - App shell uses `ThemeProvider` and `ChartResizeContext` in `src/App.tsx`.
 - Navigation is `react-router-dom` with `HashRouter`/`Routes` in `src/components/index/index.tsx`.
 - Rebalance page is lazy loaded at `#/rebalance`; navigation entries are in `src/components/index/main-nav.tsx` and `src/components/sidebar/index.tsx`. Targets, portfolio loading, CSV formatting, and the pure calculator live in `src/middlelayers/rebalance.ts`.
+- History list pages use `queryHistoricalPage()` in `src/middlelayers/charts-history.ts`: SQL returns a count, one page of snapshot totals, the next snapshot for change, asset counts, and seven logo previews. `queryHistoricalDetail()` loads one snapshot's assets and transactions when its dialog opens. Keep the list page size and detail table window bounded; preserve `DataChangedContext` reloads and the optimistic delete/undo flow.
+- Large time-series queries in `src/middlelayers/charts-timeseries.ts` aggregate in SQL. Chart components keep the returned full series for totals and tooltips, and use `downsampleIndices()` in `src/middlelayers/chart-downsample.ts` to bound plotted points by chart width while retaining endpoints and extremes.
 - Tauri backend commands/plugins are wired in `src-tauri/src/main.rs`; frontend calls via `invoke()` and Tauri plugins.
 - CEX fetchers follow the `Exchanger` pattern in `src/middlelayers/datafetch/coins/cex/cex.ts`.
 
@@ -91,6 +93,8 @@ corepack yarn update-release   # Release metadata
 ```
 
 Tests run via Vitest (`corepack yarn test` or `corepack yarn test:watch` for watch mode). All new code must include co-located tests.
+
+History performance fixtures live in `src/test/history-fixtures.ts`. The SQL and UI regressions assert row and query counts for large data without wall-clock thresholds (`charts-history-page.test.ts`, `charts-timeseries-large.test.ts`, `historical-data-performance.test.tsx`).
 
 Assistant prompt, skill, orchestrator, provider, and chat-loop changes should run the offline golden suite in `corepack yarn test`. The optional live model check is `corepack yarn eval` with `EVAL_ENDPOINT`, `EVAL_API_KEY`, and `EVAL_MODEL`; see `docs/assistant-eval.md`.
 

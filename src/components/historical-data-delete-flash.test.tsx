@@ -40,10 +40,10 @@ vi.mock("@/middlelayers/data", () => ({
   downloadCoinLogos: vi.fn(),
 }));
 
-vi.mock("@/middlelayers/charts", () => ({
+vi.mock("@/middlelayers/charts", async () => ({
+  ...(await import("@/test/mock-historical-queries")).mockHistoricalQueries(),
   deleteHistoricalDataByUUID: vi.fn(),
   deleteHistoricalDataDetailById: vi.fn(),
-  queryHistoricalData: vi.fn(),
   queryRestoreHistoricalData: vi.fn(),
   restoreHistoricalData: vi.fn(),
 }));
@@ -54,6 +54,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 
 import {
   queryHistoricalData,
+  queryHistoricalDetail,
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
   queryRestoreHistoricalData,
@@ -147,10 +148,13 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     fireEvent.click(await screen.findByRole("button", { name: /confirm/i }));
     expect(screen.getAllByText("snapshot")).toHaveLength(1);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    const latest = screen.getByText("Latest Snapshot").closest("[class*='rounded']");
+    expect(latest).toHaveTextContent("$800");
 
     await waitFor(() => expect(deleteHistoricalDataByUUID).toHaveBeenCalledWith("snapshot-1"));
     rejectDelete(new Error("disk failed"));
     await waitFor(() => expect(screen.getAllByText("snapshot")).toHaveLength(2));
+    expect(latest).toHaveTextContent("$1,200");
     expect(toastMock.mock.lastCall?.[0]).toMatchObject({
       description: "disk failed",
       variant: "destructive",
@@ -210,6 +214,10 @@ describe("Historical-data — delete does not flash loading overlay", () => {
       }],
     }, sampleRows[1]];
     const refreshedRows = [{ ...rows[0], assets: [] }, rows[1]];
+    vi.mocked(queryHistoricalDetail)
+      .mockResolvedValueOnce(rows[0] as never)
+      .mockImplementationOnce(() => new Promise((resolve) =>
+        setTimeout(() => resolve(refreshedRows[0] as never), 80)));
     vi.mocked(queryHistoricalData).mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve(
         (vi.mocked(deleteHistoricalDataDetailById).mock.calls.length ? refreshedRows : rows) as never,
@@ -230,13 +238,31 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     fireEvent.click(await screen.findByRole("button", { name: /^delete$/i }));
 
     await waitFor(() => expect(onAfterDataChanged).toHaveBeenCalledWith("delete", undefined, 7));
+    expect(within(detailDialog).queryByRole("status")).not.toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     await waitFor(() => expect(deleteHistoricalDataDetailById).toHaveBeenCalledWith(7));
     await waitFor(() => expect(queryHistoricalData).toHaveBeenCalledTimes(2));
     await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(queryHistoricalDetail).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: /historical data detail/i })).toBeInTheDocument();
     expect(within(screen.getByRole("dialog", { name: /historical data detail/i })).queryByText("BTC")).not.toBeInTheDocument();
+  });
+
+  it("updates the latest card as soon as the newest snapshot is deleted", async () => {
+    render(
+      <VersionHarness
+        currency={usdCurrency}
+        dateRange={dateRange}
+        quoteColor="green-up-red-down"
+      />,
+    );
+    await screen.findAllByText("snapshot");
+    fireEvent.click(screen.getAllByRole("button", { name: /delete/i })[0]);
+    fireEvent.click(await screen.findByRole("button", { name: /confirm/i }));
+    await waitFor(() => expect(deleteHistoricalDataByUUID).toHaveBeenCalledWith("snapshot-1"));
+    const latest = screen.getByText("Latest Snapshot").closest("[class*='rounded']") ?? screen.getByText("Latest Snapshot").parentElement?.parentElement;
+    expect(latest).toHaveTextContent("$800");
   });
 
   it("closes the detail dialog when an external refresh removes its snapshot", async () => {
@@ -352,7 +378,7 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     );
     await screen.findByText("rec-0000");
     fireEvent.click(screen.getByRole("button", { name: /next page/i }));
-    const row = screen.getByText("rec-0020").closest("tr");
+    const row = (await screen.findByText("rec-0020")).closest("tr");
     fireEvent.click(screen.getByText("rec-0020"));
     const detailDialog = await screen.findByRole("dialog", { name: /historical data detail/i });
     fireEvent.click(within(detailDialog).getByRole("button", { name: /delete/i }));
@@ -396,6 +422,51 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     // The page loading overlay must NOT flash on screen. The local list
     // already reflects the deletion; the bumped dataChangedVersion is
     // expected to refresh in the background without showing the overlay.
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("keeps the loading overlay hidden when deleting the only row on the last page", async () => {
+    const asset = {
+      id: 20,
+      uuid: "rec-0020",
+      createdAt: sampleRows[0].createdAt,
+      assetType: "crypto",
+      symbol: "BTC",
+      amount: 1,
+      value: 1200,
+      price: 1200,
+    };
+    const rows = Array.from({ length: 21 }, (_, index) => ({
+      id: `rec-${String(index).padStart(4, "0")}`,
+      createdAt: sampleRows[0].createdAt,
+      total: 1200,
+      assets: index === 20 ? [asset] : [],
+      transactions: [],
+    }));
+    let deleted = false;
+    vi.mocked(queryHistoricalData).mockImplementation(
+      () => new Promise((resolve) => setTimeout(
+        () => resolve((deleted ? rows.slice(0, 20) : rows) as never), 80,
+      )),
+    );
+    vi.mocked(deleteHistoricalDataDetailById).mockImplementation(async () => { deleted = true; });
+    render(
+      <VersionHarness
+        currency={usdCurrency}
+        dateRange={dateRange}
+        quoteColor="green-up-red-down"
+      />,
+    );
+    await screen.findByText("rec-0000");
+    fireEvent.click(screen.getByRole("button", { name: /next page/i }));
+    await screen.findByText("rec-0020");
+    fireEvent.click(screen.getByText("rec-0020"));
+    const dialog = await screen.findByRole("dialog", { name: /historical data detail/i });
+    fireEvent.click(within(dialog).getByRole("button", { name: /delete/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^delete$/i }));
+    await waitFor(() => expect(queryHistoricalData).toHaveBeenCalledTimes(4));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(await screen.findByText("rec-0000")).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

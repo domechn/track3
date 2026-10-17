@@ -23,6 +23,7 @@ import {
 import { formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { downsampleIndices } from "@/middlelayers/chart-downsample";
 
 const chartName = "Coins Percentage Overview";
 
@@ -30,6 +31,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   const { t } = useTranslation();
   const wsize = useWindowSize();
   const [topN, setTopN] = useState<AssetReference[]>([]);
+  const [chartWidth, setChartWidth] = useState(600);
   const { needResize } = useContext(ChartResizeContext);
   const [assetsPercentageChangeData, setAssetsPercentageChangeData] = useState(
     [] as AssetsPercentageChangeData
@@ -55,7 +57,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
   async function loadData(dr: TDateRange, gen: number) {
     const topN = await queryTopNAssets(dr, 6);
-    const data = await queryAssetsPercentageChange(dr);
+    const data = await queryAssetsPercentageChange(dr, 6);
     if (gen !== loadGenRef.current) {
       return;
     }
@@ -113,6 +115,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     () => ({
       maintainAspectRatio: false,
       responsive: true,
+      onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
       hover: {
         mode: "index" as const,
         intersect: false,
@@ -212,6 +215,13 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
     return { labels, topNData, othersData };
   }, [assetsPercentageChangeData, topN]);
+  const plottedIndices = useMemo(
+    () => downsampleIndices(
+      [...preparedData.topNData, preparedData.othersData],
+      Math.max(40, Math.floor(chartWidth / 2)),
+    ),
+    [preparedData, chartWidth],
+  );
 
   const barDataMemo = useMemo(() => {
     const datasetOpts = {
@@ -226,22 +236,22 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       return {
         ...datasetOpts,
         label: formatAssetLabel(asset),
-        data: preparedData.topNData[idx],
+        data: plottedIndices.map((point) => preparedData.topNData[idx][point]),
         backgroundColor: color.main,
       };
     });
     const othersDataset = {
       ...datasetOpts,
       label: t("common.others"),
-      data: preparedData.othersData,
+      data: plottedIndices.map((point) => preparedData.othersData[point]),
       backgroundColor: "rgba(148,163,184,0.5)",
     };
 
     return {
-      labels: preparedData.labels,
+      labels: plottedIndices.map((point) => preparedData.labels[point]),
       datasets: [...topNDatasets, othersDataset],
     };
-  }, [preparedData, topN, t]);
+  }, [preparedData, plottedIndices, topN, t]);
 
   return (
     <div>

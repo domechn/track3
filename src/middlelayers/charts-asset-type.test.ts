@@ -3,6 +3,8 @@ import { calculateTotalProfit, queryTopCoinsRank } from "./charts";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 
+const sqlSelect = vi.hoisted(() => vi.fn());
+vi.mock("./database", () => ({ selectFromDatabaseWithSql: sqlSelect }));
 vi.mock("./data", () => ({
   queryCoinPrices: vi.fn(),
   queryStableCoins: vi.fn(),
@@ -82,6 +84,12 @@ beforeEach(() => {
 
 describe("charts asset type handling", () => {
   it("keeps same-symbol stock and crypto ranks separate", async () => {
+    sqlSelect
+      .mockResolvedValueOnce([{ uuid: "u1", createdAt: "2024-04-01T00:00:00.000Z", total: 150 }])
+      .mockResolvedValueOnce([
+        { uuid: "u1", createdAt: "2024-04-01T00:00:00.000Z", symbol: "BTC", assetType: "crypto", value: 100, price: 100, rank: 1 },
+        { uuid: "u1", createdAt: "2024-04-01T00:00:00.000Z", symbol: "BTC", assetType: "stock", value: 50, price: 50, rank: 2 },
+      ]);
     vi.mocked(ASSET_HANDLER.listSymbolGroupedAssetsByDateRange).mockResolvedValue(
       [
         [

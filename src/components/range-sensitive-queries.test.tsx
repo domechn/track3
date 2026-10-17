@@ -13,7 +13,8 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 vi.mock("react-chartjs-2", async () => {
   const React = await import("react");
   return {
-    Line: () => <div data-testid="line-chart" />,
+    Line: ({ data }: { data: { datasets: { data: number[] }[] } }) =>
+      <div data-testid="line-chart" data-values={JSON.stringify(data.datasets.map(({ data }) => data))} />,
     Bar: ({
       data,
     }: {
@@ -250,6 +251,47 @@ beforeEach(() => {
 });
 
 describe("Range-sensitive component queries", () => {
+  it("plots bounded total-value points while keeping full-resolution totals", async () => {
+    const data = Array.from({ length: 2000 }, (_, i) => ({ usdValue: 900 + i }));
+    data[720].usdValue = 10000;
+    vi.mocked(queryAssetChange).mockResolvedValue({
+      timestamps: data.map((_, i) => rangeA.start.getTime() + i * 3_600_000),
+      data,
+    });
+    renderWithOverviewProviders(
+      <TotalValue currency={usdCurrency} dateRange={rangeA} quoteColor="green-up-red-down" />,
+    );
+    await waitFor(() => {
+      const plotted = JSON.parse(screen.getByTestId("line-chart").getAttribute("data-values") ?? "[]");
+      expect(plotted[0].length).toBeLessThan(500);
+      expect(plotted[0]).toContain(10000);
+      expect(plotted[0]).toContain(2899);
+    });
+    expect(screen.getByText(/\$1,100/)).toBeInTheDocument();
+  });
+
+  it("plots bounded PNL bars while preserving the largest gain and loss", async () => {
+    const values = Array.from({ length: 2000 }, (_, i) => ({
+      totalValue: i * 2,
+      timestamp: rangeA.start.getTime() + i * 3_600_000,
+    }));
+    values[650].totalValue = values[649].totalValue + 5000;
+    values[651].totalValue = values[650].totalValue - 4998;
+    vi.mocked(queryPNLChartValue).mockResolvedValue(values);
+    renderWithOverviewProviders(
+      <PNLChart currency={usdCurrency} dateRange={rangeA} quoteColor="green-up-red-down" />,
+    );
+    await waitFor(() => {
+      const plotted = JSON.parse(screen.getByTestId("bar-chart").getAttribute("data-values") ?? "[]");
+      expect(plotted[0].length).toBeLessThan(500);
+      expect(plotted[0]).toContain(5000);
+      expect(plotted[1]).toContain(-4998);
+      expect(plotted.flat().reduce((sum: number, value: number | null) => sum + (value ?? 0), 0))
+        .toBe(values.at(-1)!.totalValue - values[0].totalValue);
+    });
+    expect(values).toHaveLength(2000);
+  });
+
   it("does not let an older PNL range overwrite the latest chart data", async () => {
     const requestA = deferred<
       { totalValue: number; timestamp: number }[]

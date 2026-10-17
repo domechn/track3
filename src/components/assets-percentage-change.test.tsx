@@ -107,6 +107,24 @@ afterEach(() => {
 });
 
 describe("AssetsPercentageChange (stacked bar)", () => {
+  it("bounds stacked chart points while preserving the latest legend values", async () => {
+    const many: AssetsPercentageChangeData = Array.from({ length: 2000 }, (_, i) => ({
+      timestamp: dateRange.start.getTime() + i * 3_600_000,
+      percentages: [
+        { symbol: "BTC", assetType: crypto, percentage: i === 900 ? 95 : 40 },
+        { symbol: "ETH", assetType: crypto, percentage: i === 900 ? 5 : 60 },
+      ],
+    }));
+    vi.mocked(queryAssetsPercentageChange).mockResolvedValue(many);
+    renderComponent();
+    await waitFor(() => {
+      const latest = barPropsStore.current.at(-1)?.data;
+      expect(latest?.labels.length).toBeLessThan(500);
+      expect(latest?.datasets[0].data).toContain(95);
+    });
+    expect(screen.getByTestId("assets-percentage-legend")).toHaveTextContent("40.0%");
+  });
+
   it("renders the card with a bar chart and a legend", async () => {
     renderComponent();
     expect(await screen.findByTestId("bar-chart")).toBeInTheDocument();

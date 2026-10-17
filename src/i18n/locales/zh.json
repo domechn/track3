@@ -133,6 +133,7 @@
   "history.h1": "历史数据",
   "history.detailTitle": "历史数据详情",
   "history.detailDescription": "查看所选历史快照中的资产。",
+  "history.detailLoadFailed": "无法加载快照详情。请关闭后重新打开再试。",
   "history.assets": "资产",
   "history.assetsNote": "价值大于 $1",
   "history.visibleRows": "可见行",

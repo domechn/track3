@@ -48,10 +48,10 @@ vi.mock("@/middlelayers/data", () => ({
   downloadCoinLogos: vi.fn(),
 }));
 
-vi.mock("@/middlelayers/charts", () => ({
+vi.mock("@/middlelayers/charts", async () => ({
+  ...(await import("@/test/mock-historical-queries")).mockHistoricalQueries(),
   deleteHistoricalDataByUUID: vi.fn(),
   deleteHistoricalDataDetailById: vi.fn(),
-  queryHistoricalData: vi.fn(),
   queryRestoreHistoricalData: vi.fn(),
   restoreHistoricalData: vi.fn(),
 }));
