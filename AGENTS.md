@@ -91,6 +91,8 @@ corepack yarn update-release   # Release metadata
 
 Tests run via Vitest (`corepack yarn test` or `corepack yarn test:watch` for watch mode). All new code must include co-located tests.
 
+Assistant prompt, skill, orchestrator, provider, and chat-loop changes should run the offline golden suite in `corepack yarn test`. The optional live model check is `corepack yarn eval` with `EVAL_ENDPOINT`, `EVAL_API_KEY`, and `EVAL_MODEL`; see `docs/assistant-eval.md`.
+
 ## Build Requirements
 
 - Node.js 24+, Yarn 4.x (via Corepack), Rust 1.94.1+

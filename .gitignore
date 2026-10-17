@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 coverage/
+evals/report.json
 *.local
 
 # Editor directories and files
