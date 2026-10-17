@@ -377,23 +377,12 @@ impl CoinGecko {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::Deserialize;
-
-    #[derive(Deserialize)]
-    struct FixturePrice {
-        usd: Option<f64>,
-    }
+    use coingecko::response::simple::Price;
 
     #[test]
     fn maps_price_fixture_by_coin_id_and_omits_missing_prices() {
-        let fixture: HashMap<String, FixturePrice> = serde_json::from_str(
-            r#"{
-                "bitcoin": {"usd": 65000.0},
-                "ethereum": {"usd": 3500.0},
-                "missing": {}
-            }"#,
-        )
-        .unwrap();
+        let fixture: HashMap<String, Price> =
+            serde_json::from_str(include_str!("../tests/fixtures/coingecko-prices.json")).unwrap();
         let coins = vec![
             CoinGeckoCoin {
                 id: "bitcoin".to_string(),

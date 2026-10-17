@@ -72,6 +72,10 @@ fn merge_flexible_savings(
     Ok(())
 }
 
+fn build_earn_request(recv_window: u64) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(build_signed_request([("size", "100")], recv_window)?)
+}
+
 impl Binance {
     pub fn new(api_key: String, secret_key: String) -> Self {
         Self {
@@ -113,7 +117,7 @@ impl Binance {
             });
 
         // locked savings in simple earn
-        let locked_savings_req = build_signed_request([("size", "100")], funding.recv_window)?;
+        let locked_savings_req = build_earn_request(funding.recv_window)?;
         let locked_savings: LockedSavingResponse = funding
             .client
             .get_signed(
@@ -124,7 +128,7 @@ impl Binance {
 
         merge_locked_savings(&mut res, &locked_savings)?;
 
-        let flexible_savings_req = build_signed_request([("size", "100")], funding.recv_window)?;
+        let flexible_savings_req = build_earn_request(funding.recv_window)?;
         let flexible_savings: FlexibleSavingResponse = funding
             .client
             .get_signed(
@@ -185,28 +189,15 @@ impl Binance {
 mod tests {
     use super::*;
     use crate::info::sanitize_upstream_error;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
 
     #[test]
     fn parses_and_merges_locked_and_flexible_savings_fixtures() {
-        let locked: LockedSavingResponse = serde_json::from_str(
-            r#"{
-                "rows": [
-                    {"asset": "BTC", "amount": "1.25"},
-                    {"asset": "BTC", "amount": "0.75"},
-                    {"asset": "ZERO", "amount": "0"}
-                ]
-            }"#,
-        )
-        .unwrap();
-        let flexible: FlexibleSavingResponse = serde_json::from_str(
-            r#"{
-                "rows": [
-                    {"asset": "BTC", "totalAmount": "2.0"},
-                    {"asset": "ETH", "totalAmount": "3.5"}
-                ]
-            }"#,
-        )
-        .unwrap();
+        let locked: LockedSavingResponse =
+            serde_json::from_str(include_str!("../tests/fixtures/binance-locked.json")).unwrap();
+        let flexible: FlexibleSavingResponse =
+            serde_json::from_str(include_str!("../tests/fixtures/binance-flexible.json")).unwrap();
         let mut balances = HashMap::new();
 
         merge_locked_savings(&mut balances, &locked).unwrap();
@@ -242,5 +233,75 @@ mod tests {
             error,
             "GET /api?apiKey=<REDACTED>&signature=<REDACTED>&secret=<REDACTED>"
         );
+    }
+
+    #[test]
+    fn earn_request_contains_window_timestamp_and_page_size() {
+        let query = build_earn_request(5_000).unwrap();
+        let parts = query.split('&').collect::<Vec<_>>();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0], "recvWindow=5000");
+        assert!(parts[1]
+            .strip_prefix("timestamp=")
+            .unwrap()
+            .parse::<u64>()
+            .is_ok());
+        assert_eq!(parts[2], "size=100");
+    }
+
+    #[test]
+    fn earn_query_is_signed_on_the_request_sent_to_binance() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let host = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buffer = [0u8; 4096];
+            let mut bytes = Vec::new();
+            loop {
+                let count = stream.read(&mut buffer).unwrap();
+                bytes.extend_from_slice(&buffer[..count]);
+                if count == 0 || bytes.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let request = String::from_utf8_lossy(&bytes).to_string();
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{\"rows\":[]}")
+                .unwrap();
+            request
+        });
+        let query = build_earn_request(5_000).unwrap();
+        let wallet: Wallet = BinanceApi::new_with_config(
+            Some("test-api-key".to_string()),
+            Some("test-secret".to_string()),
+            &binance::config::Config::default().set_rest_api_endpoint(host),
+        );
+        let response: serde_json::Value = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                wallet
+                    .client
+                    .get_signed("/sapi/v1/simple-earn/locked/position", &query),
+            )
+            .unwrap();
+        assert_eq!(response["rows"], serde_json::json!([]));
+
+        let request = server.join().unwrap();
+        let request_line = request.lines().next().unwrap();
+        let signed_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"test-secret");
+        let expected_signature = ring::hmac::sign(&signed_key, query.as_bytes())
+            .as_ref()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        assert_eq!(
+            request_line,
+            format!(
+                "GET /sapi/v1/simple-earn/locked/position?{query}&signature={expected_signature} HTTP/1.1"
+            )
+        );
+        assert!(request
+            .to_lowercase()
+            .contains("x-mbx-apikey: test-api-key"));
     }
 }
