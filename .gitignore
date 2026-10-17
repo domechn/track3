@@ -13,6 +13,7 @@ dist-ssr
 coverage/
 test-results/
 playwright-report/
+evals/report.json
 *.local
 
 # Editor directories and files

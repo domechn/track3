@@ -17,17 +17,7 @@ import {
   type SubscriptionPlansResponse,
 } from "@/middlelayers/license";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "./ui/alert-dialog";
+import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { getVersion, trackEventWithClientID } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/i18n";
@@ -413,8 +403,8 @@ const App = ({
               >
                 {t("system.manageSub")}
               </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              <ConfirmDeleteDialog
+                trigger={
                   <Button
                     variant="destructive"
                     disabled={inactiveLicenseLoading}
@@ -424,23 +414,12 @@ const App = ({
                     )}
                     {t("system.inactivate")}
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("system.inactivateTitle")}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t("system.inactivateDescLegacy")}
-                      This does not cancel your Stripe subscription.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                    <AlertDialogAction onClick={onInactiveLicenseClick}>
-                      {t("common.confirm")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                }
+                title={t("system.inactivateTitle")}
+                description={t("system.inactivateDesc")}
+                cancelLabel={t("common.cancel")}
+                actions={[{ label: t("common.confirm"), onClick: onInactiveLicenseClick }]}
+              />
             </div>
           </CardContent>
         </Card>
@@ -483,8 +462,8 @@ const App = ({
                   height={18}
                 />
               </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              <ConfirmDeleteDialog
+                trigger={
                   <Button
                     variant="destructive"
                     disabled={inactiveLicenseLoading}
@@ -494,22 +473,12 @@ const App = ({
                     )}
                     {t("system.inactivate")}
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("system.inactivateTitle")}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t("system.inactivateDescLegacy")}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                    <AlertDialogAction onClick={onInactiveLicenseClick}>
-                      {t("common.confirm")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                }
+                title={t("system.inactivateTitle")}
+                description={t("system.inactivateDescLegacy")}
+                cancelLabel={t("common.cancel")}
+                actions={[{ label: t("common.confirm"), onClick: onInactiveLicenseClick }]}
+              />
             </div>
           </CardContent>
         </Card>

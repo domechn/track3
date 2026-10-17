@@ -12,13 +12,11 @@ import {
   CurrencyRateDetail,
   HistoricalData,
   QuoteColor,
-  RestoreHistoricalData,
   TDateRange,
 } from "@/middlelayers/types";
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import DeleteIcon from "@/assets/icons/delete-icon.png";
 
-import { useToast } from "@/components/ui/use-toast";
 import { timeToDateStr } from "@/utils/date";
 import {
   currencyWrapper,
@@ -60,19 +58,9 @@ import {
 } from "./ui/table";
 import { resolveAssetLogoSrc } from "@/utils/assets";
 import { ScrollArea } from "./ui/scroll-area";
-import { ToastAction } from "./ui/toast";
 import { positiveNegativeColor } from "@/utils/color";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "./ui/alert-dialog";
+import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
+import { useOptimisticDelete } from "./common/use-optimistic-delete";
 import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
 import { useTranslation } from "@/i18n";
@@ -113,7 +101,6 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
-  const { toast } = useToast();
   const { t } = useTranslation();
 
   const [data, setData] = useState([] as HistoricalData[]);
@@ -124,7 +111,7 @@ const App = ({
   const [pageLoading, setPageLoading] = useState(true);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
-  const [deleting, setDeleting] = useState(false);
+  const { run: runDelete, isDeleting: deleting } = useOptimisticDelete(setData);
 
   const [dataPage, setDataPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -311,122 +298,92 @@ const App = ({
     ).length;
   }, [rankData, detailSearch]);
 
-  const onDeletionUndoClick = useCallback(
-    (rhd: { uuid?: string; id?: number; rhd: RestoreHistoricalData }) => {
-      restoreHistoricalData(rhd.rhd).then(() => {
-        setIsModalOpen(false);
-
-        if (afterDataChanged) {
-          // The local list is missing the deleted row(s); the re-fetch
-          // will repopulate it. Skip the loading overlay to avoid a flash.
-          skipNextLoadingRef.current = true;
-          afterDataChanged("undoDeletion", rhd.uuid, rhd.id);
-        }
-      });
-    },
-    [afterDataChanged],
-  );
-
   const onHistoricalDataDeleteClick = useCallback(
     (uuid: string) => {
-      setDeleting(true);
-      (async () => {
-        const rhd = await queryRestoreHistoricalData(uuid);
-        await deleteHistoricalDataByUUID(uuid);
-        return rhd;
-      })()
-        .then((rhd) => {
-          toast({
-            description: t("history.deleted"),
-            action: (
-              <ToastAction
-                altText={t("history.undoDelete")}
-                onClick={() =>
-                  onDeletionUndoClick({
-                    uuid,
-                    rhd,
-                  })
-                }
-              >
-                {t("common.undo")}
-              </ToastAction>
-            ),
-          });
-          setData((prev) => prev.filter((record) => record.id !== uuid));
+      const index = data.findIndex((record) => record.id === uuid);
+      const removed = data[index];
+      if (!removed) return;
+      void runDelete({
+        update: (prev) => prev.filter((record) => record.id !== uuid),
+        rollback: (prev) => {
+          if (prev.some((record) => record.id === uuid)) return prev;
+          const next = [...prev];
+          next.splice(index, 0, removed);
+          return next;
+        },
+        commit: async () => {
+          const rhd = await queryRestoreHistoricalData(uuid);
+          await deleteHistoricalDataByUUID(uuid);
+          return rhd;
+        },
+        undo: restoreHistoricalData,
+        onDeleted: () => {
           if (afterDataChanged) {
-            // Local list is already correct; skip the next loading
-            // overlay that the dataChangedVersion bump would otherwise
-            // flash.
             skipNextLoadingRef.current = true;
             afterDataChanged("delete", uuid, undefined);
           }
           setSelectedDataId(null);
           setIsModalOpen(false);
-        })
-        .catch((e) =>
-          toast({
-            description: e.message,
-            variant: "destructive",
-          }),
-        )
-        .finally(() => {
-          setDeleting(false);
-        });
+        },
+        onUndone: () => {
+          setIsModalOpen(false);
+          if (afterDataChanged) {
+            skipNextLoadingRef.current = true;
+            afterDataChanged("undoDeletion", uuid, undefined);
+          }
+        },
+        successMessage: t("history.deleted"),
+        undoLabel: t("common.undo"),
+        undoAltText: t("history.undoDelete"),
+        undoWindowMs: 5000,
+      });
     },
-    [afterDataChanged, onDeletionUndoClick, toast],
+    [afterDataChanged, data, runDelete, t],
   );
 
   const onHistoricalDataDetailDeleteClick = useCallback(
     (id: number) => {
-      setDeleting(true);
-      (async () => {
-        const rhd = await queryRestoreHistoricalData(id);
-        await deleteHistoricalDataDetailById(id);
-        return rhd;
-      })()
-        .then((rhd) => {
-          toast({
-            description: t("history.deleted"),
-            action: (
-              <ToastAction
-                altText={t("history.undoDeleteRecord")}
-                onClick={() =>
-                  onDeletionUndoClick({
-                    id,
-                    rhd,
-                  })
-                }
-              >
-                {t("common.undo")}
-              </ToastAction>
-            ),
-          });
+      const owner = data.find((record) => record.assets.some((asset) => asset.id === id));
+      const index = owner?.assets.findIndex((asset) => asset.id === id) ?? -1;
+      const removed = owner?.assets[index];
+      if (!owner || !removed) return;
+      void runDelete({
+        update: (prev) => prev.map((record) => ({
+          ...record,
+          assets: record.assets.filter((asset) => asset.id !== id),
+        })),
+        rollback: (prev) => prev.map((record) => {
+          if (record.id !== owner.id || record.assets.some((asset) => asset.id === id)) return record;
+          const assets = [...record.assets];
+          assets.splice(index, 0, removed);
+          return { ...record, assets };
+        }),
+        commit: async () => {
+          const rhd = await queryRestoreHistoricalData(id);
+          await deleteHistoricalDataDetailById(id);
+          return rhd;
+        },
+        undo: restoreHistoricalData,
+        onDeleted: () => {
           if (afterDataChanged) {
-            // Local list is already correct; skip the next loading
-            // overlay that the dataChangedVersion bump would otherwise
-            // flash.
             skipNextLoadingRef.current = true;
             afterDataChanged("delete", undefined, id);
           }
-
-          setData((prev) =>
-            prev.map((record) => ({
-              ...record,
-              assets: record.assets.filter((asset) => asset.id !== id),
-            })),
-          );
-        })
-        .catch((e) =>
-          toast({
-            description: e.message,
-            variant: "destructive",
-          }),
-        )
-        .finally(() => {
-          setDeleting(false);
-        });
+        },
+        onUndone: () => {
+          setIsModalOpen(false);
+          if (afterDataChanged) {
+            skipNextLoadingRef.current = true;
+            afterDataChanged("undoDeletion", undefined, id);
+          }
+        },
+        successMessage: t("history.deleted"),
+        undoLabel: t("common.undo"),
+        undoAltText: t("history.undoDeleteRecord"),
+        undoWindowMs: 5000,
+      });
     },
-    [afterDataChanged, onDeletionUndoClick, toast],
+    [afterDataChanged, data, runDelete, t],
   );
 
   const onHistoricalDataDetailDeleteAndBlacklistClick = useCallback(
@@ -588,56 +545,34 @@ const App = ({
                           )}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                          <ConfirmDeleteDialog
+                            trigger={
                               <button
                                 className="opacity-80 hover:opacity-100 transition-opacity"
                                 disabled={deleting}
+                                aria-label={t("common.delete")}
                               >
                                 <img
                                   src={DeleteIcon}
-                                  alt="delete"
-                                  style={{
-                                    border: 0,
-                                    height: 18,
-                                    width: 18,
-                                  }}
+                                  alt=""
+                                  style={{ border: 0, height: 18, width: 18 }}
                                 />
                               </button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  {t("history.deleteDialogTitle")}
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  {t("history.deleteDialogDesc")}
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() =>
-                                    onHistoricalDataDetailDeleteAndBlacklistClick(
-                                      item.assetId,
-                                      item.symbol,
-                                    )
-                                  }
-                                >
-                                  {t("history.deleteBlacklist")}
-                                </AlertDialogAction>
-                                <AlertDialogAction
-                                  onClick={() =>
-                                    onHistoricalDataDetailDeleteClick(
-                                      item.assetId,
-                                    )
-                                  }
-                                >
-                                  {t("common.delete")}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                            }
+                            title={t("history.deleteDialogTitle")}
+                            description={t("history.deleteDialogDesc")}
+                            cancelLabel={t("common.cancel")}
+                            actions={[
+                              {
+                                label: t("history.deleteBlacklist"),
+                                onClick: () => onHistoricalDataDetailDeleteAndBlacklistClick(item.assetId, item.symbol),
+                              },
+                              {
+                                label: t("common.delete"),
+                                onClick: () => onHistoricalDataDetailDeleteClick(item.assetId),
+                              },
+                            ]}
+                          />
                         </TableCell>
                       </TableRow>
                     );
@@ -905,47 +840,29 @@ const App = ({
                               onClick={(e) => e.stopPropagation()}
                             >
                               {isLatest ? (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
+                                <ConfirmDeleteDialog
+                                  trigger={
                                     <button
                                       className="hidden group-hover:inline-block opacity-80 hover:opacity-100 transition-opacity"
                                       disabled={deleting}
                                       data-testid="history-delete-latest"
+                                      aria-label={t("common.delete")}
                                     >
                                       <img
                                         src={DeleteIcon}
-                                        alt="delete"
-                                        style={{
-                                          border: 0,
-                                          height: 18,
-                                          width: 18,
-                                        }}
+                                        alt=""
+                                        style={{ border: 0, height: 18, width: 18 }}
                                       />
                                     </button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>
-                                        {t("history.deleteLatestTitle")}
-                                      </AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        {t("history.deleteLatestDesc")}
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>
-                                        {t("common.cancel")}
-                                      </AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() =>
-                                          onHistoricalDataDeleteClick(row.id)
-                                        }
-                                      >
-                                        {t("common.confirm")}
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
+                                  }
+                                  title={t("history.deleteLatestTitle")}
+                                  description={t("history.deleteLatestDesc")}
+                                  cancelLabel={t("common.cancel")}
+                                  actions={[{
+                                    label: t("common.confirm"),
+                                    onClick: () => onHistoricalDataDeleteClick(row.id),
+                                  }]}
+                                />
                               ) : null}
                             </TableCell>
                           </TableRow>

@@ -1,16 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "@/i18n";
 import { cn } from "@/lib/utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -165,7 +156,6 @@ function SessionItem({
   onPin: (id: string, pinned: boolean) => void;
   t: (key: string) => string;
 }) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
 
   const handlePin = useCallback(
@@ -176,13 +166,7 @@ function SessionItem({
     [session.id, session.pinned, onPin],
   );
 
-  const handleDeleteClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmOpen(true);
-  }, []);
-
   return (
-    <>
       <div
         ref={itemRef}
         role="button"
@@ -230,42 +214,30 @@ function SessionItem({
                 <DrawingPinIcon className="h-3.5 w-3.5" />
               )}
             </button>
-            <button
-              type="button"
-              onClick={handleDeleteClick}
-              title={t("ai.session.delete")}
-              className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              data-testid={`session-delete-${session.id}`}
-            >
-              <Cross2Icon className="h-3.5 w-3.5" />
-            </button>
+            <ConfirmDeleteDialog
+              trigger={
+                <button
+                  type="button"
+                  title={t("ai.session.delete")}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  data-testid={`session-delete-${session.id}`}
+                >
+                  <Cross2Icon className="h-3.5 w-3.5" />
+                </button>
+              }
+              title={t("ai.session.confirmDeleteTitle")}
+              description={t("ai.session.confirmDeleteBody")}
+              cancelLabel={t("ai.session.cancel")}
+              actions={[{
+                label: t("ai.session.delete"),
+                onClick: () => onDelete(session.id),
+              }]}
+            />
           </span>
         </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground/60">
           {relativeTime(session.updatedAt, t)}
         </p>
       </div>
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("ai.session.confirmDeleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("ai.session.confirmDeleteBody")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("ai.session.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                onDelete(session.id);
-                setConfirmOpen(false);
-              }}
-            >
-              {t("ai.session.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
   );
 }

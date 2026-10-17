@@ -18,6 +18,7 @@
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "eval": "node ./scripts/eval.mjs",
     "preview": "vite preview",
     "update-release": "node ./scripts/update.mjs",
     "tauri": "tauri"
