@@ -56,12 +56,16 @@ import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { ChartResizeContext } from "@/App";
 import { useTranslation } from "@/i18n";
 import { DataChangedContext } from "@/contexts/data-changed";
+import { processAlerts } from "@/middlelayers/alerts";
+import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
+import { toast } from "../ui/use-toast";
 
 const Setting = React.lazy(() => import("../settings"));
 const HistoricalData = React.lazy(() => import("../historical-data"));
 const Overview = React.lazy(() => import("../overview"));
 const Comparison = React.lazy(() => import("../comparison"));
 const Rebalance = React.lazy(() => import("../rebalance"));
+const GoalsAlerts = React.lazy(() => import("../goals-alerts"));
 const WalletAnalysis = React.lazy(() => import("../wallet-analytics"));
 const CoinAnalysis = React.lazy(() => import("../coin-analytics"));
 const Configuration = React.lazy(() => import("@/components/configuration"));
@@ -410,6 +414,7 @@ function AppRoutes({
             </AnimatedPage>
           }
         />
+        <Route path="goals" element={<AnimatedPage><GoalsAlerts /></AnimatedPage>} />
         <Route
           path="history"
           element={
@@ -507,6 +512,7 @@ function AppRoutes({
 }
 
 const App = () => {
+  const { t } = useTranslation();
   const { setNeedResize } = React.useContext(ChartResizeContext);
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
@@ -557,6 +563,15 @@ const App = () => {
       }),
     ])
       .then(() => loadAllData(active))
+      .then(() => {
+        if (!active) return;
+        void processAlerts().then((alerts) => deliverAlerts(alerts, (alert) => {
+          const text = formatAlert(alert, t);
+          toast({ title: text.title, description: text.message });
+        }, t)).catch(() => {
+          console.warn("startup alert evaluation failed");
+        });
+      })
       .finally(() => {
         if (active) {
           setInitializing(false);

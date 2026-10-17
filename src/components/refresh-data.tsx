@@ -24,10 +24,12 @@ import {
 } from "./ui/alert-dialog";
 import { useTranslation } from "@/i18n";
 import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
+import { ALERT_SOURCE_STATUS_STORAGE_KEY, processAlerts } from "@/middlelayers/alerts";
+import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 
 const retries = 3;
 const retryInterval = 3000;
-const sourceStatusStorageKey = "track3-refresh-source-statuses";
+const sourceStatusStorageKey = ALERT_SOURCE_STATUS_STORAGE_KEY;
 
 function readStoredStatuses(): PortfolioSourceStatus[] {
   try {
@@ -142,6 +144,17 @@ const App = ({
       trackEventWithClientID("data_refreshed", {
         failedSources: result.sourceStatuses?.filter((source) => source.status !== "ok").map((source) => source.sourceId).join(",") ?? "",
       });
+      if (succeeded) {
+        try {
+          const alerts = await processAlerts(result.sourceResults, result.sourceStatuses);
+          await deliverAlerts(alerts, (alert) => {
+            const text = formatAlert(alert, t);
+            toast({ title: text.title, description: text.message });
+          }, t);
+        } catch {
+          console.warn("alert evaluation failed");
+        }
+      }
     } catch (error) {
       const messageKey = error instanceof FullRefreshRequiredError
         ? "refresh.runFullRefresh"

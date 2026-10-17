@@ -12,8 +12,10 @@ import {
   RocketIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  BellIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
+import { useAlertBadge } from "../use-alert-badge";
 
 const navItems = [
   { to: "/overview", labelKey: "nav.overview", icon: DashboardIcon },
@@ -21,6 +23,7 @@ const navItems = [
   { to: "/wallets", labelKey: "nav.wallets", icon: BackpackIcon },
   { to: "/comparison", labelKey: "nav.comparison", icon: MixIcon },
   { to: "/rebalance", labelKey: "nav.rebalance", icon: ActivityLogIcon },
+  { to: "/goals", labelKey: "nav.goals", icon: BellIcon },
   { to: "/history", labelKey: "nav.history", icon: ClockIcon },
   { to: "/cost-basis", labelKey: "nav.costBasis", icon: LayersIcon },
   { to: "/settings", labelKey: "nav.settings", icon: GearIcon },
@@ -31,12 +34,15 @@ function NavItem({
   label,
   icon: Icon,
   collapsed,
+  unread,
 }: {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   collapsed: boolean;
+  unread?: number;
 }) {
+  const { t } = useTranslation();
   const resolved = useResolvedPath(to);
   const match = useMatch({ path: resolved.pathname, end: false });
 
@@ -71,6 +77,12 @@ function NavItem({
           {label}
         </span>
       )}
+      {!!unread && <span className={cn(
+        "rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-destructive-foreground",
+        collapsed && "absolute -right-1 -top-1",
+      )} aria-label={t("goals.unread").replace("{count}", String(unread))}>
+        {unread > 99 ? "99+" : unread}
+      </span>}
     </Link>
   );
 }
@@ -85,6 +97,7 @@ export default function Sidebar({
   isProUser: boolean;
 }) {
   const { t } = useTranslation();
+  const unread = useAlertBadge();
   const sidebarWidth = collapsed ? 52 : 200;
   // AI is Pro-only. Insert the entry right before Settings so it
   // visually groups with the other navigation targets. Non-Pro users
@@ -130,6 +143,7 @@ export default function Sidebar({
             label={t(item.labelKey)}
             icon={item.icon}
             collapsed={collapsed}
+            unread={item.to === "/goals" ? unread : undefined}
           />
         ))}
       </nav>

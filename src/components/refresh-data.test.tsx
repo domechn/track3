@@ -8,6 +8,8 @@ import { updateAllCurrencyRates } from "@/middlelayers/configuration";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
 import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
+import { processAlerts } from "@/middlelayers/alerts";
+import { deliverAlerts } from "@/middlelayers/alert-notifications";
 
 // Hoist mock fn references so they're available inside vi.mock factories
 const mockSetButtonLoading = vi.hoisted(() => vi.fn());
@@ -45,6 +47,11 @@ vi.mock("@/utils/app", () => ({
 vi.mock("@/components/ui/use-toast", () => ({
   useToast: () => ({ toast: mockToast }),
 }));
+vi.mock("@/middlelayers/alerts", () => ({
+  ALERT_SOURCE_STATUS_STORAGE_KEY: "track3-refresh-source-statuses",
+  processAlerts: vi.fn(),
+}));
+vi.mock("@/middlelayers/alert-notifications", () => ({ deliverAlerts: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -58,9 +65,34 @@ beforeEach(() => {
   vi.mocked(getMemoryCacheInstance).mockReturnValue({
     clearCache: vi.fn(),
   } as never);
+  vi.mocked(processAlerts).mockResolvedValue([]);
+  vi.mocked(deliverAlerts).mockResolvedValue();
 });
 
 describe("RefreshData — currency rates refresh ordering", () => {
+  it("evaluates alerts after a persisted refresh using source freshness", async () => {
+    const statuses = [{ sourceId: "btc:0", label: "BTC wallet 1", status: "stale" as const }];
+    vi.mocked(refreshAllData).mockResolvedValue({
+      failedSources: [], requiresDataSourceAction: false, usedLastKnownData: true,
+      persisted: true, sourceResults: [], sourceStatuses: statuses,
+    });
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(processAlerts).toHaveBeenCalledWith([], statuses));
+    expect(deliverAlerts).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not evaluate alerts when no snapshot was persisted", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      failedSources: [], requiresDataSourceAction: true, usedLastKnownData: false, persisted: false,
+    });
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+    expect(processAlerts).not.toHaveBeenCalled();
+  });
   it("calls updateAllCurrencyRates before refreshAllData on button click", async () => {
     const callOrder: string[] = [];
     vi.mocked(updateAllCurrencyRates).mockImplementation(async () => {
