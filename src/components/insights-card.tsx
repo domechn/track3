@@ -4,11 +4,12 @@ import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
-  dismissInsight, formatInsight, INSIGHTS_CHANGED_EVENT, INSIGHT_QUESTION_STORAGE_KEY, loadInsightCard, refreshInsights,
+  dismissInsight, formatInsight, INSIGHTS_CHANGED_EVENT, loadInsightCard, refreshInsights,
   type InsightCard as StoredInsightCard,
 } from "@/middlelayers/insights-service";
 import type { InsightSeverity } from "@/middlelayers/insights";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
+import { storePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
 
 function SeverityIcon({ severity }: { severity: InsightSeverity }) {
   return severity === "info"
@@ -96,7 +97,7 @@ export default function InsightsCard({ currency }: { currency?: CurrencyRateDeta
                 <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
                   <a href="#/assistant" onClick={() => {
                     try {
-                      sessionStorage.setItem(INSIGHT_QUESTION_STORAGE_KEY, t("insights.askQuestion").replace("{insight}", text));
+                      storePendingAssistantQuestion({ question: t("insights.askQuestion").replace("{insight}", text) });
                     } catch { /* The link still opens the assistant. */ }
                   }} aria-describedby={`insight-${insight.id.replace(/[^a-zA-Z0-9-]/g, "-")}`}>{t("insights.ask")}</a>
                 </Button>

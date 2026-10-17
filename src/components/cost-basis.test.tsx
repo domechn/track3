@@ -3,12 +3,20 @@ import { beforeEach, expect, it, vi } from "vitest";
 import CostBasisPage from "./cost-basis";
 import { getCostBasisMethod, saveCostBasisMethod } from "@/middlelayers/configuration";
 import { exportCostBasisReport, loadCostBasisReport } from "@/middlelayers/cost-basis-data";
+import { COST_BASIS_SETTINGS_KEY } from "@/middlelayers/ai/actions/page-settings";
+import axe from "axe-core";
 
 vi.mock("@/middlelayers/configuration", () => ({
   getCostBasisMethod: vi.fn(), saveCostBasisMethod: vi.fn(),
+  loadAIConfig: vi.fn().mockResolvedValue({ endpoint: "http://localhost", apiKey: "", model: "test", contextSize: 8192 }),
 }));
 vi.mock("@/middlelayers/cost-basis-data", () => ({
   loadCostBasisReport: vi.fn(), exportCostBasisReport: vi.fn(),
+}));
+vi.mock("react-chartjs-2", () => ({
+  Bar: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
+  Line: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
+  Doughnut: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
 }));
 
 const report = {
@@ -22,6 +30,7 @@ const report = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.removeItem(COST_BASIS_SETTINGS_KEY);
   vi.mocked(getCostBasisMethod).mockResolvedValue("FIFO");
   vi.mocked(loadCostBasisReport).mockResolvedValue(report as never);
   vi.mocked(exportCostBasisReport).mockResolvedValue(true);
@@ -33,6 +42,32 @@ it("shows realized totals and data gaps from the loaded report", async () => {
   expect(screen.getByText(/ETH/)).toBeInTheDocument();
   expect(screen.getByText(/Missing lots/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Export CSV" })).toBeInTheDocument();
+  expect(screen.getByText(/Proceeds:/)).toHaveTextContent("200 USD");
+  expect(screen.getByText(/Cost basis:/)).toHaveTextContent("100 USD");
+});
+it("keeps manual setup open after a filter reload", async () => {
+  render(<CostBasisPage />);
+  await screen.findAllByText("BTC");
+  const panel = screen.getByText("Manual setup").closest("details");
+  await waitFor(() => expect(panel).not.toHaveAttribute("open"));
+  fireEvent.click(screen.getByText("Manual setup"));
+  fireEvent.change(screen.getByLabelText("Tax year"), { target: { value: "2024" } });
+  await waitFor(() => expect(loadCostBasisReport).toHaveBeenCalledWith(expect.objectContaining({ from: "2024-01-01" })));
+  expect(panel).toHaveAttribute("open");
+});
+
+it("leads with AI setup and keeps report details in a collapsible section", async () => {
+  render(<CostBasisPage />);
+  expect(await screen.findByText("Let the assistant set this up")).toBeVisible();
+  expect(screen.getByText("Use FIFO and show my 2025 realized gains")).toBeInTheDocument();
+  expect((await screen.findByText("Details")).closest("details")).not.toHaveAttribute("open");
+});
+
+it("has no axe violations with its visual summary shown", async () => {
+  const { container } = render(<CostBasisPage />);
+  await screen.findByText("Details");
+  const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+  expect(results.violations.map(({ id }) => id)).toEqual([]);
 });
 
 it("persists method changes and reloads the report for that method", async () => {
@@ -67,6 +102,7 @@ it("lets holding days be cleared while editing and waits before reloading", asyn
   fireEvent.change(field, { target: { value: "400" } });
   expect(loadCostBasisReport).toHaveBeenCalledTimes(calls);
   await waitFor(() => expect(loadCostBasisReport).toHaveBeenCalledWith(expect.objectContaining({ holdingPeriodDays: 400 })));
+  await waitFor(() => expect(JSON.parse(localStorage.getItem(COST_BASIS_SETTINGS_KEY) ?? "{}")).toHaveProperty("holdingPeriodDays", 400));
 });
 
 it("flags a reversed date range and does not load or export it", async () => {

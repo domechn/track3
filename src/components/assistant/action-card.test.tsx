@@ -4,6 +4,7 @@ import { expect, it, vi } from "vitest";
 import ActionCard from "./action-card";
 import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
 import axe from "axe-core";
+import { MemoryRouter } from "react-router-dom";
 
 const action: PendingAction = {
   kind: "pending_action", id: "one", toolCallId: "tool-one", name: "blacklist_add",
@@ -45,4 +46,61 @@ it("shows a dotted symbol in the preview as data", () => {
 it("shows an action result that resembles a translation key as data", () => {
   render(<ActionCard action={{ ...action, status: "approved", result: "common.delete" }} />);
   expect(screen.getByRole("status")).toHaveTextContent("common.delete");
+});
+
+it("offers the originating page after an approved setup action", () => {
+  render(<MemoryRouter><ActionCard action={{ ...action, name: "save_rebalance_targets", status: "approved" }} /></MemoryRouter>);
+  expect(screen.getByRole("link", { name: "Open Rebalance" })).toHaveAttribute("href", "/rebalance");
+});
+
+it("shows changed settings as a readable field diff", () => {
+  render(<ActionCard action={{
+    ...action, name: "set_cost_basis_settings",
+    preview: { before: '{"method":"LIFO","holdingPeriodDays":365}', after: '{"method":"FIFO","holdingPeriodDays":365}' },
+  }} />);
+  expect(screen.getByText("Method")).toBeVisible();
+  expect(screen.getByText("LIFO → FIFO")).toBeVisible();
+  expect(screen.queryByText("365 → 365")).not.toBeInTheDocument();
+});
+
+it("summarizes target percentages in the confirmation card", () => {
+  render(<ActionCard action={{
+    ...action, name: "save_rebalance_targets",
+    preview: { before: "null", after: JSON.stringify({
+      targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 40 },
+        { kind: "cash", percent: 60 }], tolerancePercent: 2,
+    }) },
+  }} />);
+  expect(screen.getByText(/BTC 40%.*Cash 60%/)).toBeVisible();
+});
+
+it("labels rebalance amounts without unresolved currency placeholders", () => {
+  render(<ActionCard action={{
+    ...action, name: "set_rebalance_options",
+    preview: { before: "{}", after: '{"injectedCash":1000,"minimumTradeValue":10}' },
+  }} />);
+  expect(screen.getByText("New cash")).toBeVisible();
+  expect(screen.getByText("Minimum trade")).toBeVisible();
+  expect(screen.queryByText(/\{currency\}/)).not.toBeInTheDocument();
+});
+it("shows the percentage alert threshold as a readable confirmation diff", () => {
+  render(<ActionCard action={{
+    ...action, name: "edit_alert",
+    preview: {
+      before: '{"id":7,"kind":"portfolio_value_change","threshold":-5,"window":"7d"}',
+      after: '{"id":7,"kind":"portfolio_value_change","threshold":-10,"window":"7d"}',
+    },
+  }} />);
+  expect(screen.getByText("Threshold")).toBeVisible();
+  expect(screen.getByText("-5% → -10%")).toBeVisible();
+});
+it("uses each alert kind's unit when a threshold changes from percent to currency", () => {
+  render(<ActionCard action={{
+    ...action, name: "edit_alert",
+    preview: {
+      before: '{"id":7,"kind":"portfolio_value_change","threshold":-10,"window":"7d"}',
+      after: '{"id":7,"kind":"period_pnl","threshold":-50,"window":"7d"}',
+    },
+  }} />);
+  expect(screen.getByText("-10% → -$50")).toBeVisible();
 });

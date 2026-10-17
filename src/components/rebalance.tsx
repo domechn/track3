@@ -20,6 +20,11 @@ import {
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { Button } from "./ui/button";
+import AISetupCard from "./common/ai-setup-card";
+import { ASSISTANT_APP_ACTION_EVENT, REBALANCE_OPTIONS_KEY } from "@/middlelayers/ai/actions/page-settings";
+import { FinanceChartSkeleton, RebalanceCharts } from "./finance-charts";
+import { rebalanceVisuals } from "./finance-visuals";
+import type { QuoteColor } from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import {
@@ -31,8 +36,14 @@ import {
 type TargetDraft = RebalanceTarget & { id: number; previousAsset?: { assetType: AssetType; symbol: string } };
 
 const numberOrZero = (raw: string) => raw === "" ? Number.NaN : Number(raw);
+function storedOptions(): Partial<RebalanceOptions> {
+  try {
+    const value: unknown = JSON.parse(sessionStorage.getItem(REBALANCE_OPTIONS_KEY) ?? "{}");
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Partial<RebalanceOptions> : {};
+  } catch { return {}; }
+}
 
-export default function Rebalance({ currency }: { currency: CurrencyRateDetail }) {
+export default function Rebalance({ currency, quoteColor = "green-up-red-down" }: { currency: CurrencyRateDetail; quoteColor?: QuoteColor }) {
   const { t } = useTranslation();
   const labelFor = (target: RebalanceTarget) =>
     target.kind === "asset" ? target.symbol || t("rebalance.targetAsset") :
@@ -49,14 +60,36 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
   const [profileReady, setProfileReady] = useState(false);
   const [status, setStatus] = useState("");
   const [normalizeError, setNormalizeError] = useState(false);
-  const [mode, setMode] = useState<"full" | "buys">("full");
-  const [injectedCash, setInjectedCash] = useState(0);
-  const [minimumTradeValue, setMinimumTradeValue] = useState(0);
-  const [ignoreBelowValue, setIgnoreBelowValue] = useState(0);
+  const [mode, setMode] = useState<"full" | "buys">(() => storedOptions().mode ?? "full");
+  const [injectedCash, setInjectedCash] = useState(() => storedOptions().injectedCash ?? 0);
+  const [minimumTradeValue, setMinimumTradeValue] = useState(() => storedOptions().minimumTradeValue ?? 0);
+  const [ignoreBelowValue, setIgnoreBelowValue] = useState(() => storedOptions().ignoreBelowValue ?? 0);
+  const [manualOpen, setManualOpen] = useState(true);
+  const manualInitialized = useRef(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [actionVersion, setActionVersion] = useState(0);
   const profileLoaded = useRef(false);
   const nextTargetId = useRef(0);
   const withIds = (draft: RebalanceTarget[]): TargetDraft[] =>
     draft.map((target) => ({ ...target, id: nextTargetId.current++ }));
+
+  useEffect(() => {
+    const changed = () => {
+      profileLoaded.current = false;
+      const options = storedOptions();
+      setMode(options.mode ?? "full");
+      setInjectedCash(options.injectedCash ?? 0);
+      setMinimumTradeValue(options.minimumTradeValue ?? 0);
+      setIgnoreBelowValue(options.ignoreBelowValue ?? 0);
+      setActionVersion((version) => version + 1);
+    };
+    window.addEventListener(ASSISTANT_APP_ACTION_EVENT, changed);
+    return () => window.removeEventListener(ASSISTANT_APP_ACTION_EVENT, changed);
+  }, []);
+
+  useEffect(() => {
+    if (optionsValid) sessionStorage.setItem(REBALANCE_OPTIONS_KEY, JSON.stringify({ mode, injectedCash, minimumTradeValue, ignoreBelowValue }));
+  }, [mode, injectedCash, minimumTradeValue, ignoreBelowValue]);
 
   useEffect(() => {
     let active = true;
@@ -76,6 +109,10 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
           setTargets(withIds(profile?.targets ?? []));
           setTolerance(profile?.tolerancePercent ?? 0);
           setSaved(!!profile || failed);
+          if (!manualInitialized.current) {
+            setManualOpen(!profile?.targets.length);
+            manualInitialized.current = true;
+          }
           setProfileLoadError(failed);
           profileLoaded.current = true;
           setProfileReady(true);
@@ -91,7 +128,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [currency.currency, currency.rate, dataChangedVersion]);
+  }, [currency.currency, currency.rate, dataChangedVersion, actionVersion]);
 
   const validation = useMemo(() => {
     if (!targets.length) return "";
@@ -118,6 +155,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
       return undefined;
     }
   }, [targets, validation, optionsValid, holdings, mode, injectedCash, minimumTradeValue, ignoreBelowValue, tolerance, stablecoinSymbols]);
+  const visual = useMemo(() => result ? rebalanceVisuals(result) : undefined, [result]);
 
   function updateTarget(index: number, next: RebalanceTarget & { previousAsset?: { assetType: AssetType; symbol: string } }) {
     setTargets((previous) => previous.map((target, i) => i === index ? { ...next, id: target.id } : target));
@@ -197,18 +235,23 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto flex max-w-6xl flex-col gap-4">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{t("rebalance.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("rebalance.description")}</p>
       </header>
-      {loading && <p role="status">{t("common.loading")}</p>}
+      <AISetupCard page="rebalance"
+        summary={`${targets.map((target) => `${labelFor(target)} ${target.percent}%`).join(", ") || "No targets"}; ${t("rebalance.tolerance")}: ${tolerance}%; ${t("rebalance.mode")}: ${mode}; ${t("rebalance.injectedCash").replace("{currency}", currency.currency)}: ${injectedCash}; ${t("rebalance.minimumTrade").replace("{currency}", currency.currency)}: ${minimumTradeValue}`}
+        suggestions={["rebalance.ai.targets", "rebalance.ai.equal", "rebalance.ai.cash"].map((key) => t(key))} />
+      {loading && !profileReady && <FinanceChartSkeleton />}
       {loadError && <p role="alert" className="text-sm text-destructive">{t("rebalance.loadError")}</p>}
       {profileLoadError && !loading && <p role="alert" className="text-sm text-destructive">{t("rebalance.profileLoadError")}</p>}
       {profileReady && (
         <>
           {!holdings.length && <p className="text-sm text-muted-foreground">{t("rebalance.noData")}</p>}
-          <Card>
+          <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)} className="order-last rounded-lg border bg-card">
+            <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
+          <Card className="border-0 shadow-none">
             <CardHeader className="px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base">{t("rebalance.targets")}</CardTitle>
@@ -330,46 +373,47 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
               {numberField("rebalance-ignore", t("rebalance.ignoreBelow").replace("{currency}", currency.currency), ignoreBelowValue, setIgnoreBelowValue)}
             </CardContent>
           </Card>
+          </details>
           {!optionsValid && <p role="alert" className="text-xs text-destructive">{t("rebalance.validationOptions")}</p>}
           {!targets.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">{t("rebalance.empty")}</p>}
           {result && (
             <>
-              <Card>
-                <CardHeader className="px-4 py-3"><CardTitle className="text-base">{t("rebalance.deviations")}</CardTitle></CardHeader>
-                <CardContent className="space-y-2 px-4 pb-4">
-                  {result.rows.filter((row) => row.kind === "asset").map((row) => (
-                    <div key={`${row.assetType}:${row.symbol}`} role="img"
-                      aria-label={t("rebalance.deviationAria")
-                        .replace("{asset}", row.symbol)
-                        .replace("{current}", row.currentPercent.toFixed(1))
-                        .replace("{target}", row.targetPercent.toFixed(1))
-                        .replace("{deviation}", row.deviationPercent.toFixed(1))}
-                      className="grid grid-cols-[70px_minmax(0,1fr)_68px] items-center gap-2 text-xs tabular-nums">
-                      <span className="truncate font-medium">{row.symbol}</span>
-                      <div className="relative h-3 rounded bg-muted">
-                        <span className="absolute bottom-0 left-1/2 top-0 w-px bg-foreground/50" />
-                        <span className={`absolute bottom-0 top-0 rounded-sm ${row.deviationPercent >= 0 ? "left-1/2 bg-amber-500/80" : "right-1/2 bg-sky-500/80"}`}
-                          style={{ width: `${Math.min(50, Math.abs(row.deviationPercent) / 2)}%` }} />
-                      </div>
-                      <span className="text-right">{row.deviationPercent >= 0 ? "+" : ""}{row.deviationPercent.toFixed(1)} {t("rebalance.percentagePoints")}</span>
-                    </div>
-                  ))}
-                  <p className="text-xs text-muted-foreground">{t("rebalance.groupRule")}</p>
-                  {result.warnings.map((warning) => (
-                    <p key={warning.kind === "empty-type" ? warning.assetType : warning.kind} className="text-xs text-amber-600">
-                      {warning.kind === "empty-type"
-                        ? t("rebalance.groupEmpty").replace("{group}", t(`rebalance.${warning.assetType}`))
-                        : t("rebalance.missingPriceTarget")}
-                    </p>
-                  ))}
-                </CardContent>
-              </Card>
+              <RebalanceCharts result={result} quoteColor={quoteColor} tolerancePercent={tolerance} />
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 py-3">
                   <CardTitle className="text-base">{t("rebalance.suggestions")}</CardTitle>
                   <Button size="sm" variant="outline" onClick={() => void exportCsv()}>{t("rebalance.export")}</Button>
                 </CardHeader>
-                <CardContent className="px-0 pb-3">
+                <CardContent className="space-y-2 px-4 pb-4">
+                  {visual?.trades.length ? visual.trades.map((row) => (
+                    <div key={`${row.assetType}:${row.symbol}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                      <p className="font-medium">
+                        {t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}{" "}
+                        {row.tradeQuantity === null ? "" : `${Number(Math.abs(row.tradeQuantity).toFixed(8)).toLocaleString(undefined, { maximumFractionDigits: 8 })} `}
+                        {row.symbol}
+                      </p>
+                      <span className="tabular-nums text-muted-foreground">~{Math.abs(row.tradeValue).toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency.currency}</span>
+                    </div>
+                  )) : <p className="text-sm text-muted-foreground">{t("rebalance.noTrade")}</p>}
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                    <span>{t("rebalance.buy")}: {visual?.buyTotal.toFixed(2)} {currency.currency}</span>
+                    <span>{t("rebalance.sell")}: {visual?.sellTotal.toFixed(2)} {currency.currency}</span>
+                    <span>{t("rebalance.cashReserve")}: {(visual?.cash?.tradeValue ?? 0).toFixed(2)} {currency.currency}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <p className="text-xs text-muted-foreground">{t("rebalance.groupRule")}</p>
+              {result.warnings.map((warning) => (
+                <p key={warning.kind === "empty-type" ? warning.assetType : warning.kind} className="text-xs text-amber-600">
+                  {warning.kind === "empty-type"
+                    ? t("rebalance.groupEmpty").replace("{group}", t(`rebalance.${warning.assetType}`))
+                    : t("rebalance.missingPriceTarget")}
+                </p>
+              ))}
+              <Card>
+                <CardContent className="px-0 pb-3 pt-0">
+                  <details open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
+                    <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.details")}</summary>
                   <div className="overflow-x-auto">
                     <table aria-label={t("rebalance.suggestions")} className="w-full min-w-[680px] text-xs tabular-nums">
                       <thead className="border-y bg-muted/40 text-muted-foreground">
@@ -399,6 +443,7 @@ export default function Rebalance({ currency }: { currency: CurrencyRateDetail }
                       </tbody>
                     </table>
                   </div>
+                  </details>
                   <p className="px-4 pt-2 text-xs text-muted-foreground">{t("rebalance.rounding").replace("{currency}", currency.currency)}</p>
                 </CardContent>
               </Card>

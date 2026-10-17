@@ -6,7 +6,7 @@ import type { AssetType } from "./datafetch/types";
 import type { PortfolioSourceResult, PortfolioSourceStatus } from "./portfolio-baseline";
 import { calculateRebalance, getRebalanceProfile, type RebalanceProfile } from "./rebalance";
 
-export type AlertKind = "total_value_target" | "asset_value_target" | "asset_price_move" | "allocation_deviation" | "period_pnl";
+export type AlertKind = "total_value_target" | "asset_value_target" | "asset_price_target" | "asset_price_move" | "allocation_deviation" | "period_pnl" | "portfolio_value_change";
 export type AlertWindow = "24h" | "7d" | "30d";
 export type AlertComparator = "gte" | "lte";
 export type AlertRule = {
@@ -36,6 +36,7 @@ export type AlertSnapshot = {
   assets: AlertAsset[];
   stablecoinSymbols?: string[];
   pnl?: Partial<Record<AlertWindow, number>>;
+  portfolioChange?: Partial<Record<AlertWindow, number>>;
   staleAssetKeys?: string[];
   hasStaleSources?: boolean;
 };
@@ -76,7 +77,7 @@ export const ALERT_SOURCE_STATUS_STORAGE_KEY = "track3-refresh-source-statuses";
 export const ALERTS_CHANGED_EVENT = "track3-alerts-changed";
 const windows: AlertWindow[] = ["24h", "7d", "30d"];
 const windowMs: Record<AlertWindow, number> = { "24h": 86400000, "7d": 7 * 86400000, "30d": 30 * 86400000 };
-const kinds: AlertKind[] = ["total_value_target", "asset_value_target", "asset_price_move", "allocation_deviation", "period_pnl"];
+const kinds: AlertKind[] = ["total_value_target", "asset_value_target", "asset_price_target", "asset_price_move", "allocation_deviation", "period_pnl", "portfolio_value_change"];
 const keyOf = (asset: { assetType: AssetType; symbol: string }) => `${asset.assetType}:${asset.symbol.toUpperCase()}`;
 const emitChanged = () => {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(ALERTS_CHANGED_EVENT));
@@ -85,13 +86,13 @@ const emitChanged = () => {
 export function validateAlertRule(rule: AlertRule): void {
   if (!kinds.includes(rule.kind) || !["gte", "lte"].includes(rule.comparator)) throw new Error("Invalid alert rule");
   if (!Number.isFinite(rule.threshold) ||
-    (rule.threshold < 0 && !["asset_price_move", "period_pnl"].includes(rule.kind))) throw new Error("Invalid threshold");
+    (rule.threshold < 0 && !["asset_price_move", "period_pnl", "portfolio_value_change"].includes(rule.kind))) throw new Error("Invalid threshold");
   if (!Number.isInteger(rule.cooldownSeconds) || rule.cooldownSeconds < 0) throw new Error("Invalid cooldown");
-  const needsAsset = ["asset_value_target", "asset_price_move", "allocation_deviation"].includes(rule.kind);
+  const needsAsset = ["asset_value_target", "asset_price_target", "asset_price_move", "allocation_deviation"].includes(rule.kind);
   if (needsAsset
     ? !(rule.symbol?.trim() && ["crypto", "stock"].includes(rule.assetType ?? ""))
     : rule.symbol !== null || rule.assetType !== null) throw new Error("Invalid asset");
-  const needsWindow = rule.kind === "asset_price_move" || rule.kind === "period_pnl";
+  const needsWindow = rule.kind === "asset_price_move" || rule.kind === "period_pnl" || rule.kind === "portfolio_value_change";
   if (needsWindow !== (rule.window !== null && windows.includes(rule.window as AlertWindow))) throw new Error("Invalid window");
 }
 
@@ -179,7 +180,7 @@ export function measureRule(
   const assetKey = rule.assetType && rule.symbol ? `${rule.assetType}:${rule.symbol.toUpperCase()}` : "";
   const assetStale = !!latest.staleAssetKeys?.includes(assetKey);
   const portfolioStale = !!latest.hasStaleSources;
-  const stale = rule.kind === "total_value_target" || rule.kind === "period_pnl" || rule.kind === "allocation_deviation"
+  const stale = rule.kind === "total_value_target" || rule.kind === "period_pnl" || rule.kind === "portfolio_value_change" || rule.kind === "allocation_deviation"
     ? portfolioStale : assetStale;
   if (stale) return { status: "data-stale", rearmed: false };
 
@@ -187,6 +188,10 @@ export function measureRule(
   const members = latest.assets.filter((asset) => keyOf(asset) === assetKey);
   if (rule.kind === "total_value_target") value = latest.assets.reduce((sum, asset) => sum + asset.value, 0);
   if (rule.kind === "asset_value_target") value = members.reduce((sum, asset) => sum + asset.value, 0);
+  if (rule.kind === "asset_price_target") {
+    const amount = members.reduce((sum, asset) => sum + (asset.amount ?? (asset.price ? asset.value / asset.price : 0)), 0);
+    value = amount > 0 ? members.reduce((sum, asset) => sum + asset.value, 0) / amount : members[0]?.price;
+  }
   if (rule.kind === "asset_price_move" && rule.window) {
     const amount = members.reduce((sum, asset) => sum + (asset.amount ?? (asset.price ? asset.value / asset.price : 0)), 0);
     const currentPrice = amount > 0 ? members.reduce((sum, asset) => sum + asset.value, 0) / amount : members[0]?.price;
@@ -194,6 +199,7 @@ export function measureRule(
     if (currentPrice !== undefined && previousPrice && previousPrice > 0) value = Math.round((currentPrice / previousPrice - 1) * 1e8) / 1e6;
   }
   if (rule.kind === "period_pnl" && rule.window) value = latest.pnl?.[rule.window];
+  if (rule.kind === "portfolio_value_change" && rule.window) value = latest.portfolioChange?.[rule.window];
   if (rule.kind === "allocation_deviation" && targets) {
     const result = calculateRebalance(
       latest.assets.map((asset) => ({
@@ -204,8 +210,13 @@ export function measureRule(
       targets.targets,
       { tolerancePercent: targets.tolerancePercent, stablecoinSymbols: latest.stablecoinSymbols },
     );
-    const row = result.rows.find((row) => row.kind === "asset" && `${row.assetType}:${row.symbol.toUpperCase()}` === assetKey);
-    if (row) value = Math.abs(row.deviationPercent);
+    if (rule.symbol === "*") {
+      value = Math.max(0, ...result.rows.filter((row) => row.kind === "asset" && row.assetType === rule.assetType)
+        .map((row) => Math.abs(row.deviationPercent)));
+    } else {
+      const row = result.rows.find((row) => row.kind === "asset" && `${row.assetType}:${row.symbol.toUpperCase()}` === assetKey);
+      if (row) value = Math.abs(row.deviationPercent);
+    }
   }
   if (value === undefined || !Number.isFinite(value)) return { status: "unavailable", rearmed: false };
   const band = Math.max(0.01, Math.abs(rule.threshold) * 0.01);
@@ -231,8 +242,10 @@ export function evaluate(
     if (rule.lastTriggeredAt && now.getTime() - Date.parse(rule.lastTriggeredAt) < rule.cooldownSeconds * 1000) return [];
     const title = rule.kind === "total_value_target" ? "Portfolio goal reached"
       : rule.kind === "asset_value_target" ? `${rule.symbol} value target reached`
+      : rule.kind === "asset_price_target" ? `${rule.symbol} price target reached`
       : rule.kind === "asset_price_move" ? `${rule.symbol} price moved`
-      : rule.kind === "allocation_deviation" ? `${rule.symbol} allocation deviated`
+      : rule.kind === "allocation_deviation" ? `${rule.symbol === "*" ? "Any asset" : rule.symbol} allocation deviated`
+      : rule.kind === "portfolio_value_change" ? "Portfolio value changed"
       : "Period P&L threshold reached";
     return [{
       ruleId: rule.id, kind: rule.kind, title, symbol: rule.symbol,
@@ -296,6 +309,7 @@ export async function loadAlertEvaluationData(
       : [];
   }
   const prices: AlertPrices = {};
+  const currentTotal = latestRows.reduce((sum, asset) => sum + asset.value, 0);
   for (const window of windows) {
     const cutoffMs = now.getTime() - windowMs[window];
     const rows = await db.select<Array<AlertAsset & { at: string }>>(
@@ -303,6 +317,12 @@ export async function loadAlertEvaluationData(
       [new Date(cutoffMs).toISOString()],
     );
     if (!rows.length || Date.parse(rows[0].at) < cutoffMs - windowMs[window] / 4) continue;
+    const previousTotal = rows.filter((asset) => !excluded.has(asset.symbol.toUpperCase()))
+      .reduce((sum, asset) => sum + asset.value, 0);
+    if (snapshots[0] && previousTotal > 0) {
+      snapshots[0].portfolioChange ??= {};
+      snapshots[0].portfolioChange[window] = Math.round((currentTotal / previousTotal - 1) * 1e8) / 1e6;
+    }
     const grouped = new Map<string, { value: number; amount: number }>();
     for (const asset of rows) {
       const key = keyOf(asset);

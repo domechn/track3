@@ -92,6 +92,7 @@ import { loadAIConfig, queryPreferCurrency } from "@/middlelayers/configuration"
 import ChatPage from "./chat-page";
 import { appendMessages, loadSession, orchestrateQuery, streamChatCompletion } from "@/middlelayers/ai";
 import { callLlm } from "@/middlelayers/ai/orchestrator/llm";
+import { storePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
 
 const baseCurrency: CurrencyRateDetail = {
   currency: "USD",
@@ -158,6 +159,31 @@ beforeEach(() => {
 });
 
 describe("ChatPage", () => {
+  it("auto-sends a setup question with its page and safe settings context in a new session", async () => {
+    storePendingAssistantQuestion({ question: "Make it equal weight", page: "rebalance", summary: "BTC 75%, ETH 25%" });
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    await waitFor(() => expect(sendSpy).toHaveBeenCalledWith("Make it equal weight", expect.stringContaining("BTC 75%, ETH 25%")));
+    expect(sendSpy.mock.calls[0][0]).toBe("Make it equal weight");
+    expect(sendSpy.mock.calls[0][1]).toContain("Rebalance");
+    expect(sessionStorage.getItem("track3-pending-assistant-question")).toBeNull();
+  });
+  it("opens the newly created session after an immediately auto-sent setup proposal", async () => {
+    storePendingAssistantQuestion({ question: "Set BTC to 100%", page: "rebalance", summary: "No targets" });
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    sendSpy.mockImplementation(() => {
+      const complete = chatOptions.current.onStreamComplete;
+      setTimeout(() => { void complete([
+        { role: "user", content: "Set BTC to 100%" },
+        { role: "assistant", blocks: [{ kind: "text", text: "Review this" }] },
+      ]); }, 0);
+    });
+    renderAt("/assistant", true);
+    await waitFor(() => expect(createNewSpy).toHaveBeenCalled());
+    await waitFor(() => expect(chatOptions.current.sessionId).toBe("mock-session-id"));
+  });
   it("prefills an insight question without sending it", async () => {
     sessionStorage.setItem("track3-insight-question", "Explain BTC concentration");
     vi.mocked(loadAIConfig).mockResolvedValue(config);
@@ -166,6 +192,14 @@ describe("ChatPage", () => {
     await waitFor(() => expect(inputSpy).toHaveBeenCalledWith("Explain BTC concentration"));
     expect(sendSpy).not.toHaveBeenCalled();
     expect(sessionStorage.getItem("track3-insight-question")).toBeNull();
+  });
+  it("prefills a shared pending insight question without sending it", async () => {
+    storePendingAssistantQuestion({ question: "Explain BTC concentration" });
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    await waitFor(() => expect(inputSpy).toHaveBeenCalledWith("Explain BTC concentration"));
+    expect(sendSpy).not.toHaveBeenCalled();
   });
   it("passes advanced header secrets into session persistence", async () => {
     titleSpy.mockResolvedValueOnce("");

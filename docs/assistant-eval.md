@@ -14,6 +14,20 @@ Each case checks the planner path, tool names and argument shapes, facts returne
 
 `propose_action` creates a pending confirmation card and never executes an action. The offline injection cases count a proposed action as a tool call and fail if a wallet alias causes an unsolicited proposal. The action tests also cover rejected, expired, and duplicate approvals, session reloads, raw argument visibility, and keyboard controls. Run these with `corepack yarn test`; no live endpoint is needed. Pending actions expire after five minutes or a session switch. A claimed action is recorded as `executing` in the encrypted session before its write starts, so a crash or double click cannot rerun it.
 
+The setup cases expect `propose_action` with validated arguments for FIFO and weighted-average cost basis, realized-gains CSV export, a seven-day portfolio value percentage drop alert (`portfolio_value_change`), an absolute BTC price target, an any-coin allocation alert, explicit rebalance weights, and buys-only rebalance with new cash. Absolute P&L alerts use `period_pnl` and USD thresholds. Cost-basis settings, alert edits and history operations, and rebalance presets and exports also use the confirmation card. The originating page is linked after approval. No action executes from a tool call alone.
+
+| Page intent | Confirmation-gated action |
+| --- | --- |
+| Cost basis method, long-term days, tax year or date range | `set_cost_basis_settings` (`method`, `holdingPeriodDays`, `from`, `to`) |
+| Realized gains export | `export_report` with `report=realized_gains`, `format=csv` or `json` |
+| New goal or alert, including absolute asset price, price move, portfolio value percentage change, allocation deviation, and period P&L | `create_alert` with kind, comparator, threshold, optional asset/window, enabled state, and cooldown |
+| Edit, enable, disable, or delete a rule | `edit_alert`, `set_alert_enabled`, `delete_alert` |
+| Acknowledge one/all or clear alert history | `acknowledge_alert`, `acknowledge_all_alerts`, `clear_alert_history` |
+| Rebalance asset/type/cash targets and tolerance | `save_rebalance_targets`; `delete_rebalance_targets` removes saved targets |
+| Equal weight or current holdings preset | `apply_rebalance_preset` |
+| Full/buys-only mode, new cash, minimum trade, ignored small holdings | `set_rebalance_options` |
+| Suggested trade CSV | `export_rebalance` |
+
 The recorded responses test wiring and deterministic facts. They do not measure how a changed prompt affects a real model; use the live tier for that.
 
 ## Live tier

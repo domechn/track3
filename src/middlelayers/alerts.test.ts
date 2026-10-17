@@ -46,6 +46,20 @@ beforeEach(() => {
 });
 
 describe("alert evaluation", () => {
+  it("triggers an absolute BTC price target from the latest price", () => {
+    const target = rule({ kind: "asset_price_target", symbol: "BTC", assetType: "crypto", threshold: 60 });
+    expect(evaluate([target], [latest], {}, undefined, now)).toMatchObject([
+      { ruleId: 1, value: 60, title: "BTC price target reached" },
+    ]);
+  });
+  it("measures the largest crypto allocation deviation for an any-coin rule", () => {
+    const targets = { targets: [
+      { kind: "asset" as const, assetType: "crypto" as const, symbol: "BTC", percent: 50 },
+      { kind: "asset" as const, assetType: "crypto" as const, symbol: "ETH", percent: 50 },
+    ], tolerancePercent: 0 };
+    const anyCoin = rule({ kind: "allocation_deviation", assetType: "crypto", symbol: "*", threshold: 5 });
+    expect(measureRule(anyCoin, [latest], {}, targets).value).toBe(10);
+  });
   it("triggers a total value goal at the exact threshold", () => {
     expect(evaluate([rule()], [latest], {}, undefined, now)).toMatchObject([
       { ruleId: 1, value: 1000, title: "Portfolio goal reached" },
@@ -74,6 +88,11 @@ describe("alert evaluation", () => {
     const prices = { "24h": { "crypto:BTC": 75 } };
     expect(evaluate([rule({ kind: "asset_price_move", symbol: "BTC", assetType: "crypto", window: "24h", comparator: "lte", threshold: -20 })], [latest], prices, undefined, now)[0].value).toBe(-20);
     expect(evaluate([rule({ kind: "period_pnl", window: "7d", comparator: "lte", threshold: -40 })], [{ ...latest, pnl: { "7d": -42 } }], {}, undefined, now)[0].value).toBe(-42);
+  });
+  it("measures a seven-day portfolio drop as a percentage of the earlier value", () => {
+    const drop = rule({ kind: "portfolio_value_change", window: "7d", comparator: "lte", threshold: -10 });
+    expect(evaluate([drop], [{ ...latest, portfolioChange: { "7d": -10 } }], {}, undefined, now)[0].value).toBe(-10);
+    expect(evaluate([drop], [{ ...latest, portfolioChange: { "7d": -1 } }], {}, undefined, now)).toEqual([]);
   });
 
   it("uses rebalance targets for allocation deviation and a real PnL input", () => {
@@ -148,6 +167,19 @@ describe("alert storage", () => {
     vi.mocked(calculateTotalProfit).mockResolvedValue({ total: 12, lastRecordDate: now } as never);
     const data = await loadAlertEvaluationData(undefined, [], now, ["7d"]);
     expect(measureRule(rule({ kind: "period_pnl", window: "7d" }), data.snapshots, {}, undefined).value).toBe(12);
+  });
+  it("derives portfolio percentage change from matching historical and current snapshots", async () => {
+    vi.mocked(getDatabase).mockResolvedValue({
+      select: async (sql: string, values?: unknown[]) => sql.includes("FROM assets_v2")
+        ? [{ assetType: "crypto", symbol: "BTC", wallet: "a", value: values?.length ? 1000 : 900,
+          amount: 1, price: values?.length ? 1000 : 900,
+          at: values?.length ? "2026-10-10T12:00:00.000Z" : now.toISOString() }]
+        : [],
+    } as never);
+    const data = await loadAlertEvaluationData(undefined, [], now);
+    expect(measureRule(rule({
+      kind: "portfolio_value_change", window: "7d", comparator: "lte", threshold: -10,
+    }), data.snapshots, {}, undefined).value).toBe(-10);
   });
   it("treats unmapped stale sources conservatively after refresh", async () => {
     vi.mocked(getDatabase).mockResolvedValue({

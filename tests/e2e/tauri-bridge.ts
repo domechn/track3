@@ -51,12 +51,13 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
   }
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/history_snapshots_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/rebalance_profiles_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/v08t09/alerts_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/sync_state_up.sql"), "utf8"));
   const config = JSON.stringify({
     endpoint: "https://assistant.test/v1",
     apiKey: "sk-e2e",
     model: "test-model",
-    contextSize: 10,
+    contextSize: 8192,
   });
   const files = new Map<string, string>();
   const requests = new Map<number, { url: string; method?: string; headers?: Record<string, string> | [string, string][]; data?: number[] }>();
@@ -255,14 +256,33 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
       } else if (request.url.endsWith("/chat/completions")) {
         const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
         if (input.stream === true) {
+          const setupQuestion = JSON.stringify(input.messages).includes("Set BTC 40%, ETH 30%, USDT 30%");
+          const afterProposal = input.messages.some((message: { role: string }) => message.role === "tool");
           if (request.url !== "https://assistant.test/v1/chat/completions"
             || input.model !== "test-model"
-            || !JSON.stringify(input.messages).includes("Say hello")) {
+            || (!JSON.stringify(input.messages).includes("Say hello") && !setupQuestion)) {
             throw new Error("unexpected assistant request");
           }
           sseCalls++;
           contentType = "text/event-stream";
-          body = [
+          body = setupQuestion ? [
+            afterProposal
+              ? `data: ${JSON.stringify({ choices: [{ delta: { content: "Review the target change above." } }] })}`
+              : `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{
+                index: 0, id: "setup-targets", type: "function",
+                function: { name: "propose_action", arguments: JSON.stringify({
+                  action: "save_rebalance_targets",
+                  args: { targets: [
+                    { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 40 },
+                    { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 30 },
+                    { kind: "asset", assetType: "crypto", symbol: "USDT", percent: 30 },
+                  ], tolerancePercent: 0 },
+                }) },
+              }] } }] })}`,
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+            "data: [DONE]",
+            "",
+          ].join("\n\n") : [
             'data: {"choices":[{"delta":{"reasoning_content":"Let me think"}}]}',
             'data: {"choices":[{"delta":{"content":"Hello from SSE"}}]}',
             'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
