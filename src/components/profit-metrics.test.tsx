@@ -21,6 +21,8 @@ const dateRange = {
   end: new Date("2024-01-31T00:00:00.000Z"),
 };
 const reportLoaded = vi.fn();
+const epoch = new Date(0);
+const emptyDay = `${epoch.getFullYear()}-${epoch.getMonth() + 1}-${epoch.getDate()}`;
 
 function wrapWithProviders(dataVersion: number) {
   return (
@@ -85,19 +87,19 @@ describe("ProfitMetrics", () => {
       await waitFor(() => {
         expect(reportLoaded).toHaveBeenCalledTimes(2);
         expect(getMetricValue("Maximum continuous profit time")).toBe(
-          "1970-1-1 ~ 1970-1-1 (0)",
+          `${emptyDay} ~ ${emptyDay} (0)`,
         );
         expect(getMetricValue("Maximum continuous lost time")).toBe(
-          "1970-1-1 ~ 1970-1-1 (0)",
+          `${emptyDay} ~ ${emptyDay} (0)`,
         );
         expect(getMetricValue("Maximum profit time")).toBe(
-          "$0.00 (1970-1-1)",
+          `$0.00 (${emptyDay})`,
         );
         expect(getMetricValue("Maximum lost time")).toBe(
-          "-$0.00 (1970-1-1)",
+          `-$0.00 (${emptyDay})`,
         );
         expect(getMetricValue("Maximum drawdown percentage")).toBe(
-          "0.00% (1970-1-1)",
+          `0.00% (${emptyDay})`,
         );
         expect(getMetricValue("ATH reached times")).toBe("0");
       });
@@ -122,7 +124,7 @@ describe("ProfitMetrics", () => {
       await waitFor(() => {
         expect(reportLoaded).toHaveBeenCalledTimes(1);
         expect(getMetricValue("Maximum profit time")).toBe(
-          "$0.00 (1970-1-1)",
+          `$0.00 (${emptyDay})`,
         );
         expect(getMetricValue("ATH reached times")).toBe("0");
       });

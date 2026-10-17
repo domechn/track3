@@ -11,7 +11,7 @@ import {
   classifySyncError, validateSyncSettings, type SyncCategoryName, type SyncConnectionResult, type SyncSettings,
 } from "@/middlelayers/sync/settings";
 
-const categories: SyncCategoryName[] = ["history", "settings", "secrets", "rebalance", "goals", "chat"];
+const categories: SyncCategoryName[] = ["history", "settings", "secrets", "rebalance", "chat"];
 const fields = ["endpoint", "region", "bucket", "prefix", "accessKeyId", "secretAccessKey"] as const;
 type Field = typeof fields[number];
 
@@ -151,6 +151,9 @@ export default function SyncSettingsPage() {
         <CardHeader>
           <CardTitle>{t("sync.title")}</CardTitle>
           <p className="text-sm text-muted-foreground">{t("sync.intro")}</p>
+          {status.mode === "unreadable" && (
+            <p role="alert" className="text-sm text-destructive">{t("sync.unreadable")}</p>
+          )}
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -221,7 +224,10 @@ export default function SyncSettingsPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>{t("sync.categories.title")}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>{t("sync.categories.title")}</CardTitle>
+          <p className="text-sm text-muted-foreground">{t("sync.categories.deviceLocal")}</p>
+        </CardHeader>
         <CardContent className="space-y-3">
           {categories.map((category) => (
             <div key={category} className="flex items-center justify-between gap-4">

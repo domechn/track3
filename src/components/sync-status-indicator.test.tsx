@@ -42,6 +42,13 @@ describe("SyncStatusIndicator", () => {
     expect(await screen.findByLabelText("Sync passphrase")).toHaveAttribute("type", "password");
   });
 
+  it("points to sync settings when saved credentials are unreadable", async () => {
+    state.current.mode = "unreadable";
+    render(<SyncStatusIndicator />);
+    fireEvent.click(screen.getByRole("button", { name: "Sync settings unreadable" }));
+    expect(screen.getByRole("link", { name: /re.enter sync settings/i })).toHaveAttribute("href", "#/settings/sync");
+  });
+
   it("shows sync errors and last round counts in an accessible details popover", async () => {
     render(<SyncStatusIndicator />);
     expect(screen.getByRole("status")).toHaveTextContent("Sync error");

@@ -21,7 +21,7 @@ export default function SyncStatusIndicator() {
   if (status.mode === "loading" || status.mode === "disabled") return null;
 
   const report = status.sync.report;
-  const phase = status.mode === "locked" ? "locked" :
+  const phase = status.mode === "unreadable" ? "unreadable" : status.mode === "locked" ? "locked" :
     status.sync.phase === "idle" && report?.conflicts.length ? "conflict" : status.sync.phase;
   const counts = t("sync.status.counts")
     .replace("{pulled}", String(report?.pulled ?? 0))
@@ -55,14 +55,19 @@ export default function SyncStatusIndicator() {
         <PopoverTrigger asChild>
           <button type="button" aria-label={t(`sync.status.${phase}`)}
             className="flex min-h-11 items-center gap-2 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-foreground shadow-sm backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${phase === "error" ? "bg-destructive" : phase === "conflict" ? "bg-amber-500" : phase === "syncing" ? "bg-primary animate-pulse motion-reduce:animate-none" : "bg-muted-foreground"}`} />
+            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${phase === "error" || phase === "unreadable" ? "bg-destructive" : phase === "conflict" ? "bg-amber-500" : phase === "syncing" ? "bg-primary animate-pulse motion-reduce:animate-none" : "bg-muted-foreground"}`} />
             {t(`sync.status.${phase}`)}
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" side="top" collisionPadding={16}
           className="w-[calc(100vw-2rem)] max-w-72 space-y-3 text-sm">
           <h2 className="font-semibold">{t("sync.status.details")}</h2>
-          {status.mode === "locked" ? (
+          {status.mode === "unreadable" ? (
+            <>
+              <p role="alert" className="text-destructive">{t("sync.unreadable")}</p>
+              <a href="#/settings/sync" className="text-primary underline">{t("sync.reenter")}</a>
+            </>
+          ) : status.mode === "locked" ? (
             <div className="space-y-2">
               <Label htmlFor="sync-status-passphrase">{t("sync.passphrase.label")}</Label>
               <Input id="sync-status-passphrase" type="password" autoComplete="off"

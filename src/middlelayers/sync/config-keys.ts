@@ -1,4 +1,4 @@
-export type SyncCategory = "settings" | "secrets" | "rebalance" | "goals";
+export type SyncCategory = "settings" | "secrets" | "rebalance";
 type ConfigCategory = SyncCategory | "local";
 type ConfigurationKey = { category: ConfigCategory; encrypted: boolean };
 

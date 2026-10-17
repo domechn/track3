@@ -16,13 +16,16 @@ vi.mock("@tauri-apps/plugin-fs", () => ({ writeTextFile: vi.fn() }));
 
 beforeEach(() => vi.clearAllMocks());
 
+const localNoon = (year: number, month: number, day: number) =>
+  new Date(year, month - 1, day, 12).toISOString();
+
 it("loads the full transaction history and latest local price", async () => {
   vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
-    { id: 1, uuid: "a", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 2, price: 100, txnCreatedAt: "2024-01-01T00:00:00Z" },
-    { id: 2, uuid: "b", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "sell", amount: 1, price: 200, txnCreatedAt: "2025-01-01T00:00:00Z" },
+    { id: 1, uuid: "a", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 2, price: 100, txnCreatedAt: localNoon(2024, 1, 1) },
+    { id: 2, uuid: "b", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "sell", amount: 1, price: 200, txnCreatedAt: localNoon(2025, 1, 1) },
   ] as never);
   vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([
-    [{ id: 9, uuid: "snapshot", createdAt: "2025-01-02T00:00:00Z", symbol: "BTC", assetType: "crypto", amount: 1, price: 300, value: 300, wallet: "w" }],
+    [{ id: 9, uuid: "snapshot", createdAt: localNoon(2025, 1, 2), symbol: "BTC", assetType: "crypto", amount: 1, price: 300, value: 300, wallet: "w" }],
   ]);
   const report = await loadCostBasisReport({ method: "FIFO", from: "2025-01-01", to: "2025-12-31" });
   expect(report.totals.gainLoss).toBe(100);
@@ -31,10 +34,10 @@ it("loads the full transaction history and latest local price", async () => {
 
 it("does not value open lots at a missing zero snapshot price", async () => {
   vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
-    { id: 1, uuid: "a", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 1, price: 100, txnCreatedAt: "2024-01-01T00:00:00Z" },
+    { id: 1, uuid: "a", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 1, price: 100, txnCreatedAt: localNoon(2024, 1, 1) },
   ] as never);
   vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([
-    [{ id: 9, uuid: "snapshot", createdAt: "2025-01-02T00:00:00Z", symbol: "BTC", assetType: "crypto", amount: 1, price: 0, value: 0, wallet: "w" }],
+    [{ id: 9, uuid: "snapshot", createdAt: localNoon(2025, 1, 2), symbol: "BTC", assetType: "crypto", amount: 1, price: 0, value: 0, wallet: "w" }],
   ]);
   const report = await loadCostBasisReport({ method: "FIFO" });
   expect(report.unrealized).toEqual([]);
@@ -42,10 +45,10 @@ it("does not value open lots at a missing zero snapshot price", async () => {
 
 it("matches a latest price when the stored symbol has surrounding spaces", async () => {
   vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
-    { id: 1, uuid: "a", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 1, price: 100, txnCreatedAt: "2024-01-01T00:00:00Z" },
+    { id: 1, uuid: "a", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 1, price: 100, txnCreatedAt: localNoon(2024, 1, 1) },
   ] as never);
   vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([
-    [{ id: 9, uuid: "snapshot", createdAt: "2025-01-02T00:00:00Z", symbol: " BTC ", assetType: "crypto", amount: 1, price: 300, value: 300, wallet: "w" }],
+    [{ id: 9, uuid: "snapshot", createdAt: localNoon(2025, 1, 2), symbol: " BTC ", assetType: "crypto", amount: 1, price: 300, value: 300, wallet: "w" }],
   ]);
   const report = await loadCostBasisReport({ method: "FIFO" });
   expect(report.unrealized).toEqual([expect.objectContaining({ symbol: "BTC", gainLoss: 200 })]);
@@ -53,9 +56,9 @@ it("matches a latest price when the stored symbol has surrounding spaces", async
 
 it("does not pair a withdrawal with a deposit after the report end date", async () => {
   vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
-    { id: 1, uuid: "buy", assetType: "crypto", symbol: "BTC", wallet: "a", txnType: "buy", amount: 1, price: 100, txnCreatedAt: "2024-01-01T00:00:00Z" },
-    { id: 2, uuid: "out", assetType: "crypto", symbol: "BTC", wallet: "a", txnType: "withdraw", amount: 1, price: 150, txnCreatedAt: "2024-12-31T00:00:00Z" },
-    { id: 3, uuid: "in", assetType: "crypto", symbol: "BTC", wallet: "b", txnType: "deposit", amount: 1, price: 150, txnCreatedAt: "2025-01-01T00:00:00Z" },
+    { id: 1, uuid: "buy", assetType: "crypto", symbol: "BTC", wallet: "a", txnType: "buy", amount: 1, price: 100, txnCreatedAt: localNoon(2024, 1, 1) },
+    { id: 2, uuid: "out", assetType: "crypto", symbol: "BTC", wallet: "a", txnType: "withdraw", amount: 1, price: 150, txnCreatedAt: localNoon(2024, 12, 31) },
+    { id: 3, uuid: "in", assetType: "crypto", symbol: "BTC", wallet: "b", txnType: "deposit", amount: 1, price: 150, txnCreatedAt: localNoon(2025, 1, 1) },
   ] as never);
   vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([]);
   const report = await loadCostBasisReport({ method: "FIFO", to: "2024-12-31" });
@@ -67,7 +70,7 @@ it("writes the displayed realized rows through the Tauri dialog and file API", a
   vi.mocked(save).mockResolvedValue("/tmp/tax.csv");
   const report = {
     method: "FIFO", from: "2025-01-01", to: "2025-12-31",
-    disposals: [{ eventId: "b", lotId: "a", assetType: "crypto", symbol: "BTC", acquiredAt: "2024-01-01T00:00:00Z", disposedAt: "2025-01-01T00:00:00Z", amount: 1, proceeds: 200, costBasis: 100, gainLoss: 100, term: "long", method: "FIFO" }],
+    disposals: [{ eventId: "b", lotId: "a", assetType: "crypto", symbol: "BTC", acquiredAt: localNoon(2024, 1, 1), disposedAt: localNoon(2025, 1, 1), amount: 1, proceeds: 200, costBasis: 100, gainLoss: 100, term: "long", method: "FIFO" }],
     warnings: [], openLots: [], unrealized: [], assets: [],
     totals: { proceeds: 200, costBasis: 100, gainLoss: 100, shortTerm: 0, longTerm: 100 },
   } as import("./cost-basis-report").CostBasisReport;

@@ -86,11 +86,12 @@ beforeEach(() => {
 
 describe("Historical Data page", () => {
   it("opens snapshot details from a named keyboard control", async () => {
+    const localNoon = new Date(2024, 3, 16, 12).toISOString();
     vi.mocked(queryHistoricalData).mockResolvedValue([{
       id: "snapshot-1",
-      createdAt: "2024-04-16T12:00:00.000Z",
+      createdAt: localNoon,
       total: 1200,
-      assets: [{ id: 7, uuid: "snapshot-1", createdAt: "2024-04-16T12:00:00.000Z",
+      assets: [{ id: 7, uuid: "snapshot-1", createdAt: localNoon,
         assetType: "crypto", symbol: "BTC", amount: 1, value: 1200, price: 1200 }],
       transactions: [],
     }]);

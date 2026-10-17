@@ -6,7 +6,7 @@ import { classifySyncError, testSyncConnection, validateSyncSettings, type SyncS
 const settings: SyncSettings = {
   endpoint: "https://s3.example.test", region: "us-east-1", bucket: "track3",
   prefix: "", accessKeyId: "key", secretAccessKey: "secret", pathStyle: true,
-  categories: { history: true, settings: true, secrets: false, rebalance: true, goals: true, chat: true },
+  categories: { history: true, settings: true, secrets: false, rebalance: true, chat: true },
   enabled: false, deviceNames: {},
 };
 
