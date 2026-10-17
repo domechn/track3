@@ -15,7 +15,7 @@ import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeColor, positiveNegativeTextClass } from "@/utils/color";
 import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
@@ -29,16 +29,8 @@ import {
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useDataChangedVersion } from "@/contexts/data-changed";
-
-function getToneClass(value: number, quoteColor: QuoteColor) {
-  if (value === 0) {
-    return "text-muted-foreground";
-  }
-  const positiveIsGreen = quoteColor === "green-up-red-down";
-  const positiveClass = positiveIsGreen ? "text-emerald-500" : "text-rose-500";
-  const negativeClass = positiveIsGreen ? "text-rose-500" : "text-emerald-500";
-  return value > 0 ? positiveClass : negativeClass;
-}
+import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
+import ProfitAttribution from "./profit-attribution";
 
 function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
   const tone = positiveNegativeColor(value, quoteColor);
@@ -77,6 +69,7 @@ const App = ({
     }[]
   >([]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
+  const [view, setView] = useState<"summary" | "attribution">("summary");
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
   const logoPathCacheRef = useRef<Map<string, string>>(new Map());
@@ -140,7 +133,7 @@ const App = ({
   );
 
   const totalToneClass = useMemo(
-    () => getToneClass(profit, quoteColor),
+    () => positiveNegativeTextClass(profit, quoteColor, 500),
     [profit, quoteColor],
   );
   const totalToneBadgeClass = useMemo(
@@ -243,7 +236,7 @@ const App = ({
           </Link>
         </TableCell>
         <TableCell className="text-right py-1.5">
-          <div className={`text-sm ${getToneClass(d.value, quoteColor)}`}>
+          <div className={`text-sm ${positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
             {(d.value < 0 ? "-" : "+") +
               currency.symbol +
               prettyNumberToLocaleString(
@@ -270,13 +263,18 @@ const App = ({
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("profit.title")}
           </CardTitle>
-          <div className="text-xs text-muted-foreground">
+          {view === "summary" && <div className="text-xs text-muted-foreground">
             {t("profit.totalLabel")
               .replace("{n}", String(coinsProfit.length))
               .replace("{up}", String(positiveCount))
               .replace("{down}", String(negativeCount))}
-          </div>
+          </div>}
+          <ButtonGroup value={view} onValueChange={(value) => setView(value as "summary" | "attribution")} aria-label={t("profit.title")} className="h-auto">
+            <ButtonGroupItem value="summary" className="min-h-11 px-2 text-xs sm:px-3">{t("profit.attribution.summary")}</ButtonGroupItem>
+            <ButtonGroupItem value="attribution" className="min-h-11 px-2 text-xs sm:px-3">{t("profit.attribution.tab")}</ButtonGroupItem>
+          </ButtonGroup>
         </div>
+        {view === "summary" && <>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="space-y-1">
             <div className={`text-xl font-semibold tracking-tight ${totalToneClass}`}>
@@ -299,8 +297,12 @@ const App = ({
             %
           </div>
         </div>
+        </>}
       </CardHeader>
       <CardContent className="space-y-2">
+        {view === "attribution" ? (
+          <ProfitAttribution currency={currency} dateRange={dateRange} quoteColor={quoteColor} />
+        ) : <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground font-medium">
@@ -324,6 +326,7 @@ const App = ({
             {t("profit.noData")}
           </div>
         )}
+        </>}
       </CardContent>
     </Card>
   );
