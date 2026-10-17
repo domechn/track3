@@ -62,10 +62,14 @@ key in `conflicts`. This applies to whole exchange, wallet, and stock config
 rows: local entries in that row are lost unless the user saved a backup before
 joining. Snapshot rows remain local when their UUID is unique.
 
-The local HLC for a config value is currently stamped when sync detects the
-change, not when the setting is saved. An older offline edit that syncs after
-a newer remote edit can therefore win. The LWW clock reflects publication
-order for such edits.
+Config LWW compares `(physical milliseconds, counter, device UUID)` from
+the HLC. A local value gets its clock when an enabled sync round first detects
+that its HMAC fingerprint changed, not when the user saves it. Pending values
+keep that clock through retries. Thus the winning value follows detection
+time and HLC ordering, not necessarily the time of the user's edit: an older
+offline edit detected in a later round can replace a newer edit from another
+device. On a device with no prior clock for a key, an existing remote value
+wins the initial conflict.
 
 Tombstone objects contain a refresh UUID, an HLC timestamp, and a `deleted`
 flag. A deletion masks the snapshot even if another device still has it. Undo
@@ -74,8 +78,10 @@ be imported again. The optimistic snapshot delete toast calls
 `recordDeletion` and `recordUndo` through `delete-hook.ts` when sync is active.
 Local snapshot changes are detected from the last synced content hash.
 SQLite revision triggers identify changed snapshot UUIDs so unchanged history
-is not read and hashed on every sync round. The local `sync_state` JSON row
-still grows with snapshot count. Edits and individual asset deletions publish
+is not read and hashed on every sync round. The `sync_state` JSON row still
+grows with snapshot count; snapshot hash and row history must survive deletion
+so a later undo can publish edits made while restoring the snapshot.
+Edits and individual asset deletions publish
 a versioned snapshot edit; applying an edit replaces that snapshot in one
 SQLite transaction. Per-asset deletion events and transaction field events
 merge across concurrent edits. A whole
@@ -87,9 +93,13 @@ an ID and append timestamp in the local encrypted session file. Merge takes
 the union of messages by ID and orders them by timestamp, then ID. Legacy messages
 without IDs receive stable IDs derived from session ID, index, and message
 content on export. This preserves old conversations while newly merged
-messages retain IDs in the encrypted session file. Session deletions publish
+messages retain IDs in the encrypted session file. The local adapter reuses
+unchanged sessions in memory based on SQLite metadata, avoiding repeated
+file reads and decryption in each round. Session deletions publish
 their own tombstones, and the manifest retains only the current session
-revision. Payloads above the single-object plaintext limit are split into
+revision. After a deletion is published, `sync_state` drops the session's
+old content hash and tracked-session marker. Payloads above the single-object
+plaintext limit are split into
 encrypted 8 MiB parts referenced by their encrypted root object; each part
 has its own checksum. A published revision supersedes old copies, which are
 removed from the device's prefix after the manifest write succeeds. Payloads
@@ -98,9 +108,22 @@ are capped at 256 MiB.
 The manifest retains only the latest config value and tombstone per key from
 each device. Older encrypted config and tombstone objects can remain in the
 bucket but are no longer referenced by the manifest. Immutable snapshot
-entries still accumulate. A manifest above 8 MiB or 100,000 entries is
-rejected; at that point sync cannot publish more snapshots until a future
-retention or compaction protocol is available.
+entries still accumulate. A serialized encrypted manifest above 8 MiB or
+100,000 entries is rejected on read; the writer enforces the 8 MiB cap.
+The byte cap is expected to bind first, around 30,000–40,000 entries depending
+on ID and version lengths. Once reached, new pushes fail until the protocol
+supports smaller manifests. A future protocol should shard immutable snapshot
+entries, for example by month, and publish an authenticated per-device shard
+index last. Existing v1 readers must not mistake a partial sharded view for
+the complete history.
+
+V1 does not garbage collect published snapshot tombstones or their underlying
+snapshot objects. Removing either without a safe checkpoint could let a
+long-offline device republish a deleted snapshot. Tombstone GC needs a
+versioned checkpoint acknowledged by every active device, a way to retire
+devices that will never return, and a rule that forces retired or stale devices
+to rebuild from that checkpoint before they can publish again. Only then can
+older tombstones and masked snapshot objects be removed.
 
 ## Sync round
 
@@ -131,6 +154,4 @@ wiring is part of the next PR.
 Malformed individual objects are reported and retried on the next round. A
 missing or invalid passphrase stops the round before local changes. The first
 round downloads existing manifests and merges without deleting local-only
-snapshots. Old tombstone and version objects remain for now; compaction needs a
-device acknowledgement or retention policy so an offline device cannot
-resurrect deleted data.
+snapshots. Old tombstone and version objects remain for now.

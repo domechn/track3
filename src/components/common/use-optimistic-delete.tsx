@@ -36,17 +36,14 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
   }: DeleteOptions<T, Result>) => {
     setIsDeleting(true);
     setItems(update);
+    const showError = (error: unknown) => toast({
+      description: error instanceof Error ? error.message : String(error),
+      variant: "destructive",
+    });
     try {
       const result = await commit();
       if (syncSnapshotUuid) {
-        try {
-          await recordSnapshotDeleted(syncSnapshotUuid);
-        } catch (error) {
-          toast({
-            description: error instanceof Error ? error.message : String(error),
-            variant: "destructive",
-          });
-        }
+        void recordSnapshotDeleted(syncSnapshotUuid).catch(showError);
       }
       onDeleted?.();
       toast({
@@ -57,15 +54,12 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
             altText={undoAltText}
             onClick={() => {
               void undo(result)
-                .then(async () => {
+                .then(() => {
                   setItems(rollback);
                   onUndone?.();
-                  if (syncSnapshotUuid) await recordSnapshotUndone(syncSnapshotUuid);
+                  if (syncSnapshotUuid) void recordSnapshotUndone(syncSnapshotUuid).catch(showError);
                 })
-                .catch((error) => toast({
-                  description: error instanceof Error ? error.message : String(error),
-                  variant: "destructive",
-                }));
+                .catch(showError);
             }}
           >
             {undoLabel}
@@ -74,10 +68,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
       });
     } catch (error) {
       setItems(rollback);
-      toast({
-        description: error instanceof Error ? error.message : String(error),
-        variant: "destructive",
-      });
+      showError(error);
     } finally {
       setIsDeleting(false);
     }

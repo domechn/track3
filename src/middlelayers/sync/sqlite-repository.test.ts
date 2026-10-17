@@ -10,7 +10,10 @@ import { listSessions, loadSession } from "../ai/sessions";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("../database", () => ({ getDatabase: vi.fn(), executeWrite: vi.fn() }));
-vi.mock("../ai/sessions", () => ({ listSessions: vi.fn(async () => []), loadSession: vi.fn(), saveSyncedSession: vi.fn() }));
+vi.mock("../ai/sessions", () => ({
+  listSessions: vi.fn(async () => []), loadSession: vi.fn(), saveSyncedSession: vi.fn(),
+  stableSyncMessage: (_id: string, _createdAt: string, _index: number, message: unknown) => message,
+}));
 
 it("decrypts local secrets for the sync payload and reencrypts pulled secrets", async () => {
   vi.mocked(getDatabase).mockResolvedValue({
@@ -87,4 +90,18 @@ it("skips one corrupt SQLite-backed session and keeps the other sessions readabl
   const repo = new SqliteSyncRepository();
   expect((await repo.listSessions()).map((session) => session.id)).toEqual(["good"]);
   expect(repo.takeReadErrors().sessionIds).toEqual(["broken"]);
+});
+
+it("reuses unchanged sessions and reloads a changed session", async () => {
+  const meta = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01", pinned: 0 as const, messageCount: 1, preview: "Hi" };
+  vi.mocked(listSessions).mockResolvedValue([meta]);
+  vi.mocked(loadSession).mockImplementation(async () => ({ ...meta, messages: [{ id: "m1", at: "2026-01-01", role: "user", content: "Hi" }] }));
+  const repo = new SqliteSyncRepository();
+  await repo.listSessions();
+  vi.mocked(loadSession).mockClear();
+  expect((await repo.listSessions())[0]?.messages).toHaveLength(1);
+  expect(loadSession).not.toHaveBeenCalled();
+  vi.mocked(listSessions).mockResolvedValue([{ ...meta, updatedAt: "2026-01-02", messageCount: 2 }]);
+  await repo.listSessions();
+  expect(loadSession).toHaveBeenCalledWith("chat");
 });

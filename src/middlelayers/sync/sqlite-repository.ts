@@ -12,6 +12,7 @@ import type { Snapshot, SyncRepository, SyncSession, SyncState, SyncMessage } fr
 export class SqliteSyncRepository implements SyncRepository {
   private configReadErrors: string[] = [];
   private sessionReadErrors: string[] = [];
+  private sessions = new Map<string, { metadata: string; session: SyncSession }>();
 
   takeReadErrors() {
     const errors = { configIds: this.configReadErrors, sessionIds: this.sessionReadErrors };
@@ -127,14 +128,26 @@ export class SqliteSyncRepository implements SyncRepository {
   async listSessions(): Promise<SyncSession[]> {
     this.sessionReadErrors = [];
     const result: SyncSession[] = [];
-    for (const meta of await listSessions()) {
+    const metadata = await listSessions();
+    const ids = new Set(metadata.map((meta) => meta.id));
+    for (const id of this.sessions.keys()) if (!ids.has(id)) this.sessions.delete(id);
+    for (const meta of metadata) {
+      const marker = JSON.stringify(meta);
+      const cached = this.sessions.get(meta.id);
+      if (cached?.metadata === marker) {
+        result.push(cached.session);
+        continue;
+      }
       try {
         const session = await loadSession(meta.id);
         if (!session) continue;
         const messages: SyncMessage[] = session.messages.map((message, index) =>
           stableSyncMessage(meta.id, meta.createdAt, index, message));
-        result.push({ ...session, messages });
+        const value = { ...session, messages };
+        this.sessions.set(meta.id, { metadata: marker, session: value });
+        result.push(value);
       } catch {
+        this.sessions.delete(meta.id);
         this.sessionReadErrors.push(meta.id);
       }
     }
@@ -147,10 +160,12 @@ export class SqliteSyncRepository implements SyncRepository {
 
   async writeSession(session: SyncSession): Promise<void> {
     await saveSyncedSession(session as ChatSession);
+    this.sessions.delete(session.id);
   }
 
   async deleteSession(id: string): Promise<void> {
     await deleteSession(id);
+    this.sessions.delete(id);
   }
 
   dataChanged(): void {
