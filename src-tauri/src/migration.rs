@@ -1092,12 +1092,10 @@ async fn repair_required_schema(
             .execute(&mut *transaction)
             .await
             .map_err(|error| format!("failed to ensure sync state tables: {error}"))?;
-        if !migration_table_exists(&mut transaction, "history_snapshots").await? {
-            sqlx::raw_sql(&history_snapshots)
-                .execute(&mut *transaction)
-                .await
-                .map_err(|error| format!("failed to ensure history snapshot index: {error}"))?;
-        }
+        sqlx::raw_sql(&history_snapshots)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to ensure history snapshot index: {error}"))?;
     }
     repair_index(
         &mut transaction,
@@ -2990,6 +2988,42 @@ mod tests {
             assert!(table_exists(&mut conn, "alert_rules").await);
             assert!(table_exists(&mut conn, "alert_history").await);
             assert_eq!(configuration(&mut conn, 999).await.as_deref(), Some("0.9.0"));
+            conn.close().await.unwrap();
+        });
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn repairs_history_triggers_when_the_snapshot_table_exists() {
+        let root = make_temp_dir("history-trigger-repair");
+        let database_path = root.join("legacy.db");
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            create_legacy_fixture(&database_path, LegacyVersion::V07).await;
+            run_migrations(&database_path, &resource_dir(), "0.9.0").await.unwrap();
+            let mut conn = connect(&database_path).await;
+            conn.execute("DROP TRIGGER history_snapshots_insert").await.unwrap();
+            conn.execute("DROP TRIGGER history_snapshots_delete").await.unwrap();
+            conn.execute("DROP TRIGGER history_snapshots_update").await.unwrap();
+            let before = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM history_snapshots")
+                .fetch_one(&mut conn).await.unwrap();
+            conn.close().await.unwrap();
+
+            run_migrations(&database_path, &resource_dir(), "0.9.0").await.unwrap();
+            let mut conn = connect(&database_path).await;
+            assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM history_snapshots")
+                .fetch_one(&mut conn).await.unwrap(), before);
+            conn.execute(
+                "INSERT INTO assets_v2 (uuid, createdAt, wallet, symbol, amount, value, price)
+                 VALUES ('repaired-snapshot', '2024-04-16T12:00:00.000Z', 'wallet', 'BTC', 1, 1, 1)",
+            ).await.unwrap();
+            assert_eq!(sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM history_snapshots WHERE uuid = 'repaired-snapshot'"
+            ).fetch_one(&mut conn).await.unwrap(), 1);
+            conn.execute("DELETE FROM assets_v2 WHERE uuid = 'repaired-snapshot'").await.unwrap();
+            assert_eq!(sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM history_snapshots WHERE uuid = 'repaired-snapshot'"
+            ).fetch_one(&mut conn).await.unwrap(), 0);
             conn.close().await.unwrap();
         });
         fs::remove_dir_all(root).unwrap();

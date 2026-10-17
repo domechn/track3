@@ -38,7 +38,7 @@ const production: Dependencies = {
 };
 
 export type RuntimeStatus = {
-  mode: "loading" | "disabled" | "locked" | "ready";
+  mode: "loading" | "disabled" | "locked" | "ready" | "unreadable";
   sync: SyncStatus;
 };
 
@@ -71,7 +71,7 @@ export class SyncRuntime {
       this.settings = await this.deps.load();
       this.publish(this.settings.enabled ? "locked" : "disabled");
     } catch {
-      this.publish("disabled");
+      this.publish("unreadable");
     }
   }
 

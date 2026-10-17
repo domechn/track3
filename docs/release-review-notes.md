@@ -1,5 +1,15 @@
 # Release review notes
 
+## Sync acceptance follow-up (0.9.0)
+
+| Finding | Disposition |
+| --- | --- |
+| Encrypted sync settings row 991 could race key rotation | The encrypt and database write now share the encryption write gate. An unreadable saved row shows a recovery state in the sync indicator and settings page; re-entering S3 settings replaces the row. |
+| Goals switch had no synced data | Removed the switch and category. Goals and alert rules remain device-local. Older saved `goals` flags are ignored. |
+| Date tests assumed UTC | History and cost-basis fixtures now represent local noon; the startup date and empty profit metric expectations use the active timezone's local dates. The Vitest environment leaves `TZ` unset so UTC, Shanghai, and Los Angeles runs exercise real local-time rendering. |
+| Existing history table could miss triggers | The 0.9.0 repair always executes the shared history SQL. The backfill runs when the index is empty; a populated index skips the asset scan and rewrite while missing triggers are restored. This repair does not reconstruct a populated but incomplete history index. |
+
+
 ## Goals and rebalance leftovers pass (0.9.0)
 
 Checked the findings in `round1.claude_out.md` (goals) and `round4.claude_out.md` (rebalance) against this branch.

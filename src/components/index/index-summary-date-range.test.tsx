@@ -221,10 +221,8 @@ describe("Summary route date range", () => {
       </ChartResizeContext.Provider>
     );
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      /loading portfolio data/i,
-    );
-    expect(screen.getByRole("status")).toHaveTextContent(
+    const loadingStatus = (await screen.findByText("Loading portfolio data")).closest('[role="status"]');
+    expect(loadingStatus).toHaveTextContent(
       /preparing your latest balances/i,
     );
   });
@@ -255,7 +253,7 @@ describe("Summary route date range", () => {
       </ChartResizeContext.Provider>,
     );
     await waitFor(() => expect(screen.getByTestId("selected-range")).toHaveTextContent(
-      "2024-04-01T00:00:00.000Z|2024-04-04T00:00:00.000Z"));
+      `${new Date(2024, 3, 1).toISOString()}|${new Date(2024, 3, 4).toISOString()}`));
     expect(localStorage.getItem(DATE_RANGE_KEY)).toBeNull();
   });
 });

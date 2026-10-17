@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS history_snapshots (
 CREATE INDEX IF NOT EXISTS history_snapshots_time_idx ON history_snapshots (createdAt DESC, uuid DESC);
 
 INSERT OR REPLACE INTO history_snapshots (uuid, createdAt)
-SELECT uuid, MAX(createdAt) FROM assets_v2 GROUP BY uuid;
+SELECT uuid, MAX(createdAt) FROM assets_v2
+GROUP BY uuid
+LIMIT (SELECT CASE WHEN EXISTS (SELECT 1 FROM history_snapshots) THEN 0 ELSE -1 END);
 
 CREATE TRIGGER IF NOT EXISTS history_snapshots_insert
 AFTER INSERT ON assets_v2

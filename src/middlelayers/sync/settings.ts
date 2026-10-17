@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { executeWrite, getDatabase } from "@/middlelayers/database";
+import { runWithEncryptionWriteGate } from "@/middlelayers/encryption-write-gate";
 import { unlockSyncHeader } from "./crypto";
 import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-store";
 import { S3Client } from "./s3-client";
 
-export type SyncCategoryName = "history" | "settings" | "secrets" | "rebalance" | "goals" | "chat";
+export type SyncCategoryName = "history" | "settings" | "secrets" | "rebalance" | "chat";
 export type SyncSettings = {
   endpoint: string;
   region: string;
@@ -23,7 +24,7 @@ const syncConfigId = "991";
 export const defaultSyncSettings: SyncSettings = {
   endpoint: "", region: "", bucket: "", prefix: "", accessKeyId: "", secretAccessKey: "",
   pathStyle: true,
-  categories: { history: true, settings: true, secrets: true, rebalance: true, goals: true, chat: true },
+  categories: { history: true, settings: true, secrets: true, rebalance: true, chat: true },
   enabled: false, deviceNames: {},
 };
 
@@ -108,12 +109,20 @@ export async function loadSyncSettings(): Promise<SyncSettings> {
   const saved = JSON.parse(data) as Partial<SyncSettings>;
   return {
     ...defaultSyncSettings, ...saved,
-    categories: { ...defaultSyncSettings.categories, ...saved.categories },
+    categories: {
+      history: saved.categories?.history ?? true,
+      settings: saved.categories?.settings ?? true,
+      secrets: saved.categories?.secrets ?? true,
+      rebalance: saved.categories?.rebalance ?? true,
+      chat: saved.categories?.chat ?? true,
+    },
     deviceNames: saved.deviceNames ?? {},
   };
 }
 
 export async function saveSyncSettings(settings: SyncSettings): Promise<void> {
-  const encrypted = await invoke<string>("encrypt", { data: JSON.stringify(settings) });
-  await executeWrite("INSERT OR REPLACE INTO configuration (id, data) VALUES (?, ?)", [syncConfigId, encrypted]);
+  await runWithEncryptionWriteGate(async () => {
+    const encrypted = await invoke<string>("encrypt", { data: JSON.stringify(settings) });
+    await executeWrite("INSERT OR REPLACE INTO configuration (id, data) VALUES (?, ?)", [syncConfigId, encrypted]);
+  });
 }

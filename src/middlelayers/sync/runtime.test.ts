@@ -10,6 +10,16 @@ const configured: SyncSettings = {
 };
 
 describe("SyncRuntime", () => {
+  it("shows a recovery state when saved sync settings cannot be read", async () => {
+    const runtime = new SyncRuntime({
+      load: async () => { throw new Error("decrypt failed"); },
+      save: async () => {},
+      store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: vi.fn() }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    expect(runtime.status().mode).toBe("unreadable");
+  });
   it("uses a shared device name when no local alias exists", async () => {
     const runtime = new SyncRuntime({
       load: async () => configured, save: async () => {}, store: () => new FakeS3(),

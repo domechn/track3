@@ -11,7 +11,7 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
     getSettings: () => ({
       endpoint: configuredEndpoint, region: "", bucket: "", prefix: "", accessKeyId: "", secretAccessKey: "",
       pathStyle: true, enabled: false, deviceNames: {},
-      categories: { history: true, settings: true, secrets: true, rebalance: true, goals: true, chat: true },
+      categories: { history: true, settings: true, secrets: true, rebalance: true, chat: true },
     }),
     test: vi.fn(async () => "configuration"),
     configure: vi.fn(async () => "ok"),
@@ -66,7 +66,13 @@ describe("Sync settings page", () => {
     expect(screen.getByLabelText("Access key ID")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("Secret access key")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("Sync passphrase")).toHaveAttribute("type", "password");
-    expect(screen.getByLabelText("Goals")).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Goals" })).not.toBeInTheDocument();
+  });
+
+  it("shows an unreadable settings warning with re-entry guidance", () => {
+    status.mode = "unreadable";
+    render(<SyncSettingsPage />);
+    expect(screen.getByRole("alert")).toHaveTextContent(/sync settings.*unreadable.*re.enter/i);
   });
 
   it("requires passphrase confirmation before enabling", async () => {

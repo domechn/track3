@@ -64,8 +64,8 @@ pull. They are included when the `secrets` category is enabled (the default).
 Local sync state stores keyed HMAC fingerprints of config values, including
 secrets, rather than plain SHA-256 digests of decrypted keys.
 License, app version, machine ID, backup paths, and import bookkeeping stay
-local. Rebalance targets use the `rebalance` category. The goals category is
-reserved for the goals schema when it lands.
+local. Rebalance targets use the `rebalance` category. Goals and alert rules
+stay on each device; there is no Goals sync switch.
 
 If a joining device already has a different value for the same config key,
 the remote LWW value replaces its local value and the sync report names the
@@ -214,11 +214,14 @@ indicator or Sync settings; automatic sync starts after unlock. There is no
 OS keychain option because Track3 has no existing keychain integration.
 
 The category switches cover snapshot history, settings, exchange/wallet/
-assistant secrets, rebalance targets, goals, and assistant chats. Goals have no
-synced keys until the goals schema exists. Secrets are decrypted from each
+assistant secrets, rebalance targets, and assistant chats. Goals and alerts
+stay on each device. Older saved sync settings with a `goals` flag still load;
+the flag is ignored. Secrets are decrypted from each
 device's local configuration and encrypted with the sync passphrase before
 upload. Sync also stores S3 credentials in this device's encrypted
-configuration row `991`; it never uploads that row. Licenses, local backup
+configuration row `991`; it never uploads that row. If that row cannot be
+read, the status indicator and Sync settings ask for the S3 settings again;
+sync remains off until those settings are saved. Licenses, local backup
 paths, and machine IDs stay local. A first join can replace conflicting
 settings according to the protocol's last writer rule, so save a backup
 before joining a populated bucket.
