@@ -58,6 +58,11 @@ function matchesTransferAmount(sent: number, received: number): boolean {
   return sent > 0 && received > 0 && received <= sent && received >= sent * 0.99;
 }
 
+function sortableTimestamp(date: string): number {
+  const timestamp = Date.parse(date);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 const lotOrders = new WeakMap<CostBasisLot, number>();
 
 function lotBefore(a: CostBasisLot, b: CostBasisLot, method: CostBasisMethod): boolean {
@@ -65,7 +70,7 @@ function lotBefore(a: CostBasisLot, b: CostBasisLot, method: CostBasisMethod): b
     const priceDifference = b.costBasis / b.amount - a.costBasis / a.amount;
     if (priceDifference !== 0) return priceDifference < 0;
   }
-  const dateDifference = a.acquiredAt.localeCompare(b.acquiredAt);
+  const dateDifference = Date.parse(a.acquiredAt) - Date.parse(b.acquiredAt);
   if (dateDifference !== 0) return method === "LIFO" ? dateDifference > 0 : dateDifference < 0;
   return method === "LIFO" ? lotOrders.get(a)! > lotOrders.get(b)! : lotOrders.get(a)! < lotOrders.get(b)!;
 }
@@ -106,9 +111,10 @@ export function calculateCostBasis(
   const disposals: RealizedGain[] = [];
   const warnings: CostBasisWarning[] = [];
   const lots = new Map<string, { all: CostBasisLot[]; heap: CostBasisLot[]; averageAmount: number; averageCost: number }>();
+  const originalAmounts = new WeakMap<CostBasisLot, number>();
   const ordered = events
     .map((value, index) => ({ value, index }))
-    .sort((a, b) => a.value.date.localeCompare(b.value.date) || a.index - b.index);
+    .sort((a, b) => (sortableTimestamp(a.value.date) - sortableTimestamp(b.value.date)) || a.index - b.index);
   const transfers = new Map<string, { inbound: CostBasisEvent[]; outbound: CostBasisEvent[] }>();
   for (const event of events) {
     if (!event.transferId) continue;
@@ -122,7 +128,7 @@ export function calculateCostBasis(
       .filter(([, pair]) =>
         pair.inbound.length === 1 && pair.outbound.length === 1 &&
         pair.inbound[0].assetType === pair.outbound[0].assetType &&
-        pair.inbound[0].symbol.toUpperCase() === pair.outbound[0].symbol.toUpperCase() &&
+        pair.inbound[0].symbol.trim().toUpperCase() === pair.outbound[0].symbol.trim().toUpperCase() &&
         pair.inbound[0].wallet !== pair.outbound[0].wallet &&
         matchesTransferAmount(pair.outbound[0].amount, pair.inbound[0].amount),
       )
@@ -171,6 +177,7 @@ export function calculateCostBasis(
         acquiredAt: event.date, amount: event.amount, costBasis,
       };
       lotOrders.set(lot, index);
+      originalAmounts.set(lot, event.amount);
       assetLots.all.push(lot);
       pushLot(assetLots.heap, lot, options.method);
       if (options.method === "AVERAGE") {
@@ -181,8 +188,10 @@ export function calculateCostBasis(
     }
     const taxable = event.type === "sell" || event.type === "swap-out";
     let remaining = event.type === "transfer-out" ? validTransfers.get(event.transferId!)! : event.amount;
-    while (remaining > 1e-10 && assetLots.heap.length > 0) {
+    let tolerance = event.amount * Number.EPSILON * 8;
+    while (remaining > tolerance && assetLots.heap.length > 0) {
       const lot = popLot(assetLots.heap, options.method);
+      tolerance = Math.max(tolerance, Math.max(event.amount, originalAmounts.get(lot)!) * 1e-12);
       const amount = Math.min(remaining, lot.amount);
       const costBasis = options.method === "AVERAGE"
         ? assetLots.averageCost * amount / assetLots.averageAmount
@@ -204,17 +213,18 @@ export function calculateCostBasis(
         assetLots.averageAmount -= amount;
         assetLots.averageCost -= costBasis;
       }
-      if (lot.amount > 1e-10) pushLot(assetLots.heap, lot, options.method);
+      if (lot.amount <= originalAmounts.get(lot)! * 1e-12) lot.amount = 0;
+      if (lot.amount > 0) pushLot(assetLots.heap, lot, options.method);
       remaining -= amount;
     }
-    if (remaining > 1e-10) warning("missing-lots", remaining);
+    if (remaining > tolerance) warning("missing-lots", remaining);
   }
   const openLots: CostBasisLot[] = [];
   const unrealized: CostBasisResult["unrealized"] = [];
   for (const [key, pool] of lots) {
     const price = options.prices?.[key];
     for (const lot of pool.all) {
-      if (lot.amount <= 1e-10) continue;
+      if (lot.amount <= 0) continue;
       if (options.method === "AVERAGE") lot.costBasis = lot.amount * pool.averageCost / pool.averageAmount;
       openLots.push(lot);
       if (price === undefined || !Number.isFinite(price) || price < 0) continue;
@@ -250,7 +260,7 @@ export function fromStoredTransactions(
     byAsset.set(key, group);
   });
   for (const assetEvents of byAsset.values()) {
-    assetEvents.sort((a, b) => a.event.date.localeCompare(b.event.date));
+    assetEvents.sort((a, b) => sortableTimestamp(a.event.date) - sortableTimestamp(b.event.date));
     const pendingWithdrawals: CostBasisEvent[] = [];
     for (const { event } of assetEvents) {
       if (event.type === "withdraw") pendingWithdrawals.push(event);

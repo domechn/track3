@@ -83,4 +83,35 @@ describe("attribution from consecutive snapshots", () => {
     ], "wallet");
     expect(groups[0].label).toBe("unknown");
   });
+
+  it("leaves a sign-mismatched transaction quantity unexplained", () => {
+    const result = attributeSnapshots([
+      snapshot(1, [asset(1, "w", "BTC", 1, 100)]),
+      snapshot(2, [asset(2, "w", "BTC", 2, 240)], [txn(2, "w", "BTC", 1, "sell")]),
+    ]);
+    expect(result.totals).toEqual({ priceEffect: 20, flowEffect: 0, residual: 120, totalChange: 140 });
+  });
+
+  it("attributes the rise from a zero starting value to market effect", () => {
+    const result = attributeSnapshots([
+      snapshot(1, [asset(1, "w", "BTC", 1, 0)]),
+      snapshot(2, [asset(2, "w", "BTC", 1, 100)]),
+    ]);
+    expect(result.totals).toEqual({ priceEffect: 100, flowEffect: 0, residual: 0, totalChange: 100 });
+  });
+
+  it("matches transaction and asset symbols regardless of case", () => {
+    const result = attributeSnapshots([
+      snapshot(1, [asset(1, "w", "btc", 1, 100)]),
+      snapshot(2, [asset(2, "w", "BtC", 2, 240)], [txn(2, "w", "BTC", 1, "buy")]),
+    ]);
+    expect(result.totals).toEqual({ priceEffect: 20, flowEffect: 120, residual: 0, totalChange: 140 });
+  });
+
+  it("uses the selected stock label in coin groups", () => {
+    const groups = groupAttribution([
+      { symbol: "ABC", assetType: "stock", wallet: "w", priceEffect: 10, flowEffect: 0, residual: 0, totalChange: 10 },
+    ], "coin", {}, "股票");
+    expect(groups[0].label).toBe("ABC · 股票");
+  });
 });

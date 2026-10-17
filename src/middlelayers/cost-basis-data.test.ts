@@ -40,6 +40,17 @@ it("does not value open lots at a missing zero snapshot price", async () => {
   expect(report.unrealized).toEqual([]);
 });
 
+it("matches a latest price when the stored symbol has surrounding spaces", async () => {
+  vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
+    { id: 1, uuid: "a", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 1, price: 100, txnCreatedAt: "2024-01-01T00:00:00Z" },
+  ] as never);
+  vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([
+    [{ id: 9, uuid: "snapshot", createdAt: "2025-01-02T00:00:00Z", symbol: " BTC ", assetType: "crypto", amount: 1, price: 300, value: 300, wallet: "w" }],
+  ]);
+  const report = await loadCostBasisReport({ method: "FIFO" });
+  expect(report.unrealized).toEqual([expect.objectContaining({ symbol: "BTC", gainLoss: 200 })]);
+});
+
 it("does not pair a withdrawal with a deposit after the report end date", async () => {
   vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
     { id: 1, uuid: "buy", assetType: "crypto", symbol: "BTC", wallet: "a", txnType: "buy", amount: 1, price: 100, txnCreatedAt: "2024-01-01T00:00:00Z" },

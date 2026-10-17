@@ -83,6 +83,14 @@ it("rounds quantities to eight places and USD values to cents in CSV", () => {
   expect(serializeRealizedGains(report, "csv")).toContain(",0.1,20.01,10.01,10.00,short,FIFO");
 });
 
+it("does not export a nonzero tiny disposal as zero quantity", () => {
+  const report = buildCostBasisReport([
+    { ...events[0], amount: 5e-11, price: 100 },
+    { ...events[2], amount: 5e-11, price: 200 },
+  ], { method: "FIFO" });
+  expect(serializeRealizedGains(report, "csv")).toContain(",5e-11,");
+});
+
 it("makes the exported gain equal the rounded proceeds less rounded basis", () => {
   const report = buildCostBasisReport([
     { ...events[0], amount: 1, price: 5.004 },

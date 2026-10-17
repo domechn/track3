@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProfitAttribution from "./profit-attribution";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
+import { DataChangedContext } from "@/contexts/data-changed";
+import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 
 vi.mock("@/middlelayers/charts-attribution-data", () => ({ queryAttribution: vi.fn() }));
 const currency = { currency: "EUR", symbol: "€", rate: 2, alias: "eur" };
@@ -87,5 +89,55 @@ describe("profit attribution", () => {
     expect(await screen.findByText("No attribution available for this range.")).toBeInTheDocument();
     await act(async () => { resolveOld(filled); });
     expect(screen.queryByText("Top contributors")).not.toBeInTheDocument();
+  });
+
+  it("keeps the previous attribution visible while refreshing stored data", async () => {
+    let resolve!: (value: typeof filled) => void;
+    vi.mocked(queryAttribution).mockResolvedValueOnce(filled)
+      .mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    const rendered = render(<DataChangedContext.Provider value={0}>{view()}</DataChangedContext.Provider>);
+    expect(await screen.findByText("Top contributors")).toBeInTheDocument();
+    rendered.rerender(<DataChangedContext.Provider value={1}>{view()}</DataChangedContext.Provider>);
+    expect(screen.getByText("Top contributors")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    await act(async () => { resolve(filled); });
+  });
+
+  it("keeps the previous attribution visible when a refresh fails", async () => {
+    let reject!: (reason: Error) => void;
+    vi.mocked(queryAttribution).mockResolvedValueOnce(filled)
+      .mockReturnValueOnce(new Promise((_, fail) => { reject = fail; }));
+    const rendered = render(<DataChangedContext.Provider value={0}>{view()}</DataChangedContext.Provider>);
+    expect(await screen.findByText("Top contributors")).toBeInTheDocument();
+    rendered.rerender(<DataChangedContext.Provider value={1}>{view()}</DataChangedContext.Provider>);
+    await act(async () => { reject(new Error("database unavailable")); });
+    expect(screen.getByText("Top contributors")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not load attribution.");
+  });
+
+  it("explains both empty market leader sections when all changes are quantity changes", async () => {
+    vi.mocked(queryAttribution).mockResolvedValue({
+      attribution: { entries: [{ symbol: "BTC", assetType: "crypto", wallet: "w", priceEffect: 0, flowEffect: 100, residual: 0, totalChange: 100 }],
+        totals: { priceEffect: 0, flowEffect: 100, residual: 0, totalChange: 100 }, startValue: 0, endValue: 100 },
+      aliases: {},
+    });
+    render(view());
+    const figure = await screen.findByRole("figure");
+    expect(within(figure).getAllByText("No market change")).toHaveLength(2);
+  });
+
+  it("renders stock attribution with the selected Chinese label", async () => {
+    localStorage.setItem(localeLocalStorageKey, "zh");
+    vi.mocked(queryAttribution).mockResolvedValue({
+      attribution: { entries: [{ symbol: "ABC", assetType: "stock", wallet: "w", priceEffect: 10, flowEffect: 0, residual: 0, totalChange: 10 }],
+        totals: { priceEffect: 10, flowEffect: 0, residual: 0, totalChange: 10 }, startValue: 100, endValue: 110 },
+      aliases: {},
+    });
+    try {
+      render(<I18nProvider>{view()}</I18nProvider>);
+      expect((await screen.findAllByText("ABC · 股票")).length).toBeGreaterThan(0);
+    } finally {
+      localStorage.removeItem(localeLocalStorageKey);
+    }
   });
 });
