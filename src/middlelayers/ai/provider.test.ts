@@ -75,6 +75,45 @@ describe("provider.normalizeEndpoint", () => {
 });
 
 describe("provider.streamChatCompletion", () => {
+  it("sends tool-call reasoning back in the next request without changing other messages", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeSseResponse(["data: [DONE]\n\n"]) as any);
+    await collect(streamChatCompletion({
+      ...baseReq,
+      messages: [
+        { role: "user", content: "portfolio?" },
+        {
+          role: "assistant",
+          content: null,
+          reasoning_content: "Check the holdings.",
+          tool_calls: [{ id: "c1", type: "function", function: { name: "asset_snapshot", arguments: "{}" } }],
+        },
+        { role: "tool", tool_call_id: "c1", content: "holdings" },
+      ],
+    }));
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body));
+    expect(body.messages[1]).toMatchObject({
+      role: "assistant",
+      reasoning_content: "Check the holdings.",
+      tool_calls: [{ id: "c1" }],
+    });
+    expect(body.messages[2]).toEqual({ role: "tool", tool_call_id: "c1", content: "holdings" });
+  });
+
+  it("emits reasoning from a JSON fallback response before its tool call", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeJsonResponse({
+      choices: [{
+        message: {
+          reasoning_content: "Need a snapshot.",
+          content: "\n\n",
+          tool_calls: [{ id: "c1", type: "function", function: { name: "asset_snapshot", arguments: "{}" } }],
+        },
+      }],
+    }) as any);
+    const events = await collect(streamChatCompletion(baseReq));
+    expect(events).toContainEqual({ kind: "think", delta: "Need a snapshot." });
+    expect(events).toContainEqual({ kind: "tool_call", id: "c1", name: "asset_snapshot", args: {} });
+  });
+
   it("parses SSE chunks into text deltas and a final done", async () => {
     const chunks = [
       'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',

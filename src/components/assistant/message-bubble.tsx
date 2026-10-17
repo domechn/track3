@@ -69,6 +69,13 @@ function ThinkBlock({ text, isStreaming, hasResponseStarted }: {
             </svg>
           </span>
           {t("assistant.chat.think.label")}
+          {isThinkingPhase && (
+            <span
+              aria-hidden
+              data-testid="thinking-stream-indicator"
+              className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground"
+            />
+          )}
         </span>
         <ChevronDownIcon
           className={cn(
@@ -94,20 +101,25 @@ function ThinkBlock({ text, isStreaming, hasResponseStarted }: {
   );
 }
 
-/** Merge consecutive text blocks into one so markdown renders continuously
- *  even when text was split by tool calls / chart blocks. */
+/** Merge consecutive text and think blocks for continuous rendering. */
 function mergeBlocks(blocks: AssistantBlock[]): AssistantBlock[] {
   const merged: AssistantBlock[] = [];
   let pendingText = "";
   for (const b of blocks) {
     if (b.kind === "text") {
+      if (!b.text.trim()) continue;
       pendingText = pendingText ? pendingText + "\n\n" + b.text : b.text;
     } else {
       if (pendingText) {
         merged.push({ kind: "text", text: pendingText });
         pendingText = "";
       }
-      merged.push(b);
+      const last = merged[merged.length - 1];
+      if (b.kind === "think" && last?.kind === "think") {
+        merged[merged.length - 1] = { kind: "think", text: last.text + b.text };
+      } else {
+        merged.push(b);
+      }
     }
   }
   if (pendingText) merged.push({ kind: "text", text: pendingText });
@@ -158,9 +170,7 @@ export default function MessageBubble({
 }) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
-  const hasResponseStarted = !isUser &&
-    message.blocks.some(b => b.kind === "think") &&
-    message.blocks.some(b => b.kind === "text");
+  const blocks = isUser ? [] : mergeBlocks(message.blocks);
 
   return (
     <div
@@ -196,7 +206,7 @@ export default function MessageBubble({
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {t("assistant.chat.title")}
             </div>
-            {message.blocks.length === 0 ? (
+            {blocks.length === 0 ? (
               <p className="flex items-center gap-1 text-sm italic text-muted-foreground">
                 <span className="inline-flex gap-1">
                   <span aria-hidden className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground" />
@@ -214,7 +224,9 @@ export default function MessageBubble({
                 {t("assistant.chat.thinking")}
               </p>
             ) : (
-              mergeBlocks(message.blocks).map((b, i) => renderAssistantBlock(b, i, isStreaming, hasResponseStarted))
+              blocks.map((b, i) => renderAssistantBlock(
+                b, i, isStreaming, blocks.slice(i + 1).some((later) => later.kind === "text"),
+              ))
             )}
           </div>
         )}

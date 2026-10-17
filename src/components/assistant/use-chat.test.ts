@@ -446,6 +446,108 @@ describe("useChat", () => {
     expect(assistant.blocks[1]?.text).toBe("Final answer");
   });
 
+  it("keeps streamed reasoning in one block per tool round and returns each round's reasoning to DeepSeek", async () => {
+    const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
+    vi.mocked(streamChatCompletion).mockImplementation(async function* (req) {
+      requests.push(req);
+      const round = requests.length;
+      if (round <= 2) {
+        yield { kind: "think", delta: `round ${round}: ` };
+        yield { kind: "text", delta: "\n\n" };
+        for (let i = 0; i < 8; i++) {
+          yield { kind: "think", delta: `${i} ` };
+        }
+        yield { kind: "tool_call", id: `c${round}`, name: "asset_snapshot", args: {} };
+      } else {
+        yield { kind: "think", delta: "final reasoning" };
+        yield { kind: "text", delta: "Your portfolio changed by $100." };
+      }
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({ ok: true, result: { data: { change: 100 } } });
+
+    const { result } = renderHook(() => useChat({
+      config: { ...config, endpoint: "https://api.deepseek.com", model: "deepseek-v4-flash" },
+      baseCurrency,
+    }));
+    await act(async () => { await result.current.send("What changed in my portfolio?"); });
+
+    const assistant = result.current.messages[1] as Extract<ChatMessage, { role: "assistant" }>;
+    expect(assistant.blocks).toEqual([
+      { kind: "think", text: "round 1: 0 1 2 3 4 5 6 7 " },
+      { kind: "think", text: "round 2: 0 1 2 3 4 5 6 7 " },
+      { kind: "think", text: "final reasoning" },
+      { kind: "text", text: "Your portfolio changed by $100." },
+    ]);
+    expect(requests).toHaveLength(3);
+    expect(requests[1]?.messages.at(-2)).toMatchObject({
+      role: "assistant",
+      reasoning_content: "round 1: 0 1 2 3 4 5 6 7 ",
+    });
+    expect(requests[2]?.messages.filter((message) => message.role === "assistant" && message.tool_calls)
+      .map((message) => message.reasoning_content)).toEqual([
+      "round 1: 0 1 2 3 4 5 6 7 ",
+      "round 2: 0 1 2 3 4 5 6 7 ",
+    ]);
+  });
+
+  it("keeps later reasoning in its round when prior rounds emitted text", async () => {
+    let round = 0;
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      round++;
+      if (round === 1) {
+        yield { kind: "text", delta: "Checking transactions." };
+        yield { kind: "tool_call", id: "c1", name: "asset_snapshot", args: {} };
+      } else {
+        yield { kind: "think", delta: "First " };
+        yield { kind: "text", delta: "\n\n" };
+        yield { kind: "think", delta: "second" };
+        yield { kind: "text", delta: "The answer is $100." };
+      }
+      yield { kind: "done" };
+    });
+    vi.mocked(runSkill).mockResolvedValue({ ok: true, result: { data: { change: 100 } } });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("What changed?"); });
+    expect((result.current.messages[1] as Extract<ChatMessage, { role: "assistant" }>).blocks).toEqual([
+      { kind: "text", text: "Checking transactions." },
+      { kind: "think", text: "First second" },
+      { kind: "text", text: "The answer is $100." },
+    ]);
+  });
+
+  it("keeps a short text preface in order when native reasoning arrives afterward", async () => {
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "First" };
+      yield { kind: "think", delta: "checking the numbers" };
+      yield { kind: "text", delta: "Final answer." };
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("What changed?"); });
+    expect((result.current.messages[1] as Extract<ChatMessage, { role: "assistant" }>).blocks).toEqual([
+      { kind: "text", text: "First" },
+      { kind: "think", text: "checking the numbers" },
+      { kind: "text", text: "Final answer." },
+    ]);
+  });
+
+  it("skips whitespace before tagged reasoning and keeps one tagged think block", async () => {
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      yield { kind: "text", delta: "\n\n" };
+      yield { kind: "text", delta: "<think>checking " };
+      yield { kind: "text", delta: "transactions</think>" };
+      yield { kind: "text", delta: "The answer is $100." };
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("What changed?"); });
+    expect((result.current.messages[1] as Extract<ChatMessage, { role: "assistant" }>).blocks).toEqual([
+      { kind: "think", text: "checking transactions" },
+      { kind: "text", text: "The answer is $100." },
+    ]);
+  });
+
   it("calls onStreamComplete with correct messages after stream finishes", async () => {
     vi.mocked(streamChatCompletion).mockImplementation(async function* () {
       yield { kind: "text", delta: "Final answer" };
@@ -701,6 +803,25 @@ describe("useChat", () => {
     expect(texts).toEqual(["Your average is 65k."]);
     expect(assistant.blocks.some((b) => b.kind === "agent_activity")).toBe(true);
     expect(streamChatCompletion).not.toHaveBeenCalled();
+  });
+
+  it("updates a single orchestrator thinking row through repeated synthesis and optimization", async () => {
+    vi.mocked(orchestrateQuery).mockImplementation(async function* () {
+      yield { kind: "synthesizing" };
+      yield { kind: "synthesizing" };
+      yield { kind: "optimizing", round: 1, totalRounds: 2 };
+      yield { kind: "optimizing", round: 2, totalRounds: 2 };
+      yield { kind: "text", delta: "Your portfolio gained $100." };
+      yield { kind: "done" };
+    });
+    const { result } = renderHook(() => useChat({ config, baseCurrency }));
+    await act(async () => { await result.current.send("What changed?"); });
+    const assistant = result.current.messages[1] as Extract<ChatMessage, { role: "assistant" }>;
+    expect(assistant.blocks.filter((block) => block.kind === "think")).toHaveLength(1);
+    expect(assistant.blocks.find((block) => block.kind === "text")).toEqual({
+      kind: "text",
+      text: "Your portfolio gained $100.",
+    });
   });
 
   it("starts a new text block for each tool-loop round", async () => {
