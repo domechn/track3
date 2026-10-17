@@ -569,7 +569,11 @@ const App = ({
             {t("totalValue.from").replace("{date}", firstDate)}
           </p>
           <div className="min-h-[120px] flex-1">
-            <Line options={options as any} data={lineDataMemo} />
+            <Line role="img" aria-label={t("totalValue.chartSummary")
+              .replace("{value}", totalValueShower.formatTotalValue())
+              .replace("{change}", changedValueOrPercentage)
+              .replace("{date}", firstDate)}
+              options={options as any} data={lineDataMemo} />
           </div>
         </CardContent>
       </Card>

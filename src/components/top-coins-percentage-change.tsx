@@ -200,7 +200,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("topCoinsPercentage.title")}
           </CardTitle>
-          <div className="text-xs text-muted-foreground/70">
+          <div className="text-xs text-muted-foreground">
             {t("topCoinsPercentage.subhead")}
           </div>
         </div>
@@ -248,7 +248,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                 className={`text-right text-[8px] font-medium uppercase tracking-wider leading-none ${
                   isValueActive
                     ? "text-muted-foreground"
-                    : "text-muted-foreground/30"
+                    : "text-muted-foreground"
                 }`}
               >
                 {t("topCoinsPercentage.valueLabel")}
@@ -259,7 +259,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                 className={`text-right text-[8px] font-medium uppercase tracking-wider leading-none ${
                   !isValueActive
                     ? "text-muted-foreground"
-                    : "text-muted-foreground/30"
+                    : "text-muted-foreground"
                 }`}
               >
                 {t("topCoinsPercentage.priceLabel")}
@@ -347,7 +347,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                     className={`font-mono tabular-nums tracking-tight text-right ${
                       valueIsActive
                         ? `text-base font-semibold ${valueClass}`
-                        : "text-[10px] text-muted-foreground/60"
+                        : "text-[10px] text-muted-foreground"
                     }`}
                   >
                     {formatPercent(row.valueEnd)}
@@ -358,7 +358,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                     className={`font-mono tabular-nums tracking-tight text-right ${
                       priceIsActive
                         ? `text-base font-semibold ${priceClass}`
-                        : "text-[10px] text-muted-foreground/60"
+                        : "text-[10px] text-muted-foreground"
                     }`}
                   >
                     {formatPercent(row.priceEnd)}

@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
+import axe from "axe-core";
 import { describe, expect, it, vi } from "vitest";
 import { QuickLookDialog } from "./quick-look-dialog";
 
 describe("QuickLookDialog", () => {
-  it("renders loading spinner when loading is true", () => {
+  it("renders loading spinner when loading is true", async () => {
     render(
       <QuickLookDialog
         open={true}
@@ -16,6 +17,9 @@ describe("QuickLookDialog", () => {
     );
 
     expect(document.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading");
+    const results = await axe.run(screen.getByRole("dialog"), { rules: { "color-contrast": { enabled: false } } });
+    expect(results.violations).toEqual([]);
   });
 
   it("renders empty state when data is empty and not loading", () => {

@@ -94,7 +94,7 @@ function ThinkBlock({ text, isStreaming, hasResponseStarted }: {
             isThinkingPhase ? "max-h-[4.5rem]" : "max-h-[300px]",
           )}
         >
-          <p className="whitespace-pre-wrap break-words text-xs italic leading-relaxed text-muted-foreground/50">
+          <p className="whitespace-pre-wrap break-words text-xs italic leading-relaxed text-muted-foreground">
             {displayText}
           </p>
         </div>
@@ -155,7 +155,7 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
             }`} />
             <span className="flex-1 truncate">{a.description}</span>
             {a.status === "completed" && a.resultPreview && (
-              <span className="text-[10px] text-muted-foreground/60 truncate max-w-[200px]">{a.resultPreview}</span>
+              <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{a.resultPreview}</span>
             )}
           </div>
         ))}

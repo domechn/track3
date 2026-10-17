@@ -213,19 +213,19 @@ const App = ({
         <TableCell className="w-[36px] py-1.5 text-xs text-muted-foreground font-mono">
           #{rankStart + idx}
         </TableCell>
-        <TableCell className="py-1.5">
+        <TableCell className="py-0 sm:py-1.5">
           <Link
             to={buildAssetDetailsPath(d)}
-            aria-label={t("common.openAssetDetails").replace(
+            className="group inline-flex min-h-11 flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
+          >
+            <span className="sr-only">{t("common.openAssetDetails").replace(
               "{asset}",
               formatAssetLabel(d),
-            )}
-            className="group inline-flex flex-row items-center rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
+            )}</span>
             <img
               className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
               src={resolveAssetLogoSrc(d, logoMap[getAssetLogoKey(d)])}
-              alt={formatAssetLabel(d)}
+              alt=""
             />
             <AssetLabel
               asset={d}

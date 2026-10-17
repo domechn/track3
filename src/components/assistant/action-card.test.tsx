@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import ActionCard from "./action-card";
 import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
+import axe from "axe-core";
 
 const action: PendingAction = {
   kind: "pending_action", id: "one", toolCallId: "tool-one", name: "blacklist_add",
@@ -21,6 +22,12 @@ it("shows validated arguments and supports keyboard approval and rejection", asy
   expect(decide).toHaveBeenCalledWith("one", "approve");
   await userEvent.click(screen.getByRole("button", { name: "Reject" }));
   expect(decide).toHaveBeenCalledWith("one", "reject");
+});
+
+it("has no axe violations while confirmation is pending", async () => {
+  const { container } = render(<ActionCard action={action} onDecide={vi.fn()} />);
+  const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+  expect(results.violations.map(({ id }) => id)).toEqual([]);
 });
 
 it("cannot approve an expired action", () => {

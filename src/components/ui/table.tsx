@@ -5,15 +5,39 @@ import { cn } from "@/lib/utils"
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
-    <table
-      ref={ref}
-      className={cn("w-full caption-bottom text-sm", className)}
-      {...props}
-    />
-  </div>
-))
+>(({ className, ...props }, ref) => {
+  const wrapperRef = React.useRef<HTMLDivElement>(null)
+  const [overflows, setOverflows] = React.useState(true)
+  const measure = React.useCallback(() => {
+    const wrapper = wrapperRef.current
+    if (wrapper) setOverflows(
+      wrapper.scrollWidth > wrapper.clientWidth || wrapper.scrollHeight > wrapper.clientHeight
+    )
+  }, [])
+  React.useLayoutEffect(measure)
+  React.useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure)
+    observer?.observe(wrapper)
+    observer?.observe(wrapper.firstElementChild!)
+    window.addEventListener("resize", measure)
+    measure()
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener("resize", measure)
+    }
+  }, [measure])
+  return (
+    <div ref={wrapperRef} tabIndex={overflows ? 0 : undefined} className="table-scroll relative w-full overflow-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <table
+        ref={ref}
+        className={cn("w-full caption-bottom text-sm", className)}
+        {...props}
+      />
+    </div>
+  )
+})
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<
@@ -69,6 +93,7 @@ const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
+    scope={props.scope ?? "col"}
     className={cn(
       "h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       className

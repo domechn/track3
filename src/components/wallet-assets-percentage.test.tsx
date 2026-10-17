@@ -592,7 +592,7 @@ describe("WalletAssetsPercentage treemap", () => {
     fireEvent.click(document.body);
   });
 
-  it("exposes an aria-label on each tile for screen readers", async () => {
+  it("exposes an accessible name on each tile for screen readers", async () => {
     mocks.queryWalletAssetsPercentage.mockResolvedValue(MIXED_15);
     const { container } = renderComponent();
 
@@ -603,8 +603,7 @@ describe("WalletAssetsPercentage treemap", () => {
     });
 
     const binanceTile = findTile(container, "binance");
-    expect(binanceTile).toHaveAttribute("aria-label");
-    expect(binanceTile.getAttribute("aria-label")).toMatch(/binance/i);
-    expect(binanceTile.getAttribute("aria-label")).toMatch(/%/);
+    expect(binanceTile).toHaveAccessibleName(/binance/i);
+    expect(binanceTile).toHaveAccessibleName(/%/);
   });
 });

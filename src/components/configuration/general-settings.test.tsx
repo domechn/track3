@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import axe from "axe-core";
 import { GeneralSettings } from "./general-settings";
 
 const baseProps = {
@@ -22,6 +23,14 @@ const baseProps = {
 };
 
 describe("GeneralSettings", () => {
+  it("names each settings control and has no axe rule violations", async () => {
+    const { container } = render(<GeneralSettings {...baseProps} />);
+    expect(screen.getByRole("combobox", { name: "Count of Results" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Base Currency" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Update currency rates" })).toBeInTheDocument();
+    const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+    expect(results.violations.map(({ id }) => id)).toEqual([]);
+  });
   it("renders groupUSD checkbox", () => {
     render(<GeneralSettings {...baseProps} />);
 

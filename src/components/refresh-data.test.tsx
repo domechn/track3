@@ -76,6 +76,11 @@ beforeEach(() => {
 });
 
 describe("RefreshData — currency rates refresh ordering", () => {
+  it("announces an active refresh to assistive technology", () => {
+    render(<RefreshData loading={true} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Refreshing portfolio");
+  });
+
   it("starts insights after refresh without waiting for insight generation", async () => {
     let finish: () => void = () => {};
     vi.mocked(refreshInsights).mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(true); }));

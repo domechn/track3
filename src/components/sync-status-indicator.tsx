@@ -48,24 +48,28 @@ export default function SyncStatusIndicator() {
 
   return (
     <div className="fixed bottom-14 right-4 z-50">
+      <span role="status" aria-live="polite" className="sr-only">
+        {busy ? t("common.loading") : t(`sync.status.${phase}`)}
+      </span>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button type="button" aria-label={t(`sync.status.${phase}`)}
-            className="flex min-h-9 items-center gap-2 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-foreground shadow-sm backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            className="flex min-h-11 items-center gap-2 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-foreground shadow-sm backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <span aria-hidden="true" className={`h-2 w-2 rounded-full ${phase === "error" ? "bg-destructive" : phase === "conflict" ? "bg-amber-500" : phase === "syncing" ? "bg-primary animate-pulse motion-reduce:animate-none" : "bg-muted-foreground"}`} />
             {t(`sync.status.${phase}`)}
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" side="top" collisionPadding={16}
-          className="w-72 max-w-[calc(100vw-2rem)] space-y-3 text-sm">
+          className="w-[calc(100vw-2rem)] max-w-72 space-y-3 text-sm">
           <h2 className="font-semibold">{t("sync.status.details")}</h2>
           {status.mode === "locked" ? (
             <div className="space-y-2">
               <Label htmlFor="sync-status-passphrase">{t("sync.passphrase.label")}</Label>
               <Input id="sync-status-passphrase" type="password" autoComplete="off"
+                aria-invalid={!!error} aria-describedby={error ? "sync-status-passphrase-error" : undefined}
                 value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
               <Button size="sm" disabled={busy} onClick={() => void unlock()}>{t("sync.unlock")}</Button>
-              {error && <p role="alert" className="text-destructive">{error}</p>}
+              {error && <p id="sync-status-passphrase-error" role="alert" className="text-destructive">{error}</p>}
             </div>
           ) : (
             <>

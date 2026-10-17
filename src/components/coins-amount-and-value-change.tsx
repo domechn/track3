@@ -249,6 +249,12 @@ const App = ({
           >
             {chartHasData ? (
               <Line
+                role="img"
+                aria-label={t("coinTrend.chartSummary")
+                  .replace("{asset}", formatAssetLabel({ symbol, assetType }))
+                  .replace("{count}", String(coinsAmountAndValueChangeData.timestamps.length))
+                  .replace("{amount}", simplifyNumber(coinsAmountAndValueChangeData.amounts[coinsAmountAndValueChangeData.amounts.length - 1] ?? 0))
+                  .replace("{value}", `${currency.symbol}${simplifyNumber(currencyWrapper(currency)(coinsAmountAndValueChangeData.values[coinsAmountAndValueChangeData.values.length - 1] ?? 0))}`)}
                 options={options as any}
                 data={chartDataByCoin(plottedData)}
                 plugins={[

@@ -41,23 +41,20 @@ const AttachModal = memo(function AttachModal({
         </DialogHeader>
         <div className="max-h-[360px] overflow-y-auto space-y-1 py-2">
           {/* None / detach */}
-          <div
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
+            aria-pressed={!currentEncoded}
             className={
-              "flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors " +
+              "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
               (!currentEncoded
                 ? "bg-accent text-accent-foreground"
                 : "hover:bg-muted")
             }
             onClick={() => selectOption("")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") selectOption("");
-            }}
           >
             <LinkBreak2Icon className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm">{t("config.others.attachToNone")}</span>
-          </div>
+          </button>
 
           {/* Exchanges */}
           {cexOptions.length > 0 && (
@@ -68,29 +65,25 @@ const AttachModal = memo(function AttachModal({
               {cexOptions.map((opt) => {
                 const exType = opt.value.split(":")[1] ?? "";
                 return (
-                  <div
+                  <button
                     key={opt.value}
-                    role="button"
-                    tabIndex={0}
+                    type="button"
+                    aria-pressed={currentEncoded === opt.value}
                     className={
-                      "flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors " +
+                      "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                       (currentEncoded === opt.value
                         ? "bg-accent text-accent-foreground"
                         : "hover:bg-muted")
                     }
                     onClick={() => selectOption(opt.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ")
-                        selectOption(opt.value);
-                    }}
                   >
                     <img
                       className="w-[20px] h-[20px] rounded-full shrink-0"
                       src={getWalletLogo(exType)}
-                      alt={exType}
+                      alt=""
                     />
                     <span className="text-sm truncate">{opt.label}</span>
-                  </div>
+                  </button>
                 );
               })}
             </>
@@ -105,29 +98,25 @@ const AttachModal = memo(function AttachModal({
               {walletOptions.map((opt) => {
                 const wType = opt.value.split(":")[1] ?? "";
                 return (
-                  <div
+                  <button
                     key={opt.value}
-                    role="button"
-                    tabIndex={0}
+                    type="button"
+                    aria-pressed={currentEncoded === opt.value}
                     className={
-                      "flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors " +
+                      "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                       (currentEncoded === opt.value
                         ? "bg-accent text-accent-foreground"
                         : "hover:bg-muted")
                     }
                     onClick={() => selectOption(opt.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ")
-                        selectOption(opt.value);
-                    }}
                   >
                     <img
                       className="w-[20px] h-[20px] rounded-full shrink-0"
                       src={getWalletLogo(wType)}
-                      alt={wType}
+                      alt=""
                     />
                     <span className="text-sm truncate">{opt.label}</span>
-                  </div>
+                  </button>
                 );
               })}
             </>

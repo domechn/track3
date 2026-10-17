@@ -35,7 +35,7 @@ function Shell() {
         </a>
         <Toaster />
         <AutoUpdater />
-        <div id="app-main-content" tabIndex={-1}>
+        <div>
           <ChartResizeContext.Provider value={{ needResize, setNeedResize }}>
             <IndexApp />
           </ChartResizeContext.Provider>

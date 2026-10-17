@@ -281,10 +281,10 @@ const App = ({
   }
 
   function getPlan(planType: "monthly" | "yearly"): SubscriptionPlan | null {
-    return (
-      subscriptionPlans?.plans.find((plan) => plan.planType === planType) ??
-      null
-    );
+    const plans = subscriptionPlans?.plans;
+    return Array.isArray(plans)
+      ? plans.find((plan) => plan.planType === planType) ?? null
+      : null;
   }
 
   function formatPlanPrice(plan: SubscriptionPlan | null): string {

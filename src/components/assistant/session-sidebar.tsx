@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "@/i18n";
 import { cn } from "@/lib/utils";
 import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
@@ -65,7 +65,7 @@ export default function SessionSidebar({
           variant="ghost"
           size="sm"
           onClick={onNew}
-          className="h-7 gap-1 px-2 text-xs"
+          className="h-11 gap-1 px-2 text-xs sm:h-7"
           data-testid="session-new-chat"
         >
           <PlusIcon className="h-3.5 w-3.5" />
@@ -90,7 +90,7 @@ export default function SessionSidebar({
             {pinned.length > 0 && (
               <div>
                 <div className="px-3 pb-0.5 pt-2.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {t("ai.session.pinned")}
                   </span>
                 </div>
@@ -114,7 +114,7 @@ export default function SessionSidebar({
             {recent.length > 0 && (
               <div>
                 <div className="px-3 pb-0.5 pt-2.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {t("ai.session.recent")}
                   </span>
                 </div>
@@ -156,8 +156,6 @@ function SessionItem({
   onPin: (id: string, pinned: boolean) => void;
   t: (key: string) => string;
 }) {
-  const itemRef = useRef<HTMLDivElement>(null);
-
   const handlePin = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -168,18 +166,8 @@ function SessionItem({
 
   return (
       <div
-        ref={itemRef}
-        role="button"
-        tabIndex={0}
-        onClick={() => onSelect(session.id)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onSelect(session.id);
-          }
-        }}
         className={cn(
-          "group relative mx-2 cursor-pointer rounded-md px-3 py-2 text-left transition-colors border-l-2",
+          "group relative mx-2 rounded-md px-3 py-2 text-left transition-colors border-l-2",
           "hover:bg-accent/60",
           isActive && "bg-accent border-primary",
           !isActive && "border-transparent",
@@ -187,25 +175,36 @@ function SessionItem({
         data-testid={`session-item-${session.id}`}
         data-active={isActive ? "true" : undefined}
       >
-        <div className="grid grid-cols-[1fr_auto] items-start gap-1">
-          <div className="flex min-w-0 items-center gap-2">
-            {isProcessing && (
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+        <div className="flex items-start gap-1">
+          <button
+            type="button"
+            onClick={() => onSelect(session.id)}
+            aria-current={isActive ? "true" : undefined}
+            className="min-h-11 min-w-0 flex-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
+            data-testid={`session-select-${session.id}`}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              {isProcessing && (
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75 opacity-75 motion-reduce:animate-none" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                </span>
+              )}
+              <span className="truncate text-sm font-medium leading-snug text-foreground/90">
+                {session.title || t("ai.session.untitled")}
               </span>
-            )}
-            <span className="truncate text-sm font-medium leading-snug text-foreground/90">
-              {session.title || t("ai.session.untitled")}
             </span>
-          </div>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              {relativeTime(session.updatedAt, t)}
+            </span>
+          </button>
           {/* Hover actions */}
-          <span className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:opacity-100">
+          <span className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 motion-reduce:opacity-100">
             <button
               type="button"
               onClick={handlePin}
               title={session.pinned === 1 ? t("ai.session.unpin") : t("ai.session.pin")}
-              className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="inline-flex h-11 w-11 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:h-8 sm:w-8"
               data-testid={`session-pin-${session.id}`}
             >
               {session.pinned === 1 ? (
@@ -219,7 +218,7 @@ function SessionItem({
                 <button
                   type="button"
                   title={t("ai.session.delete")}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring sm:h-8 sm:w-8"
                   data-testid={`session-delete-${session.id}`}
                 >
                   <Cross2Icon className="h-3.5 w-3.5" />
@@ -235,9 +234,6 @@ function SessionItem({
             />
           </span>
         </div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground/60">
-          {relativeTime(session.updatedAt, t)}
-        </p>
       </div>
   );
 }

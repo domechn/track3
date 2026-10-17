@@ -45,13 +45,16 @@ function NavItem({
   const { t } = useTranslation();
   const resolved = useResolvedPath(to);
   const match = useMatch({ path: resolved.pathname, end: false });
+  const unreadText = unread ? t("goals.unread").replace("{count}", String(unread)) : "";
 
   return (
     <Link
       to={to}
+      aria-label={collapsed ? `${label}${unreadText ? ` ${unreadText}` : ""}` : undefined}
+      title={collapsed ? label : undefined}
       aria-current={match ? "page" : undefined}
       className={cn(
-        "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200",
+        "group relative flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         "hover:bg-accent/60 hover:text-foreground",
         match ? "bg-accent/80 text-foreground" : "text-muted-foreground",
         collapsed && "justify-center px-0",
@@ -83,7 +86,7 @@ function NavItem({
       )}>
         {unread > 99 ? "99+" : unread}
       </span>}
-      {!!unread && <span className="sr-only">{collapsed ? "" : " "}{t("goals.unread").replace("{count}", String(unread))}</span>}
+      {!!unread && <span className="sr-only">{collapsed ? "" : " "}{unreadText}</span>}
     </Link>
   );
 }
@@ -136,7 +139,7 @@ export default function Sidebar({
         )}
       </div>
 
-      <nav className="flex-1 flex flex-col gap-0.5 p-2 overflow-y-auto overflow-x-hidden">
+      <nav className={cn("flex-1 flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden", collapsed ? "p-0.5" : "p-2")}>
         {items.map((item) => (
           <NavItem
             key={item.to}
@@ -149,10 +152,12 @@ export default function Sidebar({
         ))}
       </nav>
 
-      <div className="p-2 border-t border-[var(--glass-border)]">
+      <div className={cn("border-t border-[var(--glass-border)]", collapsed ? "p-0.5" : "p-2")}>
         <button
+          type="button"
+          aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}
           onClick={onToggle}
-          className="flex items-center justify-center w-full rounded-lg py-2 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+          className="flex min-h-11 items-center justify-center w-full rounded-lg py-2 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {collapsed ? (
             <ChevronRightIcon className="h-4 w-4" />

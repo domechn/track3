@@ -392,7 +392,7 @@ describe("ChatPage", () => {
     ]);
     await waitFor(() => expect(appendMessages).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByTestId("sidebar-toggle"));
-    await userEvent.click(screen.getByTestId("session-item-session-b"));
+    await userEvent.click(screen.getByTestId("session-select-session-b"));
     await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question B" }));
     await act(async () => {
       finishAppend();
@@ -407,7 +407,7 @@ describe("ChatPage", () => {
     ];
     await userEvent.click(screen.getByTestId("sidebar-toggle"));
     await userEvent.click(screen.getByTestId("sidebar-toggle"));
-    await userEvent.click(screen.getByTestId("session-item-mock-session-id"));
+    await userEvent.click(screen.getByTestId("session-select-mock-session-id"));
     await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question A" }));
     expect(loadSession).toHaveBeenCalledWith("mock-session-id");
   });
@@ -433,7 +433,7 @@ describe("ChatPage", () => {
     ]);
     await waitFor(() => expect(appendMessages).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByTestId("sidebar-toggle"));
-    await userEvent.click(screen.getByTestId("session-item-session-b"));
+    await userEvent.click(screen.getByTestId("session-select-session-b"));
     await waitFor(() => expect(chatOptions.current.sessionId).toBe("session-b"));
     await userEvent.click(screen.getByText("Assistant route"));
     await waitFor(() => expect(chatOptions.current.sessionId).toBeNull());
@@ -467,7 +467,7 @@ describe("ChatPage", () => {
     ]);
     await waitFor(() => expect(createNewSpy).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByTestId("sidebar-toggle"));
-    await userEvent.click(screen.getByTestId("session-item-session-b"));
+    await userEvent.click(screen.getByTestId("session-select-session-b"));
     await waitFor(() => expect(chatOptions.current.sessionId).toBe("session-b"));
     await userEvent.click(screen.getByText("Assistant route"));
     await waitFor(() => expect(chatOptions.current.sessionId).toBeNull());
@@ -515,9 +515,9 @@ describe("ChatPage", () => {
     ]);
     await waitFor(() => expect(chatOptions.current.sessionId).toBe("mock-session-id"));
     await userEvent.click(screen.getByTestId("sidebar-toggle"));
-    await userEvent.click(screen.getByTestId("session-item-session-b"));
+    await userEvent.click(screen.getByTestId("session-select-session-b"));
     await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question B" }));
-    await userEvent.click(screen.getByTestId("session-item-mock-session-id"));
+    await userEvent.click(screen.getByTestId("session-select-mock-session-id"));
     await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question A" }));
     expect(loadSession).toHaveBeenCalledWith("mock-session-id");
   });

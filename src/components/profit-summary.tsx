@@ -438,7 +438,7 @@ const App = ({
                   setSelectedYear(parseInt(v, 10));
                 }}
               >
-                <SelectTrigger className="h-8 w-[110px] text-sm font-medium border-border/40">
+                <SelectTrigger aria-label={`${t("profitSummary.selectYear")} ${selectedYear}`} className="h-8 w-[110px] text-sm font-medium border-border/40">
                   <SelectValue placeholder={t("profitSummary.selectYear")} />
                 </SelectTrigger>
                 <SelectContent className="overflow-y-auto max-h-[20rem]">

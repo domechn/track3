@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SessionSidebar from "./session-sidebar";
 import type { ChatSessionMeta } from "@/middlelayers/ai";
+import axe from "axe-core";
 
 function makeSession(overrides: Partial<ChatSessionMeta> = {}): ChatSessionMeta {
   return {
@@ -18,6 +19,14 @@ function makeSession(overrides: Partial<ChatSessionMeta> = {}): ChatSessionMeta 
 }
 
 describe("SessionSidebar", () => {
+  it("has no axe violations with a selectable session", async () => {
+    const { container } = render(
+      <SessionSidebar sessions={[makeSession()]} activeId="s1" isLoading={false}
+        onSelect={vi.fn()} onNew={vi.fn()} onDelete={vi.fn()} onPin={vi.fn()} />,
+    );
+    const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+    expect(results.violations.map(({ id }) => id)).toEqual([]);
+  });
   const onNew = vi.fn();
   const onSelect = vi.fn();
   const onDelete = vi.fn();
@@ -130,7 +139,7 @@ describe("SessionSidebar", () => {
         onPin={onPin}
       />,
     );
-    await userEvent.click(screen.getByTestId("session-item-x1"));
+    await userEvent.click(screen.getByTestId("session-select-x1"));
     expect(onSelect).toHaveBeenCalledWith("x1");
   });
 

@@ -294,7 +294,7 @@ describe("Overview semantic controls", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("所选区间净盈亏")).toBeInTheDocument();
     expect(
-      await screen.findAllByRole("link", { name: "打开 BTC 详情" }),
+      await screen.findAllByRole("link", { name: /打开 BTC 详情/ }),
     ).toHaveLength(2);
   });
 });

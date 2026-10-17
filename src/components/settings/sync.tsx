@@ -13,6 +13,25 @@ import {
 
 const categories: SyncCategoryName[] = ["history", "settings", "secrets", "rebalance", "goals", "chat"];
 const fields = ["endpoint", "region", "bucket", "prefix", "accessKeyId", "secretAccessKey"] as const;
+type Field = typeof fields[number];
+
+function invalidConfigurationFields(form: SyncSettings): Set<Field> {
+  const invalid = new Set<Field>();
+  let endpoint: URL | undefined;
+  try { endpoint = new URL(form.endpoint.trim()); } catch { invalid.add("endpoint"); }
+  if (endpoint && ((endpoint.protocol !== "https:" && !(endpoint.protocol === "http:" &&
+    ["localhost", "127.0.0.1"].includes(endpoint.hostname))) ||
+    endpoint.username || endpoint.password || endpoint.search || endpoint.hash ||
+    (!form.pathStyle && (endpoint.pathname !== "/" ||
+      ["localhost", "127.0.0.1"].includes(endpoint.hostname))))) invalid.add("endpoint");
+  if (!form.region.trim()) invalid.add("region");
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(form.bucket.trim())) invalid.add("bucket");
+  const prefix = form.prefix.trim().replace(/^\/+|\/+$/g, "");
+  if (prefix && prefix.split("/").some((part) => !part || /^(?:\.|%2e){1,2}$/i.test(part))) invalid.add("prefix");
+  if (!form.accessKeyId.trim()) invalid.add("accessKeyId");
+  if (!form.secretAccessKey) invalid.add("secretAccessKey");
+  return invalid;
+}
 
 export default function SyncSettingsPage() {
   const { t } = useTranslation();
@@ -25,6 +44,7 @@ export default function SyncSettingsPage() {
   const [forgetOpen, setForgetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
+  const [configurationInvalid, setConfigurationInvalid] = useState<Set<Field>>(() => new Set());
   const [devices, setDevices] = useState<Awaited<ReturnType<typeof syncRuntime.devices>>>([]);
 
   useEffect(() => {
@@ -43,9 +63,12 @@ export default function SyncSettingsPage() {
 
   function updateField(name: typeof fields[number], value: string) {
     setForm((current) => ({ ...current, [name]: value }));
+    setConfigurationInvalid(new Set());
+    setMessage(undefined);
   }
 
   function showResult(result: SyncConnectionResult) {
+    setConfigurationInvalid(result === "configuration" ? invalidConfigurationFields(form) : new Set());
     setMessage(t(`sync.connection.${result}`));
   }
 
@@ -138,6 +161,8 @@ export default function SyncSettingsPage() {
                   id={`sync-${field}`}
                   type={field === "secretAccessKey" || field === "accessKeyId" ? "password" : "text"}
                   autoComplete="off"
+                  aria-invalid={configurationInvalid.has(field)}
+                  aria-describedby={configurationInvalid.has(field) && message ? "sync-settings-message" : undefined}
                   value={form[field]}
                   onChange={(event) => updateField(field, event.target.value)}
                 />
@@ -261,7 +286,8 @@ export default function SyncSettingsPage() {
           </CardContent>
         </Card>
       )}
-      {message && <p role="alert" className="text-sm text-foreground">{message}</p>}
+      <span role="status" className="sr-only">{busy ? t("common.loading") : ""}</span>
+      {message && <p id="sync-settings-message" role="alert" className="text-sm text-foreground">{message}</p>}
     </div>
   );
 }

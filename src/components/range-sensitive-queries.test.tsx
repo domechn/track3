@@ -292,6 +292,20 @@ describe("Range-sensitive component queries", () => {
     expect(values).toHaveLength(2000);
   });
 
+  it("exposes each plotted gain and loss as a signed text value", async () => {
+    vi.mocked(queryPNLChartValue).mockResolvedValue([
+      { totalValue: 100, timestamp: rangeA.start.getTime() },
+      { totalValue: 125, timestamp: rangeA.start.getTime() + 3_600_000 },
+      { totalValue: 110, timestamp: rangeA.start.getTime() + 7_200_000 },
+    ]);
+    renderWithOverviewProviders(
+      <PNLChart currency={usdCurrency} dateRange={rangeA} quoteColor="green-up-red-down" />,
+    );
+    const table = await screen.findByRole("table", { name: "Profit and loss by period" });
+    expect(table).toHaveTextContent("+$25.00");
+    expect(table).toHaveTextContent("-$15.00");
+  });
+
   it("does not let an older PNL range overwrite the latest chart data", async () => {
     const requestA = deferred<
       { totalValue: number; timestamp: number }[]
@@ -483,7 +497,7 @@ describe("Range-sensitive component queries", () => {
       logoB.resolve("/logos/ETH.png");
       await logoB.promise;
     });
-    expect(screen.getByAltText("ETH")).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /open eth details/i }).querySelector("img")).toHaveAttribute(
       "src",
       "/logos/ETH.png",
     );
@@ -492,7 +506,7 @@ describe("Range-sensitive component queries", () => {
       logoA.resolve("/logos/BTC.png");
       await logoA.promise;
     });
-    expect(screen.getByAltText("ETH")).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /open eth details/i }).querySelector("img")).toHaveAttribute(
       "src",
       "/logos/ETH.png",
     );

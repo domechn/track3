@@ -61,7 +61,7 @@ describe("Comparison page", () => {
     ]);
     vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
     render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
-    await waitFor(() => expect(screen.getByRole("button", { name: /choose base date/i })).toHaveTextContent("2024-04-15"));
+    await waitFor(() => expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2024-04-15"));
     expect(localStorage.getItem(COMPARISON_DATES_KEY)).toBeNull();
   });
   it("replaces an assistant date selection when the user chooses a quick comparison", async () => {
@@ -195,10 +195,10 @@ describe("Comparison page", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: /choose base date/i }),
+      screen.getByRole("button", { name: /base date/i }),
     ).toHaveTextContent("2024-04-15");
     expect(
-      screen.getByRole("button", { name: /choose head date/i }),
+      screen.getByRole("button", { name: /head date/i }),
     ).toHaveTextContent("2024-04-16");
     expect(screen.queryAllByRole("combobox")).toHaveLength(0);
   });
@@ -235,12 +235,12 @@ describe("Comparison page", () => {
     expect(queryCoinDataByUUID).toHaveBeenCalledWith("latest-snapshot");
     expect(queryCoinDataByUUID).toHaveBeenCalledWith("older-same-day-snapshot");
     expect(
-      screen.getByRole("button", { name: /choose base date/i }),
+      screen.getByRole("button", { name: /base date/i }),
     ).toHaveTextContent("2024-04-16 10:30:00");
 
     vi.mocked(queryCoinDataByUUID).mockClear();
 
-    await user.click(screen.getByRole("button", { name: /choose head date/i }));
+    await user.click(screen.getByRole("button", { name: /head date/i }));
 
     expect(screen.getByText("2 snapshots on 2024-04-16")).toBeInTheDocument();
 
@@ -282,10 +282,10 @@ describe("Comparison page", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: /choose head date/i }),
+      screen.getByRole("button", { name: /head date/i }),
     ).toHaveTextContent(`2024-04-16 ${latest.time}`);
     expect(
-      screen.getByRole("button", { name: /choose base date/i }),
+      screen.getByRole("button", { name: /base date/i }),
     ).toHaveTextContent(`2024-04-16 ${older.time}`);
   });
 });

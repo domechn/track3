@@ -129,6 +129,7 @@ export const UpdatePriceDialog = ({
         <div className="grid gap-4 py-4">
           <Input
             type="number"
+            aria-label={t("coin.updatePrice")}
             value={updatePriceValue}
             onChange={(e) => setUpdatePriceValue(e.target.value)}
             onKeyDown={(e) => {
@@ -177,7 +178,7 @@ export const UpdateTransactionTypeDialog = ({
             onValueChange={(e) => setUpdateTxnTypeValue(e as TransactionType)}
             value={updateTxnTypeValue}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={`${t("coin.updateTxnType")} ${updateTxnTypeValue ? t(`coin.txnType.${updateTxnTypeValue}`) : ""}`}>
               <SelectValue placeholder={t("coin.txnTypePlaceholder")} />
             </SelectTrigger>
             <SelectContent className="overflow-y-auto max-h-[20rem]">
@@ -756,6 +757,7 @@ const App = ({
             <Button
               variant="outline"
               size="sm"
+              aria-label={t("history.prevPage")}
               onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
               disabled={dataPage <= 0}
             >
@@ -767,6 +769,7 @@ const App = ({
             <Button
               variant="outline"
               size="sm"
+              aria-label={t("history.nextPage")}
               onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
               disabled={dataPage >= maxDataPage}
             >
@@ -862,6 +865,7 @@ const App = ({
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
       <div className="relative min-h-[400px]">
+        <h1 className="sr-only">{formatAssetLabel({ symbol, assetType })}</h1>
         <StaggerContainer className="space-y-4">
           <UpdatePriceDialog
             open={updatePriceDialogOpen}
@@ -929,6 +933,7 @@ const App = ({
                           <Button
                             variant="outline"
                             role="combobox"
+                            aria-label={`${t("coin.symbol")} ${formatAssetLabel({ symbol, assetType })}`}
                             aria-expanded={coinSelectOpen}
                             className="h-[100%] w-[100%] text-xl font-semibold border-none shadow-none focus:ring-0 flex justify-between items-center"
                           >
