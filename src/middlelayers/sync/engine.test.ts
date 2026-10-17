@@ -200,6 +200,25 @@ describe("SyncEngine", () => {
     expect(repos[0].sessions.has("chat")).toBe(false);
     expect(repos[0].state.pendingSessionDeletions?.chat ?? repos[0].state.sessionDeletions?.chat).toBeDefined();
   });
+  it("does not create a fresh deletion for an already deleted session after a reset", async () => {
+    const { s3, repos, engines } = await devices(2);
+    const chat: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 0, preview: "", messages: [] };
+    repos[0].sessions.set("chat", chat);
+    await engines[0].syncOnce();
+    repos[0].sessions.delete("chat");
+    await engines[0].syncOnce();
+    const deletion = repos[0].state.sessionDeletions!.chat;
+    repos[0].state.trackedSessions = ["chat"];
+    for (const item of (await s3.listObjectsV2()).objects) await s3.deleteObject(item.key);
+    await writeSyncHeader(s3, (await createSyncHeader("passphrase")).header);
+    repos[1].sessions.set("chat", chat);
+    await engines[1].syncOnce();
+    await engines[0].syncOnce();
+    expect(repos[0].state.sessionDeletions?.chat).toEqual(deletion);
+    expect(repos[0].state.pendingSessionDeletions?.chat).toBeUndefined();
+    expect(repos[1].sessions.has("chat")).toBe(true);
+  });
   it("keeps an unpublished snapshot deletion when its device joins a replaced store first", async () => {
     const { s3, repos, engines } = await devices(2);
     repos[0].snapshots.set("one", snapshot("one"));
@@ -263,6 +282,24 @@ describe("SyncEngine", () => {
     await engines[1].syncOnce();
     await engines[2].syncOnce();
     expect(repos[2].snapshots.get("one")).toEqual(laterEdit);
+  });
+  it("accepts a reset store deletion when the local snapshot matches its original version", async () => {
+    const { s3, repos, engines } = await devices(3);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    for (const item of (await s3.listObjectsV2()).objects) await s3.deleteObject(item.key);
+    await writeSyncHeader(s3, (await createSyncHeader("passphrase")).header);
+    await engines[0].syncOnce();
+    repos[0].snapshots.set("one", snapshot("one", 2));
+    await engines[0].syncOnce();
+    await engines[2].syncOnce();
+    repos[2].snapshots.delete("one");
+    await engines[2].recordDeletion("one");
+    await engines[2].syncOnce();
+    const report = await engines[1].syncOnce();
+    expect(report.conflicts).not.toContain("snapshot:one");
+    expect(repos[1].snapshots.has("one")).toBe(false);
   });
   it("prunes deleted snapshot row caches and rebuilds them after Undo", async () => {
     const { repos, engines } = await devices(1);
@@ -422,6 +459,30 @@ describe("SyncEngine", () => {
     expect(repos[1].config.get("7")).toBe("EUR");
     expect((await engines[1].configConflicts()).map((item) => item.id)).toContain("7");
   });
+  it("clears a config conflict after its remote entry leaves the manifest", async () => {
+    const { s3, repos, engines } = await devices(2);
+    repos[0].config.set("7", "USD");
+    repos[1].config.set("7", "EUR");
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    await s3.deleteObject(`devices/${repos[0].state.deviceId}/manifest`);
+    const report = await engines[1].syncOnce();
+    expect(report.errors).toEqual([]);
+    expect(await engines[1].configConflicts()).toEqual([]);
+    expect(report.conflicts).not.toContain("7");
+    expect(repos[1].config.get("7")).toBe("EUR");
+  });
+  it("clears a config conflict when the local value becomes equal to the remote value", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].config.set("7", "USD");
+    repos[1].config.set("7", "EUR");
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[1].config.set("7", "USD");
+    const report = await engines[1].syncOnce();
+    expect(await engines[1].configConflicts()).toEqual([]);
+    expect(report.conflicts).not.toContain("7");
+  });
   it("keeps a joining device's secret until its conflict is resolved", async () => {
     const { repos, engines } = await devices(2);
     repos[0].config.set("10", "remote-secret");
@@ -540,6 +601,18 @@ describe("SyncEngine", () => {
         ...base.messages[0], blocks: [{ kind: "pending_action", id: "action", status }],
       }] };
       expect(mergeSessions(base, stale).messages[0].blocks).toEqual(base.messages[0].blocks);
+    }
+  });
+  it("preserves an executing action over a newer expired or rejected copy", () => {
+    const base: SyncSession = { id: "chat", title: "Chat", createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      pinned: 0, messageCount: 1, preview: "", messages: [{ id: "m1", at: "2026-01-01", role: "assistant",
+        blocks: [{ kind: "pending_action", id: "action", status: "executing" }] }] };
+    for (const status of ["expired", "rejected"]) {
+      const stale = { ...base, updatedAt: "2026-01-03", messages: [{
+        ...base.messages[0], blocks: [{ kind: "pending_action", id: "action", status }],
+      }] };
+      expect(mergeSessions(base, stale).messages[0].blocks).toEqual(base.messages[0].blocks);
+      expect(mergeSessions(stale, base).messages[0].blocks).toEqual(base.messages[0].blocks);
     }
   });
 

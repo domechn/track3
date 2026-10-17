@@ -65,7 +65,7 @@ export function resetSyncState(state: SyncState): SyncState {
     tombstones: { ...state.pendingTombstones },
     trackedSessions: state.trackedSessions,
     pendingSessionDeletions: state.pendingSessionDeletions,
-    sessionDeletions: { ...state.pendingSessionDeletions },
+    sessionDeletions: { ...state.sessionDeletions, ...state.pendingSessionDeletions },
   };
 }
 
@@ -164,8 +164,8 @@ export function mergeSessions(local: SyncSession | undefined, remote: SyncSessio
   const latest = remote.updatedAt > local.updatedAt ||
     remote.updatedAt === local.updatedAt && metadata(remote) > metadata(local) ? remote : local;
   const messages = new Map(local.messages.map((message) => [message.id, message]));
-  const actionRank = (status: unknown) => status === "pending" ? 0 : status === "executing" ? 1 :
-    ["expired", "rejected"].includes(String(status)) ? 2 :
+  const actionRank = (status: unknown) => status === "pending" ? 0 : status === "executing" ? 2 :
+    ["expired", "rejected"].includes(String(status)) ? 1 :
       ["approved", "failed"].includes(String(status)) ? 3 : -1;
   for (const message of remote.messages) {
     const previous = messages.get(message.id);
@@ -515,7 +515,7 @@ export class SyncEngine {
       Number(b.entry.kind === "tombstone") - Number(a.entry.kind === "tombstone"))) {
       aborted();
       const token = entryToken(owner, entry);
-      if (known.has(token)) continue;
+      if (known.has(token) && !(entry.kind === "config" && state.configConflicts[entry.id])) continue;
       if (!enabled("history") && ["snapshot", "edit", "tombstone"].includes(entry.kind)) continue;
       try {
         if ((entry.kind === "session" || entry.kind === "session-delete") && !enabled("chat")) continue;
@@ -611,6 +611,14 @@ export class SyncEngine {
       if (!category || !enabled(category) || blockedConfig.has(id)) continue;
       const value = localConfig[id] ?? null;
       const hash = await configHash(value);
+      if (state.configConflicts[id]) {
+        const remote = remoteConfig.get(id);
+        if (remote && value === remote.value.value ||
+            !remote && !manifestReadFailed && !entries.some(({ entry }) => entry.kind === "config" && entry.id === id)) {
+          delete state.configConflicts[id];
+          delete state.configResolutions[id];
+        }
+      }
       if (state.config[id]?.hash === hash) continue;
       if (state.configConflicts[id] && !remoteConfig.has(id)) continue;
       if (!state.config[id] && remoteConfig.has(id)) {
@@ -649,11 +657,14 @@ export class SyncEngine {
       const source = entries.find(({ entry }) => entry.kind === "snapshot" && entry.id === id);
       if (!edit && !source) continue;
       try {
-        const baseline = edit?.snapshot ?? await read<Snapshot>(source!.owner, source!.entry);
+        const local = await this.repo.readSnapshot(id);
+        const original = source && await read<Snapshot>(source.owner, source.entry);
+        const baseline = original && snapshotContent(local) === snapshotContent(original)
+          ? original : edit?.snapshot ?? original!;
         state.snapshotHashes[id] = await snapshotHash(baseline);
         state.assetRows[id] = await assetKeys(baseline);
         state.transactionRows[id] = await transactionRows(baseline);
-        if (edit) state.snapshotEdits[id] = edit.clock;
+        if (edit && baseline === edit.snapshot) state.snapshotEdits[id] = edit.clock;
       } catch {
         failedSnapshotIds.add(id);
         report.errors.push("Failed to read remote snapshot");
