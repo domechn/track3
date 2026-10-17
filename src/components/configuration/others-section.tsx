@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import {
   Dialog,
   DialogContent,
@@ -187,15 +188,15 @@ const OthersSection = memo(function OthersSection({
                                 <Link2Icon className="h-4 w-4 text-muted-foreground/50 hover:text-muted-foreground" />
                               </Button>
                             )}
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              onClick={() => onRemove(globalIdx)}
-                              title={t("common.delete")}
-                            >
-                              <TrashIcon className="h-4 w-4 text-muted-foreground" />
-                            </Button>
+                            <ConfirmDeleteDialog
+                              trigger={<Button size="icon" variant="ghost" className="h-7 w-7" title={t("common.delete")}>
+                                <TrashIcon className="h-4 w-4 text-muted-foreground" />
+                              </Button>}
+                              title={t("config.removeDialogTitle")}
+                              description={t("config.removeDialogDesc")}
+                              cancelLabel={t("common.cancel")}
+                              actions={[{ label: t("common.delete"), onClick: () => onRemove(globalIdx) }]}
+                            />
                           </div>
                         </TableCell>
                       </TableRow>

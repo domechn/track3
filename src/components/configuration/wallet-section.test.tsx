@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WalletSection } from "./wallet-section";
 import type { WalletRow } from "./types";
@@ -56,5 +56,18 @@ describe("WalletSection", () => {
     render(<WalletSection {...baseProps} />);
 
     expect(screen.getByText("Add Wallet Configuration")).toBeInTheDocument();
+  });
+
+  it("requires confirmation before removing a wallet draft", () => {
+    const onRemove = vi.fn();
+    render(<WalletSection {...baseProps} onRemove={onRemove} />);
+    const row = screen.getByText("1abc").closest("tr")!;
+    fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    expect(onRemove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onRemove).not.toHaveBeenCalled();
+    fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    expect(onRemove).toHaveBeenCalledWith("btc", "1abc");
   });
 });

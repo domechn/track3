@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useToast } from "@/components/ui/use-toast";
+import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
+import { useOptimisticDelete } from "@/components/common/use-optimistic-delete";
 import {
   checkIfDuplicatedHistoricalData,
   exportHistoricalData,
@@ -10,6 +12,7 @@ import {
 } from "@/middlelayers/data";
 import { UniqueIndexConflictResolver } from "@/middlelayers/types";
 import {
+  addToBlacklist,
   cleanAutoBackupDirectory,
   getAutoBackupDirectory,
   getBlacklistCoins,
@@ -59,9 +62,11 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     undefined,
   );
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
+  const { run: runBackupFolderDelete } = useOptimisticDelete(setAutoBackupDirectory);
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
   const [lastImportAt, setLastImportAt] = useState<Date>();
   const [blacklist, setBlacklist] = useState<string[]>([]);
+  const { run: runBlacklistDelete } = useOptimisticDelete(setBlacklist);
   const [encKeyInput, setEncKeyInput] = useState("");
   const [encKeyConfirm, setEncKeyConfirm] = useState("");
   const [encKeySaving, setEncKeySaving] = useState(false);
@@ -194,17 +199,38 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     }
   }
 
-  async function onClearAutoBackupFolderButtonClick() {
-    await cleanAutoBackupDirectory();
-    setAutoBackupDirectory(undefined);
+  function onClearAutoBackupFolderButtonClick() {
+    const path = autoBackupDirectory;
+    if (!path) return;
+    void runBackupFolderDelete({
+      update: () => undefined,
+      rollback: () => path,
+      commit: cleanAutoBackupDirectory,
+      undo: () => saveAutoBackupDirectory(path),
+      successMessage: t("data.clearFolderRemoved"),
+      undoLabel: t("common.undo"),
+      undoAltText: t("data.undoClearFolder"),
+      undoWindowMs: 5000,
+    });
   }
 
-  async function onRemoveFromBlacklist(symbol: string) {
-    await removeFromBlacklist(symbol);
-    setBlacklist((prev) =>
-      prev.filter((s) => s.toUpperCase() !== symbol.toUpperCase()),
-    );
-    toast({ description: t("data.removedFromBlacklist").replace("{symbol}", symbol) });
+  function onRemoveFromBlacklist(symbol: string) {
+    const index = blacklist.indexOf(symbol);
+    void runBlacklistDelete({
+      update: (prev) => prev.filter((s) => s.toUpperCase() !== symbol.toUpperCase()),
+      rollback: (prev) => {
+        if (prev.includes(symbol)) return prev;
+        const next = [...prev];
+        next.splice(index, 0, symbol);
+        return next;
+      },
+      commit: () => removeFromBlacklist(symbol),
+      undo: () => addToBlacklist(symbol),
+      successMessage: t("data.removedFromBlacklist").replace("{symbol}", symbol),
+      undoLabel: t("common.undo"),
+      undoAltText: t("data.undoBlacklistRemoval"),
+      undoWindowMs: 5000,
+    });
   }
 
   return (
@@ -330,13 +356,16 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
               <Button onClick={onChooseAutoBackupFolderButtonClick} size="sm">
                 {t("data.chooseFolder")}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onClearAutoBackupFolderButtonClick}
-              >
-                {t("data.clearFolder")}
-              </Button>
+              <ConfirmDeleteDialog
+                trigger={<Button variant="outline" size="sm">{t("data.clearFolder")}</Button>}
+                title={t("data.clearFolderTitle")}
+                description={t("data.clearFolderDesc")}
+                cancelLabel={t("common.cancel")}
+                actions={[{
+                  label: t("data.clearFolder"),
+                  onClick: onClearAutoBackupFolderButtonClick,
+                }]}
+              />
             </div>
           </div>
         </CardContent>
@@ -364,13 +393,19 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
                   className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-background/30 px-3 py-1 text-sm"
                 >
                   <span>{symbol}</span>
-                  <button
-                    aria-label={t("data.removeFromBlacklistAria").replace("{symbol}", symbol)}
-                    className="text-muted-foreground hover:text-foreground transition-colors text-xs leading-none"
-                    onClick={() => onRemoveFromBlacklist(symbol)}
-                  >
-                    ✕
-                  </button>
+                  <ConfirmDeleteDialog
+                    trigger={<button
+                      aria-label={t("data.removeFromBlacklistAria").replace("{symbol}", symbol)}
+                      className="text-muted-foreground hover:text-foreground transition-colors text-xs leading-none"
+                    >✕</button>}
+                    title={t("data.removeBlacklistTitle")}
+                    description={t("data.removeBlacklistDesc")}
+                    cancelLabel={t("common.cancel")}
+                    actions={[{
+                      label: t("data.removeBlacklistAction"),
+                      onClick: () => onRemoveFromBlacklist(symbol),
+                    }]}
+                  />
                 </div>
               ))}
             </div>
