@@ -47,6 +47,17 @@ beforeEach(() => {
 });
 
 describe("AssistantSettings", () => {
+  it("lets the user disable action proposals while keeping confirmation required", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,
+    });
+    render(<AssistantSettings />);
+    const toggle = await screen.findByRole("switch", { name: "Allow the assistant to propose actions" });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    expect(vi.mocked(saveAIConfig).mock.calls[0]?.[0].allowActions).toBe(false);
+  });
   it("shows malformed advanced JSON errors in Chinese", async () => {
     localStorage.setItem(localeLocalStorageKey, "zh");
     vi.mocked(loadAIConfig).mockRejectedValue(new AIConfigMissingError());

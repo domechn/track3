@@ -49,10 +49,11 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
-import { parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { invalidateCacheGroups } from "@/middlelayers/datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
+import { ASSISTANT_APP_ACTION_EVENT, CURRENT_DATE_RANGE_KEY, DATE_RANGE_KEY, validateActionArgs } from "@/middlelayers/ai/actions";
 import { ChartResizeContext } from "@/App";
 import { useTranslation } from "@/i18n";
 import { DataChangedContext } from "@/contexts/data-changed";
@@ -595,6 +596,13 @@ const App = () => {
     }),
     [dateRange],
   );
+  useEffect(() => {
+    if (dateRange?.from && dateRange.to) {
+      localStorage.setItem(CURRENT_DATE_RANGE_KEY, JSON.stringify({
+        from: format(dateRange.from, "yyyy-MM-dd"), to: format(dateRange.to, "yyyy-MM-dd"),
+      }));
+    }
+  }, [dateRange]);
 
   const maxDateRange = useMemo(
     () => ({
@@ -609,6 +617,22 @@ const App = () => {
     getLicenseIfIsPro().then((l) => setIsProUser(!!l));
     getQuoteColor().then((c) => setQuoteColor(c));
   }
+
+  useEffect(() => {
+    const applyAssistantAction = () => {
+      loadConfiguration();
+      try {
+        const raw = localStorage.getItem(DATE_RANGE_KEY);
+        if (!raw) return;
+        const dates = validateActionArgs("set_date_range", JSON.parse(raw));
+        setDateRange({ from: parseISO(String(dates.from)), to: parseISO(String(dates.to)) });
+      } catch {
+        localStorage.removeItem(DATE_RANGE_KEY);
+      }
+    };
+    window.addEventListener(ASSISTANT_APP_ACTION_EVENT, applyAssistantAction);
+    return () => window.removeEventListener(ASSISTANT_APP_ACTION_EVENT, applyAssistantAction);
+  }, []);
 
   // Track unmount so the background backup never setState's a torn-down
   // component. activeRef is shared between boot + background effects.
@@ -726,6 +750,7 @@ const App = () => {
     _selectedTimes: number,
     nextDateRange: DateRange | undefined,
   ) {
+    localStorage.removeItem(DATE_RANGE_KEY);
     setDateRange((prev) => {
       const prevFrom = prev?.from?.getTime() ?? 0;
       const prevTo = prev?.to?.getTime() ?? 0;
@@ -757,6 +782,15 @@ const App = () => {
       const { dr, size } = queryInfo;
       if (!preserveDateRange) {
         setDateRange((prev) => {
+          try {
+            const stored = localStorage.getItem(DATE_RANGE_KEY);
+            if (stored) {
+              const dates = validateActionArgs("set_date_range", JSON.parse(stored));
+              return { from: parseISO(String(dates.from)), to: parseISO(String(dates.to)) };
+            }
+          } catch {
+            localStorage.removeItem(DATE_RANGE_KEY);
+          }
           const prevFrom = prev?.from?.getTime() ?? 0;
           const prevTo = prev?.to?.getTime() ?? 0;
           const nextFrom = dr?.from?.getTime() ?? 0;

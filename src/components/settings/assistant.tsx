@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import {
   AIConfigMissingError,
@@ -83,6 +84,7 @@ const App = () => {
   const currentKey = () => apiKeyRef.current?.value ?? "";
   const [model, setModel] = useState("");
   const [contextSize, setContextSize] = useState<number>(DEFAULT_AI_CONTEXT_SIZE);
+  const [allowActions, setAllowActions] = useState(true);
   const [inputPrice, setInputPrice] = useState("");
   const [outputPrice, setOutputPrice] = useState("");
   const [priceError, setPriceError] = useState(false);
@@ -114,6 +116,7 @@ const App = () => {
         if (apiKeyRef.current) apiKeyRef.current.value = cfg.apiKey;
         setModel(cfg.model);
         setContextSize(cfg.contextSize);
+        setAllowActions(cfg.allowActions !== false);
         const input = cfg.inputPricePerMillionTokens ?? cfg.pricePerMillionTokens;
         const output = cfg.outputPricePerMillionTokens ?? cfg.pricePerMillionTokens;
         setInputPrice(input === undefined ? "" : String(input));
@@ -159,6 +162,7 @@ const App = () => {
       contextSize: Number.isFinite(contextSize)
         ? Math.max(1, Math.floor(contextSize))
         : DEFAULT_AI_CONTEXT_SIZE,
+      allowActions,
       inputPricePerMillionTokens: inputTokenPrice,
       outputPricePerMillionTokens: outputTokenPrice,
       advanced: parsed.value,
@@ -408,6 +412,16 @@ const App = () => {
               {t("settings.assistant.unknownKeysIgnored").replace("{keys}", advancedWarnings.join(", "))}
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-2 pt-6">
+          <div className="flex items-center gap-3">
+            <Switch id="assistant-allow-actions" checked={allowActions} onCheckedChange={setAllowActions} disabled={!loaded} />
+            <Label htmlFor="assistant-allow-actions">{t("settings.assistant.allowActions")}</Label>
+          </div>
+          <p className="text-xs text-muted-foreground">{t("settings.assistant.allowActionsHint")}</p>
         </CardContent>
       </Card>
 

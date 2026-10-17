@@ -46,6 +46,7 @@ import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/r
 import type { ChatMessage, AssistantBlock } from "./use-chat";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
 import UsageLabel from "./usage-label";
+import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
 
 type LoadState =
   | { status: "loading" }
@@ -55,6 +56,15 @@ type LoadState =
 
 export default function ChatPage({ isProUser }: { isProUser: boolean }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
+
+  useEffect(() => {
+    const refreshCurrency = () => {
+      void queryPreferCurrency().then((currency) => setState((previous) =>
+        previous.status === "ready" ? { ...previous, baseCurrency: currency } : previous)).catch(() => {});
+    };
+    window.addEventListener(ASSISTANT_APP_ACTION_EVENT, refreshCurrency);
+    return () => window.removeEventListener(ASSISTANT_APP_ACTION_EVENT, refreshCurrency);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,8 +126,8 @@ function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {
     ...(msg.usage ? { usage: msg.usage } : {}),
     ...(msg.contextTokens !== undefined ? { contextTokens: msg.contextTokens } : {}),
     blocks: msg.blocks
-      .filter((b): b is { kind: "text"; text: string } => b.kind === "text")
-      .map((b): AssistantBlock => ({ kind: "text", text: b.text })),
+      .filter((b) => b.kind === "text" || b.kind === "pending_action")
+      .map((b) => b as AssistantBlock),
   };
 }
 
@@ -130,11 +140,8 @@ function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
     ...(msg.usage ? { usage: msg.usage } : {}),
     ...(msg.contextTokens !== undefined ? { contextTokens: msg.contextTokens } : {}),
     blocks: msg.blocks
-      .filter(
-        (b): b is { kind: "text"; text: string } =>
-          b.kind === "text" && b.text.trim().length > 0,
-      )
-      .map((b): PersistedBlock => ({ kind: "text", text: b.text })),
+      .filter((b) => b.kind === "pending_action" || (b.kind === "text" && b.text.trim().length > 0))
+      .map((b) => b as PersistedBlock),
   };
 }
 
@@ -250,11 +257,9 @@ function ReadyChat({
     async (newMessages: ChatMessage[], summary?: ConversationSummary) => {
       try {
         if (newMessages.length < 2) return;
-        const exchange = [
-          newMessages[newMessages.length - 2],
-          newMessages[newMessages.length - 1],
-        ];
-        if (exchange.length < 2) return;
+        const last = newMessages[newMessages.length - 1];
+        const before = newMessages[newMessages.length - 2];
+        const exchange = before.role === "user" ? [before, last] : [last];
         const persistedExchange = exchange.map(runtimeToPersisted);
 
         let targetId = sessionId ?? undefined;
@@ -459,6 +464,8 @@ function ChatContent({
         inputPricePerMillionTokens={config.inputPricePerMillionTokens}
         outputPricePerMillionTokens={config.outputPricePerMillionTokens}
         onPickPrompt={(text) => void chat.send(text)}
+        onDecideAction={(id, decision) => void chat.decideAction(id, decision)}
+        canDecideAction={!!sessionId && !chat.isStreaming && !saveError}
       />
       {chat.messages.length > 0 && (
         <QuickActions

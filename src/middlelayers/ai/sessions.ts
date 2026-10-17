@@ -21,6 +21,7 @@ import { runWithEncryptionWriteGate } from "@/middlelayers/encryption-write-gate
 import type { TokenUsage } from "./budget";
 import type { ConversationSummary } from "./history";
 import { configuredSecretValues, redactForExport, redactSecrets } from "../security/redact";
+import type { ActionStatus, PendingAction } from "./actions/lifecycle";
 
 const SESSIONS_TABLE = "chat_sessions" as const;
 const FILE_VERSION = 1;
@@ -59,7 +60,8 @@ export type ChatSessionMeta = {
 
 export type PersistedBlock =
   | { kind: "text"; text: string }
-  | { kind: "chart"; chart: unknown };
+  | { kind: "chart"; chart: unknown }
+  | PendingAction;
 
 export type PersistedChatMessage =
   | { role: "user"; content: string }
@@ -213,9 +215,55 @@ function validMessages(value: unknown): value is PersistedChatMessage[] {
   return Array.isArray(value) && value.every((message) =>
     message && typeof message === "object" && (
       (message.role === "user" && typeof message.content === "string") ||
-      (message.role === "assistant" && Array.isArray(message.blocks))
+      (message.role === "assistant" && Array.isArray(message.blocks) && message.blocks.every((block: unknown) =>
+        block && typeof block === "object" && (
+          ((block as PersistedBlock).kind === "text" && typeof (block as { text: unknown }).text === "string") ||
+          (block as PersistedBlock).kind === "chart" ||
+          ((block as PersistedBlock).kind === "pending_action" &&
+            typeof (block as PendingAction).id === "string" &&
+            typeof (block as PendingAction).name === "string" &&
+            typeof (block as PendingAction).toolCallId === "string" &&
+            ["pending", "executing", "approved", "rejected", "expired", "failed"].includes((block as PendingAction).status))
+        ),
+      ))
     ),
   );
+}
+
+export async function claimSessionAction(id: string, actionId: string, status: ActionStatus): Promise<boolean> {
+  return runWithEncryptionWriteGate(async () => {
+    const payload = await readSessionPayload(id);
+    for (const message of payload.messages) {
+      if (message.role !== "assistant") continue;
+      const index = message.blocks.findIndex((block) => block.kind === "pending_action" && block.id === actionId);
+      if (index < 0) continue;
+      const action = message.blocks[index] as PendingAction;
+      if (action.status !== "pending") return false;
+      if (status === "executing" && Date.now() >= Date.parse(action.expiresAt)) return false;
+      message.blocks[index] = { ...action, status };
+      await writeSessionPayload(id, payload);
+      notifySessionUpdate(id);
+      return true;
+    }
+    return false;
+  });
+}
+
+export async function finishSessionAction(id: string, actionId: string, status: "approved" | "failed", result: string, secrets: readonly string[] = []): Promise<void> {
+  await runWithEncryptionWriteGate(async () => {
+    const payload = await readSessionPayload(id);
+    for (const message of payload.messages) {
+      if (message.role !== "assistant") continue;
+      const index = message.blocks.findIndex((block) => block.kind === "pending_action" && block.id === actionId);
+      if (index < 0) continue;
+      const action = message.blocks[index] as PendingAction;
+      if (action.status !== "executing") return;
+      message.blocks[index] = { ...action, status, result: redactSecrets(result, secrets) };
+      await writeSessionPayload(id, payload);
+      notifySessionUpdate(id);
+      return;
+    }
+  });
 }
 
 export async function touchSession(

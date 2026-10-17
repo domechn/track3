@@ -165,6 +165,23 @@ afterEach(() => {
 });
 
 describe("chat sessions middlelayer", () => {
+  it("claims a pending action once and preserves its audit result on reload", async () => {
+    const sessions = await import("./sessions");
+    await sessions.createSession();
+    await sessions.appendMessages("uuid-1", [{
+      role: "assistant", blocks: [{
+        kind: "pending_action", id: "action-1", toolCallId: "call-1", name: "blacklist_add",
+        args: { symbol: "BTC" }, preview: { before: "(empty)", after: "BTC" },
+        risk: "low", status: "pending", createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 300000).toISOString(),
+      }],
+    }]);
+    expect(await sessions.claimSessionAction("uuid-1", "action-1", "executing")).toBe(true);
+    expect(await sessions.claimSessionAction("uuid-1", "action-1", "executing")).toBe(false);
+    await sessions.finishSessionAction("uuid-1", "action-1", "approved", "Added BTC");
+    const loaded = await sessions.loadSession("uuid-1");
+    expect(loaded?.messages[0]).toMatchObject({ blocks: [{ status: "approved", result: "Added BTC" }] });
+  });
   it("never writes configured secrets into a session payload or preview", async () => {
     const sessions = await import("./sessions");
     await sessions.createSession();

@@ -88,6 +88,12 @@ const validConfig = {
 };
 
 describe("AI configuration storage", () => {
+  it("defaults action proposals on for saved legacy configs and persists an off choice", async () => {
+    await saveAIConfig(validConfig);
+    expect((await loadAIConfig()).allowActions).toBe(true);
+    await saveAIConfig({ ...validConfig, allowActions: false });
+    expect((await loadAIConfig()).allowActions).toBe(false);
+  });
   it("throws AIConfigMissingError when the slot is empty", async () => {
     await expect(loadAIConfig()).rejects.toBeInstanceOf(AIConfigMissingError);
   });
