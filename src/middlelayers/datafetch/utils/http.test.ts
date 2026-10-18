@@ -336,6 +336,16 @@ describe("429 retry utilities", () => {
     expect(attempt).toHaveBeenCalledTimes(2);
   });
 
+  it("does not retry a failed request just because a wallet URL contains 429", async () => {
+    const attempt = vi.fn<() => Promise<string>>()
+      .mockRejectedValue(new Error("Request failed (GET https://example.test/wallet/429401)"));
+    const result = retryOnHttpStatus(attempt, { status: 429, maxRetries: 1, baseDelayMs: 10 });
+    const rejected = expect(result).rejects.toThrow("Request failed");
+    await vi.advanceTimersByTimeAsync(10);
+    await rejected;
+    expect(attempt).toHaveBeenCalledTimes(1);
+  });
+
   it("caps an excessive retry-after delay at maxDelayMs", async () => {
     const attempt = vi
       .fn<() => Promise<string>>()

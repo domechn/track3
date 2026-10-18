@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HttpRequestError } from "./http";
-import { classifySourceError, recordSourceFailure, takeSourceFailure } from "./source-failure";
+import { classifySourceError, recordOptionalSourceFailure, recordSourceFailure, takeOptionalSourceFailures, takeSourceFailure } from "./source-failure";
 
 describe("source error categories", () => {
   it("classifies transport errors as network without reading address digits", () => {
@@ -22,5 +22,29 @@ describe("source error categories", () => {
     const source = {};
     recordSourceFailure(source, new Error("bad key sk-abcdefghijklmnop1234567890"));
     expect(takeSourceFailure(source)?.message).not.toContain("sk-abcdefghijklmnop1234567890");
+  });
+
+  it("ignores endpoint labels outside the approved catalog", () => {
+    const source = {};
+    recordOptionalSourceFailure(source, new Error("network error"), "constructor");
+    expect(takeOptionalSourceFailures(source)).toBeUndefined();
+  });
+
+  it("ignores HTTP permission errors for ordinary optional products", () => {
+    const source = {};
+    recordOptionalSourceFailure(source, new HttpRequestError("forbidden", 403), "Earn");
+    expect(takeOptionalSourceFailures(source)).toBeUndefined();
+  });
+
+  it("ignores permission messages even without an HTTP status", () => {
+    const source = {};
+    recordOptionalSourceFailure(source, new Error("permission denied"), "Futures");
+    expect(takeOptionalSourceFailures(source)).toBeUndefined();
+  });
+
+  it("keeps the disabled-product skip for Coinbase responses other than 401 or 403", () => {
+    const source = {};
+    recordOptionalSourceFailure(source, new HttpRequestError("not enabled", 400), "Portfolio INTX", true);
+    expect(takeOptionalSourceFailures(source)).toBeUndefined();
   });
 });

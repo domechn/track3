@@ -192,7 +192,7 @@ export class MexcExchange implements Exchanger {
 				return {}
 			}
 			console.error(`Fetch MEXC ${productName} balance failed:`)
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, productName)
 			return {}
 		}
 	}

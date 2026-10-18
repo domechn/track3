@@ -1,5 +1,6 @@
 import type { PortfolioSourceStatus } from "./portfolio-baseline";
 import { redactSecrets } from "./security/redact";
+import { safePartialEndpoint } from "./datafetch/utils/source-failure";
 
 const categories = new Set(["auth", "network", "rateLimit", "unsupported", "other"]);
 const kinds = new Set(["exchange", "wallet", "broker", "others"]);
@@ -15,12 +16,22 @@ export function normalizeSourceStatuses(value: unknown): PortfolioSourceStatus[]
   if (!Array.isArray(value)) return [];
   return value.flatMap((source): PortfolioSourceStatus[] => {
     if (!source || typeof source.sourceId !== "string" || typeof source.label !== "string" ||
-      !["ok", "stale", "failed"].includes(source.status)) return [];
+      !["ok", "partial", "stale", "failed"].includes(source.status)) return [];
     const provider = typeof source.provider === "string" ? redactSecrets(source.provider) : "";
+    const endpoints: string[] = Array.isArray(source.partial?.endpoints)
+      ? [...new Set<string>((source.partial.endpoints as unknown[]).filter((endpoint: unknown): endpoint is string =>
+          typeof endpoint === "string" && safePartialEndpoint(endpoint) === endpoint))].slice(0, 12)
+      : [];
     return [{
       sourceId: source.sourceId,
       label: redactSecrets(source.label),
       status: source.status,
+      ...(source.status === "partial" ? { partial: {
+        category: categories.has(source.partial?.category) ? source.partial.category : "other",
+        endpoints,
+        ...(typeof source.partial?.lowerThanPrevious === "boolean"
+          ? { lowerThanPrevious: source.partial.lowerThanPrevious } : {}),
+      } } : {}),
       ...(categories.has(source.category) ? { category: source.category } : {}),
       ...(kinds.has(source.kind) ? { kind: source.kind } : {}),
       ...(provider && provider.length <= 32 && /^[\w .-]+$/.test(provider) ? { provider } : {}),
@@ -40,6 +51,6 @@ export function sourceIdentity(source: PortfolioSourceStatus): string {
 }
 
 export function sortSourceStatuses(statuses: readonly PortfolioSourceStatus[]): PortfolioSourceStatus[] {
-  const order = { failed: 0, stale: 1, ok: 2 };
+  const order = { failed: 0, stale: 1, partial: 2, ok: 3 };
   return [...statuses].sort((a, b) => order[a.status] - order[b.status]);
 }

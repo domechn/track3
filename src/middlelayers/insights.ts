@@ -64,7 +64,7 @@ function reference(snapshots: InsightSnapshot[], at: number, days: number): Insi
 
 export function signature(insight: Insight): string {
   const { data } = insight;
-  if (insight.id === "stale") return `${insight.id}:${data.count}:${data.sources ?? ""}`;
+  if (insight.id === "stale" || insight.id === "partial") return `${insight.id}:${data.count}:${data.sources ?? ""}`;
   if (insight.id === "concentration") return `${insight.id}:${Math.round(Number(data.top1Percent) / 5)}:${Math.round(Number(data.hhi) * 20)}:${Math.round(Number(data.stablecoinPercent) / 5)}`;
   if (insight.id === "drift") return `${insight.id}:${data.symbol}:${Math.round(Number(data.deviationPercent) / 5)}`;
   if (insight.id.startsWith("goal:")) return `${insight.id}:${data.reached}:${Math.round(Number(data.value) / Math.max(1, Number(data.threshold) * 0.05))}`;
@@ -83,10 +83,15 @@ export function computeInsights(input: InsightInput): Insight[] {
   const add = (id: string, severity: InsightSeverity, messageKey: string, data: Insight["data"]) => {
     result.push({ id, severity, messageKey, data });
   };
-  const unavailable = input.sourceStatuses?.filter((source) => source.status !== "ok") ?? [];
-  const staleCount = unavailable.length;
-  if (unavailable.length) add("stale", "warning", "insights.stale", {
-    count: unavailable.length, sources: unavailable.map((source) =>
+  const staleSources = input.sourceStatuses?.filter((source) => source.status === "stale" || source.status === "failed") ?? [];
+  const partialSources = input.sourceStatuses?.filter((source) => source.status === "partial") ?? [];
+  const unreliableCount = staleSources.length + partialSources.length;
+  if (staleSources.length) add("stale", "warning", "insights.stale", {
+    count: staleSources.length, sources: staleSources.map((source) =>
+      sourceIdentity({ ...source, hint: undefined })).join(", "),
+  });
+  if (partialSources.length) add("partial", "warning", "insights.partial", {
+    count: partialSources.length, sources: partialSources.map((source) =>
       sourceIdentity({ ...source, hint: undefined })).join(", "),
   });
 
@@ -107,7 +112,7 @@ export function computeInsights(input: InsightInput): Insight[] {
   }
 
   // Stale holdings can mimic entries, exits, and price moves.
-  if (!staleCount && Number.isFinite(at)) {
+  if (!unreliableCount && Number.isFinite(at)) {
     for (const { label, days } of windows) {
       const old = reference(input.snapshots.slice(1), at, days);
       if (!old) continue;
@@ -169,7 +174,7 @@ export function computeInsights(input: InsightInput): Insight[] {
   }
 
   const alertSnapshot = { at: latest.at, assets: latest.assets.map((asset) => ({ ...asset, wallet: "" })),
-    hasStaleSources: staleCount > 0 };
+    hasStaleSources: staleSources.length > 0 };
   for (const rule of input.alertRules ?? []) {
     if (!rule.enabled || !["total_value_target", "asset_value_target"].includes(rule.kind)) continue;
     const measured = measureRule(rule, [alertSnapshot], {}, input.rebalanceProfile);
@@ -184,7 +189,7 @@ export function computeInsights(input: InsightInput): Insight[] {
     if (alert.acknowledgedAt || !Number.isFinite(at) || Math.abs(at - Date.parse(alert.triggeredAt)) > dayMs) continue;
     add(`alert:${alert.id}`, "warning", "insights.alert", { kind: alert.kind, value: round(alert.value) });
   }
-  if (input.rebalanceProfile && total > 0 && !staleCount) {
+  if (input.rebalanceProfile && total > 0 && !unreliableCount) {
     const calculation = calculateRebalance(latest.assets.map((asset) => ({ ...asset })), input.rebalanceProfile.targets,
       { tolerancePercent: input.rebalanceProfile.tolerancePercent });
     const drift = calculation.rows.filter((row) => row.kind === "asset")

@@ -1,4 +1,4 @@
-import { recordSourceFailure } from "../utils/source-failure";
+import { recordOptionalSourceFailure } from "../utils/source-failure";
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
@@ -34,7 +34,7 @@ export class SUIAnalyzer implements Analyzer {
       this.queryHolding(this.endpoint, address),
       this.queryDefiPositions(this.endpoint, address).catch((error) => {
         console.error("Failed to query SUI DeFi positions");
-        recordSourceFailure(this, error);
+        recordOptionalSourceFailure(this, error, "SUI DeFi");
         return [];
       }),
     ]);

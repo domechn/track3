@@ -34,3 +34,21 @@ it("orders failed sources before stale and current sources", () => {
   ];
   expect(sortSourceStatuses(statuses).map((source) => source.sourceId)).toEqual(["c", "b", "a"]);
 });
+
+it("preserves only safe partial endpoint names from persisted statuses", () => {
+  expect(normalizeSourceStatuses([
+    { sourceId: "cex:0", label: "Gate", status: "partial", partial: {
+      category: "network", endpoints: ["Earn", "https://secret.test/key", "Portfolio INTX"], lowerThanPrevious: true,
+    } },
+  ])).toEqual([
+    { sourceId: "cex:0", label: "Gate", status: "partial", partial: {
+      category: "network", endpoints: ["Earn", "Portfolio INTX"], lowerThanPrevious: true,
+    } },
+  ]);
+});
+
+it("drops a DEFAULT portfolio warning from saved partial status", () => {
+  expect(normalizeSourceStatuses([{ sourceId: "cex:0", label: "Coinbase", status: "partial",
+    partial: { category: "auth", endpoints: ["Portfolio DEFAULT", "Portfolio INTX"] } }])[0].partial?.endpoints)
+    .toEqual(["Portfolio INTX"]);
+});

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchPortfolios } from "./data";
 import type { GlobalConfig, WalletCoin } from "./datafetch/types";
-import { recordSourceFailure } from "./datafetch/utils/source-failure";
+import { recordOptionalSourceFailure, recordSourceFailure } from "./datafetch/utils/source-failure";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
 
 const { scenario, MockAnalyzer } = vi.hoisted(() => {
@@ -89,6 +89,73 @@ describe("per-source refresh", () => {
     expect(result.failedSources).toMatchObject([{ sourceId: "btc:0", category: "rateLimit" }]);
   });
 
+  it("keeps fetched holdings when a secondary endpoint fails", async () => {
+    scenario.load = async (id, source) => {
+      if (id === "wallet-a") recordOptionalSourceFailure(source, new Error("503 unavailable"), "Earn");
+      return [coin(id)];
+    };
+    const result = await fetchPortfolios(config, vi.fn(), userInfo);
+    expect(result.coins).toEqual([coin("wallet-a"), coin("wallet-b")]);
+    expect(result.failedSources).toEqual([]);
+    expect(result.sourceResults?.[0]).toMatchObject({
+      status: "partial", partial: { category: "network", endpoints: ["Earn"] },
+    });
+  });
+
+  it("keeps other cache entries and in-flight writes when an exchange is partial", async () => {
+    const cache = getMemoryCacheInstance("data-fetch");
+    cache.clearCache();
+    cache.setCache("other-source", "saved", 600);
+    const generation = cache.getGeneration();
+    let finishOther!: () => void;
+    const otherReady = new Promise<void>((resolve) => { finishOther = resolve; });
+    let otherStarted!: () => void;
+    const started = new Promise<void>((resolve) => { otherStarted = resolve; });
+    scenario.load = async (id, source) => {
+      if (id === "binance") {
+        recordOptionalSourceFailure(source, new Error("network error"), "Earn");
+        return [coin(id)];
+      }
+      otherStarted();
+      await otherReady;
+      cache.setCache("other-result", "fresh", 600, generation);
+      return [coin(id)];
+    };
+    try {
+      const pending = fetchPortfolios({ ...config, btc: { addresses: [] },
+        exchanges: [
+          { name: "binance", initParams: { apiKey: "key-a", secret: "secret" } },
+          { name: "kraken", initParams: { apiKey: "key-b", secret: "secret" } },
+        ] }, vi.fn(), userInfo);
+      await started;
+      finishOther();
+      expect((await pending).sourceResults?.[0].status).toBe("partial");
+      expect(cache.getCache("other-source")).toBe("saved");
+      expect(cache.getCache("other-result")).toBe("fresh");
+      expect(cache.getGeneration()).toBe(generation);
+    } finally { cache.clearCache(); }
+  });
+
+  it.each(["sol", "sui"] as const)("evicts only the %s address cache when its result is partial", async (kind) => {
+    const cache = getMemoryCacheInstance("data-fetch");
+    cache.clearCache();
+    cache.setCache("other-source", "saved", 600);
+    const generation = cache.getGeneration();
+    scenario.load = async (id, source) => {
+      cache.setCache(id, [coin(id)], 600);
+      recordOptionalSourceFailure(source, new Error("network error"), kind === "sol" ? "Solana Earn" : "SUI DeFi");
+      return [coin(id)];
+    };
+    try {
+      const result = await fetchPortfolios({ ...config, btc: { addresses: [] },
+        [kind]: { addresses: ["wallet-a"] } }, vi.fn(), userInfo);
+      expect(result.sourceResults?.[0].status).toBe("partial");
+      expect(cache.getCache("wallet-a")).toBeUndefined();
+      expect(cache.getCache("other-source")).toBe("saved");
+      expect(cache.getGeneration()).toBe(generation);
+    } finally { cache.clearCache(); }
+  });
+
   it("isolates malformed holdings from one source", async () => {
     scenario.load = async (id) => id === "wallet-a"
       ? [undefined as unknown as WalletCoin]
@@ -107,6 +174,38 @@ describe("per-source refresh", () => {
       const result = await pending;
       expect(result.coins).toEqual([coin("wallet-b")]);
       expect(result.failedSources[0]).toMatchObject({ sourceId: "btc:0", category: "network" });
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("fails a CEX source when its analyzer times out despite an earlier optional warning", async () => {
+    vi.useFakeTimers();
+    try {
+      scenario.load = async (_id, source) => {
+        recordOptionalSourceFailure(source, new Error("503 unavailable"), "Earn");
+        return new Promise(() => {});
+      };
+      const cexConfig = { ...config, btc: { addresses: [] },
+        exchanges: [{ name: "binance", initParams: { apiKey: "key", secret: "secret" } }] };
+      const pending = fetchPortfolios(cexConfig, vi.fn(), userInfo);
+      await vi.advanceTimersByTimeAsync(121_000);
+      const result = await pending;
+      expect(result.sourceResults?.[0]).toMatchObject({ status: "stale", category: "network", coins: [] });
+      expect(result.failedSources).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("lets ERC20 finish a rate-limit retry that takes longer than 30 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      scenario.load = async (id) => new Promise((resolve) =>
+        setTimeout(() => resolve([coin(id)]), 35_000));
+      const erc20Config = { ...config, btc: { addresses: [] },
+        erc20: { addresses: ["wallet-a"] } };
+      const pending = fetchPortfolios(erc20Config, vi.fn(), userInfo);
+      await vi.advanceTimersByTimeAsync(36_000);
+      const result = await pending;
+      expect(result.sourceResults?.[0]).toMatchObject({ status: "ok", coins: [coin("wallet-a")] });
+      expect(result.failedSources).toEqual([]);
     } finally { vi.useRealTimers(); }
   });
 

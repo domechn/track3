@@ -140,7 +140,7 @@ export class BitgetExchange implements Exchanger {
 
 		} catch (e) {
 			console.error("Fetch future balance failed")
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, "Futures")
 			return {}
 		}
 	}
@@ -166,7 +166,7 @@ export class BitgetExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch earn balance failed")
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, "Earn")
 			return {}
 		}
 	}
@@ -189,7 +189,7 @@ export class BitgetExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch cross margin balance failed")
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, "Margin")
 			return {}
 		}
 	}

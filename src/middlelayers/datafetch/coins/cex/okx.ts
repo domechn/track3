@@ -262,7 +262,7 @@ export class OkxExchange implements Exchanger {
 			return await fetcher()
 		} catch (error) {
 			console.error(`Fetch OKX ${productName} balance failed`)
-			recordOptionalSourceFailure(this, error)
+			recordOptionalSourceFailure(this, error, productName)
 			return {}
 		}
 	}

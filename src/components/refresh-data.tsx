@@ -140,14 +140,21 @@ const App = ({
       }
       setLastResult(result);
       if (succeeded) {
-        const unavailable = insightStatuses.filter((source) => source.status !== "ok").map((source) =>
+        const unavailable = insightStatuses.filter((source) => source.status === "stale" || source.status === "failed").map((source) =>
           sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
         const incomplete = insightStatuses.some((source) => source.status === "failed");
-        toast({ description: incomplete
+        const partialSources = insightStatuses.filter((source) => source.status === "partial");
+        const usualWarning = partialSources.some((source) => source.partial?.lowerThanPrevious);
+        const partialWarning = partialSources.length
+          ? t(usualWarning ? "refresh.partialToastLower" : "refresh.partialToast")
+            .replace("{sources}", partialSources.map((source) =>
+              sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ")) : "";
+        const statusWarning = incomplete
           ? t("refresh.incomplete").replace("{sources}", unavailable)
           : result.usedLastKnownData
             ? unavailable ? t("refresh.partial").replace("{sources}", unavailable) : t("refresh.partialGeneric")
-            : t("refresh.success") });
+            : "";
+        toast({ description: [statusWarning, partialWarning].filter(Boolean).join(" ") || t("refresh.success") });
       } else {
         const unavailable = insightStatuses.filter((source) => source.status !== "ok" &&
           (!sourceId || source.sourceId === sourceId)).map((source) =>
@@ -157,7 +164,10 @@ const App = ({
           variant: "destructive" });
       }
       trackEventWithClientID("data_refreshed", {
-        failedSources: result.sourceStatuses?.filter((source) => source.status !== "ok").map((source) => source.sourceId).join(",") ?? "",
+        failedSources: result.sourceStatuses?.filter((source) => source.status === "stale" || source.status === "failed")
+          .map((source) => source.sourceId).join(",") ?? "",
+        partialSources: result.sourceStatuses?.filter((source) => source.status === "partial")
+          .map((source) => source.sourceId).join(",") ?? "",
       });
     } catch (error) {
       const messageKey = error instanceof FullRefreshRequiredError
@@ -207,14 +217,37 @@ const App = ({
       ? `${t("refresh.hint.apikey")} ${source.hint}` : source.hint;
   const sortedStatuses = sortSourceStatuses(sourceStatuses);
   const failedStatuses = sortedStatuses.filter((source) => source.status === "failed");
+  const partialStatuses = sortedStatuses.filter((source) => source.status === "partial");
   const failedNames = failedStatuses.map(displayIdentity).join(", ");
   const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
     ok: "border-green-600/30 bg-green-600/10 text-green-800 dark:text-green-300",
     stale: "border-amber-600/30 bg-amber-600/10 text-amber-900 dark:text-amber-300",
+    partial: "border-amber-600/30 bg-amber-600/10 text-amber-900 dark:text-amber-300",
     failed: "border-red-600/30 bg-red-600/10 text-red-800 dark:text-red-300",
   };
-  const statusIcon = { ok: CheckIcon, stale: ExclamationTriangleIcon, failed: CrossCircledIcon };
+  const statusIcon = { ok: CheckIcon, stale: ExclamationTriangleIcon,
+    partial: ExclamationTriangleIcon, failed: CrossCircledIcon };
+  const endpointKeys: Record<string, string> = {
+    Earn: "earn", "Fixed-term Earn": "fixedTermEarn", Staking: "staking",
+    "Dual investment": "dualInvestment", Portfolio: "portfolio", Margin: "margin",
+    "Wallet total": "walletTotal", Futures: "futures", "Cross margin": "crossMargin",
+    "Isolated margin": "isolatedMargin", "USDT isolated swap": "usdtIsolatedSwap",
+    "USDT cross swap": "usdtCrossSwap", "Coin swap": "coinSwap",
+    "Flexible saving": "flexibleSaving", "On-chain Earn": "onChainEarn",
+    "Advanced Earn": "advancedEarn", Savings: "savings", Funding: "funding",
+    "ETH staking": "ethStaking", "DeFi staking": "defiStaking", Lending: "lending",
+    "Solana Earn": "solanaEarn", "SUI DeFi": "suiDefi", "Portfolio INTX": "portfolioIntx",
+  };
+  const partialMessage = (source: PortfolioSourceStatus) => {
+    const endpoints = source.partial?.endpoints.map((name) =>
+      t(`refresh.endpoint.${endpointKeys[name]}`)) ?? [];
+    const names = new Intl.ListFormat(locale === "zh" ? "zh-CN" : "en", {
+      style: "long", type: "conjunction",
+    }).format(endpoints);
+    return t(source.partial?.lowerThanPrevious ? "refresh.partialSourceLower" : "refresh.partialSource")
+      .replace("{endpoints}", names || t("refresh.endpoint.other"));
+  };
   const detailKey: Record<string, string> = {
     "Source timed out": "refresh.detail.timeout",
     "Unsupported exchange": "refresh.detail.unsupported",
@@ -243,7 +276,13 @@ const App = ({
           <AlertDialogHeader>
             <AlertDialogTitle>{t("refresh.sourceStatus")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {failedStatuses.length
+              {partialStatuses.length
+                ? t("refresh.partialSummary")
+                  .replace("{total}", String(sourceStatuses.length))
+                  .replace("{failed}", String(failedStatuses.length))
+                  .replace("{partial}", String(partialStatuses.length))
+                  .replace("{stale}", String(sortedStatuses.filter((source) => source.status === "stale").length))
+                : failedStatuses.length
                 ? t("refresh.failedSummary")
                   .replace("{count}", String(failedStatuses.length))
                   .replace("{total}", String(sourceStatuses.length))
@@ -272,15 +311,18 @@ const App = ({
                       <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />
                       {t(`refresh.status.${source.status}`)}
                     </span>
-                    {source.status !== "ok" && <span className="text-muted-foreground">
+                    {source.status !== "ok" && source.status !== "partial" && <span className="text-muted-foreground">
                       {t(`refresh.reason.${source.category ?? "other"}`)}
                     </span>}
                   </div>
+                  {source.status === "partial" && <div className="mt-1 text-xs text-amber-900 dark:text-amber-300">
+                    {partialMessage(source)}
+                  </div>}
                   {source.status !== "ok" && source.detail && <details className="mt-1 text-xs text-muted-foreground">
                     <summary>{t("refresh.details")}</summary>
                     <span>{redactSecrets(t(detailKey[source.detail]))}</span>
                   </details>}
-                  {source.status !== "ok" && source.lastSuccessAt && <div className="mt-1 text-xs text-muted-foreground">
+                  {(source.status === "stale" || source.status === "failed") && source.lastSuccessAt && <div className="mt-1 text-xs text-muted-foreground">
                     {t("refresh.lastData").replace("{time}", new Intl.DateTimeFormat("sv-SE", {
                       year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
                     }).format(new Date(source.lastSuccessAt)))}

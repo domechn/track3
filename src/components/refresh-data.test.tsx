@@ -383,6 +383,35 @@ describe("RefreshData — currency rates refresh ordering", () => {
     });
   });
 
+  it("shows partial endpoints and a retry beside failed and current sources", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, failedSources: [], usedLastKnownData: false,
+      sourceResults: [
+        { sourceId: "cex:0", label: "Gate.io", walletIdentities: ["gate-key"], status: "partial",
+          partial: { category: "network", endpoints: ["Earn", "Staking"], lowerThanPrevious: true }, coins: [] },
+      ],
+      sourceStatuses: [
+        { sourceId: "cex:0", label: "Gate.io", kind: "exchange", provider: "Gate",
+          status: "partial", partial: { category: "network", endpoints: ["Earn", "Staking"], lowerThanPrevious: true } },
+        { sourceId: "cex:1", label: "Coinbase", kind: "exchange", provider: "Coinbase", status: "failed", category: "auth" },
+        { sourceId: "btc:0", label: "BTC wallet 1", status: "ok" },
+      ],
+    } as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
+    expect(dialog).toHaveTextContent("1 failed, 1 partial");
+    const partialRow = screen.getByRole("group", { name: "Gate.io (Gate)" });
+    expect(partialRow).toHaveTextContent("Partial");
+    expect(partialRow).toHaveTextContent("Earn and Staking could not be read this time");
+    expect(partialRow).toHaveTextContent("totals may be lower than usual");
+    expect(screen.getByRole("button", { name: "Retry Gate.io (Gate)" })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("Coinbase");
+    expect(dialog).toHaveTextContent("OK");
+    expect(JSON.parse(localStorage.getItem("track3-refresh-source-statuses") ?? "[]")[0].status).toBe("partial");
+  });
+
   it("translates API key and safe error details for Chinese source rows", async () => {
     localStorage.setItem(localeLocalStorageKey, "zh");
     localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([

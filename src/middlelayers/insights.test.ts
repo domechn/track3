@@ -112,6 +112,17 @@ describe("computeInsights", () => {
     });
   });
 
+  it("describes partial sources by alias and provider without calling their data stale", () => {
+    const result = computeInsights({ snapshots: [snapshot("a", at, { BTC: 100 })], sourceStatuses: [
+      { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Gate",
+        hint: "ab12…9xyz", status: "partial", partial: { category: "network", endpoints: ["Earn"] } },
+    ] });
+    expect(result.find((item) => item.id === "stale")).toBeUndefined();
+    expect(result.find((item) => item.id === "partial")).toMatchObject({
+      messageKey: "insights.partial", data: { count: 1, sources: "Main (Gate)" },
+    });
+  });
+
   it("updates the unavailable-source insight when the failed account changes", () => {
     const snapshots = [snapshot("a", at, { BTC: 100 })];
     const first = computeInsights({ snapshots, sourceStatuses: [

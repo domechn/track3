@@ -23,6 +23,11 @@ export type SourceErrorCategory =
   | "other";
 
 export type SourceKind = "exchange" | "wallet" | "broker" | "others";
+export type PartialSourceFailure = {
+  category: SourceErrorCategory;
+  endpoints: string[];
+  lowerThanPrevious?: boolean;
+};
 export type SourceIdentification = {
   kind?: SourceKind;
   provider?: string;
@@ -33,8 +38,9 @@ export type PortfolioSourceResult = {
   sourceId: string;
   label: string;
   walletIdentities: string[];
-  status: "ok" | "stale";
+  status: "ok" | "partial" | "stale";
   coins: WalletCoin[];
+  partial?: PartialSourceFailure;
   category?: SourceErrorCategory;
   detail?: string;
 } & SourceIdentification;
@@ -42,7 +48,8 @@ export type PortfolioSourceResult = {
 export type PortfolioSourceStatus = {
   sourceId: string;
   label: string;
-  status: "ok" | "failed" | "stale";
+  status: "ok" | "partial" | "failed" | "stale";
+  partial?: PartialSourceFailure;
   category?: SourceErrorCategory;
   detail?: string;
   lastSuccessAt?: string;

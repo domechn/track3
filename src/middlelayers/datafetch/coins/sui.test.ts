@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendHttpRequest } from "../utils/http";
 import { getMemoryCacheInstance } from "../utils/cache";
 import { SUIAnalyzer } from "./sui";
+import { takeOptionalSourceFailures } from "../utils/source-failure";
 
 vi.mock("../utils/http", () => ({
   sendHttpRequest: vi.fn(),
@@ -167,5 +168,8 @@ describe("SUIAnalyzer", () => {
         chain: "sui",
       },
     ]);
+    expect(takeOptionalSourceFailures(analyzer)).toEqual({
+      category: "network", endpoints: ["SUI DeFi"],
+    });
   });
 });

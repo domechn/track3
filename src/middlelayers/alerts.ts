@@ -300,7 +300,7 @@ export async function loadAlertEvaluationData(
   const statuses = sourceStatuses ?? readStoredSourceStatuses();
   if (snapshots[0]) {
     const oldSnapshot = now.getTime() - Date.parse(snapshots[0].at) > 86400000;
-    snapshots[0].hasStaleSources = oldSnapshot || statuses.some((source) => source.status !== "ok");
+    snapshots[0].hasStaleSources = oldSnapshot || statuses.some((source) => source.status === "stale" || source.status === "failed");
     snapshots[0].staleAssetKeys = oldSnapshot || (!sourceResults?.length && snapshots[0].hasStaleSources)
       ? latestRows.map(keyOf)
       : sourceResults

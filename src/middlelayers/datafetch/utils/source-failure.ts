@@ -1,4 +1,4 @@
-import type { SourceErrorCategory } from "../../portfolio-baseline";
+import type { PartialSourceFailure, SourceErrorCategory } from "../../portfolio-baseline";
 
 const safeMessages: Record<SourceErrorCategory, string> = {
   auth: "Authentication or invalid key",
@@ -36,6 +36,24 @@ export function classifySourceError(error: unknown): SourceErrorCategory {
 // Optional provider calls may return partial holdings. Keep their most
 // actionable error until the owning source finishes.
 const failures = new WeakMap<object, { error: unknown; priority: number }>();
+const optionalFailures = new WeakMap<object, PartialSourceFailure>();
+const endpointNames: Record<string, string> = {
+  earn: "Earn", "fixed-term earn": "Fixed-term Earn", staking: "Staking",
+  "dual investment": "Dual investment", portfolio: "Portfolio", margin: "Margin",
+  "wallet total": "Wallet total", futures: "Futures", "cross margin": "Cross margin",
+  "isolated margin": "Isolated margin", "usdt isolated swap": "USDT isolated swap",
+  "usdt cross swap": "USDT cross swap", "coin swap": "Coin swap",
+  "flexible saving": "Flexible saving", "on-chain earn": "On-chain Earn",
+  "advanced earn": "Advanced Earn", savings: "Savings", funding: "Funding",
+  "eth staking": "ETH staking", "defi staking": "DeFi staking", lending: "Lending",
+  "solana earn": "Solana Earn", "sui defi": "SUI DeFi",
+};
+
+export function safePartialEndpoint(label: string): string | undefined {
+  if (label === "Portfolio INTX") return label;
+  const key = label.toLowerCase();
+  return Object.hasOwn(endpointNames, key) ? endpointNames[key] : undefined;
+}
 const priority: Record<SourceErrorCategory, number> = {
   rateLimit: 4,
   auth: 3,
@@ -54,17 +72,44 @@ export function recordSourceFailure(source: object, error: unknown): void {
   }
 }
 
-export function recordOptionalSourceFailure(source: object, error: unknown): void {
+export function recordOptionalSourceFailure(source: object, error: unknown, label: string, includeAuth = false): void {
+  const endpoint = safePartialEndpoint(label);
+  if (!endpoint) return;
   const status = (error as { status?: number })?.status;
-  if (status === 401 || status === 403) return;
-  if (status === 429 || status === 408 || (status !== undefined && status >= 500)) {
-    recordSourceFailure(source, error);
-    return;
-  }
+  const reportAuth = includeAuth && (status === 401 || status === 403);
+  if ((status === 401 || status === 403) && !reportAuth) return;
   const message = error instanceof Error ? error.message : String(error);
   const detail = message.replace(/https?:\/\/[^\s)]+/gi, "");
-  if (/\b(?:code\s*700011|not (?:enabled|opened|activated|allowed|supported)|permission denied|no (?:margin|futures|earn|portfolio) account)\b/i.test(detail)) return;
-  recordSourceFailure(source, error);
+  if (!reportAuth &&
+    /\b(?:code\s*700011|not (?:enabled|opened|activated|allowed|supported)|permission denied|no (?:margin|futures|earn|portfolio) account)\b/i.test(detail)) return;
+  const category = classifySourceError(error);
+  const current = optionalFailures.get(source);
+  if (!current) {
+    optionalFailures.set(source, { category, endpoints: [endpoint] });
+  } else {
+    if (priority[category] > priority[current.category]) current.category = category;
+    if (!current.endpoints.includes(endpoint)) current.endpoints.push(endpoint);
+  }
+}
+
+export function takeOptionalSourceFailures(source: object): PartialSourceFailure | undefined {
+  const partial = optionalFailures.get(source);
+  optionalFailures.delete(source);
+  return partial;
+}
+
+export function transferOptionalSourceFailures(from: object, to: object): boolean {
+  const partial = takeOptionalSourceFailures(from);
+  if (!partial) return false;
+  const current = optionalFailures.get(to);
+  if (!current) optionalFailures.set(to, partial);
+  else {
+    if (priority[partial.category] > priority[current.category]) current.category = partial.category;
+    for (const endpoint of partial.endpoints) {
+      if (!current.endpoints.includes(endpoint)) current.endpoints.push(endpoint);
+    }
+  }
+  return true;
 }
 
 export function takeSourceFailure(source: object): Error | undefined {
