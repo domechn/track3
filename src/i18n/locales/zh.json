@@ -220,6 +220,7 @@
   "refresh.partialToast": "部分成功的数据源：{sources}。部分余额未能读取。",
   "refresh.partialToastLower": "部分成功的数据源：{sources}。部分余额未能读取；总额可能比平时低。",
   "refresh.endpoint.other": "部分产品",
+  "refresh.endpoint.assets": "部分资产",
   "refresh.endpoint.earn": "理财",
   "refresh.endpoint.fixedTermEarn": "定期理财",
   "refresh.endpoint.staking": "质押",

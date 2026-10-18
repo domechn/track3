@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HttpRequestError } from "./http";
-import { classifySourceError, recordOptionalSourceFailure, recordSourceFailure, takeOptionalSourceFailures, takeSourceFailure } from "./source-failure";
+import { classifySourceError, recordOptionalSourceFailure, recordSourceFailure, safePartialEndpoint, takeOptionalSourceFailures, takeSourceFailure } from "./source-failure";
 
 describe("source error categories", () => {
   it("classifies transport errors as network without reading address digits", () => {
@@ -46,5 +46,12 @@ describe("source error categories", () => {
     const source = {};
     recordOptionalSourceFailure(source, new HttpRequestError("not enabled", 400), "Portfolio INTX", true);
     expect(takeOptionalSourceFailures(source)).toBeUndefined();
+  });
+
+  it("keeps auth failures for non-default Coinbase portfolio types", () => {
+    const source = {};
+    recordOptionalSourceFailure(source, new HttpRequestError("unauthorized", 401), "Portfolio FUTURES", true);
+    expect(takeOptionalSourceFailures(source)).toEqual({ category: "auth", endpoints: ["Portfolio FUTURES"] });
+    expect(safePartialEndpoint("Portfolio DEFAULT")).toBeUndefined();
   });
 });

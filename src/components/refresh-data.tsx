@@ -32,6 +32,7 @@ import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "@/middlelayers/source-status";
+import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failure";
 
 const retries = 3;
 const retryInterval = 3000;
@@ -131,7 +132,7 @@ const App = ({
         const statuses = normalizeSourceStatuses(result.sourceStatuses);
         setSourceStatuses(statuses);
         insightStatuses = statuses;
-        setStatusDialogOpen(statuses.some((source) => source.status !== "ok"));
+        setStatusDialogOpen(statuses.some((source) => source.status === "failed" || source.status === "stale"));
         try {
           localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
         } catch {
@@ -200,7 +201,8 @@ const App = ({
     }
   };
 
-  const hasWarning = sourceStatuses.some((source) => source.status !== "ok");
+  const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
+  const hasPartial = sourceStatuses.some((source) => source.status === "partial");
   const sourceLabel = (source: PortfolioSourceStatus) => {
     const wallet = /^(erc20|sol|btc|doge|trc20|ton|sui):(\d+)$/.exec(source.sourceId);
     if (wallet && source.label.toLowerCase() === `${wallet[1]} wallet ${Number(wallet[2]) + 1}`) {
@@ -228,20 +230,9 @@ const App = ({
   };
   const statusIcon = { ok: CheckIcon, stale: ExclamationTriangleIcon,
     partial: ExclamationTriangleIcon, failed: CrossCircledIcon };
-  const endpointKeys: Record<string, string> = {
-    Earn: "earn", "Fixed-term Earn": "fixedTermEarn", Staking: "staking",
-    "Dual investment": "dualInvestment", Portfolio: "portfolio", Margin: "margin",
-    "Wallet total": "walletTotal", Futures: "futures", "Cross margin": "crossMargin",
-    "Isolated margin": "isolatedMargin", "USDT isolated swap": "usdtIsolatedSwap",
-    "USDT cross swap": "usdtCrossSwap", "Coin swap": "coinSwap",
-    "Flexible saving": "flexibleSaving", "On-chain Earn": "onChainEarn",
-    "Advanced Earn": "advancedEarn", Savings: "savings", Funding: "funding",
-    "ETH staking": "ethStaking", "DeFi staking": "defiStaking", Lending: "lending",
-    "Solana Earn": "solanaEarn", "SUI DeFi": "suiDefi", "Portfolio INTX": "portfolioIntx",
-  };
   const partialMessage = (source: PortfolioSourceStatus) => {
     const endpoints = source.partial?.endpoints.map((name) =>
-      t(`refresh.endpoint.${endpointKeys[name]}`)) ?? [];
+      t(`refresh.endpoint.${partialEndpointKeys[name] ?? "other"}`)) ?? [];
     const names = new Intl.ListFormat(locale === "zh" ? "zh-CN" : "en", {
       style: "long", type: "conjunction",
     }).format(endpoints);
@@ -263,11 +254,13 @@ const App = ({
       </Button>
       {sourceStatuses.length > 0 && (
         <Button
-          variant={hasWarning ? "destructive" : "outline"}
+          variant={hasFailure ? "destructive" : "outline"}
           size="sm"
+          className={!hasFailure && hasPartial ? "text-amber-900 dark:text-amber-300" : undefined}
           onClick={() => setStatusDialogOpen(true)}
           disabled={refreshLoading}
         >
+          {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
           {t("refresh.sourceStatus")}
         </Button>
       )}

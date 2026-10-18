@@ -165,6 +165,30 @@ describe("per-source refresh", () => {
     expect(result.failedSources).toMatchObject([{ sourceId: "btc:0", category: "other" }]);
   });
 
+  it("drops only an invalid coin and marks its source partial", async () => {
+    scenario.load = async (id) => id === "wallet-a"
+      ? [coin(id), { ...coin(id), symbol: "ETH", amount: NaN }]
+      : [coin(id)];
+    const result = await fetchPortfolios(config, vi.fn(), userInfo);
+    expect(result.coins).toEqual([coin("wallet-a"), coin("wallet-b")]);
+    expect(result.failedSources).toEqual([]);
+    expect(result.sourceResults?.[0]).toMatchObject({
+      status: "partial", coins: [coin("wallet-a")],
+      partial: { category: "other", endpoints: ["Some assets"] },
+    });
+  });
+
+  it("fails a source when every returned coin is invalid", async () => {
+    scenario.load = async (id) => id === "wallet-a"
+      ? [{ ...coin(id), amount: NaN }]
+      : [coin(id)];
+    const result = await fetchPortfolios(config, vi.fn(), userInfo);
+    expect(result.coins).toEqual([coin("wallet-b")]);
+    expect(result.sourceResults?.[0]).toMatchObject({
+      status: "stale", detail: "Invalid source holdings", coins: [],
+    });
+  });
+
   it("times out one wallet while the other finishes", async () => {
     vi.useFakeTimers();
     try {

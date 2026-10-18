@@ -38,7 +38,7 @@ import {
 import { SUIAnalyzer } from "./datafetch/coins/sui";
 import { StockAnalyzer } from "./datafetch/coins/stock/stock-analyzer";
 import { getAddressList } from "./datafetch/utils/address";
-import { classifySourceError, takeOptionalSourceFailures, takeSourceFailure } from "./datafetch/utils/source-failure";
+import { classifySourceError, recordOptionalSourceFailure, takeOptionalSourceFailures, takeSourceFailure } from "./datafetch/utils/source-failure";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
 import { FullRefreshRequiredError } from "./refresh-error";
 import { configuredSecretValues, redactSecrets } from "./security/redact";
@@ -96,10 +96,10 @@ function uniqueIdentities(identities: string[]): string[] {
 
 const sourceTimeoutMs = 30_000;
 
-function hasValidHoldings(coins: unknown): coins is WalletCoin[] {
-  return Array.isArray(coins) && coins.every((coin) =>
-    coin &&
-    typeof coin.wallet === "string" &&
+function isValidHolding(value: unknown): value is WalletCoin {
+  if (!value || typeof value !== "object") return false;
+  const coin = value as Partial<WalletCoin>;
+  return typeof coin.wallet === "string" &&
     coin.wallet.length > 0 &&
     typeof coin.symbol === "string" &&
     coin.symbol.trim().length > 0 &&
@@ -110,8 +110,7 @@ function hasValidHoldings(coins: unknown): coins is WalletCoin[] {
       (coin.price.base === "usd" || coin.price.base === "usdt") &&
       Number.isFinite(coin.price.value) &&
       coin.price.value >= 0
-    ))
-  );
+    ));
 }
 
 async function withinSourceTimeout<T>(task: () => Promise<T>, timeoutMs: number): Promise<T> {
@@ -274,9 +273,13 @@ export async function fetchPortfolios(
           }
           await analyzer.preLoad();
           const coins = await analyzer.loadPortfolio();
-          if (!hasValidHoldings(coins)) {
+          const validCoins = Array.isArray(coins) ? coins.filter(isValidHolding) : [];
+          if (!Array.isArray(coins) || (coins.length > 0 && validCoins.length === 0)) {
             getMemoryCacheInstance("data-fetch").clearCache();
             throw new Error("Invalid source holdings");
+          }
+          if (validCoins.length < coins.length) {
+            recordOptionalSourceFailure(analyzer, new Error("Invalid source holdings"), "Some assets");
           }
           const primaryFailure = takeSourceFailure(analyzer);
           if (primaryFailure) {
@@ -289,7 +292,7 @@ export async function fetchPortfolios(
             const cache = getMemoryCacheInstance("data-fetch");
             walletIdentities.forEach((identity) => cache.deleteCache(identity));
           }
-          return { coins, partial };
+          return { coins: validCoins, partial };
         }, kind === "cex" || kind === "sol" || kind === "erc20" || kind === "stock" ? 120_000 : sourceTimeoutMs);
         return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
           hint: source.hint, walletIdentities, status: partial ? "partial" as const : "ok" as const,

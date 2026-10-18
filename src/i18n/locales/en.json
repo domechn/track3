@@ -220,6 +220,7 @@
   "refresh.partialToast": "Partial sources: {sources}. Some balances could not be read.",
   "refresh.partialToastLower": "Partial sources: {sources}. Some balances could not be read; totals may be lower than usual.",
   "refresh.endpoint.other": "Some products",
+  "refresh.endpoint.assets": "Some assets",
   "refresh.endpoint.earn": "Earn",
   "refresh.endpoint.fixedTermEarn": "Fixed-term Earn",
   "refresh.endpoint.staking": "Staking",
