@@ -235,6 +235,10 @@ export class CacheCenter {
 		return cv.data as T
 	}
 
+	public deleteCache(key: string) {
+		this.provider.delete(key)
+	}
+
 	public clearCache() {
 		console.debug("clear cache")
 

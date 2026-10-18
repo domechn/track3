@@ -1673,6 +1673,51 @@ describe("partial source snapshots", () => {
     { sourceId: "btc:1", label: "BTC wallet 2", walletIdentities: ["wallet-b"], status: "ok" as const, coins: [{ symbol: "ETH", assetType: "crypto" as const, amount: 2, wallet: "wallet-b", price: { base: "usd" as const, value: 20 } }] },
   ];
 
+  it("persists fresh partial balances without replacing them with the previous source total", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 1, uuid: "previous", createdAt: "2026-07-13T01:02:03.000Z", assetType: "crypto",
+      wallet: md5("wallet-a"), symbol: "BTC", amount: 3, value: 300, price: 100,
+    }]] as never);
+    const partialCoin = { symbol: "BTC", assetType: "crypto" as const, amount: 2, wallet: "wallet-a",
+      price: { base: "usd" as const, value: 100 } };
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [partialCoin],
+      sourceResults: [{ sourceId: "cex:0", label: "Gate", walletIdentities: ["wallet-a"], status: "partial",
+        partial: { category: "network", endpoints: ["Dual investment"] }, coins: [partialCoin] }],
+      failedSources: [],
+    } as never);
+    const result = await refreshAllData(vi.fn(), {}, operation);
+    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; amount: number; value: number }> };
+    expect(result.persisted).toBe(true);
+    expect(result.usedLastKnownData).toBe(false);
+    expect(result.sourceStatuses).toEqual([expect.objectContaining({
+      status: "partial", partial: { category: "network", endpoints: ["Dual investment"], lowerThanPrevious: true },
+    })]);
+    expect(payload.assets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: "BTC", amount: 2, value: 200 }),
+    ]));
+  });
+
+  it("omits the source value comparison when a manual entry shares its wallet", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 1, uuid: "previous", createdAt: "2026-07-13T01:02:03.000Z", assetType: "crypto",
+      wallet: md5("wallet-a"), symbol: "BTC", amount: 3, value: 300, price: 100,
+    }]] as never);
+    const exchangeCoin = { symbol: "BTC", assetType: "crypto" as const, amount: 2, wallet: "wallet-a",
+      price: { base: "usd" as const, value: 100 } };
+    const manualCoin = { ...exchangeCoin, amount: 1 };
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ ...exchangeCoin, amount: 3 }],
+      sourceResults: [
+        { sourceId: "cex:0", label: "Gate", walletIdentities: ["wallet-a"], status: "partial",
+          partial: { category: "network", endpoints: ["Earn"] }, coins: [exchangeCoin] },
+        { sourceId: "others", label: "Others", walletIdentities: ["others"], status: "ok", coins: [manualCoin] },
+      ], failedSources: [],
+    } as never);
+    const result = await refreshAllData(vi.fn(), {}, operation);
+    expect(result.sourceStatuses?.[0].partial).toEqual({ category: "network", endpoints: ["Earn"] });
+  });
+
   it("saves successful holdings and carries a failed wallet without a synthetic sale", async () => {
     vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
       id: 1, uuid: "previous", createdAt: "2026-07-13T01:02:03.000Z", assetType: "crypto", wallet: md5("wallet-a"), symbol: "BTC", amount: 3, value: 300, price: 100,
@@ -1897,6 +1942,47 @@ describe("partial source snapshots", () => {
       { sourceId: "btc:1", label: "BTC wallet 2", status: "ok", category: undefined },
     ]);
     expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("keeps the saved partial warning when a retry fails before writing", async () => {
+    const partial = { category: "network" as const, endpoints: ["Earn"] };
+    const oldResult = { sourceId: "cex:0", label: "Gate", walletIdentities: ["gate-key"],
+      status: "partial" as const, partial, coins: [] };
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [], sourceResults: [{ ...oldResult, status: "stale", partial: undefined, category: "network" }],
+      failedSources: [{ sourceId: "cex:0", analyzerName: "Gate", walletIdentities: ["gate-key"],
+        error: "network", category: "network" }],
+    } as never);
+    const result = await refreshAllData(vi.fn(), {
+      retrySourceId: "cex:0", previousSourceResults: [oldResult],
+      previousSourceStatuses: [{ sourceId: "cex:0", label: "Gate", status: "partial", partial }],
+    }, operation);
+    expect(result.persisted).toBe(false);
+    expect(result.sourceStatuses?.[0]).toMatchObject({ status: "partial", partial });
+  });
+
+  it("does not carry an old partial warning onto an OK source after a failed retry", async () => {
+    const oldPartial = { category: "network" as const, endpoints: ["Earn"] };
+    const current = { sourceId: "cex:0", label: "Gate", walletIdentities: ["gate-key"],
+      status: "ok" as const, coins: [] };
+    const failed = { sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-a"],
+      status: "stale" as const, coins: [], category: "network" as const };
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [], sourceResults: [failed],
+      failedSources: [{ sourceId: "btc:0", analyzerName: "BTC wallet 1",
+        walletIdentities: ["wallet-a"], error: "network", category: "network" }],
+    } as never);
+    const result = await refreshAllData(vi.fn(), {
+      retrySourceId: "btc:0",
+      previousSourceResults: [current, failed],
+      previousSourceStatuses: [
+        { sourceId: "cex:0", label: "Gate", status: "partial", partial: oldPartial },
+        { sourceId: "btc:0", label: "BTC wallet 1", status: "stale" },
+      ],
+    }, operation);
+    expect(result.persisted).toBe(false);
+    expect(result.sourceStatuses?.[0]).toMatchObject({ sourceId: "cex:0", status: "ok" });
+    expect(result.sourceStatuses?.[0].partial).toBeUndefined();
   });
 
   it("rejects a retry when source configuration changed since the saved refresh", async () => {

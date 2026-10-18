@@ -1,4 +1,4 @@
-import { recordSourceFailure } from "../utils/source-failure";
+import { recordOptionalSourceFailure } from "../utils/source-failure";
 import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import { retryOnHttpStatus, sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
@@ -38,7 +38,7 @@ export class SOLAnalyzer implements Analyzer {
         const balances = await this.queryBalances(address);
         const earnings = await this.queryEarnings(address).catch((error) => {
           console.error("Failed to query Solana earn positions");
-          recordSourceFailure(this, error);
+          recordOptionalSourceFailure(this, error, "Solana Earn");
           return [];
         });
         return { address, balances, earnings };
@@ -84,7 +84,7 @@ export class SOLAnalyzer implements Analyzer {
           };
         }
         const token = tokens[b.ca];
-        if (!token || !(token.price > 0)) {
+        if (!token) {
           return null;
         }
         return {

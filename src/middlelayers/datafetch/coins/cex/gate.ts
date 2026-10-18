@@ -205,7 +205,7 @@ export class GateExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch fixed-term balance failed")
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, "Fixed-term Earn")
 			return {}
 		}
 	}
@@ -228,7 +228,7 @@ export class GateExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch staking balance failed")
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, "Staking")
 			return {}
 		}
 	}
@@ -242,7 +242,7 @@ export class GateExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch dual investment balance failed")
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, "Dual investment")
 			return {}
 		}
 	}
@@ -262,7 +262,7 @@ export class GateExchange implements Exchanger {
 				console.debug("No portfolio account")
 				return {}
 			}
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, "Portfolio")
 			return {}
 		}
 	}
@@ -291,7 +291,7 @@ export class GateExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch margin balance failed")
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, "Margin")
 			return {}
 		}
 	}
@@ -318,7 +318,7 @@ export class GateExchange implements Exchanger {
 			return await fetcher()
 		} catch (error) {
 			console.error(`Fetch Gate ${productName} balance failed`)
-			recordOptionalSourceFailure(this, error)
+			recordOptionalSourceFailure(this, error, productName)
 			return {}
 		}
 	}

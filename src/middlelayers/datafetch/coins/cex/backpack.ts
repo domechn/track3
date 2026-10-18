@@ -147,7 +147,7 @@ export class BackpackExchange implements Exchanger {
 			return await fetcher()
 		} catch (e) {
 			console.error(`Fetch Backpack ${productName} balance failed:`)
-			recordOptionalSourceFailure(this, e)
+			recordOptionalSourceFailure(this, e, productName)
 			return {}
 		}
 	}

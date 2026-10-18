@@ -193,6 +193,22 @@ describe("alert storage", () => {
     expect(data.snapshots[0].staleAssetKeys).toContain("crypto:BTC");
   });
 
+  it("allows portfolio alerts when a source has fresh partial holdings", async () => {
+    vi.mocked(getDatabase).mockResolvedValue({
+      select: async (sql: string) => sql.includes("FROM assets_v2")
+        ? [{ assetType: "crypto", symbol: "BTC", wallet: "wallet-a", value: 600, amount: 10, price: 60, at: now.toISOString() }]
+        : [],
+    } as never);
+    const data = await loadAlertEvaluationData(
+      [{ sourceId: "cex:0", label: "Gate", walletIdentities: ["wallet-a"], status: "partial", coins: [],
+        partial: { category: "network", endpoints: ["Earn"] } }],
+      [{ sourceId: "cex:0", label: "Gate", status: "partial", partial: { category: "network", endpoints: ["Earn"] } }],
+      now,
+    );
+    expect(data.snapshots[0].hasStaleSources).toBe(false);
+    expect(evaluate([rule({ threshold: 600 })], data.snapshots, {}, undefined, now)).toHaveLength(1);
+  });
+
   it("marks an old startup snapshot as stale before evaluating goals", async () => {
     vi.mocked(getDatabase).mockResolvedValue({
       select: async (sql: string) => sql.includes("FROM assets_v2")

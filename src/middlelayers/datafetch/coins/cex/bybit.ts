@@ -97,12 +97,12 @@ export class BybitExchange implements Exchanger {
       this.fetchWalletBalance(),
       this.fetchEarnBalance().catch((e) => {
         console.error("Fetch Bybit earn balance failed:");
-        recordOptionalSourceFailure(this, e);
+        recordOptionalSourceFailure(this, e, "Earn");
         return {};
       }),
       this.fetchAdvanceEarnBalance().catch((e) => {
         console.error("Fetch Bybit advance earn balance failed:");
-        recordOptionalSourceFailure(this, e);
+        recordOptionalSourceFailure(this, e, "Advanced Earn");
         return {};
       }),
     ]);
@@ -139,7 +139,7 @@ export class BybitExchange implements Exchanger {
     const [flexibleResp, onchainResp] = await Promise.all([
       this.fetchEarnPosition("FlexibleSaving").catch((e) => {
         console.error("Fetch Bybit FlexibleSaving failed:");
-        recordOptionalSourceFailure(this, e);
+        recordOptionalSourceFailure(this, e, "Flexible saving");
         return {
           retCode: 0,
           retMsg: "",
@@ -148,7 +148,7 @@ export class BybitExchange implements Exchanger {
       }),
       this.fetchEarnPosition("OnChain").catch((e) => {
         console.error("Fetch Bybit OnChain failed:");
-        recordOptionalSourceFailure(this, e);
+        recordOptionalSourceFailure(this, e, "On-chain Earn");
         return {
           retCode: 0,
           retMsg: "",

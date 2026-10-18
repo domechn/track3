@@ -243,23 +243,27 @@ export async function refreshAllData(
             requiresDataSourceAction: true,
             usedLastKnownData: false,
             sourceResults: currentQueryResult.sourceResults,
-            sourceStatuses: currentQueryResult.sourceResults?.map((source) => ({
-              sourceId: source.sourceId,
-              label: source.label,
-              kind: source.kind,
-              provider: source.provider,
-              hint: source.hint,
-              detail: source.detail,
-              status: source.status === "ok"
-                ? "ok" as const
-                : options.previousSourceStatuses?.find(
-                    (previous) => previous.sourceId === source.sourceId,
-                  )?.status ?? "failed" as const,
-              category: source.category,
-              lastSuccessAt: options.previousSourceStatuses?.find(
+            sourceStatuses: currentQueryResult.sourceResults?.map((source) => {
+              const previousStatus = options.previousSourceStatuses?.find(
                 (previous) => previous.sourceId === source.sourceId,
-              )?.lastSuccessAt,
-            })),
+              );
+              const status = source.status !== "stale"
+                ? source.status
+                : previousStatus?.status ?? "failed" as const;
+              const partial = status === "partial" ? source.partial ?? previousStatus?.partial : undefined;
+              return {
+                sourceId: source.sourceId,
+                label: source.label,
+                kind: source.kind,
+                provider: source.provider,
+                hint: source.hint,
+                detail: source.detail,
+                status,
+                ...(partial ? { partial } : {}),
+                category: source.category,
+                lastSuccessAt: previousStatus?.lastSuccessAt,
+              };
+            }),
             persisted: false,
             portfolioInputGeneration: options.previousInputGeneration,
             refreshCreatedAt: options.previousRefreshCreatedAt,
@@ -308,8 +312,8 @@ export async function refreshAllData(
         );
         const sourceStatuses = readyQueryResult.portfolioResult.sourceResults?.map(
           (source): PortfolioSourceStatus => {
-            const status = source.status === "ok"
-              ? "ok"
+            const status = source.status !== "stale"
+              ? source.status
               : latestBaseline.some(
                   (asset) =>
                     asset.amount !== 0 &&
@@ -322,9 +326,23 @@ export async function refreshAllData(
             const previousSuccess = options.previousSourceStatuses?.find(
               (previous) => previous.sourceId === source.sourceId,
             )?.lastSuccessAt;
-            const lastSuccessAt = status === "ok" ? refreshCreatedAt : previousSuccess ??
+            const lastSuccessAt = (status === "ok" || status === "partial") ? refreshCreatedAt : previousSuccess ??
               (status === "stale" && Number.isFinite(latestAssetSnapshotTimestamp)
                 ? new Date(latestAssetSnapshotTimestamp).toISOString() : undefined);
+            const previousSourceAssets = latestBaseline.filter((asset) =>
+              source.walletIdentities.some((identity) => isSameWallet(identity, asset.wallet ?? "")));
+            const sharesIdentity = readyQueryResult.portfolioResult.sourceResults?.some((other) =>
+              other.sourceId !== source.sourceId && (
+                other.walletIdentities.some((identity) =>
+                  source.walletIdentities.some((own) => isSameWallet(own, identity))) ||
+                other.coins.some((coin) =>
+                  source.walletIdentities.some((own) => isSameWallet(own, coin.wallet)))
+              ));
+            const lowerThanPrevious = source.partial && previousSourceAssets.length && !sharesIdentity
+              ? calculateTotalValue(canonicalizePortfolioCoins(source.coins, canonicalization),
+                  readyQueryResult.valueContext.priceMap).reduce((sum, coin) => sum + coin.usdValue, 0) <
+                previousSourceAssets.reduce((sum, asset) => sum + asset.value, 0)
+              : undefined;
             return {
               sourceId: source.sourceId,
               label: source.label,
@@ -332,13 +350,16 @@ export async function refreshAllData(
               provider: source.provider,
               hint: source.hint,
               status,
+              ...(source.partial ? { partial: { ...source.partial,
+                ...(lowerThanPrevious !== undefined ? { lowerThanPrevious } : {}) } } : {}),
               category: source.category,
               detail: source.detail,
               ...(lastSuccessAt ? { lastSuccessAt } : {}),
             };
           },
         );
-        if (sourceStatuses?.length && sourceStatuses.every((source) => source.status !== "ok")) {
+        if (sourceStatuses?.length && sourceStatuses.every((source) =>
+          source.status === "stale" || source.status === "failed")) {
           return {
             failedSources: readyQueryResult.failedSources,
             requiresDataSourceAction: true,

@@ -12,7 +12,7 @@ import { BybitExchange } from "./bybit";
 import { HtxExchange } from "./htx";
 import { MexcExchange } from "./mexc";
 import { BackpackExchange } from "./backpack";
-import { takeSourceFailure } from "../../utils/source-failure";
+import { takeSourceFailure, transferOptionalSourceFailures } from "../../utils/source-failure";
 
 export interface Exchanger {
   getExchangeName(): string;
@@ -94,9 +94,10 @@ export class CexAnalyzer implements Analyzer {
     }
 
     const portfolio = await ex.fetchTotalBalance();
-    const partialFailure = takeSourceFailure(ex);
-    if (partialFailure) throw partialFailure;
-    cc.setCache(cacheKey, portfolio, ttl, cacheGeneration);
+    const primaryFailure = takeSourceFailure(ex);
+    if (primaryFailure) throw primaryFailure;
+    const partial = transferOptionalSourceFailures(ex, this);
+    if (!partial) cc.setCache(cacheKey, portfolio, ttl, cacheGeneration);
     return portfolio;
   }
 

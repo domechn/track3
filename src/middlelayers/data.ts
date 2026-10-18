@@ -38,7 +38,7 @@ import {
 import { SUIAnalyzer } from "./datafetch/coins/sui";
 import { StockAnalyzer } from "./datafetch/coins/stock/stock-analyzer";
 import { getAddressList } from "./datafetch/utils/address";
-import { classifySourceError, takeSourceFailure } from "./datafetch/utils/source-failure";
+import { classifySourceError, takeOptionalSourceFailures, takeSourceFailure } from "./datafetch/utils/source-failure";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
 import { FullRefreshRequiredError } from "./refresh-error";
 import { configuredSecretValues, redactSecrets } from "./security/redact";
@@ -264,7 +264,7 @@ export async function fetchPortfolios(
       }
       let walletIdentities = source.walletIdentities;
       try {
-        const portfolio = await withinSourceTimeout(async () => {
+        const { coins: portfolio, partial } = await withinSourceTimeout(async () => {
           if (source.unsupported) throw new Error("Unsupported exchange");
           const analyzer = new source.AnalyzerClass(source.config, userInfo.license);
           if (analyzer.getWalletIdentities) {
@@ -278,16 +278,22 @@ export async function fetchPortfolios(
             getMemoryCacheInstance("data-fetch").clearCache();
             throw new Error("Invalid source holdings");
           }
-          const partialFailure = takeSourceFailure(analyzer);
-          if (partialFailure) {
+          const primaryFailure = takeSourceFailure(analyzer);
+          if (primaryFailure) {
             getMemoryCacheInstance("data-fetch").clearCache();
-            throw partialFailure;
+            throw primaryFailure;
           }
           await analyzer.postLoad();
-          return coins;
-        }, kind === "cex" || kind === "sol" || kind === "stock" ? 120_000 : sourceTimeoutMs);
+          const partial = takeOptionalSourceFailures(analyzer);
+          if (partial && (kind === "sol" || kind === "sui")) {
+            const cache = getMemoryCacheInstance("data-fetch");
+            walletIdentities.forEach((identity) => cache.deleteCache(identity));
+          }
+          return { coins, partial };
+        }, kind === "cex" || kind === "sol" || kind === "erc20" || kind === "stock" ? 120_000 : sourceTimeoutMs);
         return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
-          hint: source.hint, walletIdentities, status: "ok" as const, coins: portfolio };
+          hint: source.hint, walletIdentities, status: partial ? "partial" as const : "ok" as const,
+          coins: portfolio, ...(partial ? { partial } : {}) };
       } catch (error) {
         // Upstream messages can contain credentials and request URLs. Keep only a category.
         if (error instanceof Error && error.message === "Source timed out") {

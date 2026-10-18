@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendHttpRequest } from "../utils/http";
 import { getMemoryCacheInstance } from "../utils/cache";
 import { SOLAnalyzer } from "./sol";
-import { takeSourceFailure } from "../utils/source-failure";
+import { takeOptionalSourceFailures, takeSourceFailure } from "../utils/source-failure";
 
 vi.mock("../utils/http", async () => {
   const actual = await vi.importActual<typeof import("../utils/http")>(
@@ -145,7 +145,7 @@ describe("SOLAnalyzer", () => {
     expect(takeSourceFailure(analyzer)).toBeUndefined();
   });
 
-  it("skips an unpriced listed mint without failing the wallet", async () => {
+  it("keeps an unpriced listed mint for snapshot continuity", async () => {
     vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
       if (url.includes("/holdings/")) return { uiAmount: 1, tokens: { UnpricedMint: [{ uiAmount: 3 }] } };
       if (url.includes("/search?")) return [{ id: "UnpricedMint", name: "Unpriced", symbol: "DUST", usdPrice: 0 }];
@@ -155,6 +155,8 @@ describe("SOLAnalyzer", () => {
     const portfolio = analyzer.loadPortfolio();
     await vi.runAllTimersAsync();
     await expect(portfolio).resolves.toEqual([
+      { symbol: "DUST", assetType: "crypto", amount: 3, price: { value: 0, base: "usd" },
+        wallet: SOL_ADDRESS, chain: "sol" },
       { symbol: "SOL", assetType: "crypto", amount: 1, wallet: SOL_ADDRESS, chain: "sol" },
     ]);
     expect(takeSourceFailure(analyzer)).toBeUndefined();
@@ -183,6 +185,9 @@ describe("SOLAnalyzer", () => {
         chain: "sol",
       },
     ]);
+    expect(takeOptionalSourceFailures(analyzer)).toEqual({
+      category: "network", endpoints: ["Solana Earn"],
+    });
   });
 
   it("filters a zero native balance", async () => {

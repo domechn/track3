@@ -256,10 +256,8 @@ export function isHttpStatusError(
     return error.status === status;
   }
   if (error instanceof Error) {
-    return (
-      error.message.includes(`status ${status}`) ||
-      error.message.includes(`${status}`)
-    );
+    return new RegExp(`(?:^${status}(?:$|[\\s,:])|\\b(?:status|HTTP)\\s+${status}\\b)`, "i")
+      .test(error.message);
   }
   return false;
 }

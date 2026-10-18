@@ -94,11 +94,11 @@ export class CoinbaseExchange implements Exchanger {
 						await this.addPerpPortfolioBalances(portfolio.uuid, balances)
 					}
 				} catch (error) {
-					console.warn(`Failed to fetch portfolio ${portfolio.uuid} balances:`)
-					if (portfolio.type === 'INTX') {
-						recordOptionalSourceFailure(this, error)
-					} else {
+					console.warn("Failed to fetch Coinbase portfolio balances")
+					if (portfolio.type === 'DEFAULT') {
 						recordSourceFailure(this, error)
+					} else {
+						recordOptionalSourceFailure(this, error, `Portfolio ${portfolio.type}`, true)
 					}
 				}
 			})

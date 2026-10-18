@@ -109,17 +109,17 @@ export class HtxExchange implements Exchanger {
 			this.fetchSpotBalance(accounts),
 			this.fetchEarnBalance(accounts).catch(e => {
 				console.error("Fetch HTX earn balance failed:")
-				recordOptionalSourceFailure(this, e)
+				recordOptionalSourceFailure(this, e, "Earn")
 				return {}
 			}),
 			this.fetchFuturesBalance().catch(e => {
 				console.error("Fetch HTX futures balance failed:")
-				recordOptionalSourceFailure(this, e)
+				recordOptionalSourceFailure(this, e, "Futures")
 				return {}
 			}),
 			this.fetchCrossMarginBalance(accounts).catch(e => {
 				console.error("Fetch HTX cross margin balance failed:")
-				recordOptionalSourceFailure(this, e)
+				recordOptionalSourceFailure(this, e, "Cross margin")
 				return {}
 			})
 		])
@@ -235,17 +235,17 @@ export class HtxExchange implements Exchanger {
 		const [usdtIsolated, usdtCross, coinSwap] = await Promise.all([
 			this.fetchUsdtSwapIsolatedBalance().catch(e => {
 				console.error("Fetch HTX USDT isolated swap balance failed:")
-				recordOptionalSourceFailure(this, e)
+				recordOptionalSourceFailure(this, e, "USDT isolated swap")
 				return {}
 			}),
 			this.fetchUsdtSwapCrossBalance().catch(e => {
 				console.error("Fetch HTX USDT cross swap balance failed:")
-				recordOptionalSourceFailure(this, e)
+				recordOptionalSourceFailure(this, e, "USDT cross swap")
 				return {}
 			}),
 			this.fetchCoinSwapBalance().catch(e => {
 				console.error("Fetch HTX coin swap balance failed:")
-				recordOptionalSourceFailure(this, e)
+				recordOptionalSourceFailure(this, e, "Coin swap")
 				return {}
 			})
 		])
