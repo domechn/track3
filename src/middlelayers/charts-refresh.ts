@@ -322,7 +322,9 @@ export async function refreshAllData(
             const previousSuccess = options.previousSourceStatuses?.find(
               (previous) => previous.sourceId === source.sourceId,
             )?.lastSuccessAt;
-            const lastSuccessAt = status === "ok" ? refreshCreatedAt : previousSuccess;
+            const lastSuccessAt = status === "ok" ? refreshCreatedAt : previousSuccess ??
+              (status === "stale" && Number.isFinite(latestAssetSnapshotTimestamp)
+                ? new Date(latestAssetSnapshotTimestamp).toISOString() : undefined);
             return {
               sourceId: source.sourceId,
               label: source.label,

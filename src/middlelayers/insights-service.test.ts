@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { formatInsight, loadInsightCard, summarizeInsights, type InsightCard } from "./insights-service";
-import type { Insight } from "./insights";
+import { computeInsights, type Insight } from "./insights";
 import en from "@/i18n/locales/en.json";
 import zh from "@/i18n/locales/zh.json";
 import { loadInsightCardData } from "./configuration";
@@ -89,6 +89,23 @@ describe("summarizeInsights", () => {
     await summarizeInsights({ ...privateCard, snapshotUuid: "snapshot-b", summary, summaryLocale: "zh",
       summarySnapshotUuid: "snapshot-a" }, config, "zh", fake);
     expect(fake).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps masked key and address hints out of model-facing insight text", async () => {
+    const fake = vi.fn().mockResolvedValue({ ok: true, content: "One source failed.\nAnother is stale.\nReview them locally." });
+    const sourceInsights = computeInsights({
+      snapshots: [{ uuid: "snapshot-a", at: "2026-10-17T12:30:00Z", assets: [] }],
+      sourceStatuses: [
+        { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "ab12…9xyz", status: "failed" },
+        { sourceId: "btc:0", label: "Vault", kind: "wallet", provider: "BTC", hint: "bc1q12…abcd", status: "stale" },
+      ],
+    });
+    await summarizeInsights({ ...card, insights: sourceInsights }, config, "en", fake);
+    const prompt = JSON.stringify(fake.mock.calls[0][0].messages);
+    expect(prompt).not.toContain("ab12…9xyz");
+    expect(prompt).not.toContain("bc1q12…abcd");
+    expect(JSON.stringify(sourceInsights)).not.toContain("ab12…9xyz");
+    expect(JSON.stringify(sourceInsights)).not.toContain("bc1q12…abcd");
   });
 
   it("does not cache timeout or failure and permits regeneration", async () => {

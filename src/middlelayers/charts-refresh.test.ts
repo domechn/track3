@@ -1691,7 +1691,7 @@ describe("partial source snapshots", () => {
     expect(payload.txns).not.toContainEqual(expect.objectContaining({ symbol: "BTC", txnType: "sell" }));
     expect(result.sourceStatuses).toEqual(expect.arrayContaining([expect.objectContaining({ sourceId: "btc:0", status: "stale" })]));
     expect(result.sourceStatuses?.find((source) => source.sourceId === "btc:0")?.lastSuccessAt)
-      .toBeUndefined();
+      .toBe("2026-07-13T01:02:03.000Z");
   });
 
   it("keeps the last snapshot when all sources fail", async () => {

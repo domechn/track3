@@ -1,4 +1,4 @@
-import { createElement, useContext, useState } from "react";
+import { useContext, useState } from "react";
 import {
   refreshAllData,
   type RefreshAllDataResult,
@@ -149,7 +149,8 @@ const App = ({
             ? unavailable ? t("refresh.partial").replace("{sources}", unavailable) : t("refresh.partialGeneric")
             : t("refresh.success") });
       } else {
-        const unavailable = insightStatuses.filter((source) => source.status !== "ok").map((source) =>
+        const unavailable = insightStatuses.filter((source) => source.status !== "ok" &&
+          (!sourceId || source.sourceId === sourceId)).map((source) =>
           sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
         const key = sourceId ? "refresh.sourceRetryFailed" : "refresh.allSourcesFailed";
         toast({ description: unavailable ? t(key).replace("{sources}", unavailable) : t(`${key}Generic`),
@@ -254,22 +255,21 @@ const App = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-2 max-h-80 space-y-2 overflow-y-auto">
-            {sortedStatuses.map((source) => (
+            {sortedStatuses.map((source) => {
+              const Icon = kindIcon[source.kind ?? "others"];
+              const StatusIcon = statusIcon[source.status];
+              return (
               <div key={source.sourceId} role="group" aria-label={displayIdentity(source)}
                 data-source-status-row className="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold break-all">{sourceLabel(source)}</div>
                   {source.provider && <div className="text-xs text-muted-foreground">
-                    {createElement(kindIcon[source.kind ?? "others"], {
-                      "aria-hidden": true, className: "mr-1 inline-block h-3.5 w-3.5",
-                    })}
+                    <Icon aria-hidden="true" className="mr-1 inline-block h-3.5 w-3.5" />
                     {source.provider}{source.hint && ` · ${displayHint(source)}`}
                   </div>}
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${statusStyle[source.status]}`}>
-                      {createElement(statusIcon[source.status], {
-                        "aria-hidden": true, className: "h-3.5 w-3.5",
-                      })}
+                      <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />
                       {t(`refresh.status.${source.status}`)}
                     </span>
                     {source.status !== "ok" && <span className="text-muted-foreground">
@@ -294,14 +294,14 @@ const App = ({
                     aria-label={t("refresh.retrySource").replace("{source}", displayIdentity(source))}
                     onClick={() => runRefresh(source.sourceId)}
                   >
-                    {t("refresh.retrySource").replace("{source}", displayIdentity(source))}
+                    {t("refresh.retryButton")}
                   </Button>
                 )}
               </div>
-            ))}
+            ); })}
           </div>
           <AlertDialogFooter>
-            {failedStatuses.length > 0 && lastResult?.sourceResults && <Button variant="outline"
+            {failedStatuses.length > 0 && <Button variant="outline"
               disabled={refreshLoading} onClick={() => runRefresh()}>{t("refresh.retryAllFailed")}</Button>}
             <AlertDialogCancel>{t("refresh.close")}</AlertDialogCancel>
           </AlertDialogFooter>
