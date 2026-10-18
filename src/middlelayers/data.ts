@@ -41,7 +41,9 @@ import { getAddressList } from "./datafetch/utils/address";
 import { classifySourceError, takeSourceFailure } from "./datafetch/utils/source-failure";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
 import { FullRefreshRequiredError } from "./refresh-error";
-import { redactSecrets } from "./security/redact";
+import { configuredSecretValues, redactSecrets } from "./security/redact";
+import { maskSourceIdentifier } from "./source-status";
+import { CEX_OPTIONS, STOCK_BROKER_OPTIONS } from "./constants";
 import {
   type FailedPortfolioSource,
   type LoadPortfoliosResult,
@@ -129,6 +131,10 @@ async function withinSourceTimeout<T>(task: () => Promise<T>, timeoutMs: number)
 type SourceSpec = {
   sourceId: string;
   label: string;
+  kind: "exchange" | "wallet" | "broker" | "others";
+  provider: string;
+  hint: string;
+  fallbackHint: string;
   walletIdentities: string[];
   config: GlobalConfig;
   AnalyzerClass: new (config: GlobalConfig, license?: string) => Analyzer;
@@ -137,6 +143,8 @@ type SourceSpec = {
 
 function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): SourceSpec[] {
   const sources: SourceSpec[] = [];
+  const secrets = configuredSecretValues(config);
+  const nextNumber = (provider: string) => `#${sources.filter((source) => source.provider === provider).length + 1}`;
   const addAddresses = (
     kind: "erc20" | "sol" | "btc" | "doge" | "trc20" | "ton" | "sui",
     AnalyzerClass: SourceSpec["AnalyzerClass"],
@@ -150,6 +158,10 @@ function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): 
         label: typeof alias === "object" && alias.alias?.trim()
           ? alias.alias.trim()
           : `${kind.toUpperCase()} wallet ${index + 1}`,
+        kind: "wallet",
+        provider: kind.toUpperCase(),
+        hint: maskSourceIdentifier(address, 6) ?? `#${index + 1}`,
+        fallbackHint: `#${index + 1}`,
         walletIdentities: [address],
         config: { ...config, [kind]: { addresses: [address] } },
         AnalyzerClass,
@@ -158,9 +170,18 @@ function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): 
   };
   addAddresses("erc20", (userInfo.isPro ? ERC20ProAnalyzer : ERC20NormalAnalyzer) as SourceSpec["AnalyzerClass"]);
   (config.exchanges ?? []).filter((exchange) => exchange.active !== false).forEach((exchange, index) => {
+    const provider = CEX_OPTIONS.find((option) => option.value === exchange.name.toLowerCase())?.label
+      ?? (exchange.name.toLowerCase() === "okx" ? "OKX"
+        : exchange.name.charAt(0).toUpperCase() + exchange.name.slice(1));
+    const fallbackHint = nextNumber(provider);
+    const maskedKey = maskSourceIdentifier(exchange.initParams.apiKey, 4);
     sources.push({
       sourceId: `cex:${index}`,
       label: exchange.alias?.trim() || `${exchange.name} ${index + 1}`,
+      kind: "exchange",
+      provider,
+      hint: maskedKey ?? fallbackHint,
+      fallbackHint,
       walletIdentities: [`${exchange.name === "okx" ? "okex" : exchange.name}-${exchange.initParams.apiKey}`],
       config: { ...config, exchanges: [exchange] },
       AnalyzerClass: CexAnalyzer,
@@ -172,6 +193,10 @@ function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): 
     sources.push({
       sourceId: "others",
       label: "Others",
+      kind: "others",
+      provider: "Others",
+      hint: "#1",
+      fallbackHint: "#1",
       walletIdentities: [OthersAnalyzer.wallet],
       config,
       AnalyzerClass: OthersAnalyzer,
@@ -183,14 +208,28 @@ function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): 
   addAddresses("ton", TonAnalyzer);
   addAddresses("sui", SUIAnalyzer);
   (config.stockConfig?.brokers ?? []).filter((broker) => broker.active !== false).forEach((broker, index) => {
+    const provider = STOCK_BROKER_OPTIONS.find((option) => option.value === broker.name.toLowerCase())?.label
+      ?? broker.name.charAt(0).toUpperCase() + broker.name.slice(1);
+    const fallbackHint = nextNumber(provider);
     sources.push({
       sourceId: `stock:${index}`,
       label: broker.alias?.trim() || `${broker.name.toUpperCase()} ${index + 1}`,
+      kind: "broker",
+      provider,
+      hint: fallbackHint,
+      fallbackHint,
       walletIdentities: [`${broker.name}:${broker.initParams.queryId}`],
       config: { ...config, stockConfig: { brokers: [broker] } },
       AnalyzerClass: StockAnalyzer,
     });
   });
+  sources.forEach((source) => {
+    source.label = redactSecrets(source.label, secrets);
+    source.provider = redactSecrets(source.provider, secrets);
+  });
+  const duplicates = sources.filter((source) => sources.some((other) => other !== source &&
+    other.label === source.label && other.provider === source.provider && other.hint === source.hint));
+  duplicates.forEach((source) => { source.hint = source.fallbackHint; });
   return sources;
 }
 
@@ -247,14 +286,18 @@ export async function fetchPortfolios(
           await analyzer.postLoad();
           return coins;
         }, kind === "cex" || kind === "sol" || kind === "stock" ? 120_000 : sourceTimeoutMs);
-        return { sourceId: source.sourceId, label: source.label, walletIdentities, status: "ok" as const, coins: portfolio };
+        return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
+          hint: source.hint, walletIdentities, status: "ok" as const, coins: portfolio };
       } catch (error) {
         // Upstream messages can contain credentials and request URLs. Keep only a category.
         if (error instanceof Error && error.message === "Source timed out") {
           getMemoryCacheInstance("data-fetch").clearCache();
         }
         const category = classifySourceError(error);
-        return { sourceId: source.sourceId, label: source.label, walletIdentities, status: "stale" as const, coins: [], category };
+        const detail = error instanceof Error && ["Source timed out", "Unsupported exchange", "Invalid source holdings"].includes(error.message)
+          ? error.message : undefined;
+        return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
+          hint: source.hint, walletIdentities, status: "stale" as const, coins: [], category, detail };
       } finally {
         addProgress(perProgressPer);
       }

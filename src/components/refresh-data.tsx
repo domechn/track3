@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { createElement, useContext, useState } from "react";
 import {
   refreshAllData,
   type RefreshAllDataResult,
@@ -9,7 +9,10 @@ import { v4 as uuidv4 } from "uuid";
 import { trackEventWithClientID } from "../utils/app";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "./ui/button";
-import { UpdateIcon } from "@radix-ui/react-icons";
+import {
+  ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
+  ExclamationTriangleIcon, GlobeIcon, UpdateIcon,
+} from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
 import { updateAllCurrencyRates } from "@/middlelayers/configuration";
@@ -28,6 +31,7 @@ import { ALERT_SOURCE_STATUS_STORAGE_KEY, processAlerts } from "@/middlelayers/a
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
+import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "@/middlelayers/source-status";
 
 const retries = 3;
 const retryInterval = 3000;
@@ -37,18 +41,7 @@ function readStoredStatuses(): PortfolioSourceStatus[] {
   try {
     const stored = localStorage.getItem(sourceStatusStorageKey);
     if (!stored) return [];
-    const value: unknown = JSON.parse(stored);
-    if (!Array.isArray(value)) return [];
-    const statuses = value.filter((source): source is PortfolioSourceStatus =>
-      source && typeof source.sourceId === "string" && typeof source.label === "string" &&
-      ["ok", "stale", "failed"].includes(source.status) &&
-      (source.category === undefined || ["auth", "network", "rateLimit", "unsupported", "other"].includes(source.category)),
-    ).map((source) => ({
-      sourceId: source.sourceId,
-      label: redactSecrets(source.label),
-      status: source.status,
-      ...(source.category ? { category: source.category } : {}),
-    }));
+    const statuses = normalizeSourceStatuses(JSON.parse(stored));
     if (stored !== JSON.stringify(statuses)) localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
     return statuses;
   } catch {
@@ -125,7 +118,7 @@ const App = ({
               previousSnapshotId: lastResult?.snapshotId ?? null,
               previousSnapshotKey: lastResult?.snapshotKey,
             }
-          : {},
+          : sourceStatuses.length ? { previousSourceStatuses: sourceStatuses } : {},
         operation,
         (attempt) => retry(attempt, retries, retryInterval),
       );
@@ -135,15 +128,10 @@ const App = ({
         getMemoryCacheInstance("data-fetch").clearCache();
       }
       if (result.sourceStatuses) {
-        const statuses = result.sourceStatuses.map((source) => ({
-          sourceId: source.sourceId,
-          label: redactSecrets(source.label),
-          status: source.status,
-          ...(source.category ? { category: source.category } : {}),
-        }));
+        const statuses = normalizeSourceStatuses(result.sourceStatuses);
         setSourceStatuses(statuses);
         insightStatuses = statuses;
-        setStatusDialogOpen(result.sourceStatuses.some((source) => source.status !== "ok"));
+        setStatusDialogOpen(statuses.some((source) => source.status !== "ok"));
         try {
           localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
         } catch {
@@ -152,14 +140,20 @@ const App = ({
       }
       setLastResult(result);
       if (succeeded) {
-        const incomplete = result.sourceStatuses?.some((source) => source.status === "failed");
+        const unavailable = insightStatuses.filter((source) => source.status !== "ok").map((source) =>
+          sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
+        const incomplete = insightStatuses.some((source) => source.status === "failed");
         toast({ description: incomplete
-          ? t("refresh.incomplete")
+          ? t("refresh.incomplete").replace("{sources}", unavailable)
           : result.usedLastKnownData
-            ? t("refresh.partial")
+            ? unavailable ? t("refresh.partial").replace("{sources}", unavailable) : t("refresh.partialGeneric")
             : t("refresh.success") });
       } else {
-        toast({ description: t(sourceId ? "refresh.sourceRetryFailed" : "refresh.allSourcesFailed"), variant: "destructive" });
+        const unavailable = insightStatuses.filter((source) => source.status !== "ok").map((source) =>
+          sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
+        const key = sourceId ? "refresh.sourceRetryFailed" : "refresh.allSourcesFailed";
+        toast({ description: unavailable ? t(key).replace("{sources}", unavailable) : t(`${key}Generic`),
+          variant: "destructive" });
       }
       trackEventWithClientID("data_refreshed", {
         failedSources: result.sourceStatuses?.filter((source) => source.status !== "ok").map((source) => source.sourceId).join(",") ?? "",
@@ -205,6 +199,26 @@ const App = ({
     }
     return source.sourceId === "others" ? t("refresh.othersSource") : source.label;
   };
+  const displayIdentity = (source: PortfolioSourceStatus) =>
+    sourceIdentity({ ...source, label: sourceLabel(source) });
+  const displayHint = (source: PortfolioSourceStatus) =>
+    source.kind === "exchange" && source.hint && !source.hint.startsWith("#")
+      ? `${t("refresh.hint.apikey")} ${source.hint}` : source.hint;
+  const sortedStatuses = sortSourceStatuses(sourceStatuses);
+  const failedStatuses = sortedStatuses.filter((source) => source.status === "failed");
+  const failedNames = failedStatuses.map(displayIdentity).join(", ");
+  const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
+  const statusStyle = {
+    ok: "border-green-600/30 bg-green-600/10 text-green-800 dark:text-green-300",
+    stale: "border-amber-600/30 bg-amber-600/10 text-amber-900 dark:text-amber-300",
+    failed: "border-red-600/30 bg-red-600/10 text-red-800 dark:text-red-300",
+  };
+  const statusIcon = { ok: CheckIcon, stale: ExclamationTriangleIcon, failed: CrossCircledIcon };
+  const detailKey: Record<string, string> = {
+    "Source timed out": "refresh.detail.timeout",
+    "Unsupported exchange": "refresh.detail.unsupported",
+    "Invalid source holdings": "refresh.detail.invalidholdings",
+  };
 
   return (
     <div className="flex items-center gap-2">
@@ -228,38 +242,67 @@ const App = ({
           <AlertDialogHeader>
             <AlertDialogTitle>{t("refresh.sourceStatus")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {sourceStatuses.some((source) => source.status === "failed")
-                ? t("refresh.incomplete")
+              {failedStatuses.length
+                ? t("refresh.failedSummary")
+                  .replace("{count}", String(failedStatuses.length))
+                  .replace("{total}", String(sourceStatuses.length))
+                  .replace("{sources}", failedNames)
                 : sourceStatuses.some((source) => source.status === "stale")
-                  ? t("refresh.staleWarning")
+                  ? t("refresh.staleWarning").replace("{sources}",
+                    sortedStatuses.filter((source) => source.status === "stale").map(displayIdentity).join(", "))
                   : t("refresh.allCurrent")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-2 max-h-80 space-y-2 overflow-y-auto">
-            {sourceStatuses.map((source) => (
-              <div key={source.sourceId} className="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
+            {sortedStatuses.map((source) => (
+              <div key={source.sourceId} role="group" aria-label={displayIdentity(source)}
+                data-source-status-row className="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold break-all">{sourceLabel(source)}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {t(`refresh.status.${source.status}`)}
-                    {source.status !== "ok" && ` · ${t(`refresh.reason.${source.category ?? "other"}`)}`}
+                  {source.provider && <div className="text-xs text-muted-foreground">
+                    {createElement(kindIcon[source.kind ?? "others"], {
+                      "aria-hidden": true, className: "mr-1 inline-block h-3.5 w-3.5",
+                    })}
+                    {source.provider}{source.hint && ` · ${displayHint(source)}`}
+                  </div>}
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${statusStyle[source.status]}`}>
+                      {createElement(statusIcon[source.status], {
+                        "aria-hidden": true, className: "h-3.5 w-3.5",
+                      })}
+                      {t(`refresh.status.${source.status}`)}
+                    </span>
+                    {source.status !== "ok" && <span className="text-muted-foreground">
+                      {t(`refresh.reason.${source.category ?? "other"}`)}
+                    </span>}
                   </div>
+                  {source.status !== "ok" && source.detail && <details className="mt-1 text-xs text-muted-foreground">
+                    <summary>{t("refresh.details")}</summary>
+                    <span>{redactSecrets(t(detailKey[source.detail]))}</span>
+                  </details>}
+                  {source.status !== "ok" && source.lastSuccessAt && <div className="mt-1 text-xs text-muted-foreground">
+                    {t("refresh.lastData").replace("{time}", new Intl.DateTimeFormat("sv-SE", {
+                      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+                    }).format(new Date(source.lastSuccessAt)))}
+                  </div>}
                 </div>
                 {source.status !== "ok" && lastResult?.sourceResults && (
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={refreshLoading}
-                    aria-label={t("refresh.retrySource").replace("{source}", sourceLabel(source))}
+                    aria-label={t("refresh.retrySource").replace("{source}", displayIdentity(source))}
                     onClick={() => runRefresh(source.sourceId)}
                   >
-                    {t("refresh.retryButton")}
+                    {t("refresh.retrySource").replace("{source}", displayIdentity(source))}
                   </Button>
                 )}
               </div>
             ))}
           </div>
           <AlertDialogFooter>
+            {failedStatuses.length > 0 && lastResult?.sourceResults && <Button variant="outline"
+              disabled={refreshLoading} onClick={() => runRefresh()}>{t("refresh.retryAllFailed")}</Button>}
             <AlertDialogCancel>{t("refresh.close")}</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>

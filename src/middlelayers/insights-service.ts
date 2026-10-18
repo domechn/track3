@@ -9,6 +9,7 @@ import { configuredSecretValues, redactSecrets, sanitizeUntrustedData } from "./
 import type { AIConfig } from "./types";
 import type { CurrencyRateDetail } from "./types";
 import type { PortfolioSourceStatus } from "./portfolio-baseline";
+import { normalizeSourceStatuses } from "./source-status";
 
 export const INSIGHTS_CHANGED_EVENT = "track3-insights-changed";
 export const INSIGHT_QUESTION_STORAGE_KEY = "track3-insight-question";
@@ -46,12 +47,14 @@ const monetaryKeys: Record<string, string[]> = {
 
 export function formatInsight(insight: Insight, t: (key: string) => string, locale: Locale = "en",
   currency?: CurrencyRateDetail): string {
+  const messageKey = insight.messageKey === "insights.stale" && !("sources" in insight.data)
+    ? "insights.staleLegacy" : insight.messageKey;
   return Object.entries(insight.data).reduce((text, [key, value]) =>
     text.replaceAll(`{${key}}`, key === "kind" ? t(`goals.kind.${value}`) :
       key === "window" && insight.messageKey === "insights.mover" ? t(`insights.window.${value}`) :
       typeof value === "number" ? new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US",
         { maximumFractionDigits: 2 }).format((monetaryKeys[insight.messageKey]?.includes(key) ? currency?.rate ?? 1 : 1) * value)
-        : String(value)), t(insight.messageKey)).replaceAll("{currency}", currency?.currency ?? "USD");
+        : String(value)), t(messageKey)).replaceAll("{currency}", currency?.currency ?? "USD");
 }
 
 export async function summarizeInsights(
@@ -164,8 +167,7 @@ export function cancelInsightRefresh(): void {
 function storedStatuses(): PortfolioSourceStatus[] {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(ALERT_SOURCE_STATUS_STORAGE_KEY) ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter((source) => source && typeof source.sourceId === "string" &&
-      typeof source.label === "string" && ["ok", "stale", "failed"].includes(source.status)) : [];
+    return normalizeSourceStatuses(parsed);
   } catch {
     return [];
   }
@@ -194,7 +196,9 @@ export async function refreshInsights(sourceStatuses?: PortfolioSourceStatus[], 
   const newInsights = computeInsights({ ...input, previous: previous?.insights });
   const dismissedIds = previous?.dismissedIds.filter((id) => {
     const old = previous?.insights.find((item) => item.id === id);
-    return old && insights.some((item) => item.id === id && signature(item) === signature(old));
+    return old && insights.some((item) => item.id === id &&
+      (signature(item) === signature(old) || (id === "stale" && !("sources" in old.data) &&
+        item.data.count === old.data.count)));
   }) ?? [];
   const newIds = new Set(newInsights.map((item) => item.id));
   const repeatedIds = regenerate ? [] : insights.filter((item) =>

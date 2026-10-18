@@ -11,6 +11,7 @@ import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
 import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts } from "@/middlelayers/alert-notifications";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
+import axe from "axe-core";
 
 // Hoist mock fn references so they're available inside vi.mock factories
 const mockSetButtonLoading = vi.hoisted(() => vi.fn());
@@ -128,6 +129,9 @@ describe("RefreshData — currency rates refresh ordering", () => {
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
     expect(processAlerts).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      description: "All sources failed. The saved snapshot is unchanged.",
+    }));
   });
   it("calls updateAllCurrencyRates before refreshAllData on button click", async () => {
     const callOrder: string[] = [];
@@ -250,9 +254,9 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText(/Totals may be incomplete/)).toBeTruthy();
+    expect(await screen.findByText(/Failed sources \(1 of 1\): BTC wallet 1/)).toBeTruthy();
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-      description: "All sources failed. The saved snapshot is unchanged.",
+      description: "All sources failed: BTC wallet 1. The saved snapshot is unchanged.",
     }));
   });
 
@@ -313,6 +317,90 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(await screen.findByText("Cold vault")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry Cold vault" })).toBeTruthy();
     expect(localStorage.getItem("track3-refresh-source-statuses")).toContain("Cold vault");
+  });
+
+  it("distinguishes four Main sources, sorts failures first, and retries all failed", async () => {
+    const localLastSuccess = new Date(2026, 9, 17, 12, 30).toISOString();
+    const sourceStatuses = [
+      { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "ab12…9xyz", status: "ok" },
+      { sourceId: "cex:1", label: "Main", kind: "exchange", provider: "OKX", hint: "#1", status: "failed", category: "network" },
+      { sourceId: "btc:0", label: "Main", kind: "wallet", provider: "BTC", hint: "bc1q12…abcd", status: "stale", category: "auth", lastSuccessAt: localLastSuccess },
+      { sourceId: "cex:2", label: "Main", kind: "exchange", provider: "Binance", hint: "#2", status: "failed", category: "network" },
+    ] as const;
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, sourceStatuses, sourceResults: sourceStatuses.map((source) => ({
+        sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
+        hint: source.hint, walletIdentities: [source.sourceId], status: source.status === "ok" ? "ok" : "stale", coins: [],
+      })),
+    } as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
+    expect(dialog).toHaveTextContent("Failed sources (2 of 4)");
+    const rows = Array.from(dialog.querySelectorAll("[data-source-status-row]"));
+    expect(rows).toHaveLength(4);
+    expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
+      "Main (OKX · #1)", "Main (Binance · #2)", "Main (BTC · bc1q12…abcd)", "Main (Binance · ab12…9xyz)",
+    ]);
+    expect(dialog).toHaveTextContent("Binance · API key ab12…9xyz");
+    expect(localStorage.getItem("track3-refresh-source-statuses")).toContain("ab12…9xyz");
+    expect(localStorage.getItem("track3-refresh-source-statuses")).not.toContain("API key");
+    expect(localStorage.getItem("track3-refresh-source-statuses")).not.toContain("ab12-secret-9xyz");
+    expect(screen.getByRole("button", { name: "Retry Main (OKX · #1)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry Main (OKX · #1)" })).toHaveTextContent("Retry Main (OKX · #1)");
+    expect(screen.getByRole("button", { name: "Retry all failed" })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("Last data 2026-10-17 12:30");
+    expect((await axe.run(dialog, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Retry all failed" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(refreshAllData).mock.calls[1][1]).toEqual({
+      previousSourceStatuses: sourceStatuses,
+    });
+  });
+
+  it("translates API key and safe error details for Chinese source rows", async () => {
+    localStorage.setItem(localeLocalStorageKey, "zh");
+    localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
+      { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance",
+        hint: "ab12…9xyz", status: "failed", detail: "Source timed out" },
+      { sourceId: "cex:1", label: "Second", kind: "exchange", provider: "OKX",
+        hint: "#1", status: "failed", detail: "Unsupported exchange" },
+      { sourceId: "btc:0", label: "Wallet", kind: "wallet", provider: "BTC",
+        hint: "#1", status: "stale", detail: "Invalid source holdings" },
+    ]));
+    const user = userEvent.setup();
+    render(<I18nProvider><RefreshData loading={false} /></I18nProvider>);
+    await user.click(screen.getByRole("button", { name: "数据源状态" }));
+    const dialog = screen.getByRole("alertdialog", { name: "数据源状态" });
+    expect(dialog).toHaveTextContent("Binance · API 密钥 ab12…9xyz");
+    expect(dialog).toHaveTextContent("数据源超时");
+    expect(dialog).toHaveTextContent("不支持的交易所");
+    expect(dialog).toHaveTextContent("数据源持仓无效");
+    expect(dialog).not.toHaveTextContent("API key");
+    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("carries the last successful time into a full refresh that fails without saved holdings", async () => {
+    localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
+      { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "#1",
+        status: "ok", lastSuccessAt: "2026-10-17T12:30:00Z" },
+    ]));
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, sourceStatuses: [
+        { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "#1", status: "failed",
+          lastSuccessAt: "2026-10-17T12:30:00Z" },
+      ],
+    } as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(vi.mocked(refreshAllData).mock.calls[0][1]).toEqual({
+      previousSourceStatuses: [{
+        sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "#1",
+        status: "ok", lastSuccessAt: "2026-10-17T12:30:00Z",
+      }],
+    });
   });
 
   it("ignores malformed saved source statuses", () => {

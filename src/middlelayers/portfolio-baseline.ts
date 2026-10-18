@@ -22,6 +22,13 @@ export type SourceErrorCategory =
   | "unsupported"
   | "other";
 
+export type SourceKind = "exchange" | "wallet" | "broker" | "others";
+export type SourceIdentification = {
+  kind?: SourceKind;
+  provider?: string;
+  hint?: string;
+};
+
 export type PortfolioSourceResult = {
   sourceId: string;
   label: string;
@@ -29,14 +36,17 @@ export type PortfolioSourceResult = {
   status: "ok" | "stale";
   coins: WalletCoin[];
   category?: SourceErrorCategory;
-};
+  detail?: string;
+} & SourceIdentification;
 
 export type PortfolioSourceStatus = {
   sourceId: string;
   label: string;
   status: "ok" | "failed" | "stale";
   category?: SourceErrorCategory;
-};
+  detail?: string;
+  lastSuccessAt?: string;
+} & SourceIdentification;
 
 export type LoadPortfoliosResult = {
   coins: WalletCoin[];

@@ -1,6 +1,7 @@
 import { measureRule, type AlertHistory, type AlertRule, type AlertWindow } from "./alerts";
 import type { AssetType } from "./datafetch/types";
 import type { PortfolioSourceStatus } from "./portfolio-baseline";
+import { sourceIdentity } from "./source-status";
 import { calculateRebalance, type RebalanceProfile } from "./rebalance";
 
 export type InsightSeverity = "info" | "warning" | "critical";
@@ -63,7 +64,7 @@ function reference(snapshots: InsightSnapshot[], at: number, days: number): Insi
 
 export function signature(insight: Insight): string {
   const { data } = insight;
-  if (insight.id === "stale") return `${insight.id}:${data.count}`;
+  if (insight.id === "stale") return `${insight.id}:${data.count}:${data.sources ?? ""}`;
   if (insight.id === "concentration") return `${insight.id}:${Math.round(Number(data.top1Percent) / 5)}:${Math.round(Number(data.hhi) * 20)}:${Math.round(Number(data.stablecoinPercent) / 5)}`;
   if (insight.id === "drift") return `${insight.id}:${data.symbol}:${Math.round(Number(data.deviationPercent) / 5)}`;
   if (insight.id.startsWith("goal:")) return `${insight.id}:${data.reached}:${Math.round(Number(data.value) / Math.max(1, Number(data.threshold) * 0.05))}`;
@@ -82,8 +83,11 @@ export function computeInsights(input: InsightInput): Insight[] {
   const add = (id: string, severity: InsightSeverity, messageKey: string, data: Insight["data"]) => {
     result.push({ id, severity, messageKey, data });
   };
-  const staleCount = input.sourceStatuses?.filter((source) => source.status !== "ok").length ?? 0;
-  if (staleCount) add("stale", "warning", "insights.stale", { count: staleCount });
+  const unavailable = input.sourceStatuses?.filter((source) => source.status !== "ok") ?? [];
+  const staleCount = unavailable.length;
+  if (unavailable.length) add("stale", "warning", "insights.stale", {
+    count: unavailable.length, sources: unavailable.map(sourceIdentity).join(", "),
+  });
 
   if (total >= 100) {
     const ranked = [...current.values()].filter((asset) => asset.value >= 1).sort((a, b) => b.value - a.value);
