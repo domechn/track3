@@ -267,8 +267,8 @@ test("history first cell shows the row hover feedback with a mouse", async ({ pa
   const firstCell = row.locator("td").first();
   const before = await row.evaluate((node) => getComputedStyle(node).backgroundColor);
   await row.hover();
-  const after = await row.evaluate((node) => getComputedStyle(node).backgroundColor);
-  expect(after).not.toBe(before);
+  // The row colour transitions on hover; poll instead of reading it mid-transition.
+  await expect.poll(() => row.evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe(before);
   expect(await firstCell.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
 });
 
