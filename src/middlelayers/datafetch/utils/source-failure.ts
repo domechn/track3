@@ -37,22 +37,22 @@ export function classifySourceError(error: unknown): SourceErrorCategory {
 // actionable error until the owning source finishes.
 const failures = new WeakMap<object, { error: unknown; priority: number }>();
 const optionalFailures = new WeakMap<object, PartialSourceFailure>();
-const endpointNames: Record<string, string> = {
-  earn: "Earn", "fixed-term earn": "Fixed-term Earn", staking: "Staking",
-  "dual investment": "Dual investment", portfolio: "Portfolio", margin: "Margin",
-  "wallet total": "Wallet total", futures: "Futures", "cross margin": "Cross margin",
-  "isolated margin": "Isolated margin", "usdt isolated swap": "USDT isolated swap",
-  "usdt cross swap": "USDT cross swap", "coin swap": "Coin swap",
-  "flexible saving": "Flexible saving", "on-chain earn": "On-chain Earn",
-  "advanced earn": "Advanced Earn", savings: "Savings", funding: "Funding",
-  "eth staking": "ETH staking", "defi staking": "DeFi staking", lending: "Lending",
-  "solana earn": "Solana Earn", "sui defi": "SUI DeFi",
+export const partialEndpointKeys: Record<string, string> = {
+  Earn: "earn", "Fixed-term Earn": "fixedTermEarn", Staking: "staking",
+  "Dual investment": "dualInvestment", Portfolio: "portfolio", Margin: "margin",
+  "Wallet total": "walletTotal", Futures: "futures", "Cross margin": "crossMargin",
+  "Isolated margin": "isolatedMargin", "USDT isolated swap": "usdtIsolatedSwap",
+  "USDT cross swap": "usdtCrossSwap", "Coin swap": "coinSwap",
+  "Flexible saving": "flexibleSaving", "On-chain Earn": "onChainEarn",
+  "Advanced Earn": "advancedEarn", Savings: "savings", Funding: "funding",
+  "ETH staking": "ethStaking", "DeFi staking": "defiStaking", Lending: "lending",
+  "Solana Earn": "solanaEarn", "SUI DeFi": "suiDefi",
+  "Portfolio INTX": "portfolioIntx", "Some assets": "assets",
 };
 
 export function safePartialEndpoint(label: string): string | undefined {
-  if (label === "Portfolio INTX") return label;
-  const key = label.toLowerCase();
-  return Object.hasOwn(endpointNames, key) ? endpointNames[key] : undefined;
+  if (/^Portfolio [A-Z_]+$/.test(label)) return label === "Portfolio DEFAULT" ? undefined : label;
+  return Object.keys(partialEndpointKeys).find((name) => name.toLowerCase() === label.toLowerCase());
 }
 const priority: Record<SourceErrorCategory, number> = {
   rateLimit: 4,

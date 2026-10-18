@@ -412,6 +412,26 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(JSON.parse(localStorage.getItem("track3-refresh-source-statuses") ?? "[]")[0].status).toBe("partial");
   });
 
+  it("shows a quiet warning and one toast for a partial-only refresh without opening the dialog", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, failedSources: [], usedLastKnownData: false,
+      sourceStatuses: [{ sourceId: "cex:0", label: "Coinbase", status: "partial",
+        partial: { category: "auth", endpoints: ["Some assets", "Portfolio FUTURES"] } }],
+    } as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const indicator = await screen.findByRole("button", { name: "Source status" });
+    expect(indicator).toHaveClass("text-amber-900");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast.mock.calls[0][0].description).toContain("Partial sources: Coinbase");
+    await user.click(indicator);
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent("Some assets and Some products could not be read this time");
+    expect(dialog).not.toHaveTextContent("refresh.endpoint.");
+  });
+
   it("translates API key and safe error details for Chinese source rows", async () => {
     localStorage.setItem(localeLocalStorageKey, "zh");
     localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
