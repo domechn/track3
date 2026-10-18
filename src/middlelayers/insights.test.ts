@@ -102,6 +102,27 @@ describe("computeInsights", () => {
     expect(changed.find((item) => item.id === "stale")?.data.count).toBe(2);
   });
 
+  it("names unavailable sources in the insight without exposing identifiers", () => {
+    const result = computeInsights({ snapshots: [snapshot("a", at, { BTC: 100 })], sourceStatuses: [
+      { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "#1", status: "failed" },
+      { sourceId: "cex:1", label: "Main", kind: "exchange", provider: "OKX", hint: "#1", status: "stale" },
+    ] });
+    expect(result.find((item) => item.id === "stale")?.data).toEqual({
+      count: 2, sources: "Main (Binance · #1), Main (OKX · #1)",
+    });
+  });
+
+  it("updates the unavailable-source insight when the failed account changes", () => {
+    const snapshots = [snapshot("a", at, { BTC: 100 })];
+    const first = computeInsights({ snapshots, sourceStatuses: [
+      { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", status: "failed" },
+    ] });
+    const next = computeInsights({ snapshots, previous: first, sourceStatuses: [
+      { sourceId: "cex:1", label: "Main", kind: "exchange", provider: "OKX", status: "failed" },
+    ] });
+    expect(next.find((item) => item.id === "stale")?.data.sources).toBe("Main (OKX)");
+  });
+
   it("distinguishes crypto and stock holdings with the same symbol in movers and unusual changes", () => {
     const assets = (crypto: number, stock: number) => [
       { assetType: "crypto" as const, symbol: "ABC", value: crypto, amount: crypto, price: 1 },

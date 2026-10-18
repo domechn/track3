@@ -4,6 +4,7 @@ import { getBlacklistCoins, getStableCoins } from "./configuration";
 import { executeWrite, executeWriteWork, getDatabase } from "./database";
 import type { AssetType } from "./datafetch/types";
 import type { PortfolioSourceResult, PortfolioSourceStatus } from "./portfolio-baseline";
+import { normalizeSourceStatuses } from "./source-status";
 import { calculateRebalance, getRebalanceProfile, type RebalanceProfile } from "./rebalance";
 
 export type AlertKind = "total_value_target" | "asset_value_target" | "asset_price_target" | "asset_price_move" | "allocation_deviation" | "period_pnl" | "portfolio_value_change";
@@ -352,9 +353,7 @@ function readStoredSourceStatuses(): PortfolioSourceStatus[] {
   if (typeof localStorage === "undefined") return [];
   try {
     const value: unknown = JSON.parse(localStorage.getItem(ALERT_SOURCE_STATUS_STORAGE_KEY) ?? "[]");
-    return Array.isArray(value) ? value.filter((source) =>
-      source && typeof source.sourceId === "string" && ["ok", "stale", "failed"].includes(source.status),
-    ) : [];
+    return normalizeSourceStatuses(value);
   } catch {
     return [];
   }

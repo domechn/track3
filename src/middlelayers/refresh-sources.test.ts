@@ -226,6 +226,59 @@ describe("per-source refresh", () => {
     expect(result.sourceResults?.map((source) => source.label)).toEqual(["Trading", "Cold vault", "Retirement"]);
   });
 
+  it("masks long identifiers and numbers short or colliding accounts with the same alias", async () => {
+    const result = await fetchPortfolios({
+      ...config,
+      btc: { addresses: [{ address: "0x1234567890abcdef89cd", alias: "Main" }, { address: "short", alias: "Main" }] },
+      exchanges: [
+        { name: "binance", alias: "Main", initParams: { apiKey: "ab12-secret-9xyz", secret: "private-one" } },
+        { name: "binance", alias: "Main", initParams: { apiKey: "ab12-secret-9xyz", secret: "private-two" } },
+      ],
+      stockConfig: { brokers: [{ name: "ibkr", alias: "Main", initParams: { token: "token", queryId: "one" } }] },
+    }, vi.fn(), userInfo);
+    const sources = result.sourceResults ?? [];
+    expect(sources.map(({ kind, provider, hint }) => [kind, provider, hint])).toEqual([
+      ["exchange", "Binance", "#1"], ["exchange", "Binance", "#2"],
+      ["wallet", "BTC", "0x1234…89cd"], ["wallet", "BTC", "#2"],
+      ["broker", "Interactive Brokers", "#1"],
+    ]);
+    expect(JSON.stringify(sources.map(({ kind, provider, hint }) => ({ kind, provider, hint }))))
+      .not.toContain("ab12-secret-9xyz");
+  });
+
+  it("removes a configured API key mistakenly used as an alias from status metadata", async () => {
+    const apiKey = "ab12-secret-9xyz";
+    const result = await fetchPortfolios({
+      ...config, btc: { addresses: [] },
+      exchanges: [{ name: "binance", alias: `Main ${apiKey}`,
+        initParams: { apiKey, secret: "private-one" } }],
+    }, vi.fn(), userInfo);
+    const { label, provider, hint } = result.sourceResults![0];
+    expect(`${label} ${provider} ${hint}`).not.toContain(apiKey);
+  });
+
+  it("uses only the ends of a unique exchange API key as a hint", async () => {
+    const apiKey = "ab12-secret-9xyz";
+    const result = await fetchPortfolios({
+      ...config, btc: { addresses: [] },
+      exchanges: [{ name: "binance", alias: "Main", initParams: { apiKey, secret: "private-one" } }],
+    }, vi.fn(), userInfo);
+    expect(result.sourceResults?.[0]).toMatchObject({
+      label: "Main", kind: "exchange", provider: "Binance", hint: "ab12…9xyz",
+    });
+    expect(JSON.stringify(result.sourceResults?.map(({ hint }) => hint))).not.toContain(apiKey);
+  });
+
+  it.each([
+    ["htx", "HTX"], ["mexc", "MEXC"], ["gate", "Gate.io"], ["okex", "OKX"],
+  ])("uses the configured display name for %s", async (name, provider) => {
+    const result = await fetchPortfolios({
+      ...config, btc: { addresses: [] },
+      exchanges: [{ name, initParams: { apiKey: "key", secret: "secret" } }],
+    }, vi.fn(), userInfo);
+    expect(result.sourceResults?.[0]?.provider).toBe(provider);
+  });
+
   it("reports an unsupported exchange instead of accepting an empty balance", async () => {
     const result = await fetchPortfolios({
       ...config,

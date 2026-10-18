@@ -246,12 +246,19 @@ export async function refreshAllData(
             sourceStatuses: currentQueryResult.sourceResults?.map((source) => ({
               sourceId: source.sourceId,
               label: source.label,
+              kind: source.kind,
+              provider: source.provider,
+              hint: source.hint,
+              detail: source.detail,
               status: source.status === "ok"
                 ? "ok" as const
                 : options.previousSourceStatuses?.find(
                     (previous) => previous.sourceId === source.sourceId,
                   )?.status ?? "failed" as const,
               category: source.category,
+              lastSuccessAt: options.previousSourceStatuses?.find(
+                (previous) => previous.sourceId === source.sourceId,
+              )?.lastSuccessAt,
             })),
             persisted: false,
             portfolioInputGeneration: options.previousInputGeneration,
@@ -300,10 +307,8 @@ export async function refreshAllData(
           canonicalization,
         );
         const sourceStatuses = readyQueryResult.portfolioResult.sourceResults?.map(
-          (source): PortfolioSourceStatus => ({
-            sourceId: source.sourceId,
-            label: source.label,
-            status: source.status === "ok"
+          (source): PortfolioSourceStatus => {
+            const status = source.status === "ok"
               ? "ok"
               : latestBaseline.some(
                   (asset) =>
@@ -313,9 +318,23 @@ export async function refreshAllData(
                     ),
                 )
                 ? "stale"
-                : "failed",
-            category: source.category,
-          }),
+                : "failed";
+            const previousSuccess = options.previousSourceStatuses?.find(
+              (previous) => previous.sourceId === source.sourceId,
+            )?.lastSuccessAt;
+            const lastSuccessAt = status === "ok" ? refreshCreatedAt : previousSuccess;
+            return {
+              sourceId: source.sourceId,
+              label: source.label,
+              kind: source.kind,
+              provider: source.provider,
+              hint: source.hint,
+              status,
+              category: source.category,
+              detail: source.detail,
+              ...(lastSuccessAt ? { lastSuccessAt } : {}),
+            };
+          },
         );
         if (sourceStatuses?.length && sourceStatuses.every((source) => source.status !== "ok")) {
           return {

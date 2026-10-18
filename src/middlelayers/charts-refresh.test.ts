@@ -1690,6 +1690,8 @@ describe("partial source snapshots", () => {
     ]));
     expect(payload.txns).not.toContainEqual(expect.objectContaining({ symbol: "BTC", txnType: "sell" }));
     expect(result.sourceStatuses).toEqual(expect.arrayContaining([expect.objectContaining({ sourceId: "btc:0", status: "stale" })]));
+    expect(result.sourceStatuses?.find((source) => source.sourceId === "btc:0")?.lastSuccessAt)
+      .toBeUndefined();
   });
 
   it("keeps the last snapshot when all sources fail", async () => {
@@ -1830,7 +1832,12 @@ describe("partial source snapshots", () => {
       failedSources: [{ sourceId: "stock:0", analyzerName: "IBKR 1", walletIdentities: ["ibkr:one"], error: "network", category: "network" }],
     } as never);
 
-    await refreshAllData(vi.fn(), {}, operation);
+    const result = await refreshAllData(vi.fn(), { previousSourceStatuses: [{
+      sourceId: "stock:0", label: "IBKR 1", status: "ok", lastSuccessAt: "2026-07-12T12:30:00Z",
+    }] }, operation);
+    expect(result.sourceStatuses?.find((source) => source.sourceId === "stock:0")).toMatchObject({
+      status: "failed", lastSuccessAt: "2026-07-12T12:30:00Z",
+    });
     const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string }> };
     expect(payload.assets.some((asset) => asset.symbol === "AAPL")).toBe(false);
   });
@@ -1870,6 +1877,8 @@ describe("partial source snapshots", () => {
       expect.objectContaining({ symbol: "ETH", amount: 2 }),
     ]));
     expect(result.sourceStatuses).toEqual(expect.arrayContaining([expect.objectContaining({ sourceId: "btc:0", status: "ok" })]));
+    expect(result.sourceStatuses?.find((source) => source.sourceId === "btc:0")?.lastSuccessAt)
+      .toBe(result.refreshCreatedAt);
   });
 
   it("does not replace the snapshot when a single-source retry fails", async () => {

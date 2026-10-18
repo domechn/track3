@@ -52,6 +52,17 @@ describe("summarizeInsights", () => {
     const text = formatInsight(insights[0], (key) => zh[key as keyof typeof zh] ?? key, "zh");
     expect(text).toBe("BTC 在过去24小时内变化 200 USD（40%）。");
   });
+  it("formats saved stale insights from before source names were recorded", () => {
+    expect(formatInsight({ id: "stale", severity: "warning", messageKey: "insights.stale", data: { count: 2 } },
+      (key) => en[key as keyof typeof en] ?? key)).toBe("Portfolio sources with stale or failed data (2).");
+  });
+  it("describes one stale source without plural grammar in English", () => {
+    expect(formatInsight({
+      id: "stale", severity: "warning", messageKey: "insights.stale",
+      data: { count: 1, sources: "Main (Binance · ab12…9xyz)" },
+    }, (key) => en[key as keyof typeof en] ?? key))
+      .toBe("Portfolio sources with stale or failed data (1): Main (Binance · ab12…9xyz).");
+  });
   it("keeps opt-in off by default without an LLM call", async () => {
     const fake = vi.fn();
     const summary = await summarizeInsights(card, { ...config, proactiveInsightsSummary: undefined }, "en", fake);
