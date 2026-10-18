@@ -86,7 +86,8 @@ export function computeInsights(input: InsightInput): Insight[] {
   const unavailable = input.sourceStatuses?.filter((source) => source.status !== "ok") ?? [];
   const staleCount = unavailable.length;
   if (unavailable.length) add("stale", "warning", "insights.stale", {
-    count: unavailable.length, sources: unavailable.map(sourceIdentity).join(", "),
+    count: unavailable.length, sources: unavailable.map((source) =>
+      sourceIdentity({ ...source, hint: undefined })).join(", "),
   });
 
   if (total >= 100) {

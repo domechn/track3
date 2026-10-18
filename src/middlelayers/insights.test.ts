@@ -104,11 +104,11 @@ describe("computeInsights", () => {
 
   it("names unavailable sources in the insight without exposing identifiers", () => {
     const result = computeInsights({ snapshots: [snapshot("a", at, { BTC: 100 })], sourceStatuses: [
-      { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "#1", status: "failed" },
-      { sourceId: "cex:1", label: "Main", kind: "exchange", provider: "OKX", hint: "#1", status: "stale" },
+      { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "ab12…9xyz", status: "failed" },
+      { sourceId: "cex:1", label: "Main", kind: "exchange", provider: "OKX", hint: "bc1q12…abcd", status: "stale" },
     ] });
     expect(result.find((item) => item.id === "stale")?.data).toEqual({
-      count: 2, sources: "Main (Binance · #1), Main (OKX · #1)",
+      count: 2, sources: "Main (Binance), Main (OKX)",
     });
   });
 

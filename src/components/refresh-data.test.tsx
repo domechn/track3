@@ -245,6 +245,30 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(screen.getByRole("button", { name: "Retry BTC wallet 1" })).toBeTruthy();
   });
 
+  it("names only the retried source when its retry fails", async () => {
+    const sourceStatuses = [
+      { sourceId: "btc:0", label: "Cold vault", status: "stale" as const, category: "network" as const },
+      { sourceId: "cex:0", label: "Main", kind: "exchange" as const, provider: "OKX", hint: "#1", status: "failed" as const, category: "network" as const },
+    ];
+    const result = {
+      ...partialResult,
+      sourceStatuses,
+      sourceResults: [
+        { ...failedSource, label: "Cold vault" },
+        { sourceId: "cex:0", label: "Main", walletIdentities: ["exchange-a"], status: "stale", coins: [] },
+      ],
+      persisted: false,
+    };
+    vi.mocked(refreshAllData).mockResolvedValueOnce(result as never).mockResolvedValueOnce(result as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await user.click(await screen.findByRole("button", { name: "Retry Cold vault" }));
+    await waitFor(() => expect(mockToast).toHaveBeenLastCalledWith(expect.objectContaining({
+      description: "Source retry failed: Cold vault. The saved snapshot is unchanged.",
+    })));
+  });
+
   it("warns that totals are incomplete when every source has no history", async () => {
     vi.mocked(refreshAllData).mockResolvedValue({
       ...partialResult, usedLastKnownData: false,
@@ -348,7 +372,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(localStorage.getItem("track3-refresh-source-statuses")).not.toContain("API key");
     expect(localStorage.getItem("track3-refresh-source-statuses")).not.toContain("ab12-secret-9xyz");
     expect(screen.getByRole("button", { name: "Retry Main (OKX · #1)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry Main (OKX · #1)" })).toHaveTextContent("Retry Main (OKX · #1)");
+    expect(screen.getByRole("button", { name: "Retry Main (OKX · #1)" })).toHaveTextContent(/^Retry$/);
     expect(screen.getByRole("button", { name: "Retry all failed" })).toBeInTheDocument();
     expect(dialog).toHaveTextContent("Last data 2026-10-17 12:30");
     expect((await axe.run(dialog, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
@@ -418,6 +442,18 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(screen.getByRole("button", { name: "Source status" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Source status" }));
     expect(screen.getByText("Private wallet")).toBeInTheDocument();
+  });
+
+  it("offers a full retry of failed sources after restarting", async () => {
+    const statuses = [{ sourceId: "btc:0", label: "Private wallet", status: "failed" as const, category: "network" as const }];
+    localStorage.setItem("track3-refresh-source-statuses", JSON.stringify(statuses));
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Source status" }));
+    await user.click(screen.getByRole("button", { name: "Retry all failed" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledWith(
+      expect.any(Function), { previousSourceStatuses: statuses }, expect.any(Object), expect.any(Function),
+    ));
   });
 
   it("redacts credential-like text from persisted source labels", async () => {
