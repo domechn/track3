@@ -15,7 +15,9 @@ import {
   saveStableCoins,
   getImportedPartHashes,
   saveImportedPartHash,
+  getInitialQueryDateRange,
 } from "./configuration";
+import { ASSET_HANDLER } from "./entities/assets";
 import { GlobalConfig } from "./datafetch/types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -293,5 +295,23 @@ describe("auto backup part import state", () => {
   it("treats malformed saved state as empty", async () => {
     tracing.db.select.mockResolvedValue([{ id: "9", data: "{" }] as never);
     expect(await getImportedPartHashes()).toEqual({});
+  });
+});
+
+describe("getInitialQueryDateRange", () => {
+  it("returns an undefined range (not Invalid Date) when there is no history", async () => {
+    vi.spyOn(ASSET_HANDLER, "getHasDataCreatedAtDates").mockResolvedValue([]);
+    const { dr } = await getInitialQueryDateRange();
+    expect(dr.from).toBeUndefined();
+    expect(dr.to).toBeUndefined();
+  });
+
+  it("returns min/max dates when history exists", async () => {
+    const a = new Date("2024-01-02T00:00:00Z");
+    const b = new Date("2024-03-04T00:00:00Z");
+    vi.spyOn(ASSET_HANDLER, "getHasDataCreatedAtDates").mockResolvedValue([b, a]);
+    const { dr } = await getInitialQueryDateRange();
+    expect(dr.from).toEqual(a);
+    expect(dr.to).toEqual(b);
   });
 });

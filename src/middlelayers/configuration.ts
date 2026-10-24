@@ -532,6 +532,11 @@ export async function getInitialQueryDateRange(): Promise<{
   const size = await queryQuerySize();
 
   const days = await ASSET_HANDLER.getHasDataCreatedAtDates(size);
+  if (days.length === 0) {
+    // No snapshots yet (fresh install): Math.min()/max() of nothing is +-Infinity,
+    // which becomes an Invalid Date that later throws in date-fns format().
+    return { size, dr: { from: undefined, to: undefined } };
+  }
   const from = new Date(Math.min(...days.map((d) => d.getTime())));
   const to = new Date(Math.max(...days.map((d) => d.getTime())));
 
