@@ -50,7 +50,7 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
-import { format, parseISO } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { invalidateCacheGroups } from "@/middlelayers/datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
@@ -632,7 +632,7 @@ const App = () => {
     [dateRange],
   );
   useEffect(() => {
-    if (dateRange?.from && dateRange.to) {
+    if (dateRange?.from && dateRange.to && isValid(dateRange.from) && isValid(dateRange.to)) {
       localStorage.setItem(CURRENT_DATE_RANGE_KEY, JSON.stringify({
         from: format(dateRange.from, "yyyy-MM-dd"), to: format(dateRange.to, "yyyy-MM-dd"),
       }));
