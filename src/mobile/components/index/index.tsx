@@ -21,7 +21,6 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import PageWrapper from "@/mobile/components/page-wrapper";
 import DatePicker from "@/mobile/components/date-picker";
 import RealTimeTotalValue from "@/components/realtime-total-value";
-import Sidebar from "@/components/sidebar";
 import { AnimatedPage } from "@/components/motion";
 import PageLoadingOverlay from "@/mobile/components/page-loading-overlay";
 import AutoBackupIndicator from "@/mobile/components/auto-backup-indicator";
@@ -55,7 +54,6 @@ import { invalidateCacheGroups } from "@/middlelayers/datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { ASSISTANT_APP_ACTION_EVENT, CURRENT_DATE_RANGE_KEY, DATE_RANGE_KEY, validateActionArgs } from "@/middlelayers/ai/actions";
-import { ChartResizeContext } from "@/mobile/App";
 import { useTranslation } from "@/mobile/i18n";
 import { DataChangedContext } from "@/contexts/data-changed";
 import { processAlerts } from "@/middlelayers/alerts";
@@ -253,8 +251,6 @@ function RouteLoadingFallback({ hidden }: { hidden: boolean }) {
 }
 
 type LayoutProps = {
-  sidebarCollapsed: boolean;
-  onSidebarToggle: () => void;
   initializing: boolean;
   loadFailed: boolean;
   onRetryDataLoad: () => void;
@@ -272,8 +268,6 @@ type LayoutProps = {
 };
 
 function Layout({
-  sidebarCollapsed,
-  onSidebarToggle,
   initializing,
   loadFailed,
   onRetryDataLoad,
@@ -288,7 +282,6 @@ function Layout({
 }: LayoutProps) {
   const { t } = useTranslation();
   const mobile = useIsMobile();
-  const sidebarWidth = sidebarCollapsed ? 52 : 200;
   const unread = useAlertBadge();
   const location = useLocation();
   const navigate = useNavigate();
@@ -346,14 +339,7 @@ function Layout({
 
   return (
     <div className="app-layout min-h-screen">
-      {!mobile && <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggle={onSidebarToggle}
-        isProUser={isProUser}
-      />}
-
       <div
-        style={{ marginLeft: mobile ? 0 : sidebarWidth, transition: mobile ? "none" : undefined }}
         className="app-content transition-[margin-left] duration-300 ease-in-out"
       >
         <TopBar
@@ -507,8 +493,6 @@ function AnalyticsTileIcon({ name }: { name: "allocation" | "rank" | "wallets" |
 }
 
 type AppRoutesProps = {
-  sidebarCollapsed: boolean;
-  onSidebarToggle: () => void;
   initializing: boolean;
   loadFailed: boolean;
   onRetryDataLoad: () => void;
@@ -534,8 +518,6 @@ type AppRoutesProps = {
 };
 
 function AppRoutes({
-  sidebarCollapsed,
-  onSidebarToggle,
   initializing,
   loadFailed,
   onRetryDataLoad,
@@ -570,8 +552,6 @@ function AppRoutes({
         path="/"
         element={
           <Layout
-            sidebarCollapsed={sidebarCollapsed}
-            onSidebarToggle={onSidebarToggle}
             initializing={initializing}
             loadFailed={loadFailed}
             onRetryDataLoad={onRetryDataLoad}
@@ -755,7 +735,6 @@ function AppRoutes({
 
 const App = () => {
   const { t } = useTranslation();
-  const { setNeedResize } = React.useContext(ChartResizeContext);
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
@@ -783,11 +762,6 @@ const App = () => {
   const lastSyncReport = useRef<object | undefined>(undefined);
   // Single mount guard reused by both boot and background effects.
   const activeRef = useRef(true);
-
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 640,
-  );
-  const sidebarResizeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -1115,26 +1089,6 @@ const App = () => {
     loadConfiguration();
   }, [originalQuerySize]);
 
-  const handleSidebarToggle = useCallback(() => {
-    setSidebarCollapsed((prev) => !prev);
-
-    if (sidebarResizeTimerRef.current) {
-      window.clearTimeout(sidebarResizeTimerRef.current);
-    }
-    // Trigger resize after sidebar width transition ends.
-    sidebarResizeTimerRef.current = window.setTimeout(() => {
-      setNeedResize((prev) => prev + 1);
-    }, 320);
-  }, [setNeedResize]);
-
-  useEffect(() => {
-    return () => {
-      if (sidebarResizeTimerRef.current) {
-        window.clearTimeout(sidebarResizeTimerRef.current);
-      }
-    };
-  }, []);
-
   return (
     <div>
       <AutoBackupIndicator status={autoBackupStatus} />
@@ -1142,8 +1096,6 @@ const App = () => {
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>
           <AppRoutes
-          sidebarCollapsed={sidebarCollapsed}
-          onSidebarToggle={handleSidebarToggle}
           initializing={initializing}
           loadFailed={loadFailed}
           onRetryDataLoad={() => retryLoad.current?.()}

@@ -1,11 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HashRouter, useNavigate } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import Appearance from "@/mobile/components/appearance";
+import { ThemeProvider } from "@/mobile/components/common/theme";
 import { isIOS } from "@/utils/platform";
+import { reloadApp } from "@/utils/app";
 
 vi.mock("@/utils/platform", () => ({ isIOS: vi.fn(() => true) }));
 vi.mock("@/middlelayers/configuration", () => ({
+  themeLocalStorageKey: "track3-ui-theme",
   getQuoteColor: vi.fn().mockResolvedValue("green-up-red-down"),
   saveQuoteColor: vi.fn(),
   saveTheme: vi.fn(),
@@ -50,5 +53,37 @@ describe("iPhone appearance settings", () => {
     expect(screen.getByText("Light")).toBeInTheDocument();
     expect(screen.getByText("Dark")).toBeInTheDocument();
     vi.mocked(isIOS).mockReturnValue(true);
+  });
+
+  it("switches the iPhone theme in place without a process relaunch", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    vi.mocked(reloadApp).mockClear();
+    localStorage.setItem("track3-ui-theme", "light");
+    window.location.hash = "#/settings/appearance?section=theme";
+    try {
+      render(<HashRouter><ThemeProvider><Appearance /></ThemeProvider></HashRouter>);
+      fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+      await waitFor(() => expect(document.documentElement).toHaveClass("dark"));
+      expect(reloadApp).not.toHaveBeenCalled();
+    } finally {
+      localStorage.removeItem("track3-ui-theme");
+    }
+  });
+
+  it("applies a theme without invoking the desktop process plugin", async () => {
+    vi.mocked(isIOS).mockReturnValue(false);
+    vi.mocked(reloadApp).mockClear();
+    localStorage.setItem("track3-ui-theme", "light");
+    window.location.hash = "#/settings/appearance";
+    try {
+      render(<HashRouter><ThemeProvider><Appearance /></ThemeProvider></HashRouter>);
+      fireEvent.click(screen.getByText("Dark"));
+      fireEvent.click(screen.getByRole("button", { name: "Update Preferences" }));
+      await waitFor(() => expect(document.documentElement).toHaveClass("dark"));
+      expect(reloadApp).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(isIOS).mockReturnValue(true);
+      localStorage.removeItem("track3-ui-theme");
+    }
   });
 });

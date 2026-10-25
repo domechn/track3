@@ -10,7 +10,6 @@ import {
   saveTheme,
 } from "@/middlelayers/configuration";
 import { QuoteColor } from "@/middlelayers/types";
-import { reloadApp } from "@/utils/app";
 import { Theme, useTheme } from "@/mobile/components/common/theme";
 import {
   LOCALE_LABELS,
@@ -52,7 +51,7 @@ const App = ({
     await saveTheme(v);
     setSelectedTheme(v);
     originalThemeRef.current = v;
-    reloadApp();
+    currentTheme.setTheme(v);
   }
 
   async function handleQuoteColorValueChange(val: string) {

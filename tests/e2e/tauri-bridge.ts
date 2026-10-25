@@ -25,6 +25,7 @@ type BridgeOptions = {
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
+  const isIPhone = /iPhone|iPad|iPod/.test(await page.evaluate(() => navigator.userAgent));
   const options = optionsOrS3 instanceof FakeS3
     ? { s3: optionsOrS3, seedReviewContent: legacySeedReviewContent }
     : { ...optionsOrS3, seedReviewContent: optionsOrS3.seedReviewContent ?? legacySeedReviewContent };
@@ -211,6 +212,9 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   };
 
   await page.exposeBinding("__e2eInvoke", async (_source, cmd: string, args: any, options?: any) => {
+    if (isIPhone && /^plugin:(process|updater|shell)\|/.test(cmd)) {
+      throw new Error(`Desktop-only Tauri command on iPhone: ${cmd}`);
+    }
     if (cmd === "get_database_url") return "sqlite:e2e.db";
     if (cmd === "ios_startup_failure") return lockedStartup ? "Protected key unavailable" : null;
     if (cmd === "ios_retry_startup") return false;

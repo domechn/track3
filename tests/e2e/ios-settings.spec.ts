@@ -20,6 +20,17 @@ test.afterEach(async ({ page }) => {
   expect(browserErrors.get(page)).toEqual([]);
 });
 
+test("iPhone bridge rejects desktop-only plugins", async ({ page }) => {
+  await installTauriBridge(page);
+  await page.goto("/#/settings/appearance?section=theme");
+  const results = await page.evaluate(async () => Promise.allSettled([
+    "plugin:process|relaunch",
+    "plugin:updater|check",
+    "plugin:shell|open",
+  ].map((cmd) => (window as any).__TAURI_INTERNALS__.invoke(cmd))));
+  expect(results.map((result) => result.status)).toEqual(["rejected", "rejected", "rejected"]);
+});
+
 test("More opens every iPhone settings section through the Settings hub", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page);

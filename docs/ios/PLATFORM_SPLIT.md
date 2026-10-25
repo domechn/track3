@@ -1,6 +1,6 @@
 # Platform split decisions
 
-The fork-to-master table below covers all 147 files present on desktop `origin/master` that the iOS port changed between its first commit `1f79a83` and `ios/main`. `src/main.tsx` is the single lazy shell selector; it was not changed in the original iOS fork. The P2 audit first lists the current desktop-facing diff.
+The fork-to-master table below covers all 147 files present on desktop `origin/master` that the iOS port changed between its first commit `1f79a83` and `ios/main`. `src/main.tsx` is the single shell selector; it directly imports the desktop shell and lazy loads the iOS shell. It was not changed in the original iOS fork. The P2 audit first lists the current desktop-facing diff.
 
 ## P2 audit of the current desktop-facing diff
 
@@ -16,7 +16,7 @@ Each path below differs from desktop `origin/master` and sits outside `src/mobil
 | `package.json` | `test:e2e` selects the desktop project, preserving the old script's desktop scope after mobile specs were added. Dependencies and `yarn.lock` are unchanged. |
 | `playwright.config.ts` | Names desktop and mobile projects; the desktop project excludes new phone specs. |
 | `playwright.preview.config.ts` | New production startup browser check for the lazy shell. |
-| `vite.config.ts` | Gives React one shared vendor chunk to keep the lazy shell graph free of an import cycle. The desktop entry preloads no mobile UI chunk or mobile CSS. |
+| `vite.config.ts` | Gives React one shared vendor chunk; removing it caused a production chunk cycle even with the direct desktop shell import. The desktop entry preloads no mobile UI chunk or mobile CSS. |
 | `scripts/ios/check-screenshot.swift` | Simulator screenshot check used only in the new iOS workflow. |
 | `scripts/ios/configure-project.py` | Xcode project generation check used only in the new iOS workflow. |
 | `src-tauri/Cargo.lock` | Adds only the root crate's already locked `objc2-foundation` target dependency and pure-test `fs2`/`libc` references. |
@@ -25,7 +25,7 @@ Each path below differs from desktop `origin/master` and sits outside `src/mobil
 | `src-tauri/capabilities/migrated.json` | Limits the unchanged desktop permissions to desktop platforms; iOS uses `mobile.json`. |
 | `src-tauri/pure-tests/Cargo.toml` | Enables Linux tests of shared startup security code. |
 | `src-tauri/pure-tests/src/lib.rs` | Exposes shared startup security and pure share-path checks to GTK-free tests. |
-| `src-tauri/src/app.rs` | Moves the original desktop commands and startup into the library entry needed by Tauri iOS; desktop plugins and key loading still run on desktop. iOS startup and native calls are gated. |
+| `src-tauri/src/app.rs` | Moves the original desktop commands and startup into the library entry needed by Tauri iOS; desktop plugins and key loading still run on desktop. iOS startup, native calls, and command registration are gated. |
 | `src-tauri/src/bin/export-assistant-chats.rs` | Updates the crate import to the iOS-compatible library name. The CLI logic is unchanged. |
 | `src-tauri/src/ios_share_path.rs` | Pure validator for an iOS share destination; no desktop caller. |
 | `src-tauri/src/key_rotation/files.rs` | Selects Keychain only on iOS; desktop file rotation path remains the same. |
@@ -35,7 +35,7 @@ Each path below differs from desktop `origin/master` and sits outside `src/mobil
 | `src-tauri/src/main.rs` | Desktop executable calls the shared app entry and retains the Windows subsystem setting. |
 | `src-tauri/src/startup_security.rs` | Adds iOS key creation and recovery; the existing desktop key loader is unchanged. |
 | `src/i18n/index.tsx` | Lets the mobile shell supply its own flat catalog; desktop still uses the original dictionaries. |
-| `src/main.tsx` | Selects one shell at startup. `src/mobile/App.tsx` is dynamically imported only on iOS. |
+| `src/main.tsx` | Directly imports the desktop shell and dynamically imports `src/mobile/App.tsx` only on iOS. |
 | `src/middlelayers/ai/actions/index.ts` | Uses the shared export helper; on desktop it still opens the same save picker and writes the selected path. |
 | `src/middlelayers/charts-refresh.ts` | Carries optional source completion and timing for phone refresh progress; desktop callers omit the callback. |
 | `src/middlelayers/configuration.ts` | Returns an empty date range for empty history, fixing the crash without changing populated portfolios. |
@@ -65,7 +65,7 @@ Each path below differs from desktop `origin/master` and sits outside `src/mobil
 | `tests/e2e/mobile.spec.ts` | New mobile route and interaction checks, excluded from the desktop project. |
 | `tests/e2e/tauri-bridge.ts` | Adds phone fixtures and retains the original desktop call signature. |
 | `tests/e2e/tsconfig.json` | Includes the new production startup browser spec and preview configuration. |
-| `tests/production/startup.spec.ts` | Verifies a production desktop build starts through the lazy shell. |
+| `tests/production/startup.spec.ts` | Verifies both production shells start through the shared entry. |
 
 ## Fork-to-master decisions
 
@@ -218,7 +218,7 @@ Each path below differs from desktop `origin/master` and sits outside `src/mobil
 | `tests/e2e/density.spec.ts` | Restored | Existing desktop density checks stay unchanged. |
 | `tests/e2e/smoke.spec.ts` | Restored | Existing desktop smoke checks stay unchanged. |
 | `tests/e2e/tauri-bridge.ts` | Kept | Shared IPC fixture adds iOS mocks while desktop defaults remain. |
-| `vite.config.ts` | Kept shared fix | React has its own vendor chunk so the lazy desktop and mobile entry does not create a chart chunk cycle. Other desktop chunking stays on master. |
+| `vite.config.ts` | Kept shared fix | React has its own vendor chunk to prevent a production chunk cycle with the direct desktop and lazy mobile imports. Other desktop chunking stays on master. |
 
 ## Directory layout
 

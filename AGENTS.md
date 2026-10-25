@@ -111,7 +111,7 @@ Assistant prompt, skill, orchestrator, provider, and chat-loop changes should ru
 
 - Node.js 24+, Yarn 4.x (via Corepack), Rust 1.94.1+
 - macOS: Xcode CLI tools
-- Linux: `libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, and related system libs
+- Linux: `libwebkit2gtk-4.0-dev`, `libappindicator3-dev`, and related system libs
 - Windows: MSVC toolchain
 
 ## Project Conventions
