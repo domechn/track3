@@ -369,10 +369,11 @@ fn ios_share_file(handle: tauri::AppHandle, path: String) -> Result<(), String> 
 
 #[cfg(debug_assertions)]
 #[tauri::command]
-fn mark_frontend_ready(handle: tauri::AppHandle) -> Result<(), String> {
+fn mark_frontend_ready(handle: tauri::AppHandle, width: u32, height: u32) -> Result<(), String> {
     let cache_dir = handle.path().app_cache_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
-    std::fs::write(cache_dir.join("track3-ready"), b"track3:ready").map_err(|e| e.to_string())
+    std::fs::write(cache_dir.join("track3-ready"), format!("track3:ready\n{width}x{height}\n"))
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(debug_assertions)]

@@ -13,6 +13,9 @@ private final class Track3PrivacyLock: NSObject {
     private var authenticating = false
     private var needsUnlock = false
     private var unlockGeneration = 0
+    #if targetEnvironment(simulator)
+    private var landscapeRequested = false
+    #endif
 
     var enabled: Bool { UserDefaults.standard.bool(forKey: setting) }
 
@@ -24,6 +27,9 @@ private final class Track3PrivacyLock: NSObject {
         center.addObserver(self, selector: #selector(background), name: UIApplication.didEnterBackgroundNotification, object: nil)
         center.addObserver(self, selector: #selector(foreground), name: UIApplication.didBecomeActiveNotification, object: nil)
         center.addObserver(self, selector: #selector(windowVisible), name: UIWindow.didBecomeVisibleNotification, object: nil)
+        #if targetEnvironment(simulator)
+        requestSimulatorLandscape()
+        #endif
         if enabled {
             needsUnlock = true
             cover()
@@ -87,11 +93,17 @@ private final class Track3PrivacyLock: NSObject {
     }
 
     @objc private func foreground() {
+        #if targetEnvironment(simulator)
+        requestSimulatorLandscape()
+        #endif
         if enabled && needsUnlock { cover(); authenticateForeground() }
         else { uncover() }
     }
 
     @objc private func windowVisible() {
+        #if targetEnvironment(simulator)
+        requestSimulatorLandscape()
+        #endif
         if enabled && needsUnlock {
             cover()
             if UIApplication.shared.applicationState == .active { authenticateForeground() }
@@ -99,6 +111,21 @@ private final class Track3PrivacyLock: NSObject {
             cover()
         }
     }
+
+    #if targetEnvironment(simulator)
+    private func requestSimulatorLandscape() {
+        guard !landscapeRequested,
+              ProcessInfo.processInfo.arguments.contains("-track3-landscape"),
+              UIApplication.shared.applicationState == .active,
+              let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        if #available(iOS 16.0, *) {
+            landscapeRequested = true
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { error in
+                NSLog("Track3 simulator landscape request failed: %@", error.localizedDescription)
+            }
+        }
+    }
+    #endif
 
     @objc private func retry() { authenticateForeground() }
 

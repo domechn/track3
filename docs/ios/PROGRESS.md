@@ -12,15 +12,27 @@
   The share sheet anchors to its presenting view. The iOS workflow now
   targets `feat/ios-wide-screens*` and attempts iPad portrait and landscape
   simulator captures after the existing iPhone smoke.
-- A browser viewport matrix checks 15 phone, tablet, Split View, and foldable
+- A browser viewport matrix checks 16 phone, tablet, Split View, and foldable
   sizes in light and dark across the mobile routes. Browser screenshots are
-  Chromium captures; eight representative images are in `screens/ipad/`.
+  Chromium captures; eleven representative images are in `screens/ipad/`.
   On Linux, TypeScript and the production frontend build passed, Vitest
   passed 2,214 tests, mobile Playwright passed 197 tests, desktop Playwright
   passed 77 tests, production preview passed two tests, and Rust pure tests
-  passed 62 tests. Simulator build and rotation await the driver's macOS CI
-  run. A signed iPad, Magic Keyboard, Stage Manager, and a physical foldable
-  remain unverified.
+  passed 62 tests. The two macOS iOS runs `40214915702` and `40218874665`
+  launched the iPad app in portrait, then failed because the Simulator
+  AppleScript shortcut did not rotate it. The follow-up requests landscape
+  from the simulator app and checks the WebView viewport in the ready marker;
+  it still needs a macOS CI result. Split View, Slide Over, Stage Manager,
+  Magic Keyboard and trackpad, the share popover and file picker on a real
+  iPad, and foldable posture remain unverified.
+- The review follow-up gives nested Settings and Assistant panes the content
+  width at 1000–1199 px, keeps Wallets sort labels and Settings values visible,
+  retains touch refresh and back swipe beside the sidebar, and bounds centered
+  snapshot sheets in short windows. The matrix now catches clipped leaf text,
+  main-content touch targets, and iPhone SE landscape. Local TypeScript,
+  2,215 Vitest tests, 208 mobile browser tests, and the Rust library check
+  passed. The iPad portrait and Analytics captures in `screens/ipad/` were
+  regenerated; the native landscape fix still needs macOS CI.
 
 ## X1 interaction fixes (2026-10-25)
 

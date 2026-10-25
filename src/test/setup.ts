@@ -1,6 +1,15 @@
 import { cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { afterEach } from "vitest";
+import { afterEach, beforeEach, expect } from "vitest";
+
+beforeEach(() => {
+  if (expect.getState().testPath?.includes("/src/mobile/")) {
+    Object.defineProperties(window, {
+      innerWidth: { configurable: true, value: 390 },
+      innerHeight: { configurable: true, value: 844 },
+    });
+  }
+});
 
 afterEach(() => {
   cleanup();

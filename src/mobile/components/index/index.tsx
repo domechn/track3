@@ -287,7 +287,9 @@ function Layout({
   const { t } = useTranslation();
   const mobile = useIsMobile();
   const sizeClass = useSizeClass();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.innerWidth >= 700 && window.innerHeight < 500,
+  );
   const unread = useAlertBadge();
   const location = useLocation();
   const navigate = useNavigate();
@@ -308,6 +310,8 @@ function Layout({
   const previousRoute = useRef({ tab: currentTab, path: routePath });
   const backPath = routeParents.current.get(routePath) ?? stack.at(-2) ?? rootPath;
   const canGoBack = routePath !== rootPath;
+  const showBack = canGoBack && !(sizeClass.width === "wide" &&
+    /^\/(settings|assistant|goals|rebalance)(\/|$)/.test(location.pathname));
   const routeScroll = useRef(new Map<string, number>());
   const containerScroll = useRef(new Map<string, number[]>());
   const scrollKey = (tab: string, path: string) => `${tab}:${path}`;
@@ -362,6 +366,11 @@ function Layout({
     window.addEventListener("scroll", update, { passive: true });
     return () => window.removeEventListener("scroll", update);
   }, [location.pathname]);
+  useEffect(() => {
+    if (sizeClass.width !== "compact" && sizeClass.height === "compact") {
+      setSidebarCollapsed(true);
+    }
+  }, [sizeClass.width, sizeClass.height]);
 
   return (
     <div className="app-layout min-h-screen" data-width-class={sizeClass.width}
@@ -391,7 +400,7 @@ function Layout({
           lastRefreshAt={lastRefreshAt}
           compactTitle={mobile && headerCollapsed ? routeTitle(location.pathname, t) : undefined}
           overview={location.pathname === "/overview"}
-          onBack={canGoBack ? () => { rememberScroll(); navigate(backPath); } : undefined}
+          onBack={showBack ? () => { rememberScroll(); navigate(backPath); } : undefined}
           onRefreshSuccess={onRefreshSuccess}
           refreshAction={refreshAction}
         />
@@ -408,15 +417,15 @@ function Layout({
             routeParents.current.set(link.getAttribute("href")!.slice(1), routePath);
           }}
           onPointerDown={(event) => {
-            if (sizeClass.width !== "compact" || event.pointerType !== "touch") return;
-            swipeStart.current = event.clientX < 24 &&
+            if (event.pointerType !== "touch") return;
+            swipeStart.current = event.clientX < event.currentTarget.getBoundingClientRect().left + 24 &&
               !(event.target as Element).closest('[aria-modal="true"]')
               ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
           }}
           onPointerUp={(event) => {
             const start = swipeStart.current;
             swipeStart.current = null;
-            if (sizeClass.width !== "compact" || !canGoBack || !start || event.pointerId !== start.id) return;
+            if (!canGoBack || !start || event.pointerId !== start.id) return;
             const dx = event.clientX - start.x;
             const dy = event.clientY - start.y;
             if (dx > 90 && Math.abs(dx) > Math.abs(dy)) {
@@ -425,7 +434,7 @@ function Layout({
             }
           }}
           onPointerCancel={() => { swipeStart.current = null; }}>
-          <PullToRefresh disabled={sizeClass.width !== "compact" || /^\/assistant(\/|$)/.test(location.pathname)} onRefresh={onLocalRefresh}>
+          <PullToRefresh disabled={/^\/assistant(\/|$)/.test(location.pathname)} onRefresh={onLocalRefresh}>
           {!/^\/(settings|goals|rebalance)(\/|$)/.test(location.pathname) && <div className="mobile-route-heading">
             <MobilePage title={routeTitle(location.pathname, t)} />
           </div>}

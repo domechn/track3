@@ -1255,20 +1255,24 @@ test("the latest history snapshot has a visible delete action in its detail", as
   }
 });
 
-test("wide touch screens do not activate phone gestures", async ({ browser }) => {
+test("wide touch screens retain back swipe and pull to refresh", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1280, height: 800 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
     await installTauriBridge(page);
     await page.goto("/#/coins/BTC");
-    const main = page.locator("#app-main-content");
-    await main.dispatchEvent("touchstart", { touches: [{ identifier: 1, clientX: 5, clientY: 80 }] });
-    await main.dispatchEvent("touchend", { changedTouches: [{ identifier: 1, clientX: 140, clientY: 81 }] });
-    await expect(page).toHaveURL(/#\/coins\/BTC$/);
+    const edge = await page.locator("#app-main-content").evaluate((node) => node.getBoundingClientRect().left + 20);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: edge, y: 250 }] });
+    for (const x of [20, 60, 100, 140]) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: edge + x, y: 250 }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(page).toHaveURL(/#\/summary$/);
     const pull = page.getByTestId("pull-to-refresh");
     await pull.dispatchEvent("touchstart", { touches: [{ identifier: 1, clientX: 100, clientY: 80 }] });
     await pull.dispatchEvent("touchmove", { touches: [{ identifier: 1, clientX: 100, clientY: 150 }] });
-    await expect(page.locator(".mobile-pull-indicator")).toHaveCount(0);
+    await expect(page.locator(".mobile-pull-indicator")).toHaveCount(1);
   } finally {
     await context.close();
   }

@@ -9,3 +9,7 @@ captures are 1376 × 1032 CSS px. Light and dark Overview, History detail,
 Settings, Analytics charts, and Assistant are represented here. The full
 viewport and theme matrix is attached to the iOS workflow as the
 `ios-browser-screenshots` artifact.
+
+The `pro-portrait-*` captures are 1032 × 1376 CSS px and show Settings and
+Assistant after the nested split layout fix. `ipad-11-portrait-wallets.png`
+is an 834 px wide full-page capture showing the Volatility sort control.

@@ -227,6 +227,7 @@ jobs:
           done
           test -n "$READY"
           grep -Fxq 'track3:ready' "$READY"
+          awk 'NR==2 { split($0, size, "x"); portrait=(size[1]+0 < size[2]+0) } END { exit !portrait }' "$READY"
           xcrun simctl spawn "$SIM_ID" log show --last 2m --style compact --predicate "process ==[c] \"$EXECUTABLE\"" > artifacts/ipad-log.log || true
           find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -iname "${EXECUTABLE}*" -mmin -2 -print > artifacts/ipad-crash-reports.log 2>/dev/null || true
           xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$APP_PID" '$1 == pid {found=1} END {exit !found}'
@@ -234,49 +235,27 @@ jobs:
           ! grep -Eiq 'failed to read migration|error while running tauri application' artifacts/ipad-log.log
           xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-portrait.png
           swift scripts/ios/check-screenshot.swift artifacts/ipad-portrait.png
-          open -a Simulator --args -CurrentDeviceUDID "$SIM_ID"
-          : > artifacts/ipad-rotation.log
-          WINDOW_READY=""
-          for attempt in $(seq 1 45); do
-            if osascript -e 'tell application "System Events" to count windows of process "Simulator"' \
-              > artifacts/ipad-window-count.log 2>> artifacts/ipad-rotation.log; then
-              WINDOW_COUNT=$(tr -d '[:space:]' < artifacts/ipad-window-count.log)
-              if [ "$WINDOW_COUNT" -gt 0 ]; then WINDOW_READY=1; break; fi
-            fi
-            sleep 2
-          done
-          if [ -z "$WINDOW_READY" ]; then cat artifacts/ipad-rotation.log; exit 1; fi
-          if ! osascript -e 'tell application "Simulator" to activate' -e 'delay 1' \
-            -e 'tell application "System Events" to key code 123 using command down' \
-            2>> artifacts/ipad-rotation.log; then
-            cat artifacts/ipad-rotation.log
-            exit 1
-          fi
+          rm "$READY"
+          xcrun simctl terminate "$SIM_ID" dev.track3.ios
+          LANDSCAPE_PID=$(xcrun simctl launch "$SIM_ID" dev.track3.ios -track3-landscape 2>&1 | tee artifacts/ipad-landscape-launch.log | sed -n 's/.*: //p' || true)
+          test -n "$LANDSCAPE_PID"
           LANDSCAPE=""
-          ROTATE_DEADLINE=$((SECONDS + 30))
-          while :; do
-            xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-landscape.png
-            if sips -g pixelWidth -g pixelHeight artifacts/ipad-landscape.png \
-              | awk '/pixelWidth:/ { w=$2 } /pixelHeight:/ { h=$2 } END { exit !(w>h) }'; then
+          for attempt in $(seq 1 30); do
+            if [ -f "$READY" ] && awk 'NR==2 { split($0, size, "x"); landscape=(size[1]+0 > size[2]+0) } END { exit !landscape }' "$READY"; then
               LANDSCAPE=1
               break
             fi
-            if [ "$SECONDS" -ge "$ROTATE_DEADLINE" ]; then break; fi
             sleep 2
           done
           if [ -z "$LANDSCAPE" ]; then
-            cat artifacts/ipad-rotation.log
-            sips -g pixelWidth -g pixelHeight artifacts/ipad-landscape.png
+            cat "$READY" 2>/dev/null || true
+            xcrun simctl spawn "$SIM_ID" log show --last 2m --style compact --predicate "process ==[c] \"$EXECUTABLE\"" > artifacts/ipad-landscape-log.log || true
+            cat artifacts/ipad-landscape-log.log
             exit 1
           fi
+          xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-landscape.png
           swift scripts/ios/check-screenshot.swift artifacts/ipad-landscape.png
-          python3 - <<'PY'
-          import subprocess
-          for name, landscape in (("ipad-portrait.png", False), ("ipad-landscape.png", True)):
-              output = subprocess.check_output(["sips", "-g", "pixelWidth", "-g", "pixelHeight", f"artifacts/{name}"], text=True)
-              values = {line.split(":")[0].strip(): int(line.split(":")[1]) for line in output.splitlines() if line.strip().startswith(("pixelWidth:", "pixelHeight:"))}
-              assert (values["pixelWidth"] > values["pixelHeight"]) == landscape, (name, values)
-          PY
+          xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$LANDSCAPE_PID" '$1 == pid {found=1} END {exit !found}'
       - name: Build unsigned device IPA
         run: |
           set -euo pipefail

@@ -8,6 +8,11 @@ function Probe() {
 }
 
 describe("useSizeClass", () => {
+  it("starts mobile tests in the compact phone class", () => {
+    render(<Probe />);
+    expect(screen.getByRole("status")).toHaveTextContent("compact:regular");
+  });
+
   it("updates from compact to regular to wide and back as the window resizes", () => {
     const originalWidth = window.innerWidth;
     const originalHeight = window.innerHeight;

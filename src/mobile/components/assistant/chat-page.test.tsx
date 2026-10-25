@@ -165,16 +165,19 @@ beforeEach(() => {
 describe("ChatPage", () => {
   it("opens chat sessions as a full phone page", async () => {
     const originalWidth = window.innerWidth;
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 375 });
-    vi.mocked(isIOS).mockReturnValue(true);
-    vi.mocked(loadAIConfig).mockResolvedValue(config);
-    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
-    renderAt("/assistant", true);
-    const toggle = await screen.findByTestId("sidebar-toggle");
-    await userEvent.click(toggle);
-    expect(screen.getByTestId("session-sidebar")).toBeInTheDocument();
-    expect(screen.queryByTestId("chat-card")).not.toBeInTheDocument();
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 375 });
+      vi.mocked(isIOS).mockReturnValue(true);
+      vi.mocked(loadAIConfig).mockResolvedValue(config);
+      vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+      renderAt("/assistant", true);
+      const toggle = await screen.findByTestId("sidebar-toggle");
+      await userEvent.click(toggle);
+      expect(screen.getByTestId("session-sidebar")).toBeInTheDocument();
+      expect(screen.queryByTestId("chat-card")).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
   });
 
   it("auto-sends a setup question with its page and safe settings context in a new session", async () => {

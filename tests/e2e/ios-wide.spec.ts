@@ -122,6 +122,7 @@ test("wide More keeps its menu beside selected pages", async ({ browser }) => {
       await expect(page.locator(".more-split > .mobile-split-master")).toBeVisible();
       await expect(page.locator(".more-split > .mobile-split-detail")).toBeVisible();
       await expect(page.locator(`.more-split .mobile-list-row[href='#/${route}'][aria-current='page']`)).toHaveCount(1);
+      await expect(page.locator(".mobile-header-back")).toBeHidden();
     }
     const panes = await page.evaluate(() => ({
       more: document.querySelector(".more-split > .mobile-split-master")!.getBoundingClientRect().width,
@@ -132,6 +133,140 @@ test("wide More keeps its menu beside selected pages", async ({ browser }) => {
     await page.goto("/#/settings/appearance?section=theme");
     await expect(page.locator(".ios-d3-settings-page")).toBeVisible();
     await expect(page.locator(".ios-d3-more .mobile-list-row[href='#/settings']")).toHaveAttribute("aria-current", "page");
+  } finally {
+    await context.close();
+  }
+});
+
+test("nested Settings and Assistant splits keep readable detail at 1032px", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1032, height: 1376 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    for (const route of ["settings/appearance?section=theme", "assistant"]) {
+      await page.goto(`/#/${route}`);
+      await expect(page.locator(".more-split > .mobile-split-master")).toBeHidden();
+      const detailWidth = await page.locator(route === "assistant" ? ".ios-chat-split > .mobile-split-detail" : ".ios-d3-settings .mobile-split-detail")
+        .evaluate((node) => node.getBoundingClientRect().width);
+      expect(detailWidth, route).toBeGreaterThanOrEqual(375);
+      if (route.startsWith("settings")) {
+        await expect(page.locator(".ios-d3-settings .mobile-list-value").first()).toBeVisible();
+        const labelHeight = await page.locator(".ios-d3-settings a[href='#/settings/data?section=backup'] .mobile-list-label")
+          .evaluate((node) => node.getBoundingClientRect().height);
+        expect(labelHeight).toBeLessThanOrEqual(34);
+      }
+      await expect(page.locator(".mobile-header-back")).toBeHidden();
+      mkdirSync("test-results/mobile", { recursive: true });
+      await page.screenshot({ path: `test-results/mobile/ipad-13-portrait-${route.startsWith("settings") ? "settings" : "assistant"}.png` });
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("wallet sort labels remain fully visible on tablet and landscape widths", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 834, height: 1194 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    for (const width of [834, 932, 1032, 1114, 1376]) {
+      await page.setViewportSize({ width, height: 834 });
+      await page.goto("/#/wallets");
+      await expect(page.locator(".d2-wallets")).toHaveAttribute("aria-busy", "false");
+      const segment = page.locator(".d2-wallets .wallet-change-controls .mobile-segment").last();
+      await expect(segment).toBeVisible();
+      expect(await segment.evaluate((node) => node.scrollWidth - node.clientWidth), `at ${width}px`).toBeLessThanOrEqual(1);
+      if (width === 834) {
+        mkdirSync("test-results/mobile", { recursive: true });
+        await page.screenshot({ path: "test-results/mobile/ipad-11-portrait-wallets.png", fullPage: true });
+      }
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("wide Analytics detail leaves space before the portfolio cards", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await page.locator(".analytics-tile").getByText("Returns", { exact: true }).click();
+    const gap = await page.evaluate(() => {
+      const detail = document.querySelector(".mobile-analytics-hub")!.getBoundingClientRect();
+      const summary = document.querySelector(".d2-summary")!.getBoundingClientRect();
+      return summary.top - detail.bottom;
+    });
+    expect(gap).toBeGreaterThanOrEqual(16);
+    await expect(page.locator(".d2-summary .profit-summary-card")).toBeHidden();
+  } finally {
+    await context.close();
+  }
+});
+
+test("regular touch windows keep pull to refresh and edge swipe back", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 834, height: 1194 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    const bridge = await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/history");
+    const before = bridge.localQueries();
+    await page.getByTestId("pull-to-refresh").evaluate((element) => {
+      const touch = (y: number) => new Touch({ identifier: 1, target: element, clientX: 150, clientY: y });
+      const start = touch(120);
+      const end = touch(230);
+      element.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [start], changedTouches: [start] }));
+      element.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [end], changedTouches: [end] }));
+      element.dispatchEvent(new TouchEvent("touchend", { bubbles: true, touches: [], changedTouches: [end] }));
+    });
+    await expect.poll(() => bridge.localQueries()).toBeGreaterThan(before);
+    await page.goto("/#/more");
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Language" }).click();
+    const edge = await page.locator("#app-main-content").evaluate((node) => node.getBoundingClientRect().left + 20);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: edge, y: 250 }] });
+    for (const x of [20, 60, 100, 140]) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: edge + x, y: 250 }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(page).toHaveURL(/#\/settings$/);
+  } finally {
+    await context.close();
+  }
+});
+
+test("regular windows keep the snapshot sheet rounded and scrollable", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 932, height: 430 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    for (const [width, height] of [[932, 430], [744, 1133]]) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/#/history");
+      if (height < 500) await expect(page.locator(".app-layout")).toHaveAttribute("data-sidebar-collapsed", "true");
+      await page.locator(".history-mobile-snapshot-button").first().click();
+      const sheet = page.getByRole("dialog", { name: "Snapshot details" });
+      await expect(sheet).toBeVisible();
+      const geometry = await sheet.evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        const body = node.querySelector<HTMLElement>(".mobile-sheet-body")!;
+        const style = getComputedStyle(node);
+        return { top: box.top, bottom: box.bottom, radius: style.borderBottomLeftRadius, overflow: style.overflow,
+          scrollable: body.scrollHeight > body.clientHeight };
+      });
+      expect(geometry.top).toBeGreaterThanOrEqual(height < 500 ? 8 : 0);
+      expect(geometry.bottom).toBeLessThanOrEqual(height - (height < 500 ? 8 : 0));
+      expect(geometry.radius).not.toBe("0px");
+      expect(geometry.overflow).toBe("hidden");
+      if (height < 500) expect(geometry.scrollable).toBe(true);
+      if (height < 500) {
+        mkdirSync("test-results/mobile", { recursive: true });
+        await page.screenshot({ path: "test-results/mobile/iphone-landscape-history-sheet.png" });
+      }
+      await sheet.getByRole("button", { name: "Close" }).click();
+    }
   } finally {
     await context.close();
   }
@@ -201,7 +336,7 @@ test("wide history, settings, and analytics keep list and detail visible togethe
 });
 
 const viewports = [
-  ["iphone-se", 375, 667], ["iphone-max", 430, 932], ["iphone-landscape", 932, 430],
+  ["iphone-se", 375, 667], ["iphone-se-landscape", 667, 375], ["iphone-max", 430, 932], ["iphone-landscape", 932, 430],
   ["ipad-mini-portrait", 744, 1133], ["ipad-mini-landscape", 1133, 744],
   ["ipad-11-portrait", 834, 1194], ["ipad-11-landscape", 1194, 834],
   ["ipad-13-portrait", 1032, 1376], ["ipad-13-landscape", 1376, 1032],
@@ -274,6 +409,37 @@ for (const [name, width, height] of viewports) {
             expect(box.width, `${name} ${theme} ${route} nav target`).toBeGreaterThanOrEqual(44);
             expect(box.height, `${name} ${theme} ${route} nav target`).toBeGreaterThanOrEqual(44);
           }
+          const clipped = await page.evaluate(() => {
+            const root = document.querySelector("#app-main-content")!;
+            return [...root.querySelectorAll<HTMLElement>("*")]
+              .filter((node) => node.childElementCount === 0 && node.textContent?.trim() && node.getClientRects().length)
+              .filter((node) => {
+                const style = getComputedStyle(node);
+                return style.visibility !== "hidden" && style.textOverflow !== "ellipsis" &&
+                  !node.closest(".sr-only, [aria-hidden='true']") &&
+                  node.scrollWidth > node.clientWidth + 1;
+              })
+              .slice(0, 5).map((node) => ({
+                text: node.textContent?.trim().slice(0, 60),
+                className: node.className,
+                over: node.scrollWidth - node.clientWidth,
+              }));
+          });
+          expect(clipped, `${name} ${theme} ${route} clipped text`).toEqual([]);
+          const smallTargets = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(
+            "#app-main-content button, #app-main-content a[href]",
+          )].filter((node) => {
+            const box = node.getBoundingClientRect();
+            return box.width > 0 && box.height > 0 && getComputedStyle(node).visibility !== "hidden" &&
+              !node.closest("[aria-hidden='true'], .sr-only") &&
+              (box.width < 44 || box.height < 44);
+          }).slice(0, 5).map((node) => ({
+            label: node.getAttribute("aria-label") ?? node.textContent?.trim().slice(0, 45),
+            className: node.className,
+            width: Math.round(node.getBoundingClientRect().width),
+            height: Math.round(node.getBoundingClientRect().height),
+          })));
+          expect(smallTargets, `${name} ${theme} ${route} touch targets`).toEqual([]);
           const overlap = await page.evaluate(() => {
             for (const selector of [".overview-main-grid", ".profit-metrics-mobile", ".analytics-tile-grid",
               ".cost-metric-grid", ".coin-metric-grid", ".comparison-total-grid", ".ath-metrics",

@@ -19,10 +19,15 @@ export function isAppContentRendered(): boolean {
 
 export async function markIOSReady(): Promise<void> {
   if (!isIOS() || import.meta.env.VITE_TRACK3_IOS_READY_PROBE !== "1") return;
+  const writeViewport = () => invoke("mark_frontend_ready", {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   for (let frame = 0; frame < 3600; frame++) {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (isAppContentRendered()) {
-      await invoke("mark_frontend_ready");
+      await writeViewport();
+      window.addEventListener("resize", () => { void writeViewport().catch(() => {}); });
       return;
     }
   }
