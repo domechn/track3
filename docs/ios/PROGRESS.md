@@ -23,8 +23,9 @@
   AppleScript shortcut did not rotate it. Run `40223960890` also passed
   iPad portrait but rejected the app's landscape geometry request in
   windowed mode. The current follow-up rotates the selected Simulator
-  device through its Device menu, checks the device screenshot, then
-  relaunches and checks the WebView viewport; it still needs macOS CI.
+  device through its Device menu, then relaunches and checks the WebView
+  viewport. Run `40230403597` passed web checks and built and launched
+  the app on iPhone and iPad simulators without crash reports.
   Split View, Slide Over, Stage Manager,
   Magic Keyboard and trackpad, the share popover and file picker on a real
   iPad, and foldable posture remain unverified.
@@ -51,7 +52,8 @@
   including the 48-test wide-window sweep; Rust pure tests 65/65; desktop
   Rust library and binary check; and the production frontend build. The
   workflow YAML and extracted iPad launch shell passed syntax checks.
-  The merged branch has no new macOS iOS CI result yet.
+  macOS iOS CI run `40230403597` passed, including iPhone and iPad
+  simulator launch.
 
 ## X1 interaction fixes (2026-10-25)
 

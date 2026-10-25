@@ -957,7 +957,8 @@ const App = ({
                       actions={isLatest ? [{ label: t("common.delete"), destructive: true, disabled: deleting,
                         onClick: () => setDeleteCandidate(row.id) }] : []}>
                       <button type="button" data-testid="history-mobile-row"
-                        className="history-mobile-snapshot-button" onClick={() => onRowClick(row.id)}>
+                        className="history-mobile-snapshot-button" aria-current={isWide && isModalOpen && selectedDataId === row.id ? "true" : undefined}
+                        onClick={() => onRowClick(row.id)}>
                         <span className="sr-only">{t("history.viewSnapshot").replace("{date}", timeToDateStr(new Date(row.createdAt).getTime(), true))}</span>
                         <span className="history-mobile-snapshot-primary">
                           <span className="history-mobile-snapshot-date">{new Intl.DateTimeFormat(

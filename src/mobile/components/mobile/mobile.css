@@ -1169,6 +1169,7 @@
     grid-template-columns: minmax(220px, 38%) minmax(0, 1fr);
   }
   .ios-d3-settings .mobile-list-row[aria-current="page"], .ios-d3-more .mobile-list-row[aria-current="page"],
+  .history-mobile-snapshot-button[aria-current="true"],
   .analytics-tile[aria-current="true"] {
     background: hsl(var(--primary) / .12); color: hsl(var(--primary));
   }

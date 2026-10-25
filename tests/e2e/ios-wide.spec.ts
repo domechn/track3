@@ -70,6 +70,28 @@ test("wide history keeps a later snapshot detail in view", async ({ browser }) =
   }
 });
 
+test("wide history marks the open snapshot in the list", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1194, height: 834 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/history");
+    const rows = page.locator(".history-mobile-snapshot-button");
+    await expect(rows).toHaveCount(20);
+    await expect(page.locator(".history-mobile-snapshot-button[aria-current]")).toHaveCount(0);
+    const unselectedColor = await rows.nth(1).evaluate((row) => getComputedStyle(row).backgroundColor);
+    await rows.nth(1).click();
+    await expect(rows.nth(1)).toHaveAttribute("aria-current", "true");
+    const selectedColor = await rows.nth(1).evaluate((row) => getComputedStyle(row).backgroundColor);
+    expect(selectedColor).not.toBe(unselectedColor);
+    await rows.nth(2).click();
+    await expect(rows.nth(2)).toHaveAttribute("aria-current", "true");
+    await expect(rows.nth(1)).not.toHaveAttribute("aria-current");
+  } finally {
+    await context.close();
+  }
+});
+
 test("wide coin detail keeps a single wallet treemap compact", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1194, height: 834 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
