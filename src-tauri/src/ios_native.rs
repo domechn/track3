@@ -13,6 +13,12 @@ unsafe extern "C" {
     fn track3_ios_keychain_read(output: *mut u8, capacity: i32) -> i32;
     fn track3_ios_keychain_write(input: *const u8, length: i32) -> i32;
     fn track3_ios_keychain_delete() -> bool;
+    fn track3_ios_pick_backup_folder(kind: i32, output: *mut u8, capacity: i32) -> i32;
+    fn track3_ios_restore_backup_folder(kind: i32, output: *mut u8, capacity: i32) -> i32;
+    fn track3_ios_clear_backup_folder(kind: i32);
+    fn track3_ios_undo_clear_backup_folder(kind: i32, output: *mut u8, capacity: i32) -> i32;
+    fn track3_ios_use_import_backup_folder() -> i32;
+    fn track3_ios_prepare_backup_folder(path: *const std::ffi::c_char) -> i32;
 }
 
 pub fn keychain_read() -> Result<Option<String>, String> {
@@ -95,5 +101,66 @@ pub fn share_file(handle: &tauri::AppHandle, path: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err("could not open the share sheet".into())
+    }
+}
+
+const BACKUP_PATH_CAPACITY: usize = 8192;
+
+fn backup_path_result(status: i32, bytes: &[u8]) -> Result<Option<String>, String> {
+    match status {
+        -1 => Ok(None),
+        -2 => Err("Backup folder is unavailable. Choose the folder again.".into()),
+        -3 => Err("Downloading from iCloud timed out. Try again when online.".into()),
+        -4 => Err("Choose the parent folder containing track3-backup for auto backup.".into()),
+        n if n >= 0 && (n as usize) <= bytes.len() => {
+            String::from_utf8(bytes[..n as usize].to_vec())
+                .map(Some)
+                .map_err(|_| "Invalid backup folder path".into())
+        }
+        _ => Err("Could not access backup folder".into()),
+    }
+}
+
+pub fn pick_backup_folder(kind: i32) -> Result<Option<String>, String> {
+    let mut bytes = [0u8; BACKUP_PATH_CAPACITY];
+    let status =
+        unsafe { track3_ios_pick_backup_folder(kind, bytes.as_mut_ptr(), bytes.len() as i32) };
+    backup_path_result(status, &bytes)
+}
+
+pub fn restore_backup_folder(kind: i32) -> Result<Option<String>, String> {
+    let mut bytes = [0u8; BACKUP_PATH_CAPACITY];
+    let status =
+        unsafe { track3_ios_restore_backup_folder(kind, bytes.as_mut_ptr(), bytes.len() as i32) };
+    backup_path_result(status, &bytes)
+}
+
+pub fn clear_backup_folder(kind: i32) {
+    unsafe { track3_ios_clear_backup_folder(kind) }
+}
+
+pub fn undo_clear_backup_folder(kind: i32) -> Result<Option<String>, String> {
+    let mut bytes = [0u8; BACKUP_PATH_CAPACITY];
+    let status = unsafe {
+        track3_ios_undo_clear_backup_folder(kind, bytes.as_mut_ptr(), bytes.len() as i32)
+    };
+    backup_path_result(status, &bytes)
+}
+
+pub fn use_import_backup_folder() -> Result<(), String> {
+    match unsafe { track3_ios_use_import_backup_folder() } {
+        0 => Ok(()),
+        -4 => Err("Choose the parent folder containing track3-backup for auto backup.".into()),
+        _ => Err("Import folder is unavailable. Choose it again.".into()),
+    }
+}
+
+pub fn prepare_backup_folder(path: &str) -> Result<(), String> {
+    let path = CString::new(path).map_err(|_| "Invalid backup folder path")?;
+    let status = unsafe { track3_ios_prepare_backup_folder(path.as_ptr()) };
+    match status {
+        0 => Ok(()),
+        -3 => Err("Downloading from iCloud timed out. Try again when online.".into()),
+        _ => Err("Could not download backup files from iCloud. Try again when online.".into()),
     }
 }

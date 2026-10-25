@@ -3,6 +3,7 @@ import Darwin
 import LocalAuthentication
 import Security
 import UIKit
+import UniformTypeIdentifiers
 import UserNotifications
 
 private final class Track3PrivacyLock: NSObject {
@@ -352,4 +353,261 @@ public func track3IOSShareFile(_ path: UnsafePointer<CChar>) -> Bool {
         presenter.present(controller, animated: true)
     }
     return true
+}
+
+private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
+    static let shared = Track3BackupFolder()
+    private var waiting: ((URL?) -> Void)?
+    private var presentedPicker: UIDocumentPickerViewController?
+    private var active: [Int32: URL] = [:]
+    private var cleared: [Int32: URL] = [:]
+    private let lock = NSLock()
+    private func key(_ kind: Int32) -> String { "track3.ios.backupFolder.\(kind)" }
+
+    func pick(_ kind: Int32) -> (Int32, URL?) {
+        let semaphore = DispatchSemaphore(value: 0)
+        var selected: URL?
+        DispatchQueue.main.async {
+            guard self.waiting == nil,
+                  let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                    .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else {
+                semaphore.signal()
+                return
+            }
+            self.waiting = { url in selected = url; semaphore.signal() }
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
+            picker.delegate = self
+            picker.presentationController?.delegate = self
+            self.presentedPicker = picker
+            var presenter = root
+            while let current = presenter.presentedViewController { presenter = current }
+            guard !presenter.isBeingDismissed && presenter.view.window != nil else {
+                self.finish(picker, nil)
+                return
+            }
+            presenter.present(picker, animated: true) {
+                picker.presentationController?.delegate = self
+                if picker.presentingViewController == nil { self.finish(picker, nil) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                if picker.presentingViewController == nil { self.finish(picker, nil) }
+            }
+        }
+        semaphore.wait()
+        guard let url = selected else { return (-1, nil) }
+        if kind == 0 && (url.lastPathComponent == "track3-backup" || url.deletingLastPathComponent().lastPathComponent == "track3-backup") {
+            return (-4, nil)
+        }
+        guard url.startAccessingSecurityScopedResource() else { return (-2, nil) }
+        do {
+            let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+            lock.lock()
+            defer { lock.unlock() }
+            if let old = active[kind] { old.stopAccessingSecurityScopedResource() }
+            active[kind] = url
+            cleared.removeValue(forKey: kind)
+            UserDefaults.standard.set(bookmark, forKey: key(kind))
+            return (0, url)
+        } catch {
+            url.stopAccessingSecurityScopedResource()
+            return (-2, nil)
+        }
+    }
+
+    func restore(_ kind: Int32) -> (Int32, URL?) {
+        lock.lock()
+        defer { lock.unlock() }
+        if let url = active[kind] { return FileManager.default.fileExists(atPath: url.path) ? (0, url) : (-2, nil) }
+        guard let bookmark = UserDefaults.standard.data(forKey: key(kind)) else { return (-1, nil) }
+        do {
+            var stale = false
+            let url = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+            guard url.startAccessingSecurityScopedResource() else { return (-2, nil) }
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                url.stopAccessingSecurityScopedResource()
+                return (-2, nil)
+            }
+            if stale {
+                do {
+                    UserDefaults.standard.set(try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil), forKey: key(kind))
+                } catch {
+                    url.stopAccessingSecurityScopedResource()
+                    return (-2, nil)
+                }
+            }
+            active[kind] = url
+            return (0, url)
+        } catch { return (-2, nil) }
+    }
+
+    func clear(_ kind: Int32) {
+        _ = restore(kind)
+        lock.lock()
+        defer { lock.unlock() }
+        let url = active.removeValue(forKey: kind)
+        url?.stopAccessingSecurityScopedResource()
+        cleared[kind] = url
+        UserDefaults.standard.removeObject(forKey: key(kind))
+    }
+
+    func undoClear(_ kind: Int32) -> (Int32, URL?) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let url = cleared[kind] else { return (-1, nil) }
+        guard FileManager.default.fileExists(atPath: url.path),
+              url.startAccessingSecurityScopedResource() else { return (-2, nil) }
+        do {
+            let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+            active[kind] = url
+            cleared.removeValue(forKey: kind)
+            UserDefaults.standard.set(bookmark, forKey: key(kind))
+            return (0, url)
+        } catch {
+            url.stopAccessingSecurityScopedResource()
+            return (-2, nil)
+        }
+    }
+
+    func useImportForAuto() -> Int32 {
+        guard let url = restore(1).1 else { return -2 }
+        guard url.lastPathComponent != "track3-backup" &&
+              url.deletingLastPathComponent().lastPathComponent != "track3-backup" else { return -4 }
+        // Auto and import each own one security-scope access until cleared or replaced.
+        guard url.startAccessingSecurityScopedResource() else { return -2 }
+        do {
+            let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+            lock.lock()
+            defer { lock.unlock() }
+            active.removeValue(forKey: 0)?.stopAccessingSecurityScopedResource()
+            active[0] = url
+            cleared.removeValue(forKey: 0)
+            UserDefaults.standard.set(bookmark, forKey: key(0))
+            return 0
+        } catch {
+            url.stopAccessingSecurityScopedResource()
+            return -2
+        }
+    }
+
+    private func finish(_ controller: UIDocumentPickerViewController, _ url: URL?) {
+        guard presentedPicker === controller else { return }
+        presentedPicker = nil
+        let complete = waiting
+        waiting = nil
+        complete?(url)
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        finish(controller, urls.first)
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        finish(controller, nil)
+    }
+
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        guard let picker = presentationController.presentedViewController as? UIDocumentPickerViewController else { return }
+        finish(picker, nil)
+    }
+}
+
+private func track3WritePath(_ url: URL, _ output: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    let bytes = Array(url.path.utf8)
+    guard let output, capacity > 0, bytes.count < Int(capacity) else { return -2 }
+    for (index, byte) in bytes.enumerated() { output[index] = byte }
+    return Int32(bytes.count)
+}
+
+@_cdecl("track3_ios_pick_backup_folder")
+public func track3IOSPickBackupFolder(_ kind: Int32, _ output: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    let (status, url) = Track3BackupFolder.shared.pick(kind)
+    guard let url else { return status }
+    return track3WritePath(url, output, capacity)
+}
+
+@_cdecl("track3_ios_restore_backup_folder")
+public func track3IOSRestoreBackupFolder(_ kind: Int32, _ output: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    let (status, url) = Track3BackupFolder.shared.restore(kind)
+    guard let url else { return status }
+    return track3WritePath(url, output, capacity)
+}
+
+@_cdecl("track3_ios_clear_backup_folder")
+public func track3IOSClearBackupFolder(_ kind: Int32) {
+    Track3BackupFolder.shared.clear(kind)
+}
+
+@_cdecl("track3_ios_undo_clear_backup_folder")
+public func track3IOSUndoClearBackupFolder(_ kind: Int32, _ output: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    let (status, url) = Track3BackupFolder.shared.undoClear(kind)
+    guard let url else { return status }
+    return track3WritePath(url, output, capacity)
+}
+
+@_cdecl("track3_ios_use_import_backup_folder")
+public func track3IOSUseImportBackupFolder() -> Int32 {
+    Track3BackupFolder.shared.useImportForAuto()
+}
+
+@_cdecl("track3_ios_prepare_backup_folder")
+public func track3IOSPrepareBackupFolder(_ path: UnsafePointer<CChar>) -> Int32 {
+    let root = URL(fileURLWithPath: String(cString: path), isDirectory: true)
+    let manager = FileManager.default
+    guard manager.fileExists(atPath: root.path) else { return -2 }
+    let deadline = Date().addingTimeInterval(90)
+    let keys: Set<URLResourceKey> = [.isDirectoryKey, .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]
+    func prepare(_ entry: URL) -> Int32 {
+        let name = entry.lastPathComponent
+        let placeholder = name.hasPrefix(".") && name.hasSuffix(".icloud")
+        let logical = placeholder
+            ? entry.deletingLastPathComponent().appendingPathComponent(String(name.dropFirst().dropLast(7))) : entry
+        do {
+            let values = try entry.resourceValues(forKeys: keys)
+            if placeholder || (values.isDirectory != true && values.isUbiquitousItem == true && values.ubiquitousItemDownloadingStatus == .notDownloaded) {
+                do {
+                    try manager.startDownloadingUbiquitousItem(at: logical)
+                } catch {
+                    if placeholder { try manager.startDownloadingUbiquitousItem(at: entry) }
+                    else { throw error }
+                }
+                repeat {
+                    if Date() >= deadline { return -3 }
+                    Thread.sleep(forTimeInterval: 0.25)
+                    if !manager.fileExists(atPath: logical.path) { continue }
+                    var fresh = URL(fileURLWithPath: logical.path, isDirectory: values.isDirectory == true)
+                    fresh.removeAllCachedResourceValues()
+                    let current = try fresh.resourceValues(forKeys: keys)
+                    if current.ubiquitousItemDownloadingStatus == .current ||
+                        current.ubiquitousItemDownloadingStatus == .downloaded ||
+                        current.isUbiquitousItem != true { break }
+                } while true
+            }
+            return 0
+        } catch { return -2 }
+    }
+    let tree = root.lastPathComponent == "track3-backup" || root.deletingLastPathComponent().lastPathComponent == "track3-backup"
+        ? root : root.appendingPathComponent("track3-backup", isDirectory: true)
+    let treePlaceholder = tree.deletingLastPathComponent().appendingPathComponent(".track3-backup.icloud")
+    if !manager.fileExists(atPath: tree.path) && manager.fileExists(atPath: treePlaceholder.path) {
+        let status = prepare(treePlaceholder)
+        if status != 0 { return status }
+    }
+    if manager.fileExists(atPath: tree.path) {
+        let treeStatus = prepare(tree)
+        if treeStatus != 0 { return treeStatus }
+        guard let entries = manager.enumerator(at: tree, includingPropertiesForKeys: Array(keys)) else { return -2 }
+        for case let entry as URL in entries {
+            let status = prepare(entry)
+            if status != 0 { return status }
+        }
+    }
+    if tree != root {
+        let legacy = root.appendingPathComponent("track3-auto-backup.json")
+        let placeholder = root.appendingPathComponent(".track3-auto-backup.json.icloud")
+        if manager.fileExists(atPath: legacy.path) || manager.fileExists(atPath: placeholder.path) {
+            let status = prepare(manager.fileExists(atPath: legacy.path) ? legacy : placeholder)
+            if status != 0 { return status }
+        }
+    }
+    return 0
 }

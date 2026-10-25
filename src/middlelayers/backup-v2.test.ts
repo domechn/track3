@@ -301,3 +301,22 @@ describe("v2 import", () => {
     expect(importPart).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("manual folder import", () => {
+  it("reads only the chosen client", async () => {
+    addClient("client-a");
+    addClient("client-b");
+    const imported: string[] = [];
+    await importBackupV2("/backup", "self", () => undefined, async () => {}, async (_, metadata) => {
+      imported.push(metadata.client);
+    }, { onlyClient: "client-a", strict: true });
+    expect(imported).toEqual(["client-a"]);
+  });
+
+  it("reports a missing part instead of returning an empty import", async () => {
+    const { descriptor } = addClient("client-a");
+    disk.failRead = `${root}/client-a/data/${descriptor.file}`;
+    await expect(importBackupV2("/backup", "self", () => undefined, async () => {}, async () => {},
+      { onlyClient: "client-a", strict: true })).rejects.toThrow("read failed");
+  });
+});

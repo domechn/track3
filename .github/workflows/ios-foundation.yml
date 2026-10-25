@@ -2,7 +2,7 @@ name: iOS foundation
 
 on:
   push:
-    branches: ["feat/ios-app*", "feat/ios-interaction-fixes*"]
+    branches: ["feat/ios-app*", "feat/ios-folder-picker*", "feat/ios-interaction-fixes*", "feat/ios-wide-screens*"]
   pull_request:
     paths:
       - ".env.production"
@@ -25,7 +25,7 @@ on:
 jobs:
   web:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -55,7 +55,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-chromium-${{ hashFiles('yarn.lock') }}
       - name: Install Playwright and desktop Rust system packages
-        timeout-minutes: 12
+        timeout-minutes: 25
         run: |
           sudo apt-get -o Acquire::Retries=3 update
           sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
@@ -143,7 +143,7 @@ jobs:
           test -n "$APP"
           EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
           nm -gU "$APP/$EXECUTABLE" > "$RUNNER_TEMP/track3-native-symbols.txt"
-          for symbol in track3_ios_install_native track3_ios_lock_enabled track3_ios_set_lock_enabled track3_ios_authenticate track3_ios_haptic track3_ios_set_badge track3_ios_share_file track3_ios_keychain_read track3_ios_keychain_write track3_ios_keychain_delete; do
+          for symbol in track3_ios_install_native track3_ios_lock_enabled track3_ios_set_lock_enabled track3_ios_authenticate track3_ios_haptic track3_ios_set_badge track3_ios_share_file track3_ios_keychain_read track3_ios_keychain_write track3_ios_keychain_delete track3_ios_pick_backup_folder track3_ios_restore_backup_folder track3_ios_clear_backup_folder track3_ios_undo_clear_backup_folder track3_ios_use_import_backup_folder track3_ios_prepare_backup_folder; do
             grep -Fq " _$symbol" "$RUNNER_TEMP/track3-native-symbols.txt"
           done
       - name: Launch in iPhone simulator
