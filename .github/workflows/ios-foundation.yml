@@ -2,7 +2,7 @@ name: iOS foundation
 
 on:
   push:
-    branches: ["feat/ios-app*", "feat/ios-interaction-fixes*"]
+    branches: ["feat/ios-app*", "feat/ios-interaction-fixes*", "feat/ios-wide-screens*"]
   pull_request:
     paths:
       - ".env.production"
@@ -75,9 +75,9 @@ jobs:
         run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
       - name: Test production startup
         run: corepack yarn playwright test -c playwright.preview.config.ts --workers=2
-      - name: Test iPhone flows
+      - name: Test iPhone and iPad flows
         run: corepack yarn playwright test --project=mobile --workers=2
-      - name: Upload iPhone browser screenshots
+      - name: Upload iOS browser screenshots
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v7
@@ -204,6 +204,41 @@ jobs:
           xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$APP_PID" '$1 == pid {found=1} END {exit !found}'
           test ! -s artifacts/crash-reports.log
           ! grep -Eiq 'failed to read migration|error while running tauri application' artifacts/launch.log
+      - name: Launch in iPad simulator in portrait and landscape
+        run: |
+          set -euxo pipefail
+          SIM_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for group in data["devices"].values() for d in group if d["name"].startswith("iPad") and d["state"] == "Shutdown"]; devices.sort(key=lambda d: ("13-inch" not in d["name"], d["name"])); print(devices[0]["udid"])')
+          xcrun simctl boot "$SIM_ID"
+          xcrun simctl bootstatus "$SIM_ID" -b
+          APP=$(find src-tauri -type d -name '*.app' -print -quit)
+          test -n "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily:1' "$APP/Info.plist" | grep -Fx 2
+          /usr/libexec/PlistBuddy -c 'Print :UIRequiresFullScreen' "$APP/Info.plist" | grep -Fx false
+          xcrun simctl install "$SIM_ID" "$APP"
+          xcrun simctl launch "$SIM_ID" dev.track3.ios | tee artifacts/ipad-launch.log
+          CONTAINER=$(xcrun simctl get_app_container "$SIM_ID" dev.track3.ios data)
+          READY=""
+          for attempt in $(seq 1 30); do
+            READY=$(find "$CONTAINER" -name track3-ready -type f -print -quit)
+            if [ -n "$READY" ]; then break; fi
+            sleep 2
+          done
+          test -n "$READY"
+          grep -Fxq 'track3:ready' "$READY"
+          xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-portrait.png
+          swift scripts/ios/check-screenshot.swift artifacts/ipad-portrait.png
+          open -a Simulator --args -CurrentDeviceUDID "$SIM_ID"
+          osascript -e 'tell application "Simulator" to activate' -e 'tell application "System Events" to key code 123 using command down'
+          sleep 3
+          xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-landscape.png
+          swift scripts/ios/check-screenshot.swift artifacts/ipad-landscape.png
+          python3 - <<'PY'
+          import subprocess
+          for name, landscape in (("ipad-portrait.png", False), ("ipad-landscape.png", True)):
+              output = subprocess.check_output(["sips", "-g", "pixelWidth", "-g", "pixelHeight", f"artifacts/{name}"], text=True)
+              values = {line.split(":")[0].strip(): int(line.split(":")[1]) for line in output.splitlines() if line.strip().startswith(("pixelWidth:", "pixelHeight:"))}
+              assert (values["pixelWidth"] > values["pixelHeight"]) == landscape, (name, values)
+          PY
       - name: Build unsigned device IPA
         run: |
           set -euo pipefail

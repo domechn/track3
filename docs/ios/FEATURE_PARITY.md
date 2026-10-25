@@ -1,4 +1,4 @@
-# Desktop to iPhone feature parity
+# Desktop to iPhone and iPad feature parity
 
 This inventory follows the desktop route tree in `src/components/index/index.tsx`,
 `main-nav.tsx`, `sidebar/index.tsx`, the six Settings tabs, data fetchers, and
@@ -8,8 +8,16 @@ or native iOS services. Tests listed here cover the named behavior or its
 shared data path; a browser test with mocked Tauri IPC does not prove a
 physical device integration. Native checks are recorded in
 [PROGRESS.md](PROGRESS.md).
-The Xcode target is iPhone only. iPad layouts are outside this parity claim.
-The iPhone route tree is in `src/mobile/components/index/index.tsx`.
+The Xcode target supports iPhone and iPad with one mobile route tree in
+`src/mobile/components/index/index.tsx`. Responsive browser tests cover wide
+layout and resize; physical iPad and foldable checks remain release work.
+
+At regular width the four bottom tabs become a collapsible left sidebar.
+At wide width History list/detail, Analytics tile/chart, Settings menu/page,
+and Assistant sessions/chat can appear together. Compact routes, sheets, and
+back behavior remain the same. The viewport matrix in
+`tests/e2e/ios-wide.spec.ts` covers the listed mobile destinations in light
+and dark mode.
 
 ## Navigation and portfolio pages
 

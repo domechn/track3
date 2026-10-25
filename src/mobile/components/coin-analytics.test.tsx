@@ -363,7 +363,7 @@ const secondTransaction: Transaction = {
 
 it("shows a compact phone identity, 24h price change, and an unbroken transaction date", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
   mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([transaction]);
   mocks.queryAllDataDates.mockResolvedValue([
@@ -417,7 +417,7 @@ it("uses the closest stored snapshot from roughly a day before for 24h change", 
 
 it("does not label a multi-day coin price gap as 24h", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
   mocks.queryAllDataDates.mockResolvedValue([
     { id: "latest", date: "2024-04-18", createdAt: "2024-04-18T12:00:00.000Z" },

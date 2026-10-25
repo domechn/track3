@@ -4,6 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { ActionSheet, BottomSheet, MobileRecordList, PullToRefresh, SegmentedControl, SwipeableRow } from "@/mobile/components/mobile";
 
 describe("mobile interactions", () => {
+  it("shows an inline detail pane without a modal overlay", () => {
+    render(<BottomSheet open inline onOpenChange={() => {}} title="Snapshot details">
+      <p>Assets</p>
+    </BottomSheet>);
+    expect(screen.getByRole("region", { name: "Snapshot details" })).toContainElement(screen.getByText("Assets"));
+    expect(document.querySelector(".mobile-sheet-backdrop")).toBeNull();
+  });
   it("dismisses a sheet with Escape and restores focus", async () => {
     const onOpenChange = vi.fn();
     const trigger = document.createElement("button");

@@ -56,12 +56,13 @@ Manual exports remain single JSON files. Upgraded installations still import the
 4. Support real-time portfolio value in the top bar.
 5. Support real-time prices for all tracked assets during refresh.
 
-## iOS app (iPhone)
+## iOS app (iPhone and iPad)
 
-Track3 for iPhone builds from this repository with the same portfolio, sync,
+Track3 for iPhone and iPad builds from this repository with the same portfolio, sync,
 assistant, and encrypted configuration logic as the desktop app. Its interface
-uses Overview, History, Analytics, and More tabs, touch charts, and iOS Files
-for import and export. Desktop releases keep their existing interface.
+uses Overview, History, Analytics, and More tabs on narrow windows and a
+collapsible sidebar on iPad and other wide windows. Touch charts and iOS Files
+support import and export. Desktop releases keep their existing interface.
 
 See the [iOS feature inventory](docs/ios/FEATURE_PARITY.md),
 [build instructions](docs/ios/RELEASE.md), and

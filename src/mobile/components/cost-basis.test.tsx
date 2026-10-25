@@ -49,7 +49,7 @@ it("shows realized totals and data gaps from the loaded report", async () => {
 
 it("shows an empty row for each phone cost basis section without records", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
   vi.mocked(loadCostBasisReport).mockResolvedValue({
     ...report, assets: [], disposals: [], unrealized: [],
@@ -65,7 +65,7 @@ it("shows an empty row for each phone cost basis section without records", async
 
 it("expands phone cost lots inline with their signed gain", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
   render(<CostBasisPage />);
   fireEvent.click(await screen.findByText("Details"));
@@ -81,7 +81,7 @@ it("expands phone cost lots inline with their signed gain", async () => {
 
 it("uses the same signed two-decimal gain in phone asset rows", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
   vi.mocked(loadCostBasisReport).mockResolvedValue({
     ...report, assets: [{ ...report.assets[0], gainLoss: 1891.2 }],

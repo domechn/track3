@@ -340,7 +340,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = dev.track3.ios;
 				PRODUCT_NAME = "Track3";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
 			};
 			name = debug;
@@ -492,7 +492,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = dev.track3.ios;
 				PRODUCT_NAME = "Track3";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
 			};
 			name = release;

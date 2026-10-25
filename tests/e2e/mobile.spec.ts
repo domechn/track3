@@ -787,7 +787,10 @@ test(`a ${width}pt landscape iPhone keeps the touch shell`, async ({ browser }) 
   try {
     await installTauriBridge(page);
     await page.goto("/#/overview");
-    await expect(page.locator(".mobile-tab-bar")).toBeVisible();
+    await expect(page.locator(".app-layout")).toHaveAttribute("data-width-class", "regular");
+    await expect(page.locator(".app-layout")).toHaveAttribute("data-height-class", "compact");
+    await expect(page.locator(".mobile-sidebar")).toBeVisible();
+    await expect(page.locator(".mobile-tab-bar")).toBeHidden();
     await expect(page.locator(".mobile-route-heading")).toBeVisible();
     await expect(page.locator(".app-layout > aside")).toHaveCount(0);
   } finally {

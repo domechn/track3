@@ -9,6 +9,7 @@ import re
 apple = Path("src-tauri/gen/apple")
 project = apple / "project.yml"
 text = project.read_text()
+text = re.sub(r'(?m)^      TARGETED_DEVICE_FAMILY: .*', '      TARGETED_DEVICE_FAMILY: "1,2"', text)
 version = json.loads(Path("src-tauri/tauri.conf.json").read_text())["version"]
 for key in ("MARKETING_VERSION", "CURRENT_PROJECT_VERSION"):
     line = f"      {key}: {version}"
@@ -38,6 +39,25 @@ project.write_text(text)
 
 info = apple / "track3_iOS/Info.plist"
 info_text = info.read_text()
+if "<key>UIRequiresFullScreen</key>" not in info_text:
+    info_text = info_text.replace(
+        "\t<key>UIRequiredDeviceCapabilities</key>",
+        "\t<key>UIRequiresFullScreen</key>\n\t<false/>\n\t<key>UIRequiredDeviceCapabilities</key>",
+    )
+info_text = re.sub(
+    r"(<key>UIRequiresFullScreen</key>\s*)<(?:true|false)/>",
+    r"\g<1><false/>",
+    info_text,
+)
+info_text = re.sub(
+    r"(<key>UISupportedInterfaceOrientations</key>\s*<array>).*?(</array>)",
+    r"\g<1>\n\t\t<string>UIInterfaceOrientationPortrait</string>\n"
+    r"\t\t<string>UIInterfaceOrientationLandscapeLeft</string>\n"
+    r"\t\t<string>UIInterfaceOrientationLandscapeRight</string>\n\t\g<2>",
+    info_text,
+    count=1,
+    flags=re.DOTALL,
+)
 for key, variable in (
     ("CFBundleShortVersionString", "MARKETING_VERSION"),
     ("CFBundleVersion", "CURRENT_PROJECT_VERSION"),
@@ -67,6 +87,7 @@ if pbxproj.exists():
                 f"INFOPLIST_FILE = track3_iOS/Info.plist;\n\t\t\t\t{setting}",
             )
     pbx_text = re.sub(r'(?m)^(\s*)PRODUCT_NAME = "?Track3"?;', r'\g<1>PRODUCT_NAME = "Track3";', pbx_text)
+    pbx_text = re.sub(r'(?m)^(\s*)TARGETED_DEVICE_FAMILY = [^;]+;', r'\g<1>TARGETED_DEVICE_FAMILY = "1,2";', pbx_text)
     pbxproj.write_text(pbx_text)
 
 entitlements = apple / entry.group(1)

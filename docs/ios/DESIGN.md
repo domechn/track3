@@ -1,8 +1,30 @@
-# Track3 iPhone design system
+# Track3 iPhone and iPad design system
 
 ## Direction
 
-Track3 uses the iOS grouped layout: quiet surfaces, one indigo-blue accent, prominent money, and controls with at least 44 pt touch targets. The phone layout uses the device font through `-apple-system, "SF Pro Text", "SF Pro Display", system-ui`. It applies at the existing coarse-pointer media query through 950 px. Desktop keeps its Outfit and JetBrains Mono fonts and original semantic theme values.
+Track3 uses the iOS grouped layout: quiet surfaces, one indigo-blue accent, prominent money, and controls with at least 44 pt touch targets. The mobile layout uses the device font through `-apple-system, "SF Pro Text", "SF Pro Display", system-ui` at every width and with a trackpad attached. Desktop keeps its Outfit and JetBrains Mono fonts and original semantic theme values.
+
+## Wide layouts
+
+The left sidebar replaces the bottom tabs at 700 px. It keeps the four tab
+roots and More badge; the collapsed state leaves a 64 px icon rail. Content
+has a 1240 px maximum and wider gutters. The sidebar keeps all four
+destinations and their labels visible without taking height from charts in
+landscape. At 1000 px, Overview puts its value
+and P&L charts side by side, History keeps the snapshot list and detail
+visible, Analytics keeps a chart beside its tile hub, Settings keeps its
+menu and page visible, and Assistant keeps sessions beside chat. A narrow
+Split View window falls back to the compact presentation even on iPad.
+Profit metrics use three columns where there is room; charts and readable
+lists use the remaining width without stretching one line across the display.
+
+Below 500 px tall, titles and navigation bars shrink while controls retain
+44 px targets. Landscape safe-area insets protect controls from the screen
+cutout. Sheets are bottom aligned on compact windows and centered, at most
+560 px wide, on regular windows. Hover feedback is limited to hover-capable
+pointers.
+
+Reviewed browser captures are in [screens/ipad](screens/ipad/README.md).
 
 ## Tokens
 

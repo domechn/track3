@@ -103,7 +103,7 @@ describe("Profit loading", () => {
   it("uses navigable grouped rows for profit leaders on a phone", async () => {
     const oldMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({
-      matches: query.includes("max-width: 950px"),
+      matches: query.includes("min-width: 0px"),
       media: query,
       onchange: null,
       addListener: vi.fn(), removeListener: vi.fn(),
@@ -128,7 +128,7 @@ describe("Profit loading", () => {
   it("changes the phone profit query when a hero range is selected", async () => {
     const oldMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({
-      matches: query.includes("max-width: 950px"), media: query, onchange: null,
+      matches: query.includes("min-width: 0px"), media: query, onchange: null,
       addListener: vi.fn(), removeListener: vi.fn(),
       addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
     });

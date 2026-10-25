@@ -234,7 +234,7 @@ describe("Overview semantic controls", () => {
   it("lets a phone reader choose a chart range", async () => {
     const oldMatchMedia = window.matchMedia;
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query.includes("pointer: coarse"),
+      matches: query.includes("min-width: 0px"),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));
@@ -253,7 +253,7 @@ describe("Overview semantic controls", () => {
   it("uses the shared phone chart font for Overview value ticks", async () => {
     const oldMatchMedia = window.matchMedia;
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query.includes("pointer: coarse"),
+      matches: query.includes("min-width: 0px"),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));
@@ -309,7 +309,7 @@ describe("Overview semantic controls", () => {
   it("shows allocation share and value together on phone asset rows", async () => {
     const oldMatchMedia = window.matchMedia;
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query.includes("pointer: coarse"),
+      matches: query.includes("min-width: 0px"),
       addEventListener: vi.fn(), removeEventListener: vi.fn(),
     }));
     try {

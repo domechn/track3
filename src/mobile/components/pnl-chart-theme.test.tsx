@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 it("updates phone P&L bar colors when the theme changes", async () => {
-  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
   renderChart();
   await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("#34c759"));
   fireEvent.click(document.querySelector("button")!);
@@ -62,7 +62,7 @@ it("keeps the desktop P&L bar colors on a theme change", async () => {
 });
 
 it("places phone P&L dates below the plot so bars can use its full width", async () => {
-  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
   renderChart();
   await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("#34c759"));
   expect(barProps.current?.options.scales.x.ticks.display).toBe(false);
@@ -71,7 +71,7 @@ it("places phone P&L dates below the plot so bars can use its full width", async
 });
 
 it("keeps phone P&L scale close to the actual loss and gain", async () => {
-  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
   vi.mocked(queryPNLChartValue).mockResolvedValue([
     { timestamp: 1713139200000, totalValue: 10000 },
     { timestamp: 1713225600000, totalValue: 4500 },
@@ -85,7 +85,7 @@ it("keeps phone P&L scale close to the actual loss and gain", async () => {
 });
 
 it("uses only the readable scrub chip on phones and keeps the desktop tooltip", () => {
-  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("min-width: 0px"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
   renderChart();
   expect(barProps.current?.options.plugins.tooltip.enabled).toBe(false);
 });

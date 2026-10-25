@@ -120,7 +120,7 @@
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 12px 36px -8px rgba(2, 6, 23, 0.5);
   }
-  @media (max-width: 950px) and (pointer: coarse) {
+  @media (min-width: 0px) {
     :root {
       --background: 240 20% 96%; --foreground: 240 6% 10%;
       --card: 0 0% 100%; --card-foreground: 240 6% 10%;
@@ -156,7 +156,7 @@
     background-color: hsl(var(--background));
   }
 
-  @media (max-width: 950px) and (pointer: coarse) {
+  @media (min-width: 0px) {
     body { font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif; font-size: 17px; background-image: none; }
   }
 
@@ -238,7 +238,7 @@ html {
   .ios-switch[data-state="checked"]::before { background: hsl(var(--primary)); }
   .ios-switch-thumb { position: relative; margin-left: 4px; }
 }
-@media (max-width: 950px) and (pointer: coarse) {
+@media (min-width: 0px) {
   .ios-switch { width: 51px; height: 44px; background: transparent; }
   .ios-switch[data-state="checked"] { background: transparent; }
   .ios-switch::before { content: ""; position: absolute; width: 51px; height: 31px; left: 0; border-radius: 999px; background: hsl(var(--input)); }

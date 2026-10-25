@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "@/mobile/i18n";
 import { useHaptics } from "@/mobile/components/mobile";
 import { MobileIcon } from "@/mobile/components/mobile/icons";
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 
 export type MobileTab = "overview" | "history" | "analytics" | "more";
 export const tabRoots: Record<MobileTab, string> = {
@@ -15,7 +16,13 @@ export function tabForPath(path: string): MobileTab {
   return "more";
 }
 
-export function MobileNavigation({ unread = 0, onTabSwitch }: { unread?: number; onTabSwitch?: (rootTap: boolean) => void }) {
+function Navigation({ unread = 0, onTabSwitch, sidebar = false, collapsed = false, onCollapse }: {
+  unread?: number;
+  onTabSwitch?: (rootTap: boolean) => void;
+  sidebar?: boolean;
+  collapsed?: boolean;
+  onCollapse?: () => void;
+}) {
   const { t } = useTranslation();
   const haptic = useHaptics();
   const { pathname, search, hash } = useLocation();
@@ -26,8 +33,11 @@ export function MobileNavigation({ unread = 0, onTabSwitch }: { unread?: number;
     { id: "analytics" as const, title: t("nav.analytics", "Analytics") },
     { id: "more" as const, title: t("nav.more", "More") },
   ];
-  return <nav aria-label={t("mobile.tabs", "Tabs")} className="mobile-tab-bar">
+  return <nav aria-label={t("mobile.tabs", "Tabs")} className={sidebar ? "mobile-sidebar" : "mobile-tab-bar"}
+    data-collapsed={sidebar && collapsed}>
     {tabs.map(({ id, title }) => <Link key={id} to={tabRoots[id]}
+      aria-label={id === "more" && unread > 0
+        ? `${title}, ${t("goals.unread").replace("{count}", String(unread))}` : title}
       onClick={(event) => {
         haptic("selection");
         if (selected === id && pathname === tabRoots[id] && !search && !hash) {
@@ -41,10 +51,23 @@ export function MobileNavigation({ unread = 0, onTabSwitch }: { unread?: number;
       className="mobile-tab" aria-current={selected === id ? "page" : undefined}>
       <span className="mobile-tab-icon"><MobileIcon name={id} filled={selected === id} />{id === "more" && unread > 0 &&
         <span className="mobile-tab-badge" aria-hidden="true">{unread > 99 ? "99+" : unread}</span>}</span>
-      <span>{title}</span>
+      <span className="mobile-nav-label">{title}</span>
       {id === "more" && unread > 0 && <span className="sr-only">{t("goals.unread").replace("{count}", String(unread))}</span>}
     </Link>)}
+    {sidebar && <button type="button" className="mobile-sidebar-collapse" onClick={onCollapse}
+      aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")} aria-expanded={!collapsed}>
+      {collapsed ? <ChevronRightIcon aria-hidden="true" /> : <ChevronLeftIcon aria-hidden="true" />}
+      <span className="mobile-nav-label">{t(collapsed ? "sidebar.expand" : "sidebar.collapse")}</span>
+    </button>}
   </nav>;
+}
+
+export function MobileNavigation(props: { unread?: number; onTabSwitch?: (rootTap: boolean) => void }) {
+  return <Navigation {...props} />;
+}
+
+export function MobileSidebar(props: { unread?: number; onTabSwitch?: (rootTap: boolean) => void; collapsed?: boolean; onCollapse?: () => void }) {
+  return <Navigation {...props} sidebar />;
 }
 
 export function routeTitle(path: string, t: (key: string, fallback?: string) => string) {

@@ -110,7 +110,7 @@ afterEach(() => {
 describe("AssetsPercentageChange (stacked bar)", () => {
   it("finishes the phone chart immediately when reduced motion is requested", async () => {
     vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-      matches: query.includes("pointer: coarse") || query.includes("prefers-reduced-motion"),
+      matches: query.includes("min-width: 0px") || query.includes("prefers-reduced-motion"),
       media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
       addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
     }));

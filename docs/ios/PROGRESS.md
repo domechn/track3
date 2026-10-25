@@ -1,5 +1,27 @@
 # iOS port progress
 
+## W1 responsive iOS widths
+
+- Added live width and height classes, a collapsible sidebar at 700 px, and
+  wide panes at 1000 px in the shared mobile bundle. Phone tabs and the
+  existing route stack stay in place below 700 px. History, Settings,
+  Analytics, and Assistant use `SplitView`; History keeps an inline snapshot
+  detail on wide windows. Regular-width sheets are centered cards.
+- Enabled the iPad device family, multitasking, phone landscape, and iPad
+  orientations in the committed Xcode project and Tauri's iOS Info source.
+  The share sheet anchors to its presenting view. The iOS workflow now
+  targets `feat/ios-wide-screens*` and attempts iPad portrait and landscape
+  simulator captures after the existing iPhone smoke.
+- A browser viewport matrix checks 15 phone, tablet, Split View, and foldable
+  sizes in light and dark across the mobile routes. Browser screenshots are
+  Chromium captures; eight representative images are in `screens/ipad/`.
+  On Linux, TypeScript and the production frontend build passed, Vitest
+  passed 2,214 tests, mobile Playwright passed 197 tests, desktop Playwright
+  passed 77 tests, production preview passed two tests, and Rust pure tests
+  passed 62 tests. Simulator build and rotation await the driver's macOS CI
+  run. A signed iPad, Magic Keyboard, Stage Manager, and a physical foldable
+  remain unverified.
+
 ## X1 interaction fixes (2026-10-25)
 
 1. **Long press:** The selection rule covered `.app-layout` and toasts, while sheets and dialogs portal into `body`; their text still had `user-select:auto`. The phone rule now covers the body tree, with editable fields and marked copy surfaces selectable. Browser tests inspect an open Top coins sheet and Add alert modal as well as the main page. Chromium cannot emulate WebKit selection handles or report `-webkit-touch-callout`.

@@ -1153,6 +1153,7 @@
   "nav.analytics": "Analytics",
   "nav.more": "More",
   "mobile.tabs": "Tabs",
+  "analytics.selectDetail": "Choose a chart to view here",
   "datePicker.from": "From",
   "datePicker.to": "To",
   "walletValueChanges.openDetails": "Open wallet details",

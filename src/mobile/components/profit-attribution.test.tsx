@@ -47,7 +47,7 @@ describe("profit attribution", () => {
   it("expands grouped attribution fields beneath the phone rank", async () => {
     const previousMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({
-      matches: query.includes("max-width: 950px"), media: query, onchange: null,
+      matches: query.includes("min-width: 0px"), media: query, onchange: null,
       addListener: () => {}, removeListener: () => {},
       addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
     });
@@ -160,7 +160,7 @@ describe("profit attribution", () => {
   it("explains both empty market leader sections when all changes are quantity changes", async () => {
     const previousMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({
-      matches: query.includes("max-width: 950px"), media: query, onchange: null,
+      matches: query.includes("min-width: 0px"), media: query, onchange: null,
       addListener: () => {}, removeListener: () => {},
       addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
     });
@@ -183,7 +183,7 @@ describe("profit attribution", () => {
   it("keeps contributors beyond fifth place reachable on a phone", async () => {
     const previousMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({
-      matches: query.includes("max-width: 950px"), media: query, onchange: null,
+      matches: query.includes("min-width: 0px"), media: query, onchange: null,
       addListener: () => {}, removeListener: () => {},
       addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
     });

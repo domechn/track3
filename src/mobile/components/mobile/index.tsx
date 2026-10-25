@@ -8,10 +8,12 @@ import { isIOS } from "@/utils/platform";
 import "@/mobile/components/mobile/mobile.css";
 export { AnimatedAmount, Button, DeltaPill, EmptyState, IconButton, MobileCard, MobileSkeleton, Pill, SectionHeader } from "@/mobile/components/mobile/design";
 export { MobileIcon } from "@/mobile/components/mobile/icons";
-export { MobileNavigation } from "@/mobile/components/mobile/navigation";
+export { MobileNavigation, MobileSidebar } from "@/mobile/components/mobile/navigation";
+export { SplitView } from "@/mobile/components/mobile/split-view";
+export { useSizeClass } from "@/mobile/components/mobile/size-class";
 export { Switch } from "@/mobile/components/ui/switch";
 
-export const MOBILE_MEDIA_QUERY = "(max-width: 950px) and (pointer: coarse)";
+export const MOBILE_MEDIA_QUERY = "(min-width: 0px)";
 
 export function useHaptics() {
   return (kind: "selection" | "light" | "success" = "selection") => {
@@ -64,7 +66,7 @@ export function MobilePage({
 }
 
 export function BottomSheet({
-  open, onOpenChange, title, children, detents = ["medium", "large"], initialDetent, className,
+  open, onOpenChange, title, children, detents = ["medium", "large"], initialDetent, className, inline = false,
 }: React.PropsWithChildren<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -72,6 +74,7 @@ export function BottomSheet({
   detents?: Array<"medium" | "large">;
   initialDetent?: "medium" | "large";
   className?: string;
+  inline?: boolean;
 }>) {
   const { t } = useTranslation();
   const [detent, setDetent] = useState<"medium" | "large">(initialDetent ?? detents[0] ?? "medium");
@@ -128,6 +131,14 @@ export function BottomSheet({
     : "min(60dvh, 42rem)";
   const dragHeight = drag === 0 ? undefined
     : `calc(${sheetHeight} ${drag > 0 ? "-" : "+"} ${Math.abs(drag)}px)`;
+  if (inline) return <aside role="region" aria-label={title} className={cn("mobile-inline-detail", className)}>
+    <div className="mobile-sheet-heading">
+      <h2>{title}</h2>
+      {open && <button type="button" className="mobile-sheet-close" aria-label={t("common.close", "Close")}
+        onClick={() => onOpenChange(false)}><Cross2Icon aria-hidden="true" /></button>}
+    </div>
+    {open && <div className="mobile-sheet-body">{children}</div>}
+  </aside>;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
