@@ -30,6 +30,8 @@ use crate::{
     types::{CoinWithPrice, RefreshAssetInput, RefreshTransactionInput},
 };
 use tauri::Manager;
+#[cfg(target_os = "ios")]
+use tauri_plugin_fs::FsExt;
 
 lazy_static! {
     static ref ENT: Ent = Ent::new();
@@ -38,6 +40,8 @@ lazy_static! {
 static IOS_STARTUP_FAILURE: Mutex<Option<String>> = Mutex::new(None);
 #[cfg(target_os = "ios")]
 static IOS_STARTUP_RETRYABLE: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "ios")]
+static IOS_BACKUP_FOLDER_FAILURE: Mutex<Option<String>> = Mutex::new(None);
 
 #[cfg(target_os = "ios")]
 fn set_ios_startup_failure(error: String, retryable: bool) {
@@ -367,6 +371,95 @@ fn ios_share_file(handle: tauri::AppHandle, path: String) -> Result<(), String> 
     crate::ios_native::share_file(&handle, &path)
 }
 
+#[cfg(target_os = "ios")]
+fn allow_backup_folder(handle: &tauri::AppHandle, path: &str) -> Result<(), String> {
+    let selected = std::path::Path::new(path);
+    handle
+        .fs_scope()
+        .allow_directory(selected, true)
+        .map_err(|e| e.to_string())?;
+    if let Some(parent) = crate::ios_backup_path::backup_parent(selected) {
+        handle
+            .fs_scope()
+            .allow_directory(parent, true)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+async fn ios_pick_backup_folder(
+    handle: tauri::AppHandle,
+    kind: String,
+) -> Result<Option<String>, String> {
+    let kind = crate::ios_backup_path::backup_folder_kind(&kind).map_err(|e| e.to_string())?;
+    let selected =
+        tauri::async_runtime::spawn_blocking(move || crate::ios_native::pick_backup_folder(kind))
+            .await
+            .map_err(|e| e.to_string())??;
+    if let Some(path) = &selected {
+        allow_backup_folder(&handle, path)?;
+        if kind == 0 {
+            *IOS_BACKUP_FOLDER_FAILURE
+                .lock()
+                .unwrap_or_else(|p| p.into_inner()) = None;
+        }
+    }
+    Ok(selected)
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+fn ios_backup_folder_failure() -> Option<String> {
+    if let Err(error) = crate::ios_native::restore_backup_folder(0) {
+        *IOS_BACKUP_FOLDER_FAILURE
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = Some(error);
+    }
+    IOS_BACKUP_FOLDER_FAILURE
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone()
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+fn ios_clear_backup_folder(kind: String) -> Result<(), String> {
+    let kind = crate::ios_backup_path::backup_folder_kind(&kind).map_err(|e| e.to_string())?;
+    crate::ios_native::clear_backup_folder(kind);
+    if kind == 0 {
+        *IOS_BACKUP_FOLDER_FAILURE
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = None;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+async fn ios_prepare_backup_folder(handle: tauri::AppHandle, path: String) -> Result<(), String> {
+    let auto = crate::ios_native::restore_backup_folder(0)
+        .ok()
+        .flatten()
+        .is_some_and(|saved| saved == path);
+    let result = if !handle.fs_scope().is_allowed(&path) {
+        Err("Backup folder is outside allowed Files locations".into())
+    } else {
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::ios_native::prepare_backup_folder(&path)
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    };
+    if auto {
+        *IOS_BACKUP_FOLDER_FAILURE
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = result.as_ref().err().cloned();
+    }
+    result
+}
+
 #[cfg(debug_assertions)]
 #[tauri::command]
 fn mark_frontend_ready(handle: tauri::AppHandle) -> Result<(), String> {
@@ -424,6 +517,26 @@ pub fn run() {
             app.manage(instance_lock);
             #[cfg(target_os = "ios")]
             crate::ios_native::install();
+            #[cfg(target_os = "ios")]
+            match crate::ios_native::restore_backup_folder(0) {
+                Ok(Some(path)) => {
+                    if let Err(error) = allow_backup_folder(app.handle(), &path) {
+                        *IOS_BACKUP_FOLDER_FAILURE
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner()) = Some(error);
+                    }
+                }
+                Ok(None) => (),
+                Err(error) => {
+                    *IOS_BACKUP_FOLDER_FAILURE
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner()) = Some(error)
+                }
+            }
+            #[cfg(target_os = "ios")]
+            if let Ok(Some(path)) = crate::ios_native::restore_backup_folder(1) {
+                let _ = allow_backup_folder(app.handle(), &path);
+            }
             #[cfg(target_os = "ios")]
             crate::ios_backup::exclude_existing_key_artifacts(&app_data_dir)
                 .map_err(io::Error::other)?;
@@ -522,6 +635,10 @@ pub fn run() {
         ios_haptic,
         ios_set_badge,
         ios_share_file,
+        ios_pick_backup_folder,
+        ios_backup_folder_failure,
+        ios_clear_backup_folder,
+        ios_prepare_backup_folder,
         mark_frontend_ready,
         record_frontend_error,
     ]);
@@ -548,6 +665,10 @@ pub fn run() {
         ios_haptic,
         ios_set_badge,
         ios_share_file,
+        ios_pick_backup_folder,
+        ios_backup_folder_failure,
+        ios_clear_backup_folder,
+        ios_prepare_backup_folder,
     ]);
     #[cfg(all(debug_assertions, not(target_os = "ios")))]
     let builder = builder.invoke_handler(tauri::generate_handler![

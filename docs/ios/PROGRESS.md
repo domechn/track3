@@ -1,5 +1,11 @@
 # iOS port progress
 
+## F1 folder picker (2026-10-25)
+
+- Added an iOS Files folder picker with separate persisted auto-backup and import bookmarks. Startup restores folder access into the Tauri filesystem scope. Backup settings offers Files, Documents, folder import with client review, and a revoked-folder state. iCloud download preparation runs before reading a backup tree.
+- Linux checks: frontend and browser-test TypeScript, 2,222 Vitest tests, 64 pure Rust tests, desktop Playwright 77/77, and mobile Playwright 142/142 passed. The folder Playwright spec also passed with a verified V2 part and confirmed import after the full browser runs. Desktop's two initial browser runs had intermittent Vite dynamic-module fetch failures on unrelated pages; the final one-worker full run passed 77/77 without a retry.
+- Swift picker, security scope, and iCloud Drive behavior need a signed device check; Linux cannot compile or exercise Swift. The iOS CI branch trigger includes `feat/ios-folder-picker*`; the driver must push and report the macOS CI result.
+
 ## P2 reviewer follow-up (2026-10-25)
 
 - The driver pushed P2 commit `febab6d`. [iOS foundation run 40165424556](https://github.com/domechn/track3/actions/runs/40165424556) passed both `web` and `ios` jobs, including the simulator build and launch. These reviewer fixes are local and have no CI result yet. No pull request exists for `feat/ios-app-p2`, so the existing `test-on-pr` workflow has not run.

@@ -8,6 +8,7 @@ import {
   exportHistoricalData,
   importHistoricalData,
   readHistoricalDataFromFile,
+  readHistoricalDataFromPath,
   shareHistoricalData,
 } from "@/middlelayers/data";
 import { UniqueIndexConflictResolver } from "@/middlelayers/types";
@@ -53,7 +54,8 @@ import {
   runEncryptionKeyRotation,
 } from "@/middlelayers/encryption-write-gate";
 import { redactSecrets } from "@/middlelayers/security/redact";
-import { chooseBackupLocation } from "@/utils/backup-location";
+import { chooseBackupLocation, documentsBackupLocation } from "@/utils/backup-location";
+import { findBackupFolder, listBackupClients, readBackupClient, type BackupClient, type BackupFolder } from "@/utils/backup-folder";
 import { isIOS } from "@/utils/platform";
 import { appLockEnabled, setAppLockEnabled } from "@/utils/ios-native";
 import { ConfirmSheet } from "@/mobile/components/mobile/overlays";
@@ -72,6 +74,10 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   );
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
+  const [backupFolderFailure, setBackupFolderFailure] = useState<string | null>(null);
+  const [folderReview, setFolderReview] = useState<{ folder: BackupFolder; clients: BackupClient[] }>();
+  const [folderBusy, setFolderBusy] = useState(false);
+  const [folderError, setFolderError] = useState("");
   const { run: runBackupFolderDelete } = useOptimisticDelete(setAutoBackupDirectory);
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
   const [lastImportAt, setLastImportAt] = useState<Date>();
@@ -148,6 +154,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       }
     });
     getBlacklistCoins().then(setBlacklist);
+    if (isIOS()) void invoke<string | null>("ios_backup_folder_failure").then(setBackupFolderFailure).catch(() => setBackupFolderFailure(t("data.folder.unavailable")));
   }, []);
 
   async function loadAutoBackupDirectory() {
@@ -230,14 +237,60 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       });
   }
 
+  async function onImportBackupFolderClick() {
+    setFolderError("");
+    setFolderReview(undefined);
+    try {
+      const selected = await chooseBackupLocation("import");
+      if (!selected) return;
+      setFolderBusy(true);
+      await invoke("ios_prepare_backup_folder", { path: selected });
+      const folder = await findBackupFolder(selected);
+      if (!folder) { setFolderError(t("data.folder.hint")); return; }
+      const clients = await listBackupClients(folder.directory, selected);
+      if (!clients.length && !folder.legacy) { setFolderError(t("data.folder.hint")); return; }
+      setFolderReview({ folder, clients });
+    } catch (error) {
+      setFolderError(String(error).includes("timed out") ? t("data.folder.downloadTimeout") : t("data.folder.failed"));
+    } finally { setFolderBusy(false); }
+  }
+
+  async function onImportFolderClient(client?: string) {
+    if (!folderReview) return;
+    setFolderBusy(true);
+    setFolderError("");
+    try {
+      const ed = client === undefined
+        ? await readHistoricalDataFromPath(`${folderReview.folder.directory}/track3-auto-backup.json`)
+        : await readBackupClient(folderReview.folder.directory, client);
+      setExportData(ed);
+      setShowImportConfirm(true);
+    } catch (error) { setFolderError(String(error).includes("timed out") ? t("data.folder.downloadTimeout") : t("data.folder.failed")); }
+    finally { setFolderBusy(false); }
+  }
+
   async function onChooseAutoBackupFolderButtonClick() {
+    try {
     const selected = await chooseBackupLocation();
     if (selected) {
       const path = selected as string;
       await saveAutoBackupDirectory(path);
       setAutoBackupDirectory(path);
+      setBackupFolderFailure(null);
       await loadAutoBackupTime();
     }
+    } catch (error) { setBackupFolderFailure(String(error)); }
+  }
+
+  async function onUseDocumentsFolderClick() {
+    try {
+      const path = await documentsBackupLocation();
+      await saveAutoBackupDirectory(path);
+      await invoke("ios_clear_backup_folder", { kind: "auto" });
+      setAutoBackupDirectory(path);
+      setBackupFolderFailure(null);
+      await loadAutoBackupTime();
+    } catch (error) { setBackupFolderFailure(String(error)); }
   }
 
   function onClearAutoBackupFolderButtonClick() {
@@ -330,8 +383,22 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <div className="ios-d3-backup-import-section">
         <InsetGroup title={t("data.import")}>
           <button type="button" className="ios-d3-data-action-row" onClick={onImportDataClick}><span>{t("data.importButton")}</span><ChevronRightIcon aria-hidden="true" /></button>
+          <button type="button" className="ios-d3-data-action-row" onClick={() => void onImportBackupFolderClick()} disabled={folderBusy}><span>{t("data.folder.import")}</span><ChevronRightIcon aria-hidden="true" /></button>
         </InsetGroup>
         <p className="ios-d3-settings-note ios-d3-import-note">{t("data.importDesc")}</p>
+        <p className="ios-d3-settings-note">{t("data.folder.hint")}</p>
+        {folderBusy && <p role="status">{t("data.folder.downloading")}</p>}
+        {folderError && <p role="alert" className="text-sm text-destructive">{folderError}</p>}
+        {folderReview && <div className="space-y-2 p-3 text-sm">
+          {folderReview.folder.normalized && <p>{t("data.folder.normalized").replace("{folder}", folderReview.folder.directory)}</p>}
+          <p>{folderReview.folder.directory}</p>
+          {folderReview.clients.map(({ client, exportAt, months }) => <div key={client} className="flex flex-wrap items-center justify-between gap-2">
+            <span>{client} · {t(months === 1 ? "data.folder.month" : "data.folder.months").replace("{count}", String(months))} · {new Date(exportAt).toLocaleString()}</span>
+            <Button size="sm" onClick={() => void onImportFolderClient(client)} disabled={folderBusy}>{t("data.folder.importClient").replace("{client}", client)}</Button>
+          </div>)}
+          {folderReview.folder.legacy && <Button size="sm" variant="outline" onClick={() => void onImportFolderClient()} disabled={folderBusy}>{t("data.folder.importLegacy")}</Button>}
+        </div>}
+
         </div>
         <InsetGroup title={t("data.export")}>
           <div className="ios-d3-setting-switch-row">
@@ -427,6 +494,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
               {t("data.autoBackupDesc")}
             </span>
           </div>
+          {isIOS() && <p className="text-sm text-muted-foreground">{t("data.folder.autoHint")}</p>}
           {isIOS() && <dl className="space-y-2 text-sm text-muted-foreground">
             <div className="flex justify-between gap-3">
               <dt>{t("data.mobile.lastBackupAt")}</dt>
@@ -438,6 +506,8 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </div>
           </dl>}
 
+          {isIOS() && backupFolderFailure && autoBackupDirectory && <p role="alert" className="text-sm text-destructive">{t("data.folder.unavailable")}</p>}
+          {isIOS() && autoBackupDirectory && !backupFolderFailure && <p role="status" className="text-sm text-muted-foreground">{t("data.folder.ready")}</p>}
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div
               className={cn(
@@ -447,10 +517,11 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             >
               {autoBackupDirectory}
             </div>
-            <div className="ios-d3-backup-folder-actions flex items-center gap-2">
+            <div className="ios-d3-backup-folder-actions flex flex-wrap items-center gap-2">
               <Button onClick={onChooseAutoBackupFolderButtonClick} size="sm">
-                {t(isIOS() ? "data.useDocumentsFolder" : "data.chooseFolder")}
+                {t(backupFolderFailure ? "data.folder.chooseAgain" : "data.chooseFolder")}
               </Button>
+              {isIOS() && <Button variant="outline" size="sm" onClick={() => void onUseDocumentsFolderClick()}>{t("data.useDocumentsFolder")}</Button>}
               <ConfirmDeleteDialog
                 trigger={<Button variant="outline" size="sm">{t("data.clearFolder")}</Button>}
                 title={t("data.clearFolderTitle")}

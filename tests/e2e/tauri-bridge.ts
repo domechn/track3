@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 import initSqlJs from "sql.js";
@@ -22,6 +23,7 @@ type BridgeOptions = {
   freshReviewData?: boolean;
   slowAssistant?: boolean;
   failDataQueries?: boolean;
+  backupFolderFixture?: boolean;
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
@@ -41,6 +43,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     freshReviewData = false,
     slowAssistant = false,
     failDataQueries = false,
+    backupFolderFixture = false,
   } = options;
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
@@ -191,6 +194,25 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     contextSize: 8192,
   });
   const files = new Map<string, string>();
+  const directories = new Set<string>();
+  if (backupFolderFixture) {
+    directories.add("/e2e/cloud/track3-backup");
+    directories.add("/e2e/cloud/track3-backup/device-a");
+    directories.add("/e2e/cloud/track3-backup/device-a/data");
+    const historicalData = [{
+      createdAt: "2024-02-01T00:00:00.000Z", total: 42,
+      assets: [{ id: 3, uuid: "folder-snapshot", createdAt: "2024-02-01T00:00:00.000Z", assetType: "crypto", symbol: "ETH", amount: 1, value: 42, price: 42, wallet: "folder-wallet" }],
+      transactions: [],
+    }];
+    const content = JSON.stringify({ historicalData });
+    const bytes = new TextEncoder().encode(content).length;
+    const sha256 = createHash("sha256").update(content).digest("hex");
+    const part = { bytes, file: `2024-02.${sha256.slice(0, 8)}.json`, month: "2024-02", records: 1, sha256 };
+    const payload = { client: "device-a", clientVersion: "0.9.0", exportAt: "2024-03-01T00:00:00.000Z", formatVersion: 2, parts: [part] };
+    const metaHash = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+    files.set("/e2e/cloud/track3-backup/device-a/metadata.json", JSON.stringify({ ...payload, metaHash }));
+    files.set(`/e2e/cloud/track3-backup/device-a/data/${part.file}`, content);
+  }
   let exportedPath: string | null = null;
   const requests = new Map<number, { url: string; method?: string; headers?: Record<string, string> | [string, string][]; data?: number[] }>();
   const responses = new Map<number, { bytes: number[]; read: boolean; chunks?: number[][]; chunkIndex?: number }>();
@@ -218,6 +240,9 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     if (cmd === "get_database_url") return "sqlite:e2e.db";
     if (cmd === "ios_startup_failure") return lockedStartup ? "Protected key unavailable" : null;
     if (cmd === "ios_retry_startup") return false;
+    if (cmd === "ios_backup_folder_failure") return null;
+    if (cmd === "ios_pick_backup_folder") return backupFolderFixture ? "/e2e/cloud" : null;
+    if (cmd === "ios_prepare_backup_folder" || cmd === "ios_clear_backup_folder") return null;
     if (cmd === "ios_haptic") { haptics++; return null; }
     if (cmd === "ios_lock_enabled") return false;
     if (cmd === "ios_set_badge") return null;
@@ -338,8 +363,13 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       }
       return true;
     }
-    if (cmd === "plugin:fs|exists") return files.has(args.path) ||
+    if (cmd === "plugin:fs|exists") return files.has(args.path) || directories.has(args.path) ||
       (richPortfolio && /\/assets\/coins\/(btc|eth|sol|usdc|avax|link)\.png$/.test(args.path));
+    if (cmd === "plugin:fs|read_dir") {
+      const prefix = `${args.path}/`;
+      return [...directories, ...files.keys()].filter((path) => path.startsWith(prefix) && !path.slice(prefix.length).includes("/"))
+        .map((path) => ({ name: path.slice(prefix.length), isDirectory: directories.has(path), isFile: files.has(path), isSymlink: false }));
+    }
     if (cmd === "plugin:fs|mkdir") return null;
     if (cmd === "plugin:fs|copy_file") {
       const text = files.get(args.fromPath);

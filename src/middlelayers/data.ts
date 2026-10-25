@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { isIOS } from "@/utils/platform";
 import { Analyzer, GlobalConfig, WalletCoin } from "./datafetch/types";
 import { BTCAnalyzer } from "./datafetch/coins/btc";
 import { combineCoinLists, getAssetType } from "./datafetch/utils/coins";
@@ -392,6 +393,10 @@ export async function readHistoricalDataFromFile(): Promise<
   return DATA_MANAGER.readHistoricalData(selected as string);
 }
 
+export async function readHistoricalDataFromPath(path: string): Promise<ExportData> {
+  return DATA_MANAGER.readHistoricalData(path);
+}
+
 // importHistoricalData to db
 export async function importHistoricalData(
   conflictResolver: "REPLACE" | "IGNORE",
@@ -434,6 +439,7 @@ async function performAutoBackupHistoricalData(force: boolean): Promise<boolean>
     return false;
   }
 
+  if (isIOS()) await invoke("ios_prepare_backup_folder", { path: abd });
   const client = await getClientID();
   if (!client) {
     throw new Error("missing client ID for auto backup");
@@ -458,6 +464,7 @@ export async function autoImportHistoricalData(): Promise<boolean> {
   const client = await getClientID();
   if (!client) return false;
 
+  if (isIOS()) await invoke("ios_prepare_backup_folder", { path: abd });
   let imported = false;
   let clientsWithV2 = new Set<string>();
   try {
