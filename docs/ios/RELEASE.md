@@ -57,7 +57,8 @@ release tasks; the unsigned CI IPA does not establish their accuracy.
 4. Export, share and import a JSON file through Files. Check the filename,
    import confirmation and conflict choice. Check an automatic backup in
    Track3's Documents folder. Pick a folder in iCloud Drive written by the
-   desktop app, import a listed client, and use it for auto backup. Relaunch and
+   desktop app, import a listed client, opt into using that parent folder for
+   auto backup, and verify a normal import leaves auto backup unchanged. Relaunch and
    confirm auto import still works. Revoke access or delete the folder, then
    confirm Backup settings shows Choose folder again. Try selecting
    track3-backup and a client folder inside it, plus a single JSON file.

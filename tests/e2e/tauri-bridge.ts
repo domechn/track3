@@ -24,6 +24,8 @@ type BridgeOptions = {
   slowAssistant?: boolean;
   failDataQueries?: boolean;
   backupFolderFixture?: boolean;
+  backupFolderPick?: string;
+  backupFolderFailure?: string;
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
@@ -44,6 +46,8 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     slowAssistant = false,
     failDataQueries = false,
     backupFolderFixture = false,
+    backupFolderPick,
+    backupFolderFailure,
   } = options;
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
@@ -213,6 +217,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     files.set("/e2e/cloud/track3-backup/device-a/metadata.json", JSON.stringify({ ...payload, metaHash }));
     files.set(`/e2e/cloud/track3-backup/device-a/data/${part.file}`, content);
   }
+  directories.add("/e2e/unrelated");
   let exportedPath: string | null = null;
   const requests = new Map<number, { url: string; method?: string; headers?: Record<string, string> | [string, string][]; data?: number[] }>();
   const responses = new Map<number, { bytes: number[]; read: boolean; chunks?: number[][]; chunkIndex?: number }>();
@@ -240,9 +245,10 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     if (cmd === "get_database_url") return "sqlite:e2e.db";
     if (cmd === "ios_startup_failure") return lockedStartup ? "Protected key unavailable" : null;
     if (cmd === "ios_retry_startup") return false;
-    if (cmd === "ios_backup_folder_failure") return null;
-    if (cmd === "ios_pick_backup_folder") return backupFolderFixture ? "/e2e/cloud" : null;
-    if (cmd === "ios_prepare_backup_folder" || cmd === "ios_clear_backup_folder") return null;
+    if (cmd === "ios_backup_folder_status") return { path: null, failure: backupFolderFailure ?? null };
+    if (cmd === "ios_pick_backup_folder") return backupFolderPick ?? (backupFolderFixture ? "/e2e/cloud" : null);
+    if (cmd === "ios_use_import_backup_folder") return null;
+    if (cmd === "ios_prepare_backup_folder" || cmd === "ios_clear_backup_folder" || cmd === "ios_undo_clear_backup_folder") return null;
     if (cmd === "ios_haptic") { haptics++; return null; }
     if (cmd === "ios_lock_enabled") return false;
     if (cmd === "ios_set_badge") return null;

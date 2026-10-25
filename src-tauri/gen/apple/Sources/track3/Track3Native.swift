@@ -359,6 +359,8 @@ private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate {
     static let shared = Track3BackupFolder()
     private var waiting: ((URL?) -> Void)?
     private var active: [Int32: URL] = [:]
+    private var cleared: [Int32: URL] = [:]
+    private let lock = NSLock()
     private func key(_ kind: Int32) -> String { "track3.ios.backupFolder.\(kind)" }
 
     func pick(_ kind: Int32) -> (Int32, URL?) {
@@ -378,16 +380,19 @@ private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate {
             while let current = presenter.presentedViewController { presenter = current }
             presenter.present(picker, animated: true)
         }
-        guard semaphore.wait(timeout: .now() + 180) == .success else { return (-2, nil) }
+        semaphore.wait()
         guard let url = selected else { return (-1, nil) }
         if kind == 0 && (url.lastPathComponent == "track3-backup" || url.deletingLastPathComponent().lastPathComponent == "track3-backup") {
-            return (-2, nil)
+            return (-4, nil)
         }
         guard url.startAccessingSecurityScopedResource() else { return (-2, nil) }
         do {
             let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+            lock.lock()
+            defer { lock.unlock() }
             if let old = active[kind] { old.stopAccessingSecurityScopedResource() }
             active[kind] = url
+            cleared.removeValue(forKey: kind)
             UserDefaults.standard.set(bookmark, forKey: key(kind))
             return (0, url)
         } catch {
@@ -397,6 +402,8 @@ private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate {
     }
 
     func restore(_ kind: Int32) -> (Int32, URL?) {
+        lock.lock()
+        defer { lock.unlock() }
         if let url = active[kind] { return FileManager.default.fileExists(atPath: url.path) ? (0, url) : (-2, nil) }
         guard let bookmark = UserDefaults.standard.data(forKey: key(kind)) else { return (-1, nil) }
         do {
@@ -421,8 +428,51 @@ private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate {
     }
 
     func clear(_ kind: Int32) {
-        active.removeValue(forKey: kind)?.stopAccessingSecurityScopedResource()
+        _ = restore(kind)
+        lock.lock()
+        defer { lock.unlock() }
+        let url = active.removeValue(forKey: kind)
+        url?.stopAccessingSecurityScopedResource()
+        cleared[kind] = url
         UserDefaults.standard.removeObject(forKey: key(kind))
+    }
+
+    func undoClear(_ kind: Int32) -> (Int32, URL?) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let url = cleared[kind] else { return (-1, nil) }
+        guard FileManager.default.fileExists(atPath: url.path),
+              url.startAccessingSecurityScopedResource() else { return (-2, nil) }
+        do {
+            let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+            active[kind] = url
+            cleared.removeValue(forKey: kind)
+            UserDefaults.standard.set(bookmark, forKey: key(kind))
+            return (0, url)
+        } catch {
+            url.stopAccessingSecurityScopedResource()
+            return (-2, nil)
+        }
+    }
+
+    func useImportForAuto() -> Int32 {
+        guard let url = restore(1).1 else { return -2 }
+        guard url.lastPathComponent != "track3-backup" &&
+              url.deletingLastPathComponent().lastPathComponent != "track3-backup" else { return -4 }
+        guard url.startAccessingSecurityScopedResource() else { return -2 }
+        do {
+            let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+            lock.lock()
+            defer { lock.unlock() }
+            active.removeValue(forKey: 0)?.stopAccessingSecurityScopedResource()
+            active[0] = url
+            cleared.removeValue(forKey: 0)
+            UserDefaults.standard.set(bookmark, forKey: key(0))
+            return 0
+        } catch {
+            url.stopAccessingSecurityScopedResource()
+            return -2
+        }
     }
 
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
@@ -464,6 +514,18 @@ public func track3IOSClearBackupFolder(_ kind: Int32) {
     Track3BackupFolder.shared.clear(kind)
 }
 
+@_cdecl("track3_ios_undo_clear_backup_folder")
+public func track3IOSUndoClearBackupFolder(_ kind: Int32, _ output: UnsafeMutablePointer<UInt8>?, _ capacity: Int32) -> Int32 {
+    let (status, url) = Track3BackupFolder.shared.undoClear(kind)
+    guard let url else { return status }
+    return track3WritePath(url, output, capacity)
+}
+
+@_cdecl("track3_ios_use_import_backup_folder")
+public func track3IOSUseImportBackupFolder() -> Int32 {
+    Track3BackupFolder.shared.useImportForAuto()
+}
+
 @_cdecl("track3_ios_prepare_backup_folder")
 public func track3IOSPrepareBackupFolder(_ path: UnsafePointer<CChar>) -> Int32 {
     let root = URL(fileURLWithPath: String(cString: path), isDirectory: true)
@@ -479,12 +541,21 @@ public func track3IOSPrepareBackupFolder(_ path: UnsafePointer<CChar>) -> Int32 
         do {
             let values = try entry.resourceValues(forKeys: keys)
             if placeholder || (values.isDirectory != true && values.isUbiquitousItem == true && values.ubiquitousItemDownloadingStatus != .current) {
-                try manager.startDownloadingUbiquitousItem(at: logical)
+                do {
+                    try manager.startDownloadingUbiquitousItem(at: logical)
+                } catch {
+                    if placeholder { try manager.startDownloadingUbiquitousItem(at: entry) }
+                    else { throw error }
+                }
                 repeat {
                     if Date() >= deadline { return -3 }
                     Thread.sleep(forTimeInterval: 0.25)
-                    let current = try logical.resourceValues(forKeys: keys)
-                    if current.ubiquitousItemDownloadingStatus == .current { break }
+                    if !manager.fileExists(atPath: logical.path) { continue }
+                    var fresh = URL(fileURLWithPath: logical.path, isDirectory: values.isDirectory == true)
+                    fresh.removeAllCachedResourceValues()
+                    let current = try fresh.resourceValues(forKeys: keys)
+                    if current.ubiquitousItemDownloadingStatus == .current ||
+                        current.isUbiquitousItem != true { break }
                 } while true
             }
             return 0

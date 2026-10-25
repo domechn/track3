@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { findBackupFolder } from "./backup-folder";
+import { readTextFile } from "@tauri-apps/plugin-fs";
 
 const disk = vi.hoisted(() => ({ dirs: new Set<string>(), files: new Set<string>(), metadata: "" }));
 vi.mock("@tauri-apps/plugin-fs", () => ({
@@ -8,7 +9,7 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   readTextFile: vi.fn(async (path: string) => path.endsWith("metadata.json") ? disk.metadata : ""),
 }));
 
-beforeEach(() => { disk.dirs.clear(); disk.files.clear(); disk.metadata = ""; });
+beforeEach(() => { disk.dirs.clear(); disk.files.clear(); disk.metadata = ""; vi.mocked(readTextFile).mockClear(); });
 
 it.each([
   ["/cloud", "/cloud", false],
@@ -55,4 +56,13 @@ it("lists only a selected client when the parent is outside its security scope",
   expect(await listBackupClients("/cloud", "/cloud/track3-backup/device-a")).toEqual([
     { client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 0 },
   ]);
+});
+
+it("reads a selected client's metadata once during import", async () => {
+  const { buildMetadata } = await import("./backup-v2");
+  const { readBackupClient } = await import("./backup-folder");
+  disk.metadata = JSON.stringify(buildMetadata("device-a", "0.9.0", "2024-03-01T00:00:00Z", []));
+  await readBackupClient("/cloud", "device-a");
+  expect(vi.mocked(readTextFile).mock.calls.filter(([path]) =>
+    path === "/cloud/track3-backup/device-a/metadata.json")).toHaveLength(1);
 });

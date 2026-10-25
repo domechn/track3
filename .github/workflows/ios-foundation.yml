@@ -143,7 +143,7 @@ jobs:
           test -n "$APP"
           EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
           nm -gU "$APP/$EXECUTABLE" > "$RUNNER_TEMP/track3-native-symbols.txt"
-          for symbol in track3_ios_install_native track3_ios_lock_enabled track3_ios_set_lock_enabled track3_ios_authenticate track3_ios_haptic track3_ios_set_badge track3_ios_share_file track3_ios_keychain_read track3_ios_keychain_write track3_ios_keychain_delete track3_ios_pick_backup_folder track3_ios_restore_backup_folder track3_ios_clear_backup_folder track3_ios_prepare_backup_folder; do
+          for symbol in track3_ios_install_native track3_ios_lock_enabled track3_ios_set_lock_enabled track3_ios_authenticate track3_ios_haptic track3_ios_set_badge track3_ios_share_file track3_ios_keychain_read track3_ios_keychain_write track3_ios_keychain_delete track3_ios_pick_backup_folder track3_ios_restore_backup_folder track3_ios_clear_backup_folder track3_ios_undo_clear_backup_folder track3_ios_use_import_backup_folder track3_ios_prepare_backup_folder; do
             grep -Fq " _$symbol" "$RUNNER_TEMP/track3-native-symbols.txt"
           done
       - name: Launch in iPhone simulator

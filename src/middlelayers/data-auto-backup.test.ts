@@ -26,8 +26,15 @@ const mocks = vi.hoisted(() => ({
   exportHistoricalData: vi.fn(),
   exists: vi.fn(),
   stat: vi.fn(),
+  ios: { value: false },
+  invoke: vi.fn(),
+  saveAutoBackupDirectory: vi.fn(),
+  documentDir: vi.fn(),
 }));
 
+vi.mock("@/utils/platform", () => ({ isIOS: () => mocks.ios.value }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
+vi.mock("@tauri-apps/api/path", () => ({ documentDir: mocks.documentDir }));
 vi.mock("./configuration", () => ({
   getAutoBackupDirectory: mocks.getAutoBackupDirectory,
   getLastAutoBackupAt: mocks.getLastAutoBackupAt,
@@ -36,6 +43,7 @@ vi.mock("./configuration", () => ({
   saveImportedPartHash: mocks.saveImportedPartHash,
   saveLastAutoBackupAt: mocks.saveLastAutoBackupAt,
   saveLastAutoImportAt: mocks.saveLastAutoImportAt,
+  saveAutoBackupDirectory: mocks.saveAutoBackupDirectory,
 }));
 vi.mock("@/utils/app", () => ({ getClientID: mocks.getClientID, getVersion: mocks.getVersion }));
 vi.mock("./charts-history", () => ({ queryHistoricalData: mocks.queryHistoricalData }));
@@ -63,6 +71,10 @@ const legacy: ExportData = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.ios.value = false;
+  mocks.documentDir.mockResolvedValue("/app/Documents");
+  mocks.invoke.mockImplementation(async (command: string) =>
+    command === "ios_backup_folder_status" ? { path: null, failure: null } : null);
   mocks.getAutoBackupDirectory.mockResolvedValue("/backup");
   mocks.getLastAutoBackupAt.mockResolvedValue(new Date("2023-01-01T00:00:00.000Z"));
   mocks.getLastAutoImportAt.mockResolvedValue(new Date("2024-01-01T00:00:00.000Z"));
@@ -82,6 +94,43 @@ beforeEach(() => {
 });
 
 describe("automatic backup integration", () => {
+  it("prepares the iOS Documents folder before writing a backup", async () => {
+    mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue("/app/Documents");
+    expect(await autoBackupHistoricalData(true)).toBe(true);
+    expect(mocks.invoke).toHaveBeenCalledWith("ios_prepare_backup_folder", { path: "/app/Documents", kind: "auto" });
+    expect(writeBackupV2).toHaveBeenCalledWith("/app/Documents", "self", "0.8.2", [oldRecord]);
+  });
+
+  it("uses a moved bookmark path for auto import and saves it", async () => {
+    mocks.ios.value = true;
+    mocks.invoke.mockImplementation(async (command: string) =>
+      command === "ios_backup_folder_status" ? { path: "/cloud/moved", failure: null } : null);
+    await autoImportHistoricalData();
+    expect(mocks.saveAutoBackupDirectory).toHaveBeenCalledWith("/cloud/moved");
+    expect(mocks.invoke).toHaveBeenCalledWith("ios_prepare_backup_folder", { path: "/cloud/moved", kind: "auto" });
+    expect(mocks.importBackupV2).toHaveBeenCalledWith("/cloud/moved", "self", expect.any(Function), expect.any(Function), expect.any(Function));
+  });
+
+  it("prepares the iOS Documents folder before auto import", async () => {
+    mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue("/app/Documents");
+    await autoImportHistoricalData();
+    expect(mocks.invoke).toHaveBeenCalledWith("ios_prepare_backup_folder", { path: "/app/Documents", kind: "auto" });
+    expect(mocks.importBackupV2).toHaveBeenCalledWith("/app/Documents", "self", expect.any(Function), expect.any(Function), expect.any(Function));
+  });
+
+  it("keeps an explicit Documents choice when an old bookmark remains", async () => {
+    mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue("/app/Documents");
+    mocks.invoke.mockImplementation(async (command: string) =>
+      command === "ios_backup_folder_status" ? { path: "/cloud/old", failure: null } : null);
+    await autoBackupHistoricalData(true);
+    expect(mocks.invoke).toHaveBeenCalledWith("ios_clear_backup_folder", { kind: "auto" });
+    expect(mocks.saveAutoBackupDirectory).not.toHaveBeenCalled();
+    expect(mocks.writeBackupV2).toHaveBeenCalledWith("/app/Documents", "self", "0.8.2", [oldRecord]);
+  });
+
   it("keeps the 24-hour trigger and writes v2 data for its own client", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-02-01T00:00:00.000Z"));

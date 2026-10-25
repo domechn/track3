@@ -411,16 +411,61 @@ async fn ios_pick_backup_folder(
 
 #[cfg(target_os = "ios")]
 #[tauri::command]
-fn ios_backup_folder_failure() -> Option<String> {
-    if let Err(error) = crate::ios_native::restore_backup_folder(0) {
-        *IOS_BACKUP_FOLDER_FAILURE
-            .lock()
-            .unwrap_or_else(|p| p.into_inner()) = Some(error);
-    }
-    IOS_BACKUP_FOLDER_FAILURE
+fn ios_backup_folder_status(handle: tauri::AppHandle) -> IOSBackupFolderStatus {
+    let path = match crate::ios_native::restore_backup_folder(0) {
+        Ok(path) => {
+            if let Some(path) = &path {
+                if let Err(error) = allow_backup_folder(&handle, path) {
+                    *IOS_BACKUP_FOLDER_FAILURE
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner()) = Some(error);
+                }
+            }
+            path
+        }
+        Err(error) => {
+            *IOS_BACKUP_FOLDER_FAILURE
+                .lock()
+                .unwrap_or_else(|p| p.into_inner()) = Some(error);
+            None
+        }
+    };
+    let failure = IOS_BACKUP_FOLDER_FAILURE
         .lock()
         .unwrap_or_else(|p| p.into_inner())
-        .clone()
+        .clone();
+    IOSBackupFolderStatus { path, failure }
+}
+
+#[cfg(target_os = "ios")]
+#[derive(serde::Serialize)]
+struct IOSBackupFolderStatus {
+    path: Option<String>,
+    failure: Option<String>,
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+fn ios_use_import_backup_folder(handle: tauri::AppHandle, path: String) -> Result<(), String> {
+    let selected = crate::ios_native::restore_backup_folder(1)?
+        .ok_or("Import folder is unavailable. Choose it again.")?;
+    let selected_path = std::path::Path::new(&selected)
+        .canonicalize()
+        .map_err(|_| "Import folder is unavailable. Choose it again.")?;
+    let requested_path = std::path::Path::new(&path)
+        .canonicalize()
+        .map_err(|_| "Import folder is unavailable. Choose it again.")?;
+    if crate::ios_backup_path::backup_parent(&selected_path).is_some()
+        || selected_path != requested_path
+    {
+        return Err("Choose the parent folder containing track3-backup for auto backup.".into());
+    }
+    crate::ios_native::use_import_backup_folder()?;
+    allow_backup_folder(&handle, &path)?;
+    *IOS_BACKUP_FOLDER_FAILURE
+        .lock()
+        .unwrap_or_else(|p| p.into_inner()) = None;
+    Ok(())
 }
 
 #[cfg(target_os = "ios")]
@@ -438,12 +483,26 @@ fn ios_clear_backup_folder(kind: String) -> Result<(), String> {
 
 #[cfg(target_os = "ios")]
 #[tauri::command]
-async fn ios_prepare_backup_folder(handle: tauri::AppHandle, path: String) -> Result<(), String> {
-    let auto = crate::ios_native::restore_backup_folder(0)
-        .ok()
-        .flatten()
-        .is_some_and(|saved| saved == path);
-    let result = if !handle.fs_scope().is_allowed(&path) {
+fn ios_undo_clear_backup_folder(handle: tauri::AppHandle) -> Result<Option<String>, String> {
+    let path = crate::ios_native::undo_clear_backup_folder(0)?;
+    if let Some(path) = &path {
+        allow_backup_folder(&handle, path)?;
+    }
+    Ok(path)
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+async fn ios_prepare_backup_folder(
+    handle: tauri::AppHandle,
+    path: String,
+    kind: String,
+) -> Result<(), String> {
+    let auto = crate::ios_backup_path::backup_folder_kind(&kind).map_err(|e| e.to_string())? == 0;
+    let documents = handle.path().document_dir().map_err(|e| e.to_string())?;
+    let in_documents =
+        crate::ios_backup_path::is_document_location(std::path::Path::new(&path), &documents);
+    let result = if !in_documents && !handle.fs_scope().is_allowed(&path) {
         Err("Backup folder is outside allowed Files locations".into())
     } else {
         tauri::async_runtime::spawn_blocking(move || {
@@ -636,8 +695,10 @@ pub fn run() {
         ios_set_badge,
         ios_share_file,
         ios_pick_backup_folder,
-        ios_backup_folder_failure,
+        ios_backup_folder_status,
+        ios_use_import_backup_folder,
         ios_clear_backup_folder,
+        ios_undo_clear_backup_folder,
         ios_prepare_backup_folder,
         mark_frontend_ready,
         record_frontend_error,
@@ -666,8 +727,10 @@ pub fn run() {
         ios_set_badge,
         ios_share_file,
         ios_pick_backup_folder,
-        ios_backup_folder_failure,
+        ios_backup_folder_status,
+        ios_use_import_backup_folder,
         ios_clear_backup_folder,
+        ios_undo_clear_backup_folder,
         ios_prepare_backup_folder,
     ]);
     #[cfg(all(debug_assertions, not(target_os = "ios")))]

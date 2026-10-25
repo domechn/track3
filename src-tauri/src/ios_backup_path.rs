@@ -1,5 +1,12 @@
 use std::path::{Path, PathBuf};
 
+pub fn is_document_location(path: &Path, documents: &Path) -> bool {
+    match (path.canonicalize(), documents.canonicalize()) {
+        (Ok(path), Ok(documents)) => path.starts_with(documents),
+        _ => false,
+    }
+}
+
 pub fn backup_parent(selected: &Path) -> Option<PathBuf> {
     if selected
         .file_name()

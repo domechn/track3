@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronRightIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
@@ -55,7 +55,8 @@ import {
 } from "@/middlelayers/encryption-write-gate";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { chooseBackupLocation, documentsBackupLocation } from "@/utils/backup-location";
-import { findBackupFolder, listBackupClients, readBackupClient, type BackupClient, type BackupFolder } from "@/utils/backup-folder";
+import { findBackupFolder, listBackupClients, readBackupClient, type BackupClient, type BackupFolder } from "@/middlelayers/backup-folder";
+import { backupFolderStatusEvent, type IOSBackupFolderStatus } from "@/middlelayers/ios-backup-folder";
 import { isIOS } from "@/utils/platform";
 import { appLockEnabled, setAppLockEnabled } from "@/utils/ios-native";
 import { ConfirmSheet } from "@/mobile/components/mobile/overlays";
@@ -75,9 +76,13 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
   const [backupFolderFailure, setBackupFolderFailure] = useState<string | null>(null);
+  const folderChoiceVersion = useRef(0);
   const [folderReview, setFolderReview] = useState<{ folder: BackupFolder; clients: BackupClient[] }>();
   const [folderBusy, setFolderBusy] = useState(false);
+  const [folderPreparing, setFolderPreparing] = useState(false);
+  const [folderFromCloud, setFolderFromCloud] = useState(false);
   const [folderError, setFolderError] = useState("");
+  const [useImportForAuto, setUseImportForAuto] = useState(false);
   const { run: runBackupFolderDelete } = useOptimisticDelete(setAutoBackupDirectory);
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
   const [lastImportAt, setLastImportAt] = useState<Date>();
@@ -154,13 +159,48 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       }
     });
     getBlacklistCoins().then(setBlacklist);
-    if (isIOS()) void invoke<string | null>("ios_backup_folder_failure").then(setBackupFolderFailure).catch(() => setBackupFolderFailure(t("data.folder.unavailable")));
+    const refresh = () => { void loadAutoBackupDirectory(); };
+    window.addEventListener(backupFolderStatusEvent, refresh);
+    return () => window.removeEventListener(backupFolderStatusEvent, refresh);
   }, []);
 
   async function loadAutoBackupDirectory() {
-    const d = await getAutoBackupDirectory();
-    setAutoBackupDirectory(d);
-    return !!d;
+    const version = folderChoiceVersion.current;
+    try {
+      let d = await getAutoBackupDirectory();
+      if (isIOS()) {
+        const status = await invoke<IOSBackupFolderStatus>("ios_backup_folder_status");
+        if (version !== folderChoiceVersion.current) return false;
+        if (status.path && !d) {
+          await invoke("ios_clear_backup_folder", { kind: "auto" });
+          status.failure = null;
+        } else if (status.path && d && status.path !== d) {
+          const documents = await documentsBackupLocation();
+          if (version !== folderChoiceVersion.current) return false;
+          if (d === documents) {
+            await invoke("ios_clear_backup_folder", { kind: "auto" });
+            status.failure = null;
+          } else {
+            await saveAutoBackupDirectory(status.path);
+            d = status.path;
+          }
+        }
+        setBackupFolderFailure(status.failure);
+      }
+      if (version !== folderChoiceVersion.current) return false;
+      setAutoBackupDirectory(d);
+      return !!d;
+    } catch {
+      if (isIOS()) setBackupFolderFailure("Backup folder is unavailable.");
+      return false;
+    }
+  }
+
+  function backupFailureMessage(error: string) {
+    if (error.includes("containing track3-backup")) return t("data.folder.autoHint");
+    if (error.includes("timed out")) return t("data.folder.downloadTimeout");
+    if (error.includes("download")) return t("data.folder.failed");
+    return t("data.folder.unavailable");
   }
 
   async function loadAutoBackupTime() {
@@ -186,6 +226,8 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   }
 
   async function onImportDataClick() {
+    setFolderReview(undefined);
+    setUseImportForAuto(false);
     const ed = await readHistoricalDataFromFile();
     setExportData(ed);
     if (!ed) {
@@ -216,10 +258,22 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       return;
     }
     return importHistoricalData(cr, selectedData)
-      .then((imported) => {
+      .then(async (imported) => {
         if (!imported) {
           return;
         }
+        if (isIOS() && folderReview && useImportForAuto && !folderReview.folder.normalized) {
+          try {
+            await invoke("ios_use_import_backup_folder", { path: folderReview.folder.directory });
+            await saveAutoBackupDirectory(folderReview.folder.directory);
+            setAutoBackupDirectory(folderReview.folder.directory);
+            setBackupFolderFailure(null);
+          } catch (error) {
+            setBackupFolderFailure(String(error));
+          }
+        }
+        setFolderReview(undefined);
+        setUseImportForAuto(false);
         toast({ description: t("data.importSuccess") });
         if (onDataImported) {
           onDataImported();
@@ -240,11 +294,14 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function onImportBackupFolderClick() {
     setFolderError("");
     setFolderReview(undefined);
+    setUseImportForAuto(false);
     try {
       const selected = await chooseBackupLocation("import");
       if (!selected) return;
       setFolderBusy(true);
-      await invoke("ios_prepare_backup_folder", { path: selected });
+      setFolderPreparing(true);
+      setFolderFromCloud(selected.includes("/Mobile Documents/") || selected.includes("/CloudDocs/"));
+      await invoke("ios_prepare_backup_folder", { path: selected, kind: "import" });
       const folder = await findBackupFolder(selected);
       if (!folder) { setFolderError(t("data.folder.hint")); return; }
       const clients = await listBackupClients(folder.directory, selected);
@@ -252,7 +309,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       setFolderReview({ folder, clients });
     } catch (error) {
       setFolderError(String(error).includes("timed out") ? t("data.folder.downloadTimeout") : t("data.folder.failed"));
-    } finally { setFolderBusy(false); }
+    } finally { setFolderBusy(false); setFolderPreparing(false); }
   }
 
   async function onImportFolderClient(client?: string) {
@@ -270,6 +327,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   }
 
   async function onChooseAutoBackupFolderButtonClick() {
+    folderChoiceVersion.current += 1;
     try {
     const selected = await chooseBackupLocation();
     if (selected) {
@@ -283,6 +341,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   }
 
   async function onUseDocumentsFolderClick() {
+    folderChoiceVersion.current += 1;
     try {
       const path = await documentsBackupLocation();
       await saveAutoBackupDirectory(path);
@@ -299,8 +358,15 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     void runBackupFolderDelete({
       update: () => undefined,
       rollback: () => path,
-      commit: cleanAutoBackupDirectory,
-      undo: () => saveAutoBackupDirectory(path),
+      commit: async () => {
+        await cleanAutoBackupDirectory();
+        if (isIOS()) await invoke("ios_clear_backup_folder", { kind: "auto" });
+        setBackupFolderFailure(null);
+      },
+      undo: async () => {
+        if (isIOS()) await invoke("ios_undo_clear_backup_folder");
+        await saveAutoBackupDirectory(path);
+      },
       successMessage: t("data.clearFolderRemoved"),
       undoLabel: t("common.undo"),
       undoAltText: t("data.undoClearFolder"),
@@ -387,17 +453,23 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         </InsetGroup>
         <p className="ios-d3-settings-note ios-d3-import-note">{t("data.importDesc")}</p>
         <p className="ios-d3-settings-note">{t("data.folder.hint")}</p>
-        {folderBusy && <p role="status">{t("data.folder.downloading")}</p>}
+        {folderBusy && folderPreparing && <p role="status" className="ios-d3-settings-note">{t(folderFromCloud ? "data.folder.downloading" : "data.folder.checking")}</p>}
         {folderError && <p role="alert" className="text-sm text-destructive">{folderError}</p>}
-        {folderReview && <div className="space-y-2 p-3 text-sm">
-          {folderReview.folder.normalized && <p>{t("data.folder.normalized").replace("{folder}", folderReview.folder.directory)}</p>}
-          <p>{folderReview.folder.directory}</p>
-          {folderReview.clients.map(({ client, exportAt, months }) => <div key={client} className="flex flex-wrap items-center justify-between gap-2">
-            <span>{client} · {t(months === 1 ? "data.folder.month" : "data.folder.months").replace("{count}", String(months))} · {new Date(exportAt).toLocaleString()}</span>
-            <Button size="sm" onClick={() => void onImportFolderClient(client)} disabled={folderBusy}>{t("data.folder.importClient").replace("{client}", client)}</Button>
+        {folderReview && <InsetGroup title={t("data.folder.review")}>
+          <div className="ios-d3-folder-review-info">
+            {folderReview.folder.normalized && <p>{t("data.folder.normalized").replace("{folder}", folderReview.folder.directory.split("/").filter(Boolean).at(-1) ?? "/")}</p>}
+            <p className="font-medium">{folderReview.folder.directory.split("/").filter(Boolean).at(-1) ?? "/"}</p>
+          </div>
+          {folderReview.clients.map(({ client, exportAt, months }) => <div key={client} className="ios-d3-folder-client">
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{client}</p>
+              <p className="text-muted-foreground">{t(months === 1 ? "data.folder.month" : "data.folder.months").replace("{count}", String(months))} · {t("data.folder.lastBackup").replace("{time}", new Date(exportAt).toLocaleString())}</p>
+            </div>
+            <Button size="sm" className="shrink-0" aria-label={t("data.folder.importClient").replace("{client}", client)} onClick={() => void onImportFolderClient(client)} disabled={folderBusy}>{t("data.importButton")}</Button>
           </div>)}
-          {folderReview.folder.legacy && <Button size="sm" variant="outline" onClick={() => void onImportFolderClient()} disabled={folderBusy}>{t("data.folder.importLegacy")}</Button>}
-        </div>}
+          {folderReview.folder.legacy && <div className="ios-d3-folder-client"><Button size="sm" variant="outline" onClick={() => void onImportFolderClient()} disabled={folderBusy}>{t("data.folder.importLegacy")}</Button></div>}
+          {!folderReview.folder.normalized && <label className="ios-d3-folder-auto-option"><Checkbox checked={useImportForAuto} onCheckedChange={(checked) => setUseImportForAuto(checked === true)} />{t("data.folder.useForAuto")}</label>}
+        </InsetGroup>}
 
         </div>
         <InsetGroup title={t("data.export")}>
@@ -506,7 +578,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </div>
           </dl>}
 
-          {isIOS() && backupFolderFailure && autoBackupDirectory && <p role="alert" className="text-sm text-destructive">{t("data.folder.unavailable")}</p>}
+          {isIOS() && backupFolderFailure && <p role="alert" className="text-sm text-destructive">{backupFailureMessage(backupFolderFailure)}</p>}
           {isIOS() && autoBackupDirectory && !backupFolderFailure && <p role="status" className="text-sm text-muted-foreground">{t("data.folder.ready")}</p>}
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div

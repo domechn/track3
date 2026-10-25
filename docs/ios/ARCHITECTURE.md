@@ -94,10 +94,16 @@ and saves a security-scoped bookmark in UserDefaults. Startup resolves the
 auto-backup bookmark and grants the restored path to Tauri's runtime filesystem
 scope before the webview starts auto import and backup. The import picker has a
 separate bookmark, so a one-time import does not replace the auto-backup folder.
-A stale bookmark is renewed on restore; an inaccessible or deleted folder is
+Users can opt to promote a selected parent import folder to the auto-backup
+folder. Clearing the auto-backup folder removes its bookmark; Undo can restore
+that bookmark during the current process. The app Documents directory uses
+its existing Files permission even though it has no runtime bookmark.
+A stale bookmark is renewed on restore, and the resolved path replaces an old
+configuration path; an inaccessible or deleted folder is
 shown in Backup settings with a Choose folder again action. Before reading a
 backup tree, native code requests iCloud downloads and waits up to 90 seconds;
-a download failure stops the import instead of treating a placeholder as an
+a fresh URL resource-value check on each poll observes download completion.
+A download failure stops the import instead of treating a placeholder as an
 empty backup. Choosing `track3-backup` or one of its client folders resolves to
 its parent for import. For a selected client folder, Track3 reads only that
 client within its granted security scope. The JSON file picker continues to

@@ -449,6 +449,12 @@
   .ios-d3-backup-folder-actions > button:first-child { min-width: 0; flex: 1 1 180px; white-space: nowrap; }
   .ios-d3-backup-folder-actions > *:last-child { flex: 0 0 auto; }
   .ios-d3-backup-actions .mobile-inset-group, .ios-d3-system-settings .mobile-inset-group { border-radius: 14px; }
+  .ios-d3-folder-review-info, .ios-d3-folder-client, .ios-d3-folder-auto-option { padding: 12px 16px; font-size: 15px; }
+  .ios-d3-folder-review-info, .ios-d3-folder-client { border-bottom: .5px solid var(--ios-separator); }
+  .ios-d3-folder-review-info { overflow-wrap: anywhere; color: hsl(var(--muted-foreground)); }
+  .ios-d3-folder-client, .ios-d3-folder-auto-option { display: flex; align-items: center; gap: 12px; }
+  .ios-d3-folder-client { justify-content: space-between; min-height: 56px; }
+  .ios-d3-folder-auto-option { min-height: 52px; }
   .ios-d3-setting-switch-row, .ios-d3-data-action-row, .ios-d3-license-field { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 56px; gap: 12px; padding: 8px 16px; background: hsl(var(--card)); font-size: 17px; text-align: left; }
   .ios-d3-setting-switch-row:not(:last-child), .ios-d3-data-action-row:not(:last-child) { position: relative; }
   .ios-d3-setting-switch-row:not(:last-child)::after, .ios-d3-data-action-row:not(:last-child)::after { position: absolute; right: 0; bottom: 0; left: 16px; border-bottom: .5px solid var(--ios-separator); content: ""; }

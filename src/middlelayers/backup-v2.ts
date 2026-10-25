@@ -273,7 +273,7 @@ export async function importBackupV2(
   getHash: (client: string, month: string) => string | undefined,
   saveHash: (client: string, month: string, hash: string) => Promise<void>,
   importPart: (records: BackupRecords, metadata: BackupMetadata) => Promise<void>,
-  options?: { onlyClient?: string; strict?: boolean },
+  options?: { onlyClient?: string; strict?: boolean; onMetadata?: (metadata: BackupMetadata) => void },
 ): Promise<{ imported: boolean; clientsWithV2: Set<string> }> {
   const root = `${directory}/track3-backup`;
   const clientsWithV2 = new Set<string>();
@@ -316,6 +316,7 @@ export async function importBackupV2(
       console.error("invalid backup metadata", redactSecrets(entry.name));
       continue;
     }
+    options?.onMetadata?.(metadata);
     clientsWithV2.add(entry.name);
     for (const part of metadata.parts) {
       if (getHash(entry.name, part.month) === part.sha256) continue;

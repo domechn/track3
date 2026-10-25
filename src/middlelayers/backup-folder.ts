@@ -1,6 +1,6 @@
 import { exists, readDir, readTextFile } from "@tauri-apps/plugin-fs";
-import { importBackupV2, parseMetadata, type BackupRecords } from "@/middlelayers/backup-v2";
-import type { ExportData } from "@/middlelayers/datamanager";
+import { importBackupV2, parseMetadata, type BackupMetadata, type BackupRecords } from "./backup-v2";
+import type { ExportData } from "./datamanager";
 
 export type BackupFolder = { directory: string; normalized: boolean; legacy: boolean };
 export type BackupClient = { client: string; exportAt: string; months: number };
@@ -41,12 +41,11 @@ export async function listBackupClients(directory: string, selected = directory)
 
 export async function readBackupClient(directory: string, client: string): Promise<ExportData> {
   if (!/^[A-Za-z0-9-]+$/.test(client)) throw new Error("Invalid backup client");
-  const root = `${directory}/track3-backup/${client}`;
-  const metadata = parseMetadata(await readTextFile(`${root}/metadata.json`), client);
-  if (!metadata) throw new Error("Invalid backup metadata");
+  let metadata: BackupMetadata | undefined;
   const historicalData: BackupRecords = [];
   await importBackupV2(directory, "", () => undefined, async () => {}, async (records) => {
     historicalData.push(...records);
-  }, { onlyClient: client, strict: true });
+  }, { onlyClient: client, strict: true, onMetadata: (value) => { metadata = value; } });
+  if (!metadata) throw new Error("Invalid backup metadata");
   return { client, clientVersion: metadata.clientVersion, exportAt: metadata.exportAt, historicalData, md5V2: "" };
 }
