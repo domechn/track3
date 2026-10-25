@@ -9,6 +9,12 @@ primitives are imported from the desktop component directory. The existing
 SQL migrations, refresh persistence, sync persistence, encryption, and key
 rotation code remain shared with desktop. The iOS identifier is
 `dev.track3.ios`; the desktop identifier remains unchanged.
+`src-tauri/src/app.rs` holds the shared Tauri entry and commands; desktop
+`main.rs` calls it, while the iOS library entry is exported through `lib.rs`.
+Cargo selects the native iOS dependency only for the iOS target. Desktop
+release settings stay in `tauri.conf.json` and `tauri.release.conf.json`;
+`tauri.ios.conf.json` and `capabilities/mobile.json` supply iOS settings
+without changing the desktop updater and permissions.
 
 The mobile shell loads `src/mobile/ios-style.css` and its component CSS.
 Its translation catalog preserves the iPhone wording; the shared provider

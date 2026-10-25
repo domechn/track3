@@ -4,6 +4,22 @@ on:
   push:
     branches: ["feat/ios-app*"]
   pull_request:
+    paths:
+      - ".env.production"
+      - ".github/workflows/ios-foundation.yml"
+      - "docs/ios/**"
+      - "scripts/ios/**"
+      - "src/**"
+      - "src-tauri/**"
+      - "tests/e2e/ios-*.spec.ts"
+      - "tests/e2e/mobile.spec.ts"
+      - "tests/e2e/tauri-bridge.ts"
+      - "tests/production/**"
+      - "index.html"
+      - "package.json"
+      - "yarn.lock"
+      - "playwright*.config.ts"
+      - "vite.config.ts"
   workflow_dispatch:
 
 jobs:

@@ -567,7 +567,7 @@ for (const theme of ["light", "dark"] as const) {
     try {
       await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
       await installTauriBridge(page, { richPortfolio: true, slowOverview: true });
-      await page.goto("/#/overview");
+      await page.goto("/#/overview", { waitUntil: "commit" });
       await expect(page.locator(".overview-skeleton")).toBeVisible();
       mkdirSync("test-results/mobile", { recursive: true });
       await page.screenshot({ path: `test-results/mobile/390x844-overview-loading-${theme}.png` });

@@ -3,9 +3,13 @@
 ## Release gate
 
 Run `corepack yarn tsc --noEmit`, `corepack yarn vitest run`,
+`corepack yarn test:coverage`, `corepack yarn build`,
 `corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit`,
+`corepack yarn playwright test -c playwright.preview.config.ts`,
 `corepack yarn playwright test --project=desktop`, and
 `corepack yarn playwright test --project=mobile`. Run
+`cargo check --locked --lib --bins`,
+`cargo test --locked --all-targets`, and
 `cargo test --locked -p track3-pure-tests --lib` from `src-tauri`.
 The existing `test-on-pr` workflow tests desktop release behavior. The
 `ios-foundation.yml` web and macOS iOS jobs must pass on the release commit.

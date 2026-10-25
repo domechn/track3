@@ -202,7 +202,7 @@ test("expanded overview and asset charts expose text summaries", async ({ page }
 test("expanded Overview content passes axe with its percentage rows visible", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await installTauriBridge(page, { seedReviewContent: true });
+  await installTauriBridge(page, undefined, true);
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Show More" }).click();
   await expect(page.locator("[data-testid='tcpc-row']").first()).toBeVisible();
@@ -212,7 +212,7 @@ test("expanded Overview content passes axe with its percentage rows visible", as
 
 test("assistant with pinned and recent sessions passes axe", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
-  await installTauriBridge(page, { seedReviewContent: true });
+  await installTauriBridge(page, undefined, true);
   await page.goto("/#/assistant");
   await expect(page.getByText("Pinned portfolio review")).toBeVisible();
   await expect(page.getByText("Recent portfolio review")).toBeVisible();
@@ -223,7 +223,7 @@ test("assistant with pinned and recent sessions passes axe", async ({ page }) =>
 test("small muted text in assistant sessions and expanded Overview meets AA contrast", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await installTauriBridge(page, { seedReviewContent: true });
+  await installTauriBridge(page, undefined, true);
   await page.goto("/#/assistant");
   await expect(page.getByText("Pinned portfolio review")).toBeVisible();
   for (const label of ["Pinned", "Recent"]) {
@@ -274,7 +274,7 @@ test("history first cell shows the row hover feedback with a mouse", async ({ pa
 
 test("P&L rank column moves with its table instead of pinning", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
-  await installTauriBridge(page, { seedReviewContent: true });
+  await installTauriBridge(page, undefined, true);
   await page.goto("/#/summary");
   const table = page.getByText("Top Profit", { exact: true }).locator("xpath=..").getByRole("table");
   await expect(table).toBeVisible();
@@ -435,7 +435,7 @@ test("reduced motion stops repeated animations", async ({ page }) => {
 test("sync status popover stays visible and announces state", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await installTauriBridge(page, { s3: new FakeS3() });
+  await installTauriBridge(page, new FakeS3());
   await page.goto("/#/settings/sync");
   for (const [label, value] of [
     ["S3 endpoint", "https://s3.example.test"], ["Region", "us-east-1"],

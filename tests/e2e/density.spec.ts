@@ -44,7 +44,7 @@ test("composer has one visible focus style that clears on blur", async ({ page }
 
 test("mouse session actions keep their compact size and hover reveal", async ({ page }) => {
   await page.setViewportSize({ width: 600, height: 800 });
-  await installTauriBridge(page, { seedReviewContent: true });
+  await installTauriBridge(page, undefined, true);
   await page.goto("/#/assistant");
   const pin = page.getByTestId("session-pin-pinned-e2e");
   await expect(pin).toBeAttached();

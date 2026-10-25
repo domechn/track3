@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Track3 is a privacy-focused desktop cryptocurrency portfolio tracker built with **Tauri v2** (Rust backend + React frontend). It aggregates balances from centralized exchanges (CEX) and web3 wallets, storing all data locally in encrypted SQLite.
+Track3 is a privacy-focused desktop cryptocurrency portfolio tracker built with **Tauri v2** (Rust backend + React frontend). It aggregates balances from centralized exchanges (CEX) and web3 wallets, storing portfolio data locally in SQLite and encrypting sensitive configuration and chat content.
 
 ## Architecture
 
@@ -13,7 +13,7 @@ Track3 is a privacy-focused desktop cryptocurrency portfolio tracker built with 
 - `src/style.css` and desktop Tailwind settings are desktop defaults. Mobile styles load from `src/mobile/ios-style.css` and `src/mobile/components/mobile/mobile.css`.
 - Existing translation keys retain desktop wording in `src/i18n/locales/`. The mobile provider uses `src/mobile/en.json` and `src/mobile/zh.json` for mobile copy.
 - iOS Rust and native code goes behind `cfg(target_os = "ios")` or `cfg(mobile)`. Put iOS configuration in `src-tauri/tauri.ios.conf.json` and permissions in `src-tauri/capabilities/mobile.json`; keep desktop config and permissions stable.
-- Run `corepack yarn tsc --noEmit`, `corepack yarn vitest run`, `corepack yarn playwright test --project=desktop`, `corepack yarn playwright test --project=mobile`, and `cargo test --locked -p track3-pure-tests --lib` from `src-tauri/`. macOS CI also builds and launches the iOS simulator app.
+- Run `corepack yarn tsc --noEmit`, `corepack yarn vitest run`, `corepack yarn playwright test --project=desktop`, and `corepack yarn playwright test --project=mobile` from the repository root. Run `cargo test --locked -p track3-pure-tests --lib` from `src-tauri/`. macOS CI also builds and launches the iOS simulator app.
 
 ### Two-Layer Structure
 
@@ -42,7 +42,7 @@ Additional wiring:
 - Rebalance page is lazy loaded at `#/rebalance`; navigation entries are in `src/components/index/main-nav.tsx` and `src/components/sidebar/index.tsx`. Targets, portfolio loading, CSV formatting, and the pure calculator live in `src/middlelayers/rebalance.ts`.
 - History list pages use `queryHistoricalPage()` in `src/middlelayers/charts-history.ts`: SQL returns a count, one page of snapshot totals, the next snapshot for change, asset counts, and seven logo previews. `queryHistoricalDetail()` loads one snapshot's assets and transactions when its dialog opens. Keep the list page size and detail table window bounded; preserve `DataChangedContext` reloads and the optimistic delete/undo flow.
 - Large time-series queries in `src/middlelayers/charts-timeseries.ts` aggregate in SQL. Chart components keep the returned full series for totals and tooltips, and use `downsampleIndices()` in `src/middlelayers/chart-downsample.ts` to bound plotted points by chart width while retaining endpoints and extremes.
-- Tauri backend commands/plugins are wired in `src-tauri/src/main.rs`; frontend calls via `invoke()` and Tauri plugins.
+- Tauri backend commands/plugins are wired in `src-tauri/src/app.rs`, which desktop `main.rs` and the iOS library entry use; frontend calls via `invoke()` and Tauri plugins.
 - CEX fetchers follow the `Exchanger` pattern in `src/middlelayers/datafetch/coins/cex/cex.ts`.
 
 ### Rust Backend (`src-tauri/`)
@@ -54,7 +54,7 @@ Exposes Tauri commands to frontend via `invoke()`:
 - `encrypt` / `decrypt` — Config encryption via magic-crypt
 - `download_coins_logos` — Coin logo caching
 
-Key files: `main.rs` (entry + commands), `binance.rs`, `info.rs` (CoinGecko), `migration.rs` (DB versioning), `ent.rs` (encryption), `lib.rs` (module declarations), `types.rs` (shared Rust structs)
+Key files: `main.rs` (desktop entry), `app.rs` (shared commands and setup), `binance.rs`, `info.rs` (CoinGecko), `migration.rs` (DB versioning), `ent.rs` (encryption), `lib.rs` (module declarations), `types.rs` (shared Rust structs)
 
 ### Database
 

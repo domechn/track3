@@ -34,7 +34,7 @@ import {
   AlertDialogTitle, AlertDialogTrigger,
 } from "@/mobile/components/ui/alert-dialog";
 import { useIsMobile } from "@/mobile/components/mobile";
-import { formatPhoneMoney } from "@/utils/currency";
+import { formatPhoneMoney } from "@/mobile/currency";
 
 type TargetDraft = RebalanceTarget & { id: number; previousAsset?: { assetType: AssetType; symbol: string } };
 

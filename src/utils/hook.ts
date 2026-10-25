@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { cleanTotalProfitCache } from '@/middlelayers/charts'
 import { Menu, MenuItem } from '@tauri-apps/api/menu'
 import { APP_SOFT_REFRESH_EVENT } from './events'
-import { isIOS } from './platform'
 
 export { APP_SOFT_REFRESH_EVENT } from './events'
 
@@ -110,7 +109,6 @@ async function getRightClickMenu() {
 }
 
 export async function renderRightClickMenu(event: React.MouseEvent) {
-	if (isIOS()) return
 	event.preventDefault()
 	event.stopPropagation()
 	const menu = await getRightClickMenu()

@@ -24,19 +24,23 @@ type BridgeOptions = {
   failDataQueries?: boolean;
 };
 
-export async function installTauriBridge(page: Page, {
-  s3,
-  seedReviewContent = false,
-  seedRebalanceProfile = false,
-  emptyPortfolio = false,
-  seedLockedSync = false,
-  richPortfolio = false,
-  slowOverview = false,
-  lockedStartup = false,
-  freshReviewData = false,
-  slowAssistant = false,
-  failDataQueries = false,
-}: BridgeOptions = {}) {
+export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
+  const options = optionsOrS3 instanceof FakeS3
+    ? { s3: optionsOrS3, seedReviewContent: legacySeedReviewContent }
+    : { ...optionsOrS3, seedReviewContent: optionsOrS3.seedReviewContent ?? legacySeedReviewContent };
+  const {
+    s3,
+    seedReviewContent = false,
+    seedRebalanceProfile = false,
+    emptyPortfolio = false,
+    seedLockedSync = false,
+    richPortfolio = false,
+    slowOverview = false,
+    lockedStartup = false,
+    freshReviewData = false,
+    slowAssistant = false,
+    failDataQueries = false,
+  } = options;
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
   });

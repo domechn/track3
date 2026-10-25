@@ -539,7 +539,7 @@ pub fn run() {
             app.manage(DatabasePath(database_path));
             Ok(())
         })();
-        #[cfg(debug_assertions)]
+        #[cfg(all(debug_assertions, target_os = "ios"))]
         if let Err(error) = &result {
             let _ = record_frontend_error(app.handle().clone(), format!("startup failed: {error}"));
         }

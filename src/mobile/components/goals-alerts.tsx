@@ -14,7 +14,7 @@ import type { RebalanceProfile } from "@/middlelayers/rebalance";
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Button } from "@/components/ui/button";
-import { formatPhoneMoney } from "@/utils/currency";
+import { formatPhoneMoney } from "@/mobile/currency";
 import AISetupCard from "@/mobile/components/common/ai-setup-card";
 import { FinanceChartSkeleton, GoalChart } from "@/mobile/components/finance-charts";
 import { alertSentence, goalEtaDays } from "@/components/finance-visuals";

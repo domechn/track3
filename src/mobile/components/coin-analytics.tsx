@@ -25,9 +25,9 @@ import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
   prettyNumberToLocaleString,
-  formatPhoneMoney,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
+import { formatPhoneMoney } from "@/mobile/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
 import {
   Table,

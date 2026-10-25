@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { formatPhoneMoney } from "./currency";
+import { formatPhoneMoney } from "@/mobile/currency";
 
 it("formats negative phone money with a true minus", () => {
   expect(formatPhoneMoney(-1234.5, "$", true)).toBe("−$1,234.50");

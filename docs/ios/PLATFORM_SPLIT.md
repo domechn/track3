@@ -1,6 +1,73 @@
 # Platform split decisions
 
-This table covers all 147 files present on desktop `origin/master` that the iOS port changed between its first commit `1f79a83` and `ios/main`. `src/main.tsx` is the single lazy shell selector; it was not changed in the original iOS fork. New iOS-only files are listed by the directory layout below.
+The fork-to-master table below covers all 147 files present on desktop `origin/master` that the iOS port changed between its first commit `1f79a83` and `ios/main`. `src/main.tsx` is the single lazy shell selector; it was not changed in the original iOS fork. The P2 audit first lists the current desktop-facing diff.
+
+## P2 audit of the current desktop-facing diff
+
+Each path below differs from desktop `origin/master` and sits outside `src/mobile/`, `docs/ios/`, and the Apple project. Existing desktop component files, `src/App.tsx`, `src/style.css`, desktop locale JSON, `src-tauri/tauri.conf.json`, `publish.yaml`, `test-on-pr.yaml`, and the desktop Playwright spec files are identical to master. `src/utils/app.ts`, `currency.ts`, and `hook.ts` were restored during P2. New phone code in `src/mobile/`, native files named `ios_*`, `src-tauri/Info.ios.plist`, `src-tauri/tauri.ios.conf.json`, and `src-tauri/capabilities/mobile.json` are platform-specific additions.
+
+| Path | Classification and desktop effect |
+| --- | --- |
+| `.env.production` | Build setting: disables the simulator readiness probe in a normal production build. |
+| `.github/workflows/ios-foundation.yml` | New iOS and web verification; existing desktop workflows stay unchanged. |
+| `AGENTS.md` | Platform rules and test commands. |
+| `README.md` | iPhone section and screenshot links; desktop installation and release text stays intact. |
+| `index.html` | Shared viewport and a probe that is inert unless the iOS simulator build opts in. |
+| `package.json` | `test:e2e` selects the desktop project, preserving the old script's desktop scope after mobile specs were added. Dependencies and `yarn.lock` are unchanged. |
+| `playwright.config.ts` | Names desktop and mobile projects; the desktop project excludes new phone specs. |
+| `playwright.preview.config.ts` | New production startup browser check for the lazy shell. |
+| `vite.config.ts` | Gives React one shared vendor chunk to keep the lazy shell graph free of an import cycle. The desktop entry preloads no mobile UI chunk or mobile CSS. |
+| `scripts/ios/check-screenshot.swift` | Simulator screenshot check used only in the new iOS workflow. |
+| `scripts/ios/configure-project.py` | Xcode project generation check used only in the new iOS workflow. |
+| `src-tauri/Cargo.lock` | Adds only the root crate's already locked `objc2-foundation` target dependency and pure-test `fs2`/`libc` references. |
+| `src-tauri/Cargo.toml` | Adds a library entry and target-specific iOS dependency; process, shell, and updater remain desktop dependencies. |
+| `src-tauri/build.rs` | Adds linker flags only when Cargo's target OS is iOS. |
+| `src-tauri/capabilities/migrated.json` | Limits the unchanged desktop permissions to desktop platforms; iOS uses `mobile.json`. |
+| `src-tauri/pure-tests/Cargo.toml` | Enables Linux tests of shared startup security code. |
+| `src-tauri/pure-tests/src/lib.rs` | Exposes shared startup security and pure share-path checks to GTK-free tests. |
+| `src-tauri/src/app.rs` | Moves the original desktop commands and startup into the library entry needed by Tauri iOS; desktop plugins and key loading still run on desktop. iOS startup and native calls are gated. |
+| `src-tauri/src/bin/export-assistant-chats.rs` | Updates the crate import to the iOS-compatible library name. The CLI logic is unchanged. |
+| `src-tauri/src/ios_share_path.rs` | Pure validator for an iOS share destination; no desktop caller. |
+| `src-tauri/src/key_rotation/files.rs` | Selects Keychain only on iOS; desktop file rotation path remains the same. |
+| `src-tauri/src/key_rotation/mod.rs` | Adds iOS Keychain update and rollback branches; desktop file branch remains. |
+| `src-tauri/src/key_rotation/preflight.rs` | Reads the platform key through the new helper; the helper uses the original file read on desktop. |
+| `src-tauri/src/lib.rs` | Exposes the shared app entry and gates native iOS modules. |
+| `src-tauri/src/main.rs` | Desktop executable calls the shared app entry and retains the Windows subsystem setting. |
+| `src-tauri/src/startup_security.rs` | Adds iOS key creation and recovery; the existing desktop key loader is unchanged. |
+| `src/i18n/index.tsx` | Lets the mobile shell supply its own flat catalog; desktop still uses the original dictionaries. |
+| `src/main.tsx` | Selects one shell at startup. `src/mobile/App.tsx` is dynamically imported only on iOS. |
+| `src/middlelayers/ai/actions/index.ts` | Uses the shared export helper; on desktop it still opens the same save picker and writes the selected path. |
+| `src/middlelayers/charts-refresh.ts` | Carries optional source completion and timing for phone refresh progress; desktop callers omit the callback. |
+| `src/middlelayers/configuration.ts` | Returns an empty date range for empty history, fixing the crash without changing populated portfolios. |
+| `src/middlelayers/cost-basis-data.ts` | Uses the shared export helper with the same desktop picker and file content. |
+| `src/middlelayers/data.ts` | Adds source completion and iOS export/share support; desktop fetch and save behavior remains. |
+| `src/middlelayers/portfolio-baseline.ts` | Adds optional source timing fields; existing status fields keep their shape. |
+| `src/middlelayers/source-status.ts` | Validates optional timing fields before status display; existing status fields keep their shape. |
+| `src/test/ios-configure-project.test.ts` | New Xcode project test only. |
+| `src/test/skills/ios-project.test.ts` | New iOS project and configuration test only. |
+| `src/utils/backup-location.ts` | Chooses Documents only on iOS; its phone settings page is the sole caller. |
+| `src/utils/backup-location.test.ts` | Tests both platform branches of the new helper. |
+| `src/utils/export-file.ts` | Keeps the original picker/write sequence on desktop and stages picker files on iOS. |
+| `src/utils/export-file.test.ts` | Tests desktop and iOS export behavior. |
+| `src/utils/ios-native.ts` | Phone native command adapter; no desktop UI caller. |
+| `src/utils/ios-native.test.ts` | Tests native adapter platform guards. |
+| `src/utils/ios-ready.ts` | Simulator readiness probe; no desktop caller. |
+| `src/utils/ios-ready.test.ts` | Tests the simulator probe guard and readiness marker. |
+| `src/utils/ios-startup-probe.test.ts` | Checks that normal production HTML disables the simulator probe. |
+| `src/utils/platform.ts` | Detects iOS at the single shell boundary and supplies phone safe-area and keyboard state. |
+| `src/utils/platform.test.tsx` | Tests platform detection and phone viewport state. |
+| `src/utils/share-export.ts` | Supplies the phone share action called from shared export orchestration. |
+| `src/utils/share-export.test.ts` | Tests temporary share-file cleanup. |
+| `tests/e2e/ios-d3-visual.spec.ts` | New mobile presentation checks, excluded from the desktop project. |
+| `tests/e2e/ios-d4-consistency.spec.ts` | New mobile presentation checks, excluded from the desktop project. |
+| `tests/e2e/ios-parity.spec.ts` | New mobile feature checks, excluded from the desktop project. |
+| `tests/e2e/ios-settings.spec.ts` | New mobile settings checks, excluded from the desktop project. |
+| `tests/e2e/mobile.spec.ts` | New mobile route and interaction checks, excluded from the desktop project. |
+| `tests/e2e/tauri-bridge.ts` | Adds phone fixtures and retains the original desktop call signature. |
+| `tests/e2e/tsconfig.json` | Includes the new production startup browser spec and preview configuration. |
+| `tests/production/startup.spec.ts` | Verifies a production desktop build starts through the lazy shell. |
+
+## Fork-to-master decisions
 
 | Master file | Decision | Why |
 | --- | --- | --- |
@@ -142,13 +209,14 @@ This table covers all 147 files present on desktop `origin/master` that the iOS 
 | `src/style.css` | Moved to `src/mobile/ios-style.css` | Mobile theme and viewport CSS loads with the mobile shell; desktop CSS is restored. |
 | `src/test/skills/pr-workflow.test.ts` | Restored | Existing desktop test stays unchanged. |
 | `src/utils/app.test.ts` | Restored | Existing desktop test stays unchanged. |
-| `src/utils/app.ts` | Kept | Reload still uses process relaunch on desktop; iOS reloads its webview. |
+| `src/utils/app.ts` | Restored | Only the desktop updater and appearance page call reload; the phone appearance page applies theme without a relaunch. |
 | `src/utils/chart-theme.ts` | Moved to `src/mobile/chart-theme.ts` | Mobile chart colors, fonts, and gradients differ; desktop chart defaults are restored. |
-| `src/utils/currency.ts` | Kept | Adds a phone money formatter without changing desktop formatting. |
-| `src/utils/hook.ts` | Kept | Right-click behavior is unchanged on desktop and skipped on iOS. |
+| `src/utils/currency.ts` | Restored | Phone money formatting lives in `src/mobile/currency.ts`. |
+| `src/utils/hook.ts` | Restored | The phone shell does not install the desktop context-menu handler. |
 | `tailwind.config.js` | Restored | Font changes were mobile presentation; mobile CSS selects iOS fonts. |
 | `tests/e2e/accessibility.spec.ts` | Restored | Existing desktop accessibility checks stay unchanged. |
 | `tests/e2e/density.spec.ts` | Restored | Existing desktop density checks stay unchanged. |
+| `tests/e2e/smoke.spec.ts` | Restored | Existing desktop smoke checks stay unchanged. |
 | `tests/e2e/tauri-bridge.ts` | Kept | Shared IPC fixture adds iOS mocks while desktop defaults remain. |
 | `vite.config.ts` | Kept shared fix | React has its own vendor chunk so the lazy desktop and mobile entry does not create a chart chunk cycle. Other desktop chunking stays on master. |
 

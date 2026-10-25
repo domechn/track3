@@ -3,7 +3,7 @@ import { installTauriBridge } from "./tauri-bridge";
 import { FakeS3 } from "../../src/middlelayers/sync/object-store";
 
 test("connection test uses a fake S3 bucket", async ({ page }) => {
-  await installTauriBridge(page, { s3: new FakeS3() });
+  await installTauriBridge(page, new FakeS3());
   await page.goto("/#/settings/sync");
   await page.getByLabel("S3 endpoint").fill("https://s3.example.test");
   await page.getByLabel("Region").fill("us-east-1");
@@ -34,8 +34,8 @@ test("a second device pulls history from the first device", async ({ browser }) 
   try {
     const first = await firstContext.newPage();
     const second = await secondContext.newPage();
-    await installTauriBridge(first, { s3 });
-    await installTauriBridge(second, { s3 });
+    await installTauriBridge(first, s3);
+    await installTauriBridge(second, s3);
 
     await second.goto("/#/history");
     await expect(second.getByText("Total 2 records")).toBeVisible();
