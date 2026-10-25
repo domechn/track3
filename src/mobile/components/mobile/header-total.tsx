@@ -4,17 +4,18 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { useTranslation } from "@/mobile/i18n";
-import { MOBILE_MEDIA_QUERY } from "@/mobile/components/mobile";
+import { useIsMobile } from "@/mobile/components/mobile";
 import type { TDateRange } from "@/middlelayers/types";
 
 export function MobileHeaderTotal({ currency, live, range }: {
   currency: CurrencyRateDetail; live: boolean; range?: TDateRange;
 }) {
   const { t } = useTranslation();
+  const mobile = useIsMobile();
   const version = useDataChangedVersion();
   const [total, setTotal] = useState<number>();
   useEffect(() => {
-    if (!window.matchMedia?.(MOBILE_MEDIA_QUERY).matches) return;
+    if (!mobile) return;
     let active = true;
     let retryTimer: number | undefined;
     let timer: number | undefined;
@@ -50,7 +51,7 @@ export function MobileHeaderTotal({ currency, live, range }: {
       if (timer !== undefined) window.clearInterval(timer);
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
-  }, [version, live, range?.start.getTime(), range?.end.getTime()]);
+  }, [mobile, version, live, range?.start.getTime(), range?.end.getTime()]);
   return <div className="mobile-header-total" aria-label={t("history.total")}>
     <span className="mobile-header-total-label">{t("history.total")}</span>
     <span className="mobile-header-total-value">{total === undefined ? "—" :

@@ -1,12 +1,39 @@
-# Track3 iPhone design system
+# Track3 iPhone and iPad design system
 
 ## Direction
 
-Track3 uses the iOS grouped layout: quiet surfaces, one indigo-blue accent, prominent money, and controls with at least 44 pt touch targets. The phone layout uses the device font through `-apple-system, "SF Pro Text", "SF Pro Display", system-ui`. It applies at the existing coarse-pointer media query through 950 px. Desktop keeps its Outfit and JetBrains Mono fonts and original semantic theme values.
+Track3 uses the iOS grouped layout: quiet surfaces, one indigo-blue accent, prominent money, and controls with at least 44 pt touch targets. The mobile layout uses the device font through `-apple-system, "SF Pro Text", "SF Pro Display", system-ui` at every width and with a trackpad attached. Desktop keeps its Outfit and JetBrains Mono fonts and original semantic theme values.
+
+## Wide layouts
+
+The left sidebar replaces the bottom tabs at 700 px. It keeps the four tab
+roots and More badge; the collapsed state leaves a 64 px icon rail. Content
+has a 1240 px maximum and wider gutters. The sidebar keeps all four
+destinations and their labels visible without taking height from charts in
+landscape. Overview stays in one column at 700–999 px because the sidebar
+leaves roughly 450–735 px for content after page gutters; two chart cards
+would leave narrow plotting areas. At 1000 px, Overview puts its value
+and P&L charts side by side, History keeps the snapshot list and detail
+visible, Analytics keeps a chart beside its tile hub, Settings keeps its
+menu and page visible, and Assistant keeps sessions beside chat. A narrow
+Split View window falls back to the compact presentation even on iPad.
+Profit is the Returns sheet in Analytics rather than a separate route.
+Profit metrics use three columns where there is room; charts and readable
+lists use the remaining width without stretching one line across the display.
+On wide Assistant, the chat header owns the top of the content area; the
+shared top bar, including its refresh action and sync indicator, is hidden.
+
+Below 500 px tall, titles and navigation bars shrink while controls retain
+44 px targets. Landscape safe-area insets protect controls from the screen
+cutout. Sheets are bottom aligned on compact windows and centered, at most
+560 px wide, on regular windows. Hover feedback is limited to hover-capable
+pointers.
+
+Reviewed browser captures are in [screens/ipad](screens/ipad/README.md).
 
 ## Tokens
 
-`src/mobile/ios-style.css` owns the iPhone tokens; desktop `src/style.css` keeps its master tokens. Tailwind semantic colors in `tailwind.config.js` resolve the same variables. Phone overrides apply only at the mobile media query. `--accent` remains the neutral control state on both layouts; `--ios-accent` supplies the blue brand color.
+`src/mobile/ios-style.css` owns the iOS tokens; desktop `src/style.css` keeps its master tokens. Tailwind semantic colors in `tailwind.config.js` resolve the same variables. The mobile styles load only with `src/mobile/App.tsx`; width and height queries adjust them as the window changes. `--accent` remains the neutral control state on both layouts; `--ios-accent` supplies the blue brand color.
 
 | Role | Light | Dark |
 | --- | --- | --- |
@@ -45,7 +72,7 @@ Interactive transitions use `--ios-motion` at 150–350 ms. Press states scale t
 
 ## Data screens
 
-Data screens use the same grouped background and surface tokens. Their phone styling is scoped in `src/mobile/components/mobile/mobile.css` to the coarse-pointer phone media query. Analytics has a two-column tile hub of 44 pt or larger targets, with titles aligned from the top of each tile; an odd final tile spans both columns at 320 px. Allocation, Top coins, Returns, and Position changes open full-height sheets; Wallets, Comparison, and Cost basis keep their routes. Sheets keep the common grabber, close action, and focus behavior. These pages use the shared `SegmentedControl` for range, period, rank, and attribution choices. Use component classes and the additive `data-ui-card` marker for phone rules so Tailwind utility changes do not silently alter layouts.
+Data screens use the same grouped background and surface tokens. Their styling lives in `src/mobile/components/mobile/mobile.css`, which loads only with the mobile app. Analytics has a two-column tile hub of 44 pt or larger targets, with titles aligned from the top of each tile; an odd final tile spans both columns at 320 px. Allocation, Top coins, Returns, and Position changes open full-height sheets; Wallets, Comparison, and Cost basis keep their routes. Sheets keep the common grabber, close action, and focus behavior. These pages use the shared `SegmentedControl` for range, period, rank, and attribution choices. Use component classes and the additive `data-ui-card` marker for phone rules so Tailwind utility changes do not silently alter layouts.
 
 History groups the current SQL page by local calendar month. Each inset group has a large tabular total, a signed change pill, and the asset preview. The page size and SQL query remain bounded; the latest snapshot still has swipe-delete and Undo. The detail uses a real `BottomSheet` with an asset count, search, and rows whose delete action is revealed by a swipe. The destructive snapshot action follows the asset list. Comparison keeps both short dates and totals side by side even on a narrow phone. Its total change uses `DeltaPill`; signed changes sit on their own line so amounts do not split in the middle.
 
@@ -55,7 +82,7 @@ Cost basis keeps the existing report, filters, and export actions. Its four head
 
 ## D3 feature screens
 
-The More hub and pushed feature screens use the same phone media query in `src/mobile/components/mobile/mobile.css` as the D1 primitives. They use `--primary`, grouped `--background`/`--card`, `--ios-separator`, gain/loss, and motion tokens. Do not add a second palette or font. Feature cards have no shadow or outline; 14–16 px rounded tone steps separate them. Keep text fields at 16 px to avoid iOS keyboard zoom and tap targets at least 44 px.
+The More hub and pushed feature screens use the same mobile stylesheet as the D1 primitives. They use `--primary`, grouped `--background`/`--card`, `--ios-separator`, gain/loss, and motion tokens. Do not add a second palette or font. Feature cards have no shadow or outline; 14–16 px rounded tone steps separate them. Keep text fields at 16 px to avoid iOS keyboard zoom and tap targets at least 44 px.
 
 | Screen | Pattern |
 | --- | --- |

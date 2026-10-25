@@ -1,5 +1,60 @@
 # iOS port progress
 
+## W1 responsive iOS widths
+
+- Added live width and height classes, a collapsible sidebar at 700 px, and
+  wide panes at 1000 px in the shared mobile bundle. Phone tabs and the
+  existing route stack stay in place below 700 px. History, Settings,
+  Analytics, and Assistant use `SplitView`; History keeps an inline snapshot
+  detail on wide windows. Regular-width sheets are centered cards.
+- Enabled the iPad device family, multitasking, phone landscape, and iPad
+  orientations in the committed Xcode project and Tauri's iOS Info source.
+  The share sheet anchors to its presenting view. The iOS workflow now
+  targets `feat/ios-wide-screens*` and attempts iPad portrait and landscape
+  simulator captures after the existing iPhone smoke.
+- A browser viewport matrix checks 16 phone, tablet, Split View, and foldable
+  sizes in light and dark across the mobile routes. Browser screenshots are
+  Chromium captures; twelve representative images are in `screens/ipad/`.
+  On Linux, TypeScript and the production frontend build passed, Vitest
+  passed 2,214 tests, mobile Playwright passed 197 tests, desktop Playwright
+  passed 77 tests, production preview passed two tests, and Rust pure tests
+  passed 62 tests. The macOS iOS runs `40214915702` and `40218874665`
+  launched the iPad app in portrait, then failed because the Simulator
+  AppleScript shortcut did not rotate it. Run `40223960890` also passed
+  iPad portrait but rejected the app's landscape geometry request in
+  windowed mode. The current follow-up rotates the selected Simulator
+  device through its Device menu, then relaunches and checks the WebView
+  viewport. Run `40230403597` passed web checks and built and launched
+  the app on iPhone and iPad simulators without crash reports.
+  Split View, Slide Over, Stage Manager,
+  Magic Keyboard and trackpad, the share popover and file picker on a real
+  iPad, and foldable posture remain unverified.
+- The review follow-up gives nested Settings and Assistant panes the content
+  width at 1000–1199 px, keeps Wallets sort labels and Settings values visible,
+  retains touch refresh and back swipe beside the sidebar, and bounds centered
+  snapshot sheets in short windows. The matrix now catches clipped leaf text,
+  main-content touch targets, and iPhone SE landscape. Local TypeScript,
+  2,215 Vitest tests, 208 mobile browser tests, and the Rust library check
+  passed. The iPad portrait and Analytics captures in `screens/ipad/` were
+  regenerated; the native landscape fix still needs macOS CI.
+- The current reviewer pass merges the backup-folder picker from master.
+  Simulator landscape now rotates the iPad window from Simulator's Device
+  menu before launching Track3. At wide width, Assistant collapses its empty
+  top bar, Settings and Assistant omit the outer More menu, edge swipes follow
+  the visible Back button, and History rows use shorter spacing. The mobile
+  CSS drops the always-matching media wrappers; the presentation hook uses
+  the iOS platform or a coarse pointer. Regular-width Analytics Returns
+  sheets now have browser checks and a curated capture. The real iPad picker,
+  share popover, safe-area `env()` behavior, and foldable posture still need
+  device verification.
+- Local follow-up checks passed: app and browser-test TypeScript; Vitest
+  2,256/2,256 in 266 files; Playwright 215/215 mobile and 77/77 desktop,
+  including the 48-test wide-window sweep; Rust pure tests 65/65; desktop
+  Rust library and binary check; and the production frontend build. The
+  workflow YAML and extracted iPad launch shell passed syntax checks.
+  macOS iOS CI run `40230403597` passed, including iPhone and iPad
+  simulator launch.
+
 ## X1 interaction fixes (2026-10-25)
 
 1. **Long press:** The selection rule covered `.app-layout` and toasts, while sheets and dialogs portal into `body`; their text still had `user-select:auto`. The phone rule now covers the body tree, with editable fields and marked copy surfaces selectable. Browser tests inspect an open Top coins sheet and Add alert modal as well as the main page. Chromium cannot emulate WebKit selection handles or report `-webkit-touch-callout`.

@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { MobileNavigation, routeTitle } from "@/mobile/components/mobile/navigation";
+import { MobileNavigation, MobileSidebar, routeTitle } from "@/mobile/components/mobile/navigation";
 
 function Path() {
   const location = useLocation();
@@ -10,6 +10,20 @@ function Path() {
 }
 
 describe("mobile navigation", () => {
+  it("uses the same roots and alert badge in the sidebar", () => {
+    render(<MemoryRouter initialEntries={["/goals"]}>
+      <MobileSidebar unread={3} />
+      <Routes><Route path="*" element={<Path />} /></Routes>
+    </MemoryRouter>);
+    const sidebar = document.querySelector(".mobile-sidebar")!;
+    expect(sidebar).toHaveAttribute("aria-label", "Tabs");
+    const more = sidebar.querySelector('a[href="/more"]')!;
+    expect(more).toHaveAttribute("aria-current", "page");
+    expect(more).toHaveTextContent("3");
+    expect(more).toHaveAccessibleName("More, 3 unread alerts");
+    fireEvent.click(sidebar.querySelector('a[href="/history"]')!);
+    expect(screen.getByText("/history")).toBeInTheDocument();
+  });
   it("names an asset detail page for its asset", () => {
     expect(routeTitle("/coins/BTC", (key) => key)).toBe("BTC");
   });

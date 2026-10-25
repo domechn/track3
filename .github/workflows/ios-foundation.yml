@@ -75,9 +75,9 @@ jobs:
         run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
       - name: Test production startup
         run: corepack yarn playwright test -c playwright.preview.config.ts --workers=2
-      - name: Test iPhone flows
+      - name: Test iPhone and iPad flows
         run: corepack yarn playwright test --project=mobile --workers=2
-      - name: Upload iPhone browser screenshots
+      - name: Upload iOS browser screenshots
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v7
@@ -204,6 +204,77 @@ jobs:
           xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$APP_PID" '$1 == pid {found=1} END {exit !found}'
           test ! -s artifacts/crash-reports.log
           ! grep -Eiq 'failed to read migration|error while running tauri application' artifacts/launch.log
+      - name: Launch in iPad simulator in portrait and landscape
+        run: |
+          set -euxo pipefail
+          SIM_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for group in data["devices"].values() for d in group if d["name"].startswith("iPad") and d["state"] == "Shutdown"]; devices.sort(key=lambda d: ("13-inch" not in d["name"], d["name"])); print(devices[0]["udid"])')
+          xcrun simctl shutdown all
+          xcrun simctl boot "$SIM_ID"
+          xcrun simctl bootstatus "$SIM_ID" -b
+          APP=$(find src-tauri -type d -name '*.app' -print -quit)
+          test -n "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily:1' "$APP/Info.plist" | grep -Fx 2
+          /usr/libexec/PlistBuddy -c 'Print :UIRequiresFullScreen' "$APP/Info.plist" | grep -Fx false
+          xcrun simctl install "$SIM_ID" "$APP"
+          APP_PID=$(xcrun simctl launch "$SIM_ID" dev.track3.ios 2>&1 | tee artifacts/ipad-launch.log | sed -n 's/.*: //p' || true)
+          test -n "$APP_PID"
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          CONTAINER=$(xcrun simctl get_app_container "$SIM_ID" dev.track3.ios data)
+          READY=""
+          for attempt in $(seq 1 30); do
+            READY=$(find "$CONTAINER" -name track3-ready -type f -print -quit)
+            if [ -n "$READY" ]; then break; fi
+            sleep 2
+          done
+          test -n "$READY"
+          grep -Fxq 'track3:ready' "$READY"
+          awk 'NR==2 { split($0, size, "x"); portrait=(size[1]+0 < size[2]+0) } END { exit !portrait }' "$READY"
+          xcrun simctl spawn "$SIM_ID" log show --last 2m --style compact --predicate "process ==[c] \"$EXECUTABLE\"" > artifacts/ipad-log.log || true
+          find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -iname "${EXECUTABLE}*" -mmin -2 -print > artifacts/ipad-crash-reports.log 2>/dev/null || true
+          xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$APP_PID" '$1 == pid {found=1} END {exit !found}'
+          test ! -s artifacts/ipad-crash-reports.log
+          ! grep -Eiq 'failed to read migration|error while running tauri application' artifacts/ipad-log.log
+          xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-portrait.png
+          swift scripts/ios/check-screenshot.swift artifacts/ipad-portrait.png
+          rm "$READY"
+          xcrun simctl terminate "$SIM_ID" dev.track3.ios
+          open -a Simulator --args -CurrentDeviceUDID "$SIM_ID"
+          : > artifacts/ipad-rotation.log
+          for attempt in $(seq 1 10); do
+            if osascript >> artifacts/ipad-rotation.log 2>&1 <<'APPLESCRIPT'; then break; fi
+          tell application "Simulator" to activate
+          tell application "System Events"
+            tell process "Simulator"
+              log (get name of every window)
+              set padWindow to first window whose name contains "iPad"
+              perform action "AXRaise" of padWindow
+              click menu item "Rotate Left" of menu 1 of menu bar item "Device" of menu bar 1
+            end tell
+          end tell
+          APPLESCRIPT
+            if [ "$attempt" -eq 10 ]; then cat artifacts/ipad-rotation.log; exit 1; fi
+            sleep 2
+          done
+          cat artifacts/ipad-rotation.log
+          LANDSCAPE_PID=$(xcrun simctl launch "$SIM_ID" dev.track3.ios 2>&1 | tee artifacts/ipad-landscape-launch.log | sed -n 's/.*: //p' || true)
+          test -n "$LANDSCAPE_PID"
+          LANDSCAPE=""
+          for attempt in $(seq 1 30); do
+            if [ -f "$READY" ] && awk 'NR==2 { split($0, size, "x"); landscape=(size[1]+0 > size[2]+0) } END { exit !landscape }' "$READY"; then
+              LANDSCAPE=1
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$LANDSCAPE" ]; then
+            cat "$READY" 2>/dev/null || true
+            xcrun simctl spawn "$SIM_ID" log show --last 2m --style compact --predicate "process ==[c] \"$EXECUTABLE\"" > artifacts/ipad-landscape-log.log || true
+            cat artifacts/ipad-landscape-log.log
+            exit 1
+          fi
+          xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-landscape.png
+          swift scripts/ios/check-screenshot.swift artifacts/ipad-landscape.png
+          xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$LANDSCAPE_PID" '$1 == pid {found=1} END {exit !found}'
       - name: Build unsigned device IPA
         run: |
           set -euo pipefail

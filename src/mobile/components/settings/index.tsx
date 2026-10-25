@@ -26,7 +26,7 @@ import {
 } from "@radix-ui/react-icons";
 import { LOCALE_LABELS, useTranslation } from "@/mobile/i18n";
 import { isIOS } from "@/utils/platform";
-import { InsetGroup, ListRow, useHaptics } from "@/mobile/components/mobile";
+import { InsetGroup, ListRow, SplitView, useHaptics, useSizeClass } from "@/mobile/components/mobile";
 import { getCachedPreferCurrency } from "@/middlelayers/configuration";
 import { useTheme } from "@/mobile/components/common/theme";
 import AssistantSettings from "@/mobile/components/settings/assistant";
@@ -111,21 +111,24 @@ const App = () => {
   const { t, locale } = useTranslation();
   const { theme } = useTheme();
   const haptic = useHaptics();
+  const isWide = useSizeClass().width === "wide";
   const lo = useLocation();
   const [topBar, setTopBar] = useState<HTMLElement | null>(null);
   useEffect(() => setTopBar(document.getElementById("app-top-bar")), []);
   if (isIOS()) {
     const isHub = lo.pathname === "/settings";
-    const title = mobileSettings.find((item) =>
-      `${item.href}` === `${lo.pathname}${lo.search}`)?.key ??
-      mobileSettings.find((item) => item.href.split("?")[0] === lo.pathname)?.key;
+    const selectedHref = mobileSettings.find((item) =>
+      item.href === `${lo.pathname}${lo.search}`)?.href ??
+      mobileSettings.find((item) => item.href.split("?")[0] === lo.pathname)?.href;
+    const title = mobileSettings.find((item) => item.href === selectedHref)?.key;
     return (
-      <div className="ios-d3-settings mx-auto w-full max-w-2xl min-w-0 space-y-5 pb-6">
+      <div className="ios-d3-settings mx-auto w-full min-w-0 pb-6">
         {topBar && createPortal(
           <span className="ios-d3-pushed-title">{t(title ?? "settings.title")}</span>,
           topBar)}
-        {isHub ? (
-          <>
+        <SplitView selected={!isHub} masterLabel={t("settings.sectionsAriaLabel")}
+          detailLabel={t(title ?? "settings.title")}
+          master={isHub || isWide ? <>
             <h1 className="ios-large-title mb-5 pt-2">{t("settings.title")}</h1>
             <nav aria-label={t("settings.sectionsAriaLabel")} onClickCapture={() => haptic("selection")}>
               {(["portfolio", "preferences", "privacy"] as const).map((group) => <InsetGroup key={group} title={t(`settings.mobile.group.${group}`)}>
@@ -135,22 +138,21 @@ const App = () => {
                     : item.key === "settings.mobile.language" ? LOCALE_LABELS[locale]
                       : item.key === "settings.tab.appearance" ? theme === "system" ? t("settings.mobile.system") : t(`appearance.theme.${theme}`)
                         : undefined;
-                  return <ListRow key={item.href} href={`#${item.href}`} value={value}>
+                  return <ListRow key={item.href} href={`#${item.href}`} value={value}
+                    ariaCurrent={!isHub && selectedHref === item.href ? "page" : undefined}>
                     <span aria-hidden="true" className="ios-d3-settings-icon"><Icon /></span>
                     {t(item.key)}
                   </ListRow>;
                 })}
               </InsetGroup>)}
             </nav>
-          </>
-        ) : (
-          <>
+          </> : null}
+          detail={isHub ? <p className="analytics-empty">{t("settings.selectDetail")}</p> : <>
             <header className="space-y-3 pt-1">
               <h1 className="ios-large-title mb-5">{t(title ?? "settings.title")}</h1>
             </header>
             <div className="ios-d3-settings-page"><Outlet /></div>
-          </>
-        )}
+          </>} />
       </div>
     );
   }

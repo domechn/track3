@@ -344,12 +344,13 @@ public func track3IOSShareFile(_ path: UnsafePointer<CChar>) -> Bool {
         controller.completionWithItemsHandler = { _, _, _, _ in
             try? FileManager.default.removeItem(at: folder)
         }
-        if let popover = controller.popoverPresentationController {
-            popover.sourceView = root.view
-            popover.sourceRect = CGRect(x: root.view.bounds.midX, y: root.view.bounds.maxY, width: 1, height: 1)
-        }
         var presenter = root
         while let presented = presenter.presentedViewController { presenter = presented }
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = presenter.view
+            popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+            popover.permittedArrowDirections = []
+        }
         presenter.present(controller, animated: true)
     }
     return true

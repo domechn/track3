@@ -1,6 +1,6 @@
 # Track3 iOS architecture
 
-Track3 keeps its Tauri v2 architecture: the iPhone React shell runs in
+Track3 keeps its Tauri v2 architecture: the iPhone and iPad React shell runs in
 WKWebView and invokes the shared Rust core. `src/main.tsx` selects
 `src/App.tsx` for desktop and lazily loads `src/mobile/App.tsx` on iOS.
 Mobile routes and presentation live in `src/mobile/components/`, while
@@ -65,6 +65,38 @@ supplies display name, permissions copy, file sharing, and orientations when
 Tauri generates or refreshes the project.
 
 ## Platform behavior
+
+### Adaptive width model
+
+The iOS bundle uses the same mobile routes and components at every window
+size. `useSizeClass()` reads the live viewport: compact below 700 CSS px,
+regular from 700 px, and wide from 1000 px. Height below 500 px adds a
+compact-height class. The shell records both classes on `.app-layout` and
+updates them on resize, so rotation, Split View, Slide Over, and Stage Manager
+do not remount the route. The mobile CSS has matching media queries and uses
+container queries where the available content width matters more than the
+window width.
+
+Compact width keeps the four bottom tabs and existing per-tab back and scroll
+behavior. Regular and wide widths show those same route links in a collapsible
+left sidebar. `SplitView` keeps a master and detail pane in one component:
+compact and regular widths show the selected pane; wide widths show both.
+History, Settings, Analytics, and Assistant use this primitive. History
+places its existing bounded list next to an inline snapshot detail at wide width.
+Sheets and dialogs become centered cards at regular width. Safe-area insets
+continue to pad headers, content, and navigation. Two horizontal viewport
+segments only adjust gutters when that browser feature exists; ordinary width
+breakpoints remain the fallback.
+
+The Xcode target enables iPhone and iPad, phone portrait and landscape, all
+four iPad orientations, and multitasking. `Info.ios.plist` supplies Tauri's
+generated project while the committed Xcode project contains the matching
+keys. The native share controller anchors its iPad popover to the presenting
+view. The native backup-folder `UIDocumentPicker` presents as a form sheet
+on iPad, and `tauri-plugin-dialog`'s file picker presents full screen;
+neither uses a popover anchor. The app lock covers visible scene
+windows, so its cover resizes with a window; signing and device behavior
+still require physical testing.
 
 Desktop updater, process relaunch, shell, and right-click menu are omitted on
 iOS. Dialog, filesystem, HTTP, opener, notification, and SQL plugins remain

@@ -91,7 +91,7 @@ it("keeps a newer coin range when an older query resolves later", async () => {
 it("uses short horizontal dates and one value axis on a phone", async () => {
   const previousMatchMedia = window.matchMedia;
   window.matchMedia = (query: string) => ({
-    matches: query.includes("max-width: 950px"), media: query, onchange: null,
+    matches: query.includes("pointer: coarse"), media: query, onchange: null,
     addListener: () => {}, removeListener: () => {},
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   });

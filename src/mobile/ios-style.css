@@ -120,26 +120,25 @@
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 12px 36px -8px rgba(2, 6, 23, 0.5);
   }
-  @media (max-width: 950px) and (pointer: coarse) {
-    :root {
-      --background: 240 20% 96%; --foreground: 240 6% 10%;
-      --card: 0 0% 100%; --card-foreground: 240 6% 10%;
-      --popover: 0 0% 100%; --popover-foreground: 240 6% 10%;
-      --primary: 222 59% 47%; --primary-foreground: 0 0% 100%;
-      --secondary: 240 20% 96%; --secondary-foreground: 240 6% 10%;
-      --muted: 240 20% 96%; --muted-foreground: 240 2% 39%;
-      --border: 240 5% 82%; --input: 240 5% 82%; --ring: 222 59% 47%; --radius: 1rem;
-    }
-    .dark {
-      --background: 0 0% 0%; --foreground: 0 0% 98%;
-      --card: 240 4% 11%; --card-foreground: 0 0% 98%;
-      --popover: 240 4% 11%; --popover-foreground: 0 0% 98%;
-      --primary: 221 94% 70%; --primary-foreground: 0 0% 0%;
-      --secondary: 240 3% 18%; --secondary-foreground: 0 0% 98%;
-      --muted: 240 3% 18%; --muted-foreground: 240 3% 69%;
-      --border: 240 3% 27%; --input: 240 3% 27%; --ring: 221 94% 70%;
-      --destructive: 4 100% 61%; --destructive-foreground: 0 0% 0%;
-    }
+
+  :root {
+    --background: 240 20% 96%; --foreground: 240 6% 10%;
+    --card: 0 0% 100%; --card-foreground: 240 6% 10%;
+    --popover: 0 0% 100%; --popover-foreground: 240 6% 10%;
+    --primary: 222 59% 47%; --primary-foreground: 0 0% 100%;
+    --secondary: 240 20% 96%; --secondary-foreground: 240 6% 10%;
+    --muted: 240 20% 96%; --muted-foreground: 240 2% 39%;
+    --border: 240 5% 82%; --input: 240 5% 82%; --ring: 222 59% 47%; --radius: 1rem;
+  }
+  .dark {
+    --background: 0 0% 0%; --foreground: 0 0% 98%;
+    --card: 240 4% 11%; --card-foreground: 0 0% 98%;
+    --popover: 240 4% 11%; --popover-foreground: 0 0% 98%;
+    --primary: 221 94% 70%; --primary-foreground: 0 0% 0%;
+    --secondary: 240 3% 18%; --secondary-foreground: 0 0% 98%;
+    --muted: 240 3% 18%; --muted-foreground: 240 3% 69%;
+    --border: 240 3% 27%; --input: 240 3% 27%; --ring: 221 94% 70%;
+    --destructive: 4 100% 61%; --destructive-foreground: 0 0% 0%;
   }
 }
 
@@ -155,10 +154,7 @@
     min-height: 100dvh;
     background-color: hsl(var(--background));
   }
-
-  @media (max-width: 950px) and (pointer: coarse) {
-    body { font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif; font-size: 17px; background-image: none; }
-  }
+  body { font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif; font-size: 17px; background-image: none; }
 
   @media (prefers-reduced-motion: reduce) {
     html {
@@ -226,24 +222,11 @@ html {
   -webkit-text-size-adjust: 100%;
   -webkit-touch-callout: none;
 }
-.ios-switch { position: relative; display: inline-flex; width: 36px; height: 20px; flex: none; align-items: center; border-radius: 999px; background: hsl(var(--input)); padding: 2px; transition: background 200ms var(--ios-motion); }
-.ios-switch[data-state="checked"] { background: hsl(var(--primary)); }
-.ios-switch-thumb { display: block; width: 16px; height: 16px; border-radius: 50%; background: hsl(var(--background)); box-shadow: 0 1px 3px #0003; transition: transform 200ms var(--ios-motion); }
-.ios-switch-thumb[data-state="checked"] { transform: translateX(16px); }
+.ios-switch { position: relative; display: inline-flex; width: 51px; height: 44px; flex: none; align-items: center; border-radius: 999px; background: transparent; padding: 2px; transition: background 200ms var(--ios-motion); }
+.ios-switch::before { content: ""; position: absolute; width: 51px; height: 31px; left: 0; border-radius: 999px; background: hsl(var(--input)); }
+.ios-switch[data-state="checked"]::before { background: #34c759; }
+.dark .ios-switch[data-state="checked"]::before { background: #30d158; }
+.ios-switch-thumb { position: relative; display: block; width: 27px; height: 27px; border-radius: 50%; background: white; box-shadow: 0 1px 3px #0003; transition: transform 200ms var(--ios-motion); }
+.ios-switch-thumb[data-state="checked"] { transform: translateX(20px); }
 .ios-switch:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
 .ios-switch:disabled { opacity: .5; }
-@media (min-width: 951px) and (pointer: coarse) {
-  .ios-switch { width: 44px; height: 44px; background: transparent; }
-  .ios-switch::before { content: ""; position: absolute; top: 12px; left: 4px; width: 36px; height: 20px; border-radius: 999px; background: hsl(var(--input)); }
-  .ios-switch[data-state="checked"]::before { background: hsl(var(--primary)); }
-  .ios-switch-thumb { position: relative; margin-left: 4px; }
-}
-@media (max-width: 950px) and (pointer: coarse) {
-  .ios-switch { width: 51px; height: 44px; background: transparent; }
-  .ios-switch[data-state="checked"] { background: transparent; }
-  .ios-switch::before { content: ""; position: absolute; width: 51px; height: 31px; left: 0; border-radius: 999px; background: hsl(var(--input)); }
-  .ios-switch[data-state="checked"]::before { background: #34c759; }
-  .dark .ios-switch[data-state="checked"]::before { background: #30d158; }
-  .ios-switch-thumb { position: relative; width: 27px; height: 27px; background: white; }
-  .ios-switch-thumb[data-state="checked"] { transform: translateX(20px); }
-}

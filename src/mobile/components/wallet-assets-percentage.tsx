@@ -569,7 +569,7 @@ const App = ({
           data-testid="wallet-treemap-container"
           data-single-wallet={isMobile && !!symbol && sortedWallets.length === 1}
           className="relative w-full overflow-hidden"
-          style={{ height: isMobile ? MOBILE_HEIGHT : DESKTOP_HEIGHT }}
+          style={{ height: isMobile || (!!symbol && sortedWallets.length === 1) ? MOBILE_HEIGHT : DESKTOP_HEIGHT }}
         >
           {chartHasData && !isReady ? (
             <div

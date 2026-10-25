@@ -66,7 +66,7 @@ import { StaggerContainer, FadeUp } from "@/components/motion";
 import PageLoadingOverlay from "@/mobile/components/page-loading-overlay";
 import { useTranslation } from "@/mobile/i18n";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BottomSheet, SwipeableRow, useIsMobile } from "@/mobile/components/mobile";
+import { BottomSheet, SplitView, SwipeableRow, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 import { groupHistoryMonths } from "@/mobile/components/history-months";
 
 function DesktopDetailPassthrough({ children }: React.ComponentProps<typeof BottomSheet>) {
@@ -103,6 +103,7 @@ const App = ({
 }) => {
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
+  const isWide = useSizeClass().width === "wide";
 
   const [data, setData] = useState<HistoricalPageRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -568,27 +569,13 @@ const App = ({
     }
   };
 
-  return (
-    <div className="d2-history" aria-busy={pageLoading} data-testid="history-content">
-      {!isMobile && <h1 className="sr-only">{t("history.h1")}</h1>}
-      <StaggerContainer className="space-y-4">
-        {isMobile && <ConfirmDeleteDialog
-          open={deleteCandidate !== null}
-          onOpenChange={(open) => { if (!open) setDeleteCandidate(null); }}
-          title={t("history.deleteLatestTitle")}
-          description={t("history.deleteLatestDesc")}
-          cancelLabel={t("common.cancel")}
-          actions={[{ label: t("common.confirm"), onClick: () => {
-            if (deleteCandidate) onHistoricalDataDeleteClick(deleteCandidate);
-            setDeleteCandidate(null);
-          } }]}
-        />}
+  const detailContent = (
         <Dialog
           open={!isMobile && isModalOpen}
           onOpenChange={closeDetail}
         >
           <DetailWrapper open={isModalOpen} onOpenChange={closeDetail}
-            title={t("history.snapshotDetails")} className="history-detail-sheet" detents={["large"]} initialDetent="large">
+            title={t("history.snapshotDetails")} className="history-detail-sheet" detents={["large"]} initialDetent="large" inline={isWide}>
           <DetailSurface className="history-detail-dialog min-w-[80%] touch:min-w-0 touch:w-[calc(100vw-1rem)] touch:max-w-[1200px] touch:max-h-[calc(100dvh-1rem)]">
             <DetailHeader className="history-detail-meta">
               {!isMobile && <DialogTitle>{t("history.detailTitle")}</DialogTitle>}
@@ -842,66 +829,9 @@ const App = ({
           </DetailSurface>
           </DetailWrapper>
         </Dialog>
+  );
 
-        {!isMobile && <FadeUp>
-          <div className="grid gap-3 md:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {t("history.totalRecords")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xl font-semibold">{totalCount}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("history.snapshotsStored")}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {t("history.pageStatus")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xl font-semibold">
-                  {totalPages === 0
-                    ? "0 / 0"
-                    : `${dataPage + 1} / ${totalPages}`}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("history.showing").replace("{start}", String(loadedRangeStart)).replace("{end}", String(loadedRangeEnd))}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {t("history.latestSnapshot")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xl font-semibold tracking-tight">
-                  {latestRow
-                    ? `${currency.symbol}${prettyNumberToLocaleString(
-                        currencyWrapper(currency)(latestRow.total),
-                      )}`
-                    : "-"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {latestRow
-                    ? timeToDateStr(
-                        new Date(latestRow.createdAt).getTime(),
-                        true,
-                      )
-                    : t("history.noDataLabel")}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </FadeUp>}
-
+  const listContent = (
         <FadeUp>
           <Card className={isMobile ? "history-records-card" : undefined}>
             <CardHeader className="pb-2">
@@ -1027,7 +957,8 @@ const App = ({
                       actions={isLatest ? [{ label: t("common.delete"), destructive: true, disabled: deleting,
                         onClick: () => setDeleteCandidate(row.id) }] : []}>
                       <button type="button" data-testid="history-mobile-row"
-                        className="history-mobile-snapshot-button" onClick={() => onRowClick(row.id)}>
+                        className="history-mobile-snapshot-button" aria-current={isWide && isModalOpen && selectedDataId === row.id ? "true" : undefined}
+                        onClick={() => onRowClick(row.id)}>
                         <span className="sr-only">{t("history.viewSnapshot").replace("{date}", timeToDateStr(new Date(row.createdAt).getTime(), true))}</span>
                         <span className="history-mobile-snapshot-primary">
                           <span className="history-mobile-snapshot-date">{new Intl.DateTimeFormat(
@@ -1188,6 +1119,90 @@ const App = ({
             </CardContent>
           </Card>
         </FadeUp>
+  );
+
+  return (
+    <div className="d2-history" aria-busy={pageLoading} data-testid="history-content">
+      {!isMobile && <h1 className="sr-only">{t("history.h1")}</h1>}
+      <StaggerContainer className="space-y-4">
+        {isMobile && <ConfirmDeleteDialog
+          open={deleteCandidate !== null}
+          onOpenChange={(open) => { if (!open) setDeleteCandidate(null); }}
+          title={t("history.deleteLatestTitle")}
+          description={t("history.deleteLatestDesc")}
+          cancelLabel={t("common.cancel")}
+          actions={[{ label: t("common.confirm"), onClick: () => {
+            if (deleteCandidate) onHistoricalDataDeleteClick(deleteCandidate);
+            setDeleteCandidate(null);
+          } }]}
+        />}
+        {!isMobile && detailContent}
+
+        {!isMobile && <FadeUp>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("history.totalRecords")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xl font-semibold">{totalCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t("history.snapshotsStored")}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("history.pageStatus")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xl font-semibold">
+                  {totalPages === 0
+                    ? "0 / 0"
+                    : `${dataPage + 1} / ${totalPages}`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t("history.showing").replace("{start}", String(loadedRangeStart)).replace("{end}", String(loadedRangeEnd))}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("history.latestSnapshot")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xl font-semibold tracking-tight">
+                  {latestRow
+                    ? `${currency.symbol}${prettyNumberToLocaleString(
+                        currencyWrapper(currency)(latestRow.total),
+                      )}`
+                    : "-"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {latestRow
+                    ? timeToDateStr(
+                        new Date(latestRow.createdAt).getTime(),
+                        true,
+                      )
+                    : t("history.noDataLabel")}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </FadeUp>}
+
+        {isMobile ? <SplitView selected={false} master={listContent}
+          detail={isWide && !isModalOpen
+            ? <p className="analytics-empty">{t("history.selectDetail")}</p>
+            : detailContent}
+          className="history-split" masterLabel={t("history.recordsCardTitle")}
+          detailLabel={t("history.detailTitle")} /> : listContent}
       </StaggerContainer>
     </div>
   );

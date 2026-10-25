@@ -62,12 +62,12 @@ import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { toast } from "@/mobile/components/ui/use-toast";
 import { ToastAction } from "@/mobile/components/ui/toast";
 import { markIOSReady } from "@/utils/ios-ready";
-import { BottomSheet, Button as MobileButton, InsetGroup, ListRow, MOBILE_MEDIA_QUERY, MobilePage, PullToRefresh, useHaptics, useIsMobile } from "@/mobile/components/mobile";
+import { BottomSheet, Button as MobileButton, InsetGroup, ListRow, MobilePage, PullToRefresh, SplitView, useHaptics, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 import TopCoinsRank from "@/mobile/components/top-coins-rank";
 import ProfitSummary from "@/mobile/components/profit-summary";
 import LatestAssetsPercentage from "@/mobile/components/latest-assets-percentage";
 import AssetsPercentageChange from "@/mobile/components/assets-percentage-change";
-import { MobileNavigation, routeTitle, tabForPath, tabRoots, type MobileTab } from "@/mobile/components/mobile/navigation";
+import { MobileNavigation, MobileSidebar, routeTitle, tabForPath, tabRoots, type MobileTab } from "@/mobile/components/mobile/navigation";
 import { MobileIcon, type MobileIconName } from "@/mobile/components/mobile/icons";
 import { useAlertBadge } from "@/mobile/components/use-alert-badge";
 import { MobileHeaderTotal } from "@/mobile/components/mobile/header-total";
@@ -286,6 +286,10 @@ function Layout({
 }: LayoutProps) {
   const { t } = useTranslation();
   const mobile = useIsMobile();
+  const sizeClass = useSizeClass();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.innerWidth >= 700 && window.innerHeight < 500,
+  );
   const unread = useAlertBadge();
   const location = useLocation();
   const navigate = useNavigate();
@@ -306,6 +310,8 @@ function Layout({
   const previousRoute = useRef({ tab: currentTab, path: routePath });
   const backPath = routeParents.current.get(routePath) ?? stack.at(-2) ?? rootPath;
   const canGoBack = routePath !== rootPath;
+  const showBack = canGoBack && !(sizeClass.width === "wide" &&
+    /^\/(settings|assistant|goals|rebalance)(\/|$)/.test(location.pathname));
   const routeScroll = useRef(new Map<string, number>());
   const containerScroll = useRef(new Map<string, number[]>());
   const scrollKey = (tab: string, path: string) => `${tab}:${path}`;
@@ -360,9 +366,27 @@ function Layout({
     window.addEventListener("scroll", update, { passive: true });
     return () => window.removeEventListener("scroll", update);
   }, [location.pathname]);
+  useEffect(() => {
+    if (sizeClass.width !== "compact" && sizeClass.height === "compact") {
+      setSidebarCollapsed(true);
+    }
+  }, [sizeClass.width, sizeClass.height]);
+  const onTabSwitch = (rootTap: boolean) => {
+    if (!rootTap || routePath !== rootPath) rememberScroll();
+    else scrollCaptured.current = false;
+    if (rootTap) {
+      const rootKey = scrollKey(currentTab, tabRoots[currentTab]);
+      resetRootScroll.current = routePath === rootPath ? null : rootKey;
+      routeScroll.current.set(rootKey, 0);
+      onRootTap(currentTab);
+    }
+  };
 
   return (
-    <div className="app-layout min-h-screen">
+    <div className="app-layout min-h-screen" data-width-class={sizeClass.width}
+      data-height-class={sizeClass.height} data-sidebar-collapsed={sidebarCollapsed}>
+      <MobileSidebar unread={unread} collapsed={sidebarCollapsed} onCollapse={() => setSidebarCollapsed((value) => !value)}
+        onTabSwitch={onTabSwitch} />
       <div
         className="app-content transition-[margin-left] duration-300 ease-in-out"
       >
@@ -377,7 +401,7 @@ function Layout({
           lastRefreshAt={lastRefreshAt}
           compactTitle={mobile && headerCollapsed ? routeTitle(location.pathname, t) : undefined}
           overview={location.pathname === "/overview"}
-          onBack={canGoBack ? () => { rememberScroll(); navigate(backPath); } : undefined}
+          onBack={showBack ? () => { rememberScroll(); navigate(backPath); } : undefined}
           onRefreshSuccess={onRefreshSuccess}
           refreshAction={refreshAction}
         />
@@ -394,15 +418,15 @@ function Layout({
             routeParents.current.set(link.getAttribute("href")!.slice(1), routePath);
           }}
           onPointerDown={(event) => {
-            if (!mobile || event.pointerType !== "touch") return;
-            swipeStart.current = event.clientX < 24 &&
+            if (event.pointerType !== "touch") return;
+            swipeStart.current = event.clientX < event.currentTarget.getBoundingClientRect().left + 24 &&
               !(event.target as Element).closest('[aria-modal="true"]')
               ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
           }}
           onPointerUp={(event) => {
             const start = swipeStart.current;
             swipeStart.current = null;
-            if (!mobile || !canGoBack || !start || event.pointerId !== start.id) return;
+            if (!showBack || !start || event.pointerId !== start.id) return;
             const dx = event.clientX - start.x;
             const dy = event.clientY - start.y;
             if (dx > 90 && Math.abs(dx) > Math.abs(dy)) {
@@ -411,7 +435,7 @@ function Layout({
             }
           }}
           onPointerCancel={() => { swipeStart.current = null; }}>
-          <PullToRefresh disabled={!mobile || /^\/assistant(\/|$)/.test(location.pathname)} onRefresh={onLocalRefresh}>
+          <PullToRefresh disabled={/^\/assistant(\/|$)/.test(location.pathname)} onRefresh={onLocalRefresh}>
           {!/^\/(settings|goals|rebalance)(\/|$)/.test(location.pathname) && <div className="mobile-route-heading">
             <MobilePage title={routeTitle(location.pathname, t)} />
           </div>}
@@ -442,48 +466,47 @@ function Layout({
           </PullToRefresh>
         </main>
       </div>
-      <MobileNavigation unread={unread} onTabSwitch={(rootTap) => {
-        if (!rootTap || routePath !== rootPath) rememberScroll();
-        else scrollCaptured.current = false;
-        if (rootTap) {
-          const rootKey = scrollKey(currentTab, tabRoots[currentTab]);
-          resetRootScroll.current = routePath === rootPath ? null : rootKey;
-          routeScroll.current.set(rootKey, 0);
-          onRootTap(currentTab);
-        }
-      }} />
+      <MobileNavigation unread={unread} onTabSwitch={onTabSwitch} />
     </div>
   );
 }
 
-function MoreHub() {
+function MoreHub({ children }: React.PropsWithChildren) {
   const { t } = useTranslation();
   const haptic = useHaptics();
   const unread = useOutletContext<number>();
+  const pathname = useLocation().pathname;
   const items: { href: string; label: string; value?: string; icon: MobileIconName }[] = [
     { href: "#/rebalance", label: t("nav.rebalance"), icon: "rebalance" },
     { href: "#/goals", label: t("nav.goals"), value: unread > 0 ? String(unread) : undefined, icon: "goals" },
     { href: "#/assistant", label: t("nav.assistant"), icon: "assistant" },
     { href: "#/settings", label: t("nav.settings"), icon: "settings" },
   ];
-  return <div className="mobile-more-hub ios-d3-more" onClickCapture={() => haptic("selection")}>
+  const master = <div className="mobile-more-hub ios-d3-more" onClickCapture={() => haptic("selection")}>
     <InsetGroup title={t("more.group.plan")}>
-      {items.slice(0, 2).map((item) => <ListRow key={item.href} href={item.href} value={item.value}>
+      {items.slice(0, 2).map((item) => <ListRow key={item.href} href={item.href} value={item.value}
+        ariaCurrent={pathname === item.href.slice(1) ? "page" : undefined}>
         <MobileIcon name={item.icon} />{item.label}
       </ListRow>)}
     </InsetGroup>
     <InsetGroup title={t("more.group.manage")}>
-      {items.slice(2).map((item) => <ListRow key={item.href} href={item.href} value={item.value}>
+      {items.slice(2).map((item) => <ListRow key={item.href} href={item.href} value={item.value}
+        ariaCurrent={pathname === item.href.slice(1) || (item.href === "#/assistant" && pathname.startsWith("/assistant/"))
+          || (item.href === "#/settings" && pathname.startsWith("/settings/")) ? "page" : undefined}>
         <MobileIcon name={item.icon} />{item.label}
       </ListRow>)}
     </InsetGroup>
   </div>;
+  return <SplitView selected={Boolean(children)} className={`more-split${/^\/(settings|assistant)(\/|$)/.test(pathname) ? " more-detail-only" : ""}`}
+    masterLabel={t("nav.more")} detailLabel={t("nav.more")}
+    master={master} detail={children ?? <p className="analytics-empty">{t("more.selectDetail")}</p>} />;
 }
 
 function AnalyticsHub({ currency, dateRange, quoteColor }: {
   currency: CurrencyRateDetail; dateRange: { start: Date; end: Date }; quoteColor: QuoteColor;
 }) {
   const { t } = useTranslation();
+  const isWide = useSizeClass().width === "wide";
   const [sheet, setSheet] = useState<"allocation" | "rank" | "profit" | "positions" | null>(null);
   const items: { label: string; detail: string; icon: "allocation" | "rank" | "wallets" | "comparison" | "profit" | "positions" | "cost"; href?: string; sheet?: "allocation" | "rank" | "profit" | "positions" }[] = [
     { sheet: "allocation", label: t("overview.allocation"), detail: t("analytics.allocationDetail"), icon: "allocation" },
@@ -494,26 +517,32 @@ function AnalyticsHub({ currency, dateRange, quoteColor }: {
     { sheet: "positions", label: t("analytics.positionChanges"), detail: t("analytics.positionChangesDetail"), icon: "positions" },
     { href: "#/cost-basis", label: t("nav.costBasis"), detail: t("analytics.costDetail"), icon: "cost" },
   ];
-  return <div className="mobile-analytics-hub">
-    <div className="analytics-tile-grid">
+  return <div className="mobile-analytics-hub" data-open-sheet={sheet ?? undefined}>
+    <SplitView selected={false} className="analytics-split"
+      masterLabel={t("nav.analytics")} detailLabel={t("nav.analytics")}
+      master={<div className="analytics-tile-grid">
       {items.map((item) => {
         const content = <><span className="analytics-tile-icon"><AnalyticsTileIcon name={item.icon} /></span>
           <strong>{item.label}</strong><small>{item.detail}</small></>;
         return item.href
           ? <a className="analytics-tile" key={item.label} href={item.href}>{content}</a>
-          : <button className="analytics-tile" type="button" key={item.label} onClick={() => setSheet(item.sheet!)}>{content}</button>;
+          : <button className="analytics-tile" type="button" key={item.label}
+            aria-current={isWide && sheet === item.sheet ? "true" : undefined}
+            onClick={() => setSheet(item.sheet!)}>{content}</button>;
       })}
-    </div>
-    <BottomSheet open={sheet !== null} onOpenChange={(open) => { if (!open) setSheet(null); }}
+    </div>}
+      detail={sheet === null && isWide
+        ? <div className="mobile-inline-detail analytics-empty">{t("analytics.selectDetail")}</div>
+        : <BottomSheet open={sheet !== null} onOpenChange={(open) => { if (!open) setSheet(null); }}
       title={sheet === "allocation" ? t("overview.allocation")
         : sheet === "rank" ? t("analytics.rank")
         : sheet === "positions" ? t("analytics.positionChanges") : t("analytics.profit")}
-      detents={["large"]} initialDetent="large">
+      detents={["large"]} initialDetent="large" inline={isWide}>
       {sheet === "allocation" && <div className="d2-allocation-sheet"><LatestAssetsPercentage dateRange={dateRange} currency={currency} /></div>}
       {sheet === "rank" && <div className="d2-rank-sheet"><TopCoinsRank dateRange={dateRange} currency={currency} /></div>}
       {sheet === "profit" && <div className="d2-profit-sheet"><ProfitSummary dateRange={dateRange} currency={currency} quoteColor={quoteColor} /></div>}
       {sheet === "positions" && <div className="d2-positions-sheet"><AssetsPercentageChange dateRange={dateRange} /></div>}
-    </BottomSheet>
+    </BottomSheet>} />
   </div>;
 }
 
@@ -678,12 +707,12 @@ function AppRoutes({
         <Route
           path="rebalance"
           element={
-            <AnimatedPage>
+            <MoreHub><AnimatedPage>
               <Rebalance currency={currentCurrency} quoteColor={quoteColor} />
-            </AnimatedPage>
+            </AnimatedPage></MoreHub>
           }
         />
-        <Route path="goals" element={<AnimatedPage><GoalsAlerts /></AnimatedPage>} />
+        <Route path="goals" element={<MoreHub><AnimatedPage><GoalsAlerts /></AnimatedPage></MoreHub>} />
         <Route
           path="history"
           element={
@@ -713,25 +742,25 @@ function AppRoutes({
         <Route
           path="assistant"
           element={
-            <AnimatedPage>
+            <MoreHub><AnimatedPage>
               <ChatPage isProUser={isProUser} />
-            </AnimatedPage>
+            </AnimatedPage></MoreHub>
           }
         />
         <Route
           path="assistant/:sessionId"
           element={
-            <AnimatedPage>
+            <MoreHub><AnimatedPage>
               <ChatPage isProUser={isProUser} />
-            </AnimatedPage>
+            </AnimatedPage></MoreHub>
           }
         />
         <Route
           path="settings"
           element={
-            <AnimatedPage>
+            <MoreHub><AnimatedPage>
               <Setting />
-            </AnimatedPage>
+            </AnimatedPage></MoreHub>
           }
         >
           <Route
@@ -783,6 +812,7 @@ function AppRoutes({
 
 const App = () => {
   const { t } = useTranslation();
+  const mobile = useIsMobile();
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
@@ -844,7 +874,7 @@ const App = () => {
           if (!active) return;
           setLoadFailed(true);
           console.warn("startup data loading failed");
-          if (!window.matchMedia(MOBILE_MEDIA_QUERY).matches) toast({
+          if (!mobile) toast({
             title: t("app.dataLoadFailed"),
             duration: 86_400_000,
             action: <ToastAction altText={t("app.retryDataLoad")} onClick={start} className="touch:min-h-11">

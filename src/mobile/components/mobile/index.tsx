@@ -8,10 +8,12 @@ import { isIOS } from "@/utils/platform";
 import "@/mobile/components/mobile/mobile.css";
 export { AnimatedAmount, Button, DeltaPill, EmptyState, IconButton, MobileCard, MobileSkeleton, Pill, SectionHeader } from "@/mobile/components/mobile/design";
 export { MobileIcon } from "@/mobile/components/mobile/icons";
-export { MobileNavigation } from "@/mobile/components/mobile/navigation";
+export { MobileNavigation, MobileSidebar } from "@/mobile/components/mobile/navigation";
+export { SplitView } from "@/mobile/components/mobile/split-view";
+export { useSizeClass } from "@/mobile/components/mobile/size-class";
 export { Switch } from "@/mobile/components/ui/switch";
 
-export const MOBILE_MEDIA_QUERY = "(max-width: 950px) and (pointer: coarse)";
+export const MOBILE_MEDIA_QUERY = "(pointer: coarse)";
 
 export function useHaptics() {
   return (kind: "selection" | "light" | "success" = "selection") => {
@@ -25,10 +27,10 @@ export function useHaptics() {
 }
 
 export function useIsMobile() {
-  const [mobile, setMobile] = useState(() => window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false);
+  const [mobile, setMobile] = useState(() => isIOS() || (window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false));
   useEffect(() => {
     const query = window.matchMedia(MOBILE_MEDIA_QUERY);
-    const update = () => setMobile(query.matches);
+    const update = () => setMobile(isIOS() || query.matches);
     update();
     query.addEventListener?.("change", update);
     return () => query.removeEventListener?.("change", update);
@@ -64,7 +66,7 @@ export function MobilePage({
 }
 
 export function BottomSheet({
-  open, onOpenChange, title, children, detents = ["medium", "large"], initialDetent, className,
+  open, onOpenChange, title, children, detents = ["medium", "large"], initialDetent, className, inline = false,
 }: React.PropsWithChildren<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -72,6 +74,7 @@ export function BottomSheet({
   detents?: Array<"medium" | "large">;
   initialDetent?: "medium" | "large";
   className?: string;
+  inline?: boolean;
 }>) {
   const { t } = useTranslation();
   const [detent, setDetent] = useState<"medium" | "large">(initialDetent ?? detents[0] ?? "medium");
@@ -128,6 +131,14 @@ export function BottomSheet({
     : "min(60dvh, 42rem)";
   const dragHeight = drag === 0 ? undefined
     : `calc(${sheetHeight} ${drag > 0 ? "-" : "+"} ${Math.abs(drag)}px)`;
+  if (inline) return <aside role="region" aria-label={title} className={cn("mobile-inline-detail", className)}>
+    <div className="mobile-sheet-heading">
+      <h2>{title}</h2>
+      {open && <button type="button" className="mobile-sheet-close" aria-label={t("common.close", "Close")}
+        onClick={() => onOpenChange(false)}><Cross2Icon aria-hidden="true" /></button>}
+    </div>
+    {open && <div className="mobile-sheet-body">{children}</div>}
+  </aside>;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -283,12 +294,13 @@ export function InsetGroup({ children, title, className }: React.PropsWithChildr
   </section>;
 }
 
-export function ListRow({ children, value, onClick, href, trailing, className }: React.PropsWithChildren<{
+export function ListRow({ children, value, onClick, href, trailing, className, ariaCurrent }: React.PropsWithChildren<{
   value?: React.ReactNode; onClick?: () => void; href?: string; trailing?: React.ReactNode; className?: string;
+  ariaCurrent?: "page";
 }>) {
   const content = <><span className="mobile-list-label">{children}</span>{value && <span className="mobile-list-value">{value}</span>}{trailing ?? ((href || onClick) && <ChevronRightIcon aria-hidden="true" />)}</>;
   const classes = cn("mobile-list-row", className);
-  if (href) return <a href={href} className={classes}>{content}</a>;
+  if (href) return <a href={href} className={classes} aria-current={ariaCurrent}>{content}</a>;
   if (onClick) return <button type="button" onClick={onClick} className={classes}>{content}</button>;
   return <div className={classes}>{content}</div>;
 }

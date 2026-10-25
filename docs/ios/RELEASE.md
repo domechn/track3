@@ -13,13 +13,17 @@ Run `corepack yarn tsc --noEmit`, `corepack yarn vitest run`,
 `cargo test --locked -p track3-pure-tests --lib` from `src-tauri`.
 The existing `test-on-pr` workflow tests desktop release behavior. The
 `ios-foundation.yml` web and macOS iOS jobs must pass on the release commit.
-It runs on `feat/ios-app*` pushes, relevant iOS path PRs, and manual dispatch.
+It runs on `feat/ios-app*`, `feat/ios-folder-picker*`,
+`feat/ios-interaction-fixes*`, and `feat/ios-wide-screens*` pushes, relevant iOS
+path PRs, and manual dispatch.
 Check that the simulator launch produced a rendered screenshot, the ready
 marker, no crash report, and an unsigned device IPA. Previous CI runs in the
 separate iOS repository do not verify this combined codebase. The unsigned
 IPA needs Apple signing and provisioning before device installation.
-The Xcode target currently supports iPhone only (`TARGETED_DEVICE_FAMILY=1`);
-an iPad layout requires separate design and validation before enabling iPad.
+The Xcode target supports iPhone and iPad (`TARGETED_DEVICE_FAMILY=1,2`).
+The macOS job launches both simulator families and captures iPad portrait
+and landscape screenshots. Check both captures and the built app's device
+family and multitasking keys.
 
 Existing license-key entry unlocks paid Pro features on iOS while external
 checkout is hidden. App Store Guideline 3.1.1 may still require in-app purchase
@@ -71,6 +75,17 @@ release tasks; the unsigned CI IPA does not establish their accuracy.
 6. Use the assistant chat with a configured provider and confirm that a
    proposed write requires approval. Check the composer above the keyboard
    and Back navigation through Settings and other tabs.
+7. On an iPad, rotate through portrait and landscape. Resize Track3 in Split
+   View and Stage Manager across the 700 px and 1000 px breakpoints; open it
+   in narrow Slide Over. Check the current route, chat draft, history detail,
+   and scroll position after each change. Repeat navigation with a Magic
+   Keyboard and trackpad, including visible focus and hover states.
+8. On iPad, share an export and open a Files picker. Confirm the share sheet
+   has a popover anchor, the picker opens without a crash, and dismissal
+   returns to Track3. Check the app-switcher privacy cover and device lock
+   while two windows are present if the installed iPadOS version allows it.
+   A foldable browser and a spanned dual-screen browser need separate device
+   checks; the Chromium width matrix exercises the CSS fallback only.
 
 Record device, iOS version, signed build identifier, and results in the
 release record. Background refresh, backup and sync execute while the app is

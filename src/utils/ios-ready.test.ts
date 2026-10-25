@@ -36,8 +36,27 @@ it("marks iOS ready after the rendered app opens its bridge", async () => {
   document.body.innerHTML = '<main id="app-main-content"><div aria-busy="false"><h1>Overview</h1></div></main>';
   vi.stubEnv("VITE_TRACK3_IOS_READY_PROBE", "1");
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => callback(0));
-  await markIOSReady();
-  expect(mocks.invoke).toHaveBeenCalledWith("mark_frontend_ready");
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  try {
+    Object.defineProperties(window, {
+      innerWidth: { configurable: true, value: 744 },
+      innerHeight: { configurable: true, value: 1133 },
+    });
+    await markIOSReady();
+    expect(mocks.invoke).toHaveBeenCalledWith("mark_frontend_ready", { width: 744, height: 1133 });
+    Object.defineProperties(window, {
+      innerWidth: { configurable: true, value: 1133 },
+      innerHeight: { configurable: true, value: 744 },
+    });
+    window.dispatchEvent(new Event("resize"));
+    expect(mocks.invoke).toHaveBeenCalledWith("mark_frontend_ready", { width: 1133, height: 744 });
+  } finally {
+    Object.defineProperties(window, {
+      innerWidth: { configurable: true, value: originalWidth },
+      innerHeight: { configurable: true, value: originalHeight },
+    });
+  }
 });
 
 it("does not invoke the CI probe in ordinary builds", async () => {

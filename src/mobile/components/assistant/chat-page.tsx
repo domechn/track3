@@ -51,6 +51,7 @@ import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
 import { INSIGHT_QUESTION_STORAGE_KEY } from "@/middlelayers/insights-service";
 import { takePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
 import { isIOS, usePlatform } from "@/utils/platform";
+import { SplitView, useSizeClass } from "@/mobile/components/mobile";
 
 type LoadState =
   | { status: "loading" }
@@ -159,6 +160,7 @@ function ReadyChat({
   const { t } = useTranslation();
   const { keyboardHeight } = usePlatform();
   const mobile = isIOS();
+  const widthClass = useSizeClass().width;
   const layoutRef = useRef<HTMLDivElement>(null);
   const [mobileHeight, setMobileHeight] = useState<number>();
   useLayoutEffect(() => {
@@ -168,7 +170,8 @@ function ReadyChat({
       const top = layoutRef.current?.getBoundingClientRect().top;
       if (top === undefined) return;
       const viewportBottom = visual ? visual.offsetTop + visual.height : window.innerHeight;
-      const tabTop = document.querySelector(".mobile-tab-bar")?.getBoundingClientRect().top ?? viewportBottom;
+      const tab = document.querySelector(".mobile-tab-bar");
+      const tabTop = tab?.getClientRects().length ? tab.getBoundingClientRect().top : viewportBottom;
       setMobileHeight(Math.max(0, Math.floor(Math.min(viewportBottom, tabTop) - top - 8)));
     };
     update();
@@ -403,7 +406,9 @@ function ReadyChat({
           {t("assistant.chat.deleteFailed")}: {deleteError}
         </p>
       )}
-      {mobile && sidebarOpen && <div className="flex w-full min-w-0 flex-col">
+      {mobile ? <SplitView selected={!sidebarOpen} className="ios-chat-split"
+        masterLabel={t("ai.session.show")} detailLabel={t("nav.assistant")}
+        master={sidebarOpen || widthClass === "wide" ? <div className="flex h-full w-full min-w-0 flex-col">
         <button className="min-h-11 self-start px-4 text-primary" onClick={() => setSidebarOpen(false)}>
           {t("common.back")}
         </button>
@@ -418,8 +423,25 @@ function ReadyChat({
           onPin={pin}
           processingId={processingSessionId}
         />
-      </div>}
-      {!mobile && <div
+      </div> : null}
+        detail={sidebarOpen && widthClass !== "wide" ? null : sessionLoadError ? (
+          <div role="alert" className="flex-1 p-6 text-sm text-destructive">
+            {t("assistant.chat.sessionLoadFailed")}: {sessionLoadError}
+          </div>
+        ) : sessionId && loadedSessionId !== sessionId && createdSessionIdRef.current !== sessionId ? (
+          <div className="flex-1 p-6"><Skeleton className="h-24 w-full" /></div>
+        ) : <ChatContent
+          sessionId={sessionId ?? null}
+          config={config}
+          baseCurrency={baseCurrency}
+          initialMessages={initialMsgs}
+          initialSummary={initialSummary}
+          onStreamComplete={handleStreamComplete}
+          saveError={saveError}
+          onStreamingChange={handleStreamingChange}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={handleToggleSidebar}
+        />} /> : <><div
         className={`overflow-hidden transition-[width] duration-200 ease-in-out ${
           sidebarOpen ? "w-[260px]" : "w-0"
         }`}
@@ -436,8 +458,8 @@ function ReadyChat({
           processingId={processingSessionId}
        />
         </div>
-      </div>}
-     {mobile && sidebarOpen ? null : sessionLoadError ? (
+      </div>
+     {sessionLoadError ? (
        <div role="alert" className="flex-1 p-6 text-sm text-destructive">
          {t("assistant.chat.sessionLoadFailed")}: {sessionLoadError}
        </div>
@@ -454,7 +476,7 @@ function ReadyChat({
         onStreamingChange={handleStreamingChange}
        sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
-     />}
+     />}</>}
     </div>
   );
 }
@@ -483,6 +505,7 @@ function ChatContent({
   onToggleSidebar: () => void;
 }) {
   const { t } = useTranslation();
+  const sizeClass = useSizeClass();
   const chat = useChat({
     config,
     baseCurrency,
@@ -493,7 +516,7 @@ function ChatContent({
     onStreamComplete,
     onStreamingChange,
   });
-  const mobileHeaderHost = isIOS() ? document.getElementById("app-top-bar") : null;
+  const mobileHeaderHost = isIOS() && sizeClass.width !== "wide" ? document.getElementById("app-top-bar") : null;
   useEffect(() => {
     try {
       if (!sessionId) {

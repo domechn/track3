@@ -14,7 +14,7 @@ vi.mock("@/middlelayers/charts-refresh", () => ({
 it("uses the allocation wallet name and omits the desktop page-size select on a phone", async () => {
   const previousMatchMedia = window.matchMedia;
   window.matchMedia = (query: string) => ({
-    matches: query.includes("max-width: 950px"), media: query, onchange: null,
+    matches: query.includes("pointer: coarse"), media: query, onchange: null,
     addListener: () => {}, removeListener: () => {},
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   });
