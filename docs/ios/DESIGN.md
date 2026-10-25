@@ -20,6 +20,8 @@ Split View window falls back to the compact presentation even on iPad.
 Profit is the Returns sheet in Analytics rather than a separate route.
 Profit metrics use three columns where there is room; charts and readable
 lists use the remaining width without stretching one line across the display.
+On wide Assistant, the chat header owns the top of the content area; the
+shared top bar, including its refresh action and sync indicator, is hidden.
 
 Below 500 px tall, titles and navigation bars shrink while controls retain
 44 px targets. Landscape safe-area insets protect controls from the screen

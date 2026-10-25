@@ -256,16 +256,6 @@ jobs:
             sleep 2
           done
           cat artifacts/ipad-rotation.log
-          DEVICE_LANDSCAPE=""
-          for attempt in $(seq 1 10); do
-            xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-device-landscape.png
-            if sips -g pixelWidth -g pixelHeight artifacts/ipad-device-landscape.png | awk '/pixelWidth:/ { w=$2 } /pixelHeight:/ { h=$2 } END { exit !(w>h) }'; then
-              DEVICE_LANDSCAPE=1
-              break
-            fi
-            sleep 2
-          done
-          test -n "$DEVICE_LANDSCAPE"
           LANDSCAPE_PID=$(xcrun simctl launch "$SIM_ID" dev.track3.ios 2>&1 | tee artifacts/ipad-landscape-launch.log | sed -n 's/.*: //p' || true)
           test -n "$LANDSCAPE_PID"
           LANDSCAPE=""

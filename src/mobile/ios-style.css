@@ -232,13 +232,6 @@ html {
 .ios-switch-thumb[data-state="checked"] { transform: translateX(16px); }
 .ios-switch:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
 .ios-switch:disabled { opacity: .5; }
-@media (min-width: 951px) and (pointer: coarse) {
-  .ios-switch { width: 44px; height: 44px; background: transparent; }
-  .ios-switch::before { content: ""; position: absolute; top: 12px; left: 4px; width: 36px; height: 20px; border-radius: 999px; background: hsl(var(--input)); }
-  .ios-switch[data-state="checked"]::before { background: hsl(var(--primary)); }
-  .ios-switch-thumb { position: relative; margin-left: 4px; }
-}
-
   .ios-switch { width: 51px; height: 44px; background: transparent; }
   .ios-switch[data-state="checked"] { background: transparent; }
   .ios-switch::before { content: ""; position: absolute; width: 51px; height: 31px; left: 0; border-radius: 999px; background: hsl(var(--input)); }

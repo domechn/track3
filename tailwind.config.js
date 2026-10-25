@@ -102,6 +102,6 @@ module.exports = {
   },
   plugins: [
     require("tailwindcss-animate"),
-    require("tailwindcss/plugin")(({ addVariant }) => addVariant("touch", "@media (pointer: coarse)")),
+    require("tailwindcss/plugin")(({ addVariant }) => addVariant("touch", "@media (any-pointer: coarse)")),
   ],
 };

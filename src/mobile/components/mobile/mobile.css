@@ -1111,9 +1111,11 @@
   .ios-chat-split .ios-d3-chat-header h3 { position: static; transform: none; }
   .ios-chat-split .ios-d3-chat-header-primary > button:first-child { display: none; }
   .ios-chat-split [data-testid="chat-card"] { background: hsl(var(--card)); }
+  .analytics-split { grid-template-columns: minmax(320px, 42%) minmax(0, 1fr); }
   .analytics-split .analytics-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analytics-split .analytics-tile-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .analytics-split .mobile-inline-detail .mobile-sheet-body { padding: 16px; }
+  .ios-d3-chat .assistant-insights-card .flex:has(> [id^="insight-"]) { align-items: center; }
   .mobile-analytics-hub { margin-bottom: 24px; }
   .analytics-empty { display: grid; min-height: 240px; place-items: center; color: hsl(var(--muted-foreground)); font-size: 15px; }
   .overview-main-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
@@ -1126,6 +1128,11 @@
   .overview-sections .overview-allocation-card .mobile-allocation-chart { width: min(220px, 100%); height: 220px; }
   .overview-sections .overview-movers-card .profit-mobile-list { max-width: 760px; }
   .history-split { grid-template-columns: minmax(280px, 40%) minmax(0, 1fr); align-items: start; }
+  .history-split > .mobile-split-detail {
+    position: sticky; top: calc(64px + var(--mobile-safe-top));
+    max-height: calc(100dvh - 64px - var(--mobile-safe-top) - var(--mobile-safe-bottom));
+    overflow: auto;
+  }
   .history-mobile-snapshot-button { min-height: 64px; gap: 4px; padding: 8px 12px; }
   .history-detail-sheet.mobile-inline-detail .mobile-sheet-body { padding: 16px; }
   .history-detail-sheet.mobile-inline-detail .history-detail-dialog { width: 100% !important; }

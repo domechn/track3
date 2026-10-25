@@ -16,3 +16,5 @@ is an 834 px wide full-page capture showing the Volatility sort control.
 `mini-portrait-analytics-profit.png` shows the centered Returns sheet at
 744 × 1133 CSS px. The Settings and Assistant captures show the two-pane
 layouts, and the History capture shows the shorter wide-window rows.
+`ipad-11-landscape-history-scrolled-detail.png` shows snapshot 18 with its
+detail still visible after scrolling the list.

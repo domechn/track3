@@ -371,21 +371,22 @@ function Layout({
       setSidebarCollapsed(true);
     }
   }, [sizeClass.width, sizeClass.height]);
+  const onTabSwitch = (rootTap: boolean) => {
+    if (!rootTap || routePath !== rootPath) rememberScroll();
+    else scrollCaptured.current = false;
+    if (rootTap) {
+      const rootKey = scrollKey(currentTab, tabRoots[currentTab]);
+      resetRootScroll.current = routePath === rootPath ? null : rootKey;
+      routeScroll.current.set(rootKey, 0);
+      onRootTap(currentTab);
+    }
+  };
 
   return (
     <div className="app-layout min-h-screen" data-width-class={sizeClass.width}
       data-height-class={sizeClass.height} data-sidebar-collapsed={sidebarCollapsed}>
       <MobileSidebar unread={unread} collapsed={sidebarCollapsed} onCollapse={() => setSidebarCollapsed((value) => !value)}
-        onTabSwitch={(rootTap) => {
-          if (!rootTap || routePath !== rootPath) rememberScroll();
-          else scrollCaptured.current = false;
-          if (rootTap) {
-            const rootKey = scrollKey(currentTab, tabRoots[currentTab]);
-            resetRootScroll.current = routePath === rootPath ? null : rootKey;
-            routeScroll.current.set(rootKey, 0);
-            onRootTap(currentTab);
-          }
-        }} />
+        onTabSwitch={onTabSwitch} />
       <div
         className="app-content transition-[margin-left] duration-300 ease-in-out"
       >
@@ -465,16 +466,7 @@ function Layout({
           </PullToRefresh>
         </main>
       </div>
-      <MobileNavigation unread={unread} onTabSwitch={(rootTap) => {
-        if (!rootTap || routePath !== rootPath) rememberScroll();
-        else scrollCaptured.current = false;
-        if (rootTap) {
-          const rootKey = scrollKey(currentTab, tabRoots[currentTab]);
-          resetRootScroll.current = routePath === rootPath ? null : rootKey;
-          routeScroll.current.set(rootKey, 0);
-          onRootTap(currentTab);
-        }
-      }} />
+      <MobileNavigation unread={unread} onTabSwitch={onTabSwitch} />
     </div>
   );
 }

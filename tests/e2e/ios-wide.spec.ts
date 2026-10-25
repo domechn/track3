@@ -49,6 +49,73 @@ test("resizing keeps the selected history snapshot", async ({ browser }) => {
   }
 });
 
+test("wide history keeps a later snapshot detail in view", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1194, height: 834 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/history");
+    await expect(page.locator(".history-mobile-snapshot-button")).toHaveCount(20);
+    await page.locator(".history-mobile-snapshot-button").nth(17).click();
+    const detail = page.getByRole("region", { name: "Snapshot details" });
+    await expect(detail.locator(".history-mobile-asset")).toHaveCount(7);
+    const bounds = await detail.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.y).toBeGreaterThanOrEqual(0);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(834);
+    mkdirSync("test-results/mobile", { recursive: true });
+    await page.screenshot({ path: "test-results/mobile/ipad-history-scrolled-detail.png" });
+  } finally {
+    await context.close();
+  }
+});
+
+test("wide coin detail keeps a single wallet treemap compact", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1194, height: 834 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/coins/BTC");
+    const treemap = page.getByTestId("wallet-treemap-container");
+    await expect(treemap.getByTestId("wallet-treemap-tile")).toHaveCount(1);
+    expect(await treemap.evaluate((node) => node.getBoundingClientRect().height)).toBeLessThanOrEqual(300);
+  } finally {
+    await context.close();
+  }
+});
+
+test("spanned Analytics gives its tile hub enough width", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1114, height: 705 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    const master = page.locator(".analytics-split > .mobile-split-master");
+    expect(await master.evaluate((node) => node.getBoundingClientRect().width)).toBeGreaterThanOrEqual(350);
+  } finally {
+    await context.close();
+  }
+});
+
+test("wide Assistant aligns insight actions with their text", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/assistant");
+    const insight = page.locator(".ios-d3-chat .assistant-insights-card [id^='insight-']").first();
+    await expect(insight).toBeVisible();
+    const offset = await insight.evaluate((node) => {
+      const text = node.getBoundingClientRect();
+      const actions = node.nextElementSibling!.getBoundingClientRect();
+      return Math.abs((text.top + text.bottom) / 2 - (actions.top + actions.bottom) / 2);
+    });
+    expect(offset).toBeLessThanOrEqual(5);
+  } finally {
+    await context.close();
+  }
+});
+
 test("compact Analytics keeps its hub behind an open chart sheet", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
