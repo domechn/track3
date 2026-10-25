@@ -1243,5 +1243,6 @@
   "assistant.chat.examples.short.compare": "30-day changes",
   "assistant.chat.examples.short.activity": "Recent transactions",
   "assistant.chat.examples.short.btc": "Bitcoin position",
-  "assistant.chat.examples.short.altcoin": "Solana performance"
+  "assistant.chat.examples.short.altcoin": "Solana performance",
+  "mobile.refreshView": "Refresh view"
 }

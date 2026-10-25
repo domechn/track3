@@ -440,6 +440,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div
+              data-selectable=""
               className={cn(
                 "text-sm text-muted-foreground whitespace-nowrap overflow-x-auto scrollbar-hide",
                 autoBackupDirectory ? "block" : "hidden",

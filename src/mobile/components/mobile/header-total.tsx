@@ -17,8 +17,10 @@ export function MobileHeaderTotal({ currency, live, range }: {
     if (!window.matchMedia?.(MOBILE_MEDIA_QUERY).matches) return;
     let active = true;
     let retryTimer: number | undefined;
+    let timer: number | undefined;
     let failures = 0;
     const load = () => {
+      if (document.visibilityState === "hidden") return;
       const query = range
         ? queryTotalValue(range).then((result) => result.totalValue)
         : (live ? queryRealTimeAssetsValue() : queryLatestAssets())
@@ -33,10 +35,18 @@ export function MobileHeaderTotal({ currency, live, range }: {
         if (active && failures++ < 2) retryTimer = window.setTimeout(load, 1_000);
       });
     };
-    load();
-    const timer = live ? window.setInterval(load, 60_000) : undefined;
+    const onVisibilityChange = () => {
+      if (timer !== undefined) window.clearInterval(timer);
+      timer = undefined;
+      if (document.visibilityState === "hidden") return;
+      load();
+      if (live) timer = window.setInterval(load, 60_000);
+    };
+    onVisibilityChange();
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       active = false;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (timer !== undefined) window.clearInterval(timer);
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };

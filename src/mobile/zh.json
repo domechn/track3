@@ -1243,5 +1243,6 @@
   "assistant.chat.examples.short.compare": "近 30 天变化",
   "assistant.chat.examples.short.activity": "最近交易",
   "assistant.chat.examples.short.btc": "比特币持仓",
-  "assistant.chat.examples.short.altcoin": "Solana 表现"
+  "assistant.chat.examples.short.altcoin": "Solana 表现",
+  "mobile.refreshView": "刷新页面"
 }

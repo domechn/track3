@@ -67,7 +67,7 @@ import TopCoinsRank from "@/mobile/components/top-coins-rank";
 import ProfitSummary from "@/mobile/components/profit-summary";
 import LatestAssetsPercentage from "@/mobile/components/latest-assets-percentage";
 import AssetsPercentageChange from "@/mobile/components/assets-percentage-change";
-import { MobileNavigation, routeTitle, tabForPath, tabRoots } from "@/mobile/components/mobile/navigation";
+import { MobileNavigation, routeTitle, tabForPath, tabRoots, type MobileTab } from "@/mobile/components/mobile/navigation";
 import { MobileIcon, type MobileIconName } from "@/mobile/components/mobile/icons";
 import { useAlertBadge } from "@/mobile/components/use-alert-badge";
 import { MobileHeaderTotal } from "@/mobile/components/mobile/header-total";
@@ -265,6 +265,8 @@ type LayoutProps = {
   ) => void;
   lastRefreshAt?: string;
   onRefreshSuccess: () => void;
+  onLocalRefresh: () => Promise<void>;
+  onRootTap: (tab: MobileTab) => void;
 };
 
 function Layout({
@@ -279,6 +281,8 @@ function Layout({
   onDatePickerValueChange,
   lastRefreshAt,
   onRefreshSuccess,
+  onLocalRefresh,
+  onRootTap,
 }: LayoutProps) {
   const { t } = useTranslation();
   const mobile = useIsMobile();
@@ -298,37 +302,57 @@ function Layout({
     if (existing >= 0) stack.splice(existing + 1);
     else stack.push(routePath);
   }
-  const backPath = stack.at(-2) ?? rootPath;
-  const canGoBack = routePath !== rootPath;
+  const routeParents = useRef(new Map<string, string>());
   const previousRoute = useRef({ tab: currentTab, path: routePath });
-  const tabScroll = useRef<Record<"overview" | "history" | "analytics" | "more", number>>({
-    overview: 0, history: 0, analytics: 0, more: 0,
-  });
-  const tabPaths = useRef<Record<"overview" | "history" | "analytics" | "more", string>>({ ...tabRoots });
-  const tabSwitchCaptured = useRef(false);
+  const backPath = routeParents.current.get(routePath) ?? stack.at(-2) ?? rootPath;
+  const canGoBack = routePath !== rootPath;
+  const routeScroll = useRef(new Map<string, number>());
+  const containerScroll = useRef(new Map<string, number[]>());
+  const scrollKey = (tab: string, path: string) => `${tab}:${path}`;
+  const scrollContainers = () => Array.from(document.querySelectorAll<HTMLElement>(
+    "#app-main-content .ios-d3-chat [data-radix-scroll-area-viewport]",
+  ));
+  const resetRootScroll = useRef<string | null>(null);
+  const scrollCaptured = useRef(false);
+  const rememberScroll = () => {
+    const key = scrollKey(currentTab, routePath);
+    routeScroll.current.set(key, window.scrollY);
+    containerScroll.current.set(key, scrollContainers().map((element) => element.scrollTop));
+    scrollCaptured.current = true;
+  };
   const swipeStart = useRef<{ id: number; x: number; y: number } | null>(null);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const refreshAction = useRef<(() => Promise<void>) | null>(null);
   useLayoutEffect(() => {
     const previous = previousRoute.current;
     if (previous.tab === currentTab && previous.path === routePath) return;
-    const switchingTabs = previous.tab !== currentTab;
-    if (switchingTabs && !tabSwitchCaptured.current) tabScroll.current[previous.tab] = window.scrollY;
-    tabSwitchCaptured.current = false;
-    const target = switchingTabs && tabPaths.current[currentTab] === routePath
-      ? tabScroll.current[currentTab] : 0;
-    const restore = () => window.scrollTo(0, target);
+    if (!scrollCaptured.current) routeScroll.current.set(scrollKey(previous.tab, previous.path), window.scrollY);
+    scrollCaptured.current = false;
+    const key = scrollKey(currentTab, routePath);
+    const target = resetRootScroll.current === key ? 0 : routeScroll.current.get(key) ?? 0;
+    const containers = containerScroll.current.get(key) ?? [];
+    resetRootScroll.current = null;
+    const restore = () => {
+      window.scrollTo({ top: target, behavior: "auto" });
+      const elements = scrollContainers();
+      elements.forEach((element, index) => { element.scrollTop = containers[index] ?? 0; });
+      return Math.abs(window.scrollY - target) < 2 && containers.every((value, index) =>
+        Math.abs((elements[index]?.scrollTop ?? -1) - value) < 2);
+    };
     restore();
     const main = document.getElementById("app-main-content");
-    const observer = target > 0 && main && typeof ResizeObserver !== "undefined"
+    const observer = (target > 0 || containers.some((value) => value > 0)) && main && typeof ResizeObserver !== "undefined"
       ? new ResizeObserver(() => {
-        restore();
-        if (Math.abs(window.scrollY - target) < 2) observer?.disconnect();
+        if (restore()) observer?.disconnect();
       }) : null;
     if (main && observer) observer.observe(main);
-    tabPaths.current[currentTab] = routePath;
+    const stopRestoring = () => observer?.disconnect();
+    window.addEventListener("touchstart", stopRestoring, { once: true, passive: true });
     previousRoute.current = { tab: currentTab, path: routePath };
-    return () => observer?.disconnect();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("touchstart", stopRestoring);
+    };
   }, [currentTab, routePath]);
   useEffect(() => {
     const update = () => setHeaderCollapsed(window.scrollY > 64);
@@ -353,13 +377,22 @@ function Layout({
           lastRefreshAt={lastRefreshAt}
           compactTitle={mobile && headerCollapsed ? routeTitle(location.pathname, t) : undefined}
           overview={location.pathname === "/overview"}
-          onBack={canGoBack ? () => navigate(backPath) : undefined}
+          onBack={canGoBack ? () => { rememberScroll(); navigate(backPath); } : undefined}
           onRefreshSuccess={onRefreshSuccess}
           refreshAction={refreshAction}
         />
 
         {/* Main content */}
         <main id="app-main-content" tabIndex={-1} className="p-5"
+          onContextMenuCapture={(event) => {
+            if ((event.target as Element).closest("canvas")) event.preventDefault();
+          }}
+          onClickCapture={(event) => {
+            const link = (event.target as Element).closest('a[href^="#/"]');
+            if (!link) return;
+            rememberScroll();
+            routeParents.current.set(link.getAttribute("href")!.slice(1), routePath);
+          }}
           onPointerDown={(event) => {
             if (!mobile || event.pointerType !== "touch") return;
             swipeStart.current = event.clientX < 24 &&
@@ -372,13 +405,13 @@ function Layout({
             if (!mobile || !canGoBack || !start || event.pointerId !== start.id) return;
             const dx = event.clientX - start.x;
             const dy = event.clientY - start.y;
-            if (dx > 90 && Math.abs(dx) > Math.abs(dy)) navigate(backPath);
+            if (dx > 90 && Math.abs(dx) > Math.abs(dy)) {
+              rememberScroll();
+              navigate(backPath);
+            }
           }}
           onPointerCancel={() => { swipeStart.current = null; }}>
-          <PullToRefresh disabled={!mobile || /^\/assistant(\/|$)/.test(location.pathname)} onRefresh={() => refreshAction.current?.()}
-            lastRefreshText={lastRefreshAt
-              ? t("topbar.lastRefreshAt") + lastRefreshAt
-              : t("topbar.neverRefreshBefore")}>
+          <PullToRefresh disabled={!mobile || /^\/assistant(\/|$)/.test(location.pathname)} onRefresh={onLocalRefresh}>
           {!/^\/(settings|goals|rebalance)(\/|$)/.test(location.pathname) && <div className="mobile-route-heading">
             <MobilePage title={routeTitle(location.pathname, t)} />
           </div>}
@@ -409,9 +442,14 @@ function Layout({
           </PullToRefresh>
         </main>
       </div>
-      <MobileNavigation unread={unread} onTabSwitch={() => {
-        tabScroll.current[currentTab] = window.scrollY;
-        tabSwitchCaptured.current = true;
+      <MobileNavigation unread={unread} onTabSwitch={(rootTap) => {
+        rememberScroll();
+        if (rootTap) {
+          const rootKey = scrollKey(currentTab, tabRoots[currentTab]);
+          resetRootScroll.current = rootKey;
+          routeScroll.current.set(rootKey, 0);
+          onRootTap(currentTab);
+        }
       }} />
     </div>
   );
@@ -514,6 +552,7 @@ type AppRoutesProps = {
   ) => void;
   lastRefreshAt?: string;
   onDataChanged: () => void;
+  onLocalRefresh: () => Promise<void>;
   handleConfigurationSave: () => void;
 };
 
@@ -536,9 +575,11 @@ function AppRoutes({
   onDatePickerValueChange,
   lastRefreshAt,
   onDataChanged,
+  onLocalRefresh,
   handleConfigurationSave,
 }: AppRoutesProps) {
   const location = useLocation();
+  const [overviewExpanded, setOverviewExpanded] = useState(false);
 
   useEffect(() => {
     if (location.pathname !== "/history") {
@@ -566,6 +607,10 @@ function AppRoutes({
               onDataChanged();
               syncRuntime.trigger("refresh");
             }}
+            onLocalRefresh={onLocalRefresh}
+            onRootTap={(tab) => {
+              if (tab === "overview") setOverviewExpanded(false);
+            }}
           />
         }
       >
@@ -580,6 +625,8 @@ function AppRoutes({
                   currency={currentCurrency}
                   dateRange={tDateRange}
                   quoteColor={quoteColor}
+                  expanded={overviewExpanded}
+                  onExpandedChange={setOverviewExpanded}
                 />
               </PageWrapper>
             </AnimatedPage>
@@ -989,6 +1036,12 @@ const App = () => {
     });
   }
 
+  async function refreshLocalView() {
+    await Promise.all([loadAllData(true, true), queryPreferCurrency().then(setCurrentCurrency),
+      getLicenseIfIsPro().then((license) => setIsProUser(!!license)), getQuoteColor().then(setQuoteColor)]);
+    setDataChangedVersion((version) => version + 1);
+  }
+
   const onDataChangedRef = useRef(onDataChanged);
   onDataChangedRef.current = onDataChanged;
 
@@ -1114,6 +1167,7 @@ const App = () => {
           onDatePickerValueChange={onDatePickerValueChange}
           lastRefreshAt={lastRefreshAt}
           onDataChanged={onDataChanged}
+          onLocalRefresh={refreshLocalView}
           handleConfigurationSave={handleConfigurationSave}
         />
         </HashRouter>

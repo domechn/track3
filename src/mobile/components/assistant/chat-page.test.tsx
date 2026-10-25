@@ -356,7 +356,7 @@ describe("ChatPage", () => {
       expect(screen.getByTestId("assistant-error")).toBeTruthy();
     });
     expect(screen.getByText(/Something went wrong/i)).toBeTruthy();
-    expect(screen.getByText(/network down/i)).toBeTruthy();
+    expect(screen.getByText(/network down/i)).toHaveAttribute("data-selectable");
   });
 
   it("navigates after saving the first exchange without waiting for title generation", async () => {
