@@ -7,7 +7,7 @@ import { OthersAnalyzer } from "./datafetch/coins/others";
 import { SOLAnalyzer } from "./datafetch/coins/sol";
 import { ERC20NormalAnalyzer, ERC20ProAnalyzer } from "./datafetch/coins/erc20";
 import { CexAnalyzer, supportedExchanges } from "./datafetch/coins/cex/cex";
-import { save, open } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import { AddProgressFunc, UserLicenseInfo } from "./types";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRC20ProUserAnalyzer } from "./datafetch/coins/trc20";
@@ -44,6 +44,8 @@ import { FullRefreshRequiredError } from "./refresh-error";
 import { configuredSecretValues, redactSecrets } from "./security/redact";
 import { maskSourceIdentifier } from "./source-status";
 import { CEX_OPTIONS, STOCK_BROKER_OPTIONS } from "./constants";
+import { exportFile } from "@/utils/export-file";
+import { shareExport } from "@/utils/share-export";
 import {
   type FailedPortfolioSource,
   type LoadPortfoliosResult,
@@ -140,7 +142,7 @@ type SourceSpec = {
   unsupported?: boolean;
 };
 
-function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): SourceSpec[] {
+function listPortfolioSourceSpecs(config: GlobalConfig, userInfo: UserLicenseInfo): SourceSpec[] {
   const sources: SourceSpec[] = [];
   const secrets = configuredSecretValues(config);
   const nextNumber = (provider: string) => `#${sources.filter((source) => source.provider === provider).length + 1}`;
@@ -232,14 +234,18 @@ function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): 
   return sources;
 }
 
+export function listPortfolioSources(config: GlobalConfig, userInfo: UserLicenseInfo): Array<{ sourceId: string; label: string }> {
+  return listPortfolioSourceSpecs(config, userInfo).map(({ sourceId, label }) => ({ sourceId, label }));
+}
+
 // progress percent is 70
 export async function fetchPortfolios(
   config: GlobalConfig,
   addProgress: AddProgressFunc,
   userInfo: UserLicenseInfo,
-  options: { sourceId?: string } = {},
+  options: { sourceId?: string; onSourceResult?: (source: PortfolioSourceResult) => void } = {},
 ): Promise<LoadPortfoliosResult> {
-  const allSources = listPortfolioSources(config, userInfo);
+  const allSources = listPortfolioSourceSpecs(config, userInfo);
   const sources = options.sourceId
     ? allSources.filter((source) => source.sourceId === options.sourceId)
     : allSources;
@@ -261,6 +267,7 @@ export async function fetchPortfolios(
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
+      const startedAt = new Date().toISOString();
       let walletIdentities = source.walletIdentities;
       try {
         const { coins: portfolio, partial } = await withinSourceTimeout(async () => {
@@ -296,7 +303,7 @@ export async function fetchPortfolios(
         }, kind === "cex" || kind === "sol" || kind === "erc20" || kind === "stock" ? 120_000 : sourceTimeoutMs);
         return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
           hint: source.hint, walletIdentities, status: partial ? "partial" as const : "ok" as const,
-          coins: portfolio, ...(partial ? { partial } : {}) };
+          coins: portfolio, startedAt, finishedAt: new Date().toISOString(), ...(partial ? { partial } : {}) };
       } catch (error) {
         // Upstream messages can contain credentials and request URLs. Keep only a category.
         if (error instanceof Error && error.message === "Source timed out") {
@@ -306,17 +313,18 @@ export async function fetchPortfolios(
         const detail = error instanceof Error && ["Source timed out", "Unsupported exchange", "Invalid source holdings"].includes(error.message)
           ? error.message : undefined;
         return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
-          hint: source.hint, walletIdentities, status: "stale" as const, coins: [], category, detail };
+          hint: source.hint, walletIdentities, status: "stale" as const, coins: [], category, detail,
+          startedAt, finishedAt: new Date().toISOString() };
       } finally {
         addProgress(perProgressPer);
       }
     };
-    if (!["erc20", "sol", "btc", "doge", "trc20", "ton", "sui"].includes(kind)) {
-      return run();
-    }
     const task = run();
-    chainTasks.set(kind, task);
-    return task;
+    if (["erc20", "sol", "btc", "doge", "trc20", "ton", "sui"].includes(kind)) chainTasks.set(kind, task);
+    return task.then((result) => {
+      try { options.onSourceResult?.(result); } catch { /* UI progress cannot fail the refresh. */ }
+      return result;
+    });
   }));
   const failedSources: FailedPortfolioSource[] = sourceResults
     .filter((source) => source.status === "stale")
@@ -338,21 +346,12 @@ export async function fetchPortfolios(
 export async function exportHistoricalData(
   exportConfiguration = false,
 ): Promise<boolean> {
-  const filePath = await save({
-    filters: [
-      {
-        name: "track3-export-data",
-        extensions: ["json"],
-      },
-    ],
-    defaultPath: "track3-export-data.json",
-  });
+  return exportFile("track3-export-data.json", ["json"], (path) =>
+    DATA_MANAGER.exportHistoricalData(path, exportConfiguration));
+}
 
-  if (!filePath) {
-    return false;
-  }
-  await DATA_MANAGER.exportHistoricalData(filePath, exportConfiguration);
-  return true;
+export async function shareHistoricalData(exportConfiguration = false): Promise<void> {
+  await shareExport((path) => DATA_MANAGER.exportHistoricalData(path, exportConfiguration));
 }
 
 // return true if there are duplicated data in track3-export-data

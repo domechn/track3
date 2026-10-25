@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 import initSqlJs from "sql.js";
+import md5 from "md5";
 import { FakeS3, S3Error } from "../../src/middlelayers/sync/object-store";
 
 const schemaFiles = [
@@ -9,7 +10,38 @@ const schemaFiles = [
   "currency_rates", "configuration",
 ];
 
-export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewContent = false) {
+type BridgeOptions = {
+  s3?: FakeS3;
+  seedReviewContent?: boolean;
+  seedRebalanceProfile?: boolean;
+  emptyPortfolio?: boolean;
+  seedLockedSync?: boolean;
+  richPortfolio?: boolean;
+  slowOverview?: boolean;
+  lockedStartup?: boolean;
+  freshReviewData?: boolean;
+  slowAssistant?: boolean;
+  failDataQueries?: boolean;
+};
+
+export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
+  const isIPhone = /iPhone|iPad|iPod/.test(await page.evaluate(() => navigator.userAgent));
+  const options = optionsOrS3 instanceof FakeS3
+    ? { s3: optionsOrS3, seedReviewContent: legacySeedReviewContent }
+    : { ...optionsOrS3, seedReviewContent: optionsOrS3.seedReviewContent ?? legacySeedReviewContent };
+  const {
+    s3,
+    seedReviewContent = false,
+    seedRebalanceProfile = false,
+    emptyPortfolio = false,
+    seedLockedSync = false,
+    richPortfolio = false,
+    slowOverview = false,
+    lockedStartup = false,
+    freshReviewData = false,
+    slowAssistant = false,
+    failDataQueries = false,
+  } = options;
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
   });
@@ -35,6 +67,97 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
   db.run("INSERT INTO configuration (id, data) VALUES (11, ?)", [
     "btc: {addresses: []}\nerc20: {addresses: []}\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
   ]);
+  if (seedLockedSync) {
+    db.run("INSERT INTO configuration (id, data) VALUES (991, ?)", [
+      `!ent:e2e:${JSON.stringify({ enabled: true, endpoint: "https://s3.example.test", bucket: "track3", region: "us-east-1", accessKeyId: "e2e-access", secretAccessKey: "e2e-secret" })}`,
+    ]);
+  }
+  if (emptyPortfolio) {
+    db.run("DELETE FROM assets_v2");
+    db.run("UPDATE configuration SET data = ? WHERE id = 12",
+      ["configs:\n  groupUSD: false\nothers: []\n"]);
+  }
+  if (richPortfolio && !emptyPortfolio) {
+    db.run("DELETE FROM assets_v2");
+    db.run("INSERT INTO configuration (id, data) VALUES (6, '60')");
+    const bitcoinAddress = "bc1q-demo-cold-storage";
+    const solanaAddress = "demo-solana-wallet";
+    const coinbaseIdentity = "coinbase-demo-key";
+    const ibkrIdentity = "ibkr:demo-query";
+    db.run("UPDATE configuration SET data = ? WHERE id = 11", [
+      `btc:\n  addresses:\n    - address: ${bitcoinAddress}\n      alias: Cold storage\nsol:\n  addresses:\n    - address: ${solanaAddress}\n      alias: Solana wallet\nerc20: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n`,
+    ]);
+    db.run("INSERT INTO configuration (id, data) VALUES (10, ?)", [
+      "!ent:e2e:exchanges:\n  - name: coinbase\n    alias: Main exchange\n    initParams:\n      apiKey: demo-key\n      secret: demo-secret\n",
+    ]);
+    db.run("INSERT INTO configuration (id, data) VALUES (20, ?)", [
+      "!ent:e2e:brokers:\n  - name: ibkr\n    alias: Brokerage\n    initParams:\n      token: demo-token\n      queryId: demo-query\n",
+    ]);
+    const holdings = [
+      { symbol: "BTC", type: "crypto", wallet: md5(bitcoinAddress), amount: 0.36, base: 28_000 },
+      { symbol: "ETH", type: "crypto", wallet: md5(coinbaseIdentity), amount: 3.8, base: 12_000 },
+      { symbol: "AAPL", type: "stock", wallet: md5(ibkrIdentity), amount: 43, base: 9_000 },
+      { symbol: "SOL", type: "crypto", wallet: md5(solanaAddress), amount: 42, base: 7_000 },
+      { symbol: "USDC", type: "crypto", wallet: md5(coinbaseIdentity), amount: 6_400, base: 6_400 },
+      { symbol: "AVAX", type: "crypto", wallet: md5(coinbaseIdentity), amount: 81, base: 3_000 },
+      { symbol: "LINK", type: "crypto", wallet: md5(coinbaseIdentity), amount: 90, base: 1_600 },
+    ];
+    const firstReviewDay = freshReviewData
+      ? new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() - 59))
+      : new Date(Date.UTC(2026, 7, 24));
+    for (let day = 0; day < 60; day++) {
+      const uuid = `demo-${String(day).padStart(2, "0")}`;
+      const createdAt = new Date(firstReviewDay.getTime() + day * 86400000).toISOString();
+      const dailyMove = [0.004, -0.012, 0.008, 0.015, -0.006, 0.003, -0.009, 0.011, -0.004];
+      const market = 0.86 + day * 0.004
+        + (day >= 13 ? -0.055 : 0) + (day >= 27 ? 0.045 : 0)
+        + (day >= 40 ? -0.035 : 0) + (day >= 51 ? 0.065 : 0)
+        + dailyMove[day % dailyMove.length];
+      for (const [index, holding] of holdings.entries()) {
+        const value = Math.round(holding.base * (holding.symbol === "USDC"
+          ? 1 : market * (1 + dailyMove[(day + index * 2) % dailyMove.length] * (index + 2))) * 100) / 100;
+        db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [uuid, createdAt, holding.wallet, holding.type, holding.symbol, holding.amount, value, value / holding.amount]);
+      }
+    }
+    for (const [index, holding] of holdings.entries()) {
+      const first = db.exec("SELECT id FROM assets_v2 WHERE uuid = 'demo-00' AND symbol = ?", [holding.symbol])[0]?.values[0];
+      const last = db.exec("SELECT price, value FROM assets_v2 WHERE uuid = 'demo-59' AND symbol = ?", [holding.symbol])[0]?.values[0];
+      if (!first || !last) throw new Error("Demo holding snapshot is missing");
+      const costFactor = [0.78, 1.18, 0.86, 1.24, 1, 0.82, 1.26][index];
+      db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'buy', ?)`,
+      ["demo-00", first[0], holding.type, holding.wallet, holding.symbol,
+        holding.amount, Number(last[0]) * costFactor, firstReviewDay.toISOString()]);
+    }
+    for (const [symbol, amount, saleFactor, day] of [
+      ["SOL", 5, 1.08, 20],
+      ["BTC", 0.08, 1.05, 40],
+      ["ETH", 0.8, 0.82, 44],
+    ] as const) {
+      const holding = holdings.find((item) => item.symbol === symbol)!;
+      const snapshot = `demo-${day}`;
+      const row = db.exec("SELECT id, price FROM assets_v2 WHERE uuid = ? AND symbol = ?", [snapshot, symbol])[0]?.values[0];
+      const latest = db.exec("SELECT price FROM assets_v2 WHERE uuid = 'demo-59' AND symbol = ?", [symbol])[0]?.values[0];
+      if (!row || !latest) throw new Error("Demo sale snapshot is missing");
+      const soldAt = new Date(Date.UTC(2026, 7, 24 + day)).toISOString();
+      const repurchasedAt = new Date(Date.UTC(2026, 7, 24 + 55)).toISOString();
+      db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'sell', ?)`,
+      [snapshot, row[0], holding.type, holding.wallet, symbol, amount, Number(latest[0]) * saleFactor, soldAt]);
+      db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'buy', ?)`,
+      ["demo-55", row[0], holding.type, holding.wallet, symbol, amount, Number(latest[0]) * 0.96, repurchasedAt]);
+    }
+    if (!seedReviewContent) db.run("INSERT INTO configuration (id, data) VALUES (992, ?)", [
+      `!ent:e2e:${JSON.stringify({
+        snapshotUuid: "demo-59", dismissedIds: [],
+        insights: [{ id: "new:crypto:SOL", severity: "info", messageKey: "insights.newAsset",
+          data: { symbol: "SOL", value: 7298.27 } }],
+      })}`,
+    ]);
+  }
   if (seedReviewContent) {
     db.run(`INSERT INTO chat_sessions (id, title, createdAt, updatedAt, pinned, messageCount, preview)
       VALUES ('pinned-e2e', 'Pinned portfolio review', '2026-01-01', '2026-01-02', 1, 0, ''),
@@ -51,6 +174,14 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
   }
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/history_snapshots_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/rebalance_profiles_up.sql"), "utf8"));
+  if (seedRebalanceProfile) {
+    db.run("INSERT INTO rebalance_profiles (id, targets, tolerance_percent) VALUES (1, ?, 0)", [
+      JSON.stringify([
+        { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+        { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 50 },
+      ]),
+    ]);
+  }
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/alerts_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/sync_state_up.sql"), "utf8"));
   const config = JSON.stringify({
@@ -60,11 +191,14 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
     contextSize: 8192,
   });
   const files = new Map<string, string>();
+  let exportedPath: string | null = null;
   const requests = new Map<number, { url: string; method?: string; headers?: Record<string, string> | [string, string][]; data?: number[] }>();
-  const responses = new Map<number, { bytes: number[]; read: boolean }>();
+  const responses = new Map<number, { bytes: number[]; read: boolean; chunks?: number[][]; chunkIndex?: number }>();
   let nextRid = 1;
   let refreshes = 0;
   let sseCalls = 0;
+  let haptics = 0;
+  let shares = 0;
 
   const select = (query: string, values: unknown[] = []) => {
     const result = db.exec(query, values as any[]);
@@ -78,9 +212,34 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
   };
 
   await page.exposeBinding("__e2eInvoke", async (_source, cmd: string, args: any, options?: any) => {
+    if (isIPhone && /^plugin:(process|updater|shell)\|/.test(cmd)) {
+      throw new Error(`Desktop-only Tauri command on iPhone: ${cmd}`);
+    }
     if (cmd === "get_database_url") return "sqlite:e2e.db";
+    if (cmd === "ios_startup_failure") return lockedStartup ? "Protected key unavailable" : null;
+    if (cmd === "ios_retry_startup") return false;
+    if (cmd === "ios_haptic") { haptics++; return null; }
+    if (cmd === "ios_lock_enabled") return false;
+    if (cmd === "ios_set_badge") return null;
+    if (cmd === "query_binance_balance") {
+      if (args.apiKey !== "e2e-api-key" || args.apiSecret !== "e2e-api-secret") {
+        throw new Error("unexpected exchange credentials");
+      }
+      return {};
+    }
+    if (cmd === "ios_share_file") {
+      if (!/^\/e2e\/cache\/[0-9a-f-]{36}\/track3-export-data\.json$/.test(args.path) || !files.has(args.path)) {
+        throw new Error(`invalid export file: ${args.path}`);
+      }
+      shares++;
+      return null;
+    }
     if (cmd === "plugin:sql|load") return args.db;
-    if (cmd === "plugin:sql|select") return select(args.query, args.values);
+    if (cmd === "plugin:sql|select") {
+      if (failDataQueries && /\bassets_v2\b/i.test(args.query)) throw new Error("Demo database unavailable");
+      if (slowOverview && /assets_v2/i.test(args.query)) await new Promise((resolve) => setTimeout(resolve, 1000));
+      return select(args.query, args.values);
+    }
     if (cmd === "plugin:sql|execute") return execute(args.query, args.values);
     if (cmd === "delete_sync_snapshot") {
       // Mirrors the Rust command: remove the snapshot's rows from every snapshot-scoped table.
@@ -106,7 +265,17 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
       insert("transactions", snapshot.transactions);
       return true;
     }
-    if (cmd === "plugin:path|resolve_directory") return "/e2e/app";
+    if (cmd === "plugin:path|resolve_directory") {
+      if (args.directory === 16) return "/e2e/cache";
+      if (args.directory === 6) return "/e2e/documents";
+      return "/e2e/app";
+    }
+    if (cmd === "plugin:dialog|save") {
+      exportedPath = `/e2e/documents/${args.options.defaultPath}`;
+      files.set(exportedPath, "");
+      return exportedPath;
+    }
+    if (cmd === "plugin:dialog|open") return exportedPath;
     if (cmd === "plugin:app|version") return "0.8.2";
     if (cmd === "plugin:app|tauri_version") return "2.11.1";
     if (cmd === "plugin:updater|check") return null;
@@ -169,8 +338,20 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
       }
       return true;
     }
-    if (cmd === "plugin:fs|exists") return files.has(args.path);
+    if (cmd === "plugin:fs|exists") return files.has(args.path) ||
+      (richPortfolio && /\/assets\/coins\/(btc|eth|sol|usdc|avax|link)\.png$/.test(args.path));
     if (cmd === "plugin:fs|mkdir") return null;
+    if (cmd === "plugin:fs|copy_file") {
+      const text = files.get(args.fromPath);
+      if (text === undefined) throw new Error(`file missing: ${args.fromPath}`);
+      files.set(args.toPath, text);
+      return null;
+    }
+    if (cmd === "plugin:fs|stat") {
+      const text = files.get(args.path);
+      if (text === undefined) throw new Error(`file missing: ${args.path}`);
+      return { size: new TextEncoder().encode(text).length, isFile: true, isDirectory: false, isSymlink: false, mtime: null, atime: null, birthtime: null, readonly: false };
+    }
     if (cmd === "plugin:fs|remove") {
       files.delete(args.path);
       return null;
@@ -253,14 +434,17 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
           : '{"planType":"yearly","status":"active","currentPeriodEnd":"2026-12-01T00:00:00.000Z","cancelAtPeriodEnd":false,"isLegacy":false}';
       } else if (request.url.endsWith("/api/coins/price")) {
         body = '{"data":{"BTC":42000,"USDT":1}}';
+      } else if (request.url.endsWith("/api/coins/listStableCoins")) {
+        body = '{"data":[{"symbol":"USDT"},{"symbol":"USDC"}]}';
       } else if (request.url.endsWith("/chat/completions")) {
         const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
         if (input.stream === true) {
           const setupQuestion = JSON.stringify(input.messages).includes("Set BTC 40%, ETH 30%, USDT 30%");
+          const portfolioQuestion = richPortfolio && JSON.stringify(input.messages).includes("How is my portfolio doing?");
           const afterProposal = input.messages.some((message: { role: string }) => message.role === "tool");
           if (request.url !== "https://assistant.test/v1/chat/completions"
             || input.model !== "test-model"
-            || (!JSON.stringify(input.messages).includes("Say hello") && !setupQuestion)) {
+            || (!JSON.stringify(input.messages).includes("Say hello") && !setupQuestion && !portfolioQuestion)) {
             throw new Error("unexpected assistant request");
           }
           sseCalls++;
@@ -283,18 +467,46 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
             "data: [DONE]",
             "",
           ].join("\n\n") : [
-            'data: {"choices":[{"delta":{"reasoning_content":"Let me think"}}]}',
-            'data: {"choices":[{"delta":{"content":"Hello from SSE"}}]}',
+            ...portfolioQuestion ? [] : ['data: {"choices":[{"delta":{"reasoning_content":"Let me think"}}]}'],
+            `data: ${JSON.stringify({ choices: [{ delta: { content: portfolioQuestion
+              ? "**Portfolio check**\n\nYour seven holdings have climbed over the past two months, with a few pullbacks along the way.\n\n- **Largest position:** Bitcoin remains the anchor.\n- **Positive contributor:** AAPL is above its cost basis.\n- **Watch closely:** ETH is below its cost basis.\n\nOpen Analytics for the full return breakdown."
+              : "Hello from SSE" } }] })}`,
             'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
             "data: [DONE]",
             "",
           ].join("\n\n");
         } else {
-          body = '{"choices":[{"message":{"content":"Greeting"}}]}';
+          const isToolActivityPlan = slowAssistant
+            && input.messages.some((message: { content?: string }) => message.content?.includes("portfolio-analysis planner"))
+            && input.messages.some((message: { content?: string }) => message.content?.includes("Show my tool activity"));
+          if (slowAssistant && !isToolActivityPlan
+            && input.messages.some((message: { content?: string }) => message.content?.includes("Show my tool activity"))) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          body = JSON.stringify({
+            choices: [{ message: { content: isToolActivityPlan ? JSON.stringify({
+              complexity: "multi",
+              reasoning: "Read holdings and portfolio value",
+              tasks: [
+                { id: "t1", skillName: "asset_snapshot", args: {}, description: "Read holdings", dependsOn: [] },
+                { id: "t2", skillName: "portfolio_value", args: {}, description: "Check total value", dependsOn: [] },
+              ],
+              requiresRefinement: false,
+              maxOptimizerRounds: 0,
+            }) : "Your portfolio is ready to explore." } }],
+          });
         }
       }
       const rid = nextRid++;
-      responses.set(rid, { bytes: Array.from(new TextEncoder().encode(body)), read: false });
+      const response = { bytes: Array.from(new TextEncoder().encode(body)), read: false, chunks: undefined as number[][] | undefined, chunkIndex: 0 };
+      if (slowAssistant && contentType === "text/event-stream" && (body.includes("Hello from SSE") || body.includes("Portfolio check"))) {
+        const split = body.indexOf('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}');
+        response.chunks = [
+          Array.from(new TextEncoder().encode(body.slice(0, split))),
+          Array.from(new TextEncoder().encode(body.slice(split))),
+        ];
+      }
+      responses.set(rid, response);
       return {
         status: 200, statusText: "OK", url: request.url,
         headers: { "content-type": contentType }, rid,
@@ -303,15 +515,26 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
     if (cmd === "plugin:http|fetch_read_body") {
       const response = responses.get(args.rid);
       if (!response || response.read) return [1];
+      if (response.chunks) {
+        const chunkIndex = response.chunkIndex ?? 0;
+        if (chunkIndex >= response.chunks.length) {
+          response.read = true;
+          return [1];
+        }
+        if (chunkIndex === 1) await new Promise((resolve) => setTimeout(resolve, 1000));
+        response.chunkIndex = chunkIndex + 1;
+        return [...response.chunks[chunkIndex], 0];
+      }
       response.read = true;
       return [...response.bytes, 0];
     }
     if (cmd === "plugin:http|fetch_cancel_body" || cmd === "plugin:http|fetch_cancel") return null;
     throw new Error(`Unhandled Tauri command: ${cmd}`);
   });
-  await page.addInitScript(() => {
+  await page.addInitScript((withLogos: boolean) => {
     let callbackId = 0;
     const callbacks = new Map<number, Function>();
+    (window as any).isTauri = true;
     (window as any).__TAURI_INTERNALS__ = {
       invoke: (cmd: string, args: unknown, options: unknown) =>
         (window as any).__e2eInvoke(cmd, args, options),
@@ -325,9 +548,23 @@ export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewCont
         callbacks.delete(id);
         delete (window as any)[`_${id}`];
       },
-      convertFileSrc: (path: string) => path,
+      convertFileSrc: (path: string) => {
+        if (!withLogos) return path;
+        const symbol = path.match(/\/assets\/coins\/([a-z]+)\.png$/)?.[1];
+        if (!symbol) return path;
+        const colors: Record<string, string> = {
+          btc: "#f7931a", eth: "#62688f", sol: "#0f827b",
+          usdc: "#2775ca", avax: "#e84142", link: "#315cbe",
+        };
+        const glyphs: Record<string, string> = { btc: "₿", eth: "Ξ", sol: "S", usdc: "$", avax: "A", link: "L" };
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="20" fill="${colors[symbol] ?? "#315cbe"}"/>
+          <text x="20" y="27" text-anchor="middle" fill="white" font-family="-apple-system,system-ui" font-size="22" font-weight="700">${glyphs[symbol] ?? symbol[0].toUpperCase()}</text>
+        </svg>`;
+        return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      },
       metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
     };
-  });
-  return { persistedRefreshes: () => refreshes, sseRequests: () => sseCalls };
+  }, richPortfolio);
+  return { persistedRefreshes: () => refreshes, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares };
 }

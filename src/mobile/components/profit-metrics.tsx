@@ -1,0 +1,445 @@
+import {
+  CurrencyRateDetail,
+  QuoteColor,
+  TDateRange,
+  TotalValuesData,
+} from "@/middlelayers/types";
+import { useContext, useEffect, useMemo, useState, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
+import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import { daysBetweenDates, timeToDateStr } from "@/utils/date";
+import { positiveNegativeTextClass } from "@/utils/color";
+import React from "react";
+import { queryTotalValues } from "@/middlelayers/charts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/mobile/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useWindowSize } from "@/utils/hook";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/mobile/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
+import { useIsMobile } from "@/mobile/components/mobile";
+
+const App = ({
+  dateRange,
+  currency,
+  quoteColor,
+}: {
+  dateRange: TDateRange;
+  currency: CurrencyRateDetail;
+  quoteColor: QuoteColor;
+}) => {
+  const [maxSingleDayProfitData, setMaxSingleDayProfitData] = useState({
+    timestamp: 0,
+    value: 0,
+  });
+  const [maxSingleDayLostData, setMaxSingleDayLostData] = useState({
+    timestamp: 0,
+    value: 0,
+  });
+
+  const [maxProfileDateRange, setMaxProfileDateRange] = useState<TDateRange>({
+    start: new Date(0),
+    end: new Date(0),
+  });
+
+  const [maxLostDateRange, setMaxLostDateRange] = useState<TDateRange>({
+    start: new Date(0),
+    end: new Date(0),
+  });
+
+  const [maxDrawdownData, setMaxDrawdownData] = useState({
+    date: new Date(0),
+    value: 0,
+  });
+
+  const [athTimes, setAthTimes] = useState({
+    times: 0,
+    dateAndValues: [] as { date: Date; value: number }[],
+  });
+  const [isATHTimesModalOpen, setIsATHTimesModalOpen] = useState(false);
+  const { t, locale } = useTranslation();
+  const isMobile = useIsMobile();
+  const wsize = useWindowSize();
+  const { reportLoaded } = useContext(OverviewLoadingContext);
+
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end]
+  );
+  const dataChangedVersion = useDataChangedVersion();
+
+  const loadGenRef = useRef(0);
+  useEffect(() => {
+    const gen = ++loadGenRef.current;
+    loadData(dateRange, gen);
+  }, [rangeKey, dataChangedVersion]);
+
+  async function loadData(dt: TDateRange, gen: number) {
+    try {
+      const values = await queryTotalValues(dt);
+      if (gen !== loadGenRef.current) {
+        return;
+      }
+      handleTotalValues(values);
+    } catch {
+      if (gen !== loadGenRef.current) {
+        return;
+      }
+      resetMetrics();
+    } finally {
+      if (gen === loadGenRef.current) {
+        reportLoaded();
+      }
+    }
+  }
+
+  function handleTotalValues(values: TotalValuesData) {
+    if (values.length === 0) {
+      resetMetrics();
+      return;
+    }
+
+    const diffs = values.map((v, idx) => ({
+      timestamp: v.timestamp,
+      diff: values[idx - 1] ? v.totalValue - values[idx - 1].totalValue : 0,
+    }));
+
+    const maxProfit = diffs.reduce(
+      (a, b) => (a.diff > b.diff ? a : b),
+      diffs[0],
+    );
+    const maxLost = diffs.reduce(
+      (a, b) => (a.diff < b.diff ? a : b),
+      diffs[0],
+    );
+
+    const pos = longestContinuousSubarray(diffs);
+    const nag = longestContinuousSubarray(diffs, false);
+
+    setMaxProfileDateRange({
+      start: new Date(pos[0]?.timestamp ?? 0),
+      end: new Date(pos[pos.length - 1]?.timestamp ?? 0),
+    });
+
+    setMaxLostDateRange({
+      start: new Date(nag[0]?.timestamp ?? 0),
+      end: new Date(nag[nag.length - 1]?.timestamp ?? 0),
+    });
+
+    setMaxSingleDayProfitData({
+      timestamp: maxProfit.timestamp,
+      value: maxProfit.diff,
+    });
+    setMaxSingleDayLostData({
+      timestamp: maxLost.timestamp,
+      value: maxLost.diff,
+    });
+
+    handleATHValues(values);
+  }
+
+  function resetMetrics() {
+    setMaxSingleDayProfitData({ timestamp: 0, value: 0 });
+    setMaxSingleDayLostData({ timestamp: 0, value: 0 });
+    setMaxProfileDateRange({ start: new Date(0), end: new Date(0) });
+    setMaxLostDateRange({ start: new Date(0), end: new Date(0) });
+    setMaxDrawdownData({ date: new Date(0), value: 0 });
+    setAthTimes({ times: 0, dateAndValues: [] });
+    setIsATHTimesModalOpen(false);
+  }
+
+  function handleATHValues(values: TotalValuesData) {
+    let maxTotalValue = 0;
+    let maxDrawdownPercentage = 0;
+    let maxDrawdownDate = new Date();
+    let athTimes = 0;
+    const athTimeAndValues = [];
+    for (let i = 0; i < values.length; i++) {
+      const cur = values[i].totalValue;
+      if (cur > maxTotalValue) {
+        athTimes++;
+
+        athTimeAndValues.push({
+          date: new Date(values[i].timestamp),
+          value: values[i].totalValue,
+        });
+        maxTotalValue = cur;
+      }
+
+      if (maxTotalValue === 0) {
+        continue;
+      }
+      const drawdown = (cur - maxTotalValue) / maxTotalValue;
+
+      if (drawdown < maxDrawdownPercentage) {
+        maxDrawdownPercentage = drawdown;
+        maxDrawdownDate = new Date(values[i].timestamp);
+      }
+    }
+
+    setMaxDrawdownData({
+      value: maxDrawdownPercentage * 100,
+      date: maxDrawdownDate,
+    });
+
+    setAthTimes({
+      times: athTimes,
+      dateAndValues: athTimeAndValues.slice().reverse(),
+    });
+  }
+
+  function longestContinuousSubarray(
+    arr: { diff: number; timestamp: number }[],
+    positive = true
+  ) {
+    let maxLength = 0;
+    let currentLength = 0;
+    let startIndex = 0;
+    let endIndex = 0;
+    let currentStartIndex = 0;
+
+    const match = (n: number) => (positive ? n > 0 : n < 0);
+
+    for (let i = 0; i < arr.length; i++) {
+      if (match(arr[i].diff)) {
+        currentLength++;
+        if (currentLength === 1) {
+          currentStartIndex = i;
+        }
+        if (currentLength >= maxLength) {
+          maxLength = currentLength;
+          startIndex = currentStartIndex;
+          endIndex = i;
+        }
+      } else {
+        currentLength = 0;
+      }
+    }
+
+    return maxLength === 0 ? [] : arr.slice(startIndex, endIndex + 1);
+  }
+
+  function onATHTimesClick() {
+    setIsATHTimesModalOpen(true);
+  }
+
+  const athReachedDetailsDialog = useMemo(
+    () => renderATHReachedDetailsDialog(),
+    [isATHTimesModalOpen]
+  );
+
+  function renderATHReachedDetailsDialog() {
+    return (
+      <Dialog open={isATHTimesModalOpen} onOpenChange={setIsATHTimesModalOpen}>
+        <DialogContent className="min-w-[80%]">
+          <DialogHeader>
+            <DialogTitle>{t("profitMetrics.dialogTitle")}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea
+            className="w-full"
+            style={{
+              maxHeight: (wsize.height ?? 800) * 0.8,
+            }}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("profitMetrics.time")}</TableHead>
+                  <TableHead>{t("profitMetrics.date")}</TableHead>
+                  <TableHead>{t("profitMetrics.value")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {athTimes.dateAndValues.map((v, idx) => (
+                    <TableRow key={"ath-reached-details-" + idx}>
+                      <TableCell>{idx + 1}</TableCell>
+                      <TableCell>{timeToDateStr(v.date)}</TableCell>
+                      <TableCell>
+                        {currency.symbol +
+                          prettyNumberToLocaleString(
+                            currencyWrapper(currency)(v.value)
+                          )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const MaxTotalValueView = React.memo(() => {
+    if (isMobile) {
+      const shortDate = (date: Date | number) => new Intl.DateTimeFormat(
+        locale === "zh" ? "zh-CN" : "en-US",
+        { year: "numeric", month: "short", day: "numeric" },
+      ).format(new Date(date));
+      const shortRange = (start: Date, end: Date) => {
+        if (start.toDateString() === end.toDateString()) return shortDate(start);
+        const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+        if (locale === "zh") return `${shortDate(start)}–${sameMonth ? end.getDate() + "日" : shortDate(end)}`;
+        const monthDay = (date: Date) => new Intl.DateTimeFormat("en-US",
+          { month: "short", day: "numeric" }).format(date);
+        return sameMonth
+          ? `${monthDay(start)}–${end.getDate()}, ${end.getFullYear()}`
+          : `${monthDay(start)}–${monthDay(end)}${start.getFullYear() === end.getFullYear() ? `, ${end.getFullYear()}` : ""}`;
+      };
+      const amount = (value: number) => `${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(value)))}`;
+      const streakDays = (start: Date, end: Date) => start.getTime() === 0 ? 0 : daysBetweenDates(start, end) + 1;
+      const streakValue = (start: Date, end: Date) => {
+        const days = streakDays(start, end);
+        return `${days} ${t(days === 1 ? "profitMetrics.day" : "profitMetrics.days")}`;
+      };
+      const tiles = [
+        { label: t("profitMetrics.maxContProfitShort"), value: streakValue(maxProfileDateRange.start, maxProfileDateRange.end), date: maxProfileDateRange.start.getTime() === 0 ? "—" : shortRange(maxProfileDateRange.start, maxProfileDateRange.end) },
+        { label: t("profitMetrics.maxContLossShort"), value: streakValue(maxLostDateRange.start, maxLostDateRange.end), date: maxLostDateRange.start.getTime() === 0 ? "—" : shortRange(maxLostDateRange.start, maxLostDateRange.end) },
+        { label: t("profitMetrics.maxProfitShort"), value: maxSingleDayProfitData.value < 0 ? "—" : amount(maxSingleDayProfitData.value), date: shortDate(maxSingleDayProfitData.timestamp), tone: "gain" },
+        { label: t("profitMetrics.maxLossShort"), value: maxSingleDayLostData.value > 0 ? "—" : `−${amount(maxSingleDayLostData.value)}`, date: shortDate(maxSingleDayLostData.timestamp), tone: "loss" },
+        { label: t("profitMetrics.maxDrawdownShort"), value: `${maxDrawdownData.value.toFixed(2).replace("-", "−")}%`, date: shortDate(maxDrawdownData.date), tone: "loss" },
+      ];
+      return <div>
+        {athReachedDetailsDialog}
+        <div className="profit-metrics-mobile">
+          {tiles.map((tile) => <div className="profit-metric-tile" key={tile.label}>
+            <span className="profit-metric-label">{tile.label}</span>
+            <strong className="profit-metric-value ios-money" data-tone={tile.tone}>{tile.value}</strong>
+            <span className="profit-metric-date">{tile.date}</span>
+          </div>)}
+          <button type="button" className="profit-metric-tile" onClick={onATHTimesClick}>
+            <span className="profit-metric-label">{t("profitMetrics.athReachedShort")}</span>
+            <strong className="profit-metric-value ios-money">{athTimes.times} {t("profitMetrics.times")}</strong>
+            <span className="profit-metric-date"><InfoCircledIcon className="inline h-3.5 w-3.5" /> {t("profitMetrics.dialogTitle")}</span>
+          </button>
+        </div>
+      </div>;
+    }
+    return (
+      <div>
+        {athReachedDetailsDialog}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
+            <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {t("profitMetrics.maxContProfit")}
+            </div>
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
+              {timeToDateStr(maxProfileDateRange.start)} ~{" "}
+              {timeToDateStr(maxProfileDateRange.end)} (
+              {daysBetweenDates(maxProfileDateRange.start, maxProfileDateRange.end)})
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
+            <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {t("profitMetrics.maxContLoss")}
+            </div>
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
+              {timeToDateStr(maxLostDateRange.start)} ~{" "}
+              {timeToDateStr(maxLostDateRange.end)} (
+              {daysBetweenDates(maxLostDateRange.start, maxLostDateRange.end)})
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
+            <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {t("profitMetrics.maxProfit")}
+            </div>
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
+              {maxSingleDayProfitData.value < 0 ? (
+                "-"
+              ) : (
+                <span>
+                  <span
+                    className={positiveNegativeTextClass(1, quoteColor, 700)}
+                  >
+                    {currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(maxSingleDayProfitData.value)
+                      )}
+                  </span>{" "}
+                  ({timeToDateStr(maxSingleDayProfitData.timestamp)})
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
+            <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {t("profitMetrics.maxLoss")}
+            </div>
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
+              {maxSingleDayLostData.value > 0 ? (
+                "-"
+              ) : (
+                <span>
+                  <span
+                    className={positiveNegativeTextClass(-1, quoteColor, 700)}
+                  >
+                    -
+                    {currency.symbol +
+                      prettyNumberToLocaleString(
+                        currencyWrapper(currency)(
+                          Math.abs(maxSingleDayLostData.value)
+                        )
+                      )}
+                  </span>{" "}
+                  ({timeToDateStr(maxSingleDayLostData.timestamp)})
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
+            <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {t("profitMetrics.maxDrawdown")}
+            </div>
+            <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto touch:min-w-0 touch:break-words touch:text-right touch:whitespace-normal touch:overflow-visible">
+              <span
+                className={positiveNegativeTextClass(-1, quoteColor, 700)}
+              >
+                {maxDrawdownData.value.toFixed(2)}%
+              </span>{" "}
+              ({timeToDateStr(maxDrawdownData.date)})
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {t("profitMetrics.athReached")}
+            </div>
+            <button
+              type="button"
+              className="flex touch:min-h-11 touch:min-w-11 items-center whitespace-nowrap rounded text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring md:text-base"
+              onClick={onATHTimesClick}
+            >
+              <span>{athTimes.times}</span>
+              <InfoCircledIcon className="ml-2 h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  });
+
+  return (
+    <Card className="profit-metrics-card">
+      <CardHeader className="space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {t("profitMetrics.title")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mt-2">
+          <MaxTotalValueView />
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default App;

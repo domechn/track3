@@ -60,6 +60,7 @@ export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
 );
 
 export type RefreshAllDataOptions = {
+  onSourceResult?: (source: PortfolioSourceResult) => void;
   retrySourceId?: string;
   previousSourceResults?: PortfolioSourceResult[];
   previousSourceStatuses?: PortfolioSourceStatus[];
@@ -261,6 +262,8 @@ export async function refreshAllData(
                 status,
                 ...(partial ? { partial } : {}),
                 category: source.category,
+                startedAt: source.startedAt,
+                finishedAt: source.finishedAt,
                 lastSuccessAt: previousStatus?.lastSuccessAt,
               };
             }),
@@ -354,6 +357,8 @@ export async function refreshAllData(
                 ...(lowerThanPrevious !== undefined ? { lowerThanPrevious } : {}) } } : {}),
               category: source.category,
               detail: source.detail,
+              startedAt: source.startedAt,
+              finishedAt: source.finishedAt,
               ...(lastSuccessAt ? { lastSuccessAt } : {}),
             };
           },
@@ -937,8 +942,11 @@ async function queryCoinsData(
   const userProInfo = await isProVersion();
   addProgress(2);
   let portfolioResult = options.retrySourceId
-    ? await fetchPortfolios(config, addProgress, userProInfo, { sourceId: options.retrySourceId })
-    : await fetchPortfolios(config, addProgress, userProInfo);
+    ? await fetchPortfolios(config, addProgress, userProInfo, { sourceId: options.retrySourceId,
+      ...(options.onSourceResult ? { onSourceResult: options.onSourceResult } : {}) })
+    : options.onSourceResult
+      ? await fetchPortfolios(config, addProgress, userProInfo, { onSourceResult: options.onSourceResult })
+      : await fetchPortfolios(config, addProgress, userProInfo);
   if (options.retrySourceId) {
     const previous = options.previousSourceResults?.find((source) => source.sourceId === options.retrySourceId);
     const retried = portfolioResult.sourceResults?.[0];

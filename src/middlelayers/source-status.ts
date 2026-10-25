@@ -22,10 +22,16 @@ export function normalizeSourceStatuses(value: unknown): PortfolioSourceStatus[]
       ? [...new Set<string>((source.partial.endpoints as unknown[]).filter((endpoint: unknown): endpoint is string =>
           typeof endpoint === "string" && safePartialEndpoint(endpoint) === endpoint))].slice(0, 12)
       : [];
+    const validTiming = typeof source.startedAt === "string" && typeof source.finishedAt === "string" &&
+      /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(source.startedAt) &&
+      /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(source.finishedAt) &&
+      Number.isFinite(Date.parse(source.startedAt)) && Number.isFinite(Date.parse(source.finishedAt)) &&
+      Date.parse(source.startedAt) <= Date.parse(source.finishedAt);
     return [{
       sourceId: source.sourceId,
       label: redactSecrets(source.label),
       status: source.status,
+      ...(validTiming ? { startedAt: source.startedAt, finishedAt: source.finishedAt } : {}),
       ...(source.status === "partial" ? { partial: {
         category: categories.has(source.partial?.category) ? source.partial.category : "other",
         endpoints,

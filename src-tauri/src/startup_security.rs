@@ -5,6 +5,7 @@ use std::{
 };
 
 use fs2::FileExt;
+use sqlx::{sqlite::SqliteConnectOptions, Connection, SqliteConnection};
 
 pub const LEGACY_ENCRYPTION_KEY: &str = "#t.3eis@hck,btr!a";
 const INSTANCE_LOCK_NAME: &str = ".track3-instance.lock";
@@ -115,6 +116,110 @@ pub fn load_encryption_key(key_path: &Path) -> Result<String, String> {
     };
     validate_encryption_key_material(&key)?;
     Ok(key)
+}
+
+#[cfg(target_os = "ios")]
+pub fn load_or_create_ios_encryption_key(
+    key_path: &Path,
+    fresh_database: bool,
+) -> Result<String, String> {
+    load_or_create_ios_key_with(
+        key_path,
+        fresh_database,
+        crate::ios_native::keychain_read,
+        crate::ios_native::keychain_write,
+    )
+}
+
+#[cfg(any(test, target_os = "ios"))]
+fn load_or_create_ios_key_with(
+    key_path: &Path,
+    fresh_database: bool,
+    read_key: impl FnOnce() -> Result<Option<String>, String>,
+    write_key: impl Fn(&str) -> Result<(), String>,
+) -> Result<String, String> {
+    reject_link_or_reparse_point(key_path)?;
+    if let Some(key) = read_key()? {
+        validate_encryption_key_material(&key)?;
+        if key_path.exists() {
+            if load_encryption_key(key_path)? != key {
+                return Err("iOS Keychain and legacy key file differ".into());
+            }
+            fs::remove_file(key_path)
+                .map_err(|error| format!("failed to remove legacy key file: {error}"))?;
+        }
+        return Ok(key);
+    }
+    if key_path.exists() {
+        let key = load_encryption_key(key_path)?;
+        write_key(&key)?;
+        fs::remove_file(key_path)
+            .map_err(|error| format!("failed to remove legacy key file: {error}"))?;
+        return Ok(key);
+    }
+    if !fresh_database {
+        return Ok(LEGACY_ENCRYPTION_KEY.to_string());
+    }
+    let key = format!(
+        "{}{}",
+        uuid::Uuid::new_v4().simple(),
+        uuid::Uuid::new_v4().simple()
+    );
+    write_key(&key)?;
+    Ok(key)
+}
+
+pub async fn ios_key_recovery_needed(
+    database_path: &Path,
+    key_path: &Path,
+) -> Result<bool, String> {
+    ios_key_recovery_needed_with(database_path, key_path, cfg!(target_os = "ios"), || {
+        #[cfg(target_os = "ios")]
+        {
+            crate::ios_native::keychain_read()
+        }
+        #[cfg(not(target_os = "ios"))]
+        {
+            Ok(None)
+        }
+    })
+    .await
+}
+
+async fn ios_key_recovery_needed_with(
+    database_path: &Path,
+    key_path: &Path,
+    is_ios: bool,
+    read_key: impl FnOnce() -> Result<Option<String>, String>,
+) -> Result<bool, String> {
+    if !is_ios && key_path.exists() {
+        return Ok(false);
+    }
+    let encryption_key = if is_ios {
+        read_key()?.unwrap_or_else(|| LEGACY_ENCRYPTION_KEY.to_string())
+    } else {
+        LEGACY_ENCRYPTION_KEY.to_string()
+    };
+    let options = SqliteConnectOptions::new()
+        .filename(database_path)
+        .create_if_missing(false)
+        .read_only(true);
+    let mut database = SqliteConnection::connect_with(&options)
+        .await
+        .map_err(|error| format!("failed to inspect configuration: {error}"))?;
+    let encrypted: Vec<String> =
+        sqlx::query_scalar("SELECT data FROM configuration WHERE data LIKE '!ent:%'")
+            .fetch_all(&mut database)
+            .await
+            .map_err(|error| format!("failed to inspect configuration: {error}"))?;
+    database
+        .close()
+        .await
+        .map_err(|error| format!("failed to close configuration: {error}"))?;
+    let ent = crate::ent::Ent::new();
+    Ok(encrypted
+        .into_iter()
+        .any(|value| ent.decrypt_with_key(value, &encryption_key).is_err()))
 }
 
 fn open_key_file_no_follow(key_path: &Path) -> Result<File, std::io::Error> {
@@ -244,6 +349,157 @@ mod tests {
             load_encryption_key(&directory.0.join(".ent-key")).unwrap(),
             LEGACY_ENCRYPTION_KEY
         );
+    }
+
+    #[test]
+    fn ios_keychain_reuses_a_saved_key_and_removes_a_matching_legacy_file() {
+        let directory = TestDirectory::new();
+        let key_path = directory.0.join(".ent-key");
+        fs::write(&key_path, "saved-device-key").unwrap();
+
+        let key = super::load_or_create_ios_key_with(
+            &key_path,
+            false,
+            || Ok(Some("saved-device-key".to_string())),
+            |_| panic!("a saved key must not be replaced"),
+        )
+        .unwrap();
+        assert_eq!(key, "saved-device-key");
+        assert!(!key_path.exists());
+    }
+
+    #[test]
+    fn ios_keychain_migrates_a_legacy_file_and_rejects_a_conflicting_key() {
+        let directory = TestDirectory::new();
+        let key_path = directory.0.join(".ent-key");
+        fs::write(&key_path, "legacy-device-key").unwrap();
+        let saved = std::cell::RefCell::new(None);
+
+        assert_eq!(
+            super::load_or_create_ios_key_with(
+                &key_path,
+                false,
+                || Ok(None),
+                |key| {
+                    *saved.borrow_mut() = Some(key.to_string());
+                    Ok(())
+                },
+            )
+            .unwrap(),
+            "legacy-device-key"
+        );
+        assert_eq!(saved.into_inner().as_deref(), Some("legacy-device-key"));
+        assert!(!key_path.exists());
+
+        fs::write(&key_path, "different-file-key").unwrap();
+        let error = super::load_or_create_ios_key_with(
+            &key_path,
+            false,
+            || Ok(Some("saved-device-key".to_string())),
+            |_| panic!("a conflicting key must not be replaced"),
+        )
+        .unwrap_err();
+        assert!(error.contains("differ"));
+        assert!(key_path.exists());
+    }
+
+    #[test]
+    fn fresh_ios_keychain_install_saves_a_random_key() {
+        let directory = TestDirectory::new();
+        let key_path = directory.0.join(".ent-key");
+        let saved = std::cell::RefCell::new(None);
+
+        let key = super::load_or_create_ios_key_with(
+            &key_path,
+            true,
+            || Ok(None),
+            |key| {
+                *saved.borrow_mut() = Some(key.to_string());
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_ne!(key, LEGACY_ENCRYPTION_KEY);
+        assert!(key.len() >= 32);
+        assert_eq!(saved.into_inner().as_deref(), Some(key.as_str()));
+        assert!(!key_path.exists());
+    }
+
+    #[test]
+    fn missing_ios_key_reports_unreadable_encrypted_configuration() {
+        use sqlx::{Connection, Executor, SqliteConnection};
+
+        let directory = TestDirectory::new();
+        let database_path = directory.0.join("track3.db");
+        let key_path = directory.0.join(".ent-key");
+        let ent = crate::ent::Ent::new();
+        let ciphertext = ent
+            .encrypt_with_key("exchange credential".to_string(), "missing-device-key")
+            .unwrap();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!(
+                "sqlite://{}?mode=rwc",
+                database_path.display()
+            ))
+            .await
+            .unwrap();
+            db.execute(include_str!("../migrations/init/configuration_up.sql"))
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO configuration (id, data) VALUES (10, ?)")
+                .bind(&ciphertext)
+                .execute(&mut db)
+                .await
+                .unwrap();
+            db.close().await.unwrap();
+
+            assert!(
+                super::ios_key_recovery_needed_with(&database_path, &key_path, true, || Ok(None),)
+                    .await
+                    .unwrap()
+            );
+            assert!(
+                !super::ios_key_recovery_needed_with(&database_path, &key_path, true, || Ok(Some(
+                    "missing-device-key".to_string()
+                )),)
+                .await
+                .unwrap()
+            );
+            assert!(
+                super::ios_key_recovery_needed_with(&database_path, &key_path, true, || Err(
+                    "Keychain unavailable".to_string()
+                ),)
+                .await
+                .unwrap_err()
+                .contains("Keychain unavailable")
+            );
+
+            assert!(super::ios_key_recovery_needed(&database_path, &key_path)
+                .await
+                .unwrap());
+            fs::write(&key_path, "missing-device-key").unwrap();
+            assert!(!super::ios_key_recovery_needed(&database_path, &key_path)
+                .await
+                .unwrap());
+            fs::remove_file(&key_path).unwrap();
+            let mut db =
+                SqliteConnection::connect(&format!("sqlite://{}", database_path.display()))
+                    .await
+                    .unwrap();
+            let legacy = ent
+                .encrypt_with_key("legacy credential".to_string(), LEGACY_ENCRYPTION_KEY)
+                .unwrap();
+            sqlx::query("UPDATE configuration SET data = ? WHERE id = 10")
+                .bind(legacy)
+                .execute(&mut db)
+                .await
+                .unwrap();
+            db.close().await.unwrap();
+            assert!(!super::ios_key_recovery_needed(&database_path, &key_path)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]

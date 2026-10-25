@@ -1,0 +1,10 @@
+{
+  "productName": "Track3",
+  "identifier": "dev.track3.ios",
+  "bundle": {
+    "icon": ["app-icon.png"],
+    "iOS": {
+      "minimumSystemVersion": "15.0"
+    }
+  }
+}

@@ -56,6 +56,21 @@ Manual exports remain single JSON files. Upgraded installations still import the
 4. Support real-time portfolio value in the top bar.
 5. Support real-time prices for all tracked assets during refresh.
 
+## iOS app (iPhone)
+
+Track3 for iPhone builds from this repository with the same portfolio, sync,
+assistant, and encrypted configuration logic as the desktop app. Its interface
+uses Overview, History, Analytics, and More tabs, touch charts, and iOS Files
+for import and export. Desktop releases keep their existing interface.
+
+See the [iOS feature inventory](docs/ios/FEATURE_PARITY.md),
+[build instructions](docs/ios/RELEASE.md), and
+[platform split](docs/ios/PLATFORM_SPLIT.md).
+
+| Overview | History | Analytics |
+| --- | --- | --- |
+| <img src="docs/ios/screens/overview-light.png" width="180" alt="iPhone overview"> | <img src="docs/ios/screens/history-light.png" width="180" alt="iPhone history"> | <img src="docs/ios/screens/analytics-light.png" width="180" alt="iPhone analytics"> |
+
 ## Installation
 
 [Download In Release Page](https://github.com/domechn/track3/releases)

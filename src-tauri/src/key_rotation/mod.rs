@@ -12,7 +12,7 @@ use crate::startup_security::validate_encryption_key_material;
 
 use files::{
     cleanup_file_artifacts, install_contents, install_key_contents, read_optional_string,
-    remove_if_exists, restore_contents, session_path, sibling_with_suffix,
+    read_persisted_key, remove_if_exists, restore_contents, session_path, sibling_with_suffix,
     validate_session_file_name, FileInstallFailpoint, BACKUP_SUFFIX, KEY_FILE_NAME,
 };
 use journal::{CleanupFailpoint, RotationJournal};
@@ -278,7 +278,7 @@ fn align_active_key_for_recovery(
     }
 
     let key_path = app_data_dir.join(KEY_FILE_NAME);
-    let persisted_key = read_optional_string(&key_path)?;
+    let persisted_key = read_persisted_key(&key_path)?;
     let backup_key = read_optional_string(&sibling_with_suffix(&key_path, BACKUP_SUFFIX))?;
     let recovered_key = match persisted_key.as_deref() {
         Some(key) if key == journal.old_key => &journal.old_key,
@@ -454,6 +454,22 @@ fn replace_key_file(
     failpoint: RotationFailpoint,
 ) -> Result<(), ExecutionError> {
     let key_path = app_data_dir.join(KEY_FILE_NAME);
+    #[cfg(target_os = "ios")]
+    {
+        let current = read_persisted_key(&key_path).map_err(ExecutionError::operational)?;
+        if current.as_deref() != Some(journal.new_key.as_str()) {
+            if current.as_deref() != Some(journal.old_key.as_str())
+                && !(current.is_none() && !journal.key_file_existed)
+            {
+                return Err(ExecutionError::operational(
+                    "iOS Keychain key changed during rotation",
+                ));
+            }
+            crate::ios_native::keychain_write(&journal.new_key)
+                .map_err(ExecutionError::operational)?;
+        }
+    }
+    #[cfg(not(target_os = "ios"))]
     install_key_contents(
         &key_path,
         journal.key_file_existed,
@@ -509,11 +525,30 @@ fn restore_key_file(
     journal: &RotationJournal,
 ) -> Result<(), String> {
     let key_path = app_data_dir.join(KEY_FILE_NAME);
-    if journal.key_file_existed {
-        restore_contents(&key_path, &journal.old_key, &journal.new_key)?;
-    } else {
-        remove_if_exists(&key_path)?;
-        cleanup_file_artifacts(&key_path)?;
+    #[cfg(target_os = "ios")]
+    {
+        let current = read_persisted_key(&key_path)?;
+        match current.as_deref() {
+            Some(key) if key == journal.old_key.as_str() => {}
+            None if !journal.key_file_existed => {}
+            Some(key) if key == journal.new_key.as_str() => {
+                if journal.key_file_existed {
+                    crate::ios_native::keychain_write(&journal.old_key)?;
+                } else {
+                    crate::ios_native::keychain_delete()?;
+                }
+            }
+            _ => return Err("iOS Keychain key changed during rotation".into()),
+        }
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        if journal.key_file_existed {
+            restore_contents(&key_path, &journal.old_key, &journal.new_key)?;
+        } else {
+            remove_if_exists(&key_path)?;
+            cleanup_file_artifacts(&key_path)?;
+        }
     }
 
     let current = ent.current_key()?;

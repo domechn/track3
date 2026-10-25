@@ -3,6 +3,6 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["./*.ts", "../../playwright.config.ts"],
+  "include": ["./*.ts", "../production/*.ts", "../../playwright.config.ts", "../../playwright.preview.config.ts"],
   "references": []
 }

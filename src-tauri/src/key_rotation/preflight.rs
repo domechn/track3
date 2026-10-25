@@ -8,8 +8,8 @@ use crate::startup_security::LEGACY_ENCRYPTION_KEY;
 use super::{
     database,
     files::{
-        canonical_sessions_dir, read_optional_string, reject_link_or_reparse_point, session_path,
-        validate_session_file_name, KEY_FILE_NAME,
+        canonical_sessions_dir, read_optional_string, read_persisted_key,
+        reject_link_or_reparse_point, session_path, validate_session_file_name, KEY_FILE_NAME,
     },
     journal::{ConfigurationRotation, RotationJournal, RotationPhase, SessionRotation},
 };
@@ -24,7 +24,7 @@ pub(super) async fn prepare(
         .current_key()
         .map_err(|error| format!("encryption key preflight failed: {error}"))?;
     let key_path = app_data_dir.join(KEY_FILE_NAME);
-    let persisted_key = read_optional_string(&key_path)
+    let persisted_key = read_persisted_key(&key_path)
         .map_err(|error| format!("encryption key preflight failed: {error}"))?;
     let key_file_existed = persisted_key.is_some();
     if persisted_key

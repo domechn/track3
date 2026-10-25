@@ -15,7 +15,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=desktop",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "eval": "node ./scripts/eval.mjs",
