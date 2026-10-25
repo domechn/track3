@@ -33,8 +33,12 @@ export async function listBackupClients(directory: string, selected = directory)
   const clients: BackupClient[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory || entry.isSymlink || !/^[A-Za-z0-9-]+$/.test(entry.name)) continue;
-    const metadata = parseMetadata(await readTextFile(`${root}/${entry.name}/metadata.json`), entry.name);
-    if (metadata) clients.push({ client: entry.name, exportAt: metadata.exportAt, months: metadata.parts.length });
+    try {
+      const metadata = parseMetadata(await readTextFile(`${root}/${entry.name}/metadata.json`), entry.name);
+      if (metadata) clients.push({ client: entry.name, exportAt: metadata.exportAt, months: metadata.parts.length });
+    } catch {
+      // A client may be incomplete while its metadata is still syncing.
+    }
   }
   return clients.sort((a, b) => b.exportAt.localeCompare(a.exportAt));
 }

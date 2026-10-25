@@ -43,7 +43,7 @@ test("shows a revoked folder state and a choose again action", async ({ page }) 
   await page.setViewportSize({ width: 320, height: 568 });
   await installTauriBridge(page, { backupFolderFailure: "Backup folder is unavailable. Choose the folder again." });
   await page.goto("/#/settings/data?section=backup");
-  await expect(page.getByRole("alert")).toHaveText("Backup folder unavailable.");
+  await expect(page.getByRole("alert")).toHaveText("Backup folder old is unavailable.");
   await expect(page.getByRole("button", { name: "Choose folder again" })).toBeVisible();
   await page.getByRole("alert").evaluate((element) => element.scrollIntoView({ block: "center" }));
   await expect.poll(async () => (await page.getByRole("alert").boundingBox())?.y).toBeLessThan(440);

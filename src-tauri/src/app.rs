@@ -378,12 +378,6 @@ fn allow_backup_folder(handle: &tauri::AppHandle, path: &str) -> Result<(), Stri
         .fs_scope()
         .allow_directory(selected, true)
         .map_err(|e| e.to_string())?;
-    if let Some(parent) = crate::ios_backup_path::backup_parent(selected) {
-        handle
-            .fs_scope()
-            .allow_directory(parent, true)
-            .map_err(|e| e.to_string())?;
-    }
     Ok(())
 }
 

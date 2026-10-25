@@ -62,6 +62,8 @@ release tasks; the unsigned CI IPA does not establish their accuracy.
    confirm auto import still works. Revoke access or delete the folder, then
    confirm Backup settings shows Choose folder again. Try selecting
    track3-backup and a client folder inside it, plus a single JSON file.
+   After choosing iCloud Drive for auto backup, create a new backup and
+   verify another device can read it; iCloud writes need device verification.
 5. Set a known encryption key and save it separately, export configuration,
    rotate the key, then verify the app can reopen. Test recovery from an
    interrupted rotation. Restore to a second device with the known key;

@@ -472,6 +472,7 @@ private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate, UIAd
         guard let url = restore(1).1 else { return -2 }
         guard url.lastPathComponent != "track3-backup" &&
               url.deletingLastPathComponent().lastPathComponent != "track3-backup" else { return -4 }
+        // Auto and import each own one security-scope access until cleared or replaced.
         guard url.startAccessingSecurityScopedResource() else { return -2 }
         do {
             let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
@@ -562,7 +563,7 @@ public func track3IOSPrepareBackupFolder(_ path: UnsafePointer<CChar>) -> Int32 
             ? entry.deletingLastPathComponent().appendingPathComponent(String(name.dropFirst().dropLast(7))) : entry
         do {
             let values = try entry.resourceValues(forKeys: keys)
-            if placeholder || (values.isDirectory != true && values.isUbiquitousItem == true && values.ubiquitousItemDownloadingStatus != .current) {
+            if placeholder || (values.isDirectory != true && values.isUbiquitousItem == true && values.ubiquitousItemDownloadingStatus == .notDownloaded) {
                 do {
                     try manager.startDownloadingUbiquitousItem(at: logical)
                 } catch {
@@ -577,6 +578,7 @@ public func track3IOSPrepareBackupFolder(_ path: UnsafePointer<CChar>) -> Int32 
                     fresh.removeAllCachedResourceValues()
                     let current = try fresh.resourceValues(forKeys: keys)
                     if current.ubiquitousItemDownloadingStatus == .current ||
+                        current.ubiquitousItemDownloadingStatus == .downloaded ||
                         current.isUbiquitousItem != true { break }
                 } while true
             }

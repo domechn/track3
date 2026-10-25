@@ -1257,6 +1257,8 @@
   "data.folder.importClient": "Import {client}",
   "data.folder.importLegacy": "Import legacy backup",
   "data.folder.unavailable": "Backup folder unavailable.",
+  "data.folder.unavailable.named": "Backup folder {folder} is unavailable.",
+  "data.folder.icloud": "iCloud Drive",
   "data.folder.chooseAgain": "Choose folder again",
   "data.folder.failed": "Could not access or download the backup folder. Try again when online.",
   "data.folder.downloadTimeout": "Downloading from iCloud timed out. Try again when online.",

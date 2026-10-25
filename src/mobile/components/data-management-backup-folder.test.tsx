@@ -62,14 +62,14 @@ it("reviews a selected folder and imports without changing auto backup", async (
 it("shows a saved Documents choice in the current app container", async () => {
   m.getFolder.mockResolvedValue("track3:ios-documents");
   render(<HashRouter><DataManagement /></HashRouter>);
-  expect(await screen.findByText("/app/Documents")).toBeInTheDocument();
+  expect(await screen.findByText("Documents")).toBeInTheDocument();
   expect(m.save).not.toHaveBeenCalled();
 });
 
 it("migrates an old Documents container path in backup settings", async () => {
   m.getFolder.mockResolvedValue("/var/mobile/Containers/Data/Application/12345678-1234-1234-1234-123456789abc/Documents");
   render(<HashRouter><DataManagement /></HashRouter>);
-  expect(await screen.findByText("/app/Documents")).toBeInTheDocument();
+  expect(await screen.findByText("Documents")).toBeInTheDocument();
   expect(m.save).toHaveBeenCalledWith("track3:ios-documents");
 });
 
@@ -78,12 +78,20 @@ it("saves a Documents marker when selected", async () => {
   render(<HashRouter><DataManagement /></HashRouter>);
   fireEvent.click(screen.getByRole("button", { name: "Use Documents folder" }));
   await waitFor(() => expect(m.save).toHaveBeenCalledWith("track3:ios-documents"));
-  expect(screen.getByText("/app/Documents")).toBeInTheDocument();
+  expect(screen.getByText("Documents")).toBeInTheDocument();
+});
+
+it("shows the chosen iCloud folder by name and location", async () => {
+  m.getFolder.mockResolvedValue("/private/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/backups");
+  render(<HashRouter><DataManagement /></HashRouter>);
+  expect(await screen.findByText("backups")).toBeInTheDocument();
+  expect(screen.getByText(/iCloud Drive/)).toBeInTheDocument();
+  expect(screen.queryByText("/private/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/backups")).not.toBeInTheDocument();
 });
 
 it("shows background iCloud preparation in backup settings", async () => {
   render(<HashRouter><DataManagement /></HashRouter>);
-  await screen.findByText("/app/Documents");
+  await screen.findByText("Documents");
   window.dispatchEvent(new CustomEvent("track3:backup-folder-preparation", { detail: true }));
   expect(await screen.findByText("Downloading from iCloud…")).toBeInTheDocument();
   window.dispatchEvent(new CustomEvent("track3:backup-folder-preparation", { detail: false }));
@@ -93,12 +101,12 @@ it("shows background iCloud preparation in backup settings", async () => {
 it("shows a missing saved folder and lets the owner choose again", async () => {
   m.getFolder.mockResolvedValue("/cloud/old");
   m.invoke.mockImplementation(async (command: string) =>
-    command === "ios_backup_folder_status" ? { path: null, failure: "Backup folder is unavailable." } : null);
+    command === "ios_backup_folder_status" ? { path: null, failure: "Backup folder is unavailable. Choose the folder again." } : null);
   m.choose.mockResolvedValue("/cloud/new");
   render(<HashRouter><DataManagement /></HashRouter>);
-  expect(await screen.findByRole("alert")).toHaveTextContent("Backup folder unavailable");
+  expect(await screen.findByRole("alert")).toHaveTextContent("Backup folder old is unavailable");
   fireEvent.click(screen.getByRole("button", { name: "Choose folder again" }));
-  await waitFor(() => expect(screen.getByText("/cloud/new")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("new")).toBeInTheDocument());
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
@@ -124,11 +132,24 @@ it("can opt into auto backup after importing from a parent folder", async () => 
 
 it("refreshes a later iCloud timeout in backup settings", async () => {
   render(<HashRouter><DataManagement /></HashRouter>);
-  await screen.findByText("/app/Documents");
+  await screen.findByText("Documents");
   m.invoke.mockImplementation(async (command: string) =>
     command === "ios_backup_folder_status" ? { path: null, failure: "Downloading from iCloud timed out. Try again when online." } : null);
   window.dispatchEvent(new Event("track3:backup-folder-status"));
   expect(await screen.findByRole("alert")).toHaveTextContent("Downloading from iCloud timed out");
+  expect(screen.getByRole("button", { name: "Choose Folder" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Choose folder again" })).not.toBeInTheDocument();
+});
+
+it("keeps the normal chooser label after a rejected pick while the old folder works", async () => {
+  m.getFolder.mockResolvedValue("/cloud/old");
+  m.invoke.mockImplementation(async (command: string) =>
+    command === "ios_backup_folder_status" ? { path: "/cloud/old", failure: null } : null);
+  m.choose.mockRejectedValueOnce("Choose the parent folder containing track3-backup for auto backup.");
+  render(<HashRouter><DataManagement /></HashRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "Choose Folder" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Choose the parent folder containing track3-backup");
+  expect(screen.getByRole("button", { name: "Choose Folder" })).toBeInTheDocument();
 });
 
 it("removes an orphaned auto bookmark left by an earlier Clear", async () => {
@@ -163,14 +184,14 @@ it("keeps a newly picked bookmark while its configuration write is pending", asy
   window.dispatchEvent(new Event("track3:backup-folder-status"));
   await waitFor(() => expect(m.invoke.mock.calls.filter(([command]) => command === "ios_backup_folder_status")).toHaveLength(2));
   finishSave();
-  expect(await screen.findByText("/cloud/new")).toBeInTheDocument();
+  expect(await screen.findByText("new")).toBeInTheDocument();
   await act(async () => { finishRefresh(); });
   expect(m.invoke).not.toHaveBeenCalledWith("ios_clear_backup_folder", { kind: "auto" });
 });
 
 it("clears the bookmark with the folder and restores it on Undo", async () => {
   render(<HashRouter><DataManagement /></HashRouter>);
-  await screen.findByText("/app/Documents");
+  await screen.findByText("Documents");
   fireEvent.click(screen.getByRole("button", { name: "Clear" }));
   fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear" }));
   await waitFor(() => expect(m.invoke).toHaveBeenCalledWith("ios_clear_backup_folder", { kind: "auto" }));

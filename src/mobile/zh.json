@@ -1257,6 +1257,8 @@
   "data.folder.importClient": "导入 {client}",
   "data.folder.importLegacy": "导入旧版备份",
   "data.folder.unavailable": "备份文件夹不可用。",
+  "data.folder.unavailable.named": "备份文件夹 {folder} 不可用。",
+  "data.folder.icloud": "iCloud 云盘",
   "data.folder.chooseAgain": "重新选择文件夹",
   "data.folder.failed": "无法访问或下载备份文件夹。请联网后重试。",
   "data.folder.downloadTimeout": "从 iCloud 下载超时。请联网后重试。",

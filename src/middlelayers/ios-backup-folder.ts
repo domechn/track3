@@ -21,21 +21,23 @@ export function isIOSDocumentsBackupChoice(configured: string, documents: string
     || /\/Containers\/Data\/Application\/[0-9a-f-]{36}\/Documents$/i.test(configured);
 }
 
-export async function loadAutoBackupFolder(): Promise<{ directory: string | undefined; failure: string | null }> {
+export async function loadAutoBackupFolder(): Promise<{ directory: string | undefined; failure: string | null; bookmarkUnavailable: boolean }> {
   const version = autoChoiceVersion;
   const configured = await getAutoBackupDirectory();
-  if (!isIOS()) return { directory: configured, failure: null };
+  if (!isIOS()) return { directory: configured, failure: null, bookmarkUnavailable: false };
   const status = await invoke<IOSBackupFolderStatus>("ios_backup_folder_status");
   const { path } = status;
   const documents = await documentDir();
+  const bookmarkUnavailable = !!configured && !isIOSDocumentsBackupChoice(configured, documents)
+    && !path && !!status.failure?.includes("Choose the folder again");
   if (autoChoiceInFlight || version !== autoChoiceVersion) {
-    return { directory: configured === iosDocumentsBackupMarker ? documents : configured, failure: status.failure };
+    return { directory: configured === iosDocumentsBackupMarker ? documents : configured, failure: status.failure, bookmarkUnavailable };
   }
   if (!configured && path) {
     await invoke("ios_clear_backup_folder", { kind: "auto" });
     status.failure = null;
   }
-  if (!configured) return { directory: undefined, failure: status.failure };
+  if (!configured) return { directory: undefined, failure: status.failure, bookmarkUnavailable };
   if (isIOSDocumentsBackupChoice(configured, documents)
     && (configured === iosDocumentsBackupMarker || configured === documents || path !== configured)) {
     if (path || status.failure?.includes("Choose the folder again")) {
@@ -43,13 +45,13 @@ export async function loadAutoBackupFolder(): Promise<{ directory: string | unde
       status.failure = null;
     }
     if (configured !== iosDocumentsBackupMarker) await saveAutoBackupDirectory(iosDocumentsBackupMarker);
-    return { directory: documents, failure: status.failure };
+    return { directory: documents, failure: status.failure, bookmarkUnavailable };
   }
   if (path && path !== configured) {
     await saveAutoBackupDirectory(path);
-    return { directory: path, failure: status.failure };
+    return { directory: path, failure: status.failure, bookmarkUnavailable };
   }
-  return { directory: configured, failure: status.failure };
+  return { directory: configured, failure: status.failure, bookmarkUnavailable };
 }
 
 export async function getAutoBackupPath(): Promise<string | undefined> {

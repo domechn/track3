@@ -75,6 +75,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
   const [backupFolderFailure, setBackupFolderFailure] = useState<string | null>(null);
+  const [backupBookmarkUnavailable, setBackupBookmarkUnavailable] = useState(false);
   const folderChoiceVersion = useRef(0);
   const [folderReview, setFolderReview] = useState<{ folder: BackupFolder; clients: BackupClient[] }>();
   const [folderBusy, setFolderBusy] = useState(false);
@@ -172,13 +173,19 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function loadAutoBackupDirectory() {
     const version = folderChoiceVersion.current;
     try {
-      const { directory, failure } = await loadAutoBackupFolder();
+      const { directory, failure, bookmarkUnavailable } = await loadAutoBackupFolder();
       if (version !== folderChoiceVersion.current) return false;
-      if (isIOS()) setBackupFolderFailure(failure);
+      if (isIOS()) {
+        setBackupFolderFailure(failure);
+        setBackupBookmarkUnavailable(bookmarkUnavailable);
+      }
       setAutoBackupDirectory(directory);
       return !!directory;
     } catch {
-      if (isIOS()) setBackupFolderFailure("Backup folder is unavailable.");
+      if (isIOS()) {
+        setBackupFolderFailure("Backup folder is unavailable.");
+        setBackupBookmarkUnavailable(false);
+      }
       return false;
     }
   }
@@ -187,7 +194,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     if (error.includes("containing track3-backup")) return t("data.folder.autoHint");
     if (error.includes("timed out")) return t("data.folder.downloadTimeout");
     if (error.includes("download")) return t("data.folder.failed");
-    return t("data.folder.unavailable");
+    return autoBackupFolderName && backupBookmarkUnavailable
+      ? t("data.folder.unavailable.named").replace("{folder}", autoBackupFolderName)
+      : t("data.folder.unavailable");
   }
 
   async function loadAutoBackupTime() {
@@ -320,6 +329,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     if (selected) {
       setAutoBackupDirectory(selected);
       setBackupFolderFailure(null);
+      setBackupBookmarkUnavailable(false);
       await loadAutoBackupTime();
     }
     } catch (error) { setBackupFolderFailure(String(error)); }
@@ -334,6 +344,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       await invoke("ios_clear_backup_folder", { kind: "auto" });
       setAutoBackupDirectory(path);
       setBackupFolderFailure(null);
+      setBackupBookmarkUnavailable(false);
       await loadAutoBackupTime();
     } catch (error) { setBackupFolderFailure(String(error)); }
   }
@@ -385,6 +396,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const showBackup = !section || section === "backup";
   const showBlacklist = !section || section === "blacklist";
   const showSecurity = !section || section === "security";
+  const autoBackupFolderName = autoBackupDirectory?.split("/").filter(Boolean).at(-1) ?? autoBackupDirectory;
 
   return (
     <div className="ios-d3-settings-content ios-d3-data-settings space-y-6">
@@ -575,11 +587,14 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
                 autoBackupDirectory ? "block" : "hidden",
               )}
             >
-              {autoBackupDirectory}
+              {isIOS() ? <>
+                <span title={autoBackupDirectory}>{autoBackupFolderName}</span>
+                {autoBackupDirectory && isICloudDrivePath(autoBackupDirectory) && <span> · {t("data.folder.icloud")}</span>}
+              </> : autoBackupDirectory}
             </div>
             <div className="ios-d3-backup-folder-actions flex flex-wrap items-center gap-2">
               <Button onClick={onChooseAutoBackupFolderButtonClick} size="sm">
-                {t(backupFolderFailure ? "data.folder.chooseAgain" : "data.chooseFolder")}
+                {t(backupBookmarkUnavailable ? "data.folder.chooseAgain" : "data.chooseFolder")}
               </Button>
               {isIOS() && <Button variant="outline" size="sm" onClick={() => void onUseDocumentsFolderClick()}>{t("data.useDocumentsFolder")}</Button>}
               <ConfirmDeleteDialog

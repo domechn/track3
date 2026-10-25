@@ -9,7 +9,13 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   readTextFile: vi.fn(async (path: string) => path.endsWith("metadata.json") ? disk.metadata : ""),
 }));
 
-beforeEach(() => { disk.dirs.clear(); disk.files.clear(); disk.metadata = ""; vi.mocked(readTextFile).mockClear(); });
+beforeEach(() => {
+  disk.dirs.clear();
+  disk.files.clear();
+  disk.metadata = "";
+  vi.mocked(readTextFile).mockReset();
+  vi.mocked(readTextFile).mockImplementation(async (path) => String(path).endsWith("metadata.json") ? disk.metadata : "");
+});
 
 it.each([
   ["/cloud", "/cloud", false],
@@ -55,6 +61,22 @@ it("lists only a selected client when the parent is outside its security scope",
   const { listBackupClients } = await import("./backup-folder");
   expect(await listBackupClients("/cloud", "/cloud/track3-backup/device-a")).toEqual([
     { client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 0 },
+  ]);
+});
+
+it("skips a client whose metadata has not downloaded yet", async () => {
+  const { buildMetadata } = await import("./backup-v2");
+  disk.dirs.add("/cloud/track3-backup");
+  disk.dirs.add("/cloud/track3-backup/device-a");
+  disk.dirs.add("/cloud/track3-backup/device-b");
+  disk.files.add("/cloud/track3-backup/device-b/metadata.json");
+  vi.mocked(readTextFile).mockImplementation(async (path) => {
+    if (String(path).includes("/device-a/")) throw new Error("metadata is unavailable");
+    return JSON.stringify(buildMetadata("device-b", "0.9.0", "2024-03-01T00:00:00Z", []));
+  });
+  const { listBackupClients } = await import("./backup-folder");
+  expect(await listBackupClients("/cloud")).toEqual([
+    { client: "device-b", exportAt: "2024-03-01T00:00:00Z", months: 0 },
   ]);
 });
 
