@@ -21,7 +21,7 @@ function Shell() {
   const focusMainContent = React.useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
-      document.getElementById("app-main-content")?.focus();
+      document.getElementById("app-main-content")?.focus({ preventScroll: true });
     },
     [],
   );

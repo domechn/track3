@@ -226,11 +226,13 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   const responses = new Map<number, { bytes: number[]; read: boolean; chunks?: number[][]; chunkIndex?: number }>();
   let nextRid = 1;
   let refreshes = 0;
+  let localQueries = 0;
   let sseCalls = 0;
   let haptics = 0;
   let shares = 0;
 
   const select = (query: string, values: unknown[] = []) => {
+    localQueries++;
     const result = db.exec(query, values as any[]);
     return result.flatMap(({ columns, values: rows }) =>
       rows.map((row) => Object.fromEntries(columns.map((column, i) => [column, row[i]]))),
@@ -605,5 +607,5 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
     };
   }, richPortfolio);
-  return { persistedRefreshes: () => refreshes, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares };
+  return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares };
 }

@@ -1264,5 +1264,6 @@
   "data.folder.downloadTimeout": "从 iCloud 下载超时。请联网后重试。",
   "data.folder.ready": "备份文件夹已就绪",
   "data.folder.autoHint": "请选择包含 track3-backup 的上级文件夹，即桌面端自动备份使用的文件夹。",
-  "data.folder.month": "{count} 个月"
+  "data.folder.month": "{count} 个月",
+  "mobile.refreshView": "刷新页面"
 }

@@ -71,14 +71,20 @@ const App = ({
   currency,
   dateRange,
   quoteColor,
+  expanded,
+  onExpandedChange,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }) => {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const [isShowMore, setIsShowMore] = useState<boolean>(false);
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const isShowMore = expanded ?? localExpanded;
+  const setIsShowMore = onExpandedChange ?? setLocalExpanded;
   const [pageLoading, setPageLoading] = useState(true);
   const loadedCountRef = useRef(0);
   const rangeKey = useMemo(

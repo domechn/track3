@@ -40,6 +40,24 @@ it("updates the Pro header total when live portfolio prices change", async () =>
   expect(screen.getByLabelText("Total")).toHaveTextContent("$120");
 });
 
+it("pauses live price queries while the app is hidden and resumes on return", async () => {
+  vi.clearAllMocks();
+  vi.useFakeTimers();
+  vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  vi.mocked(queryRealTimeAssetsValue).mockResolvedValue([{ value: 100 }] as never);
+  render(<MobileHeaderTotal live currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }} />);
+  await act(async () => { await Promise.resolve(); });
+  expect(queryRealTimeAssetsValue).toHaveBeenCalledTimes(1);
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+  expect(queryRealTimeAssetsValue).toHaveBeenCalledTimes(1);
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  await act(async () => { document.dispatchEvent(new Event("visibilitychange")); await Promise.resolve(); });
+  expect(queryRealTimeAssetsValue).toHaveBeenCalledTimes(2);
+});
+
 it("keeps the last header total when a later live query fails", async () => {
   vi.useFakeTimers();
   vi.stubGlobal("matchMedia", () => ({ matches: true }));

@@ -1264,5 +1264,6 @@
   "data.folder.downloadTimeout": "Downloading from iCloud timed out. Try again when online.",
   "data.folder.ready": "Backup folder ready",
   "data.folder.autoHint": "Choose the parent folder containing track3-backup, the same folder used for Auto backup on desktop.",
-  "data.folder.month": "{count} month"
+  "data.folder.month": "{count} month",
+  "mobile.refreshView": "Refresh view"
 }
