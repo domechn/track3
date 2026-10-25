@@ -229,7 +229,7 @@ for (const width of [320, 375, 390, 430]) {
           node.scrollIntoView({ block: "start" });
           window.scrollBy(0, -72);
         });
-        await expect(page.locator(".mobile-header-total-value")).not.toHaveText("—");
+        await expect(page.locator(".mobile-header-total-value")).not.toHaveText("—", { timeout: 15_000 });
         await capture("profit-summary");
         await page.locator(".d2-summary .profit-summary-card").getByRole("button", { name: /^Oct / }).click();
         await expect(page.locator(".d2-summary .profit-summary-card .overview-pnl-plot canvas")).toBeVisible();
@@ -684,6 +684,9 @@ for (const size of sizes) {
           }).slice(0, 5).map((node) => ({ text: node.textContent?.slice(0, 35), width: node.clientWidth, scroll: node.scrollWidth })),
         }));
         expect(metrics.clipped, `${route}: clipped text`).toEqual([]);
+        if (route === "overview") {
+          expect(metrics.overflowElements, `${route}: elements outside viewport`).toEqual([]);
+        }
         expect(metrics.pageWidth, `${route}: document overflow ${JSON.stringify(metrics.overflowElements)}`).toBeLessThanOrEqual(metrics.viewportWidth);
         expect(metrics.mainBottomPadding, `${route}: home indicator clearance`).toBeGreaterThanOrEqual(metrics.tabHeight);
         expect(metrics.safeBottomDelta, `${route}: safe-area inset is ignored`).toBe(31);

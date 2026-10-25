@@ -191,7 +191,7 @@
   .history-mobile-delete { min-height: 2.75rem; margin-top: .4rem; color: hsl(var(--destructive)); font-size: .875rem; }
   .overview-sections { display: grid; gap: 24px; }
   .overview-sections > * { margin-top: 0 !important; }
-  .overview-main-grid { display: flex; flex-direction: column; gap: 24px; }
+  .overview-main-grid { display: flex; min-width: 0; flex-direction: column; gap: 24px; }
   .overview-main-grid > * { width: 100%; }
   .overview-sections :is(.mobile-hero-card, .overview-pnl-card, .overview-allocation-card, .overview-movers-card, .overview-insights-card) { border: 0; box-shadow: none; }
   .mobile-hero-card { background: transparent !important; }

@@ -33,10 +33,10 @@
           }).catch(() => {});
         };
         window.onerror = (message, source, line, column, error) => {
-          recordError(error?.stack || `${message} at ${source}:${line}:${column}`);
+          recordError(`${message} at ${source}:${line}:${column}\n${error?.stack ?? ""}`);
         };
         window.addEventListener("unhandledrejection", (event) => {
-          recordError(event.reason?.stack || event.reason);
+          recordError(`${event.reason?.message ?? event.reason}\n${event.reason?.stack ?? ""}`);
         });
         window.addEventListener("error", (event) => {
           if (event.target !== window) {

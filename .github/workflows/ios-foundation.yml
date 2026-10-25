@@ -4,26 +4,6 @@ on:
   push:
     branches: ["feat/ios-app*"]
   pull_request:
-    paths:
-      - "src/mobile/**"
-      - "src/main.tsx"
-      - "src/i18n/index.tsx"
-      - "src/utils/platform*"
-      - "src/utils/ios-*"
-      - "src-tauri/Cargo.toml"
-      - "src-tauri/Cargo.lock"
-      - "src-tauri/Info.ios.plist"
-      - "src-tauri/build.rs"
-      - "src-tauri/gen/apple/**"
-      - "src-tauri/tauri.ios.conf.json"
-      - "src-tauri/capabilities/mobile.json"
-      - "src-tauri/src/app.rs"
-      - "src-tauri/src/ios_*"
-      - "scripts/ios/**"
-      - "docs/ios/**"
-      - "tests/e2e/mobile.spec.ts"
-      - "tests/e2e/ios-*.spec.ts"
-      - ".github/workflows/ios-foundation.yml"
   workflow_dispatch:
 
 jobs:
@@ -77,6 +57,8 @@ jobs:
         run: corepack yarn playwright install chromium
       - name: Check browser tests
         run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
+      - name: Test production startup
+        run: corepack yarn playwright test -c playwright.preview.config.ts --workers=2
       - name: Test iPhone flows
         run: corepack yarn playwright test --project=mobile --workers=2
       - name: Upload iPhone browser screenshots
@@ -89,9 +71,9 @@ jobs:
           retention-days: 1
       - name: Test desktop browser flows
         run: corepack yarn playwright test --project=desktop tests/e2e/smoke.spec.ts tests/e2e/accessibility.spec.ts tests/e2e/density.spec.ts tests/e2e/ai-setup.spec.ts --workers=2
-      - name: Check desktop Rust library
+      - name: Check desktop Rust library and binaries
         timeout-minutes: 15
-        run: cargo check --locked --lib
+        run: cargo check --locked --lib --bins
         working-directory: src-tauri
       - run: cargo test --locked -p track3-pure-tests --lib
         working-directory: src-tauri

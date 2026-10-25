@@ -150,7 +150,7 @@ This table covers all 147 files present on desktop `origin/master` that the iOS 
 | `tests/e2e/accessibility.spec.ts` | Restored | Existing desktop accessibility checks stay unchanged. |
 | `tests/e2e/density.spec.ts` | Restored | Existing desktop density checks stay unchanged. |
 | `tests/e2e/tauri-bridge.ts` | Kept | Shared IPC fixture adds iOS mocks while desktop defaults remain. |
-| `vite.config.ts` | Restored | Desktop chunking remains on master. |
+| `vite.config.ts` | Kept shared fix | React has its own vendor chunk so the lazy desktop and mobile entry does not create a chart chunk cycle. Other desktop chunking stays on master. |
 
 ## Directory layout
 

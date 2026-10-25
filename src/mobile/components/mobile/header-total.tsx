@@ -16,6 +16,8 @@ export function MobileHeaderTotal({ currency, live, range }: {
   useEffect(() => {
     if (!window.matchMedia?.(MOBILE_MEDIA_QUERY).matches) return;
     let active = true;
+    let retryTimer: number | undefined;
+    let failures = 0;
     const load = () => {
       const query = range
         ? queryTotalValue(range).then((result) => result.totalValue)
@@ -23,12 +25,21 @@ export function MobileHeaderTotal({ currency, live, range }: {
           .catch(() => queryLatestAssets())
           .then((assets) => assets.reduce((sum, asset) => sum + asset.value, 0));
       void query.then((value) => {
-        if (active) setTotal(value);
-      }).catch(() => { if (active) setTotal(undefined); });
+        if (active) {
+          failures = 0;
+          setTotal(value);
+        }
+      }).catch(() => {
+        if (active && failures++ < 2) retryTimer = window.setTimeout(load, 1_000);
+      });
     };
     load();
     const timer = live ? window.setInterval(load, 60_000) : undefined;
-    return () => { active = false; if (timer !== undefined) window.clearInterval(timer); };
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearInterval(timer);
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
   }, [version, live, range?.start.getTime(), range?.end.getTime()]);
   return <div className="mobile-header-total" aria-label={t("history.total")}>
     <span className="mobile-header-total-label">{t("history.total")}</span>
