@@ -2,45 +2,87 @@ import { invoke } from "@tauri-apps/api/core";
 import { documentDir } from "@tauri-apps/api/path";
 import { getAutoBackupDirectory, saveAutoBackupDirectory } from "./configuration";
 import { isIOS } from "@/utils/platform";
+import { chooseBackupLocation } from "@/utils/backup-location";
 
 export type IOSBackupFolderStatus = { path: string | null; failure: string | null };
 export const backupFolderStatusEvent = "track3:backup-folder-status";
 export const backupFolderPreparationEvent = "track3:backup-folder-preparation";
 export const iosDocumentsBackupMarker = "track3:ios-documents";
 let activePreparations = 0;
+let autoChoiceInFlight = false;
+let autoChoiceVersion = 0;
+
+export function isICloudDrivePath(path: string): boolean {
+  return path.includes("/Mobile Documents/") || path.includes("/CloudDocs/");
+}
 
 export function isIOSDocumentsBackupChoice(configured: string, documents: string): boolean {
   return configured === iosDocumentsBackupMarker || configured === documents
     || /\/Containers\/Data\/Application\/[0-9a-f-]{36}\/Documents$/i.test(configured);
 }
 
-export async function getAutoBackupPath(): Promise<string | undefined> {
+export async function loadAutoBackupFolder(): Promise<{ directory: string | undefined; failure: string | null }> {
+  const version = autoChoiceVersion;
   const configured = await getAutoBackupDirectory();
-  if (!configured || !isIOS()) return configured;
-  const { path, failure } = await invoke<IOSBackupFolderStatus>("ios_backup_folder_status");
+  if (!isIOS()) return { directory: configured, failure: null };
+  const status = await invoke<IOSBackupFolderStatus>("ios_backup_folder_status");
+  const { path } = status;
   const documents = await documentDir();
+  if (autoChoiceInFlight || version !== autoChoiceVersion) {
+    return { directory: configured === iosDocumentsBackupMarker ? documents : configured, failure: status.failure };
+  }
+  if (!configured && path) {
+    await invoke("ios_clear_backup_folder", { kind: "auto" });
+    status.failure = null;
+  }
+  if (!configured) return { directory: undefined, failure: status.failure };
   if (isIOSDocumentsBackupChoice(configured, documents)
     && (configured === iosDocumentsBackupMarker || configured === documents || path !== configured)) {
-    if (path || failure?.includes("Choose the folder again")) await invoke("ios_clear_backup_folder", { kind: "auto" });
+    if (path || status.failure?.includes("Choose the folder again")) {
+      await invoke("ios_clear_backup_folder", { kind: "auto" });
+      status.failure = null;
+    }
     if (configured !== iosDocumentsBackupMarker) await saveAutoBackupDirectory(iosDocumentsBackupMarker);
-    return documents;
+    return { directory: documents, failure: status.failure };
   }
   if (path && path !== configured) {
     await saveAutoBackupDirectory(path);
-    return path;
+    return { directory: path, failure: status.failure };
   }
-  return configured;
+  return { directory: configured, failure: status.failure };
+}
+
+export async function getAutoBackupPath(): Promise<string | undefined> {
+  return (await loadAutoBackupFolder()).directory;
+}
+
+export async function chooseAndSaveAutoBackupFolder(): Promise<string | null> {
+  autoChoiceVersion += 1;
+  autoChoiceInFlight = true;
+  try {
+    const path = await chooseBackupLocation();
+    if (path) await saveAutoBackupDirectory(path);
+    return path;
+  } finally {
+    autoChoiceInFlight = false;
+    autoChoiceVersion += 1;
+  }
 }
 
 export async function prepareAutoBackupPath(path: string): Promise<void> {
   if (!isIOS()) return;
-  activePreparations += 1;
-  window.dispatchEvent(new CustomEvent(backupFolderPreparationEvent, { detail: true }));
+  const fromCloud = isICloudDrivePath(path);
+  if (fromCloud) {
+    activePreparations += 1;
+    window.dispatchEvent(new CustomEvent(backupFolderPreparationEvent, { detail: true }));
+  }
   try {
     await invoke("ios_prepare_backup_folder", { path, kind: "auto" });
   } finally {
-    activePreparations -= 1;
-    window.dispatchEvent(new CustomEvent(backupFolderPreparationEvent, { detail: activePreparations > 0 }));
+    if (fromCloud) {
+      activePreparations -= 1;
+      window.dispatchEvent(new CustomEvent(backupFolderPreparationEvent, { detail: activePreparations > 0 }));
+    }
     window.dispatchEvent(new Event(backupFolderStatusEvent));
   }
 }

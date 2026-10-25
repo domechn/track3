@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HashRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import DataManagement from "./data-management";
@@ -13,6 +13,7 @@ vi.mock("@/utils/backup-location", () => ({ chooseBackupLocation: m.choose, docu
 vi.mock("@/middlelayers/backup-folder", () => ({ findBackupFolder: m.find, listBackupClients: m.list, readBackupClient: m.read }));
 vi.mock("@/utils/ios-native", () => ({ appLockEnabled: vi.fn(async () => false) }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: m.invoke }));
+vi.mock("@tauri-apps/api/path", () => ({ documentDir: m.documents }));
 vi.mock("@/mobile/components/ui/use-toast", () => ({ useToast: () => ({ toast: m.toast }) }));
 vi.mock("@/middlelayers/configuration", () => ({
   getAutoBackupDirectory: m.getFolder, getBlacklistCoins: m.getBlacklist,
@@ -41,6 +42,7 @@ beforeEach(() => {
   m.duplicate.mockResolvedValue(false);
   m.importData.mockResolvedValue(true);
   m.clean.mockResolvedValue(undefined);
+  m.save.mockResolvedValue(undefined);
 });
 
 it("reviews a selected folder and imports without changing auto backup", async () => {
@@ -136,6 +138,34 @@ it("removes an orphaned auto bookmark left by an earlier Clear", async () => {
   render(<HashRouter><DataManagement /></HashRouter>);
   await waitFor(() => expect(m.invoke).toHaveBeenCalledWith("ios_clear_backup_folder", { kind: "auto" }));
   expect(m.save).not.toHaveBeenCalled();
+});
+
+it("keeps a newly picked bookmark while its configuration write is pending", async () => {
+  m.getFolder.mockResolvedValue(undefined);
+  let finishSave!: () => void;
+  let picked = false;
+  m.choose.mockImplementation(async () => {
+    picked = true;
+    return "/cloud/new";
+  });
+  m.save.mockImplementation(() => new Promise<void>((resolve) => { finishSave = resolve; }));
+  let finishRefresh!: () => void;
+  m.invoke.mockImplementation(async (command: string) => {
+    if (command !== "ios_backup_folder_status") return null;
+    if (!picked) return { path: null, failure: null };
+    await new Promise<void>((resolve) => { finishRefresh = resolve; });
+    return { path: "/cloud/new", failure: null };
+  });
+  render(<HashRouter><DataManagement /></HashRouter>);
+  await waitFor(() => expect(m.invoke).toHaveBeenCalledWith("ios_backup_folder_status"));
+  fireEvent.click(screen.getByRole("button", { name: "Choose Folder" }));
+  await waitFor(() => expect(m.save).toHaveBeenCalledWith("/cloud/new"));
+  window.dispatchEvent(new Event("track3:backup-folder-status"));
+  await waitFor(() => expect(m.invoke.mock.calls.filter(([command]) => command === "ios_backup_folder_status")).toHaveLength(2));
+  finishSave();
+  expect(await screen.findByText("/cloud/new")).toBeInTheDocument();
+  await act(async () => { finishRefresh(); });
+  expect(m.invoke).not.toHaveBeenCalledWith("ios_clear_backup_folder", { kind: "auto" });
 });
 
 it("clears the bookmark with the folder and restores it on Undo", async () => {

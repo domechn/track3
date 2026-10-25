@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { isIOS } from "@/utils/platform";
 import { Analyzer, GlobalConfig, WalletCoin } from "./datafetch/types";
 import { BTCAnalyzer } from "./datafetch/coins/btc";
 import { combineCoinLists, getAssetType } from "./datafetch/utils/coins";

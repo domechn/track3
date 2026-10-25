@@ -121,6 +121,29 @@ describe("automatic backup integration", () => {
     expect(mocks.importBackupV2).toHaveBeenCalledWith("/app/Documents", "self", expect.any(Function), expect.any(Function), expect.any(Function));
   });
 
+  it("does not announce an iCloud download for the Documents folder", async () => {
+    mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue("/app/Documents");
+    const events: boolean[] = [];
+    const listener = (event: Event) => events.push((event as CustomEvent<boolean>).detail);
+    window.addEventListener("track3:backup-folder-preparation", listener);
+    try {
+      await autoImportHistoricalData();
+      expect(events).toEqual([]);
+    } finally {
+      window.removeEventListener("track3:backup-folder-preparation", listener);
+    }
+  });
+
+  it("clears an orphaned bookmark when no auto backup folder is configured", async () => {
+    mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue(undefined);
+    mocks.invoke.mockImplementation(async (command: string) =>
+      command === "ios_backup_folder_status" ? { path: "/cloud/old", failure: null } : null);
+    expect(await autoImportHistoricalData()).toBe(false);
+    expect(mocks.invoke).toHaveBeenCalledWith("ios_clear_backup_folder", { kind: "auto" });
+  });
+
   it("resolves the Documents marker after the app container moves", async () => {
     mocks.ios.value = true;
     mocks.getAutoBackupDirectory.mockResolvedValue(iosDocumentsBackupMarker);
@@ -163,9 +186,10 @@ describe("automatic backup integration", () => {
 
   it("announces iCloud preparation while the native download is pending", async () => {
     mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue("/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/backups");
     let finish!: () => void;
     mocks.invoke.mockImplementation(async (command: string) => {
-      if (command === "ios_backup_folder_status") return { path: null, failure: null };
+      if (command === "ios_backup_folder_status") return { path: "/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/backups", failure: null };
       if (command === "ios_prepare_backup_folder") await new Promise<void>((resolve) => { finish = resolve; });
       return null;
     });

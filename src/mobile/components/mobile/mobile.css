@@ -300,6 +300,8 @@
   .overview-source-row > svg:last-child { display: none; }
   .comparison-date-button { padding-left: 4px; padding-right: 4px; }
   .comparison-date-button svg { display: none; }
+  .ios-d3-backup-folder-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .ios-d3-backup-folder-actions > * { width: 100%; }
 }
 
 
@@ -444,6 +446,7 @@
   .ios-d3-backup-actions .mobile-inset-section { margin-bottom: 0; }
   .ios-d3-backup-actions .ios-d3-backup-import-section + .mobile-inset-section { margin-top: 26px; }
   .ios-d3-backup-actions .ios-d3-import-note { display: block; margin: 8px 12px 0; }
+  .ios-d3-backup-actions .ios-d3-folder-review { margin-top: 18px; }
   .ios-d3-auto-backup-setting .ios-d3-data-panel-content > .grid { grid-template-columns: minmax(0, 1fr); }
   .ios-d3-backup-actions .ios-d3-backup-folder-actions { flex-wrap: wrap; }
   .ios-d3-backup-folder-actions > button:first-child { min-width: 0; flex: 1 1 180px; white-space: nowrap; }
@@ -452,6 +455,7 @@
   .ios-d3-folder-review-info, .ios-d3-folder-client, .ios-d3-folder-auto-option { padding: 12px 16px; font-size: 15px; }
   .ios-d3-folder-review-info, .ios-d3-folder-client { border-bottom: .5px solid var(--ios-separator); }
   .ios-d3-folder-review-info { overflow-wrap: anywhere; color: hsl(var(--muted-foreground)); }
+  .ios-d3-folder-review-name { margin-bottom: 4px; color: hsl(var(--foreground)); font-weight: 600; }
   .ios-d3-folder-client, .ios-d3-folder-auto-option { display: flex; align-items: center; gap: 12px; }
   .ios-d3-folder-client { justify-content: space-between; min-height: 56px; }
   .ios-d3-folder-auto-option { min-height: 52px; }

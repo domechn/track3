@@ -16,7 +16,7 @@ test("imports from a selected Files backup folder", async ({ page }) => {
   await expect(page.getByRole("alertdialog", { name: "Restore data?" })).toBeVisible();
   await page.getByRole("alertdialog", { name: "Restore data?" }).getByRole("button", { name: "Restore" }).click();
   await expect(page.getByRole("alertdialog", { name: "Restore data?" })).toHaveCount(0);
-  await expect(page.getByText("Import data successfully")).toBeVisible();
+  await expect(page.getByText("Import data successfully", { exact: true })).toBeVisible();
 });
 
 test("normalizes a picked backup client and keeps its review inside a small phone", async ({ page }) => {

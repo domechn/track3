@@ -532,7 +532,7 @@
   "data.conflictOverwrite": "覆盖",
   "data.conflictIgnore": "跳过",
   "data.import": "导入数据",
-  "data.importDesc": "读取导出文件并与当前记录合并。 可选择 JSON 文件，或从备份文件夹导入。",
+  "data.importDesc": "读取导出文件并与当前记录合并。可选择 JSON 文件，或从备份文件夹导入。",
   "data.importButton": "导入",
   "data.export": "导出数据",
   "data.includeConfig": "包含配置",

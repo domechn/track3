@@ -15,7 +15,6 @@ import { UniqueIndexConflictResolver } from "@/middlelayers/types";
 import {
   addToBlacklist,
   cleanAutoBackupDirectory,
-  getAutoBackupDirectory,
   getBlacklistCoins,
   getLastAutoImportAt,
   getLastAutoBackupAt,
@@ -56,7 +55,7 @@ import {
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { chooseBackupLocation, documentsBackupLocation } from "@/utils/backup-location";
 import { findBackupFolder, listBackupClients, readBackupClient, type BackupClient, type BackupFolder } from "@/middlelayers/backup-folder";
-import { backupFolderPreparationEvent, backupFolderStatusEvent, iosDocumentsBackupMarker, isIOSDocumentsBackupChoice, type IOSBackupFolderStatus } from "@/middlelayers/ios-backup-folder";
+import { backupFolderPreparationEvent, backupFolderStatusEvent, chooseAndSaveAutoBackupFolder, iosDocumentsBackupMarker, isICloudDrivePath, isIOSDocumentsBackupChoice, loadAutoBackupFolder } from "@/middlelayers/ios-backup-folder";
 import { isIOS } from "@/utils/platform";
 import { appLockEnabled, setAppLockEnabled } from "@/utils/ios-native";
 import { ConfirmSheet } from "@/mobile/components/mobile/overlays";
@@ -173,30 +172,11 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function loadAutoBackupDirectory() {
     const version = folderChoiceVersion.current;
     try {
-      let d = await getAutoBackupDirectory();
-      if (isIOS()) {
-        const status = await invoke<IOSBackupFolderStatus>("ios_backup_folder_status");
-        if (version !== folderChoiceVersion.current) return false;
-        const documents = await documentsBackupLocation();
-        if (version !== folderChoiceVersion.current) return false;
-        if (d && isIOSDocumentsBackupChoice(d, documents)
-          && (d === iosDocumentsBackupMarker || d === documents || status.path !== d)) {
-          if (status.path || status.failure?.includes("Choose the folder again")) await invoke("ios_clear_backup_folder", { kind: "auto" });
-          if (d !== iosDocumentsBackupMarker) await saveAutoBackupDirectory(iosDocumentsBackupMarker);
-          d = documents;
-          if (status.path || status.failure?.includes("Choose the folder again")) status.failure = null;
-        } else if (status.path && !d) {
-          await invoke("ios_clear_backup_folder", { kind: "auto" });
-          status.failure = null;
-        } else if (status.path && d && status.path !== d) {
-          await saveAutoBackupDirectory(status.path);
-          d = status.path;
-        }
-        setBackupFolderFailure(status.failure);
-      }
+      const { directory, failure } = await loadAutoBackupFolder();
       if (version !== folderChoiceVersion.current) return false;
-      setAutoBackupDirectory(d);
-      return !!d;
+      if (isIOS()) setBackupFolderFailure(failure);
+      setAutoBackupDirectory(directory);
+      return !!directory;
     } catch {
       if (isIOS()) setBackupFolderFailure("Backup folder is unavailable.");
       return false;
@@ -307,7 +287,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       if (!selected) return;
       setFolderBusy(true);
       setFolderPreparing(true);
-      setFolderFromCloud(selected.includes("/Mobile Documents/") || selected.includes("/CloudDocs/"));
+      setFolderFromCloud(isICloudDrivePath(selected));
       await invoke("ios_prepare_backup_folder", { path: selected, kind: "import" });
       const folder = await findBackupFolder(selected);
       if (!folder) { setFolderError(t("data.folder.hint")); return; }
@@ -336,15 +316,14 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   async function onChooseAutoBackupFolderButtonClick() {
     folderChoiceVersion.current += 1;
     try {
-    const selected = await chooseBackupLocation();
+    const selected = await chooseAndSaveAutoBackupFolder();
     if (selected) {
-      const path = selected as string;
-      await saveAutoBackupDirectory(path);
-      setAutoBackupDirectory(path);
+      setAutoBackupDirectory(selected);
       setBackupFolderFailure(null);
       await loadAutoBackupTime();
     }
     } catch (error) { setBackupFolderFailure(String(error)); }
+    finally { folderChoiceVersion.current += 1; }
   }
 
   async function onUseDocumentsFolderClick() {
@@ -462,11 +441,11 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <p className="ios-d3-settings-note">{t("data.folder.hint")}</p>
         {folderBusy && folderPreparing && <p role="status" className="ios-d3-settings-note">{t(folderFromCloud ? "data.folder.downloading" : "data.folder.checking")}</p>}
         {folderError && <p role="alert" className="text-sm text-destructive">{folderError}</p>}
-        {folderReview && <InsetGroup title={t("data.folder.review")}>
+        {folderReview && <InsetGroup title={t("data.folder.review")} className="ios-d3-folder-review">
           <div className="ios-d3-folder-review-info">
+            <p className="ios-d3-folder-review-name">{folderReview.folder.directory.split("/").filter(Boolean).at(-1) ?? "/"}</p>
             {folderReview.folder.normalized && <p>{t("data.folder.normalized").replace("{folder}", folderReview.folder.directory.split("/").filter(Boolean).at(-1) ?? "/")}</p>}
             {folderReview.folder.normalized && <p>{t("data.folder.normalizedAutoHint")}</p>}
-            <p className="font-medium">{folderReview.folder.directory.split("/").filter(Boolean).at(-1) ?? "/"}</p>
           </div>
           {folderReview.clients.map(({ client, exportAt, months }) => <div key={client} className="ios-d3-folder-client">
             <div className="min-w-0 flex-1">

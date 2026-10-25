@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { backupFolderPreparationEvent } from "@/middlelayers/ios-backup-folder";
 import {
   Tooltip,
   TooltipContent,
@@ -64,5 +66,3 @@ export default function AutoBackupIndicator({
     </div>
   );
 }
-import { useEffect, useState } from "react";
-import { backupFolderPreparationEvent } from "@/middlelayers/ios-backup-folder";
