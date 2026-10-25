@@ -13,7 +13,7 @@ export { SplitView } from "@/mobile/components/mobile/split-view";
 export { useSizeClass } from "@/mobile/components/mobile/size-class";
 export { Switch } from "@/mobile/components/ui/switch";
 
-export const MOBILE_MEDIA_QUERY = "(min-width: 0px)";
+export const MOBILE_MEDIA_QUERY = "(pointer: coarse)";
 
 export function useHaptics() {
   return (kind: "selection" | "light" | "success" = "selection") => {
@@ -27,10 +27,10 @@ export function useHaptics() {
 }
 
 export function useIsMobile() {
-  const [mobile, setMobile] = useState(() => window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false);
+  const [mobile, setMobile] = useState(() => isIOS() || (window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false));
   useEffect(() => {
     const query = window.matchMedia(MOBILE_MEDIA_QUERY);
-    const update = () => setMobile(query.matches);
+    const update = () => setMobile(isIOS() || query.matches);
     update();
     query.addEventListener?.("change", update);
     return () => query.removeEventListener?.("change", update);

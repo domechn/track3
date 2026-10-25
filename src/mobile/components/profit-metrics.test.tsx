@@ -54,7 +54,7 @@ describe("ProfitMetrics", () => {
   it("puts phone metric dates on their own line below unbroken values", async () => {
     const previousMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({
-      matches: query.includes("min-width: 0px"), media: query, onchange: null,
+      matches: query.includes("pointer: coarse"), media: query, onchange: null,
       addListener: () => {}, removeListener: () => {},
       addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
     });
@@ -85,7 +85,7 @@ describe("ProfitMetrics", () => {
   it("uses the mathematical minus sign for a phone drawdown", async () => {
     const previousMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({
-      matches: query.includes("min-width: 0px"), media: query, onchange: null,
+      matches: query.includes("pointer: coarse"), media: query, onchange: null,
       addListener: () => {}, removeListener: () => {},
       addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
     });

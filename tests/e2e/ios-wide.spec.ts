@@ -63,6 +63,33 @@ test("compact Analytics keeps its hub behind an open chart sheet", async ({ brow
   }
 });
 
+for (const [name, width, height] of [["ipad-mini", 744, 1133], ["iphone-landscape", 932, 430]] as const) {
+  test(`${name} opens Analytics profit in a centered sheet`, async ({ browser }) => {
+    const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width, height }, hasTouch: true, isMobile: true });
+    const page = await context.newPage();
+    try {
+      await installTauriBridge(page, { richPortfolio: true });
+      await page.goto("/#/summary");
+      await page.locator(".analytics-tile").getByText("Returns", { exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "Returns" });
+      await expect(dialog).toBeVisible();
+      const geometry = await dialog.evaluate((node) => {
+        const bounds = node.getBoundingClientRect();
+        return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
+      });
+      expect(geometry.left).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(width);
+      expect(geometry.top).toBeGreaterThanOrEqual(0);
+      expect(geometry.bottom).toBeLessThanOrEqual(height);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      mkdirSync("test-results/mobile", { recursive: true });
+      await page.screenshot({ path: `test-results/mobile/${name}-analytics-profit.png` });
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 test("regular and wide Overview charts keep their date labels inside the card", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 744, height: 1133 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
@@ -109,7 +136,7 @@ test("wide hubs show empty details and mark the selected item", async ({ browser
   }
 });
 
-test("wide More keeps its menu beside selected pages", async ({ browser }) => {
+test("wide More keeps its menu beside Goals and Rebalance, then gives Settings and Assistant more room", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   try {
@@ -119,20 +146,25 @@ test("wide More keeps its menu beside selected pages", async ({ browser }) => {
     await expect(page.locator(".more-split > .mobile-split-detail")).toContainText("Choose a page");
     for (const route of ["goals", "rebalance", "assistant", "settings"]) {
       await page.goto(`/#/${route}`);
-      await expect(page.locator(".more-split > .mobile-split-master")).toBeVisible();
+      if (route === "assistant" || route === "settings") {
+        await expect(page.locator(".more-split > .mobile-split-master")).toBeHidden();
+      } else {
+        await expect(page.locator(".more-split > .mobile-split-master")).toBeVisible();
+      }
       await expect(page.locator(".more-split > .mobile-split-detail")).toBeVisible();
       await expect(page.locator(`.more-split .mobile-list-row[href='#/${route}'][aria-current='page']`)).toHaveCount(1);
       await expect(page.locator(".mobile-header-back")).toBeHidden();
+      if (route === "assistant") await expect(page.locator("#app-top-bar")).toBeHidden();
     }
     const panes = await page.evaluate(() => ({
-      more: document.querySelector(".more-split > .mobile-split-master")!.getBoundingClientRect().width,
+      settings: document.querySelector(".ios-d3-settings .mobile-split-detail")!.getBoundingClientRect().width,
       appearanceLabel: document.querySelector(".ios-d3-settings a[href='#/settings/appearance?section=theme'] .mobile-list-label")!.getBoundingClientRect().height,
     }));
-    expect(panes.more).toBeLessThanOrEqual(260);
+    expect(panes.settings).toBeGreaterThanOrEqual(560);
     expect(panes.appearanceLabel).toBeLessThanOrEqual(34);
     await page.goto("/#/settings/appearance?section=theme");
     await expect(page.locator(".ios-d3-settings-page")).toBeVisible();
-    await expect(page.locator(".ios-d3-more .mobile-list-row[href='#/settings']")).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".more-split > .mobile-split-master")).toBeHidden();
   } finally {
     await context.close();
   }
@@ -156,6 +188,7 @@ test("nested Settings and Assistant splits keep readable detail at 1032px", asyn
         expect(labelHeight).toBeLessThanOrEqual(34);
       }
       await expect(page.locator(".mobile-header-back")).toBeHidden();
+      if (route === "assistant") await expect(page.locator("#app-top-bar")).toBeHidden();
       mkdirSync("test-results/mobile", { recursive: true });
       await page.screenshot({ path: `test-results/mobile/ipad-13-portrait-${route.startsWith("settings") ? "settings" : "assistant"}.png` });
     }
@@ -237,6 +270,26 @@ test("regular touch windows keep pull to refresh and edge swipe back", async ({ 
   }
 });
 
+test("wide detail pages ignore the edge back swipe when they have no back button", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true, seedRebalanceProfile: true });
+    const cdp = await context.newCDPSession(page);
+    for (const route of ["settings/appearance?section=theme", "goals", "rebalance", "assistant"]) {
+      await page.goto(`/#/${route}`);
+      await expect(page.locator(".mobile-header-back")).toBeHidden();
+      const edge = await page.locator("#app-main-content").evaluate((node) => node.getBoundingClientRect().left + 12);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: edge, y: 250 }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: edge + 120, y: 250 }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await expect(page).toHaveURL(new RegExp(`#/${route.replace(/[?]/g, "\\?")}$`));
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 test("regular windows keep the snapshot sheet rounded and scrollable", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 932, height: 430 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
@@ -303,6 +356,8 @@ test("wide history, settings, and analytics keep list and detail visible togethe
     await expect(page.locator(".d2-history .mobile-split-view .mobile-split-master")).toBeVisible();
     await expect(page.locator(".d2-history .mobile-split-view .mobile-split-detail")).toBeVisible();
     await expect(page.locator(".history-mobile-list")).toBeVisible();
+    expect(await page.locator(".history-mobile-snapshot-button").first().evaluate((node) =>
+      node.getBoundingClientRect().height)).toBeLessThanOrEqual(72);
     await expect(page.locator(".mobile-sheet-backdrop")).toHaveCount(0);
     await page.screenshot({ path: "test-results/mobile/ipad-history-detail.png" });
 

@@ -47,6 +47,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }));
+vi.mock("@tauri-apps/api/path", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@tauri-apps/api/path")>(),
+  documentDir: vi.fn(async () => "/Documents"),
+}));
 
 vi.mock("@/mobile/components/ui/use-toast", () => ({
   useToast: () => ({ toast: mocks.toast }),
@@ -82,7 +86,8 @@ beforeEach(() => {
     new Date("2024-04-15T00:00:00.000Z"),
   );
   mocks.getBlacklistCoins.mockResolvedValue(["BTC"]);
-  mocks.invoke.mockResolvedValue(undefined);
+  mocks.invoke.mockImplementation(async (command: string) =>
+    command === "ios_backup_folder_status" ? { path: null, failure: null } : undefined);
   mocks.removeFromBlacklist.mockResolvedValue(undefined);
   mocks.addToBlacklist.mockResolvedValue(undefined);
   mocks.cleanAutoBackupDirectory.mockResolvedValue(undefined);

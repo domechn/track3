@@ -36,7 +36,7 @@ it("uses a dash for a month with no snapshot", async () => {
 
 it("lets the phone narrow a month's P&L chart to seven days", () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    matches: query.includes("min-width: 0px"),
+    matches: query.includes("pointer: coarse"),
     media: query,
     onchange: null,
     addListener: vi.fn(),

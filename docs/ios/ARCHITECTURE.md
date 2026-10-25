@@ -92,8 +92,9 @@ The Xcode target enables iPhone and iPad, phone portrait and landscape, all
 four iPad orientations, and multitasking. `Info.ios.plist` supplies Tauri's
 generated project while the committed Xcode project contains the matching
 keys. The native share controller anchors its iPad popover to the presenting
-view. The iOS document picker in `tauri-plugin-dialog` uses full-screen
-presentation, so it has no popover anchor. The app lock covers visible scene
+view. The native backup-folder `UIDocumentPicker` presents as a form sheet
+on iPad, and `tauri-plugin-dialog`'s file picker presents full screen;
+neither uses a popover anchor. The app lock covers visible scene
 windows, so its cover resizes with a window; signing and device behavior
 still require physical testing.
 
@@ -119,11 +120,26 @@ to an external path. It keeps the selected Documents file when the picker
 returns that path with or without iOS's `/private` alias.
 This prevents an earlier Documents export from being overwritten or deleted
 when the user cancels. Desktop exports write directly to the selected path.
-Automatic
-backups on iOS use the app's Documents directory, with filesystem scope for
-that directory. Backups are available through Files and Finder. Selecting
-arbitrary external directories across launches is unavailable because the
-current plugin does not retain security-scoped access.
+Automatic backups can use Track3's Documents directory or a folder selected in
+Files, including iCloud Drive. The native folder picker opens folders in place
+and saves a security-scoped bookmark in UserDefaults. Startup resolves the
+auto-backup bookmark and grants the restored path to Tauri's runtime filesystem
+scope before the webview starts auto import and backup. The import picker has a
+separate bookmark, so a one-time import does not replace the auto-backup folder.
+Users can opt to promote a selected parent import folder to the auto-backup
+folder. Clearing the auto-backup folder removes its bookmark; Undo can restore
+that bookmark during the current process. The app Documents directory uses
+its existing Files permission even though it has no runtime bookmark.
+A stale bookmark is renewed on restore, and the resolved path replaces an old
+configuration path; an inaccessible or deleted folder is
+shown in Backup settings with a Choose folder again action. Before reading a
+backup tree, native code requests iCloud downloads and waits up to 90 seconds;
+a fresh URL resource-value check on each poll observes download completion.
+A download failure stops the import instead of treating a placeholder as an
+empty backup. Choosing `track3-backup` or one of its client folders resolves to
+its parent for import. For a selected client folder, Track3 reads only that
+client within its granted security scope. The JSON file picker continues to
+use the dialog plugin's `.json` UTType filter.
 
 The simulator debug build enables a frontend probe that waits for rendered
 content, including the empty portfolio on a fresh install, and invokes a

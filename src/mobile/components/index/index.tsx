@@ -62,7 +62,7 @@ import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { toast } from "@/mobile/components/ui/use-toast";
 import { ToastAction } from "@/mobile/components/ui/toast";
 import { markIOSReady } from "@/utils/ios-ready";
-import { BottomSheet, Button as MobileButton, InsetGroup, ListRow, MOBILE_MEDIA_QUERY, MobilePage, PullToRefresh, SplitView, useHaptics, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
+import { BottomSheet, Button as MobileButton, InsetGroup, ListRow, MobilePage, PullToRefresh, SplitView, useHaptics, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 import TopCoinsRank from "@/mobile/components/top-coins-rank";
 import ProfitSummary from "@/mobile/components/profit-summary";
 import LatestAssetsPercentage from "@/mobile/components/latest-assets-percentage";
@@ -425,7 +425,7 @@ function Layout({
           onPointerUp={(event) => {
             const start = swipeStart.current;
             swipeStart.current = null;
-            if (!canGoBack || !start || event.pointerId !== start.id) return;
+            if (!showBack || !start || event.pointerId !== start.id) return;
             const dx = event.clientX - start.x;
             const dy = event.clientY - start.y;
             if (dx > 90 && Math.abs(dx) > Math.abs(dy)) {
@@ -505,7 +505,7 @@ function MoreHub({ children }: React.PropsWithChildren) {
       </ListRow>)}
     </InsetGroup>
   </div>;
-  return <SplitView selected={Boolean(children)} className="more-split"
+  return <SplitView selected={Boolean(children)} className={`more-split${/^\/(settings|assistant)(\/|$)/.test(pathname) ? " more-detail-only" : ""}`}
     masterLabel={t("nav.more")} detailLabel={t("nav.more")}
     master={master} detail={children ?? <p className="analytics-empty">{t("more.selectDetail")}</p>} />;
 }
@@ -820,6 +820,7 @@ function AppRoutes({
 
 const App = () => {
   const { t } = useTranslation();
+  const mobile = useIsMobile();
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
@@ -881,7 +882,7 @@ const App = () => {
           if (!active) return;
           setLoadFailed(true);
           console.warn("startup data loading failed");
-          if (!window.matchMedia(MOBILE_MEDIA_QUERY).matches) toast({
+          if (!mobile) toast({
             title: t("app.dataLoadFailed"),
             duration: 86_400_000,
             action: <ToastAction altText={t("app.retryDataLoad")} onClick={start} className="touch:min-h-11">

@@ -1,9 +1,30 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ActionSheet, BottomSheet, MobileRecordList, PullToRefresh, SegmentedControl, SwipeableRow } from "@/mobile/components/mobile";
+import { ActionSheet, BottomSheet, MobileRecordList, PullToRefresh, SegmentedControl, SwipeableRow, useIsMobile } from "@/mobile/components/mobile";
+
+function MobileLayoutProbe() {
+  return <span>{useIsMobile() ? "mobile layout" : "desktop layout"}</span>;
+}
 
 describe("mobile interactions", () => {
+  it("keeps the mobile presentation when no media query matches", () => {
+    const agent = vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)");
+    const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+      matches: false, media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+    try {
+      render(<MobileLayoutProbe />);
+      expect(screen.getByText("mobile layout")).toBeInTheDocument();
+    } finally {
+      matchMedia.mockRestore();
+      agent.mockRestore();
+    }
+  });
+
   it("shows an inline detail pane without a modal overlay", () => {
     render(<BottomSheet open inline onOpenChange={() => {}} title="Snapshot details">
       <p>Assets</p>

@@ -39,6 +39,10 @@ and dark mode.
 | Date range and refresh, source status and retry | Overview header date sheet; Refresh button or pull down | `src/mobile/components/date-picker.tsx`, `refresh-data.tsx`, `src/mobile/components/mobile/index.tsx` | `tests/e2e/mobile.spec.ts`, `tests/e2e/ios-settings.spec.ts`, `src/mobile/components/refresh-data.test.tsx` | Adapted |
 | Unread alert navigation badge | More tab badge, Goals & Alerts history | `src/mobile/components/use-alert-badge.ts`, `src/mobile/components/mobile/navigation.tsx` | `src/mobile/components/use-alert-badge.test.ts`, `src/mobile/components/mobile/navigation.test.tsx` | Adapted |
 
+Profit is presented through Analytics → Returns; it has no separate mobile
+route. The regular-width profit sheet is covered at iPad mini portrait and
+iPhone landscape sizes in `tests/e2e/ios-wide.spec.ts`.
+
 ## Settings and local data
 
 | Desktop feature or setting | iPhone location | Implementation | Test | Status |
@@ -62,7 +66,7 @@ and dark mode.
 | Assistant advanced JSON (`temperature`, `top_p`, headers, extra body, provider) | More → Settings → AI assistant → Advanced JSON | `src/mobile/components/settings/assistant.tsx` | `src/components/settings/assistant.test.tsx` | Done |
 | Assistant actions and proactive insight summary switches | More → Settings → AI assistant → Action and insight controls | `src/mobile/components/settings/assistant.tsx`, `src/mobile/components/insights-card.tsx` | `src/components/settings/assistant.test.tsx`, `src/components/insights-card.test.tsx` | Done |
 | JSON export/import, optional configuration, conflict resolution | More → Settings → Backup → Export, Share JSON or Import | `src/mobile/components/data-management.tsx`, `src/middlelayers/datamanager.ts`, `src/utils/export-file.ts` | `tests/e2e/ios-parity.spec.ts`, `src/middlelayers/datamanager.test.ts` | Adapted |
-| Automatic monthly backup and restore, status, folder clearing | More → Settings → Backup → automatic backup in Documents; last backup and import dates appear inline | `src/mobile/components/data-management.tsx`, `src/middlelayers/data.ts` | `src/mobile/components/data-management-blacklist.test.tsx`, `src/mobile/components/auto-backup-indicator.test.tsx`, `src/middlelayers/data-auto-backup.test.ts` | Adapted |
+| Automatic monthly backup and restore, status, folder clearing | More → Settings → Backup → choose a Files or iCloud Drive folder, or use Documents; import a backup folder with client review and optional auto backup; last backup and import dates appear inline | `src/mobile/components/data-management.tsx`, `src/middlelayers/data.ts` | `src/mobile/components/data-management-backup-folder.test.tsx`, `src/middlelayers/backup-folder.test.ts`, `tests/e2e/ios-backup-folder.spec.ts` | Adapted |
 | Encryption key rotation and recovery notice | More → Settings → Security → Update Encryption Key; startup notice | `src/mobile/components/data-management.tsx`, `ios-key-recovery-notice.tsx`, `src-tauri/src/ent.rs` | `src/mobile/components/ios-key-recovery-notice.test.tsx`, `src-tauri/pure-tests` | Adapted |
 | Face ID/Touch ID/passcode lock, app switcher cover | More → Settings → Security → App lock | `src/mobile/components/data-management.tsx`, `src-tauri/gen/apple/Sources/track3/Track3Native.swift` | `src/mobile/components/data-management-blacklist.test.tsx`; device check pending | Adapted |
 | Encrypted S3 endpoint, region, bucket, prefix, access key ID and secret, path style, connection test | More → Settings → Backup and sync → Connection | `src/mobile/components/settings/sync.tsx`, `src/middlelayers/sync/settings.ts` | `src/components/settings/sync.test.tsx`, `src/middlelayers/sync/s3-client.test.ts` | Done |

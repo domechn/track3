@@ -16,7 +16,6 @@ import { queryHistoricalData } from "./charts-history";
 import { exists, stat } from "@tauri-apps/plugin-fs";
 import { importBackupV2, writeBackupV2 } from "./backup-v2";
 import {
-  getAutoBackupDirectory,
   getImportedPartHashes,
   getLastAutoImportAt,
   getLastAutoBackupAt,
@@ -46,6 +45,7 @@ import { maskSourceIdentifier } from "./source-status";
 import { CEX_OPTIONS, STOCK_BROKER_OPTIONS } from "./constants";
 import { exportFile } from "@/utils/export-file";
 import { shareExport } from "@/utils/share-export";
+import { getAutoBackupPath, prepareAutoBackupPath } from "./ios-backup-folder";
 import {
   type FailedPortfolioSource,
   type LoadPortfoliosResult,
@@ -392,6 +392,10 @@ export async function readHistoricalDataFromFile(): Promise<
   return DATA_MANAGER.readHistoricalData(selected as string);
 }
 
+export async function readHistoricalDataFromPath(path: string): Promise<ExportData> {
+  return DATA_MANAGER.readHistoricalData(path);
+}
+
 // importHistoricalData to db
 export async function importHistoricalData(
   conflictResolver: "REPLACE" | "IGNORE",
@@ -414,7 +418,7 @@ export function autoBackupHistoricalData(
 }
 
 async function performAutoBackupHistoricalData(force: boolean): Promise<boolean> {
-  const abd = await getAutoBackupDirectory();
+  const abd = await getAutoBackupPath();
   // user did not set auto backup directory
   if (!abd) {
     return false;
@@ -434,6 +438,7 @@ async function performAutoBackupHistoricalData(force: boolean): Promise<boolean>
     return false;
   }
 
+  await prepareAutoBackupPath(abd);
   const client = await getClientID();
   if (!client) {
     throw new Error("missing client ID for auto backup");
@@ -449,7 +454,7 @@ async function performAutoBackupHistoricalData(force: boolean): Promise<boolean>
 
 // auto import backup data into app
 export async function autoImportHistoricalData(): Promise<boolean> {
-  const abd = await getAutoBackupDirectory();
+  const abd = await getAutoBackupPath();
   // user did not set auto backup directory
   if (!abd) {
     return false;
@@ -458,6 +463,7 @@ export async function autoImportHistoricalData(): Promise<boolean> {
   const client = await getClientID();
   if (!client) return false;
 
+  await prepareAutoBackupPath(abd);
   let imported = false;
   let clientsWithV2 = new Set<string>();
   try {

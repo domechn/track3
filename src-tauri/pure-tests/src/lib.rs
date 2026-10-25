@@ -4,6 +4,8 @@ pub mod binance;
 pub mod ent;
 #[path = "../../src/info.rs"]
 pub mod info;
+#[path = "../../src/ios_backup_path.rs"]
+pub mod ios_backup_path;
 #[path = "../../src/ios_share_path.rs"]
 pub mod ios_share_path;
 #[path = "../../src/migration.rs"]
@@ -221,6 +223,38 @@ mod init_schema_tests {
             }
             db.close().await.unwrap();
         });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod backup_folder_path_tests {
+    use super::ios_backup_path::{backup_folder_kind, backup_parent, is_document_location};
+    use std::path::Path;
+
+    #[test]
+    fn accepts_only_known_folder_bookmarks() {
+        assert_eq!(backup_folder_kind("auto"), Ok(0));
+        assert_eq!(backup_folder_kind("import"), Ok(1));
+        assert!(backup_folder_kind("other").is_err());
+    }
+
+    #[test]
+    fn normalizes_child_backup_locations() {
+        assert_eq!(backup_parent(Path::new("/cloud/track3-backup")), Some(Path::new("/cloud").to_path_buf()));
+        assert_eq!(backup_parent(Path::new("/cloud/track3-backup/client-a")), Some(Path::new("/cloud").to_path_buf()));
+        assert_eq!(backup_parent(Path::new("/cloud/other")), None);
+    }
+
+    #[test]
+    fn documents_location_accepts_children_but_not_a_sibling() {
+        let root = std::env::temp_dir().join(format!("track3-doc-path-{}", std::process::id()));
+        let documents = root.join("Documents");
+        std::fs::create_dir_all(documents.join("backups")).unwrap();
+        std::fs::create_dir_all(root.join("Other")).unwrap();
+        assert!(is_document_location(&documents, &documents));
+        assert!(is_document_location(&documents.join("backups"), &documents));
+        assert!(!is_document_location(&root.join("Other"), &documents));
         std::fs::remove_dir_all(root).unwrap();
     }
 }

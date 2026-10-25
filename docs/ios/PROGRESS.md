@@ -14,15 +14,18 @@
   simulator captures after the existing iPhone smoke.
 - A browser viewport matrix checks 16 phone, tablet, Split View, and foldable
   sizes in light and dark across the mobile routes. Browser screenshots are
-  Chromium captures; eleven representative images are in `screens/ipad/`.
+  Chromium captures; twelve representative images are in `screens/ipad/`.
   On Linux, TypeScript and the production frontend build passed, Vitest
   passed 2,214 tests, mobile Playwright passed 197 tests, desktop Playwright
   passed 77 tests, production preview passed two tests, and Rust pure tests
-  passed 62 tests. The two macOS iOS runs `40214915702` and `40218874665`
+  passed 62 tests. The macOS iOS runs `40214915702` and `40218874665`
   launched the iPad app in portrait, then failed because the Simulator
-  AppleScript shortcut did not rotate it. The follow-up requests landscape
-  from the simulator app and checks the WebView viewport in the ready marker;
-  it still needs a macOS CI result. Split View, Slide Over, Stage Manager,
+  AppleScript shortcut did not rotate it. Run `40223960890` also passed
+  iPad portrait but rejected the app's landscape geometry request in
+  windowed mode. The current follow-up rotates the selected Simulator
+  device through its Device menu, checks the device screenshot, then
+  relaunches and checks the WebView viewport; it still needs macOS CI.
+  Split View, Slide Over, Stage Manager,
   Magic Keyboard and trackpad, the share popover and file picker on a real
   iPad, and foldable posture remain unverified.
 - The review follow-up gives nested Settings and Assistant panes the content
@@ -33,6 +36,22 @@
   2,215 Vitest tests, 208 mobile browser tests, and the Rust library check
   passed. The iPad portrait and Analytics captures in `screens/ipad/` were
   regenerated; the native landscape fix still needs macOS CI.
+- The current reviewer pass merges the backup-folder picker from master.
+  Simulator landscape now rotates the iPad window from Simulator's Device
+  menu before launching Track3. At wide width, Assistant collapses its empty
+  top bar, Settings and Assistant omit the outer More menu, edge swipes follow
+  the visible Back button, and History rows use shorter spacing. The mobile
+  CSS drops the always-matching media wrappers; the presentation hook uses
+  the iOS platform or a coarse pointer. Regular-width Analytics Returns
+  sheets now have browser checks and a curated capture. The real iPad picker,
+  share popover, safe-area `env()` behavior, and foldable posture still need
+  device verification.
+- Local follow-up checks passed: app and browser-test TypeScript; Vitest
+  2,256/2,256 in 266 files; Playwright 215/215 mobile and 77/77 desktop,
+  including the 48-test wide-window sweep; Rust pure tests 65/65; desktop
+  Rust library and binary check; and the production frontend build. The
+  workflow YAML and extracted iPad launch shell passed syntax checks.
+  The merged branch has no new macOS iOS CI result yet.
 
 ## X1 interaction fixes (2026-10-25)
 
@@ -51,6 +70,17 @@ The comparable eight-step History Chromium trace recorded **59 ms task time and 
 Previous X1 local checks before this reviewer follow-up: app and browser-test TypeScript passed, Vitest passed 2,209/2,209, mobile Playwright passed 160/160, unchanged desktop Playwright passed 77/77, the production build and both startup checks passed, pure Rust tests passed 62/62, and desktop Rust library and binary checks passed. Git diff whitespace checks passed. The driver then pushed `02073ac`; [iOS foundation run 40202624869](https://github.com/domechn/track3/actions/runs/40202624869) passed both web and ios jobs, including the simulator build and launch. This reviewer follow-up has no CI or physical iPhone result yet.
 
 Reviewer follow-up local verification: app and browser-test TypeScript and the production frontend build passed, Vitest passed 2,210/2,210 in 262 files, the mobile Playwright suite passed 163/163, and pure Rust tests passed 62/62. The unchanged desktop Playwright suite passed 77/77 with one worker. With two workers it twice passed 76/77 because the existing density test measured a nominal 36 px element as 36.000015 px; that focused file passed 12/12 alone. No desktop file was edited. The final full mobile trace measured 57 ms task time and 1 layout for History; Overview measured 137 ms task time, 7 layouts, 0 long tasks over 50 ms, 0 canvas additions, and 0 new 2D contexts. These are Chromium measurements, not iPhone frame timings.
+
+## F1 folder picker (2026-10-25)
+
+- CI run [40210083729](https://github.com/domechn/track3/actions/runs/40210083729) on `28bbaf7`: `ios` passed the Swift/Rust build, symbol check, and simulator launch. `web` failed in `density.spec.ts` when Chromium reported a 36 px control as 36.000015 px. The current follow-up adds a 0.01 px tolerance, shares Documents/bookmark reconciliation between the UI and automatic backup, protects a bookmark while its configuration write is pending, limits the iCloud progress message to iCloud paths, and adjusts the folder review layout. CI for this follow-up is pending.
+- Current follow-up local checks passed: `corepack yarn tsc --noEmit`, 2,245 Vitest tests in 264 files, 77/77 desktop Playwright checks, 145/145 mobile Playwright checks, 65/65 Rust pure tests, and `git diff --check`. The first mobile folder browser attempt showed the page fallback on its first navigation. A focused rerun reached import and exposed an ambiguous toast locator; after narrowing the selector, the four folder checks and the full mobile suite passed. The refreshed 320 px folder review and failure screenshots were inspected.
+- The prior `28bbaf7` local checks passed app and browser-test TypeScript, 2,242 Vitest tests in 264 files, 65 Rust pure tests, 145/145 mobile Playwright checks, and 77/77 desktop Playwright checks on Linux. The four folder browser checks passed and their failure-state screenshot was inspected. An earlier full Vitest run found a missing Documents path mock in an existing mobile test; the mock was added and the full rerun passed. One desktop density run measured 60.000122 px against a 60 px limit and failed, then its focused 12 tests and the clean full rerun passed. One mobile visual run lost Assistant chat state during a source edit and Vite reload; the clean full rerun passed. Signed-device verification remains open.
+- Reviewer follow-up: Documents remains a valid iOS auto backup location; restored bookmark paths now update saved configuration, and auto backup errors refresh the settings status. The picker stays open until selection or cancellation, folder bookmark access is synchronized, iCloud polls refresh cached URL values, and Clear removes the bookmark while preserving in-process Undo. Folder review uses an inset group with an explicit auto backup opt-in. Folder import orchestration moved to `src/middlelayers/backup-folder.ts`.
+- Previous reviewer follow-up verification on Linux: `tsc --noEmit` passed; Vitest passed 264 files and 2,232 tests; pure Rust tests passed 65; desktop Playwright passed 77; mobile Playwright passed 145. One earlier mobile visual run hit a page-load error and timed out; the affected case passed alone, and the second full mobile run passed. The newer run 40206547076 supersedes the statement about awaiting its macOS CI result; signed-device verification remains open.
+- Added an iOS Files folder picker with separate persisted auto-backup and import bookmarks. Startup restores folder access into the Tauri filesystem scope. Backup settings offers Files, Documents, folder import with client review, and a revoked-folder state. iCloud download preparation runs before reading a backup tree.
+- Earlier F1 Linux checks, before `d9fa9bc`: frontend and browser-test TypeScript, 2,222 Vitest tests, 64 pure Rust tests, desktop Playwright 77/77, and mobile Playwright 142/142 passed. The folder Playwright spec also passed with a verified V2 part and confirmed import after the full browser runs. Desktop's two initial browser runs had intermittent Vite dynamic-module fetch failures on unrelated pages; the final one-worker full run passed 77/77 without a retry.
+- Swift picker, security scope, and iCloud Drive behavior need a signed device check; Linux cannot compile or exercise Swift. The iOS CI branch trigger includes `feat/ios-folder-picker*`.
 
 ## P2 reviewer follow-up (2026-10-25)
 

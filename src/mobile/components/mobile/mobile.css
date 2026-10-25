@@ -68,8 +68,8 @@
 .mobile-data-error { justify-content: center; min-height: 360px; }
 .mobile-data-error svg { width: 112px; height: 112px; }
 @media (prefers-reduced-motion: reduce) { .mobile-tab, .mobile-icon-button, .mobile-primary-button { transition: none; } .mobile-skeleton { animation: none; } }
-@media (min-width: 0px) { .mobile-tab-bar { display: flex; } }
-@media (min-width: 0px) { .fixed.auto-backup-browser-indicator { bottom: calc(5rem + env(safe-area-inset-bottom)); } }
+.mobile-tab-bar { display: flex; }
+.fixed.auto-backup-browser-indicator { bottom: calc(5rem + env(safe-area-inset-bottom)); }
 .date-picker-mobile { display: none; }
 .mobile-date-input { min-height: 2.75rem; width: 100%; border: 1px solid hsl(var(--border)); border-radius: .6rem; padding: .5rem .75rem; background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 1rem; }
 .mobile-date-snapshots { display: grid; gap: .5rem; }
@@ -83,7 +83,7 @@
 .mobile-coin-options { display: grid; }
 .mobile-coin-option { min-height: 2.75rem; width: 100%; border-bottom: 1px solid hsl(var(--border)); padding: .6rem; text-align: left; }
 @media (pointer: coarse) { .mobile-chart-touch, .mobile-chart-touch canvas { touch-action: pan-y; } }
-@media (min-width: 0px) {
+
   .mobile-loading-overlay { align-items: flex-start; min-height: calc(100dvh - 7rem); border-radius: 0; background: hsl(var(--background)); padding: 12px 0; backdrop-filter: none; }
   .mobile-loading-message { display: none; }
   .mobile-loading-layout { display: grid; width: 100%; gap: 16px; }
@@ -124,7 +124,7 @@
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
   .mobile-alert-content button, .mobile-dialog-content button { min-height: 2.75rem; }
-}
+
 @media (max-width: 399px) {
   .comparison-total-grid.comparison-total-grid { grid-template-columns: minmax(0, 1fr); }
   .comparison-total-grid > :nth-child(1) { grid-column: 1; grid-row: 1; }
@@ -138,7 +138,7 @@
 .mobile-route-heading, .history-mobile-list, .history-mobile-detail-list, .mobile-header-total, .mobile-compact-title, .mobile-analytics-hub { display: none; }
 .overview-pnl-plot { height: 100%; }
 
-@media (min-width: 0px) {
+
   .app-layout { font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif; }
   body, body * {
     -webkit-user-select: none;
@@ -307,7 +307,7 @@
   @container (max-width: 76px) {
     [data-testid="wallet-treemap-tile"] .line-clamp-2 { font-size: 10px; }
   }
-}
+
 @media (max-width: 359px) {
   .mobile-overview-compact-title { display: none; }
   .mobile-mover-rank { display: none; }
@@ -317,12 +317,14 @@
   .overview-source-row > svg:last-child { display: none; }
   .comparison-date-button { padding-left: 4px; padding-right: 4px; }
   .comparison-date-button svg { display: none; }
+  .ios-d3-backup-folder-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .ios-d3-backup-folder-actions > * { width: 100%; }
 }
 
 
 /* Phone app shell and feature screens. */
 /* Phone feature screens use the D1 semantic palette and grouped surfaces. */
-@media (min-width: 0px) {
+
   #app-main-content:has(.ios-d3-chat) .mobile-route-heading { display: none; }
   #app-top-bar .ios-d3-pushed-title { display: none; }
   #app-top-bar.mobile-topbar-back:has(.mobile-compact-title) .ios-d3-pushed-title { position: absolute; top: var(--mobile-safe-top); left: 50%; display: grid; max-width: calc(100% - 140px); height: 56px; overflow: hidden; place-items: center; transform: translateX(-50%); font-size: 17px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
@@ -461,11 +463,19 @@
   .ios-d3-backup-actions .mobile-inset-section { margin-bottom: 0; }
   .ios-d3-backup-actions .ios-d3-backup-import-section + .mobile-inset-section { margin-top: 26px; }
   .ios-d3-backup-actions .ios-d3-import-note { display: block; margin: 8px 12px 0; }
+  .ios-d3-backup-actions .ios-d3-folder-review { margin-top: 18px; }
   .ios-d3-auto-backup-setting .ios-d3-data-panel-content > .grid { grid-template-columns: minmax(0, 1fr); }
   .ios-d3-backup-actions .ios-d3-backup-folder-actions { flex-wrap: wrap; }
   .ios-d3-backup-folder-actions > button:first-child { min-width: 0; flex: 1 1 180px; white-space: nowrap; }
   .ios-d3-backup-folder-actions > *:last-child { flex: 0 0 auto; }
   .ios-d3-backup-actions .mobile-inset-group, .ios-d3-system-settings .mobile-inset-group { border-radius: 14px; }
+  .ios-d3-folder-review-info, .ios-d3-folder-client, .ios-d3-folder-auto-option { padding: 12px 16px; font-size: 15px; }
+  .ios-d3-folder-review-info, .ios-d3-folder-client { border-bottom: .5px solid var(--ios-separator); }
+  .ios-d3-folder-review-info { overflow-wrap: anywhere; color: hsl(var(--muted-foreground)); }
+  .ios-d3-folder-review-name { margin-bottom: 4px; color: hsl(var(--foreground)); font-weight: 600; }
+  .ios-d3-folder-client, .ios-d3-folder-auto-option { display: flex; align-items: center; gap: 12px; }
+  .ios-d3-folder-client { justify-content: space-between; min-height: 56px; }
+  .ios-d3-folder-auto-option { min-height: 52px; }
   .ios-d3-setting-switch-row, .ios-d3-data-action-row, .ios-d3-license-field { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 56px; gap: 12px; padding: 8px 16px; background: hsl(var(--card)); font-size: 17px; text-align: left; }
   .ios-d3-setting-switch-row:not(:last-child), .ios-d3-data-action-row:not(:last-child) { position: relative; }
   .ios-d3-setting-switch-row:not(:last-child)::after, .ios-d3-data-action-row:not(:last-child)::after { position: absolute; right: 0; bottom: 0; left: 16px; border-bottom: .5px solid var(--ios-separator); content: ""; }
@@ -701,7 +711,7 @@
   .ios-d3-auto-backup p:last-child { margin-left: 14px; font-size: 13px; }
   .ios-d3-sync-indicator button { border: .5px solid var(--ios-separator); border-radius: 99px; background: hsl(var(--card)); box-shadow: none; backdrop-filter: none; font-size: 13px; }
   .ios-d3-sync-popover { border: .5px solid var(--ios-separator); border-radius: 16px; background: hsl(var(--card)); box-shadow: none; font-size: 15px; }
-}
+
 @media (max-width: 340px) and (pointer: coarse) {
   .ios-d3-chat-header h3 { left: calc(50% + 20px); }
 }
@@ -713,7 +723,7 @@
 
 /* Phone app shell and feature screens. */
 /* Phone data pages use D1's semantic colors and grouped surfaces. Desktop stays unchanged. */
-@media (min-width: 0px) {
+
   .overview-pnl-plot { position: relative; }
   .pnl-scrub-chip { position: absolute; top: 2px; z-index: 2; display: flex; align-items: center; gap: 7px; transform: translateX(-50%); border-radius: 999px; background: hsl(var(--card) / .96); padding: 5px 9px; box-shadow: 0 2px 8px #0002; font-size: 12px; white-space: nowrap; pointer-events: none; }
   .pnl-scrub-chip strong { font-variant-numeric: tabular-nums; }
@@ -991,7 +1001,7 @@
 
   :is(.d2-summary, .d2-wallets, .d2-comparison, .d2-coin, .d2-cost) [data-ui-card] { border: 0; box-shadow: none; }
   :is(.d2-summary, .d2-coin, .d2-cost) .ios-money { font-family: inherit; font-variant-numeric: tabular-nums; }
-}
+
 
 @container (max-width: 94px) {
   .wallet-tile-category { display: none; }
@@ -1089,6 +1099,7 @@
 }
 
 @media (min-width: 1000px) {
+  .app-layout:has(.ios-d3-chat) #app-top-bar { display: none; }
   .mobile-split-view { display: grid; grid-template-columns: minmax(280px, 34%) minmax(0, 1fr); gap: 24px; }
   .mobile-split-view > .mobile-split-master { display: block !important; }
   .mobile-split-view > .mobile-split-detail { display: block !important; }
@@ -1115,6 +1126,7 @@
   .overview-sections .overview-allocation-card .mobile-allocation-chart { width: min(220px, 100%); height: 220px; }
   .overview-sections .overview-movers-card .profit-mobile-list { max-width: 760px; }
   .history-split { grid-template-columns: minmax(280px, 40%) minmax(0, 1fr); align-items: start; }
+  .history-mobile-snapshot-button { min-height: 64px; gap: 4px; padding: 8px 12px; }
   .history-detail-sheet.mobile-inline-detail .mobile-sheet-body { padding: 16px; }
   .history-detail-sheet.mobile-inline-detail .history-detail-dialog { width: 100% !important; }
 }
@@ -1144,6 +1156,8 @@
 
 @media (min-width: 1000px) {
   .more-split { grid-template-columns: minmax(190px, 220px) minmax(0, 1fr); }
+  .more-split.more-detail-only { grid-template-columns: minmax(0, 1fr); }
+  .more-split.more-detail-only > .mobile-split-master { display: none !important; }
   .more-split .ios-d3-settings .mobile-split-view {
     grid-template-columns: minmax(220px, 38%) minmax(0, 1fr);
   }
@@ -1154,10 +1168,6 @@
   #app-main-content:has(.mobile-analytics-hub[data-open-sheet="profit"]) .d2-summary .profit-summary-card { display: none; }
 }
 
-@media (min-width: 1000px) and (max-width: 1199px) {
-  .more-split:has(.ios-d3-settings, .ios-chat-split) { grid-template-columns: minmax(0, 1fr); }
-  .more-split:has(.ios-d3-settings, .ios-chat-split) > .mobile-split-master { display: none !important; }
-}
 
 @media (horizontal-viewport-segments: 2) {
   .mobile-split-view {

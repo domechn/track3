@@ -273,17 +273,21 @@ export async function importBackupV2(
   getHash: (client: string, month: string) => string | undefined,
   saveHash: (client: string, month: string, hash: string) => Promise<void>,
   importPart: (records: BackupRecords, metadata: BackupMetadata) => Promise<void>,
+  options?: { onlyClient?: string; strict?: boolean; onMetadata?: (metadata: BackupMetadata) => void },
 ): Promise<{ imported: boolean; clientsWithV2: Set<string> }> {
   const root = `${directory}/track3-backup`;
   const clientsWithV2 = new Set<string>();
   let imported = false;
-  if (!(await exists(root))) {
+  if (!options?.onlyClient && !(await exists(root))) {
     return { imported, clientsWithV2 };
   }
   let entries;
   try {
-    entries = await readDir(root);
+    entries = options?.onlyClient
+      ? [{ name: options.onlyClient, isDirectory: true, isSymlink: false }]
+      : await readDir(root);
   } catch (error) {
+    if (options?.strict) throw error;
     console.error("failed to list backup clients", redactSecrets(String(error)));
     return { imported, clientsWithV2 };
   }
@@ -291,7 +295,7 @@ export async function importBackupV2(
     if (
       !entry.isDirectory ||
       entry.isSymlink ||
-      entry.name === client ||
+      (!options?.onlyClient && entry.name === client) ||
       !validClient(entry.name)
     ) {
       continue;
@@ -304,12 +308,15 @@ export async function importBackupV2(
         entry.name,
       );
     } catch (error) {
+      if (options?.strict) throw error;
       console.error("failed to read backup metadata", redactSecrets(entry.name), redactSecrets(String(error)));
     }
     if (!metadata) {
+      if (options?.strict) throw new Error("invalid backup metadata");
       console.error("invalid backup metadata", redactSecrets(entry.name));
       continue;
     }
+    options?.onMetadata?.(metadata);
     clientsWithV2.add(entry.name);
     for (const part of metadata.parts) {
       if (getHash(entry.name, part.month) === part.sha256) continue;
@@ -320,6 +327,7 @@ export async function importBackupV2(
         imported = true;
         await saveHash(entry.name, part.month, part.sha256);
       } catch (error) {
+        if (options?.strict) throw error;
         console.error("failed to import backup part", redactSecrets(entry.name), part.month, redactSecrets(String(error)));
       }
     }

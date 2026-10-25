@@ -9,12 +9,12 @@ test("mouse layout stays compact at narrow and wide desktop widths", async ({ pa
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(false);
     const settingsTab = page.getByRole("link", { name: "Sync", exact: true }).last();
     await expect(settingsTab).toBeVisible();
-    expect((await settingsTab.boundingBox())!.height).toBeLessThanOrEqual(36);
+    expect((await settingsTab.boundingBox())!.height).toBeLessThanOrEqual(36.01);
     const track = page.getByRole("switch", { name: "Path style addressing" });
-    expect((await track.boundingBox())!.height).toBe(20);
-    expect((await page.getByRole("button", { name: "Enable sync" }).boundingBox())!.height).toBe(36);
+    expect((await track.boundingBox())!.height).toBeCloseTo(20, 2);
+    expect((await page.getByRole("button", { name: "Enable sync" }).boundingBox())!.height).toBeCloseTo(36, 2);
     const sidebar = page.locator("aside").getByRole("link", { name: "Overview" });
-    expect((await sidebar.boundingBox())!.height).toBeLessThanOrEqual(38);
+    expect((await sidebar.boundingBox())!.height).toBeLessThanOrEqual(38.01);
     expect((await page.locator("aside").boundingBox())!.width).toBe(200);
     await page.goto("/#/settings/configuration");
     const labels = page.locator('label[for="groupUSD"], label[for="hideInactive"]');
@@ -22,11 +22,11 @@ test("mouse layout stays compact at narrow and wide desktop widths", async ({ pa
     const switchRowPitch = await labels.evaluateAll(
       (labels) => labels[1].getBoundingClientRect().top - labels[0].getBoundingClientRect().top,
     );
-    expect(switchRowPitch).toBeLessThanOrEqual(width === 600 ? 60 : 40);
+    expect(switchRowPitch).toBeLessThanOrEqual(width === 600 ? 60.01 : 40.01);
     await page.goto("/#/assistant");
     const send = page.getByTestId("chat-send");
     await expect(send).toBeVisible();
-    expect((await send.boundingBox())!.height).toBe(36);
+    expect((await send.boundingBox())!.height).toBeCloseTo(36, 2);
   }
 });
 

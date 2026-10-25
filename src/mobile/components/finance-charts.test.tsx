@@ -49,7 +49,7 @@ it("shows zero cost basis gains with a neutral value and no plus sign", () => {
 it("shows USD cost basis totals with a dollar symbol on phones", () => {
   const previousMatchMedia = window.matchMedia;
   window.matchMedia = (query: string) => ({
-    matches: query.includes("min-width: 0px"), media: query, onchange: null,
+    matches: query.includes("pointer: coarse"), media: query, onchange: null,
     addListener: () => {}, removeListener: () => {},
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   });
@@ -124,7 +124,7 @@ it("maps deviations from the calculator and includes the configured tolerance", 
 it("maps portfolio values and a total value goal to separate line datasets", () => {
   const previousMatchMedia = window.matchMedia;
   window.matchMedia = (query: string) => ({
-    matches: query.includes("min-width: 0px"), media: query, onchange: null,
+    matches: query.includes("pointer: coarse"), media: query, onchange: null,
     addListener: () => {}, removeListener: () => {},
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   });

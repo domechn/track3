@@ -13,3 +13,6 @@ viewport and theme matrix is attached to the iOS workflow as the
 The `pro-portrait-*` captures are 1032 × 1376 CSS px and show Settings and
 Assistant after the nested split layout fix. `ipad-11-portrait-wallets.png`
 is an 834 px wide full-page capture showing the Volatility sort control.
+`mini-portrait-analytics-profit.png` shows the centered Returns sheet at
+744 × 1133 CSS px. The Settings and Assistant captures show the two-pane
+layouts, and the History capture shows the shorter wide-window rows.
