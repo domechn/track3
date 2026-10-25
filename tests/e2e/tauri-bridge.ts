@@ -10,7 +10,33 @@ const schemaFiles = [
   "currency_rates", "configuration",
 ];
 
-export async function installTauriBridge(page: Page, s3?: FakeS3, seedReviewContent = false, seedRebalanceProfile = false, emptyPortfolio = false, seedLockedSync = false, richPortfolio = false, slowOverview = false, lockedStartup = false, freshReviewData = false, slowAssistant = false, failDataQueries = false) {
+type BridgeOptions = {
+  s3?: FakeS3;
+  seedReviewContent?: boolean;
+  seedRebalanceProfile?: boolean;
+  emptyPortfolio?: boolean;
+  seedLockedSync?: boolean;
+  richPortfolio?: boolean;
+  slowOverview?: boolean;
+  lockedStartup?: boolean;
+  freshReviewData?: boolean;
+  slowAssistant?: boolean;
+  failDataQueries?: boolean;
+};
+
+export async function installTauriBridge(page: Page, {
+  s3,
+  seedReviewContent = false,
+  seedRebalanceProfile = false,
+  emptyPortfolio = false,
+  seedLockedSync = false,
+  richPortfolio = false,
+  slowOverview = false,
+  lockedStartup = false,
+  freshReviewData = false,
+  slowAssistant = false,
+  failDataQueries = false,
+}: BridgeOptions = {}) {
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
   });

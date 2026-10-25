@@ -21,7 +21,7 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import PageWrapper from "@/mobile/components/page-wrapper";
 import DatePicker from "@/mobile/components/date-picker";
 import RealTimeTotalValue from "@/components/realtime-total-value";
-import Sidebar from "@/mobile/components/sidebar";
+import Sidebar from "@/components/sidebar";
 import { AnimatedPage } from "@/components/motion";
 import PageLoadingOverlay from "@/mobile/components/page-loading-overlay";
 import AutoBackupIndicator from "@/mobile/components/auto-backup-indicator";

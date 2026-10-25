@@ -1,11 +1,9 @@
 import "./ios-style.css";
 import IndexApp from "@/mobile/components/index";
-import AutoUpdater from "@/mobile/components/auto-updater";
 import { Toaster } from "@/mobile/components/ui/toaster";
 import React from "react";
 import { ThemeProvider } from "@/mobile/components/common/theme";
 import { themeLocalStorageKey } from "@/middlelayers/configuration";
-import { renderRightClickMenu } from "@/utils/hook";
 import { I18nProvider, useTranslation } from "@/mobile/i18n";
 import { isIOS, PlatformProvider } from "@/utils/platform";
 import IOSKeyRecoveryNotice from "@/mobile/components/ios-key-recovery-notice";
@@ -30,7 +28,7 @@ function Shell() {
 
   return (
     <ThemeProvider defaultTheme={isIOS() ? "system" : "light"} storageKey={themeLocalStorageKey}>
-      <div className="min-h-dvh" onContextMenu={isIOS() ? undefined : renderRightClickMenu}>
+      <div className="min-h-dvh">
         <a
           href="#app-main-content"
           onClick={focusMainContent}
@@ -39,7 +37,6 @@ function Shell() {
           {t("app.skipToMainContent")}
         </a>
         <Toaster />
-        <AutoUpdater />
         <IOSStartupGate>
           <IOSKeyRecoveryNotice />
           <div>

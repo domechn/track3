@@ -463,8 +463,6 @@ pub fn run() {
     #[cfg(not(mobile))]
     let builder = builder.plugin(tauri_plugin_shell::init());
     let builder = builder.plugin(tauri_plugin_dialog::init());
-    #[cfg(not(mobile))]
-    let builder = builder.plugin(tauri_plugin_sql::Builder::default().build());
     let builder = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init());

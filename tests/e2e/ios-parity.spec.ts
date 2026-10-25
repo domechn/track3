@@ -78,7 +78,7 @@ test("the phone shell applies top and side safe-area insets once", async ({ page
 for (const phone of phones) {
   test(`portfolio routes fit iPhone ${phone.name} with native controls`, async ({ page }) => {
     await page.setViewportSize({ width: phone.width, height: phone.height });
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     mkdirSync("test-results/mobile", { recursive: true });
     for (const [route, title] of [
       ["overview", "Overview"],
@@ -151,7 +151,7 @@ for (const phone of phones) {
 
   test(`rebalance disclosures have 44px targets on iPhone ${phone.name}`, async ({ page }) => {
     await page.setViewportSize({ width: phone.width, height: phone.height });
-    await installTauriBridge(page, undefined, false, true);
+    await installTauriBridge(page, { seedRebalanceProfile: true });
     await page.goto("/#/rebalance");
     await expect(page.getByText("Manual setup", { exact: true })).toBeVisible();
     for (const title of ["Manual setup", "Details"]) {
@@ -164,7 +164,7 @@ for (const phone of phones) {
 
   test(`first launch adds a holding and refreshes on iPhone ${phone.name}`, async ({ page }) => {
     await page.setViewportSize({ width: phone.width, height: phone.height });
-    await installTauriBridge(page, undefined, false, false, true);
+    await installTauriBridge(page, { emptyPortfolio: true });
     await page.goto("/#/overview");
     await expect(page.getByText("Your portfolio starts here")).toBeVisible();
     await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-first-launch.png` });
@@ -238,7 +238,7 @@ for (const phone of phones) {
 
   test(`a goal, rebalance targets, and assistant reply work from More on iPhone ${phone.name}`, async ({ page }) => {
     await page.setViewportSize({ width: phone.width, height: phone.height });
-    await installTauriBridge(page, undefined, false, true);
+    await installTauriBridge(page, { seedRebalanceProfile: true });
     await page.goto("/#/more");
     await page.getByRole("link", { name: "Goals & Alerts" }).click();
     await page.getByRole("button", { name: "Add alert" }).click();

@@ -1,6 +1,8 @@
+#[cfg(test)]
+use std::io::Write;
 use std::{
     fs::{self, File, OpenOptions},
-    io::{ErrorKind, Read, Write},
+    io::{ErrorKind, Read},
     path::Path,
 };
 
@@ -118,8 +120,8 @@ pub fn load_encryption_key(key_path: &Path) -> Result<String, String> {
     Ok(key)
 }
 
-#[cfg(not(target_os = "ios"))]
-pub fn load_or_create_ios_encryption_key(
+#[cfg(test)]
+fn load_or_create_file_encryption_key_for_test(
     key_path: &Path,
     fresh_database: bool,
 ) -> Result<String, String> {
@@ -150,8 +152,6 @@ pub fn load_or_create_ios_encryption_key(
         file.write_all(key.as_bytes())
             .and_then(|_| file.sync_all())
             .map_err(|error| format!("failed to persist encryption key: {error}"))?;
-        #[cfg(target_os = "ios")]
-        crate::ios_backup::exclude_key_artifact(key_path)?;
         Ok(key)
     })();
     if result.is_err() {
@@ -165,8 +165,23 @@ pub fn load_or_create_ios_encryption_key(
     key_path: &Path,
     fresh_database: bool,
 ) -> Result<String, String> {
+    load_or_create_ios_key_with(
+        key_path,
+        fresh_database,
+        crate::ios_native::keychain_read,
+        crate::ios_native::keychain_write,
+    )
+}
+
+#[cfg(any(test, target_os = "ios"))]
+fn load_or_create_ios_key_with(
+    key_path: &Path,
+    fresh_database: bool,
+    read_key: impl FnOnce() -> Result<Option<String>, String>,
+    write_key: impl Fn(&str) -> Result<(), String>,
+) -> Result<String, String> {
     reject_link_or_reparse_point(key_path)?;
-    if let Some(key) = crate::ios_native::keychain_read()? {
+    if let Some(key) = read_key()? {
         validate_encryption_key_material(&key)?;
         if key_path.exists() {
             if load_encryption_key(key_path)? != key {
@@ -179,7 +194,7 @@ pub fn load_or_create_ios_encryption_key(
     }
     if key_path.exists() {
         let key = load_encryption_key(key_path)?;
-        crate::ios_native::keychain_write(&key)?;
+        write_key(&key)?;
         fs::remove_file(key_path)
             .map_err(|error| format!("failed to remove legacy key file: {error}"))?;
         return Ok(key);
@@ -192,7 +207,7 @@ pub fn load_or_create_ios_encryption_key(
         uuid::Uuid::new_v4().simple(),
         uuid::Uuid::new_v4().simple()
     );
-    crate::ios_native::keychain_write(&key)?;
+    write_key(&key)?;
     Ok(key)
 }
 
@@ -200,17 +215,33 @@ pub async fn ios_key_recovery_needed(
     database_path: &Path,
     key_path: &Path,
 ) -> Result<bool, String> {
-    #[cfg(target_os = "ios")]
-    let encryption_key =
-        crate::ios_native::keychain_read()?.unwrap_or_else(|| LEGACY_ENCRYPTION_KEY.to_string());
-    #[cfg(not(target_os = "ios"))]
-    let encryption_key = LEGACY_ENCRYPTION_KEY.to_string();
-    #[cfg(not(target_os = "ios"))]
-    if key_path.exists() {
+    ios_key_recovery_needed_with(database_path, key_path, cfg!(target_os = "ios"), || {
+        #[cfg(target_os = "ios")]
+        {
+            crate::ios_native::keychain_read()
+        }
+        #[cfg(not(target_os = "ios"))]
+        {
+            Ok(None)
+        }
+    })
+    .await
+}
+
+async fn ios_key_recovery_needed_with(
+    database_path: &Path,
+    key_path: &Path,
+    is_ios: bool,
+    read_key: impl FnOnce() -> Result<Option<String>, String>,
+) -> Result<bool, String> {
+    if !is_ios && key_path.exists() {
         return Ok(false);
     }
-    #[cfg(target_os = "ios")]
-    let _ = key_path;
+    let encryption_key = if is_ios {
+        read_key()?.unwrap_or_else(|| LEGACY_ENCRYPTION_KEY.to_string())
+    } else {
+        LEGACY_ENCRYPTION_KEY.to_string()
+    };
     let options = SqliteConnectOptions::new()
         .filename(database_path)
         .create_if_missing(false)
@@ -363,25 +394,26 @@ mod tests {
     }
 
     #[test]
-    fn fresh_ios_install_gets_a_persisted_random_key() {
+    fn test_file_key_shim_persists_a_random_key() {
         let directory = TestDirectory::new();
         let key_path = directory.0.join(".ent-key");
 
-        let first = super::load_or_create_ios_encryption_key(&key_path, true).unwrap();
+        let first = super::load_or_create_file_encryption_key_for_test(&key_path, true).unwrap();
         assert_ne!(first, LEGACY_ENCRYPTION_KEY);
         assert!(first.len() >= 32);
         assert_eq!(fs::read_to_string(&key_path).unwrap(), first);
         assert_eq!(
-            super::load_or_create_ios_encryption_key(&key_path, true).unwrap(),
+            super::load_or_create_file_encryption_key_for_test(&key_path, true).unwrap(),
             first
         );
         assert_eq!(
-            super::load_or_create_ios_encryption_key(&key_path, false).unwrap(),
+            super::load_or_create_file_encryption_key_for_test(&key_path, false).unwrap(),
             first
         );
         let other = TestDirectory::new();
         assert_ne!(
-            super::load_or_create_ios_encryption_key(&other.0.join(".ent-key"), true).unwrap(),
+            super::load_or_create_file_encryption_key_for_test(&other.0.join(".ent-key"), true)
+                .unwrap(),
             first
         );
         #[cfg(unix)]
@@ -395,14 +427,88 @@ mod tests {
     }
 
     #[test]
-    fn existing_ios_database_without_a_key_keeps_legacy_compatibility() {
+    fn test_file_key_shim_keeps_legacy_compatibility() {
         let directory = TestDirectory::new();
         let key_path = directory.0.join(".ent-key");
 
         assert_eq!(
-            super::load_or_create_ios_encryption_key(&key_path, false).unwrap(),
+            super::load_or_create_file_encryption_key_for_test(&key_path, false).unwrap(),
             LEGACY_ENCRYPTION_KEY
         );
+        assert!(!key_path.exists());
+    }
+
+    #[test]
+    fn ios_keychain_reuses_a_saved_key_and_removes_a_matching_legacy_file() {
+        let directory = TestDirectory::new();
+        let key_path = directory.0.join(".ent-key");
+        fs::write(&key_path, "saved-device-key").unwrap();
+
+        let key = super::load_or_create_ios_key_with(
+            &key_path,
+            false,
+            || Ok(Some("saved-device-key".to_string())),
+            |_| panic!("a saved key must not be replaced"),
+        )
+        .unwrap();
+        assert_eq!(key, "saved-device-key");
+        assert!(!key_path.exists());
+    }
+
+    #[test]
+    fn ios_keychain_migrates_a_legacy_file_and_rejects_a_conflicting_key() {
+        let directory = TestDirectory::new();
+        let key_path = directory.0.join(".ent-key");
+        fs::write(&key_path, "legacy-device-key").unwrap();
+        let saved = std::cell::RefCell::new(None);
+
+        assert_eq!(
+            super::load_or_create_ios_key_with(
+                &key_path,
+                false,
+                || Ok(None),
+                |key| {
+                    *saved.borrow_mut() = Some(key.to_string());
+                    Ok(())
+                },
+            )
+            .unwrap(),
+            "legacy-device-key"
+        );
+        assert_eq!(saved.into_inner().as_deref(), Some("legacy-device-key"));
+        assert!(!key_path.exists());
+
+        fs::write(&key_path, "different-file-key").unwrap();
+        let error = super::load_or_create_ios_key_with(
+            &key_path,
+            false,
+            || Ok(Some("saved-device-key".to_string())),
+            |_| panic!("a conflicting key must not be replaced"),
+        )
+        .unwrap_err();
+        assert!(error.contains("differ"));
+        assert!(key_path.exists());
+    }
+
+    #[test]
+    fn fresh_ios_keychain_install_saves_a_random_key() {
+        let directory = TestDirectory::new();
+        let key_path = directory.0.join(".ent-key");
+        let saved = std::cell::RefCell::new(None);
+
+        let key = super::load_or_create_ios_key_with(
+            &key_path,
+            true,
+            || Ok(None),
+            |key| {
+                *saved.borrow_mut() = Some(key.to_string());
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_ne!(key, LEGACY_ENCRYPTION_KEY);
+        assert!(key.len() >= 32);
+        assert_eq!(saved.into_inner().as_deref(), Some(key.as_str()));
         assert!(!key_path.exists());
     }
 
@@ -434,6 +540,27 @@ mod tests {
                 .await
                 .unwrap();
             db.close().await.unwrap();
+
+            assert!(
+                super::ios_key_recovery_needed_with(&database_path, &key_path, true, || Ok(None),)
+                    .await
+                    .unwrap()
+            );
+            assert!(
+                !super::ios_key_recovery_needed_with(&database_path, &key_path, true, || Ok(Some(
+                    "missing-device-key".to_string()
+                )),)
+                .await
+                .unwrap()
+            );
+            assert!(
+                super::ios_key_recovery_needed_with(&database_path, &key_path, true, || Err(
+                    "Keychain unavailable".to_string()
+                ),)
+                .await
+                .unwrap_err()
+                .contains("Keychain unavailable")
+            );
 
             assert!(super::ios_key_recovery_needed(&database_path, &key_path)
                 .await

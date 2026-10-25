@@ -104,7 +104,7 @@ test("an edge swipe inside a source editor leaves the form open", async ({ page,
 
 test("locked sync status stays clear of the More tab and tab bar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installTauriBridge(page, undefined, false, false, false, true);
+  await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
   const pill = page.getByRole("button", { name: "Sync locked" });
   await expect(pill).toBeVisible();
@@ -234,7 +234,7 @@ test("custom asset source picker opens from the bottom of the iPhone screen", as
 
 test("rebalance suggestions use readable cards at 375px when a profile has data", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await installTauriBridge(page, undefined, false, true);
+  await installTauriBridge(page, { seedRebalanceProfile: true });
   await page.goto("/#/rebalance");
   await page.getByText("Details", { exact: true }).click();
   const cards = page.getByRole("list", { name: "Suggested trades" });

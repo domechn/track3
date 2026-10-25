@@ -42,8 +42,8 @@ This table covers all 147 files present on desktop `origin/master` that the iOS 
 | `src/components/assistant/session-sidebar.tsx` | Moved to `src/mobile/components/assistant/session-sidebar.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
 | `src/components/ath-value.tsx` | Moved to `src/mobile/components/ath-value.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
 | `src/components/auto-backup-indicator.tsx` | Moved to `src/mobile/components/auto-backup-indicator.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
-| `src/components/auto-updater.test.tsx` | Moved to `src/mobile/components/auto-updater.test.tsx` | Mobile test variant; the existing desktop test is restored. |
-| `src/components/auto-updater.tsx` | Moved to `src/mobile/components/auto-updater.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
+| `src/components/auto-updater.test.tsx` | Restored | The updater is desktop-only; no mobile copy is needed. |
+| `src/components/auto-updater.tsx` | Restored | The updater is desktop-only; no mobile copy is needed. |
 | `src/components/coin-analytics.test.tsx` | Moved to `src/mobile/components/coin-analytics.test.tsx` | Mobile test variant; the existing desktop test is restored. |
 | `src/components/coin-analytics.tsx` | Moved to `src/mobile/components/coin-analytics.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
 | `src/components/coins-amount-and-value-change.test.tsx` | Moved to `src/mobile/components/coins-amount-and-value-change.test.tsx` | Mobile test variant; the existing desktop test is restored. |
@@ -58,9 +58,9 @@ This table covers all 147 files present on desktop `origin/master` that the iOS 
 | `src/components/configuration/general-settings.test.tsx` | Moved to `src/mobile/components/configuration/general-settings.test.tsx` | Mobile test variant; the existing desktop test is restored. |
 | `src/components/configuration/general-settings.tsx` | Moved to `src/mobile/components/configuration/general-settings.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
 | `src/components/configuration/index.tsx` | Moved to `src/mobile/components/configuration/index.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
-| `src/components/configuration/others-section.test.tsx` | Moved to `src/mobile/components/configuration/others-section.test.tsx` | Mobile test variant; the existing desktop test is restored. |
+| `src/components/configuration/others-section.test.tsx` | Restored | The shared component keeps its desktop test; the iOS sources page uses mobile-specific controls. |
 | `src/components/configuration/quick-look-dialog.tsx` | Moved to `src/mobile/components/configuration/quick-look-dialog.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
-| `src/components/configuration/summary-cards.test.tsx` | Moved to `src/mobile/components/configuration/summary-cards.test.tsx` | Mobile test variant; the existing desktop test is restored. |
+| `src/components/configuration/summary-cards.test.tsx` | Restored | The shared summary cards keep their desktop test; iOS uses its own sources page. |
 | `src/components/cost-basis.test.tsx` | Moved to `src/mobile/components/cost-basis.test.tsx` | Mobile test variant; the existing desktop test is restored. |
 | `src/components/cost-basis.tsx` | Moved to `src/mobile/components/cost-basis.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
 | `src/components/data-management-blacklist.test.tsx` | Moved to `src/mobile/components/data-management-blacklist.test.tsx` | Mobile test variant; the existing desktop test is restored. |
@@ -125,8 +125,8 @@ This table covers all 147 files present on desktop `origin/master` that the iOS 
 | `src/components/wallet-assets-percentage.test.tsx` | Moved to `src/mobile/components/wallet-assets-percentage.test.tsx` | Mobile test variant; the existing desktop test is restored. |
 | `src/components/wallet-assets-percentage.tsx` | Moved to `src/mobile/components/wallet-assets-percentage.tsx` | Mobile presentation or mobile test variant; the desktop file is restored. |
 | `src/i18n/locales/catalog-parity.test.ts` | Restored | Existing desktop locale parity test stays unchanged. |
-| `src/i18n/locales/en.json` | Split | Existing desktop wording is restored; new keys are shared and mobile wording lives in `src/mobile/en.json`. |
-| `src/i18n/locales/zh.json` | Split | Existing desktop wording is restored; new keys are shared and mobile wording lives in `src/mobile/zh.json`. |
+| `src/i18n/locales/en.json` | Restored | Mobile-only keys live in `src/mobile/en.json`; the desktop catalog matches master. |
+| `src/i18n/locales/zh.json` | Restored | Mobile-only keys live in `src/mobile/zh.json`; the desktop catalog matches master. |
 | `src/middlelayers/ai/actions/index.ts` | Kept | Shared export and date logic is used by both platforms; desktop operations retain their path. |
 | `src/middlelayers/charts-refresh.test.ts` | Restored | Existing desktop test stays unchanged; mobile flows have separate tests. |
 | `src/middlelayers/charts-refresh.ts` | Kept | Shared source identity, status, timing, and progress data serve both shells without changing desktop presentation. |
@@ -156,7 +156,7 @@ This table covers all 147 files present on desktop `origin/master` that the iOS 
 
 - `src/components/` and `src/App.tsx`: desktop presentation, restored from master.
 - `src/mobile/components/` and `src/mobile/App.tsx`: iPhone presentation and co-located tests. Unchanged primitives are imported from `src/components/`.
-- Ten unchanged component importers are also copied into the mobile graph because they import a component with an iPhone variant: optimistic delete, four configuration sections and their summary, main navigation, sidebar, command, and toast support. These remain presentation code; portfolio logic stays shared.
+- Mobile code imports unchanged desktop components from `src/components/`. The iOS sources page uses mobile-specific controls; its unused desktop-style configuration sections and navigation copies are removed. Other mobile copies retain platform-specific presentation or behavior.
 - `src/middlelayers/`: shared portfolio, refresh, assistant, sync, and persistence logic.
 - `src-tauri/src/app.rs`: shared Tauri commands and setup; native iOS modules are gated by `cfg(target_os = "ios")`.
 - `src-tauri/tauri.conf.json` and `capabilities/migrated.json`: desktop settings; `tauri.ios.conf.json` and `capabilities/mobile.json`: iOS overrides.

@@ -70,7 +70,7 @@ jobs:
           path: test-results/mobile/*.png
           retention-days: 1
       - name: Test desktop browser flows
-        run: corepack yarn playwright test --project=desktop tests/e2e/smoke.spec.ts tests/e2e/accessibility.spec.ts tests/e2e/density.spec.ts tests/e2e/ai-setup.spec.ts --workers=2
+        run: corepack yarn playwright test --project=desktop --workers=2
       - name: Check desktop Rust library and binaries
         timeout-minutes: 15
         run: cargo check --locked --lib --bins

@@ -19,7 +19,7 @@ test("data screens expose grouped history and analytics destinations", async ({ 
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/history");
     await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
     await page.getByRole("combobox", { name: "Rows 20" }).click();
@@ -97,7 +97,7 @@ test("phone P&L bars expose a value chip while scrubbing", async ({ browser }) =
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     const plot = page.locator(".overview-pnl-plot").first();
     await expect(plot.locator("canvas")).toBeVisible();
@@ -115,7 +115,7 @@ test("a phone tap on P&L bars keeps the value chip visible", async ({ browser })
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     const plot = page.locator(".overview-pnl-plot").first();
     await expect(plot.locator("canvas")).toBeVisible();
@@ -132,7 +132,7 @@ test("SE data cards keep equal side margins and coin history labels clear their 
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/summary");
     await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
     await page.locator(".d2-summary .profit-summary-card").getByRole("button", { name: /^Oct / }).click();
@@ -184,7 +184,7 @@ for (const width of [320, 375, 390, 430]) {
       try {
         await page.emulateMedia({ colorScheme: theme });
         await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-        await installTauriBridge(page, undefined, false, false, false, false, true);
+        await installTauriBridge(page, { richPortfolio: true });
 
         await page.goto("/#/history");
         await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20);
@@ -319,7 +319,7 @@ test("a first launch portfolio offers a direct source setup action", async ({ br
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, true);
+    await installTauriBridge(page, { emptyPortfolio: true });
     await page.goto("/#/overview");
     await expect(page.getByRole("button", { name: "Add your first source" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Refresh" })).toHaveCount(0);
@@ -345,7 +345,7 @@ test("review screenshots have several assets and a multi-month trend", async ({ 
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     await expect(page.locator(".mobile-allocation-row")).toHaveCount(5, { timeout: 5_000 });
     await expect(page.locator(".overview-source-row")).toHaveCount(3);
@@ -401,7 +401,7 @@ test("Overview cards and source labels fit the phone layout", async ({ browser }
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     await expect(page.locator(".overview-source-row")).toHaveCount(3);
     const pnl = page.locator(".overview-pnl-card");
@@ -435,7 +435,7 @@ test("scrolled bars keep text behind them quiet when blur is unavailable", async
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     await expect(page.locator(".mobile-allocation-row")).toHaveCount(5);
     await page.evaluate(() => window.scrollTo(0, 700));
@@ -453,7 +453,7 @@ test("Overview range chips change the chart start and hero delta", async ({ brow
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     await expect(page.locator(".mobile-hero-dates")).toContainText("Aug 24");
     const allDelta = await page.locator(".mobile-hero-change").textContent();
@@ -469,7 +469,7 @@ test("touching the trend reveals a readable value chip", async ({ browser }) => 
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     const chart = page.locator(".mobile-hero-chart canvas");
     await expect(chart).toBeVisible();
@@ -495,7 +495,7 @@ test("Overview skeleton reserves the first paint", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true, true);
+    await installTauriBridge(page, { richPortfolio: true, slowOverview: true });
     await page.goto("/#/overview");
     await expect(page.locator("main [aria-busy]").first()).toHaveAttribute("aria-busy", "false");
     await expect(page.locator(".overview-skeleton")).toBeVisible();
@@ -523,7 +523,7 @@ test("a failed portfolio query shows a reviewable error state", async ({ browser
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = await context.newPage();
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true, failDataQueries: true });
     await page.goto("/#/overview");
     await expect(page.getByRole("alert")).toContainText("Could not load portfolio data");
   } finally {
@@ -544,8 +544,7 @@ for (const theme of ["light", "dark"] as const) {
       const page = await context.newPage();
       try {
         await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-        await installTauriBridge(page, undefined, false, false, state === "empty", false,
-          false, false, false, false, false, state === "error");
+        await installTauriBridge(page, { emptyPortfolio: state === "empty", failDataQueries: state === "error" });
         for (const route of state === "error" ? reviewDataRoutes.slice(0, 7) : reviewDataRoutes) {
           await page.goto(`/#/${route}`);
           if (state === "error") await expect(page.getByRole("alert", { name: "" })).toContainText("Could not load portfolio data");
@@ -567,7 +566,7 @@ for (const theme of ["light", "dark"] as const) {
     const page = await context.newPage();
     try {
       await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-      await installTauriBridge(page, undefined, false, false, false, false, true, true);
+      await installTauriBridge(page, { richPortfolio: true, slowOverview: true });
       await page.goto("/#/overview");
       await expect(page.locator(".overview-skeleton")).toBeVisible();
       mkdirSync("test-results/mobile", { recursive: true });
@@ -586,7 +585,7 @@ for (const theme of ["light", "dark"] as const) {
     const page = await context.newPage();
     try {
       await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-      await installTauriBridge(page, undefined, false, false, false, false, true, true);
+      await installTauriBridge(page, { richPortfolio: true, slowOverview: true });
       mkdirSync("test-results/mobile", { recursive: true });
       for (const route of reviewDataRoutes) {
         await page.goto(`/#/${route}`);
@@ -608,7 +607,7 @@ for (const size of sizes) {
     const page = watchPage(await context.newPage());
     mkdirSync("test-results/mobile", { recursive: true });
     try {
-      await installTauriBridge(page, undefined, false, false, false, false, true);
+      await installTauriBridge(page, { richPortfolio: true });
       for (const route of routes) {
         await page.goto(`/#/${route}`);
         await expect(page.locator(".mobile-tab-bar")).toBeVisible();
@@ -991,7 +990,7 @@ test("coin transactions open as detail rows with edit actions", async ({ browser
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, true);
+    await installTauriBridge(page, { seedReviewContent: true });
     await page.goto("/#/coins/BTC");
     await expect(page.locator(".coin-mobile-transactions")).toBeVisible();
     const row = page.locator(".coin-mobile-transactions .mobile-list-row").first();
@@ -1075,7 +1074,7 @@ test("insight actions fit full size phone touch targets", async ({ browser }) =>
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, true);
+    await installTauriBridge(page, { seedReviewContent: true });
     await page.goto("/#/assistant");
     const card = page.getByRole("region", { name: "Insights" });
     await expect(card).toBeVisible();
@@ -1127,7 +1126,7 @@ test("large route titles collapse into the sticky header while scrolling", async
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
-    await installTauriBridge(page, undefined, false, false, false, false, true);
+    await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     await expect(page.getByRole("button", { name: "Show More" })).toBeVisible();
     await expect(page.locator("#app-top-bar .mr-4")).toHaveCount(0);

@@ -3,7 +3,7 @@ import { installTauriBridge } from "./tauri-bridge";
 
 test("320px Wallets labels and change controls fit without wrapping words", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
-  await installTauriBridge(page, undefined, false, false, false, false, true);
+  await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/wallets");
   await expect(page.locator("[data-testid='wallet-treemap-tile']").first()).toBeVisible();
   const tileLabels = await page.locator("[data-testid='wallet-treemap-tile'] .line-clamp-2").evaluateAll((nodes) =>
@@ -37,7 +37,7 @@ test("320px Wallets labels and change controls fit without wrapping words", asyn
 
 test("Overview uses the shared phone switches", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installTauriBridge(page, undefined, false, false, false, false, true);
+  await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
   for (const label of ["Percent", "BTC base"]) {
     const control = page.getByRole("switch", { name: label });
@@ -50,7 +50,7 @@ test("Overview uses the shared phone switches", async ({ page }) => {
 
 test("startup failure leaves recovery routes and pushed titles reachable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installTauriBridge(page, undefined, false, false, false, false, true, false, false, false, false, true);
+  await installTauriBridge(page, { richPortfolio: true, failDataQueries: true });
   await page.goto("/#/overview");
   await expect(page.locator(".mobile-data-error")).toContainText("Could not load portfolio data");
   await page.goto("/#/rebalance");
@@ -63,7 +63,7 @@ test("startup failure leaves recovery routes and pushed titles reachable", async
 
 test("pushed titles and goal editor actions use the same balanced insets", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
-  await installTauriBridge(page, undefined, false, false, false, false, true);
+  await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/wallets");
   await expect(page.locator(".wallet-change-mobile-list")).toBeVisible();
   await page.locator(".wallet-change-mobile-list").scrollIntoViewIfNeeded();
@@ -93,7 +93,7 @@ test("rich dark Analytics drawdown has readable loss text", async ({ page }) => 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: "dark" });
   await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-  await installTauriBridge(page, undefined, false, false, false, false, true);
+  await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/summary");
   await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
   const drawdown = page.locator(".ath-card").getByText("% from ATH").locator("..").locator("div").last();
@@ -116,7 +116,7 @@ test("rich dark Analytics drawdown has readable loss text", async ({ page }) => 
 
 test("phone titles share one page inset and performance metrics share one layout", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
-  await installTauriBridge(page, undefined, false, false, false, false, true);
+  await installTauriBridge(page, { richPortfolio: true });
   for (const [route, label] of [
     ["/overview", "Overview"], ["/history", "History"], ["/summary", "Analytics"],
     ["/goals", "Goals & Alerts"], ["/settings", "Settings"],
@@ -144,7 +144,7 @@ test("phone titles share one page inset and performance metrics share one layout
 
 test("the three 390px performance metrics align their labels and values", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installTauriBridge(page, undefined, false, false, false, false, true);
+  await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
   await expect(page.locator(".overview-pnl-metric")).toHaveCount(3);
   for (const selector of [".overview-pnl-metric > :first-child", ".overview-pnl-metric-value"]) {
@@ -155,7 +155,7 @@ test("the three 390px performance metrics align their labels and values", async 
 
 test("phone Goals and Assistant cards use quiet headings", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installTauriBridge(page, undefined, false, false, false, false, true);
+  await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/goals");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
   const heading = page.getByRole("heading", { name: "Rules" });

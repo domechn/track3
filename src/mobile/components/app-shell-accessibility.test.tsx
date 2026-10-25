@@ -11,20 +11,12 @@ vi.mock("@/mobile/components/index", () => ({
   default: () => <main id="app-main-content" tabIndex={-1}>index app</main>,
 }));
 
-vi.mock("@/mobile/components/auto-updater", () => ({
-  default: () => null,
-}));
-
 vi.mock("@/mobile/components/ui/toaster", () => ({
   Toaster: () => null,
 }));
 
 vi.mock("@/mobile/components/common/theme", () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-vi.mock("@/utils/hook", () => ({
-  renderRightClickMenu: vi.fn(),
 }));
 
 vi.mock("@/mobile/components/total-value-and-change", () => ({

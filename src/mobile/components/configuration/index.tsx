@@ -49,12 +49,12 @@ import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/r
 import { isIOS } from "@/utils/platform";
 import { useSearchParams } from "react-router-dom";
 
-import { SummaryCards } from "@/mobile/components/configuration/summary-cards";
+import { SummaryCards } from "@/components/configuration/summary-cards";
 import { GeneralSettings } from "@/mobile/components/configuration/general-settings";
-import { ExchangeSection } from "@/mobile/components/configuration/exchange-section";
-import { StockBrokerSection } from "@/mobile/components/configuration/stock-broker-section";
-import { WalletSection } from "@/mobile/components/configuration/wallet-section";
-import { OthersSection } from "@/mobile/components/configuration/others-section";
+import { ExchangeSection } from "@/components/configuration/exchange-section";
+import { StockBrokerSection } from "@/components/configuration/stock-broker-section";
+import { WalletSection } from "@/components/configuration/wallet-section";
+import { OthersSection } from "@/components/configuration/others-section";
 import { QuickLookDialog } from "@/mobile/components/configuration/quick-look-dialog";
 import { AttachModal } from "@/mobile/components/configuration/attach-modal";
 import { MobileSources } from "@/mobile/components/configuration/mobile-sources";

@@ -47,7 +47,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await page.emulateMedia({ colorScheme: theme });
     await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-    await installTauriBridge(page, undefined, false, true, false, false, true, false, false, true, true);
+    await installTauriBridge(page, { seedRebalanceProfile: true, richPortfolio: true, freshReviewData: true, slowAssistant: true });
     mkdirSync("test-results/mobile", { recursive: true });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -270,7 +270,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await page.emulateMedia({ colorScheme: theme });
     await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-    await installTauriBridge(page, undefined, false, false, true);
+    await installTauriBridge(page, { emptyPortfolio: true });
     mkdirSync("test-results/mobile", { recursive: true });
     await page.goto("/#/overview");
     await expect(page.getByRole("button", { name: "Add your first source" })).toBeVisible();
@@ -289,7 +289,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await page.emulateMedia({ colorScheme: theme });
     await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-    await installTauriBridge(page, undefined, false, false, false, false, false, false, true);
+    await installTauriBridge(page, { lockedStartup: true });
     mkdirSync("test-results/mobile", { recursive: true });
     await page.goto("/#/overview");
     await expect(page.getByRole("alert")).toContainText("Track3 is locked");
@@ -299,7 +299,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
 
 test("D3 pushed titles replace the large title after scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
-  await installTauriBridge(page, undefined, false, true, false, false, true, false, false, true, true);
+  await installTauriBridge(page, { seedRebalanceProfile: true, richPortfolio: true, freshReviewData: true, slowAssistant: true });
   await page.goto("/#/settings/data?section=backup");
   await expect(page.getByRole("heading", { name: "Backup", level: 1 })).toBeVisible();
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toBeHidden();

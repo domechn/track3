@@ -68,7 +68,7 @@ vi.mock("@/components/realtime-total-value", () => ({
   default: () => null,
 }));
 
-vi.mock("@/mobile/components/sidebar", () => ({
+vi.mock("@/components/sidebar", () => ({
   default: () => null,
 }));
 
