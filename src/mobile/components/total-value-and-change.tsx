@@ -1,0 +1,675 @@
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  AssetChangeData,
+  CurrencyRateDetail,
+  QuoteColor,
+  TDateRange,
+  TotalValueData,
+} from "@/middlelayers/types";
+import { timeToDateStr } from "@/utils/date";
+import {
+  currencyWrapper,
+  prettyNumberToLocaleString,
+  simplifyNumber,
+} from "@/utils/currency";
+import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Line } from "react-chartjs-2";
+import {
+  queryAssetChange,
+  queryTotalValue,
+  resizeChart,
+  resizeChartWithDelay,
+} from "@/middlelayers/charts";
+import bluebird from "bluebird";
+import { ChartResizeContext } from "@/mobile/App";
+import { positiveNegativeTextClass } from "@/utils/color";
+import {
+  getChartPalette,
+  createGradientFill,
+  glassScaleOptions,
+  glassTooltip,
+  phoneChartFontFamily,
+} from "@/mobile/chart-theme";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useTranslation } from "@/mobile/i18n";
+import { useDataChangedVersion } from "@/contexts/data-changed";
+import { downsampleIndices } from "@/middlelayers/chart-downsample";
+import { AnimatedAmount, DeltaPill, SegmentedControl, Switch, useHaptics, useIsMobile } from "@/mobile/components/mobile";
+import { visibleHistoryIndices } from "@/mobile/components/mobile/chart-range";
+import { useTheme } from "@/mobile/components/common/theme";
+
+interface TotalValueShower {
+  currencyName(): string;
+
+  changePercentage(): number;
+
+  formatTotalValue(): string;
+
+  formatChangeValue(): string;
+}
+
+const chartName = "Trend of Asset";
+const btcSymbol = "₿";
+
+class FiatTotalValue implements TotalValueShower {
+  private currency: CurrencyRateDetail;
+  private prevValue: number;
+  private latestValue: number;
+
+  constructor(
+    currency: CurrencyRateDetail,
+    prevValue: number,
+    latestValue: number,
+  ) {
+    this.currency = currency;
+    this.prevValue = prevValue;
+    this.latestValue = latestValue;
+  }
+  formatTotalValue(): string {
+    return (
+      this.currency.symbol +
+      prettyNumberToLocaleString(
+        currencyWrapper(this.currency)(this.latestValue),
+      )
+    );
+  }
+
+  currencyName(): string {
+    return this.currency.currency;
+  }
+
+  changePercentage(): number {
+    return !this.prevValue
+      ? 100
+      : ((this.latestValue - this.prevValue) / this.prevValue) * 100;
+  }
+
+  private getUpOrDown(val: number) {
+    const p = val > 0 ? "+" : val === 0 ? "" : "-";
+    return p;
+  }
+
+  formatChangeValue(): string {
+    let val = this.latestValue - this.prevValue;
+    const p = this.getUpOrDown(val);
+    if (val < 0) {
+      val = -val;
+    }
+    return (
+      p +
+      this.currency.symbol +
+      prettyNumberToLocaleString(currencyWrapper(this.currency)(val))
+    );
+  }
+}
+
+class BTCTotalValue implements TotalValueShower {
+  private prevValue: number;
+  private latestValue: number;
+  private preBtcPrice: number;
+  private latestBtcPrice: number;
+
+  private symbol = btcSymbol;
+
+  constructor(
+    prevValue: number,
+    latestValue: number,
+    preBtcPrice: number,
+    latestBtcPrice: number,
+  ) {
+    this.prevValue = prevValue;
+    this.latestValue = latestValue;
+
+    this.preBtcPrice = preBtcPrice;
+    this.latestBtcPrice = latestBtcPrice;
+  }
+
+  formatTotalValue(): string {
+    const bp = this.latestBtcPrice;
+    if (!bp) {
+      return this.symbol + "0";
+    }
+    return this.symbol + (this.latestValue / bp).toFixed(8);
+  }
+
+  currencyName(): string {
+    return "BTC";
+  }
+
+  changePercentage(): number {
+    const preBTC = this.getBTCAmount(this.prevValue, this.preBtcPrice);
+    const latestBTC = this.getBTCAmount(this.latestValue, this.latestBtcPrice);
+    if (!preBTC) {
+      return !!latestBTC ? 100 : 0;
+    }
+    return ((latestBTC - preBTC) / preBTC) * 100;
+  }
+
+  private getUpOrDown(val: number) {
+    const p = val > 0 ? "+" : val === 0 ? "" : "-";
+    return p;
+  }
+
+  formatChangeValue(): string {
+    let val =
+      this.getBTCAmount(this.latestValue, this.latestBtcPrice) -
+      this.getBTCAmount(this.prevValue, this.preBtcPrice);
+    const p = this.getUpOrDown(val);
+    if (val < 0) {
+      val = -val;
+    }
+    return p + this.symbol + val.toFixed(8);
+  }
+
+  private getBTCAmount(value: number, btcPrice: number) {
+    if (!btcPrice) {
+      return 0;
+    }
+    return value / btcPrice;
+  }
+}
+
+const App = ({
+  currency,
+  dateRange,
+  quoteColor,
+}: {
+  currency: CurrencyRateDetail;
+  dateRange: TDateRange;
+  quoteColor: QuoteColor;
+}) => {
+  const { resolvedTheme } = useTheme();
+  const { t, locale } = useTranslation();
+  const { needResize } = useContext(ChartResizeContext);
+  const { reportLoaded } = useContext(OverviewLoadingContext);
+  const isMobile = useIsMobile();
+  const palette = getChartPalette(isMobile, resolvedTheme);
+  const lineColor = palette[0].main;
+  const haptic = useHaptics();
+
+  const [totalValueData, setTotalValueData] = useState<TotalValueData>({
+    totalValue: 0,
+  });
+  const [assetChangeData, setAssetChangeData] = useState<AssetChangeData>({
+    timestamps: [],
+    data: [],
+  });
+
+  const [btcAsBase, setBtcAsBase] = useState(false);
+
+  const [showPercentageInChart, setShowPercentageInChart] = useState(false);
+
+  const [showValue, setShowValue] = useState(false);
+  const [chartRange, setChartRange] = useState<"1W" | "1M" | "3M" | "1Y" | "ALL">("ALL");
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  const [scrubPosition, setScrubPosition] = useState<{ x: number; y: number; top: number; bottom: number } | null>(null);
+  const lastScrub = useRef<number | null>(null);
+  const [chartWidth, setChartWidth] = useState(600);
+  const chartChipRef = useRef<HTMLDivElement>(null);
+  const [chartChipWidth, setChartChipWidth] = useState(0);
+  useLayoutEffect(() => {
+    if (chartChipRef.current) setChartChipWidth(chartChipRef.current.getBoundingClientRect().width);
+  });
+  const loadGenRef = useRef(0);
+  const rangeKey = useMemo(
+    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [dateRange.start, dateRange.end],
+  );
+  const dataChangedVersion = useDataChangedVersion();
+
+  const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
+  const rangeDays = { "1W": 7, "1M": 30, "3M": 90, "1Y": 365, ALL: null }[chartRange];
+  const visibleIndices = useMemo(() => isMobile
+    ? visibleHistoryIndices(assetChangeData.timestamps, rangeDays)
+    : assetChangeData.timestamps.map((_, index) => index),
+  [assetChangeData.timestamps, rangeDays, isMobile]);
+  const firstTotalValue = useMemo(
+    () => assetChangeData.data[visibleIndices[0] ?? 0]?.usdValue ?? 0,
+    [assetChangeData, visibleIndices],
+  );
+  const firstDate = useMemo(
+    () => timeToDateStr(assetChangeData.timestamps[visibleIndices[0] ?? 0] ?? 0),
+    [assetChangeData, visibleIndices],
+  );
+  const displayedFirstDate = isMobile && assetChangeData.timestamps.length
+    ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })
+      .format(new Date(assetChangeData.timestamps[visibleIndices[0] ?? 0]))
+    : firstDate;
+
+  const totalValueShower = useMemo(
+    () =>
+      getTotalValueShower(
+        btcAsBase,
+        firstTotalValue,
+        totalValue,
+        assetChangeData,
+      ),
+    [assetChangeData, firstTotalValue, totalValue, btcAsBase],
+  );
+
+  const changedValueOrPercentage = useMemo(() => {
+    if (showValue) {
+      return totalValueShower.formatChangeValue();
+    }
+    let val = getPercentageChange(
+      totalValueShower,
+      totalValue,
+      firstTotalValue,
+    );
+    const p = getUpOrDown(val);
+    if (val < 0) {
+      val = -val;
+    }
+    return `${p}${prettyNumberToLocaleString(val)}%`;
+  }, [showValue, firstTotalValue, totalValue, totalValueShower]);
+
+  useEffect(() => {
+    const gen = ++loadGenRef.current;
+    void loadData(dateRange, gen)
+      .then(() => {
+        if (gen !== loadGenRef.current) {
+          return;
+        }
+        resizeChartWithDelay(chartName);
+      })
+      .finally(() => {
+        if (gen === loadGenRef.current) {
+          reportLoaded();
+        }
+      });
+  }, [rangeKey, dataChangedVersion]);
+
+  useEffect(() => resizeChart(chartName), [needResize]);
+
+  async function loadData(dr: TDateRange, gen: number) {
+    return bluebird.all([loadTotalValue(dr, gen), loadChartData(dr, gen)]);
+  }
+
+  async function loadTotalValue(dr: TDateRange, gen: number) {
+    const tv = await queryTotalValue(dr);
+    if (gen !== loadGenRef.current) {
+      return tv;
+    }
+    setTotalValueData(tv);
+    return tv;
+  }
+
+  async function loadChartData(dr: TDateRange, gen: number) {
+    const ac = await queryAssetChange(dr);
+    if (gen !== loadGenRef.current) {
+      return ac;
+    }
+    setAssetChangeData(ac);
+    return ac;
+  }
+
+  function getTotalValueShower(
+    btcAsBase: boolean,
+    firstTotalValue: number,
+    totalValue: number,
+    assetChangeData: AssetChangeData,
+  ) {
+    if (btcAsBase) {
+      return new BTCTotalValue(
+        firstTotalValue,
+        totalValue,
+        assetChangeData.data[visibleIndices[0] ?? 0]?.btcPrice ?? 0,
+        assetChangeData.data[assetChangeData.data.length - 1]?.btcPrice ?? 0,
+      );
+    }
+    return new FiatTotalValue(currency, firstTotalValue, totalValue);
+  }
+
+  function getUpOrDown(val: number) {
+    const p = val > 0 ? "+" : val === 0 ? "" : "-";
+    return p;
+  }
+
+  function getPercentageChange(
+    ts: TotalValueShower,
+    totalValue: number,
+    firstTotalValue: number,
+  ) {
+    // to handle empty data
+    if (totalValue === firstTotalValue) {
+      return 0;
+    }
+    if (firstTotalValue === 0) {
+      return 100;
+    }
+    return ts.changePercentage();
+  }
+
+  const lineValues = useMemo(() => {
+    const baseData = assetChangeData.data[visibleIndices[0] ?? 0];
+    if (!baseData) {
+      return [];
+    }
+
+    const baseDataValue =
+      (btcAsBase
+        ? baseData.btcPrice
+          ? baseData.usdValue / baseData.btcPrice
+          : 0
+        : currencyWrapper(currency)(baseData.usdValue)) || 0.0000000001;
+
+    if (btcAsBase) {
+      return assetChangeData.data
+        .map((d) => (d.btcPrice ? d.usdValue / d.btcPrice : 0))
+        .map((d) =>
+          showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d,
+        );
+    }
+    return assetChangeData.data
+      .map((d) => currencyWrapper(currency)(d.usdValue))
+      .map((d) => (showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d));
+  }, [assetChangeData, btcAsBase, currency, showPercentageInChart, visibleIndices]);
+  const plottedIndices = useMemo(
+    () => downsampleIndices([visibleIndices.map((index) => lineValues[index])],
+      Math.max(40, Math.floor(chartWidth / 2))).map((index) => visibleIndices[index]),
+    [lineValues, chartWidth, visibleIndices],
+  );
+  const plottedTimestamps = useMemo(
+    () => plottedIndices.map((index) => assetChangeData.timestamps[index]),
+    [plottedIndices, assetChangeData.timestamps],
+  );
+
+  function changePercentageColorClass(
+    ts: TotalValueShower,
+    totalValue: number,
+    firstTotalValue: number,
+  ) {
+    const pc = getPercentageChange(ts, totalValue, firstTotalValue);
+    return positiveNegativeTextClass(pc, quoteColor, 500);
+  }
+
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      responsive: true,
+      animation: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? false : { duration: 350 },
+      onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
+      onHover: (_event: unknown, elements: Array<{ index: number; element: { x: number; y: number } }>,
+        chart: { chartArea: { top: number; bottom: number } }) => {
+        if (!isMobile) return;
+        const next = elements[0]?.index ?? null;
+        if (next !== null && next !== lastScrub.current) haptic("selection");
+        lastScrub.current = next;
+        setScrubIndex(next);
+        setScrubPosition(next === null ? null : {
+          x: elements[0].element.x, y: elements[0].element.y,
+          top: chart.chartArea.top, bottom: chart.chartArea.bottom,
+        });
+      },
+      hover: {
+        mode: "index",
+        intersect: false,
+      },
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
+      plugins: {
+        title: {
+          display: false,
+          // text is set for resizing
+          text: chartName,
+        },
+        datalabels: {
+          display: false,
+        },
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          ...glassTooltip,
+          enabled: !isMobile,
+          callbacks: {
+            label: (context: { parsed: { y: number } }) => {
+              const v = context.parsed.y.toLocaleString();
+              if (showPercentageInChart) {
+                return `${v}%`;
+              }
+              if (btcAsBase) {
+                return `${btcSymbol}${v}`;
+              }
+              return currency.symbol + v;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: {
+            display: false,
+          },
+          ticks: {
+            ...glassScaleOptions.ticks,
+            font: { ...glassScaleOptions.ticks.font, family: isMobile ? phoneChartFontFamily : undefined },
+            display: !isMobile,
+            maxRotation: 0,
+            minRotation: 0,
+            align: "center",
+            autoSkip: isMobile,
+            maxTicksLimit: 3,
+            callback: function (val: number, index: number) {
+              const data = plottedTimestamps;
+
+              const size = data.length;
+              const start = 0;
+              const end = size - 1;
+
+              // only show start and end date
+              if (isMobile) return "";
+              if (index === start) {
+                return timeToDateStr(data[index]);
+              }
+
+              if (index === end) {
+                return timeToDateStr(data[index]);
+              }
+
+              return "";
+            },
+          },
+          grid: {
+            display: false,
+          },
+          border: { display: !isMobile },
+        },
+        y: {
+          title: {
+            display: false,
+            text: currency.currency,
+          },
+          offset: true,
+          ticks: {
+            ...glassScaleOptions.ticks,
+            font: { ...glassScaleOptions.ticks.font, family: isMobile ? phoneChartFontFamily : undefined },
+            precision: 2,
+            maxTicksLimit: 3,
+            callback: (value: any) => {
+              return showPercentageInChart
+                ? `${value.toLocaleString()}%`
+                : isMobile ? simplifyNumber(value).replace(/^-/, "−") : simplifyNumber(value);
+            },
+          },
+          grid: {
+            ...glassScaleOptions.grid,
+          },
+          border: { display: !isMobile },
+        },
+      },
+      layout: { padding: { right: isMobile ? 8 : 0 } },
+    }),
+    [
+      showPercentageInChart,
+      btcAsBase,
+      currency.symbol,
+      currency.currency,
+      plottedTimestamps,
+      isMobile,
+    ],
+  );
+
+  const lineDataMemo = useMemo(() => {
+    return {
+      labels: plottedTimestamps.map((x) => timeToDateStr(x)),
+      datasets: [
+        {
+          label: "Value",
+          data: plottedIndices.map((index) => lineValues[index]),
+          borderColor: lineColor,
+          backgroundColor: (context: any) => {
+            const { chart } = context;
+            const { ctx, chartArea } = chart;
+            if (!chartArea) {
+              return palette[0].bg;
+            }
+            return createGradientFill(ctx, chartArea, lineColor);
+          },
+          borderWidth: 2.5,
+          tension: 0.4,
+          pointRadius: 0,
+          pointStyle: "rotRect",
+          fill: "start",
+        },
+      ],
+    };
+  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, palette]);
+
+  return (
+    <div className="h-full overview-total">
+      <Card
+        className="flex h-full flex-col mobile-hero-card"
+        onMouseEnter={() => { if (!isMobile) setShowValue(true); }}
+        onMouseLeave={() => { if (!isMobile) setShowValue(false); }}
+      >
+        <CardHeader className="flex flex-row items-center justify-between pb-2 mobile-hero-header">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            {isMobile ? t("overview.portfolioValue") : t("totalValue.title").replace("{currency}", totalValueShower.currencyName())}
+          </CardTitle>
+          <div className="flex space-x-2 mobile-hero-tools">
+            {isMobile ? <label className="mobile-hero-switch-label">
+              <span>{t("overview.percentChart")}</span>
+              <Switch aria-label={t("overview.percentChart")} checked={showPercentageInChart}
+                onCheckedChange={setShowPercentageInChart} />
+            </label> : <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="touch:h-11 touch:w-11 text-muted-foreground h-8 w-8"
+              aria-label={isMobile ? `${t("overview.percentChart")} — ${t("totalValue.showPercentage")}` : t("totalValue.showPercentage")}
+              aria-pressed={showPercentageInChart}
+              onClick={() => setShowPercentageInChart(!showPercentageInChart)}
+            >
+              <svg
+                viewBox="0 0 1024 1024"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path
+                  d="M904.8 167.771429l-48.457143-48.457143a9.177143 9.177143 0 0 0-12.914286 0L119.2 843.314286a9.177143 9.177143 0 0 0 0 12.914285l48.457143 48.457143c3.542857 3.542857 9.371429 3.542857 12.914286 0L904.685714 180.571429c3.657143-3.428571 3.657143-9.257143 0.114286-12.8zM274.285714 438.857143c90.742857 0 164.571429-73.828571 164.571429-164.571429s-73.828571-164.571429-164.571429-164.571428-164.571429 73.828571-164.571428 164.571428 73.828571 164.571429 164.571428 164.571429z m0-246.857143c45.371429 0 82.285714 36.914286 82.285715 82.285714s-36.914286 82.285714-82.285715 82.285715-82.285714-36.914286-82.285714-82.285715 36.914286-82.285714 82.285714-82.285714z m475.428572 393.142857c-90.742857 0-164.571429 73.828571-164.571429 164.571429s73.828571 164.571429 164.571429 164.571428 164.571429-73.828571 164.571428-164.571428-73.828571-164.571429-164.571428-164.571429z m0 246.857143c-45.371429 0-82.285714-36.914286-82.285715-82.285714s36.914286-82.285714 82.285715-82.285715 82.285714 36.914286 82.285714 82.285715-36.914286 82.285714-82.285714 82.285714z"
+                  p-id="4221"
+                  fill="currentColor"
+                ></path>
+              </svg>
+            </Button>
+            }
+            {isMobile ? <label className="mobile-hero-switch-label">
+              <span>{t("overview.btcBase")}</span>
+              <Switch aria-label={t("overview.btcBase")} checked={btcAsBase}
+                onCheckedChange={setBtcAsBase} />
+            </label> : <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="touch:h-11 touch:w-11 text-muted-foreground h-8 w-8"
+              aria-label={isMobile ? `${t("overview.btcBase")} — ${t("totalValue.switchBase")}` : t("totalValue.switchBase")}
+              aria-pressed={btcAsBase}
+              onClick={() => setBtcAsBase(!btcAsBase)}
+            >
+              <svg
+                viewBox="0 0 15 15"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3.35355 1.85355C3.54882 1.65829 3.54882 1.34171 3.35355 1.14645C3.15829 0.951184 2.84171 0.951184 2.64645 1.14645L0.646447 3.14645C0.451184 3.34171 0.451184 3.65829 0.646447 3.85355L2.64645 5.85355C2.84171 6.04882 3.15829 6.04882 3.35355 5.85355C3.54882 5.65829 3.54882 5.34171 3.35355 5.14645L2.20711 4H9.5C11.433 4 13 5.567 13 7.5C13 7.77614 13.2239 8 13.5 8C13.7761 8 14 7.77614 14 7.5C14 5.01472 11.9853 3 9.5 3H2.20711L3.35355 1.85355ZM2 7.5C2 7.22386 1.77614 7 1.5 7C1.22386 7 1 7.22386 1 7.5C1 9.98528 3.01472 12 5.5 12H12.7929L11.6464 13.1464C11.4512 13.3417 11.4512 13.6583 11.6464 13.8536C11.8417 14.0488 12.1583 14.0488 12.3536 13.8536L14.3536 11.8536C14.5488 11.6583 14.5488 11.3417 14.3536 11.1464L12.3536 9.14645C12.1583 8.95118 11.8417 8.95118 11.6464 9.14645C11.4512 9.34171 11.4512 9.65829 11.6464 9.85355L12.7929 11H5.5C3.567 11 2 9.433 2 7.5Z"
+                  fill="currentColor"
+                  fillRule="evenodd"
+                  clipRule="evenodd"
+                ></path>
+              </svg>
+            </Button>
+            }
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col">
+          <div className={`${isMobile ? "" : "text-2xl"} font-semibold tabular-nums tracking-tight mobile-hero-value`}>
+            {isMobile && !btcAsBase
+              ? <AnimatedAmount value={currencyWrapper(currency)(totalValue)}
+                  format={(value) => currency.symbol + prettyNumberToLocaleString(value)} />
+              : totalValueShower.formatTotalValue()}
+          </div>
+          <p className="text-xs text-muted-foreground mb-2 mobile-hero-change">
+            <button type="button" aria-label={`${changedValueOrPercentage}, ${t("totalValue.toggleChange")}`}
+              onClick={() => setShowValue((value) => !value)}
+              className={`tabular-nums touch:min-h-11 touch:px-2 ${changePercentageColorClass(
+                totalValueShower,
+                totalValue,
+                firstTotalValue,
+              )}`}
+            >
+              {isMobile ? <DeltaPill value={totalValue - firstTotalValue} quoteColor={quoteColor}>{changedValueOrPercentage}</DeltaPill> : changedValueOrPercentage}
+            </button>{" "}
+            {t("totalValue.from").replace("{date}", displayedFirstDate)}
+          </p>
+          <div className="min-h-[120px] flex-1 mobile-hero-chart" onPointerLeave={() => { setScrubIndex(null); setScrubPosition(null); }}>
+            {isMobile && scrubIndex !== null && scrubPosition && plottedTimestamps[scrubIndex] !== undefined && <>
+              <div className="mobile-chart-crosshair" aria-hidden="true"
+                style={{ left: scrubPosition.x, top: scrubPosition.top, height: scrubPosition.bottom - scrubPosition.top }} />
+              <div className="mobile-chart-point" aria-hidden="true"
+                style={{ left: scrubPosition.x, top: scrubPosition.y }} />
+              <div ref={chartChipRef} className="mobile-chart-chip" aria-hidden="true"
+                style={{ left: Math.max(chartChipWidth / 2 + 4, Math.min(chartWidth - chartChipWidth / 2 - 4, scrubPosition.x)) }}>
+                {new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })
+                  .format(new Date(plottedTimestamps[scrubIndex]))} · {showPercentageInChart
+                  ? `${lineValues[plottedIndices[scrubIndex]]?.toFixed(2)}%`
+                  : `${btcAsBase ? btcSymbol : currency.symbol}${prettyNumberToLocaleString(lineValues[plottedIndices[scrubIndex]] ?? 0)}`}
+              </div></>}
+            <Line role="img" aria-label={t("totalValue.chartSummary")
+              .replace("{value}", totalValueShower.formatTotalValue())
+              .replace("{change}", changedValueOrPercentage)
+              .replace("{date}", displayedFirstDate)}
+              options={options as any} data={lineDataMemo} />
+          </div>
+          {isMobile && plottedTimestamps.length > 0 && <div className="mobile-hero-dates" aria-hidden="true">
+            <span>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })
+              .format(new Date(plottedTimestamps[0]))}</span>
+            <span>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })
+              .format(new Date(plottedTimestamps[plottedTimestamps.length - 1]))}</span>
+          </div>}
+          {isMobile && <SegmentedControl label={t("overview.chartRange")} value={chartRange} onChange={(value) => setChartRange(value)}
+            options={([
+              ["1W", "overview.rangeWeek"], ["1M", "overview.rangeMonth"],
+              ["3M", "overview.rangeQuarter"], ["1Y", "overview.rangeYear"], ["ALL", "overview.rangeAll"],
+            ] as const).map(([value, key]) => ({ value, label: t(key) }))} />}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default App;

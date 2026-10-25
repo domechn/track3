@@ -6,6 +6,15 @@ Track3 is a privacy-focused desktop cryptocurrency portfolio tracker built with 
 
 ## Architecture
 
+### Desktop and iOS split
+
+- `src/main.tsx` selects the desktop `src/App.tsx` or lazy-loaded `src/mobile/App.tsx` once at startup. Keep mobile imports behind this boundary.
+- `src/components/` is the desktop presentation. `src/mobile/components/` holds the iPhone presentation and mobile component tests. Share unchanged components by importing from `src/components/`; keep portfolio and persistence logic in `src/middlelayers/` once.
+- `src/style.css` and desktop Tailwind settings are desktop defaults. Mobile styles load from `src/mobile/ios-style.css` and `src/mobile/components/mobile/mobile.css`.
+- Existing translation keys retain desktop wording in `src/i18n/locales/`. The mobile provider uses `src/mobile/en.json` and `src/mobile/zh.json` for mobile copy.
+- iOS Rust and native code goes behind `cfg(target_os = "ios")` or `cfg(mobile)`. Put iOS configuration in `src-tauri/tauri.ios.conf.json` and permissions in `src-tauri/capabilities/mobile.json`; keep desktop config and permissions stable.
+- Run `corepack yarn tsc --noEmit`, `corepack yarn vitest run`, `corepack yarn playwright test --project=desktop`, `corepack yarn playwright test --project=mobile`, and `cargo test --locked -p track3-pure-tests --lib` from `src-tauri/`. macOS CI also builds and launches the iOS simulator app.
+
 ### Two-Layer Structure
 
 - **`src/`** — React/TypeScript frontend (Vite, Tailwind CSS, shadcn/ui)
@@ -102,7 +111,7 @@ Assistant prompt, skill, orchestrator, provider, and chat-loop changes should ru
 
 - Node.js 24+, Yarn 4.x (via Corepack), Rust 1.94.1+
 - macOS: Xcode CLI tools
-- Linux: `libwebkit2gtk-4.0-dev`, `libappindicator3-dev`, and related system libs
+- Linux: `libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, and related system libs
 - Windows: MSVC toolchain
 
 ## Project Conventions

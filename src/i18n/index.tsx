@@ -50,6 +50,10 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | undefined>(undefined);
 
+export function useProvidedTranslation() {
+  return useContext(I18nContext);
+}
+
 function resolveKey(dict: Dictionary, key: string): string | undefined {
   if (key in dict) {
     return dict[key];
@@ -57,7 +61,10 @@ function resolveKey(dict: Dictionary, key: string): string | undefined {
   return undefined;
 }
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
+export function I18nProvider({ children, dictionaries: overrides }: {
+  children: React.ReactNode;
+  dictionaries?: Record<Locale, Dictionary>;
+}) {
   const [locale, setLocaleState] = useState<Locale>(() => detectInitialLocale());
 
   const setLocale = useCallback((next: Locale) => {
@@ -74,18 +81,18 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const t = useCallback(
     (key: string, fallback?: string) => {
-      const fromActive = resolveKey(dictionaries[locale], key);
+      const fromActive = resolveKey(overrides?.[locale] ?? dictionaries[locale], key);
       if (fromActive !== undefined) {
         return fromActive;
       }
       // Fallback to English when active locale is missing a key
-      const fromEnglish = resolveKey(dictionaries.en, key);
+      const fromEnglish = resolveKey(overrides?.en ?? dictionaries.en, key);
       if (fromEnglish !== undefined) {
         return fromEnglish;
       }
       return fallback ?? key;
     },
-    [locale],
+    [locale, overrides],
   );
 
   useEffect(() => {

@@ -13,6 +13,11 @@ export function prettyNumberToLocaleString(value: number) {
 	})
 }
 
+export function formatPhoneMoney(value: number, symbol: string, signed = false) {
+	const sign = value < 0 ? "−" : signed && value > 0 ? "+" : ""
+	return `${sign}${symbol}${prettyNumberToLocaleString(Math.abs(value))}`
+}
+
 // keep n digits after decimal point, value needs to > 1
 // 1 => 1
 // 1.23456 => 1.234

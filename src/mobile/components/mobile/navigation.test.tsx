@@ -1,0 +1,39 @@
+import React from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MobileNavigation, routeTitle } from "@/mobile/components/mobile/navigation";
+
+function Path() {
+  const location = useLocation();
+  return <output>{location.pathname + location.search}</output>;
+}
+
+describe("mobile navigation", () => {
+  it("names an asset detail page for its asset", () => {
+    expect(routeTitle("/coins/BTC", (key) => key)).toBe("BTC");
+  });
+  it("shows four tabs and restores the last route in a tab", () => {
+    render(<MemoryRouter initialEntries={["/cost-basis"]}>
+      <MobileNavigation unread={2} />
+      <Routes><Route path="*" element={<Path />} /></Routes>
+    </MemoryRouter>);
+    const tabs = screen.getAllByRole("link", { name: /overview|history|analytics|more/i, hidden: true });
+    expect(tabs).toHaveLength(4);
+    expect(screen.getByRole("link", { name: /analytics/i, hidden: true })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("link", { name: /history/i, hidden: true }));
+    expect(screen.getByText("/history")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: /analytics/i, hidden: true }));
+    expect(screen.getByText("/cost-basis")).toBeInTheDocument();
+  });
+
+  it("keeps a stock asset's query when returning to its tab", () => {
+    render(<MemoryRouter initialEntries={["/coins/AAPL?assetType=stock"]}>
+      <MobileNavigation />
+      <Routes><Route path="*" element={<Path />} /></Routes>
+    </MemoryRouter>);
+    fireEvent.click(screen.getByRole("link", { name: /history/i, hidden: true }));
+    fireEvent.click(screen.getByRole("link", { name: /analytics/i, hidden: true }));
+    expect(screen.getByText("/coins/AAPL?assetType=stock")).toBeInTheDocument();
+  });
+});

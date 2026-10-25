@@ -1,0 +1,285 @@
+name: iOS foundation
+
+on:
+  push:
+    branches: ["feat/ios-app*"]
+  pull_request:
+    paths:
+      - "src/mobile/**"
+      - "src/main.tsx"
+      - "src/i18n/index.tsx"
+      - "src/utils/platform*"
+      - "src/utils/ios-*"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/Cargo.lock"
+      - "src-tauri/Info.ios.plist"
+      - "src-tauri/build.rs"
+      - "src-tauri/gen/apple/**"
+      - "src-tauri/tauri.ios.conf.json"
+      - "src-tauri/capabilities/mobile.json"
+      - "src-tauri/src/app.rs"
+      - "src-tauri/src/ios_*"
+      - "scripts/ios/**"
+      - "docs/ios/**"
+      - "tests/e2e/mobile.spec.ts"
+      - "tests/e2e/ios-*.spec.ts"
+      - ".github/workflows/ios-foundation.yml"
+  workflow_dispatch:
+
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - run: corepack enable
+      - name: Find Yarn cache
+        id: yarn-cache
+        run: echo "dir=$(corepack yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.yarn-cache.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+      - run: corepack yarn install --immutable
+      - run: corepack yarn tsc --noEmit
+      - run: corepack yarn vitest run
+      - run: corepack yarn build
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-chromium-${{ hashFiles('yarn.lock') }}
+      - name: Install Playwright and desktop Rust system packages
+        timeout-minutes: 12
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            xvfb fonts-noto-color-emoji fonts-unifont libfontconfig1 libfreetype6 \
+            xfonts-cyrillic xfonts-scalable fonts-liberation fonts-ipafont-gothic \
+            fonts-wqy-zenhei fonts-tlwg-loma-otf fonts-freefont-ttf \
+            libasound2t64 libatk-bridge2.0-0t64 libatk1.0-0t64 \
+            libatspi2.0-0t64 libcairo2 libcups2t64 libdbus-1-3 libdrm2 \
+            libgbm1 libglib2.0-0t64 libnspr4 libnss3 libpango-1.0-0 \
+            libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 \
+            libxfixes3 libxkbcommon0 libxrandr2 \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Install Playwright Chromium
+        timeout-minutes: 10
+        run: corepack yarn playwright install chromium
+      - name: Check browser tests
+        run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
+      - name: Test iPhone flows
+        run: corepack yarn playwright test --project=mobile --workers=2
+      - name: Upload iPhone browser screenshots
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-browser-screenshots
+          path: test-results/mobile/*.png
+          retention-days: 1
+      - name: Test desktop browser flows
+        run: corepack yarn playwright test --project=desktop tests/e2e/smoke.spec.ts tests/e2e/accessibility.spec.ts tests/e2e/density.spec.ts tests/e2e/ai-setup.spec.ts --workers=2
+      - name: Check desktop Rust library
+        timeout-minutes: 15
+        run: cargo check --locked --lib
+        working-directory: src-tauri
+      - run: cargo test --locked -p track3-pure-tests --lib
+        working-directory: src-tauri
+
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - run: corepack enable
+      - name: Find Yarn cache
+        id: yarn-cache
+        run: echo "dir=$(corepack yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.yarn-cache.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+      - run: corepack yarn install --immutable
+      - run: corepack yarn build
+      - name: Initialize the Xcode project when absent
+        run: |
+          if [ ! -f src-tauri/gen/apple/project.yml ]; then
+            corepack yarn tauri ios init --ci
+          fi
+          python3 scripts/ios/configure-project.py
+          corepack yarn tauri icon src-tauri/app-icon.png --output generated-icons
+          cp generated-icons/ios/*.png src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/
+          git diff --exit-code -- src-tauri/gen/apple
+      - name: Check the device Rust target
+        run: cargo check --locked --target aarch64-apple-ios --lib
+        working-directory: src-tauri
+      - name: Check the simulator Rust target
+        run: cargo check --locked --target aarch64-apple-ios-sim --lib
+        working-directory: src-tauri
+      - name: Build unsigned simulator app
+        run: VITE_TRACK3_IOS_READY_PROBE=1 corepack yarn tauri ios build --target aarch64-sim --debug --no-sign --ci
+      - name: Check native symbols in simulator app
+        run: |
+          set -euo pipefail
+          APP=$(find src-tauri -type d -name '*.app' -print -quit)
+          test -n "$APP"
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          nm -gU "$APP/$EXECUTABLE" > "$RUNNER_TEMP/track3-native-symbols.txt"
+          for symbol in track3_ios_install_native track3_ios_lock_enabled track3_ios_set_lock_enabled track3_ios_authenticate track3_ios_haptic track3_ios_set_badge track3_ios_share_file track3_ios_keychain_read track3_ios_keychain_write track3_ios_keychain_delete; do
+            grep -Fq " _$symbol" "$RUNNER_TEMP/track3-native-symbols.txt"
+          done
+      - name: Launch in iPhone simulator
+        run: |
+          set -euxo pipefail
+          SIM_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(d["udid"] for group in data["devices"].values() for d in group if d["name"].startswith("iPhone") and d["state"] == "Shutdown"))')
+          xcrun simctl boot "$SIM_ID"
+          xcrun simctl bootstatus "$SIM_ID" -b
+          APP=$(find src-tauri -type d -name '*.app' -print -quit)
+          test -n "$APP"
+          test -n "$(find "$APP" -type f -path '*/migrations/init/assets_v2_up.sql' -print -quit)"
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          mkdir -p artifacts
+          for attempt in 1 2 3; do
+            if xcrun simctl install "$SIM_ID" "$APP"; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 10
+          done
+          APP_PID=$(xcrun simctl launch "$SIM_ID" dev.track3.ios 2>&1 | tee artifacts/simctl-launch.log | sed -n 's/.*: //p' || true)
+          CONTAINER=$(xcrun simctl get_app_container "$SIM_ID" dev.track3.ios data)
+          dump_frontend_errors() {
+            ERROR_FILE=$(find "$CONTAINER" -name track3-frontend-errors.log -type f -print -quit)
+            if [ -n "$ERROR_FILE" ]; then
+              cp "$ERROR_FILE" artifacts/frontend-errors.log
+              cat artifacts/frontend-errors.log
+            fi
+          }
+          trap dump_frontend_errors EXIT
+          sleep 20
+          xcrun simctl spawn "$SIM_ID" log show --last 1m --style compact --predicate "process ==[c] \"$EXECUTABLE\"" > artifacts/launch.log || true
+          find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -iname "${EXECUTABLE}*" -mmin -2 -print > artifacts/crash-reports.log 2>/dev/null || true
+          xcrun simctl io "$SIM_ID" screenshot artifacts/iphone-initial.png
+          ditto -c -k --keepParent "$APP" artifacts/Track3-simulator.app.zip
+          cat artifacts/simctl-launch.log
+          cat artifacts/launch.log
+          cat artifacts/crash-reports.log
+          sips -Z 600 artifacts/iphone-initial.png --out /tmp/track3-launch-initial-small.png >/dev/null
+          echo "TRACK3_INITIAL_SCREENSHOT_BEGIN"
+          base64 -i /tmp/track3-launch-initial-small.png | fold -w 3000 | sed 's/^/TRACK3_INITIAL_SCREENSHOT_CHUNK:/'
+          echo "TRACK3_INITIAL_SCREENSHOT_END"
+          swift scripts/ios/check-screenshot.swift artifacts/iphone-initial.png
+          test -n "$APP_PID"
+          READY=""
+          for attempt in $(seq 1 30); do
+            READY=$(find "$CONTAINER" -name track3-ready -type f -print -quit)
+            if [ -n "$READY" ]; then break; fi
+            sleep 2
+          done
+          test -n "$READY"
+          grep -Fxq 'track3:ready' "$READY"
+          echo "track3:ready" >> artifacts/launch.log
+          xcrun simctl io "$SIM_ID" screenshot artifacts/iphone-launch.png
+          sips -Z 600 artifacts/iphone-launch.png --out /tmp/track3-launch-small.png >/dev/null
+          echo "TRACK3_SCREENSHOT_BEGIN"
+          base64 -i /tmp/track3-launch-small.png | fold -w 3000 | sed 's/^/TRACK3_SCREENSHOT_CHUNK:/'
+          echo "TRACK3_SCREENSHOT_END"
+          swift scripts/ios/check-screenshot.swift artifacts/iphone-launch.png
+          xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$APP_PID" '$1 == pid {found=1} END {exit !found}'
+          test ! -s artifacts/crash-reports.log
+          ! grep -Eiq 'failed to read migration|error while running tauri application' artifacts/launch.log
+      - name: Build unsigned device IPA
+        run: |
+          set -euo pipefail
+          if ! corepack yarn tauri ios build --target aarch64 --debug --no-sign --ci; then
+            echo "Tauri did not export an unsigned IPA; checking for a built device app"
+          fi
+          IPA=$(find src-tauri -type f -name '*.ipa' -print -quit)
+          if [ -n "$IPA" ]; then
+            cp "$IPA" artifacts/Track3-unsigned.ipa
+          else
+            APP=$(find src-tauri -type d -name '*.app' ! -ipath '*sim*' -print -quit)
+            test -n "$APP"
+            EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+            test -x "$APP/$EXECUTABLE"
+            mkdir -p artifacts/ipa/Payload
+            cp -R "$APP" artifacts/ipa/Payload/
+            (cd artifacts/ipa && zip -qry ../Track3-unsigned.ipa Payload)
+            rm -rf artifacts/ipa
+          fi
+      - name: Check committed Xcode project
+        run: |
+          python3 scripts/ios/configure-project.py
+          git diff --exit-code -- src-tauri/gen/apple
+      - name: Print simulator crash reason
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from time import time
+
+          root = Path.home() / "Library/Logs/DiagnosticReports"
+          for path in sorted(root.glob("*.ips"), key=lambda item: item.stat().st_mtime, reverse=True):
+              if time() - path.stat().st_mtime > 600 or not path.name.lower().startswith(("track3", "track3_ios")):
+                  continue
+              print(f"Crash report: {path.name}")
+              lines = path.read_text(errors="replace").splitlines()
+              try:
+                  report = json.loads("\n".join(lines[1:]))
+                  for key in ("exception", "termination", "asi", "faultingThread", "lastExceptionBacktrace"):
+                      if key in report:
+                          print(f"{key}: {str(report[key])[:4000]}")
+                  thread = report.get("faultingThread")
+                  if isinstance(thread, int):
+                      frames = report.get("threads", [])[thread].get("frames", [])
+                      print(f"frames: {str(frames[:12])[:4000]}")
+              except (ValueError, IndexError, KeyError, TypeError):
+                  for line in lines[:120]:
+                      if any(word in line.lower() for word in ("exception", "termination", "panic", "abort")):
+                          print(line[:1000])
+              break
+          PY
+      - name: Upload simulator screenshots and launch logs
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-simulator
+          path: |
+            artifacts/*.png
+            artifacts/*.log
+          retention-days: 1
+      - name: Upload unsigned iOS builds
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-builds
+          path: |
+            artifacts/*.zip
+            artifacts/*.ipa
+          retention-days: 1
+      - name: Typecheck iOS native bridge
+        if: always()
+        run: |
+          SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
+          xcrun swiftc -typecheck -sdk "$SDK" -target arm64-apple-ios15.0-simulator src-tauri/gen/apple/Sources/track3/Track3Native.swift

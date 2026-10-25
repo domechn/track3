@@ -4,10 +4,10 @@ import { fromStoredTransactions } from "./cost-basis";
 import { buildCostBasisReport, serializeRealizedGains } from "./cost-basis-report";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { ASSET_HANDLER } from "./entities/assets";
-import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { format } from "date-fns";
 import { redactForExport, redactSecrets } from "./security/redact";
+import { exportFile } from "@/utils/export-file";
 
 export async function loadCostBasisReport(
   options: { method: CostBasisMethod; from?: string; to?: string; holdingPeriodDays?: number },
@@ -42,14 +42,9 @@ export async function exportCostBasisReport(
   report: CostBasisReport,
   format: "csv" | "json",
 ): Promise<boolean> {
-  const filePath = await save({
-    filters: [{ name: `cost-basis-${format}`, extensions: [format] }],
-    defaultPath: `track3-realized-gains.${format}`,
-  });
-  if (!filePath) return false;
   const serialized = serializeRealizedGains(report, format);
-  await writeTextFile(filePath, format === "json"
-    ? JSON.stringify(redactForExport(JSON.parse(serialized)), null, 2)
-    : redactSecrets(serialized));
-  return true;
+  return exportFile(`track3-realized-gains.${format}`, [format], (path) =>
+    writeTextFile(path, format === "json"
+      ? JSON.stringify(redactForExport(JSON.parse(serialized)), null, 2)
+      : redactSecrets(serialized)), `cost-basis-${format}`);
 }

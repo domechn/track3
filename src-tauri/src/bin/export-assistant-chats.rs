@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use track3::{
+use track3_lib::{
     ent::Ent,
     info::sanitize_upstream_error,
     startup_security::{load_encryption_key, LEGACY_ENCRYPTION_KEY},

@@ -1,0 +1,46 @@
+{
+  "identifier": "mobile",
+  "platforms": ["iOS"],
+  "local": true,
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "fs:default",
+    "fs:allow-stat",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-write-text-file",
+    "fs:allow-exists",
+    "fs:allow-mkdir",
+    "fs:allow-read-dir",
+    "fs:allow-remove",
+    "fs:allow-copy-file",
+    "fs:allow-rename",
+    "fs:allow-app-write-recursive",
+    "fs:allow-appcache-write-recursive",
+    "fs:allow-appconfig-write-recursive",
+    "fs:allow-document-read-recursive",
+    "fs:allow-document-write-recursive",
+    {
+      "identifier": "fs:scope",
+      "allow": ["$APPDATA/**", "$APPCACHE/**", "$APPCONFIG/**", "$DOCUMENT/**"]
+    },
+    "dialog:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://**/" },
+        { "url": "https://*:*/*" },
+        { "url": "http://localhost:*/*" },
+        { "url": "http://127.0.0.1:*/*" }
+      ]
+    },
+    "notification:default",
+    "sql:default",
+    "sql:allow-execute",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://**/" }]
+    }
+  ]
+}

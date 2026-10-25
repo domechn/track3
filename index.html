@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/track3.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta
       name="description"
       content="Track3 is a privacy-focused desktop portfolio tracker. Assets and transactions are stored locally in SQLite without application-layer encryption; sensitive configuration and chat content use application-layer encryption."
@@ -24,6 +25,26 @@
 
   <body>
     <div id="root"></div>
+    <script id="ios-startup-probe">
+      if ("%VITE_TRACK3_IOS_READY_PROBE%" === "1") {
+        const recordError = (message) => {
+          window.__TAURI_INTERNALS__?.invoke("record_frontend_error", {
+            message: String(message).slice(0, 4000),
+          }).catch(() => {});
+        };
+        window.onerror = (message, source, line, column, error) => {
+          recordError(error?.stack || `${message} at ${source}:${line}:${column}`);
+        };
+        window.addEventListener("unhandledrejection", (event) => {
+          recordError(event.reason?.stack || event.reason);
+        });
+        window.addEventListener("error", (event) => {
+          if (event.target !== window) {
+            recordError(`Resource failed: ${event.target?.src || event.target?.href || "unknown"}`);
+          }
+        }, true);
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,5 +1,5 @@
-import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { exportFile } from "@/utils/export-file";
 import {
   addToBlacklist, getBlacklistCoins, removeFromBlacklist, getQuoteColor,
   saveQuoteColor, queryPreferCurrency, savePreferCurrency, listAllCurrencyRates,
@@ -341,11 +341,6 @@ function csvCell(value: unknown): string {
 async function exportPortfolio(report: "portfolio_snapshot" | "markdown_summary", format: "csv" | "json" | "md"): Promise<string> {
   const assets = redactForExport(await queryLatestAssets());
   const rate = await queryPreferCurrency();
-  const filePath = await save({
-    defaultPath: `track3-${report.replace("_", "-")}.${format}`,
-    filters: [{ name: report, extensions: [format] }],
-  });
-  if (!filePath) return "assistant.action.result.canceled";
   const total = assets.reduce((sum, asset) => sum + asset.value * rate.rate, 0);
   const content = format === "json"
     ? JSON.stringify({ currency: rate.currency, total, assets }, null, 2)
@@ -354,8 +349,9 @@ async function exportPortfolio(report: "portfolio_snapshot" | "markdown_summary"
         assets.map((asset) => `- ${asset.symbol}: ${(asset.value * rate.rate).toFixed(2)} ${rate.currency}`).join("\n")
       : ["symbol,assetType,amount,value,price",
         ...assets.map((asset) => [asset.symbol, asset.assetType, asset.amount, asset.value * rate.rate, asset.price * rate.rate].map(csvCell).join(","))].join("\r\n");
-  await writeTextFile(filePath, redactSecrets(content));
-  return "assistant.action.result.exported";
+  return await exportFile(`track3-${report.replace("_", "-")}.${format}`, [format], (path) =>
+    writeTextFile(path, redactSecrets(content)), report)
+    ? "assistant.action.result.exported" : "assistant.action.result.canceled";
 }
 
 export async function executeAction(name: string, raw: unknown): Promise<string> {
@@ -396,11 +392,10 @@ export async function executeAction(name: string, raw: unknown): Promise<string>
       const { holdings, stablecoinSymbols } = await loadRebalanceHoldings(currency);
       const options = readStored(REBALANCE_OPTIONS_KEY, sessionStorage);
       const result = calculateRebalance(holdings, profile.targets, { ...options, tolerancePercent: profile.tolerancePercent, stablecoinSymbols });
-      const filePath = await save({ defaultPath: "track3-rebalance.csv", filters: [{ name: "track3-rebalance", extensions: ["csv"] }] });
-      if (!filePath) return "assistant.action.result.canceled";
       const dictionary: Record<string, string> = localStorage.getItem(localeLocalStorageKey) === "zh" ? zh : en;
-      await writeTextFile(filePath, suggestionsToCsv(result, currency.currency, (key) => dictionary[key] ?? en[key as keyof typeof en] ?? key));
-      return "assistant.action.result.exported";
+      return await exportFile("track3-rebalance.csv", ["csv"], (path) =>
+        writeTextFile(path, suggestionsToCsv(result, currency.currency, (key) => dictionary[key] ?? en[key as keyof typeof en] ?? key)))
+        ? "assistant.action.result.exported" : "assistant.action.result.canceled";
     }
     case "set_cost_basis_settings": {
       const current: Record<string, unknown> = { method: await getCostBasisMethod(), ...readStored(COST_BASIS_SETTINGS_KEY) };

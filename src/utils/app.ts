@@ -4,6 +4,7 @@ import { exists } from "@tauri-apps/plugin-fs";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { fetch } from "@tauri-apps/plugin-http";
+import { isIOS } from "./platform";
 
 const APTABASE_APP_KEY = "A-EU-6972874637";
 const APTABASE_HOSTS = {
@@ -97,7 +98,7 @@ export async function getImageApiPath(cacheDir: string, symbol: string) {
 }
 
 export function reloadApp() {
-  return relaunch();
+  return isIOS() ? window.location.reload() : relaunch();
 }
 
 function getAptabaseEndpoint(appKey: string) {

@@ -43,6 +43,8 @@ export type PortfolioSourceResult = {
   partial?: PartialSourceFailure;
   category?: SourceErrorCategory;
   detail?: string;
+  startedAt?: string;
+  finishedAt?: string;
 } & SourceIdentification;
 
 export type PortfolioSourceStatus = {
@@ -53,6 +55,8 @@ export type PortfolioSourceStatus = {
   category?: SourceErrorCategory;
   detail?: string;
   lastSuccessAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
 } & SourceIdentification;
 
 export type LoadPortfoliosResult = {

@@ -1,0 +1,1277 @@
+import {
+  calculateTotalProfit,
+  listAllowedSymbols,
+  queryAssetMaxAmountBySymbol,
+  queryAllDataDates,
+  queryLastAssetsBySymbol,
+  queryTransactionsBySymbolAndDateRange,
+  updateTransactionPrice,
+  updateTransactionTxnType,
+} from "@/middlelayers/charts";
+import {
+  Asset,
+  AssetReference,
+  CurrencyRateDetail,
+  TDateRange,
+  Transaction,
+  TransactionType,
+} from "@/middlelayers/types";
+import { AssetType } from "@/middlelayers/datafetch/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedVersion } from "@/contexts/data-changed";
+import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  currencyWrapper,
+  prettyNumberKeepNDigitsAfterDecimalPoint,
+  prettyNumberToLocaleString,
+  formatPhoneMoney,
+  prettyPriceNumberToLocaleString,
+} from "@/utils/currency";
+import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { getImageApiPath } from "@/utils/app";
+import { WalletAnalyzer } from "@/middlelayers/wallet";
+import { timeToDateStr } from "@/utils/date";
+import {
+  CaretSortIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Pencil2Icon,
+} from "@radix-ui/react-icons";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/mobile/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/mobile/components/ui/use-toast";
+import CoinsAmountAndValueChange from "@/mobile/components/coins-amount-and-value-change";
+import WalletAssetsPercentage from "@/mobile/components/wallet-assets-percentage";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/mobile/components/ui/command";
+import { cn } from "@/lib/utils";
+import { StaggerContainer, FadeUp } from "@/components/motion";
+import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import AssetLabel from "@/components/common/asset-label";
+import {
+  buildAssetDetailsPath,
+  formatAssetLabel,
+  getAssetLogoKey,
+  parseAssetTypeSearchParam,
+  resolveAssetLogoSrc,
+  shouldDownloadCryptoLogo,
+} from "@/utils/assets";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useTranslation } from "@/mobile/i18n";
+import { BottomSheet, DeltaPill, MobileRecordList, useIsMobile } from "@/mobile/components/mobile";
+
+function formatEditablePrice(value: number): string {
+  if (!Number.isFinite(value)) {
+    return String(value);
+  }
+  return String(Number(value.toPrecision(15)));
+}
+
+function transactionMutationKey(
+  transactionId: number,
+  field: "price" | "type",
+) {
+  return `${transactionId}:${field}`;
+}
+
+interface UpdatePriceDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  updatePriceValue: string;
+  setUpdatePriceValue: (value: string) => void;
+  onSave: () => void;
+  pending?: boolean;
+}
+
+export const UpdatePriceDialog = ({
+  open,
+  onOpenChange,
+  updatePriceValue,
+  setUpdatePriceValue,
+  onSave,
+  pending = false,
+}: UpdatePriceDialogProps) => {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{t("coin.updatePrice")}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <Input
+            type="number"
+            aria-label={t("coin.updatePrice")}
+            value={updatePriceValue}
+            onChange={(e) => setUpdatePriceValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onSave();
+              }
+            }}
+          />
+        </div>
+        <DialogFooter>
+          <Button type="submit" onClick={onSave} disabled={pending}>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+interface UpdateTransactionTypeDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  updateTxnTypeValue?: TransactionType;
+  setUpdateTxnTypeValue: (value: TransactionType) => void;
+  onSave: () => void;
+  pending?: boolean;
+}
+
+export const UpdateTransactionTypeDialog = ({
+  open,
+  onOpenChange,
+  updateTxnTypeValue,
+  setUpdateTxnTypeValue,
+  onSave,
+  pending = false,
+}: UpdateTransactionTypeDialogProps) => {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[250px]">
+        <DialogHeader>
+          <DialogTitle>{t("coin.updateTxnType")}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <Select
+            onValueChange={(e) => setUpdateTxnTypeValue(e as TransactionType)}
+            value={updateTxnTypeValue}
+          >
+            <SelectTrigger aria-label={`${t("coin.updateTxnType")} ${updateTxnTypeValue ? t(`coin.txnType.${updateTxnTypeValue}`) : ""}`}>
+              <SelectValue placeholder={t("coin.txnTypePlaceholder")} />
+            </SelectTrigger>
+            <SelectContent className="overflow-y-auto max-h-[20rem]">
+              <SelectGroup>
+                <SelectItem value="sell">{t("coin.txnType.sell")}</SelectItem>
+                <SelectItem value="buy">{t("coin.txnType.buy")}</SelectItem>
+                <SelectItem value="withdraw">{t("coin.txnType.withdraw")}</SelectItem>
+                <SelectItem value="deposit">{t("coin.txnType.deposit")}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button type="submit" onClick={onSave} disabled={pending}>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const App = ({
+  currency,
+  dateRange,
+  onDataChanged,
+}: {
+  currency: CurrencyRateDetail;
+  dateRange: TDateRange;
+  onDataChanged?: () => void;
+}) => {
+  const { symbol } = useParams() as { symbol: string };
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { t, locale } = useTranslation();
+  const isMobile = useIsMobile();
+  const pageSize = 20;
+  const LOAD_COUNT = 3; // loadSymbolData, CoinsAmountAndValueChange, WalletAssetsPercentage
+  const assetType = parseAssetTypeSearchParam(searchParams.get("assetType"));
+
+  const [pageLoading, setPageLoading] = useState(true);
+  const loadedCountRef = useRef(0);
+  const loadGenRef = useRef(0);
+  const queryKey = useMemo(
+    () =>
+      `${symbol}-${assetType}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
+    [symbol, assetType, dateRange.start, dateRange.end],
+  );
+  const dataChangedVersion = useDataChangedVersion();
+
+  const reportLoaded = useCallback(() => {
+    loadedCountRef.current += 1;
+    if (loadedCountRef.current >= LOAD_COUNT) {
+      setPageLoading(false);
+    }
+  }, []);
+
+  const [dataPage, setDataPage] = useState<number>(0);
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [lastAsset, setLastAsset] = useState<Asset | undefined>();
+  const [previousPrice, setPreviousPrice] = useState<number>();
+
+  const [buyAmount, setBuyAmount] = useState<number>(0);
+  const [sellAmount, setSellAmount] = useState<number>(0);
+  const [costAvgPrice, setCostAvgPrice] = useState<number>(0);
+  const [sellAvgPrice, setSellAvgPrice] = useState<number>(0);
+
+  const [profit, setProfit] = useState<number>(0);
+  const [profitPercentage, setProfitPercentage] = useState<
+    number | undefined
+  >();
+
+  const [updateTxnId, setUpdateTxnId] = useState<number>(0);
+  const editSessionRef = useRef(0);
+  const [updatePriceValue, setUpdatePriceValue] = useState("");
+  const [updatePriceOriginalValue, setUpdatePriceOriginalValue] =
+    useState<number>(Number.NaN);
+  const [updatePriceRate, setUpdatePriceRate] =
+    useState<number>(Number.NaN);
+  const [updatePriceDirty, setUpdatePriceDirty] = useState(false);
+  const [updatePriceDialogOpen, setUpdatePriceDialogOpen] = useState(false);
+
+  const [updateTxnTypeValue, setUpdateTxnTypeValue] = useState<
+    TransactionType | undefined
+  >();
+  const [updateTxnDialogOpen, setUpdateTxnTypeDialogOpen] = useState(false);
+  const pendingMutationKeysRef = useRef<Set<string>>(new Set());
+  const [pendingMutationKeys, setPendingMutationKeys] = useState<Set<string>>(
+    new Set(),
+  );
+
+  function beginEditSession() {
+    editSessionRef.current += 1;
+    return editSessionRef.current;
+  }
+
+  function onUpdatePriceDialogOpenChange(open: boolean) {
+    if (!open) {
+      beginEditSession();
+    }
+    setUpdatePriceDialogOpen(open);
+  }
+
+  function onUpdateTxnTypeDialogOpenChange(open: boolean) {
+    if (!open) {
+      beginEditSession();
+    }
+    setUpdateTxnTypeDialogOpen(open);
+  }
+
+  function setMutationPending(key: string, pending: boolean) {
+    const next = new Set(pendingMutationKeysRef.current);
+    if (pending) {
+      next.add(key);
+    } else {
+      next.delete(key);
+    }
+    pendingMutationKeysRef.current = next;
+    setPendingMutationKeys(next);
+  }
+
+  function openUpdateTxnTypeDialog(act: Transaction) {
+    if (
+      pendingMutationKeysRef.current.has(
+        transactionMutationKey(act.id, "type"),
+      )
+    ) {
+      return;
+    }
+    beginEditSession();
+    setUpdatePriceDialogOpen(false);
+    setUpdateTxnId(act.id);
+    setUpdateTxnTypeValue(act.txnType);
+    setUpdateTxnTypeDialogOpen(true);
+  }
+
+  function openUpdatePriceDialog(act: Transaction) {
+    if (
+      pendingMutationKeysRef.current.has(
+        transactionMutationKey(act.id, "price"),
+      )
+    ) {
+      return;
+    }
+    beginEditSession();
+    setUpdateTxnTypeDialogOpen(false);
+    setUpdateTxnId(act.id);
+    setUpdatePriceValue(
+      formatEditablePrice(act.price * currency.rate),
+    );
+    setUpdatePriceOriginalValue(act.price);
+    setUpdatePriceRate(currency.rate);
+    setUpdatePriceDirty(false);
+    setUpdatePriceDialogOpen(true);
+  }
+
+  const [maxPosition, setMaxPosition] = useState<number>(0);
+
+  const [coinSelectOpen, setCoinSelectOpen] = useState(false);
+  const [walletAliasMap, setWalletAliasMap] = useState<{
+    [k: string]: string | undefined;
+  }>({});
+
+  const [logo, setLogo] = useState("");
+
+  const [allowSymbols, setAllowSymbols] = useState<AssetReference[]>([]);
+  const [coinKeyword, setCoinKeyword] = useState("");
+  const [coinListLimit, setCoinListLimit] = useState(200);
+
+  const allowSymbolGenRef = useRef(0);
+  useEffect(() => {
+    // Increment first so the captured gen is current when the async
+    // listAllowedSymbols() resolves — this ref is independent of the
+    // symbol-load generation below, which is bumped by a sibling effect
+    // that runs after this one.
+    const gen = ++allowSymbolGenRef.current;
+    loadAllowedSymbols(gen);
+  }, [dataChangedVersion]);
+
+  useEffect(() => {
+    setPageLoading(true);
+    loadedCountRef.current = 0;
+    loadGenRef.current += 1;
+  }, [queryKey, dataChangedVersion]);
+
+  useEffect(() => {
+    loadSymbolData(symbol, dateRange, assetType);
+    setDataPage(0);
+
+    const timer = setTimeout(() => setPageLoading(false), 8000);
+    return () => clearTimeout(timer);
+  }, [queryKey, dataChangedVersion]);
+
+  useEffect(() => {
+    if (!coinSelectOpen) {
+      setCoinKeyword("");
+      setCoinListLimit(200);
+    }
+  }, [coinSelectOpen]);
+
+  async function getLogoPath(symbol: string, selectedAssetType: AssetType) {
+    if (!shouldDownloadCryptoLogo({ assetType: selectedAssetType })) {
+      return "";
+    }
+    const acd = await getAppCacheDir();
+    return getImageApiPath(acd, symbol);
+  }
+
+  useEffect(() => {
+    if (transactions.length === 0) {
+      return;
+    }
+
+    // init wallet alias map
+    const wa = new WalletAnalyzer(async () => []);
+    wa.listWalletAliases(
+      Array.from(new Set(transactions.map((t) => t.wallet).filter((w): w is string => !!w))),
+    ).then((res) => {
+      const wam: { [k: string]: string | undefined } = {};
+      for (const [v, k] of Object.entries(res)) {
+        wam[v] = k?.alias ? `${k.alias} (${k.type})` : k?.wallet;
+      }
+      setWalletAliasMap(wam);
+    });
+  }, [transactions]);
+
+  const breakevenPrice = useMemo(() => {
+    if (!lastAsset) {
+      return;
+    }
+    if (lastAsset.amount === 0) {
+      return profit > 0 ? 0 : undefined;
+    }
+    return (lastAsset.price * lastAsset.amount - profit) / lastAsset.amount;
+  }, [profit, lastAsset]);
+
+  const breakEvenPriceStr = useMemo(
+    () =>
+      breakevenPrice === undefined
+        ? "∞"
+        : currency.symbol +
+          prettyPriceNumberToLocaleString(
+            currencyWrapper(currency)(Math.max(breakevenPrice, 0) || 0),
+          ),
+    [currency, breakevenPrice],
+  );
+
+  const sellPriceStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellAvgPrice)),
+    [currency, sellAvgPrice],
+  );
+  const sellAmountStr = useMemo(() => prettyAmount(sellAmount), [sellAmount]);
+
+  const costPriceStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(costAvgPrice)),
+    [currency, costAvgPrice],
+  );
+  const buyAmountStr = useMemo(() => prettyAmount(buyAmount), [buyAmount]);
+  const lastPrice = useMemo(() => lastAsset?.price || 0, [lastAsset]);
+  const change24h = previousPrice && lastPrice
+    ? (lastPrice - previousPrice) / previousPrice * 100 : undefined;
+  const lastPriceStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyPriceNumberToLocaleString(currencyWrapper(currency)(lastPrice)),
+    [currency, lastPrice],
+  );
+
+  const allowSymbolRankMap = useMemo(() => {
+    const rankMap = new Map<string, number>();
+    allowSymbols.forEach((item, idx) => {
+      rankMap.set(getAssetLogoKey(item), idx + 1);
+    });
+    return rankMap;
+  }, [allowSymbols]);
+
+  const rank = useMemo(() => {
+    const rankNum =
+      allowSymbolRankMap.get(getAssetLogoKey({ symbol, assetType })) ?? 0;
+    if (rankNum === 0) {
+      return "-";
+    }
+
+    return "#" + rankNum;
+  }, [symbol, allowSymbolRankMap]);
+
+  const filteredAllowSymbols = useMemo(() => {
+    const keyword = coinKeyword.trim().toUpperCase();
+    if (!keyword) {
+      return allowSymbols;
+    }
+    return allowSymbols.filter((item) =>
+      formatAssetLabel(item).toUpperCase().includes(keyword),
+    );
+  }, [allowSymbols, coinKeyword]);
+
+  const visibleAllowSymbols = useMemo(
+    () => filteredAllowSymbols.slice(0, coinListLimit),
+    [filteredAllowSymbols, coinListLimit],
+  );
+
+  const txnIndexMap = useMemo(() => {
+    const indexMap = new Map<number, number>();
+    transactions.forEach((item, idx) => {
+      indexMap.set(item.id, idx);
+    });
+    return indexMap;
+  }, [transactions]);
+
+  const profitStr = useMemo(
+    () =>
+      currency.symbol +
+      prettyNumberToLocaleString(currencyWrapper(currency)(profit)),
+    [currency, profit],
+  );
+
+  const positionsStr = useMemo(
+    () => prettyAmount(lastAsset?.amount || 0),
+    [lastAsset],
+  );
+  const maxPositionsStr = useMemo(
+    () => prettyAmount(maxPosition),
+    [maxPosition],
+  );
+
+  const profitRate = useMemo(
+    () => (profitPercentage ? profitPercentage.toFixed(2) : 0),
+    [profitPercentage],
+  );
+
+  function prettyAmount(amount: number) {
+    return amount >= 1
+      ? prettyNumberKeepNDigitsAfterDecimalPoint(amount, 4)
+      : prettyPriceNumberToLocaleString(amount);
+  }
+
+  async function loadSymbolData(
+    s: string,
+    selectedRange: TDateRange,
+    selectedAssetType: AssetType,
+  ) {
+    const gen = loadGenRef.current;
+
+    // fetch all data before setting any state to avoid multiple re-renders
+    const [txns, tp, la, ama, lp, snapshotDates] = await Promise.all([
+      queryTransactionsBySymbolAndDateRange(
+        s,
+        selectedRange,
+        selectedAssetType,
+      ),
+      calculateTotalProfit(selectedRange, s, selectedAssetType),
+      queryLastAssetsBySymbol(s, selectedRange, selectedAssetType),
+      queryAssetMaxAmountBySymbol(s, selectedRange, selectedAssetType),
+      getLogoPath(s, selectedAssetType),
+      queryAllDataDates(),
+    ]);
+    const latestSnapshotTime = snapshotDates.reduce((latest, item) => {
+      const time = new Date(item.createdAt).getTime();
+      return time >= selectedRange.start.getTime() && time <= selectedRange.end.getTime() && time > latest
+        ? time : latest;
+    }, 0);
+    const previousDay = latestSnapshotTime - 24 * 60 * 60 * 1000;
+    const previousSnapshotTime = latestSnapshotTime ? snapshotDates.reduce<number | undefined>((closest, item) => {
+      const time = new Date(item.createdAt).getTime();
+      const distance = Math.abs(time - previousDay);
+      return time < latestSnapshotTime && distance <= 6 * 60 * 60 * 1000 &&
+        (closest === undefined || distance < Math.abs(closest - previousDay)) ? time : closest;
+    }, undefined) : undefined;
+    const previous = previousSnapshotTime !== undefined
+      ? await queryLastAssetsBySymbol(s, {
+        start: new Date(0),
+        end: new Date(previousSnapshotTime),
+      }, selectedAssetType)
+      : undefined;
+
+    // ignore stale results if symbol/dateRange changed while loading
+    if (gen !== loadGenRef.current) return;
+
+    setTransactions(txns);
+    setLastAsset(la);
+    setPreviousPrice(previous?.price);
+    setMaxPosition(ama);
+    setLogo(lp);
+
+    const detail = tp.coins.find(
+      (c) => c.symbol === s && c.assetType === selectedAssetType,
+    );
+    if (detail) {
+      setBuyAmount(detail.buyAmount);
+      setSellAmount(detail.sellAmount);
+      setCostAvgPrice(detail.costAvgPrice);
+      setSellAvgPrice(detail.sellAvgPrice);
+    }
+
+    setProfit(tp.total);
+    setProfitPercentage(tp.percentage);
+    reportLoaded();
+  }
+
+  async function loadAllowedSymbols(gen: number) {
+    const ss = await listAllowedSymbols();
+    if (gen !== allowSymbolGenRef.current) {
+      return;
+    }
+    setAllowSymbols(ss);
+  }
+
+  async function onUpdatePriceDialogSaveClick() {
+    const mutationKey = transactionMutationKey(updateTxnId, "price");
+    if (pendingMutationKeysRef.current.has(mutationKey)) {
+      return;
+    }
+    if (!symbol) {
+      toast({
+        description: t("coin.invalidSymbol"),
+        variant: "destructive",
+      });
+      return;
+    }
+    const quotePrice = Number(updatePriceValue);
+    if (
+      updatePriceValue.trim() === "" ||
+      !Number.isFinite(quotePrice) ||
+      quotePrice < 0 ||
+      !Number.isFinite(updatePriceRate) ||
+      updatePriceRate <= 0
+    ) {
+      toast({
+        description: t("coin.invalidPrice"),
+        variant: "destructive",
+      });
+      return;
+    }
+    const txnIndex = txnIndexMap.get(updateTxnId) ?? -1;
+    if (txnIndex === -1) {
+      toast({
+        description: t("coin.invalidAction"),
+        variant: "destructive",
+      });
+      return;
+    }
+    const act = transactions[txnIndex];
+    const editSession = editSessionRef.current;
+
+    const usdPrice = updatePriceDirty
+      ? quotePrice / updatePriceRate
+      : updatePriceOriginalValue;
+    if (!Number.isFinite(usdPrice) || usdPrice < 0) {
+      toast({
+        description: t("coin.invalidPrice"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setMutationPending(mutationKey, true);
+    try {
+      await updateTransactionPrice(act.id, usdPrice);
+    } catch {
+      if (editSession === editSessionRef.current) {
+        toast({
+          description: t("coin.transactionUpdateFailed"),
+          variant: "destructive",
+        });
+      }
+      return;
+    } finally {
+      setMutationPending(mutationKey, false);
+    }
+
+    setTransactions((current) =>
+      current.map((txn) =>
+        txn.id === act.id ? { ...txn, price: usdPrice } : txn,
+      ),
+    );
+    onDataChanged?.();
+    if (editSession !== editSessionRef.current) {
+      return;
+    }
+    beginEditSession();
+    setUpdatePriceDialogOpen(false);
+    setUpdateTxnId(0);
+    setUpdatePriceValue("");
+    setUpdatePriceDirty(false);
+  }
+
+  async function onUpdateTxnTypeDialogSaveClick() {
+    const mutationKey = transactionMutationKey(updateTxnId, "type");
+    if (pendingMutationKeysRef.current.has(mutationKey)) {
+      return;
+    }
+    if (!symbol) {
+      toast({
+        description: t("coin.invalidSymbol"),
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!updateTxnTypeValue) {
+      toast({
+        description: t("coin.invalidTxnType"),
+        variant: "destructive",
+      });
+      return;
+    }
+    const txnIndex = txnIndexMap.get(updateTxnId) ?? -1;
+    if (txnIndex === -1) {
+      toast({
+        description: t("coin.invalidAction"),
+        variant: "destructive",
+      });
+      return;
+    }
+    const act = transactions[txnIndex];
+    const txnType = updateTxnTypeValue;
+    const editSession = editSessionRef.current;
+
+    setMutationPending(mutationKey, true);
+    try {
+      await updateTransactionTxnType(act.id, txnType);
+    } catch {
+      if (editSession === editSessionRef.current) {
+        toast({
+          description: t("coin.transactionUpdateFailed"),
+          variant: "destructive",
+        });
+      }
+      return;
+    } finally {
+      setMutationPending(mutationKey, false);
+    }
+
+    setTransactions((current) =>
+      current.map((txn) =>
+        txn.id === act.id ? { ...txn, txnType } : txn,
+      ),
+    );
+    onDataChanged?.();
+    if (editSession !== editSessionRef.current) {
+      return;
+    }
+    beginEditSession();
+    setUpdateTxnTypeDialogOpen(false);
+    setUpdateTxnId(0);
+    setUpdateTxnTypeValue(undefined);
+  }
+
+  function HistoryTable() {
+    const isMobile = useIsMobile();
+    const historicalData = useMemo(() => transactions, [transactions]);
+
+    const maxDataPage = useMemo(() => {
+      // - 0.000000000001 is for float number precision
+      const mp = Math.floor(historicalData.length / pageSize - 0.000000000001);
+      return mp >= 0 ? mp : 0;
+    }, [historicalData]);
+
+    const tableHasData = useMemo(
+      () => Object.keys(historicalData).length > 0,
+      [historicalData],
+    );
+
+    const getAmountStr = (act: Transaction) => {
+      const raw = prettyPriceNumberToLocaleString(act.amount);
+      if (act.txnType === "sell" || act.txnType === "withdraw") {
+        return `-${raw}`;
+      }
+      if (act.txnType === "buy" || act.txnType === "deposit") {
+        return `+${raw}`;
+      }
+      return raw;
+    };
+
+    const getValueStr = (act: Transaction) => {
+      const raw = `${currency.symbol}${prettyPriceNumberToLocaleString(
+        currencyWrapper(currency)(act.price * act.amount),
+      )}`;
+      if (act.txnType === "sell") {
+        return `-${raw}`;
+      }
+      if (act.txnType === "buy") {
+        return `+${raw}`;
+      }
+      return "0";
+    };
+
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            {t("coin.history")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {maxDataPage > 0 && <div className="flex space-x-2 py-1 items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={t("history.prevPage")}
+              onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
+              disabled={dataPage <= 0}
+            >
+              <ChevronLeftIcon />
+            </Button>
+            <div className="text-muted-foreground text-sm">
+              {dataPage + 1} {"/"} {maxDataPage + 1}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={t("history.nextPage")}
+              onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
+              disabled={dataPage >= maxDataPage}
+            >
+              <ChevronRightIcon />
+            </Button>
+          </div>}
+          {isMobile && <MobileRecordList className="coin-mobile-transactions"
+            records={historicalData.slice(dataPage * pageSize, (dataPage + 1) * pageSize).map((act) => ({
+              id: String(act.id), title: new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
+                { month: "short", day: "numeric" }).format(new Date(act.txnCreatedAt)),
+              subtitle: getValueStr(act),
+              fields: [
+                { label: t("coin.col.amount"), value: getAmountStr(act) },
+                { label: t("coin.col.type"), value: t(`coin.txnType.${act.txnType}`) },
+                { label: t("coin.col.price"), value: `${currency.symbol}${prettyPriceNumberToLocaleString(currencyWrapper(currency)(act.price))}` },
+                { label: t("coin.col.value"), value: getValueStr(act) },
+                { label: t("coin.col.time"), value: timeToDateStr(new Date(act.txnCreatedAt).getTime(), true) },
+                { label: t("coin.col.wallet"), value: act.wallet ? walletAliasMap[act.wallet] || "" : "" },
+              ],
+              actions: [
+                { label: t("coin.updatePrice"), onClick: () => openUpdatePriceDialog(act) },
+                { label: t("coin.updateTxnType"), onClick: () => openUpdateTxnTypeDialog(act) },
+              ],
+            }))} />}
+          {!isMobile && <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("coin.col.amount")}</TableHead>
+                <TableHead className="w-[120px]">{t("coin.col.type")}</TableHead>
+                <TableHead className="w-[300px]">{t("coin.col.price")}</TableHead>
+                <TableHead>{t("coin.col.value")}</TableHead>
+                <TableHead>{t("coin.col.time")}</TableHead>
+                <TableHead className="text-right">{t("coin.col.wallet")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {historicalData
+                .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
+                .map((act, i) => (
+                  <TableRow key={i} className="h-[42px] group">
+                    <TableCell className="py-1.5">
+                      <div className="flex flex-row items-center">
+                        <div
+                          className="mr-1 font-medium text-sm"
+                          title={"" + act.amount}
+                        >
+                          {getAmountStr(act)}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <div className="flex space-x-2">
+                        <div className="text-muted-foreground text-sm">
+                          {act.txnType}
+                        </div>
+                        <Pencil2Icon
+                          className="h-4 w-4 cursor-pointer hidden group-hover:inline-block touch:inline-block text-muted-foreground"
+                          onClick={() => openUpdateTxnTypeDialog(act)}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <div className="flex space-x-2">
+                        <div className="text-muted-foreground text-sm">
+                          {currency.symbol}
+                          {prettyPriceNumberToLocaleString(
+                            currencyWrapper(currency)(act.price),
+                          )}
+                        </div>
+                        <Pencil2Icon
+                          className="h-4 w-4 cursor-pointer hidden group-hover:inline-block touch:inline-block text-muted-foreground"
+                          onClick={() => openUpdatePriceDialog(act)}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <div className="text-muted-foreground text-sm">
+                        {getValueStr(act)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <div className="text-muted-foreground text-sm">
+                        {timeToDateStr(
+                          new Date(act.txnCreatedAt).getTime(),
+                          true,
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right py-1.5">
+                      <div className="text-sm">
+                        {act.wallet ? walletAliasMap[act.wallet] || "" : ""}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>}
+
+          {!tableHasData && (
+            <div className="flex items-center justify-center">
+              <div className="text-lg text-muted-foreground m-auto">
+                {t("coin.noData")}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <OverviewLoadingContext.Provider value={{ reportLoaded }}>
+      <div className="d2-coin relative min-h-[400px]">
+        {!isMobile && <h1 className="sr-only">{formatAssetLabel({ symbol, assetType })}</h1>}
+        {isMobile && <div className="coin-detail-hero">
+          <div className="coin-detail-identity">
+            <img src={resolveAssetLogoSrc({ symbol, assetType }, logo)} alt="" />
+            <button type="button" role="combobox" aria-label={`${t("coin.symbol")} ${formatAssetLabel({ symbol, assetType })}`}
+              aria-expanded={coinSelectOpen} onClick={() => setCoinSelectOpen(true)}>
+              {symbol}<CaretSortIcon aria-hidden="true" />
+            </button>
+          </div>
+          <BottomSheet open={coinSelectOpen} onOpenChange={setCoinSelectOpen} title={t("coin.symbol")}>
+            <Input value={coinKeyword} onChange={(event) => { setCoinKeyword(event.target.value); setCoinListLimit(200); }}
+              placeholder={t("coin.searchPlaceholder")} className="mb-3 min-h-11" />
+            <div className="mobile-coin-options">
+              {visibleAllowSymbols.map((item) => <button type="button" key={getAssetLogoKey(item)}
+                className="mobile-coin-option" onClick={() => {
+                  setCoinSelectOpen(false);
+                  navigate(buildAssetDetailsPath(item));
+                }}>{formatAssetLabel(item)}</button>)}
+              {filteredAllowSymbols.length > coinListLimit && <button type="button"
+                className="mobile-coin-option" onClick={() => setCoinListLimit((prev) => prev + 200)}>
+                {t("coin.showMoreN").replace("{n}", String(filteredAllowSymbols.length - coinListLimit))}
+              </button>}
+            </div>
+          </BottomSheet>
+          <p className="coin-detail-price ios-money">{lastPriceStr}</p>
+          <div className="coin-detail-change">
+            <DeltaPill value={change24h ?? 0}>{change24h === undefined ? "—" : `${change24h > 0 ? "+" : ""}${change24h.toFixed(2)}%`}</DeltaPill>
+            <span>{t("coin.change24h")}</span>
+          </div>
+        </div>}
+        <StaggerContainer className="space-y-4">
+          <UpdatePriceDialog
+            open={updatePriceDialogOpen}
+            onOpenChange={onUpdatePriceDialogOpenChange}
+            updatePriceValue={updatePriceValue}
+            setUpdatePriceValue={(value) => {
+              setUpdatePriceValue(value);
+              setUpdatePriceDirty(true);
+            }}
+            onSave={onUpdatePriceDialogSaveClick}
+            pending={pendingMutationKeys.has(
+              transactionMutationKey(updateTxnId, "price"),
+            )}
+          />
+
+          <UpdateTransactionTypeDialog
+            open={updateTxnDialogOpen}
+            onOpenChange={onUpdateTxnTypeDialogOpenChange}
+            updateTxnTypeValue={updateTxnTypeValue}
+            setUpdateTxnTypeValue={setUpdateTxnTypeValue}
+            onSave={onUpdateTxnTypeDialogSaveClick}
+            pending={pendingMutationKeys.has(
+              transactionMutationKey(updateTxnId, "type"),
+            )}
+          />
+          <div className="coin-metric-grid grid gap-4 grid-cols-6">
+            {!isMobile && <FadeUp className="coin-symbol-metric col-span-6 md:col-span-2 sm:col-span-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {t("coin.symbol")}
+                  </CardTitle>
+                  <svg
+                    viewBox="0 0 1024 1024"
+                    version="1.1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    p-id="2876"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path
+                      d="M580.8 468.8H448c-38.4 0-68.8-30.4-68.8-64s30.4-64 68.8-64h192c25.6 0 43.2-17.6 43.2-43.2s-17.6-43.2-43.2-43.2h-84.8v-43.2c0-25.6-17.6-43.2-43.2-43.2s-43.2 17.6-43.2 43.2V256h-17.6c-84.8 0-153.6 68.8-153.6 148.8s68.8 148.8 153.6 148.8h132.8c38.4 0 68.8 30.4 68.8 64s-33.6 64-72 64H384c-25.6 0-43.2 17.6-43.2 43.2S358.4 768 384 768h84.8v43.2c0 25.6 17.6 43.2 43.2 43.2s43.2-17.6 43.2-43.2V768h25.6c84.8 0 153.6-68.8 153.6-148.8s-68.8-150.4-153.6-150.4z"
+                      p-id="2877"
+                      fill="currentColor"
+                    ></path>
+                    <path
+                      d="M512 0C230.4 0 0 230.4 0 512s230.4 512 512 512 512-230.4 512-512S793.6 0 512 0z m0 939.2c-235.2 0-427.2-192-427.2-427.2S276.8 84.8 512 84.8s427.2 192 427.2 427.2-192 427.2-427.2 427.2z"
+                      p-id="2878"
+                      fill="currentColor"
+                    ></path>
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex">
+                    <img
+                      className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
+                      src={resolveAssetLogoSrc({ symbol, assetType }, logo)}
+                      alt={formatAssetLabel({ symbol, assetType })}
+                    />
+                    <div className="w-[100%] min-w-0 h-[32px] mobile-coin-selector">
+                      <Popover
+                        open={coinSelectOpen}
+                        onOpenChange={setCoinSelectOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-label={`${t("coin.symbol")} ${formatAssetLabel({ symbol, assetType })}`}
+                            aria-expanded={coinSelectOpen}
+                            className="h-[100%] w-[100%] text-xl font-semibold border-none shadow-none focus:ring-0 flex justify-between items-center"
+                          >
+                            <div className="min-w-0">
+                              <AssetLabel
+                                asset={{ symbol, assetType }}
+                                className="max-w-full"
+                                labelClassName="truncate"
+                              />
+                            </div>
+                            <CaretSortIcon className="h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[100%] p-1">
+                          <Command>
+                            <CommandInput
+                              placeholder={t("coin.searchPlaceholder")}
+                              className="h-9"
+                              value={coinKeyword}
+                              onValueChange={(val) => {
+                                setCoinKeyword(val);
+                                setCoinListLimit(200);
+                              }}
+                            />
+                            <CommandList>
+                              <CommandEmpty>{t("coin.noCoinFound")}</CommandEmpty>
+                              <CommandGroup>
+                                {visibleAllowSymbols.map((s) => (
+                                  <CommandItem
+                                    key={getAssetLogoKey(s)}
+                                    value={formatAssetLabel(s)}
+                                    onSelect={() => {
+                                      setCoinSelectOpen(false);
+                                      navigate(buildAssetDetailsPath(s));
+                                    }}
+                                  >
+                                    <AssetLabel asset={s} className="min-w-0" />
+                                    <CheckIcon
+                                      className={cn(
+                                        "ml-auto h-4 w-4",
+                                        getAssetLogoKey(s) ===
+                                          getAssetLogoKey({ symbol, assetType })
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                              {filteredAllowSymbols.length > coinListLimit ? (
+                                <div className="px-2 py-2">
+                                  <Button
+                                    variant="ghost"
+                                    className="w-full h-8"
+                                    onClick={() =>
+                                      setCoinListLimit((prev) => prev + 200)
+                                    }
+                                  >
+                                    {t("coin.showMoreN")
+                                      .replace("{n}", String(filteredAllowSymbols.length - coinListLimit))}
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>{t("coin.rankLabel")}</div>
+                    <div>{rank}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>}
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card className="coin-metric-card coin-breakeven-card">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {t("coin.breakeven")}
+                  </CardTitle>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {breakEvenPriceStr}
+                  </div>
+                  <div className="coin-breakeven-subtitle text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>{t(isMobile ? "coin.lastPriceShort" : "coin.lastPrice")}</div>
+                    <div>{lastPriceStr}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card className="coin-metric-card">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {t("coin.positions")}
+                  </CardTitle>
+                  <svg
+                    className="h-4 w-4 text-muted-foreground"
+                    viewBox="0 0 1024 1024"
+                    version="1.1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    p-id="3273"
+                    width="16"
+                    height="16"
+                  >
+                    <path
+                      d="M205.971 159.72c23.856-65.521 103.802-93.332 177.05-66.675L804.79 246.58H836.8c68.04 0 123.2 55.162 123.2 123.204v123.204a33.602 33.602 0 0 1-33.6 33.6c-37.114 0-67.2 30.088-67.2 67.203 0 37.114 30.086 67.202 67.2 67.202 18.557 0 33.6 15.043 33.6 33.6v123.204C960 885.838 904.84 941 836.8 941H187.2C119.16 941 64 885.838 64 817.796V694.593c0-18.558 15.043-33.601 33.6-33.601 37.114 0 67.2-30.088 67.2-67.202 0-37.115-30.086-67.202-67.2-67.202-18.557 0-33.6-15.044-33.6-33.601V369.783c0-63.618 48.216-115.98 110.096-122.52l31.875-87.542z m630 153.291H792.66l-0.067 0.168-0.493-0.179-606.07 0.011c-14.86 0-29.112 5.9-39.62 16.402A55.983 55.983 0 0 0 130 369.01v93.832c58.002 14.918 100.853 67.534 100.853 130.164 0 62.629-42.851 115.245-100.853 130.163v93.832a55.983 55.983 0 0 0 16.41 39.597A56.045 56.045 0 0 0 186.03 873h649.94c14.86 0 29.112-5.9 39.62-16.402A55.983 55.983 0 0 0 892 817.001V723.17c-58.002-14.918-100.853-67.534-100.853-130.163 0-62.63 42.851-115.246 100.853-130.164V369.01a55.983 55.983 0 0 0-16.41-39.597 56.045 56.045 0 0 0-39.62-16.402zM645.4 634c18.557 0 33.6 15.222 33.6 34s-15.043 34-33.6 34H376.6c-18.557 0-33.6-15.222-33.6-34s15.043-34 33.6-34h268.8z m0-157c18.557 0 33.6 15.222 33.6 34s-15.043 34-33.6 34H376.6c-18.557 0-33.6-15.222-33.6-34s15.043-34 33.6-34h268.8zM359.018 156.031c-40.828-14.807-80.807-0.959-90.796 26.392L245 246h362l-247.982-89.969z"
+                      fill="currentColor"
+                      p-id="3274"
+                    ></path>
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {positionsStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>{t(isMobile ? "coin.maxShort" : "coin.maxPositions")}</div>
+                    <div>{maxPositionsStr}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card className="coin-metric-card">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {t("coin.profit")}
+                  </CardTitle>
+                  <svg
+                    viewBox="0 0 1024 1024"
+                    version="1.1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    p-id="1885"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path
+                      d="M162.016 580.992L192.032 640q-31.008 30.016-32 64 4 64 102.496 111.008T512.032 864q151.008-2.016 249.504-48.992T864.032 704q-0.992-34.016-32-64l31.008-59.008q31.008 26.016 48 56.992T928.032 704q-4.992 99.008-123.008 160.512T512.032 928q-175.008-2.016-292.992-63.488T96.032 704q0-35.008 17.504-66.016t48.512-56.992z m0-192L192.032 448q-31.008 30.016-32 64 4 64 102.496 111.008T512.032 672q151.008-2.016 249.504-48.992T864.032 512q-0.992-34.016-32-64l31.008-59.008q31.008 26.016 48 56.992T928.032 512q-4.992 99.008-123.008 160.512T512.032 736q-175.008-2.016-292.992-63.488T96.032 512q0-35.008 17.504-66.016t48.512-56.992zM512 544q-175.008-2.016-292.992-63.488T96 320q4.992-99.008 123.008-160.512T512 96q175.008 2.016 292.992 63.488T928 320q-4.992 99.008-123.008 160.512T512 544z m0-64q151.008-2.016 249.504-48.992T864 320q-4-64-102.496-111.008T512 160q-151.008 2.016-249.504 48.992T160 320q4 64 102.496 111.008T512 480z"
+                      p-id="1886"
+                      fill="currentColor"
+                    ></path>
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis"
+                    data-tone={profit > 0 ? "gain" : profit < 0 ? "loss" : "neutral"}>
+                    {isMobile ? formatPhoneMoney(currencyWrapper(currency)(profit), currency.symbol, true) : profitStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>{t("coin.profitRate")}</div>
+                    <div>{profitRate}%</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card className="coin-metric-card">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {t("coin.costPrice")}
+                  </CardTitle>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {costPriceStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>{t("coin.buyAmount")}</div>
+                    <div>{buyAmountStr}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+
+            <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
+              <Card className="coin-metric-card">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {t("coin.sellPrice")}
+                  </CardTitle>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    className="h-4 w-4 text-muted-foreground"
+                  >
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
+                    {sellPriceStr}
+                  </div>
+                  <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
+                    <div>{t("coin.sellAmount")}</div>
+                    <div>{sellAmountStr}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeUp>
+          </div>
+          <FadeUp>
+            <CoinsAmountAndValueChange
+              currency={currency}
+              symbol={symbol}
+              assetType={assetType}
+              dateRange={dateRange}
+            />
+          </FadeUp>
+          <FadeUp>
+            <WalletAssetsPercentage
+              currency={currency}
+              dateRange={dateRange}
+              symbol={symbol}
+              assetType={assetType}
+              displayAmount={true}
+            />
+          </FadeUp>
+          <FadeUp>
+            <HistoryTable />
+          </FadeUp>
+        </StaggerContainer>
+        <div
+          data-testid="coin-page-loading-overlay"
+          className={`absolute inset-0 z-10 backdrop-blur-md bg-background/60 rounded-lg transition-opacity duration-500 motion-reduce:transition-none ${
+            pageLoading ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        />
+      </div>
+    </OverviewLoadingContext.Provider>
+  );
+};
+
+export default App;

@@ -1,10 +1,11 @@
 use std::{
     fs::{self, File, OpenOptions},
-    io::{ErrorKind, Read},
+    io::{ErrorKind, Read, Write},
     path::Path,
 };
 
 use fs2::FileExt;
+use sqlx::{sqlite::SqliteConnectOptions, Connection, SqliteConnection};
 
 pub const LEGACY_ENCRYPTION_KEY: &str = "#t.3eis@hck,btr!a";
 const INSTANCE_LOCK_NAME: &str = ".track3-instance.lock";
@@ -115,6 +116,121 @@ pub fn load_encryption_key(key_path: &Path) -> Result<String, String> {
     };
     validate_encryption_key_material(&key)?;
     Ok(key)
+}
+
+#[cfg(not(target_os = "ios"))]
+pub fn load_or_create_ios_encryption_key(
+    key_path: &Path,
+    fresh_database: bool,
+) -> Result<String, String> {
+    if !fresh_database {
+        return load_encryption_key(key_path);
+    }
+    reject_link_or_reparse_point(key_path)?;
+    if key_path.exists() {
+        return load_encryption_key(key_path);
+    }
+
+    let key = format!(
+        "{}{}",
+        uuid::Uuid::new_v4().simple(),
+        uuid::Uuid::new_v4().simple()
+    );
+    let mut options = OpenOptions::new();
+    options.create_new(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW).mode(0o600);
+    }
+    let mut file = options
+        .open(key_path)
+        .map_err(|error| format!("failed to create encryption key: {error}"))?;
+    let result = (|| {
+        file.write_all(key.as_bytes())
+            .and_then(|_| file.sync_all())
+            .map_err(|error| format!("failed to persist encryption key: {error}"))?;
+        #[cfg(target_os = "ios")]
+        crate::ios_backup::exclude_key_artifact(key_path)?;
+        Ok(key)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(key_path);
+    }
+    result
+}
+
+#[cfg(target_os = "ios")]
+pub fn load_or_create_ios_encryption_key(
+    key_path: &Path,
+    fresh_database: bool,
+) -> Result<String, String> {
+    reject_link_or_reparse_point(key_path)?;
+    if let Some(key) = crate::ios_native::keychain_read()? {
+        validate_encryption_key_material(&key)?;
+        if key_path.exists() {
+            if load_encryption_key(key_path)? != key {
+                return Err("iOS Keychain and legacy key file differ".into());
+            }
+            fs::remove_file(key_path)
+                .map_err(|error| format!("failed to remove legacy key file: {error}"))?;
+        }
+        return Ok(key);
+    }
+    if key_path.exists() {
+        let key = load_encryption_key(key_path)?;
+        crate::ios_native::keychain_write(&key)?;
+        fs::remove_file(key_path)
+            .map_err(|error| format!("failed to remove legacy key file: {error}"))?;
+        return Ok(key);
+    }
+    if !fresh_database {
+        return Ok(LEGACY_ENCRYPTION_KEY.to_string());
+    }
+    let key = format!(
+        "{}{}",
+        uuid::Uuid::new_v4().simple(),
+        uuid::Uuid::new_v4().simple()
+    );
+    crate::ios_native::keychain_write(&key)?;
+    Ok(key)
+}
+
+pub async fn ios_key_recovery_needed(
+    database_path: &Path,
+    key_path: &Path,
+) -> Result<bool, String> {
+    #[cfg(target_os = "ios")]
+    let encryption_key =
+        crate::ios_native::keychain_read()?.unwrap_or_else(|| LEGACY_ENCRYPTION_KEY.to_string());
+    #[cfg(not(target_os = "ios"))]
+    let encryption_key = LEGACY_ENCRYPTION_KEY.to_string();
+    #[cfg(not(target_os = "ios"))]
+    if key_path.exists() {
+        return Ok(false);
+    }
+    #[cfg(target_os = "ios")]
+    let _ = key_path;
+    let options = SqliteConnectOptions::new()
+        .filename(database_path)
+        .create_if_missing(false)
+        .read_only(true);
+    let mut database = SqliteConnection::connect_with(&options)
+        .await
+        .map_err(|error| format!("failed to inspect configuration: {error}"))?;
+    let encrypted: Vec<String> =
+        sqlx::query_scalar("SELECT data FROM configuration WHERE data LIKE '!ent:%'")
+            .fetch_all(&mut database)
+            .await
+            .map_err(|error| format!("failed to inspect configuration: {error}"))?;
+    database
+        .close()
+        .await
+        .map_err(|error| format!("failed to close configuration: {error}"))?;
+    let ent = crate::ent::Ent::new();
+    Ok(encrypted
+        .into_iter()
+        .any(|value| ent.decrypt_with_key(value, &encryption_key).is_err()))
 }
 
 fn open_key_file_no_follow(key_path: &Path) -> Result<File, std::io::Error> {
@@ -244,6 +360,106 @@ mod tests {
             load_encryption_key(&directory.0.join(".ent-key")).unwrap(),
             LEGACY_ENCRYPTION_KEY
         );
+    }
+
+    #[test]
+    fn fresh_ios_install_gets_a_persisted_random_key() {
+        let directory = TestDirectory::new();
+        let key_path = directory.0.join(".ent-key");
+
+        let first = super::load_or_create_ios_encryption_key(&key_path, true).unwrap();
+        assert_ne!(first, LEGACY_ENCRYPTION_KEY);
+        assert!(first.len() >= 32);
+        assert_eq!(fs::read_to_string(&key_path).unwrap(), first);
+        assert_eq!(
+            super::load_or_create_ios_encryption_key(&key_path, true).unwrap(),
+            first
+        );
+        assert_eq!(
+            super::load_or_create_ios_encryption_key(&key_path, false).unwrap(),
+            first
+        );
+        let other = TestDirectory::new();
+        assert_ne!(
+            super::load_or_create_ios_encryption_key(&other.0.join(".ent-key"), true).unwrap(),
+            first
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&key_path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+    }
+
+    #[test]
+    fn existing_ios_database_without_a_key_keeps_legacy_compatibility() {
+        let directory = TestDirectory::new();
+        let key_path = directory.0.join(".ent-key");
+
+        assert_eq!(
+            super::load_or_create_ios_encryption_key(&key_path, false).unwrap(),
+            LEGACY_ENCRYPTION_KEY
+        );
+        assert!(!key_path.exists());
+    }
+
+    #[test]
+    fn missing_ios_key_reports_unreadable_encrypted_configuration() {
+        use sqlx::{Connection, Executor, SqliteConnection};
+
+        let directory = TestDirectory::new();
+        let database_path = directory.0.join("track3.db");
+        let key_path = directory.0.join(".ent-key");
+        let ent = crate::ent::Ent::new();
+        let ciphertext = ent
+            .encrypt_with_key("exchange credential".to_string(), "missing-device-key")
+            .unwrap();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!(
+                "sqlite://{}?mode=rwc",
+                database_path.display()
+            ))
+            .await
+            .unwrap();
+            db.execute(include_str!("../migrations/init/configuration_up.sql"))
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO configuration (id, data) VALUES (10, ?)")
+                .bind(&ciphertext)
+                .execute(&mut db)
+                .await
+                .unwrap();
+            db.close().await.unwrap();
+
+            assert!(super::ios_key_recovery_needed(&database_path, &key_path)
+                .await
+                .unwrap());
+            fs::write(&key_path, "missing-device-key").unwrap();
+            assert!(!super::ios_key_recovery_needed(&database_path, &key_path)
+                .await
+                .unwrap());
+            fs::remove_file(&key_path).unwrap();
+            let mut db =
+                SqliteConnection::connect(&format!("sqlite://{}", database_path.display()))
+                    .await
+                    .unwrap();
+            let legacy = ent
+                .encrypt_with_key("legacy credential".to_string(), LEGACY_ENCRYPTION_KEY)
+                .unwrap();
+            sqlx::query("UPDATE configuration SET data = ? WHERE id = 10")
+                .bind(legacy)
+                .execute(&mut db)
+                .await
+                .unwrap();
+            db.close().await.unwrap();
+            assert!(!super::ios_key_recovery_needed(&database_path, &key_path)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]

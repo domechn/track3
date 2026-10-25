@@ -12,6 +12,18 @@ pub(super) const BACKUP_SUFFIX: &str = ".rotation.bak";
 pub(super) const KEY_FILE_NAME: &str = ".ent-key";
 const ROTATION_ARTIFACT_MARKER: &str = ".rotation.";
 
+pub(super) fn read_persisted_key(path: &Path) -> Result<Option<String>, String> {
+    #[cfg(target_os = "ios")]
+    {
+        let _ = path;
+        crate::ios_native::keychain_read()
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        read_optional_string(path)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum ReplacementStrategy {
     RenameAbsent,
@@ -369,7 +381,14 @@ pub(super) fn write_random_restricted(
             Uuid::new_v4()
         ));
         match write_restricted_new(&path, data) {
-            Ok(()) => return Ok(path),
+            Ok(()) => {
+                #[cfg(target_os = "ios")]
+                if let Err(error) = crate::ios_backup::exclude_key_artifact(&path) {
+                    let _ = fs::remove_file(&path);
+                    return Err(error);
+                }
+                return Ok(path);
+            }
             Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
             Err(error) => {
                 return Err(format!("failed to stage {}: {error}", target.display()));
