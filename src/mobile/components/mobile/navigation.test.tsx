@@ -6,14 +6,14 @@ import { MobileNavigation, routeTitle } from "@/mobile/components/mobile/navigat
 
 function Path() {
   const location = useLocation();
-  return <output>{location.pathname + location.search}</output>;
+  return <output>{location.pathname + location.search + location.hash}</output>;
 }
 
 describe("mobile navigation", () => {
   it("names an asset detail page for its asset", () => {
     expect(routeTitle("/coins/BTC", (key) => key)).toBe("BTC");
   });
-  it("shows four tabs and restores the last route in a tab", () => {
+  it("shows four tabs and opens each tab at its root", () => {
     render(<MemoryRouter initialEntries={["/cost-basis"]}>
       <MobileNavigation unread={2} />
       <Routes><Route path="*" element={<Path />} /></Routes>
@@ -24,16 +24,25 @@ describe("mobile navigation", () => {
     fireEvent.click(screen.getByRole("link", { name: /history/i, hidden: true }));
     expect(screen.getByText("/history")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: /analytics/i, hidden: true }));
-    expect(screen.getByText("/cost-basis")).toBeInTheDocument();
+    expect(screen.getByText("/summary")).toBeInTheDocument();
   });
 
-  it("keeps a stock asset's query when returning to its tab", () => {
+  it("does not retain a stock detail query when returning to Analytics", () => {
     render(<MemoryRouter initialEntries={["/coins/AAPL?assetType=stock"]}>
       <MobileNavigation />
       <Routes><Route path="*" element={<Path />} /></Routes>
     </MemoryRouter>);
     fireEvent.click(screen.getByRole("link", { name: /history/i, hidden: true }));
     fireEvent.click(screen.getByRole("link", { name: /analytics/i, hidden: true }));
-    expect(screen.getByText("/coins/AAPL?assetType=stock")).toBeInTheDocument();
+    expect(screen.getByText("/summary")).toBeInTheDocument();
+  });
+
+  it.each(["?range=7d", "#details"])("clears an active tab's %s when tapping its root", (suffix) => {
+    render(<MemoryRouter initialEntries={[`/overview${suffix}`]}>
+      <MobileNavigation />
+      <Routes><Route path="*" element={<Path />} /></Routes>
+    </MemoryRouter>);
+    fireEvent.click(screen.getByRole("link", { name: /overview/i, hidden: true }));
+    expect(screen.getByText("/overview")).toBeInTheDocument();
   });
 });

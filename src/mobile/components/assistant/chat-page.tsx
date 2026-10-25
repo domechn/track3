@@ -751,7 +751,7 @@ function ErrorCard({ message }: { message: string }) {
           {t("assistant.chat.error.network")}
         </p>
         {message ? (
-          <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-md border border-destructive/20 bg-destructive/[0.04] p-2 font-mono text-[11px] text-destructive/80">
+          <pre data-selectable="" className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-md border border-destructive/20 bg-destructive/[0.04] p-2 font-mono text-[11px] text-destructive/80">
             {message}
           </pre>
         ) : null}

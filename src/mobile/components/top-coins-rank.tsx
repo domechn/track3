@@ -177,11 +177,11 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
                   <small>{holding ? `${holding.percentage.toFixed(1)}%` : "—"} · {renderChangeBadge(row.change)}</small>
                 </span>}>
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">#{row.rank}</span>
+                  <span className="w-5 min-[400px]:w-8 shrink-0 font-mono text-xs text-muted-foreground">#{row.rank}</span>
                   <img className="h-6 w-6 shrink-0 rounded-full"
                     src={resolveAssetLogoSrc(asset, logoMap[logoKey])}
                     alt={formatAssetLabel(asset)} />
-                  <AssetLabel asset={asset} labelClassName="truncate text-sm font-medium" />
+                  <AssetLabel asset={asset} labelClassName="truncate text-sm font-medium" badgeClassName="top-coins-rank-type" />
                 </span>
               </ListRow>;
             })}

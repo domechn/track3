@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "@/mobile/i18n";
 import { useHaptics } from "@/mobile/components/mobile";
@@ -16,15 +15,11 @@ export function tabForPath(path: string): MobileTab {
   return "more";
 }
 
-export function MobileNavigation({ unread = 0, onTabSwitch }: { unread?: number; onTabSwitch?: () => void }) {
+export function MobileNavigation({ unread = 0, onTabSwitch }: { unread?: number; onTabSwitch?: (rootTap: boolean) => void }) {
   const { t } = useTranslation();
   const haptic = useHaptics();
-  const { pathname, search } = useLocation();
+  const { pathname, search, hash } = useLocation();
   const selected = tabForPath(pathname);
-  const lastPath = useRef<Record<MobileTab, string>>({ ...tabRoots });
-  useEffect(() => {
-    lastPath.current[selected] = pathname + search;
-  }, [pathname, search, selected]);
   const tabs = [
     { id: "overview" as const, title: t("nav.overview") },
     { id: "history" as const, title: t("nav.history") },
@@ -32,14 +27,15 @@ export function MobileNavigation({ unread = 0, onTabSwitch }: { unread?: number;
     { id: "more" as const, title: t("nav.more", "More") },
   ];
   return <nav aria-label={t("mobile.tabs", "Tabs")} className="mobile-tab-bar">
-    {tabs.map(({ id, title }) => <Link key={id} to={selected === id ? tabRoots[id] : lastPath.current[id]}
+    {tabs.map(({ id, title }) => <Link key={id} to={tabRoots[id]}
       onClick={(event) => {
         haptic("selection");
-        if (selected === id && pathname === tabRoots[id]) {
+        if (selected === id && pathname === tabRoots[id] && !search && !hash) {
           event.preventDefault();
+          onTabSwitch?.(true);
           window.scrollTo(0, 0);
-        } else if (selected !== id) {
-          onTabSwitch?.();
+        } else {
+          onTabSwitch?.(selected === id);
         }
       }}
       className="mobile-tab" aria-current={selected === id ? "page" : undefined}>

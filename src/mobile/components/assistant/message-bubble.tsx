@@ -222,13 +222,14 @@ export default function MessageBubble({
         </span>
       )}
       <div
+        data-selectable=""
         className={cn(
           "ios-d3-chat-body",
           isUser ? "max-w-full" : "flex-1 min-w-0",
           "rounded-2xl px-4 py-3 shadow-sm",
           isUser
             ? "bg-primary text-primary-foreground"
-            : "border border-[var(--glass-border)] bg-card/80 backdrop-blur",
+            : "border border-[var(--glass-border)] bg-card/80",
         )}
       >
         {isUser ? (

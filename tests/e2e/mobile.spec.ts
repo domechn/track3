@@ -1290,7 +1290,7 @@ test("refresh source status rises from the bottom as a sheet", async ({ browser 
   }
 });
 
-test("pulling down reveals the last refresh time", async ({ browser }) => {
+test("pulling down identifies a local view refresh", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
@@ -1301,7 +1301,7 @@ test("pulling down reveals the last refresh time", async ({ browser }) => {
     const cdp = await context.newCDPSession(page);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 180, y: 140 }] });
     await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 180, y: 185 }] });
-    await expect(page.locator(".mobile-pull-indicator")).toContainText(/Last Refresh At:|Never Refresh Before/);
+    await expect(page.locator(".mobile-pull-indicator")).toHaveAttribute("aria-label", "Refresh view");
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   } finally {
     await context.close();

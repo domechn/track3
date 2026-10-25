@@ -14,7 +14,7 @@ function useModal(onDismiss?: () => void) {
     const controls = () => Array.from(root.querySelectorAll<HTMLElement>(
       'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
     )).filter((element) => element.getClientRects().length > 0 || import.meta.env.MODE === "test");
-    (controls()[0] ?? root).focus();
+    (controls()[0] ?? root).focus({ preventScroll: true });
     const onKeyDown = (event: KeyboardEvent) => {
       if (Array.from(document.querySelectorAll('[aria-modal="true"]')).at(-1) !== root) return;
       if (event.key === "Escape" && dismissRef.current) {
@@ -23,19 +23,19 @@ function useModal(onDismiss?: () => void) {
       }
       if (event.key !== "Tab") return;
       const items = controls();
-      if (!items.length) { event.preventDefault(); root.focus(); return; }
+      if (!items.length) { event.preventDefault(); root.focus({ preventScroll: true }); return; }
       const first = items[0], last = items[items.length - 1];
       if (event.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) {
-        event.preventDefault(); last.focus();
+        event.preventDefault(); last.focus({ preventScroll: true });
       } else if (!event.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) {
-        event.preventDefault(); first.focus();
+        event.preventDefault(); first.focus({ preventScroll: true });
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
+      previousFocus?.focus({ preventScroll: true });
     };
   }, []);
   return ref;

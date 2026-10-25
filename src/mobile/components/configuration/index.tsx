@@ -453,11 +453,7 @@ const App = ({
 
   function notifyConfigurationSaved() {
     if (!onConfigurationSave) return;
-    const scrollY = window.scrollY;
     onConfigurationSave();
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: scrollY });
-    });
   }
 
   function submitConfiguration() {

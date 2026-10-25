@@ -25,7 +25,6 @@
 .mobile-segment { min-height: 2.75rem; flex: 1; min-width: max-content; padding: .4rem .8rem; border-radius: .5rem; font-size: .875rem; }
 .mobile-segment[aria-checked="true"] { background: var(--ios-segment-selected); box-shadow: 0 1px 3px rgba(0,0,0,.14); font-weight: 600; }
 .mobile-pull-indicator { display: grid; place-items: center; color: hsl(var(--primary)); font-size: 1.5rem; }
-.mobile-pull-last-refresh { font-size: .75rem; line-height: 1.25; color: hsl(var(--muted-foreground)); }
 .mobile-inset-section { margin: 0 0 1.25rem; }
 .mobile-inset-heading { margin: 0 .75rem .5rem; font-size: 13px; color: hsl(var(--muted-foreground)); }
 .mobile-inset-group { overflow: hidden; border-radius: .875rem; background: hsl(var(--card)); }
@@ -131,6 +130,7 @@
   .comparison-total-grid > :nth-child(1) { grid-column: 1; grid-row: 1; }
   .comparison-total-grid > :nth-child(2) { grid-column: 1; grid-row: 2; }
   .comparison-total-grid > :nth-child(3) { grid-column: 1; grid-row: 3; }
+  .top-coins-rank-mobile .top-coins-rank-type { display: none; }
 }
 
 
@@ -140,6 +140,23 @@
 
 @media (max-width: 950px) and (pointer: coarse) {
   .app-layout { font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif; }
+  body, body * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body :is(canvas, img, a) { -webkit-touch-callout: none; }
+  body :is(input, textarea, [contenteditable], [data-selectable]),
+  body :is([contenteditable], [data-selectable]) * {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+  body canvas { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .mobile-toast { flex-direction: column; align-items: stretch; gap: 8px; padding-right: 56px; overflow-wrap: anywhere; }
+  .mobile-toast > .mobile-toast-action { align-self: flex-end; max-width: 100%; margin-left: 0 !important; }
+  html { scroll-behavior: auto; overscroll-behavior-y: contain; }
   .app-layout .glass { background: hsl(var(--card)); border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .app-layout .font-mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; }
   .app-layout { min-width: 0; max-width: 100vw; }
@@ -175,7 +192,7 @@
   #app-top-bar .date-picker-mobile button { color: hsl(var(--primary)); }
   #app-top-bar .date-picker-mobile svg { width: 20px; height: 20px; }
   #app-top-bar .absolute { position: fixed; left: 1rem; right: 1rem; top: calc(var(--mobile-safe-top) + 3.5rem); padding: .5rem; border-radius: .75rem; background: hsl(var(--card)); box-shadow: 0 4px 16px rgba(0,0,0,.15); }
-  #app-main-content { min-width: 0; width: 100%; padding: calc(1rem + var(--mobile-safe-top)) max(1rem, var(--mobile-safe-right)) calc(5rem + var(--mobile-safe-bottom)) max(1rem, var(--mobile-safe-left)); overflow-x: clip; touch-action: pan-y; }
+  #app-main-content { min-width: 0; width: 100%; padding: calc(1rem + var(--mobile-safe-top)) max(1rem, var(--mobile-safe-right)) calc(5rem + var(--mobile-safe-bottom)) max(1rem, var(--mobile-safe-left)); overflow-x: clip; overflow-anchor: none; overscroll-behavior-y: contain; touch-action: pan-y; }
   .mobile-topbar-back + #app-main-content { padding-top: 1rem; }
   #app-main-content > * { min-width: 0; }
   .mobile-route-heading { display: block; }
@@ -358,7 +375,7 @@
   body:has(.ios-d3-sources) .mobile-action-sheet { padding-bottom: 6px; }
   body:has(.ios-d3-sources) .mobile-action.text-destructive { color: var(--ios-loss); }
   .ios-d3-source-editor { padding-bottom: 20px; }
-  .ios-d3-editor-nav { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; margin: -16px -20px 0; padding: 16px 20px 8px; background: hsl(var(--background) / .94); backdrop-filter: blur(18px); }
+  .ios-d3-editor-nav { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; margin: -16px -20px 0; padding: 16px 20px 8px; background: hsl(var(--background)); backdrop-filter: none; }
   .ios-d3-editor-nav > button:last-child { justify-self: end; }
   .ios-d3-editor-nav button { padding-left: 0; color: hsl(var(--primary)); font-size: 17px; }
   .ios-d3-other-editor .ios-d3-editor-nav { align-items: center; }
@@ -678,11 +695,11 @@
   .ios-d3-startup-lock h1 { font-size: 28px; line-height: 1.2; letter-spacing: -.03em; }
   .ios-d3-startup-lock p { font-size: 15px; line-height: 1.45; }
   .ios-d3-startup-lock button { min-width: 180px; border-radius: 12px; font-size: 17px; font-weight: 600; }
-  .ios-d3-auto-backup { border: .5px solid var(--ios-separator); border-radius: 14px; background: hsl(var(--card) / .96); box-shadow: none; backdrop-filter: blur(18px); }
+  .ios-d3-auto-backup { border: .5px solid var(--ios-separator); border-radius: 14px; background: hsl(var(--card)); box-shadow: none; backdrop-filter: none; }
   .ios-d3-auto-backup::before { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: hsl(var(--primary)); content: ""; }
   .ios-d3-auto-backup p:first-child { display: inline; font-size: 15px; }
   .ios-d3-auto-backup p:last-child { margin-left: 14px; font-size: 13px; }
-  .ios-d3-sync-indicator button { border: .5px solid var(--ios-separator); border-radius: 99px; background: hsl(var(--card) / .96); box-shadow: none; backdrop-filter: blur(18px); font-size: 13px; }
+  .ios-d3-sync-indicator button { border: .5px solid var(--ios-separator); border-radius: 99px; background: hsl(var(--card)); box-shadow: none; backdrop-filter: none; font-size: 13px; }
   .ios-d3-sync-popover { border: .5px solid var(--ios-separator); border-radius: 16px; background: hsl(var(--card)); box-shadow: none; font-size: 15px; }
 }
 @media (max-width: 340px) and (pointer: coarse) {
@@ -752,10 +769,12 @@
   .d2-rank-sheet .top-coins-rank-header { display: none; }
   .d2-rank-sheet .top-coins-rank-content { padding: 0; }
   .d2-rank-sheet .top-coins-rank-mobile { border: 0; }
-  .d2-rank-sheet .mobile-list-row { min-height: 62px; }
-  .d2-rank-sheet .mobile-list-value { flex: none; white-space: nowrap; text-align: right; }
-  .top-coins-rank-value { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
-  .top-coins-rank-value strong { color: hsl(var(--foreground)); font-size: 15px; font-weight: 600; }
+  .top-coins-rank-mobile .mobile-list-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, min(36%, 150px)) 16px; min-height: 62px; align-items: center; }
+  .top-coins-rank-mobile .mobile-list-label > span { min-width: 0; }
+  .top-coins-rank-mobile .mobile-list-label .truncate { min-width: 4ch; }
+  .top-coins-rank-mobile .mobile-list-value { min-width: 0; white-space: normal; text-align: right; }
+  .top-coins-rank-value { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
+  .top-coins-rank-value strong { max-width: 100%; color: hsl(var(--foreground)); font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
   .top-coins-rank-value small { display: flex; align-items: center; gap: 3px; font-size: 12px; }
   .d2-allocation-sheet .overview-allocation-card, .d2-positions-sheet .position-changes-card { border: 0; background: transparent; box-shadow: none; }
   .d2-positions-sheet .position-changes-header { display: none; }

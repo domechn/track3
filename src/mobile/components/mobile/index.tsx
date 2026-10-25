@@ -136,7 +136,7 @@ export function BottomSheet({
           style={{ ...(viewport ? { bottom: viewport.bottom, maxHeight: viewport.height } : {}), height: dragHeight }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            restoreFocus.current?.focus();
+            restoreFocus.current?.focus({ preventScroll: true });
           }}>
           <div className="mobile-sheet-handle-area" onPointerDown={dragStart} onPointerMove={dragMove}
             onPointerUp={dragEnd} onPointerCancel={() => { startY.current = null; setDrag(0); }}>
@@ -230,12 +230,13 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
   </div>;
 }
 
-export function PullToRefresh({ children, onRefresh, disabled, className, lastRefreshText }: React.PropsWithChildren<{
-  onRefresh: () => void | Promise<void>; disabled?: boolean; className?: string; lastRefreshText?: string;
+export function PullToRefresh({ children, onRefresh, disabled, className }: React.PropsWithChildren<{
+  onRefresh: () => void | Promise<void>; disabled?: boolean; className?: string;
 }>) {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const haptic = useHaptics();
+  const { t } = useTranslation();
   const start = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => () => { start.current = null; }, []);
   return <div data-testid="pull-to-refresh" className={className}
@@ -267,9 +268,9 @@ export function PullToRefresh({ children, onRefresh, disabled, className, lastRe
       setRefreshing(true);
       void Promise.resolve(onRefresh()).finally(() => setRefreshing(false));
     }}>
-    {(pull > 0 || refreshing) && <div className="mobile-pull-indicator" role="status" style={{ minHeight: pull || 44 }}>
+    {(pull > 0 || refreshing) && <div className="mobile-pull-indicator" role="status"
+      aria-label={t("mobile.refreshView")} style={{ minHeight: pull || 44 }}>
       <span className={refreshing ? "animate-spin" : ""} aria-hidden="true">↻</span>
-      {lastRefreshText && <span className="mobile-pull-last-refresh">{lastRefreshText}</span>}
     </div>}
     {children}
   </div>;
