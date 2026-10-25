@@ -1059,12 +1059,11 @@
     padding-bottom: 20px;
   }
   .fixed.auto-backup-browser-indicator { bottom: calc(1rem + var(--mobile-safe-bottom)); }
-  .overview-pnl-plot { min-height: 220px; }
+  .overview-pnl-chart.overview-pnl-chart { height: 252px; min-height: 252px; }
   .d2-summary .profit-metrics-mobile { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .d2-cost .cost-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .d2-coin .coin-metric-grid > * { grid-column: span 2; }
   .d2-coin .coin-metric-grid > :last-child:nth-child(odd) { grid-column: span 2; }
-  .history-mobile-snapshot-button { max-width: 620px; }
   .mobile-inset-group, .mobile-record-list { max-width: 100%; }
   #app-main-content:has(.ios-d3-chat) { padding-inline: max(24px, var(--mobile-safe-left)) max(24px, var(--mobile-safe-right)); }
 }
@@ -1073,6 +1072,16 @@
   .analytics-tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .analytics-tile-grid > :last-child:nth-child(odd) { grid-column: auto; }
   .overview-main-grid > * { grid-column: span 1; }
+}
+
+.history-month-section { container-type: inline-size; }
+@container (min-width: 620px) {
+  .history-mobile-snapshot-button {
+    grid-template-columns: minmax(76px, .8fr) minmax(125px, 1.2fr) minmax(115px, 1fr) auto;
+    align-items: center;
+  }
+  .history-mobile-snapshot-primary, .history-mobile-snapshot-secondary { display: contents; }
+  .history-mobile-snapshot-total { font-size: 18px; }
 }
 
 @media (min-width: 1000px) {
@@ -1116,6 +1125,26 @@
 @media (hover: hover) {
   .mobile-sidebar :is(.mobile-tab, .mobile-sidebar-collapse):hover:not([aria-current="page"]),
   .mobile-list-row:hover { background: hsl(var(--secondary)); }
+}
+
+:is(.mobile-sidebar .mobile-tab, .mobile-sidebar-collapse, .mobile-list-row, .history-mobile-snapshot-button):focus-visible {
+  outline: 2px solid hsl(var(--ring)); outline-offset: -2px;
+}
+
+@media (min-width: 1000px) {
+  .more-split { grid-template-columns: minmax(190px, 220px) minmax(0, 1fr); }
+  .more-split .ios-d3-settings .mobile-split-view {
+    grid-template-columns: minmax(220px, 38%) minmax(0, 1fr);
+  }
+  .ios-d3-settings .mobile-list-row[aria-current="page"], .ios-d3-more .mobile-list-row[aria-current="page"],
+  .analytics-tile[aria-current="true"] {
+    background: hsl(var(--primary) / .12); color: hsl(var(--primary));
+  }
+  .mobile-analytics-hub[data-open-sheet="profit"] ~ .d2-summary .summary-stack > :nth-child(2) { display: none; }
+}
+
+@media (min-width: 1000px) and (max-width: 1199px) {
+  .more-split .ios-d3-settings .mobile-list-value { display: none; }
 }
 
 @media (horizontal-viewport-segments: 2) {

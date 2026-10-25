@@ -63,6 +63,98 @@ test("compact Analytics keeps its hub behind an open chart sheet", async ({ brow
   }
 });
 
+test("regular and wide Overview charts keep their date labels inside the card", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 744, height: 1133 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    for (const [width, height] of [[744, 1133], [1376, 1032]]) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/#/overview");
+      await expect(page.locator(".overview-pnl-dates")).toBeVisible();
+      const bounds = await page.evaluate(() => {
+        const card = document.querySelector(".overview-pnl-card")!.getBoundingClientRect();
+        const plot = document.querySelector(".overview-pnl-plot")!.getBoundingClientRect();
+        const dates = document.querySelector(".overview-pnl-dates")!.getBoundingClientRect();
+        return { plotBottom: plot.bottom, datesBottom: dates.bottom, cardBottom: card.bottom, plotHeight: plot.height };
+      });
+      expect(bounds.plotHeight).toBeGreaterThanOrEqual(220);
+      expect(bounds.plotBottom).toBeLessThanOrEqual(bounds.cardBottom);
+      expect(bounds.datesBottom).toBeLessThanOrEqual(bounds.cardBottom);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("wide hubs show empty details and mark the selected item", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/history");
+    await expect(page.locator(".history-split .mobile-split-detail")).toContainText("Choose a snapshot");
+    await page.goto("/#/settings");
+    await expect(page.locator(".ios-d3-settings .mobile-split-detail")).toContainText("Choose a setting");
+    await page.goto("/#/settings/appearance?section=theme");
+    await expect(page.locator(".ios-d3-settings .mobile-list-row[aria-current='page']")).toContainText("Appearance");
+    await page.goto("/#/summary");
+    await page.locator(".analytics-tile").getByText("Allocation", { exact: true }).click();
+    await expect(page.locator(".analytics-tile[aria-current='true']")).toContainText("Allocation");
+    await page.locator(".analytics-tile").getByText("Returns", { exact: true }).click();
+    await expect(page.getByRole("region", { name: "Returns" })).toHaveCount(1);
+    await expect(page.locator(".d2-summary .profit-summary-card")).toBeHidden();
+  } finally {
+    await context.close();
+  }
+});
+
+test("wide More keeps its menu beside selected pages", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true, seedRebalanceProfile: true });
+    await page.goto("/#/more");
+    await expect(page.locator(".more-split > .mobile-split-master")).toBeVisible();
+    await expect(page.locator(".more-split > .mobile-split-detail")).toContainText("Choose a page");
+    for (const route of ["goals", "rebalance", "assistant", "settings"]) {
+      await page.goto(`/#/${route}`);
+      await expect(page.locator(".more-split > .mobile-split-master")).toBeVisible();
+      await expect(page.locator(".more-split > .mobile-split-detail")).toBeVisible();
+      await expect(page.locator(`.more-split .mobile-list-row[href='#/${route}'][aria-current='page']`)).toHaveCount(1);
+    }
+    const panes = await page.evaluate(() => ({
+      more: document.querySelector(".more-split > .mobile-split-master")!.getBoundingClientRect().width,
+      appearanceLabel: document.querySelector(".ios-d3-settings a[href='#/settings/appearance?section=theme'] .mobile-list-label")!.getBoundingClientRect().height,
+    }));
+    expect(panes.more).toBeLessThanOrEqual(260);
+    expect(panes.appearanceLabel).toBeLessThanOrEqual(34);
+    await page.goto("/#/settings/appearance?section=theme");
+    await expect(page.locator(".ios-d3-settings-page")).toBeVisible();
+    await expect(page.locator(".ios-d3-more .mobile-list-row[href='#/settings']")).toHaveAttribute("aria-current", "page");
+  } finally {
+    await context.close();
+  }
+});
+
+test("regular width history rows align with their month card", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 932, height: 430 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/history");
+    await expect(page.locator(".history-month-rows")).toBeVisible();
+    const edges = await page.evaluate(() => {
+      const card = document.querySelector(".history-month-rows")!.getBoundingClientRect();
+      const row = document.querySelector(".history-mobile-snapshot-button")!.getBoundingClientRect();
+      return { cardRight: card.right, rowRight: row.right };
+    });
+    expect(edges.rowRight).toBeGreaterThanOrEqual(edges.cardRight - 1);
+  } finally {
+    await context.close();
+  }
+});
+
 test("wide history, settings, and analytics keep list and detail visible together", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true, reducedMotion: "reduce" });
   const page = await context.newPage();
@@ -133,12 +225,22 @@ for (const [name, width, height] of viewports) {
       });
       const page = await context.newPage();
       try {
+        const safeLeft = height < 500 ? 44 : 24;
+        const safeRight = height < 500 ? 34 : 24;
+        const safeTop = 12;
+        const safeBottom = 20;
         await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
         await installTauriBridge(page, { richPortfolio: true, seedRebalanceProfile: true });
         for (const route of routes) {
           await page.goto(`/#/${route}`);
           await expect(page.locator("#app-main-content")).toBeVisible();
           await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
+          await page.evaluate(({ left, right, top, bottom }) => {
+            document.documentElement.style.setProperty("--mobile-safe-left", `${left}px`);
+            document.documentElement.style.setProperty("--mobile-safe-right", `${right}px`);
+            document.documentElement.style.setProperty("--mobile-safe-top", `${top}px`);
+            document.documentElement.style.setProperty("--mobile-safe-bottom", `${bottom}px`);
+          }, { left: safeLeft, right: safeRight, top: safeTop, bottom: safeBottom });
           const size = width >= 1000 ? "wide" : width >= 700 ? "regular" : "compact";
           await expect(page.locator(".app-layout")).toHaveAttribute("data-width-class", size);
           await expect(page.locator(".app-layout")).toHaveAttribute("data-height-class", height < 500 ? "compact" : "regular");
@@ -152,12 +254,16 @@ for (const [name, width, height] of viewports) {
               mainWidth: main.getBoundingClientRect().width,
               paddingLeft: parseFloat(style.paddingLeft),
               paddingRight: parseFloat(style.paddingRight),
+              paddingTop: parseFloat(style.paddingTop),
+              paddingBottom: parseFloat(style.paddingBottom),
             };
           });
           expect(layout.documentWidth, `${name} ${theme} ${route}`).toBeLessThanOrEqual(width + 1);
           expect(layout.mainWidth, `${name} ${theme} ${route}`).toBeGreaterThan(0);
-          expect(layout.paddingLeft, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(16);
-          expect(layout.paddingRight, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(16);
+          expect(layout.paddingLeft, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeLeft);
+          expect(layout.paddingRight, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeRight);
+          expect(layout.paddingTop, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeTop);
+          expect(layout.paddingBottom, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeBottom);
           const navigation = page.locator(size === "compact" ? ".mobile-tab-bar a" : ".mobile-sidebar a");
           const targets = await navigation.evaluateAll((nodes) => nodes.map((node) => {
             const box = node.getBoundingClientRect();
@@ -169,7 +275,9 @@ for (const [name, width, height] of viewports) {
             expect(box.height, `${name} ${theme} ${route} nav target`).toBeGreaterThanOrEqual(44);
           }
           const overlap = await page.evaluate(() => {
-            for (const selector of [".overview-main-grid", ".profit-metrics-mobile", ".analytics-tile-grid", ".cost-metric-grid"]) {
+            for (const selector of [".overview-main-grid", ".profit-metrics-mobile", ".analytics-tile-grid",
+              ".cost-metric-grid", ".coin-metric-grid", ".comparison-total-grid", ".ath-metrics",
+              ".profit-period-grid", ".history-detail-tools"]) {
               const grid = document.querySelector<HTMLElement>(selector);
               if (!grid || !grid.getClientRects().length) continue;
               const boxes = [...grid.children].filter((node) => node.getClientRects().length)
@@ -196,11 +304,37 @@ for (const [name, width, height] of viewports) {
             expect(allocation.chartRight, `${name} ${theme} allocation columns`).toBeLessThan(allocation.rowsLeft);
             expect(allocation.verticalOverlap, `${name} ${theme} allocation columns`).toBeGreaterThan(50);
           }
+          if (route === "overview" && size !== "compact") {
+            await expect(page.locator(".overview-pnl-dates")).toBeVisible();
+            const chart = await page.evaluate(() => {
+              const card = document.querySelector(".overview-pnl-card")!.getBoundingClientRect();
+              const plot = document.querySelector(".overview-pnl-plot")!.getBoundingClientRect();
+              const dates = document.querySelector(".overview-pnl-dates")!.getBoundingClientRect();
+              return { plotBottom: plot.bottom, datesBottom: dates.bottom, cardBottom: card.bottom };
+            });
+            expect(chart.plotBottom, `${name} ${theme} plot`).toBeLessThanOrEqual(chart.cardBottom);
+            expect(chart.datesBottom, `${name} ${theme} dates`).toBeLessThanOrEqual(chart.cardBottom);
+          }
           if (route === "summary") {
             await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
             const columns = await page.locator(".profit-metrics-mobile").evaluate((node) =>
               getComputedStyle(node).gridTemplateColumns.split(" ").length);
             expect(columns).toBe(size === "compact" ? 2 : 3);
+            if (size === "wide") {
+              const tiles = await page.locator(".analytics-tile-grid").evaluate((node) =>
+                getComputedStyle(node).gridTemplateColumns.split(" ").length);
+              expect(tiles).toBe(2);
+            }
+          }
+          if (route === "cost-basis") {
+            const columns = await page.locator(".cost-metric-grid").evaluate((node) =>
+              getComputedStyle(node).gridTemplateColumns.split(" ").length);
+            expect(columns).toBe(size === "compact" ? 2 : 4);
+          }
+          if (route === "coins/BTC") {
+            const span = await page.locator(".coin-metric-grid > :first-child").evaluate((node) =>
+              getComputedStyle(node).gridColumnStart);
+            expect(span).toBe(size === "compact" ? "span 3" : "span 2");
           }
           if (route === "history") {
             await page.locator(".history-mobile-snapshot-button").first().click();

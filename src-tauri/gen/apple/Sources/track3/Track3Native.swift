@@ -348,6 +348,7 @@ public func track3IOSShareFile(_ path: UnsafePointer<CChar>) -> Bool {
         if let popover = controller.popoverPresentationController {
             popover.sourceView = presenter.view
             popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+            popover.permittedArrowDirections = []
         }
         presenter.present(controller, animated: true)
     }

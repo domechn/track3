@@ -294,12 +294,13 @@ export function InsetGroup({ children, title, className }: React.PropsWithChildr
   </section>;
 }
 
-export function ListRow({ children, value, onClick, href, trailing, className }: React.PropsWithChildren<{
+export function ListRow({ children, value, onClick, href, trailing, className, ariaCurrent }: React.PropsWithChildren<{
   value?: React.ReactNode; onClick?: () => void; href?: string; trailing?: React.ReactNode; className?: string;
+  ariaCurrent?: "page";
 }>) {
   const content = <><span className="mobile-list-label">{children}</span>{value && <span className="mobile-list-value">{value}</span>}{trailing ?? ((href || onClick) && <ChevronRightIcon aria-hidden="true" />)}</>;
   const classes = cn("mobile-list-row", className);
-  if (href) return <a href={href} className={classes}>{content}</a>;
+  if (href) return <a href={href} className={classes} aria-current={ariaCurrent}>{content}</a>;
   if (onClick) return <button type="button" onClick={onClick} className={classes}>{content}</button>;
   return <div className={classes}>{content}</div>;
 }

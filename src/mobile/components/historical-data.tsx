@@ -1196,7 +1196,10 @@ const App = ({
           </div>
         </FadeUp>}
 
-        {isMobile ? <SplitView selected={false} master={listContent} detail={detailContent}
+        {isMobile ? <SplitView selected={false} master={listContent}
+          detail={isWide && !isModalOpen
+            ? <p className="analytics-empty">{t("history.selectDetail")}</p>
+            : detailContent}
           className="history-split" masterLabel={t("history.recordsCardTitle")}
           detailLabel={t("history.detailTitle")} /> : listContent}
       </StaggerContainer>

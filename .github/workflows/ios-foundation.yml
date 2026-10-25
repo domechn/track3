@@ -215,7 +215,9 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily:1' "$APP/Info.plist" | grep -Fx 2
           /usr/libexec/PlistBuddy -c 'Print :UIRequiresFullScreen' "$APP/Info.plist" | grep -Fx false
           xcrun simctl install "$SIM_ID" "$APP"
-          xcrun simctl launch "$SIM_ID" dev.track3.ios | tee artifacts/ipad-launch.log
+          APP_PID=$(xcrun simctl launch "$SIM_ID" dev.track3.ios 2>&1 | tee artifacts/ipad-launch.log | sed -n 's/.*: //p' || true)
+          test -n "$APP_PID"
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
           CONTAINER=$(xcrun simctl get_app_container "$SIM_ID" dev.track3.ios data)
           READY=""
           for attempt in $(seq 1 30); do
@@ -225,12 +227,48 @@ jobs:
           done
           test -n "$READY"
           grep -Fxq 'track3:ready' "$READY"
+          xcrun simctl spawn "$SIM_ID" log show --last 2m --style compact --predicate "process ==[c] \"$EXECUTABLE\"" > artifacts/ipad-log.log || true
+          find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -iname "${EXECUTABLE}*" -mmin -2 -print > artifacts/ipad-crash-reports.log 2>/dev/null || true
+          xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$APP_PID" '$1 == pid {found=1} END {exit !found}'
+          test ! -s artifacts/ipad-crash-reports.log
+          ! grep -Eiq 'failed to read migration|error while running tauri application' artifacts/ipad-log.log
           xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-portrait.png
           swift scripts/ios/check-screenshot.swift artifacts/ipad-portrait.png
           open -a Simulator --args -CurrentDeviceUDID "$SIM_ID"
-          osascript -e 'tell application "Simulator" to activate' -e 'tell application "System Events" to key code 123 using command down'
-          sleep 3
-          xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-landscape.png
+          : > artifacts/ipad-rotation.log
+          WINDOW_READY=""
+          for attempt in $(seq 1 45); do
+            if osascript -e 'tell application "System Events" to count windows of process "Simulator"' \
+              > artifacts/ipad-window-count.log 2>> artifacts/ipad-rotation.log; then
+              WINDOW_COUNT=$(tr -d '[:space:]' < artifacts/ipad-window-count.log)
+              if [ "$WINDOW_COUNT" -gt 0 ]; then WINDOW_READY=1; break; fi
+            fi
+            sleep 2
+          done
+          if [ -z "$WINDOW_READY" ]; then cat artifacts/ipad-rotation.log; exit 1; fi
+          if ! osascript -e 'tell application "Simulator" to activate' -e 'delay 1' \
+            -e 'tell application "System Events" to key code 123 using command down' \
+            2>> artifacts/ipad-rotation.log; then
+            cat artifacts/ipad-rotation.log
+            exit 1
+          fi
+          LANDSCAPE=""
+          ROTATE_DEADLINE=$((SECONDS + 30))
+          while :; do
+            xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-landscape.png
+            if sips -g pixelWidth -g pixelHeight artifacts/ipad-landscape.png \
+              | awk '/pixelWidth:/ { w=$2 } /pixelHeight:/ { h=$2 } END { exit !(w>h) }'; then
+              LANDSCAPE=1
+              break
+            fi
+            if [ "$SECONDS" -ge "$ROTATE_DEADLINE" ]; then break; fi
+            sleep 2
+          done
+          if [ -z "$LANDSCAPE" ]; then
+            cat artifacts/ipad-rotation.log
+            sips -g pixelWidth -g pixelHeight artifacts/ipad-landscape.png
+            exit 1
+          fi
           swift scripts/ios/check-screenshot.swift artifacts/ipad-landscape.png
           python3 - <<'PY'
           import subprocess

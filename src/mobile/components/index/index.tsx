@@ -470,28 +470,35 @@ function Layout({
   );
 }
 
-function MoreHub() {
+function MoreHub({ children }: React.PropsWithChildren) {
   const { t } = useTranslation();
   const haptic = useHaptics();
   const unread = useOutletContext<number>();
+  const pathname = useLocation().pathname;
   const items: { href: string; label: string; value?: string; icon: MobileIconName }[] = [
     { href: "#/rebalance", label: t("nav.rebalance"), icon: "rebalance" },
     { href: "#/goals", label: t("nav.goals"), value: unread > 0 ? String(unread) : undefined, icon: "goals" },
     { href: "#/assistant", label: t("nav.assistant"), icon: "assistant" },
     { href: "#/settings", label: t("nav.settings"), icon: "settings" },
   ];
-  return <div className="mobile-more-hub ios-d3-more" onClickCapture={() => haptic("selection")}>
+  const master = <div className="mobile-more-hub ios-d3-more" onClickCapture={() => haptic("selection")}>
     <InsetGroup title={t("more.group.plan")}>
-      {items.slice(0, 2).map((item) => <ListRow key={item.href} href={item.href} value={item.value}>
+      {items.slice(0, 2).map((item) => <ListRow key={item.href} href={item.href} value={item.value}
+        ariaCurrent={pathname === item.href.slice(1) ? "page" : undefined}>
         <MobileIcon name={item.icon} />{item.label}
       </ListRow>)}
     </InsetGroup>
     <InsetGroup title={t("more.group.manage")}>
-      {items.slice(2).map((item) => <ListRow key={item.href} href={item.href} value={item.value}>
+      {items.slice(2).map((item) => <ListRow key={item.href} href={item.href} value={item.value}
+        ariaCurrent={pathname === item.href.slice(1) || (item.href === "#/assistant" && pathname.startsWith("/assistant/"))
+          || (item.href === "#/settings" && pathname.startsWith("/settings/")) ? "page" : undefined}>
         <MobileIcon name={item.icon} />{item.label}
       </ListRow>)}
     </InsetGroup>
   </div>;
+  return <SplitView selected={Boolean(children)} className="more-split"
+    masterLabel={t("nav.more")} detailLabel={t("nav.more")}
+    master={master} detail={children ?? <p className="analytics-empty">{t("more.selectDetail")}</p>} />;
 }
 
 function AnalyticsHub({ currency, dateRange, quoteColor }: {
@@ -509,7 +516,7 @@ function AnalyticsHub({ currency, dateRange, quoteColor }: {
     { sheet: "positions", label: t("analytics.positionChanges"), detail: t("analytics.positionChangesDetail"), icon: "positions" },
     { href: "#/cost-basis", label: t("nav.costBasis"), detail: t("analytics.costDetail"), icon: "cost" },
   ];
-  return <div className="mobile-analytics-hub">
+  return <div className="mobile-analytics-hub" data-open-sheet={sheet ?? undefined}>
     <SplitView selected={false} className="analytics-split"
       masterLabel={t("nav.analytics")} detailLabel={t("nav.analytics")}
       master={<div className="analytics-tile-grid">
@@ -518,7 +525,9 @@ function AnalyticsHub({ currency, dateRange, quoteColor }: {
           <strong>{item.label}</strong><small>{item.detail}</small></>;
         return item.href
           ? <a className="analytics-tile" key={item.label} href={item.href}>{content}</a>
-          : <button className="analytics-tile" type="button" key={item.label} onClick={() => setSheet(item.sheet!)}>{content}</button>;
+          : <button className="analytics-tile" type="button" key={item.label}
+            aria-current={isWide && sheet === item.sheet ? "true" : undefined}
+            onClick={() => setSheet(item.sheet!)}>{content}</button>;
       })}
     </div>}
       detail={sheet === null && isWide
@@ -697,12 +706,12 @@ function AppRoutes({
         <Route
           path="rebalance"
           element={
-            <AnimatedPage>
+            <MoreHub><AnimatedPage>
               <Rebalance currency={currentCurrency} quoteColor={quoteColor} />
-            </AnimatedPage>
+            </AnimatedPage></MoreHub>
           }
         />
-        <Route path="goals" element={<AnimatedPage><GoalsAlerts /></AnimatedPage>} />
+        <Route path="goals" element={<MoreHub><AnimatedPage><GoalsAlerts /></AnimatedPage></MoreHub>} />
         <Route
           path="history"
           element={
@@ -732,25 +741,25 @@ function AppRoutes({
         <Route
           path="assistant"
           element={
-            <AnimatedPage>
+            <MoreHub><AnimatedPage>
               <ChatPage isProUser={isProUser} />
-            </AnimatedPage>
+            </AnimatedPage></MoreHub>
           }
         />
         <Route
           path="assistant/:sessionId"
           element={
-            <AnimatedPage>
+            <MoreHub><AnimatedPage>
               <ChatPage isProUser={isProUser} />
-            </AnimatedPage>
+            </AnimatedPage></MoreHub>
           }
         />
         <Route
           path="settings"
           element={
-            <AnimatedPage>
+            <MoreHub><AnimatedPage>
               <Setting />
-            </AnimatedPage>
+            </AnimatedPage></MoreHub>
           }
         >
           <Route

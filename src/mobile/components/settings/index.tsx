@@ -117,9 +117,10 @@ const App = () => {
   useEffect(() => setTopBar(document.getElementById("app-top-bar")), []);
   if (isIOS()) {
     const isHub = lo.pathname === "/settings";
-    const title = mobileSettings.find((item) =>
-      `${item.href}` === `${lo.pathname}${lo.search}`)?.key ??
-      mobileSettings.find((item) => item.href.split("?")[0] === lo.pathname)?.key;
+    const selectedHref = mobileSettings.find((item) =>
+      item.href === `${lo.pathname}${lo.search}`)?.href ??
+      mobileSettings.find((item) => item.href.split("?")[0] === lo.pathname)?.href;
+    const title = mobileSettings.find((item) => item.href === selectedHref)?.key;
     return (
       <div className="ios-d3-settings mx-auto w-full min-w-0 pb-6">
         {topBar && createPortal(
@@ -137,7 +138,8 @@ const App = () => {
                     : item.key === "settings.mobile.language" ? LOCALE_LABELS[locale]
                       : item.key === "settings.tab.appearance" ? theme === "system" ? t("settings.mobile.system") : t(`appearance.theme.${theme}`)
                         : undefined;
-                  return <ListRow key={item.href} href={`#${item.href}`} value={value}>
+                  return <ListRow key={item.href} href={`#${item.href}`} value={value}
+                    ariaCurrent={!isHub && selectedHref === item.href ? "page" : undefined}>
                     <span aria-hidden="true" className="ios-d3-settings-icon"><Icon /></span>
                     {t(item.key)}
                   </ListRow>;
@@ -145,7 +147,7 @@ const App = () => {
               </InsetGroup>)}
             </nav>
           </> : null}
-          detail={isHub ? null : <>
+          detail={isHub ? <p className="analytics-empty">{t("settings.selectDetail")}</p> : <>
             <header className="space-y-3 pt-1">
               <h1 className="ios-large-title mb-5">{t(title ?? "settings.title")}</h1>
             </header>
