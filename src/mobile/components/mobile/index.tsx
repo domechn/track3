@@ -230,8 +230,8 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
   </div>;
 }
 
-export function PullToRefresh({ children, onRefresh, disabled, className, lastRefreshText }: React.PropsWithChildren<{
-  onRefresh: () => void | Promise<void>; disabled?: boolean; className?: string; lastRefreshText?: string;
+export function PullToRefresh({ children, onRefresh, disabled, className }: React.PropsWithChildren<{
+  onRefresh: () => void | Promise<void>; disabled?: boolean; className?: string;
 }>) {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -271,7 +271,6 @@ export function PullToRefresh({ children, onRefresh, disabled, className, lastRe
     {(pull > 0 || refreshing) && <div className="mobile-pull-indicator" role="status"
       aria-label={t("mobile.refreshView")} style={{ minHeight: pull || 44 }}>
       <span className={refreshing ? "animate-spin" : ""} aria-hidden="true">↻</span>
-      {lastRefreshText && <span className="mobile-pull-last-refresh">{lastRefreshText}</span>}
     </div>}
     {children}
   </div>;

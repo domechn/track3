@@ -106,14 +106,6 @@ describe("mobile interactions", () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it("shows the last refresh time while pulling down", () => {
-    render(<PullToRefresh onRefresh={() => {}} lastRefreshText="Last refresh at 10:30"><div>Content</div></PullToRefresh>);
-    const area = screen.getByTestId("pull-to-refresh");
-    fireEvent.touchStart(area, { touches: [{ clientX: 100, clientY: 20 }] });
-    fireEvent.touchMove(area, { touches: [{ clientX: 100, clientY: 65 }] });
-    expect(screen.getByRole("status")).toHaveTextContent("Last refresh at 10:30");
-  });
-
   it("does not refresh when a drag starts inside a portal sheet", () => {
     const onRefresh = vi.fn();
     render(<PullToRefresh onRefresh={onRefresh}>

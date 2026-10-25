@@ -290,7 +290,7 @@ function Layout({
   const location = useLocation();
   const navigate = useNavigate();
   const currentTab = tabForPath(location.pathname);
-  const routePath = location.pathname + location.search;
+  const routePath = location.pathname + location.search + location.hash;
   const rootPath = tabRoots[currentTab];
   const tabStacks = useRef<Record<"overview" | "history" | "analytics" | "more", string[]>>({
     overview: [tabRoots.overview], history: [tabRoots.history],
@@ -443,10 +443,11 @@ function Layout({
         </main>
       </div>
       <MobileNavigation unread={unread} onTabSwitch={(rootTap) => {
-        rememberScroll();
+        if (!rootTap || routePath !== rootPath) rememberScroll();
+        else scrollCaptured.current = false;
         if (rootTap) {
           const rootKey = scrollKey(currentTab, tabRoots[currentTab]);
-          resetRootScroll.current = rootKey;
+          resetRootScroll.current = routePath === rootPath ? null : rootKey;
           routeScroll.current.set(rootKey, 0);
           onRootTap(currentTab);
         }
@@ -1037,6 +1038,7 @@ const App = () => {
   }
 
   async function refreshLocalView() {
+    clearAllCache();
     await Promise.all([loadAllData(true, true), queryPreferCurrency().then(setCurrentCurrency),
       getLicenseIfIsPro().then((license) => setIsProUser(!!license)), getQuoteColor().then(setQuoteColor)]);
     setDataChangedVersion((version) => version + 1);

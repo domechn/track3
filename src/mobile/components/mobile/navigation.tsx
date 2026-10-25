@@ -18,7 +18,7 @@ export function tabForPath(path: string): MobileTab {
 export function MobileNavigation({ unread = 0, onTabSwitch }: { unread?: number; onTabSwitch?: (rootTap: boolean) => void }) {
   const { t } = useTranslation();
   const haptic = useHaptics();
-  const { pathname } = useLocation();
+  const { pathname, search, hash } = useLocation();
   const selected = tabForPath(pathname);
   const tabs = [
     { id: "overview" as const, title: t("nav.overview") },
@@ -30,7 +30,7 @@ export function MobileNavigation({ unread = 0, onTabSwitch }: { unread?: number;
     {tabs.map(({ id, title }) => <Link key={id} to={tabRoots[id]}
       onClick={(event) => {
         haptic("selection");
-        if (selected === id && pathname === tabRoots[id]) {
+        if (selected === id && pathname === tabRoots[id] && !search && !hash) {
           event.preventDefault();
           onTabSwitch?.(true);
           window.scrollTo(0, 0);

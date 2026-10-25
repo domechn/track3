@@ -6,7 +6,7 @@ import { MobileNavigation, routeTitle } from "@/mobile/components/mobile/navigat
 
 function Path() {
   const location = useLocation();
-  return <output>{location.pathname + location.search}</output>;
+  return <output>{location.pathname + location.search + location.hash}</output>;
 }
 
 describe("mobile navigation", () => {
@@ -35,5 +35,14 @@ describe("mobile navigation", () => {
     fireEvent.click(screen.getByRole("link", { name: /history/i, hidden: true }));
     fireEvent.click(screen.getByRole("link", { name: /analytics/i, hidden: true }));
     expect(screen.getByText("/summary")).toBeInTheDocument();
+  });
+
+  it.each(["?range=7d", "#details"])("clears an active tab's %s when tapping its root", (suffix) => {
+    render(<MemoryRouter initialEntries={[`/overview${suffix}`]}>
+      <MobileNavigation />
+      <Routes><Route path="*" element={<Path />} /></Routes>
+    </MemoryRouter>);
+    fireEvent.click(screen.getByRole("link", { name: /overview/i, hidden: true }));
+    expect(screen.getByText("/overview")).toBeInTheDocument();
   });
 });
