@@ -355,9 +355,10 @@ public func track3IOSShareFile(_ path: UnsafePointer<CChar>) -> Bool {
     return true
 }
 
-private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate {
+private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
     static let shared = Track3BackupFolder()
     private var waiting: ((URL?) -> Void)?
+    private var presentedPicker: UIDocumentPickerViewController?
     private var active: [Int32: URL] = [:]
     private var cleared: [Int32: URL] = [:]
     private let lock = NSLock()
@@ -376,9 +377,21 @@ private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate {
             self.waiting = { url in selected = url; semaphore.signal() }
             let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
             picker.delegate = self
+            picker.presentationController?.delegate = self
+            self.presentedPicker = picker
             var presenter = root
             while let current = presenter.presentedViewController { presenter = current }
-            presenter.present(picker, animated: true)
+            guard !presenter.isBeingDismissed && presenter.view.window != nil else {
+                self.finish(picker, nil)
+                return
+            }
+            presenter.present(picker, animated: true) {
+                picker.presentationController?.delegate = self
+                if picker.presentingViewController == nil { self.finish(picker, nil) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                if picker.presentingViewController == nil { self.finish(picker, nil) }
+            }
         }
         semaphore.wait()
         guard let url = selected else { return (-1, nil) }
@@ -475,16 +488,25 @@ private final class Track3BackupFolder: NSObject, UIDocumentPickerDelegate {
         }
     }
 
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    private func finish(_ controller: UIDocumentPickerViewController, _ url: URL?) {
+        guard presentedPicker === controller else { return }
+        presentedPicker = nil
         let complete = waiting
         waiting = nil
-        complete?(urls.first)
+        complete?(url)
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        finish(controller, urls.first)
     }
 
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        let complete = waiting
-        waiting = nil
-        complete?(nil)
+        finish(controller, nil)
+    }
+
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        guard let picker = presentationController.presentedViewController as? UIDocumentPickerViewController else { return }
+        finish(picker, nil)
     }
 }
 

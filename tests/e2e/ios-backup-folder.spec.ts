@@ -27,9 +27,9 @@ test("normalizes a picked backup client and keeps its review inside a small phon
   await expect(page.getByText("Using the parent folder cloud because it contains track3-backup.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Import device-a" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
-  await page.locator(".ios-d3-folder-client").first().evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
+  await page.locator(".ios-d3-folder-client").first().evaluate((element) => element.scrollIntoView({ block: "center" }));
   await expect.poll(async () => (await page.locator(".ios-d3-folder-client").first().boundingBox())?.y).toBeLessThan(440);
-  await page.screenshot({ path: "test-results/mobile/backup-folder-review.png" });
+  await page.screenshot({ path: "test-results/mobile/backup-folder-review.png", animations: "disabled" });
 });
 
 test("explains an unrelated folder", async ({ page }) => {
@@ -45,6 +45,7 @@ test("shows a revoked folder state and a choose again action", async ({ page }) 
   await page.goto("/#/settings/data?section=backup");
   await expect(page.getByRole("alert")).toHaveText("Backup folder unavailable.");
   await expect(page.getByRole("button", { name: "Choose folder again" })).toBeVisible();
-  await page.getByRole("alert").evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
-  await page.screenshot({ path: "test-results/mobile/backup-folder-failure.png" });
+  await page.getByRole("alert").evaluate((element) => element.scrollIntoView({ block: "center" }));
+  await expect.poll(async () => (await page.getByRole("alert").boundingBox())?.y).toBeLessThan(440);
+  await page.screenshot({ path: "test-results/mobile/backup-folder-failure.png", animations: "disabled" });
 });

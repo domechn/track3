@@ -47,6 +47,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }));
+vi.mock("@tauri-apps/api/path", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@tauri-apps/api/path")>(),
+  documentDir: vi.fn(async () => "/Documents"),
+}));
 
 vi.mock("@/mobile/components/ui/use-toast", () => ({
   useToast: () => ({ toast: mocks.toast }),

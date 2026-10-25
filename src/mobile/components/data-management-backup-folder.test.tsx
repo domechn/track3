@@ -6,10 +6,10 @@ import { Toast, ToastProvider, ToastViewport } from "@/mobile/components/ui/toas
 
 const m = vi.hoisted(() => ({
   invoke: vi.fn(), choose: vi.fn(), find: vi.fn(), list: vi.fn(), read: vi.fn(), save: vi.fn(),
-  getFolder: vi.fn(), getBlacklist: vi.fn(), getTime: vi.fn(), duplicate: vi.fn(), importData: vi.fn(), toast: vi.fn(), clean: vi.fn(),
+  getFolder: vi.fn(), getBlacklist: vi.fn(), getTime: vi.fn(), duplicate: vi.fn(), importData: vi.fn(), toast: vi.fn(), clean: vi.fn(), documents: vi.fn(),
 }));
 vi.mock("@/utils/platform", () => ({ isIOS: () => true }));
-vi.mock("@/utils/backup-location", () => ({ chooseBackupLocation: m.choose, documentsBackupLocation: vi.fn() }));
+vi.mock("@/utils/backup-location", () => ({ chooseBackupLocation: m.choose, documentsBackupLocation: m.documents }));
 vi.mock("@/middlelayers/backup-folder", () => ({ findBackupFolder: m.find, listBackupClients: m.list, readBackupClient: m.read }));
 vi.mock("@/utils/ios-native", () => ({ appLockEnabled: vi.fn(async () => false) }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: m.invoke }));
@@ -35,6 +35,7 @@ beforeEach(() => {
   m.list.mockResolvedValue([{ client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 2 }]);
   m.read.mockResolvedValue({ client: "device-a", exportAt: "2024-03-01T00:00:00Z", historicalData: [], md5V2: "" });
   m.getFolder.mockResolvedValue("/app/Documents");
+  m.documents.mockResolvedValue("/app/Documents");
   m.getBlacklist.mockResolvedValue([]);
   m.getTime.mockResolvedValue(new Date(0));
   m.duplicate.mockResolvedValue(false);
@@ -47,12 +48,44 @@ it("reviews a selected folder and imports without changing auto backup", async (
   fireEvent.click(screen.getByRole("button", { name: "Import from backup folder" }));
   expect(await screen.findByText(/Using the parent folder/)).toBeInTheDocument();
   expect(screen.getByText("device-a")).toBeInTheDocument();
+  expect(screen.getByText("To use it for auto backup, choose the parent folder directly under Auto backup folder.")).toBeInTheDocument();
   expect(screen.getByText(/2 months · Last backup:/)).toHaveTextContent(/\d{1,2}:\d{2}/);
   fireEvent.click(screen.getByRole("button", { name: "Import device-a" }));
   const confirm = await screen.findByRole("alertdialog", { name: "Restore data?" });
   fireEvent.click(within(confirm).getByRole("button", { name: "Restore" }));
   await waitFor(() => expect(m.importData).toHaveBeenCalled());
+  expect(m.save).not.toHaveBeenCalledWith("/cloud");
+});
+
+it("shows a saved Documents choice in the current app container", async () => {
+  m.getFolder.mockResolvedValue("track3:ios-documents");
+  render(<HashRouter><DataManagement /></HashRouter>);
+  expect(await screen.findByText("/app/Documents")).toBeInTheDocument();
   expect(m.save).not.toHaveBeenCalled();
+});
+
+it("migrates an old Documents container path in backup settings", async () => {
+  m.getFolder.mockResolvedValue("/var/mobile/Containers/Data/Application/12345678-1234-1234-1234-123456789abc/Documents");
+  render(<HashRouter><DataManagement /></HashRouter>);
+  expect(await screen.findByText("/app/Documents")).toBeInTheDocument();
+  expect(m.save).toHaveBeenCalledWith("track3:ios-documents");
+});
+
+it("saves a Documents marker when selected", async () => {
+  m.getFolder.mockResolvedValue(undefined);
+  render(<HashRouter><DataManagement /></HashRouter>);
+  fireEvent.click(screen.getByRole("button", { name: "Use Documents folder" }));
+  await waitFor(() => expect(m.save).toHaveBeenCalledWith("track3:ios-documents"));
+  expect(screen.getByText("/app/Documents")).toBeInTheDocument();
+});
+
+it("shows background iCloud preparation in backup settings", async () => {
+  render(<HashRouter><DataManagement /></HashRouter>);
+  await screen.findByText("/app/Documents");
+  window.dispatchEvent(new CustomEvent("track3:backup-folder-preparation", { detail: true }));
+  expect(await screen.findByText("Downloading from iCloud…")).toBeInTheDocument();
+  window.dispatchEvent(new CustomEvent("track3:backup-folder-preparation", { detail: false }));
+  await waitFor(() => expect(screen.queryByText("Downloading from iCloud…")).not.toBeInTheDocument());
 });
 
 it("shows a missing saved folder and lets the owner choose again", async () => {

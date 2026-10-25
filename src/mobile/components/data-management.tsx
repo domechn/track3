@@ -56,7 +56,7 @@ import {
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { chooseBackupLocation, documentsBackupLocation } from "@/utils/backup-location";
 import { findBackupFolder, listBackupClients, readBackupClient, type BackupClient, type BackupFolder } from "@/middlelayers/backup-folder";
-import { backupFolderStatusEvent, type IOSBackupFolderStatus } from "@/middlelayers/ios-backup-folder";
+import { backupFolderPreparationEvent, backupFolderStatusEvent, iosDocumentsBackupMarker, isIOSDocumentsBackupChoice, type IOSBackupFolderStatus } from "@/middlelayers/ios-backup-folder";
 import { isIOS } from "@/utils/platform";
 import { appLockEnabled, setAppLockEnabled } from "@/utils/ios-native";
 import { ConfirmSheet } from "@/mobile/components/mobile/overlays";
@@ -80,6 +80,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [folderReview, setFolderReview] = useState<{ folder: BackupFolder; clients: BackupClient[] }>();
   const [folderBusy, setFolderBusy] = useState(false);
   const [folderPreparing, setFolderPreparing] = useState(false);
+  const [backgroundPreparing, setBackgroundPreparing] = useState(false);
   const [folderFromCloud, setFolderFromCloud] = useState(false);
   const [folderError, setFolderError] = useState("");
   const [useImportForAuto, setUseImportForAuto] = useState(false);
@@ -160,8 +161,13 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     });
     getBlacklistCoins().then(setBlacklist);
     const refresh = () => { void loadAutoBackupDirectory(); };
+    const preparation = (event: Event) => setBackgroundPreparing((event as CustomEvent<boolean>).detail);
     window.addEventListener(backupFolderStatusEvent, refresh);
-    return () => window.removeEventListener(backupFolderStatusEvent, refresh);
+    window.addEventListener(backupFolderPreparationEvent, preparation);
+    return () => {
+      window.removeEventListener(backupFolderStatusEvent, refresh);
+      window.removeEventListener(backupFolderPreparationEvent, preparation);
+    };
   }, []);
 
   async function loadAutoBackupDirectory() {
@@ -171,19 +177,20 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       if (isIOS()) {
         const status = await invoke<IOSBackupFolderStatus>("ios_backup_folder_status");
         if (version !== folderChoiceVersion.current) return false;
-        if (status.path && !d) {
+        const documents = await documentsBackupLocation();
+        if (version !== folderChoiceVersion.current) return false;
+        if (d && isIOSDocumentsBackupChoice(d, documents)
+          && (d === iosDocumentsBackupMarker || d === documents || status.path !== d)) {
+          if (status.path || status.failure?.includes("Choose the folder again")) await invoke("ios_clear_backup_folder", { kind: "auto" });
+          if (d !== iosDocumentsBackupMarker) await saveAutoBackupDirectory(iosDocumentsBackupMarker);
+          d = documents;
+          if (status.path || status.failure?.includes("Choose the folder again")) status.failure = null;
+        } else if (status.path && !d) {
           await invoke("ios_clear_backup_folder", { kind: "auto" });
           status.failure = null;
         } else if (status.path && d && status.path !== d) {
-          const documents = await documentsBackupLocation();
-          if (version !== folderChoiceVersion.current) return false;
-          if (d === documents) {
-            await invoke("ios_clear_backup_folder", { kind: "auto" });
-            status.failure = null;
-          } else {
-            await saveAutoBackupDirectory(status.path);
-            d = status.path;
-          }
+          await saveAutoBackupDirectory(status.path);
+          d = status.path;
         }
         setBackupFolderFailure(status.failure);
       }
@@ -344,7 +351,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     folderChoiceVersion.current += 1;
     try {
       const path = await documentsBackupLocation();
-      await saveAutoBackupDirectory(path);
+      await saveAutoBackupDirectory(iosDocumentsBackupMarker);
       await invoke("ios_clear_backup_folder", { kind: "auto" });
       setAutoBackupDirectory(path);
       setBackupFolderFailure(null);
@@ -365,7 +372,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       },
       undo: async () => {
         if (isIOS()) await invoke("ios_undo_clear_backup_folder");
-        await saveAutoBackupDirectory(path);
+        await saveAutoBackupDirectory(isIOS() && isIOSDocumentsBackupChoice(path, await documentsBackupLocation()) ? iosDocumentsBackupMarker : path);
       },
       successMessage: t("data.clearFolderRemoved"),
       undoLabel: t("common.undo"),
@@ -458,6 +465,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         {folderReview && <InsetGroup title={t("data.folder.review")}>
           <div className="ios-d3-folder-review-info">
             {folderReview.folder.normalized && <p>{t("data.folder.normalized").replace("{folder}", folderReview.folder.directory.split("/").filter(Boolean).at(-1) ?? "/")}</p>}
+            {folderReview.folder.normalized && <p>{t("data.folder.normalizedAutoHint")}</p>}
             <p className="font-medium">{folderReview.folder.directory.split("/").filter(Boolean).at(-1) ?? "/"}</p>
           </div>
           {folderReview.clients.map(({ client, exportAt, months }) => <div key={client} className="ios-d3-folder-client">
@@ -579,7 +587,8 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
           </dl>}
 
           {isIOS() && backupFolderFailure && <p role="alert" className="text-sm text-destructive">{backupFailureMessage(backupFolderFailure)}</p>}
-          {isIOS() && autoBackupDirectory && !backupFolderFailure && <p role="status" className="text-sm text-muted-foreground">{t("data.folder.ready")}</p>}
+          {isIOS() && backgroundPreparing && <p role="status" className="text-sm text-muted-foreground">{t("data.folder.downloading")}</p>}
+          {isIOS() && autoBackupDirectory && !backupFolderFailure && !backgroundPreparing && <p role="status" className="text-sm text-muted-foreground">{t("data.folder.ready")}</p>}
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div
               className={cn(

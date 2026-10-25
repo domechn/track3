@@ -1251,6 +1251,7 @@
   "data.folder.review": "Backup folder",
   "data.folder.useForAuto": "Use this folder for auto backup",
   "data.folder.normalized": "Using the parent folder {folder} because it contains track3-backup.",
+  "data.folder.normalizedAutoHint": "To use it for auto backup, choose the parent folder directly under Auto backup folder.",
   "data.folder.months": "{count} months",
   "data.folder.lastBackup": "Last backup: {time}",
   "data.folder.importClient": "Import {client}",

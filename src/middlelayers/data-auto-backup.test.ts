@@ -7,6 +7,7 @@ import {
   saveLastAutoBackupAt,
   saveLastAutoImportAt,
 } from "./configuration";
+import { iosDocumentsBackupMarker } from "./ios-backup-folder";
 
 const mocks = vi.hoisted(() => ({
   getAutoBackupDirectory: vi.fn(),
@@ -120,6 +121,35 @@ describe("automatic backup integration", () => {
     expect(mocks.importBackupV2).toHaveBeenCalledWith("/app/Documents", "self", expect.any(Function), expect.any(Function), expect.any(Function));
   });
 
+  it("resolves the Documents marker after the app container moves", async () => {
+    mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue(iosDocumentsBackupMarker);
+    mocks.documentDir.mockResolvedValue("/new-container/Documents");
+    await autoImportHistoricalData();
+    expect(mocks.importBackupV2).toHaveBeenCalledWith("/new-container/Documents", "self", expect.any(Function), expect.any(Function), expect.any(Function));
+  });
+
+  it("migrates a saved Documents path from an old iOS container", async () => {
+    mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue("/var/mobile/Containers/Data/Application/12345678-1234-1234-1234-123456789abc/Documents");
+    mocks.documentDir.mockResolvedValue("/var/mobile/Containers/Data/Application/abcdefab-1234-1234-1234-123456789abc/Documents");
+    await autoImportHistoricalData();
+    expect(mocks.saveAutoBackupDirectory).toHaveBeenCalledWith(iosDocumentsBackupMarker);
+    expect(mocks.importBackupV2).toHaveBeenCalledWith("/var/mobile/Containers/Data/Application/abcdefab-1234-1234-1234-123456789abc/Documents", "self", expect.any(Function), expect.any(Function), expect.any(Function));
+  });
+
+  it("keeps a bookmarked Files folder even if its name resembles an old Documents path", async () => {
+    const selected = "/var/mobile/Containers/Data/Application/12345678-1234-1234-1234-123456789abc/Documents";
+    mocks.ios.value = true;
+    mocks.getAutoBackupDirectory.mockResolvedValue(selected);
+    mocks.documentDir.mockResolvedValue("/var/mobile/Containers/Data/Application/abcdefab-1234-1234-1234-123456789abc/Documents");
+    mocks.invoke.mockImplementation(async (command: string) =>
+      command === "ios_backup_folder_status" ? { path: selected, failure: null } : null);
+    await autoImportHistoricalData();
+    expect(mocks.importBackupV2).toHaveBeenCalledWith(selected, "self", expect.any(Function), expect.any(Function), expect.any(Function));
+    expect(mocks.saveAutoBackupDirectory).not.toHaveBeenCalledWith(iosDocumentsBackupMarker);
+  });
+
   it("keeps an explicit Documents choice when an old bookmark remains", async () => {
     mocks.ios.value = true;
     mocks.getAutoBackupDirectory.mockResolvedValue("/app/Documents");
@@ -127,8 +157,30 @@ describe("automatic backup integration", () => {
       command === "ios_backup_folder_status" ? { path: "/cloud/old", failure: null } : null);
     await autoBackupHistoricalData(true);
     expect(mocks.invoke).toHaveBeenCalledWith("ios_clear_backup_folder", { kind: "auto" });
-    expect(mocks.saveAutoBackupDirectory).not.toHaveBeenCalled();
+    expect(mocks.saveAutoBackupDirectory).toHaveBeenCalledWith(iosDocumentsBackupMarker);
     expect(mocks.writeBackupV2).toHaveBeenCalledWith("/app/Documents", "self", "0.8.2", [oldRecord]);
+  });
+
+  it("announces iCloud preparation while the native download is pending", async () => {
+    mocks.ios.value = true;
+    let finish!: () => void;
+    mocks.invoke.mockImplementation(async (command: string) => {
+      if (command === "ios_backup_folder_status") return { path: null, failure: null };
+      if (command === "ios_prepare_backup_folder") await new Promise<void>((resolve) => { finish = resolve; });
+      return null;
+    });
+    const events: boolean[] = [];
+    const listener = (event: Event) => events.push((event as CustomEvent<boolean>).detail);
+    window.addEventListener("track3:backup-folder-preparation", listener);
+    try {
+      const backup = autoBackupHistoricalData(true);
+      await vi.waitFor(() => expect(events).toEqual([true]));
+      finish();
+      await backup;
+      expect(events).toEqual([true, false]);
+    } finally {
+      window.removeEventListener("track3:backup-folder-preparation", listener);
+    }
   });
 
   it("keeps the 24-hour trigger and writes v2 data for its own client", async () => {
