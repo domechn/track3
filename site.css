@@ -205,7 +205,7 @@ section.tint {
   right: -16px;
   bottom: -56px;
   width: 23%;
-  border-radius: 30px;
+  border-radius: 26px;
   padding: 7px;
   overflow: hidden;
   box-shadow: 0 24px 50px -20px rgba(20, 10, 80, 0.5);
@@ -329,21 +329,14 @@ section.tint {
   align-items: end;
 }
 .dev {
-  border-radius: 38px;
-  padding: 11px;
+  border-radius: 30px;
+  padding: 8px;
   overflow: hidden;
   background: #15122a;
 }
-.dev img,
-.phone img {
-  border-radius: 27px;
-}
-.dev.ipad img {
-  border-radius: 12px;
-}
 .dev.ipad {
-  border-radius: 26px;
-  padding: 14px;
+  border-radius: 22px;
+  padding: 10px;
 }
 .devices {
   align-items: center;
