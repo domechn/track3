@@ -21,7 +21,7 @@ vi.mock("./configuration", () => ({
 const clientId = "client-123";
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   vi.mocked(getClientID).mockResolvedValue(clientId);
 
   const clearLicenseCache = (licenseModule as Record<string, unknown>)
@@ -32,6 +32,51 @@ beforeEach(() => {
 });
 
 describe("LicenseCenter subscription APIs", () => {
+  it("refreshes the usage lookup after one minute", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-10-26T00:00:00Z"));
+      vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+      vi.mocked(sendHttpRequest).mockResolvedValue({
+        enforced: true,
+        usage: {
+          erc20: { limit: 300, used: 298, remaining: 2, periodStart: "2026-10-03", periodEnd: "2026-11-03" },
+          tron: { limit: 300, used: 297, remaining: 3, periodStart: "2026-10-03", periodEnd: "2026-11-03" },
+        },
+      });
+      await LicenseCenter.getInstance().getUsage();
+      vi.setSystemTime(new Date("2026-10-26T00:00:59Z"));
+      await LicenseCenter.getInstance().getUsage();
+      expect(sendHttpRequest).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(new Date("2026-10-26T00:01:01Z"));
+      await LicenseCenter.getInstance().getUsage();
+      expect(sendHttpRequest).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("loads usage once within its cache window and tolerates a failed lookup", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+    const usage = {
+      enforced: true,
+      usage: {
+        erc20: { limit: 300, used: 4, remaining: 296, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+        tron: { limit: 300, used: 1, remaining: 299, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+      },
+    };
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce(usage);
+    expect(await LicenseCenter.getInstance().getUsage()).toEqual(usage);
+    expect(await LicenseCenter.getInstance().getUsage()).toEqual(usage);
+    expect(sendHttpRequest).toHaveBeenCalledTimes(1);
+    expect(sendHttpRequest).toHaveBeenCalledWith("POST", `${PRO_API_ENDPOINT}/api/license`, 10000,
+      { "x-track3-client-id": clientId, "x-track3-api-key": "stored-license" }, { action: "usage" });
+    licenseModule.clearLicenseCache();
+    vi.mocked(sendHttpRequest).mockRejectedValueOnce(new Error("offline"));
+    expect(await LicenseCenter.getInstance().getUsage()).toBeUndefined();
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce(usage);
+    expect(await LicenseCenter.getInstance().getUsage()).toEqual(usage);
+  });
   it("reuses the cached pro status for the same stored license", async () => {
     vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
     vi.mocked(sendHttpRequest).mockResolvedValue({ isPro: true });

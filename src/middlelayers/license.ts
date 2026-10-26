@@ -5,12 +5,26 @@ import { UserLicenseInfo } from "@/middlelayers/types";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "./consts";
 
-type SubscriptionInfo = {
+export type ResourceUsage = {
+  limit: number;
+  used: number;
+  remaining: number;
+  periodStart: string;
+  periodEnd: string;
+};
+
+export type ProUsage = {
+  enforced: boolean;
+  usage: { erc20: ResourceUsage; tron: ResourceUsage };
+};
+
+export type SubscriptionInfo = {
   planType: "monthly" | "yearly" | null;
   status: "active" | "past_due" | "canceled" | "incomplete" | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   isLegacy: boolean;
+  usage?: ProUsage["usage"];
 };
 
 export type SubscriptionPlan = {
@@ -29,6 +43,7 @@ const LICENSE_CACHE_KEY_PREFIXES = {
   proStatus: "pro-status",
   subscriptionInfo: "subscription-info",
   subscriptionPlans: "subscription-plans",
+  usage: "usage",
 };
 
 const licenseCache = getMemoryCacheInstance(
@@ -43,8 +58,8 @@ function getCachedLicenseValue<T>(key: string): T | undefined {
   return licenseCache.getCache<T>(key);
 }
 
-function setCachedLicenseValue<T>(key: string, value: T): T {
-  licenseCache.setCache(key, value, LICENSE_CACHE_TTL_SECONDS);
+function setCachedLicenseValue<T>(key: string, value: T, ttl = LICENSE_CACHE_TTL_SECONDS): T {
+  licenseCache.setCache(key, value, ttl);
   return value;
 }
 
@@ -233,6 +248,25 @@ export class LicenseCenter {
     );
 
     return setCachedLicenseValue(cacheKey, resp);
+  }
+
+  public async getUsage(): Promise<ProUsage | undefined> {
+    try {
+      const license = await getLicenseIfIsPro();
+      if (!license) return;
+      const cacheKey = makeLicenseCacheKey(LICENSE_CACHE_KEY_PREFIXES.usage, license);
+      const cached = getCachedLicenseValue<ProUsage>(cacheKey);
+      if (cached) return cached;
+      const resp = await sendHttpRequest<ProUsage>(
+        "POST", this.subscriptionInfoEndpoint, 10000,
+        { "x-track3-client-id": await getClientID(), "x-track3-api-key": license },
+        { action: "usage" },
+      );
+      if (!resp?.usage?.erc20 || !resp.usage.tron) return;
+      return setCachedLicenseValue(cacheKey, resp, 60);
+    } catch {
+      return;
+    }
   }
 
   public async getSubscriptionPlans(): Promise<SubscriptionPlansResponse> {

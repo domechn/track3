@@ -4,6 +4,7 @@ const safeMessages: Record<SourceErrorCategory, string> = {
   auth: "Authentication or invalid key",
   network: "Network or timeout",
   rateLimit: "Rate limit",
+  quota: "Monthly refresh limit reached",
   unsupported: "Unsupported source",
   other: "Source provider failed",
 };
@@ -22,6 +23,7 @@ export function classifySourceError(error: unknown): SourceErrorCategory {
   if (error instanceof SanitizedSourceError) return error.category;
   const status = (error as { status?: number })?.status;
   const message = error instanceof Error ? error.message : String(error);
+  if (status === 429 && message.includes("USAGE_LIMIT_EXCEEDED")) return "quota";
   if (status === 429) return "rateLimit";
   if (status === 401 || status === 403) return "auth";
   if (status === 408 || (status && status >= 500)) return "network";
@@ -55,6 +57,7 @@ export function safePartialEndpoint(label: string): string | undefined {
   return Object.keys(partialEndpointKeys).find((name) => name.toLowerCase() === label.toLowerCase());
 }
 const priority: Record<SourceErrorCategory, number> = {
+  quota: 5,
   rateLimit: 4,
   auth: 3,
   network: 2,

@@ -46,6 +46,7 @@ import {
 } from "@/middlelayers/constants";
 import { useTranslation } from "@/mobile/i18n";
 import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
+import { classifySourceError } from "@/middlelayers/datafetch/utils/source-failure";
 import { isIOS } from "@/utils/platform";
 import { useSearchParams } from "react-router-dom";
 
@@ -624,7 +625,8 @@ const App = ({
       buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
-        description: t("config.failedFetchBalances") + safeError(e),
+        description: classifySourceError(e) === "quota"
+          ? t("refresh.reason.quota") : t("config.failedFetchBalances") + safeError(e),
         variant: "destructive",
       });
       setQuickLookOpen(false);

@@ -14,6 +14,7 @@ import { deliverAlerts } from "@/middlelayers/alert-notifications";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 import axe from "axe-core";
 import { isIOS } from "@/utils/platform";
+import { isProVersion } from "@/middlelayers/license";
 vi.mock("@/utils/platform", async (original) => ({
   ...await original<typeof import("@/utils/platform")>(), isIOS: vi.fn(() => false),
 }));
@@ -23,6 +24,7 @@ const mockSetButtonLoading = vi.hoisted(() => vi.fn());
 const mockSetProgress = vi.hoisted(() => vi.fn());
 const mockToast = vi.hoisted(() => vi.fn());
 const mockRefreshAction = vi.hoisted(() => ({ current: null as null | (() => Promise<void>) }));
+const mockGetUsage = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mobile/components/index", async () => {
   const { createContext } = await import("react");
@@ -46,7 +48,10 @@ vi.mock("@/middlelayers/configuration", () => ({
   updateAllCurrencyRates: vi.fn(),
 }));
 vi.mock("@/middlelayers/data", () => ({ listPortfolioSources: vi.fn() }));
-vi.mock("@/middlelayers/license", () => ({ isProVersion: vi.fn().mockResolvedValue({ isPro: false }) }));
+vi.mock("@/middlelayers/license", () => ({
+  isProVersion: vi.fn(),
+  LicenseCenter: { getInstance: () => ({ getUsage: mockGetUsage }) },
+}));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
   getMemoryCacheInstance: vi.fn(),
@@ -76,6 +81,7 @@ beforeEach(() => {
   localStorage.clear();
   vi.mocked(updateAllCurrencyRates).mockResolvedValue(undefined as never);
   vi.mocked(getConfiguration).mockResolvedValue(undefined);
+  vi.mocked(isProVersion).mockResolvedValue({ isPro: false });
   vi.mocked(listPortfolioSources).mockReturnValue([]);
   vi.mocked(refreshAllData).mockResolvedValue({
     failedSources: [],
@@ -91,6 +97,22 @@ beforeEach(() => {
 });
 
 describe("RefreshData — currency rates refresh ordering", () => {
+  it("asks before consuming more Pro TRON refreshes than remain", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
+    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "trc20:0", label: "TRON wallet" }]);
+    mockGetUsage.mockResolvedValue({
+      enforced: true,
+      usage: {
+        erc20: { limit: 300, used: 0, remaining: 300, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+        tron: { limit: 300, used: 300, remaining: 0, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+      },
+    });
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alertdialog", { name: "Refresh limit" })).toHaveTextContent("1 TRON");
+    expect(refreshAllData).not.toHaveBeenCalled();
+  });
   it("exposes a refresh promise for pull to refresh until the refresh completes", async () => {
     let finish: (() => void) | undefined;
     vi.mocked(refreshAllData).mockImplementation(() => new Promise((resolve) => {

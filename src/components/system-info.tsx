@@ -15,21 +15,15 @@ import {
   LicenseCenter,
   type SubscriptionPlan,
   type SubscriptionPlansResponse,
+  type SubscriptionInfo,
 } from "@/middlelayers/license";
+import { ProUsageRows } from "./pro-usage-rows";
 import { useToast } from "@/components/ui/use-toast";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { getVersion, trackEventWithClientID } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
-
-type SubscriptionInfo = {
-  planType: "monthly" | "yearly" | null;
-  status: "active" | "past_due" | "canceled" | "incomplete" | null;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  isLegacy: boolean;
-};
 
 const App = ({
   onProStatusChange,
@@ -340,6 +334,7 @@ const App = ({
             <p className="text-xs text-muted-foreground">
               {t("system.appVersionNote")}
             </p>
+            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} t={t} />}
           </CardContent>
         </Card>
         <Card>

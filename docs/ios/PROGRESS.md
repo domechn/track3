@@ -599,3 +599,7 @@ the committed-project check; the later S4 run `39969080654` passed it.
   sheet.
 - Previously, `cargo test --locked -p track3-pure-tests --lib` passed: 60
   tests. It was not rerun for this review pass.
+
+## Pro usage metering
+
+The shared iOS UI shows monthly ERC20 and TRON refresh usage in Pro settings, warns before a refresh would exceed remaining uses, and labels exhausted sources in refresh status. Browser bridge tests cover the usage rows and quota response; live quota accounting requires the separate Pro API.

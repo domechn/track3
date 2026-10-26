@@ -107,6 +107,24 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("shows metered Pro usage on the iOS Pro settings screen", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    mocks.getSubscriptionInfo.mockResolvedValue({
+      planType: "monthly", status: "active", currentPeriodEnd: "2026-11-03T00:00:00.000Z",
+      cancelAtPeriodEnd: false, isLegacy: false,
+      usage: {
+        erc20: { limit: 300, used: 12, remaining: 288, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
+        tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
+      },
+    });
+    window.location.hash = "#/settings?section=pro";
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    expect(await screen.findByText("ERC20 wallet refreshes")).toBeInTheDocument();
+    expect(screen.getByText("TRON wallet refreshes")).toBeInTheDocument();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+    expect(screen.getAllByText(/Resets/)).toHaveLength(2);
+  });
   it("keeps license entry but hides external subscription links on iPhone", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     window.location.hash = "#/settings/systemInfo?section=pro";

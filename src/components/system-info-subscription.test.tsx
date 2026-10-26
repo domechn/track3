@@ -101,6 +101,44 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("shows both metered uses and reset dates for an active Pro license", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    mocks.getSubscriptionInfo.mockResolvedValue({
+      planType: "monthly", status: "active", currentPeriodEnd: "2026-11-03T00:00:00.000Z",
+      cancelAtPeriodEnd: false, isLegacy: false,
+      usage: {
+        erc20: { limit: 300, used: 12, remaining: 288, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
+        tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
+      },
+    });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    expect(await screen.findByText("ERC20 wallet refreshes")).toBeInTheDocument();
+    expect(screen.getByText("TRON wallet refreshes")).toBeInTheDocument();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+    expect(screen.getByText("12 / 300")).toBeInTheDocument();
+    expect(screen.getAllByText(/Resets/)).toHaveLength(2);
+  });
+
+  it("shows the backend UTC reset day in time zones behind UTC", async () => {
+    const originalTimeZone = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    try {
+      mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+      mocks.getSubscriptionInfo.mockResolvedValue({
+        planType: "monthly", status: "active", currentPeriodEnd: "2026-11-03T00:00:00.000Z",
+        cancelAtPeriodEnd: false, isLegacy: false,
+        usage: {
+          erc20: { limit: 300, used: 12, remaining: 288, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
+          tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
+        },
+      });
+      render(<SystemInfo onProStatusChange={vi.fn()} />);
+      expect(await screen.findAllByText(/Resets/)).toHaveLength(2);
+      expect(screen.getAllByText(/Nov 3, 2026/)).toHaveLength(2);
+    } finally {
+      process.env.TZ = originalTimeZone;
+    }
+  });
   it("keeps subscription controls available when plan data is malformed", async () => {
     mocks.getSubscriptionPlans.mockResolvedValueOnce({});
     render(<SystemInfo onProStatusChange={vi.fn()} />);

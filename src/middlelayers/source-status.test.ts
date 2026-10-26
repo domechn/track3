@@ -1,6 +1,12 @@
 import { expect, it } from "vitest";
 import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "./source-status";
 
+it("keeps the quota reason in refresh status", () => {
+  expect(normalizeSourceStatuses([{
+    sourceId: "erc20:0", label: "Wallet", status: "failed", category: "quota",
+  }])[0].category).toBe("quota");
+});
+
 it("loads old saved statuses with their original label", () => {
   expect(normalizeSourceStatuses([{ sourceId: "btc:0", label: "Main", status: "failed" }]))
     .toEqual([{ sourceId: "btc:0", label: "Main", status: "failed" }]);

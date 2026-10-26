@@ -4,7 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RefreshData from "@/components/refresh-data";
 import { refreshAllData } from "@/middlelayers/charts";
-import { updateAllCurrencyRates } from "@/middlelayers/configuration";
+import { getConfiguration, updateAllCurrencyRates } from "@/middlelayers/configuration";
+import { listPortfolioSources } from "@/middlelayers/data";
+import { isProVersion } from "@/middlelayers/license";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
 import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
@@ -17,6 +19,7 @@ import axe from "axe-core";
 const mockSetButtonLoading = vi.hoisted(() => vi.fn());
 const mockSetProgress = vi.hoisted(() => vi.fn());
 const mockToast = vi.hoisted(() => vi.fn());
+const mockGetUsage = vi.hoisted(() => vi.fn());
 
 vi.mock("@/components/index/index", async () => {
   const { createContext } = await import("react");
@@ -35,7 +38,13 @@ vi.mock("@/middlelayers/charts", () => ({
 }));
 
 vi.mock("@/middlelayers/configuration", () => ({
+  getConfiguration: vi.fn(),
   updateAllCurrencyRates: vi.fn(),
+}));
+vi.mock("@/middlelayers/data", () => ({ listPortfolioSources: vi.fn() }));
+vi.mock("@/middlelayers/license", () => ({
+  isProVersion: vi.fn(),
+  LicenseCenter: { getInstance: () => ({ getUsage: mockGetUsage }) },
 }));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
@@ -63,6 +72,9 @@ beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
   vi.mocked(updateAllCurrencyRates).mockResolvedValue(undefined as never);
+  vi.mocked(getConfiguration).mockResolvedValue(undefined);
+  vi.mocked(isProVersion).mockResolvedValue({ isPro: false });
+  vi.mocked(listPortfolioSources).mockReturnValue([]);
   vi.mocked(refreshAllData).mockResolvedValue({
     failedSources: [],
     requiresDataSourceAction: false,
@@ -77,6 +89,37 @@ beforeEach(() => {
 });
 
 describe("RefreshData — currency rates refresh ordering", () => {
+  it("asks before consuming more Pro ERC20 refreshes than remain", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
+    vi.mocked(listPortfolioSources).mockReturnValue([
+      { sourceId: "erc20:0", label: "Wallet 1" },
+      { sourceId: "erc20:1", label: "Wallet 2" },
+    ]);
+    mockGetUsage.mockResolvedValue({
+      enforced: true,
+      usage: {
+        erc20: { limit: 300, used: 299, remaining: 1, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+        tron: { limit: 300, used: 0, remaining: 300, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+      },
+    });
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alertdialog", { name: "Refresh limit" })).toHaveTextContent("2 ERC20");
+    expect(refreshAllData).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Continue refresh" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+  });
+
+  it("starts a Pro refresh without a usage request when no metered wallet is configured", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
+    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "btc:0", label: "Bitcoin" }]);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+    expect(mockGetUsage).not.toHaveBeenCalled();
+  });
   it("announces an active refresh to assistive technology", () => {
     render(<RefreshData loading={true} />);
     expect(screen.getByRole("status")).toHaveTextContent("Refreshing portfolio");

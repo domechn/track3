@@ -26,6 +26,8 @@ type BridgeOptions = {
   backupFolderFixture?: boolean;
   backupFolderPick?: string;
   backupFolderFailure?: string;
+  proUsageFixture?: boolean;
+  quotaExhaustedFixture?: boolean;
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
@@ -48,6 +50,8 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     backupFolderFixture = false,
     backupFolderPick,
     backupFolderFailure,
+    proUsageFixture = false,
+    quotaExhaustedFixture = false,
   } = options;
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
@@ -74,6 +78,11 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   db.run("INSERT INTO configuration (id, data) VALUES (11, ?)", [
     "btc: {addresses: []}\nerc20: {addresses: []}\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
   ]);
+  if (quotaExhaustedFixture) {
+    db.run("UPDATE configuration SET data = ? WHERE id = 11", [
+      "btc: {addresses: []}\nerc20: {addresses: ['0x1111111111111111111111111111111111111111']}\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
+    ]);
+  }
   if (backupFolderFailure) {
     db.run("INSERT INTO configuration (id, data) VALUES (3, '/e2e/cloud/old')");
   }
@@ -466,13 +475,25 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       }
       let contentType = "application/json";
       let body = "{}";
+      let status = 200;
+      const usage = {
+        erc20: { limit: 300, used: 12, remaining: 288, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
+        tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
+      };
       if (request.url.endsWith("/api/license/isPro")) {
         body = '{"isPro":true}';
       } else if (request.url.endsWith("/api/license")) {
         const action = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? []))).action;
         body = action === "subscription-plans"
           ? '{"plans":[{"planType":"monthly","currency":"usd","unitAmountCents":1299,"interval":"month"},{"planType":"yearly","currency":"usd","unitAmountCents":9999,"interval":"year"}]}'
-          : '{"planType":"yearly","status":"active","currentPeriodEnd":"2026-12-01T00:00:00.000Z","cancelAtPeriodEnd":false,"isLegacy":false}';
+          : action === "usage"
+            ? JSON.stringify({ enforced: true, usage })
+            : JSON.stringify({ planType: "yearly", status: "active", currentPeriodEnd: "2026-12-01T00:00:00.000Z",
+              cancelAtPeriodEnd: false, isLegacy: false, ...(proUsageFixture ? { usage } : {}) });
+      } else if (quotaExhaustedFixture && request.url.endsWith("/api/erc20/assetsBalances")) {
+        status = 429;
+        body = JSON.stringify({ error: "Monthly ERC20 wallet refresh limit reached", code: "USAGE_LIMIT_EXCEEDED",
+          resource: "erc20", usage: { ...usage.erc20, used: 300, remaining: 0 } });
       } else if (request.url.endsWith("/api/coins/price")) {
         body = '{"data":{"BTC":42000,"USDT":1}}';
       } else if (request.url.endsWith("/api/coins/listStableCoins")) {
@@ -549,8 +570,8 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       }
       responses.set(rid, response);
       return {
-        status: 200, statusText: "OK", url: request.url,
-        headers: { "content-type": contentType }, rid,
+        status, statusText: status === 200 ? "OK" : "Error", url: request.url,
+        headers: { "content-type": contentType, ...(status === 429 ? { "Retry-After": "3600" } : {}) }, rid,
       };
     }
     if (cmd === "plugin:http|fetch_read_body") {
