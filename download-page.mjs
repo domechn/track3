@@ -6,6 +6,9 @@ const EMPTY_DOWNLOADS = Object.freeze({
 });
 
 const PLATFORM_LABELS = {
+  ios: {
+    unknown: "iPhone or iPad",
+  },
   macos: {
     arm64: "macOS (Apple Silicon)",
     x64: "macOS (Intel)",
@@ -101,6 +104,12 @@ function detectOs(navigatorLike) {
   ).toLowerCase();
   const userAgent = String(navigatorLike?.userAgent ?? "").toLowerCase();
 
+  if (
+    /iphone|ipad|ipod/.test(platformHint + " " + userAgent) ||
+    (platformHint.includes("mac") && navigatorLike?.maxTouchPoints > 1)
+  ) {
+    return "ios";
+  }
   if (platformHint.includes("mac") || /mac os x|macintosh/.test(userAgent)) {
     return "macos";
   }
@@ -143,6 +152,9 @@ function detectArch(navigatorLike) {
 
 export function detectPlatform(navigatorLike = globalThis.navigator ?? {}) {
   const os = detectOs(navigatorLike);
+  if (os === "ios") {
+    return { os, arch: "unknown", confidence: "high", label: PLATFORM_LABELS.ios.unknown };
+  }
   const archResult = detectArch(navigatorLike);
 
   return {
