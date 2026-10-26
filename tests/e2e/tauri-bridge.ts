@@ -29,6 +29,7 @@ type BridgeOptions = {
   proUsageFixture?: boolean;
   quotaExhaustedFixture?: boolean;
   preflightExhaustedFixture?: boolean;
+  checkoutFixture?: boolean;
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
@@ -54,6 +55,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     proUsageFixture = false,
     quotaExhaustedFixture = false,
     preflightExhaustedFixture = false,
+    checkoutFixture = false,
   } = options;
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
@@ -75,6 +77,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       (994, '!ent:e2e:ai'),
       (998, 'e2e-client');
   `);
+  if (checkoutFixture) db.run("DELETE FROM configuration WHERE id = 997");
   db.run("INSERT INTO configuration (id, data) VALUES (12, ?)",
     ["configs:\n  groupUSD: false\nothers:\n  - symbol: BTC\n    amount: 2\n"]);
   db.run("INSERT INTO configuration (id, data) VALUES (11, ?)", [
@@ -241,6 +244,9 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   let sseCalls = 0;
   let haptics = 0;
   let shares = 0;
+  let checkoutStatus: "pending" | "completed" | "expired" = "pending";
+  let checkoutSessions = 0;
+  const openedUrls: string[] = [];
 
   const select = (query: string, values: unknown[] = []) => {
     localQueries++;
@@ -288,6 +294,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       return select(args.query, args.values);
     }
     if (cmd === "plugin:sql|execute") return execute(args.query, args.values);
+    if (cmd === "plugin:opener|open_url") { openedUrls.push(args.url); return null; }
     if (cmd === "delete_sync_snapshot") {
       // Mirrors the Rust command: remove the snapshot's rows from every snapshot-scoped table.
       for (const table of ["asset_prices", "transactions", "assets_v2", "history_snapshots"]) {
@@ -482,7 +489,26 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
         erc20: { limit: 300, used: preflightExhaustedFixture ? 300 : 12, remaining: preflightExhaustedFixture ? 0 : 288, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
         tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
       };
-      if (request.url.endsWith("/api/license/isPro")) {
+      const requestPath = new URL(request.url).pathname;
+      if (checkoutFixture && requestPath === "/api/stripe") {
+        const url = new URL(request.url);
+        if (url.searchParams.get("action") === "checkout-status") {
+          body = JSON.stringify(checkoutStatus === "completed"
+            ? { status: "completed", license: "e2e-stripe-license", planType: "yearly", periodEnd: "2026-12-01T00:00:00.000Z" }
+            : { status: checkoutStatus });
+        } else {
+          const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
+          if (input.action !== "create-checkout-session" || !["monthly", "yearly"].includes(input.planType)) {
+            throw new Error("unexpected Stripe checkout request");
+          }
+          checkoutSessions++;
+          body = JSON.stringify({ sessionId: "cs_e2e_123", url: "https://checkout.stripe.test/session" });
+        }
+      } else if (checkoutFixture && requestPath === "/api/license/validate") {
+        body = '{"isValid":true}';
+      } else if (checkoutFixture && requestPath === "/api/license/active") {
+        body = '{"success":true}';
+      } else if (request.url.endsWith("/api/license/isPro")) {
         body = '{"isPro":true}';
       } else if (request.url.endsWith("/api/license")) {
         const action = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? []))).action;
@@ -630,5 +656,6 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
     };
   }, richPortfolio);
-  return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares };
+  return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares,
+    openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; } };
 }

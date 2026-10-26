@@ -32,6 +32,65 @@ beforeEach(() => {
 });
 
 describe("LicenseCenter subscription APIs", () => {
+  it("accepts an already bound checkout device and saves its license", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue(undefined);
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.endsWith("/validate")) return { isValid: true };
+      if (url.endsWith("/active")) return { success: false, error: "Already active" };
+      if (url.endsWith("/isPro")) return { isPro: true };
+      return {};
+    });
+    const save = vi.fn();
+    await licenseModule.activateLicenseOnDevice("stripe-license", save, {
+      invalid: "Invalid key", failed: "Activation failed",
+    });
+    expect(save).toHaveBeenCalledExactlyOnceWith("stripe-license");
+  });
+
+  it("rechecks device binding after the webhook updates an earlier negative Pro lookup", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue(undefined);
+    let bound = false;
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.endsWith("/validate")) return { isValid: true };
+      if (url.endsWith("/active")) { bound = true; return { success: false, error: "Already active" }; }
+      if (url.endsWith("/isPro")) return { isPro: bound };
+      return {};
+    });
+    await LicenseCenter.getInstance().isProUser("stripe-license");
+    const save = vi.fn();
+    await licenseModule.activateLicenseOnDevice("stripe-license", save, {
+      invalid: "Invalid key", failed: "Activation failed",
+    });
+    expect(save).toHaveBeenCalledExactlyOnceWith("stripe-license");
+  });
+
+  it("preserves a device limit error when restore cannot bind this device", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue(undefined);
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.endsWith("/validate")) return { isValid: true };
+      if (url.endsWith("/active")) return { success: false, error: "Three device limit reached" };
+      if (url.endsWith("/isPro")) return { isPro: false };
+      return {};
+    });
+    const save = vi.fn();
+    await expect(licenseModule.activateLicenseOnDevice("stripe-license", save, {
+      invalid: "Invalid key", failed: "Activation failed",
+    })).rejects.toThrow("Three device limit reached");
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("does not treat a locally stored but unbound key as activated", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stripe-license");
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.endsWith("/isPro")) return { isPro: false };
+      if (url.endsWith("/validate")) return { isValid: true };
+      if (url.endsWith("/active")) return { success: false, error: "Three device limit reached" };
+      return {};
+    });
+    await expect(licenseModule.activateLicenseOnDevice("stripe-license", vi.fn(), {
+      invalid: "Invalid key", failed: "Activation failed",
+    })).rejects.toThrow("Three device limit reached");
+  });
   it("refreshes the usage lookup after one minute", async () => {
     vi.useFakeTimers();
     try {
@@ -244,6 +303,7 @@ describe("LicenseCenter subscription APIs", () => {
       "GET",
       `${PRO_API_ENDPOINT}/api/stripe?action=checkout-status&session_id=cs_test_123`,
       10000,
+      { "x-track3-client-id": clientId },
     );
   });
 

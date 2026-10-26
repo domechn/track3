@@ -57,6 +57,7 @@ Pro includes:
 - All-chain asset refresh for supported Pro networks
 
 One wallet refresh counts as one use. Limits reset monthly on the license billing date.
+On desktop, open Settings → System Info to subscribe in the system browser or restore a purchase with the license key from the Track3 success page.
 
 1. Support 85+ EVM compatible Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base, and most ERC20 tokens on these chains.
 2. Support TRON wallets and TRC20 assets.

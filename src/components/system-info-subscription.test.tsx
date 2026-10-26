@@ -9,6 +9,7 @@ const exhaustedUsage = {
 };
 
 const mocks = vi.hoisted(() => ({
+  activateLicenseOnDevice: vi.fn(),
   activeLicense: vi.fn(),
   clearLicenseCache: vi.fn(),
   cleanLicense: vi.fn(),
@@ -48,6 +49,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 }));
 
 vi.mock("@/middlelayers/license", () => ({
+  activateLicenseOnDevice: mocks.activateLicenseOnDevice,
   clearLicenseCache: mocks.clearLicenseCache,
   LicenseCenter: {
     getInstance: () => ({
@@ -66,6 +68,8 @@ vi.mock("@/middlelayers/license", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
+  mocks.trackEventWithClientID.mockResolvedValue(undefined);
   mocks.getVersion.mockResolvedValue("0.6.1");
   mocks.getLicenseIfIsPro.mockResolvedValue(undefined);
   mocks.createCheckoutSession.mockResolvedValue({
@@ -79,6 +83,14 @@ beforeEach(() => {
   mocks.validateLicense.mockResolvedValue({ isValid: true });
   mocks.activeLicense.mockResolvedValue({ success: true });
   mocks.saveLicense.mockResolvedValue(undefined);
+  mocks.activateLicenseOnDevice.mockImplementation(async (license: string, save: (key: string) => Promise<void>) => {
+    const valid = await mocks.validateLicense(license);
+    if (!valid.isValid) throw new Error("Invalid key");
+    const active = await mocks.activeLicense(license);
+    if (!active.success) throw new Error(active.error);
+    await save(license);
+    mocks.clearLicenseCache();
+  });
   mocks.getSubscriptionInfo.mockResolvedValue({
     planType: "yearly",
     status: "active",
@@ -220,7 +232,8 @@ describe("System Info subscription management", () => {
     ).toHaveClass("mt-auto");
   });
 
-  it("tracks subscribe clicks and shows that subscriptions are not supported yet", async () => {
+  it("opens checkout and shows waiting and recovery actions", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
     render(<SystemInfo onProStatusChange={vi.fn()} />);
 
     fireEvent.click(
@@ -228,19 +241,30 @@ describe("System Info subscription management", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.trackEventWithClientID).toHaveBeenCalledWith(
-        "subscription_subscribe_clicked",
-        { planType: "yearly" },
-      );
-      expect(mocks.toast).toHaveBeenCalledWith({
-        description:
-          "Subscription is not supported yet. Please wait for future updates.",
-      });
+      expect(mocks.openUrl).toHaveBeenCalledWith("https://checkout.stripe.test/session");
+      expect(screen.getByText(/waiting for payment/i)).toBeInTheDocument();
     });
-    expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
-    expect(mocks.openUrl).not.toHaveBeenCalledWith(
-      "https://checkout.stripe.test/session",
-    );
+    expect(screen.getByRole("button", { name: /i've paid.*check again/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+    expect(mocks.createCheckoutSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("activates a completed checkout and updates Pro status", async () => {
+    const onProStatusChange = vi.fn();
+    render(<SystemInfo onProStatusChange={onProStatusChange} />);
+    fireEvent.click(await screen.findByRole("button", { name: /subscribe yearly/i }));
+    await waitFor(() => expect(screen.getByText("Pro", { exact: true })).toBeInTheDocument());
+    expect(mocks.saveLicense).toHaveBeenCalledWith("license-from-stripe");
+    expect(onProStatusChange).toHaveBeenCalledWith(true);
+    expect(screen.getByText(/subscription activated/i)).toBeInTheDocument();
+  });
+
+  it("shows an expired checkout with a way to try again", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "expired" });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /subscribe monthly/i }));
+    expect(await screen.findByText(/checkout session expired/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /subscribe monthly/i })).toBeEnabled();
   });
 
   it("clears the license cache after inactivating the device", async () => {
@@ -275,7 +299,7 @@ describe("System Info subscription management", () => {
       error: "license custom-private-license was rejected",
     });
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    fireEvent.click(await screen.findByText(/Enter existing license key/i));
+    fireEvent.click(await screen.findByText(/Restore purchase/i));
     fireEvent.change(screen.getByPlaceholderText(/license key/i), {
       target: { value: "custom-private-license" },
     });
@@ -315,5 +339,13 @@ describe("System Info subscription management", () => {
         "https://billing.stripe.test/portal",
       );
     });
+  });
+
+  it("opens Manage Subscription even if analytics is unavailable", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
+    mocks.trackEventWithClientID.mockRejectedValue(new Error("offline"));
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /manage subscription/i }));
+    await waitFor(() => expect(mocks.openUrl).toHaveBeenCalledWith("https://billing.stripe.test/portal"));
   });
 });
