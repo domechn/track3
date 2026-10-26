@@ -36,7 +36,7 @@ describe("CheckoutFlow", () => {
     expect(open).toHaveBeenCalledWith(session.url);
     expect(states).toContain("waiting");
     expect(JSON.parse(localStorage.getItem(checkoutPendingKey)!)).toEqual({
-      sessionId: session.sessionId, createdAt: Date.now(),
+      sessionId: session.sessionId, url: session.url, planType: "yearly", createdAt: Date.now(), dismissed: false,
     });
     await vi.advanceTimersByTimeAsync(3000);
     expect(activate).toHaveBeenCalledExactlyOnceWith("secret-license");
@@ -63,6 +63,78 @@ describe("CheckoutFlow", () => {
     expect(localStorage.getItem(checkoutPendingKey)).not.toBeNull();
   });
 
+  it("reopens checkout after Cancel without resuming it automatically", async () => {
+    await flow.start("monthly");
+    flow.cancel();
+    await flow.resume();
+    expect(states.at(-1)).toBe("idle");
+    expect(status).toHaveBeenCalledTimes(1);
+    await flow.start("monthly");
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(states.at(-1)).toBe("waiting");
+  });
+
+  it("uses the newly selected plan after Cancel", async () => {
+    await flow.start("monthly");
+    flow.cancel();
+    await flow.start("yearly");
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenNthCalledWith(1, "monthly");
+    expect(create).toHaveBeenCalledWith("yearly");
+    expect(open).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a late created session recoverable after Cancel", async () => {
+    let finish!: (value: typeof session) => void;
+    create.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const starting = flow.start("monthly");
+    flow.cancel();
+    finish(session);
+    await starting;
+    expect(localStorage.getItem(checkoutPendingKey)).not.toBeNull();
+    expect(open).not.toHaveBeenCalled();
+    await flow.resume();
+    expect(status).not.toHaveBeenCalled();
+    await flow.start("monthly");
+    expect(open).toHaveBeenCalledWith(session.url);
+  });
+
+  it("keeps a late created session available after leaving the page", async () => {
+    let finish!: (value: typeof session) => void;
+    create.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const starting = flow.start("monthly");
+    flow.dispose();
+    finish(session);
+    await starting;
+    expect(localStorage.getItem(checkoutPendingKey)).not.toBeNull();
+    const next = new CheckoutFlow({ createCheckoutSession: create, getCheckoutStatus: status } as Pick<LicenseCenter, "createCheckoutSession" | "getCheckoutStatus">,
+      open as (url: string) => Promise<void>, activate as (license: string) => Promise<void>,
+      (state) => states.push(state), localStorage);
+    await next.resume();
+    expect(status).toHaveBeenCalledWith(session.sessionId);
+    next.dispose();
+  });
+
+  it("discards pending checkout when a license is restored manually", async () => {
+    await flow.start("monthly");
+    flow.clearPending();
+    await flow.resume();
+    expect(localStorage.getItem(checkoutPendingKey)).toBeNull();
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(states.at(-1)).toBe("idle");
+  });
+
+  it("does not recreate pending checkout when manual restore wins a creation race", async () => {
+    let finish!: (value: typeof session) => void;
+    create.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const starting = flow.start("monthly");
+    flow.clearPending();
+    finish(session);
+    await starting;
+    expect(localStorage.getItem(checkoutPendingKey)).toBeNull();
+  });
+
   it("ignores a late response from a cancelled run after checking again", async () => {
     let finishOld!: (value: { status: "completed"; license: string }) => void;
     let finishCurrent!: (value: { status: "pending" }) => void;
@@ -72,7 +144,7 @@ describe("CheckoutFlow", () => {
     const first = flow.start("monthly");
     await vi.advanceTimersByTimeAsync(0);
     flow.cancel();
-    const second = flow.resume();
+    const second = flow.start("monthly");
     await vi.advanceTimersByTimeAsync(0);
     finishOld({ status: "completed", license: "stale-license" });
     await first;
@@ -107,6 +179,16 @@ describe("CheckoutFlow", () => {
     await flow.resume();
     expect(status).not.toHaveBeenCalled();
     expect(localStorage.getItem(checkoutPendingKey)).toBeNull();
+  });
+
+  it("starts a fresh checkout if a saved browser URL is unsafe", async () => {
+    localStorage.setItem(checkoutPendingKey, JSON.stringify({
+      sessionId: "cs_old", url: "javascript:alert(1)", planType: "monthly", createdAt: Date.now(),
+    }));
+    await flow.start("monthly");
+    expect(open).toHaveBeenCalledWith(session.url);
+    expect(create).toHaveBeenCalledExactlyOnceWith("monthly");
+    expect(states.at(-1)).toBe("waiting");
   });
 
   it("backs off after network errors, then accepts a manual check", async () => {
@@ -152,5 +234,18 @@ describe("CheckoutFlow", () => {
     await flow.resume();
     expect(states.at(-1)).toBe("completed");
     expect(activate).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes a redacted device-limit error to the checkout UI", async () => {
+    status.mockResolvedValue({ status: "completed", license: "secret-license" });
+    activate.mockRejectedValue(new Error("secret-license is active on 3 devices"));
+    let shownError: string | undefined;
+    flow.dispose();
+    flow = new CheckoutFlow({ createCheckoutSession: create, getCheckoutStatus: status } as Pick<LicenseCenter, "createCheckoutSession" | "getCheckoutStatus">,
+      open as (url: string) => Promise<void>, activate as (license: string) => Promise<void>,
+      (phase, error) => { states.push(phase); shownError = error; }, localStorage);
+    await flow.start("monthly");
+    expect(states.at(-1)).toBe("error");
+    expect(shownError).toBe("<REDACTED> is active on 3 devices");
   });
 });

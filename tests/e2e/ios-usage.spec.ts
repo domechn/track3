@@ -25,6 +25,10 @@ test("iOS offers restore without a purchase action", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Restore purchase" })).toBeVisible();
   await expect(page.getByText(/Manage an existing subscription or restore a purchase/)).toBeVisible();
   await expect(page.getByRole("button", { name: /Subscribe/ })).toHaveCount(0);
+  await page.goto("/#/settings/systemInfo");
+  await expect(page.getByRole("button", { name: /Subscribe/ })).toHaveCount(0);
+  await page.goto("/#/settings/systemInfo?section=about");
+  await expect(page.getByRole("button", { name: /Subscribe/ })).toHaveCount(0);
   expect(bridge.checkoutSessions()).toBe(0);
 });
 

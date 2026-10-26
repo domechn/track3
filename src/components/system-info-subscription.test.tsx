@@ -1,7 +1,9 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SystemInfo from "@/components/system-info";
+import { checkoutPendingKey } from "@/middlelayers/checkout";
+import { I18nProvider, useTranslation } from "@/i18n";
 
 const exhaustedUsage = {
   erc20: { limit: 300, used: 300, remaining: 0, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
@@ -249,6 +251,36 @@ describe("System Info subscription management", () => {
     expect(mocks.createCheckoutSession).toHaveBeenCalledTimes(1);
   });
 
+  it("opens the browser again when subscribing after Cancel", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /subscribe monthly/i }));
+    await screen.findByText(/waiting for payment/i);
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+    expect(screen.queryByText(/waiting for payment/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /subscribe monthly/i }));
+    await waitFor(() => expect(mocks.openUrl).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(/waiting for payment/i)).toBeInTheDocument();
+    expect(mocks.trackEventWithClientID).toHaveBeenCalledWith("subscription_checkout_cancelled");
+  });
+
+  it("shows a timeout with actions and records the outcome", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    await screen.findByRole("button", { name: /subscribe monthly/i });
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: /subscribe monthly/i }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
+      expect(screen.getByText(/payment check timed out/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /i've paid.*check again/i })).toBeInTheDocument();
+      expect(mocks.trackEventWithClientID).toHaveBeenCalledWith("subscription_checkout_timed_out");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("activates a completed checkout and updates Pro status", async () => {
     const onProStatusChange = vi.fn();
     render(<SystemInfo onProStatusChange={onProStatusChange} />);
@@ -257,6 +289,8 @@ describe("System Info subscription management", () => {
     expect(mocks.saveLicense).toHaveBeenCalledWith("license-from-stripe");
     expect(onProStatusChange).toHaveBeenCalledWith(true);
     expect(screen.getByText(/subscription activated/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^close$/i }));
+    expect(screen.queryByText(/subscription activated/i)).not.toBeInTheDocument();
   });
 
   it("shows an expired checkout with a way to try again", async () => {
@@ -265,6 +299,46 @@ describe("System Info subscription management", () => {
     fireEvent.click(await screen.findByRole("button", { name: /subscribe monthly/i }));
     expect(await screen.findByText(/checkout session expired/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /subscribe monthly/i })).toBeEnabled();
+    expect(mocks.trackEventWithClientID).toHaveBeenCalledWith("subscription_checkout_expired");
+    fireEvent.click(screen.getByRole("button", { name: /^close$/i }));
+    expect(screen.queryByText(/checkout session expired/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a redacted activation error with the device limit", async () => {
+    mocks.activeLicense.mockResolvedValue({ success: false, error: "license-from-stripe is active on 3 devices" });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /subscribe monthly/i }));
+    expect(await screen.findByText(/active on 3 devices/i)).toHaveTextContent("<REDACTED> is active on 3 devices");
+    expect(screen.getByText(/active on 3 devices/i)).not.toHaveTextContent("license-from-stripe");
+    expect(mocks.trackEventWithClientID).toHaveBeenCalledWith("subscription_checkout_error");
+  });
+
+  it("clears pending checkout after restoring a license key", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /subscribe monthly/i }));
+    await screen.findByText(/waiting for payment/i);
+    fireEvent.click(screen.getByText(/restore purchase/i));
+    fireEvent.change(screen.getByPlaceholderText(/license key/i), { target: { value: "restored-license" } });
+    fireEvent.click(screen.getByRole("button", { name: /^activate$/i }));
+    await waitFor(() => expect(mocks.saveLicense).toHaveBeenCalledWith("restored-license"));
+    expect(localStorage.getItem(checkoutPendingKey)).toBeNull();
+    expect(screen.queryByText(/waiting for payment/i)).not.toBeInTheDocument();
+  });
+
+  it("uses the current language for checkout completion", async () => {
+    function LanguageSwitch() {
+      const { setLocale } = useTranslation();
+      return <button onClick={() => setLocale("zh")}>Switch language</button>;
+    }
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
+    render(<I18nProvider><LanguageSwitch /><SystemInfo onProStatusChange={vi.fn()} /></I18nProvider>);
+    fireEvent.click(await screen.findByRole("button", { name: /subscribe monthly/i }));
+    await screen.findByText(/waiting for payment/i);
+    fireEvent.click(screen.getByRole("button", { name: "Switch language" }));
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "completed", license: "license-from-stripe" });
+    fireEvent.click(screen.getByRole("button", { name: /我已付款/ }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ description: "Pro 订阅已激活！" }));
   });
 
   it("clears the license cache after inactivating the device", async () => {
