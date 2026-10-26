@@ -69,13 +69,36 @@ describe("LicenseCenter subscription APIs", () => {
     expect(await LicenseCenter.getInstance().getUsage()).toEqual(usage);
     expect(await LicenseCenter.getInstance().getUsage()).toEqual(usage);
     expect(sendHttpRequest).toHaveBeenCalledTimes(1);
-    expect(sendHttpRequest).toHaveBeenCalledWith("POST", `${PRO_API_ENDPOINT}/api/license`, 10000,
+    expect(sendHttpRequest).toHaveBeenCalledWith("POST", `${PRO_API_ENDPOINT}/api/license`, 3000,
       { "x-track3-client-id": clientId, "x-track3-api-key": "stored-license" }, { action: "usage" });
     licenseModule.clearLicenseCache();
     vi.mocked(sendHttpRequest).mockRejectedValueOnce(new Error("offline"));
     expect(await LicenseCenter.getInstance().getUsage()).toBeUndefined();
     vi.mocked(sendHttpRequest).mockResolvedValueOnce(usage);
     expect(await LicenseCenter.getInstance().getUsage()).toEqual(usage);
+  });
+  it("invalidates usage and subscription details after a refresh without discarding the Pro status", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, _url, _timeout, _headers, body) => {
+      const action = (body as { action?: string } | undefined)?.action;
+      if (action === "usage") return { enforced: true, usage: {
+        erc20: { limit: 300, used: 4, remaining: 296, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+        tron: { limit: 300, used: 1, remaining: 299, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+      } };
+      if (action === "subscription-info") return {
+        planType: "monthly", status: "active", currentPeriodEnd: "2026-11-01",
+        cancelAtPeriodEnd: false, isLegacy: false,
+      };
+      return { isPro: true };
+    });
+    await isProVersion();
+    await LicenseCenter.getInstance().getUsage();
+    await LicenseCenter.getInstance().getSubscriptionInfo();
+    await licenseModule.invalidateUsageCache();
+    await isProVersion();
+    await LicenseCenter.getInstance().getUsage();
+    await LicenseCenter.getInstance().getSubscriptionInfo();
+    expect(sendHttpRequest).toHaveBeenCalledTimes(5);
   });
   it("reuses the cached pro status for the same stored license", async () => {
     vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");

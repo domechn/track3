@@ -16,7 +16,18 @@ test("iOS Pro screen shows usage and an exhausted wallet shows quota status", as
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   const status = page.getByRole("alertdialog", { name: "Source status" });
-  await expect(status).toContainText("Monthly refresh limit reached", { timeout: 90_000 });
+  await expect(status).toContainText("Monthly refresh limit reached", { timeout: 15_000 });
+});
+
+test("iOS asks before an exhausted Pro wallet refresh", async ({ page }) => {
+  await installTauriBridge(page, { quotaExhaustedFixture: true, preflightExhaustedFixture: true });
+  await page.goto("/#/overview");
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  const preflight = page.getByRole("alertdialog", { name: "Refresh limit" });
+  await expect(preflight).toContainText("with 0 left");
+  await expect(preflight.getByRole("button", { name: "Continue refresh" })).toBeVisible();
+  await preflight.getByRole("button", { name: "Continue refresh" }).click();
+  await expect(page.getByRole("alertdialog", { name: "Source status" })).toContainText("Monthly refresh limit reached");
 });
 
 test("iOS wallet quick look explains a monthly quota failure", async ({ page }) => {

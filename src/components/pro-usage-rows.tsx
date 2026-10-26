@@ -1,8 +1,10 @@
 import type { SubscriptionInfo } from "@/middlelayers/license";
+import { Progress } from "@/components/ui/progress";
 
-export function ProUsageRows({ usage, t }: {
+export function ProUsageRows({ usage, t, locale }: {
   usage?: SubscriptionInfo["usage"];
   t: (key: string) => string;
+  locale: string;
 }) {
   if (!usage) return null;
   return <div className="mt-4 space-y-4">
@@ -15,13 +17,12 @@ export function ProUsageRows({ usage, t }: {
           <span>{t(`system.usage.${resource}`)}</span>
           <span>{row.used} / {row.limit}</span>
         </div>
-        <div role="progressbar" aria-label={t(`system.usage.${resource}`)}
-          aria-valuenow={Math.min(row.used, row.limit)} aria-valuemin={0} aria-valuemax={row.limit}
-          className="h-2 overflow-hidden rounded-full bg-muted">
-          <div className="h-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, row.limit > 0 ? row.used / row.limit * 100 : 0))}%` }} />
-        </div>
+        <Progress value={Math.min(row.used, row.limit)} max={row.limit}
+          className="bg-muted-foreground/25"
+          aria-label={t(`system.usage.${resource}`)}
+          indicatorClassName={row.used >= row.limit ? "bg-destructive" : undefined} />
         {Number.isFinite(date.getTime()) && <p className="text-xs text-muted-foreground">
-          {t("system.usage.resetsOn").replace("{date}", date.toLocaleDateString(undefined, {
+          {t("system.usage.resetsOn").replace("{date}", date.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
             year: "numeric", month: "short", day: "numeric", timeZone: "UTC",
           }))}
         </p>}

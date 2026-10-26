@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import {
   refreshAllData,
   type RefreshAllDataResult,
@@ -34,7 +34,7 @@ import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-s
 import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "@/middlelayers/source-status";
 import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failure";
 import { listPortfolioSources } from "@/middlelayers/data";
-import { isProVersion, LicenseCenter } from "@/middlelayers/license";
+import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
 
 const retries = 3;
@@ -66,6 +66,9 @@ const App = ({
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult>();
   const [preflight, setPreflight] = useState<{ sourceId?: string; warnings: UsageWarning[] } | null>(null);
+  const [preflightPending, setPreflightPending] = useState(false);
+  const preflightPendingRef = useRef(false);
+  const refreshInProgress = useRef(false);
 
   const {
     setButtonLoading: setRefreshLoading,
@@ -95,7 +98,9 @@ const App = ({
   }
 
   const runRefresh = async (sourceId?: string) => {
+    if (refreshInProgress.current) return;
     if (sourceId && !lastResult?.sourceResults) return;
+    refreshInProgress.current = true;
     cancelInsightRefresh();
     setRefreshLoading(true);
     const operation: RefreshOperation = { operationUuid: uuidv4() };
@@ -183,6 +188,8 @@ const App = ({
       toast({ description: t(messageKey), variant: "destructive" });
       trackEventWithClientID("data_refreshed", { failed: "true" });
     } finally {
+      await invalidateUsageCache();
+      refreshInProgress.current = false;
       setRefreshLoading(false);
       setProgress(0);
       afterRefresh?.(succeeded);
@@ -206,7 +213,9 @@ const App = ({
   };
 
   const requestRefresh = async (sourceId?: string) => {
-    if (refreshLoading || preflight) return;
+    if (refreshLoading || preflight || preflightPendingRef.current || refreshInProgress.current) return;
+    preflightPendingRef.current = true;
+    setPreflightPending(true);
     try {
       const [config, userInfo] = await Promise.all([getConfiguration(), isProVersion()]);
       if (config && userInfo.isPro) {
@@ -224,6 +233,9 @@ const App = ({
       }
     } catch {
       // Usage lookup is advisory. A refresh still runs when it is unavailable.
+    } finally {
+      preflightPendingRef.current = false;
+      setPreflightPending(false);
     }
     await runRefresh(sourceId);
   };
@@ -274,9 +286,9 @@ const App = ({
 
   return (
     <div className="flex items-center gap-2">
-      <span role="status" className="sr-only">{refreshLoading ? t("refresh.inProgress") : ""}</span>
-      <Button variant="outline" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading}>
-        <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading ? "animate-spin motion-reduce:animate-none" : ""}`} />
+      <span role="status" className="sr-only">{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
+      <Button variant="outline" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
+        <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
         <p className="hidden sm:inline-block">{t("common.refresh")}</p>
       </Button>
       {sourceStatuses.length > 0 && (
@@ -285,7 +297,7 @@ const App = ({
           size="sm"
           className={!hasFailure && hasPartial ? "text-amber-900 dark:text-amber-300" : undefined}
           onClick={() => setStatusDialogOpen(true)}
-          disabled={refreshLoading}
+          disabled={refreshLoading || preflightPending}
         >
           {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
           {t("refresh.sourceStatus")}
@@ -371,11 +383,11 @@ const App = ({
                     }).format(new Date(source.lastSuccessAt)))}
                   </div>}
                 </div>
-                {source.status !== "ok" && lastResult?.sourceResults && (
+                {source.status !== "ok" && source.category !== "quota" && lastResult?.sourceResults && (
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={refreshLoading}
+                    disabled={refreshLoading || preflightPending}
                     aria-label={t("refresh.retrySource").replace("{source}", displayIdentity(source))}
                     onClick={() => requestRefresh(source.sourceId)}
                   >
@@ -386,8 +398,8 @@ const App = ({
             ); })}
           </div>
           <AlertDialogFooter>
-            {failedStatuses.length > 0 && <Button variant="outline"
-              disabled={refreshLoading} onClick={() => requestRefresh()}>{t("refresh.retryAllFailed")}</Button>}
+            {failedStatuses.some((source) => source.category !== "quota") && <Button variant="outline"
+              disabled={refreshLoading || preflightPending} onClick={() => requestRefresh()}>{t("refresh.retryAllFailed")}</Button>}
             <AlertDialogCancel>{t("refresh.close")}</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>

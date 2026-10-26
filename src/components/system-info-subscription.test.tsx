@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SystemInfo from "@/components/system-info";
 
@@ -117,6 +117,9 @@ describe("System Info subscription management", () => {
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
     expect(screen.getByText("12 / 300")).toBeInTheDocument();
     expect(screen.getAllByText(/Resets/)).toHaveLength(2);
+    const proCard = screen.getByText("Pro Status").closest(".glass");
+    expect(proCard).not.toBeNull();
+    expect(within(proCard as HTMLElement).getByText("ERC20 wallet refreshes")).toBeInTheDocument();
   });
 
   it("shows the backend UTC reset day in time zones behind UTC", async () => {

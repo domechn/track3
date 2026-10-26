@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render as testingRender, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as testingRender, screen, waitFor, within } from "@testing-library/react";
 import { HashRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SystemInfo from "@/mobile/components/system-info";
@@ -107,6 +107,22 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("places usage in the Pro card on non-iOS mobile", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    mocks.getSubscriptionInfo.mockResolvedValue({
+      planType: "monthly", status: "active", currentPeriodEnd: "2026-11-03T00:00:00.000Z",
+      cancelAtPeriodEnd: false, isLegacy: false,
+      usage: {
+        erc20: { limit: 300, used: 12, remaining: 288, periodStart: "2026-10-03", periodEnd: "2026-11-03" },
+        tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03", periodEnd: "2026-11-03" },
+      },
+    });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    await screen.findByText("ERC20 wallet refreshes");
+    const proCard = screen.getByText("Pro status").closest("[data-ui-card]");
+    expect(proCard).not.toBeNull();
+    expect(within(proCard as HTMLElement).getByText("ERC20 wallet refreshes")).toBeInTheDocument();
+  });
   it("shows metered Pro usage on the iOS Pro settings screen", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     mocks.getLicenseIfIsPro.mockResolvedValue("pro");
@@ -121,6 +137,7 @@ describe("System Info subscription management", () => {
     window.location.hash = "#/settings?section=pro";
     render(<SystemInfo onProStatusChange={vi.fn()} />);
     expect(await screen.findByText("ERC20 wallet refreshes")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Monthly refresh usage" })).toBeInTheDocument();
     expect(screen.getByText("TRON wallet refreshes")).toBeInTheDocument();
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
     expect(screen.getAllByText(/Resets/)).toHaveLength(2);

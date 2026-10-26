@@ -1276,5 +1276,6 @@
   "refresh.preflight.continue": "继续刷新",
   "system.usage.erc20": "ERC20 钱包刷新",
   "system.usage.tron": "TRON 钱包刷新",
-  "system.usage.resetsOn": "{date} 重置"
+  "system.usage.resetsOn": "{date} 重置",
+  "system.usage.heading": "每月刷新用量"
 }

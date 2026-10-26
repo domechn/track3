@@ -31,7 +31,7 @@ const App = ({
   onProStatusChange: (active: boolean) => void;
 }) => {
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [version, setVersion] = useState<string>("0.1.0");
   const [activeLicense, setActiveLicense] = useState<string | undefined>();
   const [inputLicense, setInputLicense] = useState<string | undefined>();
@@ -334,7 +334,6 @@ const App = ({
             <p className="text-xs text-muted-foreground">
               {t("system.appVersionNote")}
             </p>
-            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} t={t} />}
           </CardContent>
         </Card>
         <Card>
@@ -356,6 +355,7 @@ const App = ({
                     : t("system.proStatus.legacy")
                   : t("system.proStatus.subPrompt")}
             </p>
+            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} t={t} locale={locale} />}
           </CardContent>
         </Card>
       </div>

@@ -28,6 +28,7 @@ type BridgeOptions = {
   backupFolderFailure?: string;
   proUsageFixture?: boolean;
   quotaExhaustedFixture?: boolean;
+  preflightExhaustedFixture?: boolean;
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
@@ -52,6 +53,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     backupFolderFailure,
     proUsageFixture = false,
     quotaExhaustedFixture = false,
+    preflightExhaustedFixture = false,
   } = options;
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
@@ -477,7 +479,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       let body = "{}";
       let status = 200;
       const usage = {
-        erc20: { limit: 300, used: 12, remaining: 288, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
+        erc20: { limit: 300, used: preflightExhaustedFixture ? 300 : 12, remaining: preflightExhaustedFixture ? 0 : 288, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
         tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
       };
       if (request.url.endsWith("/api/license/isPro")) {

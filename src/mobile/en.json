@@ -1276,5 +1276,6 @@
   "refresh.preflight.continue": "Continue refresh",
   "system.usage.erc20": "ERC20 wallet refreshes",
   "system.usage.tron": "TRON wallet refreshes",
-  "system.usage.resetsOn": "Resets {date}"
+  "system.usage.resetsOn": "Resets {date}",
+  "system.usage.heading": "Monthly refresh usage"
 }

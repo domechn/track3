@@ -67,6 +67,16 @@ export function clearLicenseCache(): void {
   licenseCache.clearCache();
 }
 
+export async function invalidateUsageCache(): Promise<void> {
+  try {
+    const license = await getLicenseIfIsPro();
+    licenseCache.deleteCache(makeLicenseCacheKey(LICENSE_CACHE_KEY_PREFIXES.usage, license));
+    licenseCache.deleteCache(makeLicenseCacheKey(LICENSE_CACHE_KEY_PREFIXES.subscriptionInfo, license));
+  } catch {
+    // A cache cleanup failure must not change the refresh result.
+  }
+}
+
 export async function isProVersion(): Promise<UserLicenseInfo> {
   // check if pro user
   const license = await getLicenseIfIsPro();
@@ -258,7 +268,7 @@ export class LicenseCenter {
       const cached = getCachedLicenseValue<ProUsage>(cacheKey);
       if (cached) return cached;
       const resp = await sendHttpRequest<ProUsage>(
-        "POST", this.subscriptionInfoEndpoint, 10000,
+        "POST", this.subscriptionInfoEndpoint, 3000,
         { "x-track3-client-id": await getClientID(), "x-track3-api-key": license },
         { action: "usage" },
       );

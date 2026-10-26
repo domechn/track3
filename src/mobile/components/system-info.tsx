@@ -34,7 +34,7 @@ const App = ({
   onProStatusChange: (active: boolean) => void;
 }) => {
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [searchParams] = useSearchParams();
   const [version, setVersion] = useState<string>("0.1.0");
   const [activeLicense, setActiveLicense] = useState<string | undefined>();
@@ -331,9 +331,9 @@ const App = ({
       {activeLicense && subscriptionInfo && subscriptionInfo.status !== "active" && <ListRow value={subscriptionStatusLabel(subscriptionInfo.status)}>{t("system.statusLabel")}</ListRow>}
       {activeLicense && subscriptionInfo?.planType && <ListRow value={t(subscriptionInfo.planType === "monthly" ? "system.monthly" : "system.yearly")}>{t("system.planLabel")}</ListRow>}
     </InsetGroup>
-    {activeLicense && subscriptionInfo?.usage && <InsetGroup><div className="px-4 pb-4">
-      <ProUsageRows usage={subscriptionInfo.usage} t={t} />
-    </div></InsetGroup>}
+    {activeLicense && subscriptionInfo?.usage && <><h2 className="ios-d3-section-heading">{t("system.usage.heading")}</h2><InsetGroup><div className="px-4 pb-4">
+      <ProUsageRows usage={subscriptionInfo.usage} t={t} locale={locale} />
+    </div></InsetGroup></>}
     {!activeLicense && <section>
       <h2 className="ios-d3-section-heading">{t("system.legacyInputTitle")}</h2>
       <div className="ios-d3-license-group">
@@ -378,7 +378,6 @@ const App = ({
             <p className="text-xs text-muted-foreground">
               {t("system.appVersionNote")}
             </p>
-            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} t={t} />}
           </CardContent>
         </Card>}
         {section !== "about" && <Card>
@@ -400,6 +399,7 @@ const App = ({
                     : t("system.proStatus.legacy")
                   : t("system.proStatus.subPrompt")}
             </p>
+            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} t={t} locale={locale} />}
           </CardContent>
         </Card>}
       </div>
