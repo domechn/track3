@@ -22,13 +22,13 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://track3.domc.me/" />
-    <meta property="og:image" content="https://track3.domc.me/images/desktop/overview.webp" />
-    <meta property="og:image:width" content="1600" />
-    <meta property="og:image:height" content="1000" />
+    <meta property="og:image" content="https://track3.domc.me/images/social-overview.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop and iOS" />
     <meta name="twitter:description" content="Track crypto and stocks on desktop, iPhone, and iPad, with portfolio analytics and an AI assistant." />
-    <meta name="twitter:image" content="https://track3.domc.me/images/desktop/overview.webp" />
+    <meta name="twitter:image" content="https://track3.domc.me/images/social-overview.jpg" />
     <link rel="canonical" href="https://track3.domc.me/" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -950,7 +950,10 @@
       }
       .cta .section__label {
         justify-content: center;
-        color: rgba(255, 255, 255, 0.74);
+        color: var(--text);
+        background: #fff;
+        border-radius: 999px;
+        padding: 7px 12px;
         margin-bottom: 18px;
       }
       .cta p {
@@ -1116,7 +1119,6 @@
           border-radius: 12px;
         }
         .nav__menu-links a:hover { background: var(--accent-soft); }
-        }
         .nav__cta {
           padding: 10px 14px;
         }
@@ -1138,10 +1140,10 @@
           margin-left: 8px;
           margin-right: 8px;
         }
-        .hero__aside { order: 2; }
-        .hero__copy { order: 3 !important; }
-        .hero__actions { order: 4 !important; }
-        .hero__platforms { order: 5 !important; }
+        .hero__copy { order: 2 !important; }
+        .hero__actions { order: 3 !important; }
+        .hero__platforms { order: 4 !important; }
+        .hero__aside { order: 5; }
         .hero__content,
         .hero__aside,
         .privacy-banner,
@@ -1412,7 +1414,7 @@
             <div class="screenshots__dots" id="ipadDots"></div>
           </div>
         </div>
-        <p class="ios__note">Files import and export, iCloud Drive backup folders, Face ID app lock, and local alerts are available in the iOS build. Track3 for iOS builds from the repository and can be sideloaded with AltStore or Sideloadly using a free Apple ID; free signing lasts 7 days. <a href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad">Read the iOS overview</a> and <a href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">build and signing guide</a>.</p>
+        <p class="ios__note">Files import and export, iCloud Drive backup folders, Face ID app lock, and local alerts are available in the iOS build. Track3 for iOS builds from the repository; the <a href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">release guide covers Xcode building and signing</a>. AltStore and Sideloadly are general sideload options, but the repository does not document their steps. Free Apple ID signing generally needs renewal every 7 days. <a href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad">Read the iOS overview</a>.</p>
       </div>
     </section>
 
@@ -1569,7 +1571,7 @@
       <div class="container" style="text-align: center">
         <div class="animate-in">
           <p class="section__label">&#128257; Supported Platforms</p>
-          <h2 class="section__title">
+          <h2 class="section__title" style="margin-left: auto; margin-right: auto">
             Connect exchanges, brokers, and wallets
           </h2>
           <p
@@ -1582,19 +1584,19 @@
         </div>
         <div class="exchanges animate-in">
           <div class="exchange">
-            <span class="exchange__logo">&#127312;</span> Binance
+            <span class="exchange__logo">&#127313;</span> Binance
           </div>
           <div class="exchange">
-            <span class="exchange__logo">&#127320;</span> OKX
+            <span class="exchange__logo">&#127326;</span> OKX
           </div>
           <div class="exchange">
             <span class="exchange__logo">&#127313;</span> Bitget
           </div>
           <div class="exchange">
-            <span class="exchange__logo">&#127318;</span> Kraken
+            <span class="exchange__logo">&#127322;</span> Kraken
           </div>
           <div class="exchange">
-            <span class="exchange__logo">&#127316;</span> Gate.io
+            <span class="exchange__logo">&#127318;</span> Gate.io
           </div>
           <div class="exchange">
             <span class="exchange__logo">&#127313;</span> Bybit
@@ -1606,7 +1608,10 @@
             <span class="exchange__logo">&#127319;</span> HTX
           </div>
           <div class="exchange">
-            <span class="exchange__logo">&#127316;</span> MEXC
+            <span class="exchange__logo">&#127324;</span> MEXC
+          </div>
+          <div class="exchange">
+            <span class="exchange__logo">&#127313;</span> Backpack
           </div>
           <div class="exchange">
             <span class="exchange__logo">&#128200;</span> IBKR
@@ -1937,7 +1942,7 @@
             >Wiki</a
           >
           <a
-            href="https://github.com/domechn/track3/blob/main/LICENSE"
+            href="https://github.com/domechn/track3/blob/master/LICENSE"
             target="_blank"
             rel="noopener"
             >License</a

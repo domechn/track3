@@ -6,7 +6,7 @@
     <title>Get Track3 — Desktop Downloads and iOS Build Guide</title>
     <meta
       name="description"
-      content="Get Track3 v0.9.0 for macOS, Windows, or Linux, or follow the build and sideload guide for iPhone and iPad. There is no iOS App Store release."
+      content="Get the latest Track3 desktop installer for macOS, Windows, or Linux. For iPhone and iPad, see the repository's Xcode build and signing guide."
     />
     <meta
       property="og:title"
@@ -21,11 +21,11 @@
       property="og:url"
       content="https://track3.domc.me/download.html"
     />
-    <meta property="og:image" content="https://track3.domc.me/images/desktop/overview.webp" />
+    <meta property="og:image" content="https://track3.domc.me/images/social-overview.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Get Track3 — Desktop Downloads and iOS Build Guide" />
     <meta name="twitter:description" content="Desktop installers and the iPhone and iPad build guide for Track3." />
-    <meta name="twitter:image" content="https://track3.domc.me/images/desktop/overview.webp" />
+    <meta name="twitter:image" content="https://track3.domc.me/images/social-overview.jpg" />
     <link rel="canonical" href="https://track3.domc.me/download.html" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -617,8 +617,8 @@
               <div class="panel__header">
                 <p class="eyebrow">iPhone and iPad</p>
                 <h2 class="panel__title" id="iosDownloadTitle">Build and sideload the iOS app</h2>
-                <p class="panel__text">The iOS app is not on the App Store. Build it from the repository, sign it with your Apple ID, then install it with AltStore or Sideloadly. A free Apple ID requires renewing the signing every 7 days.</p>
-                <p class="panel__text"><a href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad">iOS overview in the README</a> · <a href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">Build and signing guide</a></p>
+                <p class="panel__text">The iOS app is not on the App Store. Build and sign it from the repository with Xcode. AltStore and Sideloadly are general sideload options, but the repository does not document their steps. Free Apple ID signing generally needs renewal every 7 days.</p>
+                <p class="panel__text"><a href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad">iOS overview in the README</a> · <a href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">Xcode build and signing guide</a></p>
               </div>
             </div>
           </section>
@@ -783,9 +783,9 @@
         if (detectedPlatform.os === "ios") {
           return {
             title: "Track3 for iPhone and iPad",
-            text: "Build Track3 for iOS from the repository, then sideload the signed app with AltStore or Sideloadly. Free Apple ID signing lasts 7 days.",
+            text: "Build and sign Track3 for iOS with Xcode. The repository's release guide covers these steps; it does not document AltStore or Sideloadly sideloading.",
             actions: [
-              '<a class="download-button" href="#ios">See iOS build steps</a>',
+              '<a class="download-button" href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">See Xcode build guide</a>',
             ],
           };
         }
