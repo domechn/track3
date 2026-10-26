@@ -110,6 +110,9 @@ function detectOs(navigatorLike) {
   ) {
     return "ios";
   }
+  if (userAgent.includes("android")) {
+    return "unknown";
+  }
   if (platformHint.includes("mac") || /mac os x|macintosh/.test(userAgent)) {
     return "macos";
   }

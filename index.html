@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop and iOS</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop and iOS
+    </title>
     <meta
       name="description"
       content="Track3 tracks crypto and stock portfolios across exchanges, brokers, and wallets on desktop, iPhone, and iPad. Explore history, analytics, goals, and an AI assistant with local storage and optional encrypted sync."
@@ -22,2018 +24,733 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://track3.domc.me/" />
-    <meta property="og:image" content="https://track3.domc.me/images/social-overview.jpg" />
+    <meta
+      property="og:image"
+      content="https://track3.domc.me/images/social-overview.jpg"
+    />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop and iOS" />
-    <meta name="twitter:description" content="Track crypto and stocks on desktop, iPhone, and iPad, with portfolio analytics and an AI assistant." />
-    <meta name="twitter:image" content="https://track3.domc.me/images/social-overview.jpg" />
+    <meta
+      name="twitter:title"
+      content="Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop and iOS"
+    />
+    <meta
+      name="twitter:description"
+      content="Track crypto and stocks on desktop, iPhone, and iPad, with portfolio analytics and an AI assistant."
+    />
+    <meta
+      name="twitter:image"
+      content="https://track3.domc.me/images/social-overview.jpg"
+    />
     <link rel="canonical" href="https://track3.domc.me/" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      href="images/app-icon.png"
-    />
-    <style>
-      /* ── Reset & Base ── */
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      :root {
-        --bg: #ffffff;
-        --surface: rgba(255, 255, 255, 0.78);
-        --surface-solid: #ffffff;
-        --surface-soft: #f1efff;
-        --border: rgba(24, 19, 13, 0.12);
-        --border-strong: rgba(24, 19, 13, 0.18);
-        --text: #171422;
-        --text-muted: #68627d;
-        --text-soft: #5e5875;
-        --accent: #6d5cff;
-        --accent-hover: #5a49ed;
-        --accent-soft: #efecff;
-        --green: #3f8f53;
-        --rose: #d9d3ff;
-        --shadow: 0 20px 60px rgba(73, 63, 148, 0.1);
-        --shadow-lg: 0 28px 90px rgba(73, 63, 148, 0.14);
-        --radius: 26px;
-        --radius-card: 22px;
-      }
-      html {
-        scroll-behavior: smooth;
-        font-size: 16px;
-        background: var(--bg);
-      }
-      body {
-        font-family: "Manrope", "Helvetica Neue", Helvetica, Arial, sans-serif;
-        background: #ffffff;
-        color: var(--text);
-        line-height: 1.6;
-        -webkit-font-smoothing: antialiased;
-        overflow-x: hidden;
-        min-height: 100vh;
-      }
-      body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background-image:
-          linear-gradient(rgba(24, 19, 13, 0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(24, 19, 13, 0.03) 1px, transparent 1px);
-        background-size: 32px 32px;
-        opacity: 0.45;
-        mask-image: linear-gradient(
-          180deg,
-          rgba(0, 0, 0, 0.32),
-          transparent 92%
-        );
-        -webkit-mask-image: linear-gradient(
-          180deg,
-          rgba(0, 0, 0, 0.32),
-          transparent 92%
-        );
-      }
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
-      img {
-        max-width: 100%;
-        display: block;
-      }
-      ul {
-        list-style: none;
-      }
-
-      /* ── Utility ── */
-      .container {
-        max-width: 1180px;
-        margin: 0 auto;
-        padding: 0 24px;
-      }
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-      }
-
-      /* ── Background blobs ── */
-      .blob {
-        display: none;
-      }
-      .blob--1 {
-        width: 520px;
-        height: 520px;
-        background: rgba(217, 211, 255, 0.9);
-        top: -140px;
-        left: -120px;
-      }
-      .blob--2 {
-        width: 420px;
-        height: 420px;
-        background: rgba(109, 92, 255, 0.24);
-        bottom: 8%;
-        right: -110px;
-      }
-
-      /* ── Header / Nav ── */
-      header {
-        position: fixed;
-        top: 18px;
-        left: 0;
-        right: 0;
-        z-index: 100;
-        transition: transform 0.3s ease;
-      }
-      header.scrolled .nav {
-        transform: translateY(-2px);
-        box-shadow: 0 18px 42px rgba(45, 36, 95, 0.12);
-        border-color: var(--border-strong);
-      }
-      .nav {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 22px;
-        min-height: 72px;
-        padding: 12px 22px;
-        background: rgba(255, 255, 255, 0.82);
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
-        box-shadow: 0 12px 40px rgba(45, 36, 95, 0.08);
-        transition:
-          box-shadow 0.3s,
-          transform 0.3s,
-          border-color 0.3s;
-      }
-      .nav__brand {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-weight: 700;
-        font-size: 1.12rem;
-        letter-spacing: -0.02em;
-      }
-      .nav__brand img {
-        width: 36px;
-        height: 36px;
-        border-radius: 12px;
-        box-shadow: 0 8px 20px rgba(109, 92, 255, 0.22);
-      }
-      .nav__links {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-      .nav__links a {
-        padding: 10px 14px;
-        border-radius: 999px;
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.76rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-        transition:
-          color 0.2s,
-          background 0.2s;
-      }
-      .nav__links a:hover {
-        color: var(--text);
-        background: var(--surface-soft);
-      }
-      .nav__menu { display: none; }
-      .nav__cta {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: var(--accent);
-        color: #fff;
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: 0.84rem;
-        font-weight: 700;
-        padding: 10px 18px;
-        border-radius: 999px;
-        border: none;
-        cursor: pointer;
-        box-shadow: 0 12px 28px rgba(109, 92, 255, 0.26);
-        transition:
-          background 0.2s,
-          box-shadow 0.2s,
-          transform 0.2s;
-      }
-      .nav__cta:hover {
-        background: var(--accent-hover);
-        box-shadow: 0 16px 34px rgba(109, 92, 255, 0.34);
-        transform: translateY(-1px);
-      }
-
-      /* ── Hero ── */
-      .hero {
-        position: relative;
-        z-index: 1;
-        padding: 112px 0 42px;
-      }
-      .hero__grid {
-        display: grid;
-        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-        gap: 20px;
-        align-items: center;
-      }
-      .hero__content,
-      .hero__aside {
-        border: 1px solid var(--border);
-        border-radius: 36px;
-        background: rgba(255, 255, 255, 0.72);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        box-shadow: var(--shadow);
-      }
-      .hero__content {
-        padding: 36px;
-      }
-      .hero__aside {
-        padding: 14px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .hero__badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: var(--accent-soft);
-        border: 1px solid rgba(109, 92, 255, 0.22);
-        border-radius: 999px;
-        padding: 10px 16px;
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.8rem;
-        color: var(--text);
-        margin-bottom: 22px;
-        font-weight: 500;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .hero__badge svg {
-        width: 14px;
-        height: 14px;
-        color: var(--accent-hover);
-      }
-      .hero__eyebrow,
-      .hero__aside-label,
-      .section__label,
-      .hero__platforms,
-      .plan h3 {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text-soft);
-      }
-      .hero__eyebrow {
-        margin-bottom: 18px;
-      }
-      .hero__content h1 {
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: clamp(2.8rem, 4.3vw, 4.5rem);
-        font-weight: 700;
-        letter-spacing: -0.05em;
-        line-height: 0.98;
-        margin-bottom: 22px;
-        max-width: 13ch;
-      }
-      .hero__aside img {
-        width: 100%;
-        height: auto;
-        border-radius: 24px;
-      }
-      .hero__aside p {
-        padding: 0 8px 4px;
-        color: var(--text-muted);
-        font-size: 0.84rem;
-      }
-      .hero__content h1 span {
-        color: var(--accent-hover);
-      }
-      .hero__copy {
-        color: var(--text-muted);
-        font-size: 1.08rem;
-        max-width: 620px;
-        margin: 0 0 34px;
-      }
-      .hero__actions {
-        display: flex;
-        gap: 14px;
-        justify-content: flex-start;
-        flex-wrap: wrap;
-        margin-bottom: 24px;
-      }
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 15px 24px;
-        border-radius: 999px;
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: 0.95rem;
-        font-weight: 600;
-        border: 1px solid transparent;
-        cursor: pointer;
-        transition: all 0.25s;
-      }
-      .btn--primary {
-        background: var(--accent);
-        color: #fff;
-      }
-      .btn--primary:hover {
-        background: var(--accent-hover);
-        box-shadow: 0 18px 36px rgba(109, 92, 255, 0.28);
-        transform: translateY(-2px);
-      }
-      .btn--outline {
-        background: rgba(255, 255, 255, 0.7);
-        color: var(--text);
-        border-color: var(--border-strong);
-      }
-      .btn--outline:hover {
-        background: #fff;
-        border-color: rgba(24, 19, 13, 0.4);
-        transform: translateY(-2px);
-      }
-      .btn svg {
-        width: 18px;
-        height: 18px;
-      }
-      .hero__platforms {
-        color: var(--text-soft);
-      }
-      .hero__aside-title {
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: 1.68rem;
-        line-height: 1.06;
-        letter-spacing: -0.04em;
-        max-width: 12ch;
-      }
-      .hero__aside-copy {
-        color: var(--text-muted);
-        font-size: 0.95rem;
-      }
-      .hero__highlights {
-        display: grid;
-        gap: 12px;
-      }
-      .hero__highlight {
-        display: flex;
-        gap: 12px;
-        padding: 14px 16px;
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        background: var(--surface-solid);
-      }
-      .hero__dot {
-        width: 10px;
-        height: 10px;
-        margin-top: 8px;
-        border-radius: 50%;
-        background: var(--accent);
-        flex-shrink: 0;
-      }
-      .hero__highlight strong {
-        display: block;
-        font-size: 0.95rem;
-        margin-bottom: 2px;
-      }
-      .hero__highlight span {
-        color: var(--text-muted);
-        font-size: 0.86rem;
-        line-height: 1.45;
-      }
-      .hero__stats {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
-        margin-top: auto;
-      }
-      .hero__stat {
-        padding: 16px;
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        background: linear-gradient(
-          180deg,
-          rgba(255, 255, 255, 0.96),
-          rgba(239, 236, 255, 0.82)
-        );
-      }
-      .hero__stat strong {
-        display: block;
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: 1.5rem;
-        line-height: 1;
-        margin-bottom: 6px;
-      }
-      .hero__stat span {
-        display: block;
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.75rem;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-      }
-
-      /* ── Screenshot carousel ── */
-      .screenshots {
-        position: relative;
-        z-index: 1;
-        padding: 32px 0 24px;
-        scroll-margin-top: 120px;
-        background: #ffffff;
-      }
-      .screenshots__intro {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 28px;
-        margin-bottom: 26px;
-      }
-      .screenshots__intro-note {
-        max-width: 420px;
-        color: var(--text-muted);
-        font-size: 0.98rem;
-      }
-      .screenshots__frame {
-        padding: 28px 0 22px;
-        border-top: 1px solid var(--border-strong);
-        border-bottom: 1px solid var(--border);
-        background: #ffffff;
-      }
-      .screenshots__track {
-        display: flex;
-        align-items: center;
-        gap: 24px;
-        overflow-x: auto;
-        scroll-snap-type: x mandatory;
-        padding: 0 24px 20px;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-      }
-      .screenshots__track::-webkit-scrollbar {
-        display: none;
-      }
-      .screenshots__track img {
-        flex: 0 0 min(88vw, 960px);
-        width: min(88vw, 960px);
-        height: auto;
-        scroll-snap-align: center;
-        border-radius: 32px;
-        border: 1px solid var(--border);
-        background: #fff;
-        padding: 12px;
-        box-shadow: var(--shadow-lg);
-        transition:
-          transform 0.3s,
-          box-shadow 0.3s;
-      }
-      .screenshots__track--ai img:nth-child(2) {
-        flex-basis: 280px;
-        width: 280px;
-      }
-      .screenshots__track--ai img:nth-child(3) {
-        flex-basis: min(78vw, 650px);
-        width: min(78vw, 650px);
-      }
-      .screenshots__track--phones img {
-        flex: 0 0 auto;
-        width: min(64vw, 280px);
-        height: auto;
-        padding: 8px;
-        border: 8px solid #252234;
-        border-radius: 38px;
-        background: #252234;
-      }
-      .screenshots__track--tablets img {
-        flex: 0 0 auto;
-        width: min(80vw, 650px);
-        height: auto;
-        padding: 8px;
-        border: 10px solid #252234;
-        border-radius: 28px;
-        background: #252234;
-      }
-      .ios__screens {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 34px;
-      }
-      .ios__screens > div {
-        min-width: 0;
-      }
-      .ios__screen-label {
-        margin: 0 0 14px 24px;
-        color: var(--text-muted);
-        font-size: 0.9rem;
-        font-weight: 700;
-      }
-      .ios__note {
-        margin-top: 28px;
-        padding: 22px 26px;
-        border: 1px solid var(--border-strong);
-        border-radius: 22px;
-        background: var(--accent-soft);
-        color: var(--text);
-      }
-      .ios__note a {
-        color: #4835d2;
-        text-decoration: underline;
-        text-underline-offset: 3px;
-      }
-      .screenshots__track img:hover {
-        transform: translateY(-4px) scale(1.01);
-        box-shadow: 0 34px 90px rgba(73, 63, 148, 0.16);
-      }
-      .screenshots__dots {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 8px;
-      }
-      .screenshots__dots button {
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        border: none;
-        background: rgba(24, 19, 13, 0.18);
-        cursor: pointer;
-        transition:
-          background 0.2s,
-          transform 0.2s;
-        padding: 0;
-      }
-      .screenshots__dots button.active {
-        background: var(--text);
-        transform: scale(1.35);
-      }
-
-      /* ── Section styling ── */
-      .section {
-        position: relative;
-        z-index: 1;
-        padding: 96px 0;
-        scroll-margin-top: 120px;
-      }
-      #ios {
-        padding-top: 48px;
-      }
-      .section + .section {
-        border-top: 1px solid rgba(24, 19, 13, 0.08);
-      }
-      .section__label {
-        margin-bottom: 14px;
-      }
-      .section__title {
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: clamp(2rem, 4vw, 3.4rem);
-        font-weight: 700;
-        letter-spacing: -0.04em;
-        line-height: 1.05;
-        margin-bottom: 18px;
-        max-width: 15ch;
-      }
-      .section__desc {
-        color: var(--text-muted);
-        max-width: 620px;
-        font-size: 1.04rem;
-        margin-bottom: 50px;
-      }
-
-      /* ── Features grid ── */
-      .features {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 20px;
-      }
-      .feature {
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-card);
-        padding: 28px;
-        box-shadow: 0 8px 24px rgba(73, 63, 148, 0.05);
-        transition:
-          border-color 0.3s,
-          transform 0.3s,
-          box-shadow 0.3s;
-      }
-      .feature:hover {
-        border-color: rgba(24, 19, 13, 0.24);
-        transform: translateY(-4px);
-        box-shadow: var(--shadow);
-      }
-      .feature__icon {
-        width: 54px;
-        height: 54px;
-        border-radius: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 20px;
-        font-size: 1.4rem;
-        border: 1px solid rgba(24, 19, 13, 0.06);
-      }
-      .feature__icon--purple {
-        background: rgba(109, 92, 255, 0.14);
-        color: var(--accent-hover);
-      }
-      .feature__icon--green {
-        background: rgba(63, 143, 83, 0.14);
-        color: var(--green);
-      }
-      .feature__icon--blue {
-        background: rgba(118, 160, 230, 0.18);
-        color: #3264bf;
-      }
-      .feature__icon--amber {
-        background: rgba(109, 92, 255, 0.16);
-        color: var(--accent-hover);
-      }
-      .feature__icon--rose {
-        background: rgba(217, 211, 255, 0.26);
-        color: var(--accent);
-      }
-      .feature__icon--cyan {
-        background: rgba(99, 196, 209, 0.18);
-        color: #1c8092;
-      }
-      .feature h3 {
-        font-size: 1.08rem;
-        font-weight: 700;
-        margin-bottom: 10px;
-      }
-      .feature p,
-      .pro-feature p,
-      .plan__desc,
-      .plan__list,
-      .pricing__note,
-      .privacy-banner p,
-      .footer__left,
-      .footer__links a {
-        color: var(--text-muted);
-      }
-      .feature p {
-        font-size: 0.92rem;
-        line-height: 1.58;
-      }
-
-      /* ── Exchanges ── */
-      .exchanges {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 14px;
-        margin-top: 48px;
-      }
-      .exchange {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        padding: 18px 20px;
-        font-weight: 600;
-        font-size: 0.94rem;
-        transition:
-          border-color 0.3s,
-          transform 0.3s,
-          box-shadow 0.3s;
-      }
-      .exchange:hover {
-        border-color: var(--border-strong);
-        transform: translateY(-2px);
-        box-shadow: 0 12px 28px rgba(73, 63, 148, 0.1);
-      }
-      .exchange__logo {
-        font-size: 1.1rem;
-      }
-
-      /* ── Chains grid ── */
-      .chains {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        justify-content: center;
-        margin-top: 32px;
-      }
-      .chain {
-        background: rgba(255, 255, 255, 0.78);
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        padding: 10px 16px;
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        font-weight: 600;
-        transition:
-          border-color 0.2s,
-          color 0.2s,
-          background 0.2s;
-      }
-      .chain:hover {
-        border-color: var(--border-strong);
-        color: var(--text);
-        background: #fff;
-      }
-
-      /* ── Pro subscription ── */
-      .pricing {
-        display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-        gap: 28px;
-        align-items: start;
-      }
-      .pro-features {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-      }
-      .pro-feature,
-      .plan {
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-card);
-        box-shadow: var(--shadow);
-      }
-      .pro-feature {
-        padding: 24px;
-      }
-      .pro-feature h3 {
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: 8px;
-      }
-      .pro-feature p {
-        font-size: 0.9rem;
-        line-height: 1.58;
-      }
-      .plans {
-        display: grid;
-        gap: 16px;
-        position: sticky;
-        top: 118px;
-      }
-      .plan {
-        position: relative;
-        padding: 30px;
-        overflow: hidden;
-      }
-      .plan--featured {
-        border-color: rgba(109, 92, 255, 0.34);
-        background: linear-gradient(
-          180deg,
-          #f1eeff 0%,
-          rgba(255, 255, 255, 0.94) 100%
-        );
-        box-shadow: 0 22px 60px rgba(109, 92, 255, 0.2);
-      }
-      .plan__badge {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        border: 1px solid rgba(109, 92, 255, 0.24);
-        background: rgba(255, 255, 255, 0.86);
-        color: var(--text);
-        border-radius: 999px;
-        padding: 6px 10px;
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.75rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        font-weight: 600;
-      }
-      .plan h3 {
-        margin-bottom: 12px;
-      }
-      .plan__price {
-        display: flex;
-        align-items: baseline;
-        gap: 8px;
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: 3rem;
-        font-weight: 700;
-        letter-spacing: -0.05em;
-        margin-bottom: 10px;
-      }
-      .plan__price span {
-        color: var(--text-muted);
-        font-family: "Manrope", sans-serif;
-        font-size: 0.95rem;
-        font-weight: 600;
-      }
-      .plan__desc {
-        font-size: 0.92rem;
-        margin-bottom: 20px;
-      }
-      .plan__list {
-        display: grid;
-        gap: 12px;
-        font-size: 0.88rem;
-      }
-      .plan__list li {
-        display: flex;
-        gap: 10px;
-        align-items: flex-start;
-      }
-      .plan__list li::before {
-        content: "";
-        width: 8px;
-        height: 8px;
-        flex: 0 0 8px;
-        margin-top: 7px;
-        border-radius: 999px;
-        background: var(--accent-hover);
-      }
-      .pricing__note {
-        border-top: 1px solid var(--border);
-        font-size: 0.82rem;
-        margin-top: 4px;
-        padding-top: 16px;
-        line-height: 1.56;
-      }
-
-      /* ── Privacy banner ── */
-      .privacy-banner {
-        position: relative;
-        z-index: 1;
-        background: linear-gradient(
-          135deg,
-          rgba(255, 255, 255, 0.96),
-          rgba(239, 236, 255, 0.82)
-        );
-        border: 1px solid var(--border);
-        border-radius: 36px;
-        padding: 56px 48px;
-        text-align: center;
-        margin: 0 auto;
-        max-width: 920px;
-        box-shadow: var(--shadow);
-      }
-      .privacy-banner h2,
-      .cta h2 {
-        font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: clamp(2rem, 4vw, 3rem);
-        font-weight: 700;
-        line-height: 1.04;
-        letter-spacing: -0.05em;
-        margin-bottom: 16px;
-      }
-      .privacy-banner p {
-        max-width: 540px;
-        margin: 0 auto 32px;
-        font-size: 1rem;
-      }
-      .privacy-checks {
-        display: flex;
-        gap: 14px;
-        justify-content: center;
-        flex-wrap: wrap;
-      }
-      .privacy-check {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 14px 18px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.72);
-        font-size: 0.9rem;
-        font-weight: 600;
-      }
-      .privacy-check svg {
-        color: var(--green);
-        width: 20px;
-        height: 20px;
-        flex-shrink: 0;
-      }
-
-      /* ── CTA section ── */
-      .cta {
-        position: relative;
-        z-index: 1;
-        text-align: center;
-        padding: 30px 0 120px;
-      }
-      .cta__panel {
-        border-radius: 38px;
-        padding: 64px 52px;
-        background: linear-gradient(
-          135deg,
-          #8d82ff 0%,
-          #6d5cff 56%,
-          #5542e8 100%
-        );
-        box-shadow: 0 28px 80px rgba(109, 92, 255, 0.32);
-        color: #fff;
-      }
-      .cta .section__label {
-        justify-content: center;
-        color: var(--text);
-        background: #fff;
-        border-radius: 999px;
-        padding: 7px 12px;
-        margin-bottom: 18px;
-      }
-      .cta p {
-        color: rgba(255, 255, 255, 0.82);
-        font-size: 1.08rem;
-        max-width: 560px;
-        margin: 0 auto 36px;
-      }
-      .cta .hero__actions {
-        justify-content: center;
-        margin-bottom: 0;
-      }
-      .cta .btn--primary {
-        background: rgba(255, 255, 255, 0.96);
-        color: var(--accent-hover);
-      }
-      .cta .btn--outline {
-        background: rgba(255, 255, 255, 0.12);
-        border-color: rgba(255, 255, 255, 0.26);
-        color: #fff;
-      }
-      .cta .btn--outline:hover {
-        background: rgba(255, 255, 255, 0.2);
-      }
-
-      /* ── Footer ── */
-      footer {
-        position: relative;
-        z-index: 1;
-        border-top: 1px solid var(--border);
-        padding: 34px 0 44px;
-        background: rgba(255, 255, 255, 0.28);
-      }
-      .footer__inner {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 16px;
-      }
-      .footer__left,
-      .footer__links a {
-        font-size: 0.85rem;
-      }
-      .footer__links {
-        display: flex;
-        gap: 24px;
-      }
-      .footer__links a {
-        transition: color 0.2s;
-      }
-      .footer__links a:hover {
-        color: var(--text);
-      }
-
-      /* ── Animations ── */
-      @keyframes fadeUp {
-        from {
-          opacity: 0;
-          transform: translateY(32px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      .animate-in {
-        opacity: 1;
-      }
-      :focus-visible {
-        outline: 3px solid #4835d2;
-        outline-offset: 3px;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after {
-          scroll-behavior: auto !important;
-          animation-duration: 0.01ms !important;
-          transition-duration: 0.01ms !important;
-        }
-        .animate-in { opacity: 1; transform: none; }
-      }
-
-      /* hero elements animate on load */
-      .hero__badge {
-        animation: fadeUp 0.6s 0.1s both;
-      }
-      .hero__eyebrow {
-        animation: fadeUp 0.6s 0.18s both;
-      }
-      .hero__content h1 {
-        animation: fadeUp 0.6s 0.26s both;
-      }
-      .hero__copy {
-        animation: fadeUp 0.6s 0.4s both;
-      }
-      .hero .hero__actions {
-        animation: fadeUp 0.6s 0.52s both;
-      }
-      .hero .hero__platforms {
-        animation: fadeUp 0.6s 0.62s both;
-      }
-
-      /* ── Responsive ── */
-      @media (max-width: 980px) {
-        .hero__grid,
-        .pricing {
-          grid-template-columns: 1fr;
-        }
-        .screenshots__intro {
-          align-items: flex-start;
-          flex-direction: column;
-        }
-        .plans {
-          position: static;
-        }
-      }
-      @media (max-width: 768px) {
-        .container {
-          padding: 0 18px;
-        }
-        header {
-          top: 12px;
-        }
-        .nav {
-          min-height: 64px;
-          padding: 10px 14px;
-          border-radius: 26px;
-        }
-        .nav {
-          gap: 10px;
-        }
-        .nav__links {
-          display: none;
-        }
-        .nav__menu {
-          display: block;
-          margin-left: auto;
-          position: relative;
-        }
-        .nav__menu summary {
-          cursor: pointer;
-          list-style: none;
-          padding: 8px;
-          color: var(--text);
-          font-weight: 700;
-          font-size: 0.84rem;
-        }
-        .nav__menu summary::-webkit-details-marker { display: none; }
-        .nav__menu-links {
-          position: absolute;
-          top: calc(100% + 14px);
-          right: -72px;
-          width: min(300px, 80vw);
-          padding: 10px;
-          display: grid;
-          background: #fff;
-          border: 1px solid var(--border);
-          border-radius: 20px;
-          box-shadow: var(--shadow);
-        }
-        .nav__menu-links a {
-          padding: 8px 12px;
-          border-radius: 12px;
-        }
-        .nav__menu-links a:hover { background: var(--accent-soft); }
-        .nav__cta {
-          padding: 10px 14px;
-        }
-        .hero {
-          padding: 112px 0 32px;
-        }
-        .hero__grid {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        .hero__content {
-          display: contents;
-        }
-        .hero__content > * {
-          order: 1;
-        }
-        .hero__badge, .hero__eyebrow, .hero__content h1 {
-          margin-left: 8px;
-          margin-right: 8px;
-        }
-        .hero__copy { order: 2 !important; }
-        .hero__aside { order: 3; }
-        .hero__actions { order: 4 !important; }
-        .hero__platforms { order: 5 !important; }
-        .hero__content,
-        .hero__aside,
-        .privacy-banner,
-        .cta__panel {
-          border-radius: 28px;
-          padding: 24px;
-        }
-        .hero__content h1 {
-          font-size: clamp(2.4rem, 10vw, 3.6rem);
-          max-width: none;
-        }
-        .hero__copy { margin-bottom: 18px; }
-        .hero__actions { margin-bottom: 16px; }
-        .hero__aside img { border-radius: 16px; }
-        .screenshots__track--phones img { width: min(66vw, 260px); }
-        .screenshots__track--tablets img { width: min(86vw, 560px); }
-        .hero__actions {
-          width: 100%;
-        }
-        .btn {
-          justify-content: center;
-          width: 100%;
-        }
-        .hero__stats {
-          grid-template-columns: 1fr;
-        }
-        .screenshots {
-          padding-bottom: 24px;
-        }
-        .screenshots__frame {
-          padding-top: 20px;
-        }
-        .screenshots__track {
-          gap: 18px;
-          padding: 0 18px 18px;
-        }
-        .screenshots__track img {
-          flex-basis: calc(100vw - 36px);
-          border-radius: 24px;
-          padding: 8px;
-        }
-        .screenshots__track--phones img {
-          flex-basis: auto;
-        }
-        .screenshots__track--tablets img {
-          flex-basis: auto;
-        }
-        .section {
-          padding: 72px 0;
-        }
-        #ios {
-          padding-top: 36px;
-        }
-        .features,
-        .pro-features {
-          grid-template-columns: 1fr;
-        }
-        .plan__badge {
-          position: static;
-          display: inline-flex;
-          margin-bottom: 14px;
-        }
-        .privacy-checks {
-          justify-content: flex-start;
-        }
-        .privacy-check {
-          width: 100%;
-          justify-content: flex-start;
-        }
-        .cta {
-          padding: 20px 0 96px;
-        }
-        .footer__inner {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .footer__links {
-          flex-wrap: wrap;
-          gap: 14px 18px;
-        }
-      }
-    </style>
+    <link rel="icon" type="image/png" href="images/app-icon.png" />
+    <link rel="stylesheet" href="site.css" />
   </head>
   <body id="top">
-    <!-- Background blobs -->
-    <div class="blob blob--1"></div>
-    <div class="blob blob--2"></div>
-
-    <!-- Header -->
-    <header id="header">
-      <nav class="container nav">
-        <a href="#top" class="nav__brand">
-          <img
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header>
+      <div class="wrap">
+        <a class="brand" href="./index.html"
+          ><img
             src="images/app-icon.png"
-            alt="Track3 icon"
-            width="36"
-            height="36"
-          />
-          Track3
-        </a>
-        <div class="nav__links">
-          <a href="#features">Features</a>
-          <a href="#ai">AI</a>
-          <a href="#ios">iOS</a>
-          <a href="#exchanges">Sources</a>
-          <a href="#pro">Pro</a>
-          <a href="#screenshots">Screenshots</a>
-          <a href="#privacy">Privacy</a>
-        </div>
-        <details class="nav__menu">
+            alt=""
+            width="30"
+            height="30"
+          />Track3</a
+        >
+        <nav aria-label="Primary">
+          <a href="#features">Features</a><a href="#ios">iPhone &amp; iPad</a
+          ><a href="#privacy">Privacy</a><a href="#pro">Pro</a>
+        </nav>
+        <details class="mobile-menu">
           <summary>Menu</summary>
-          <div class="nav__menu-links">
-            <a href="#screenshots">Desktop screenshots</a>
-            <a href="#ios">iPhone and iPad</a>
-            <a href="#features">Features</a>
-            <a href="#ai">AI assistant</a>
-            <a href="#exchanges">Sources</a>
-            <a href="#pro">Pro</a>
-            <a href="#privacy">Privacy</a>
+          <div class="menu-links">
+            <a href="#features">Features</a><a href="#ios">iPhone &amp; iPad</a
+            ><a href="#privacy">Privacy</a><a href="#pro">Pro</a>
           </div>
         </details>
-        <a href="./download.html" class="nav__cta">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Download
-        </a>
-      </nav>
+        <a class="btn primary" href="./download.html">Download</a>
+      </div>
     </header>
 
-    <!-- Hero -->
-    <section class="hero">
-      <div class="container">
-        <div class="hero__grid">
-          <div class="hero__content">
-            <div class="hero__badge">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+    <main id="main">
+      <section class="hero">
+        <div class="wrap grid">
+          <div>
+            <h1>Know your portfolio, wherever you are.</h1>
+            <p class="lead">
+              Crypto and stocks across exchanges, wallets and Interactive
+              Brokers in one private place. History, PnL, cost basis and a
+              Pro-only assistant that answers from your own data.
+            </p>
+            <div class="cta">
+              <a class="btn primary" data-primary-cta href="./download.html"
+                >Get Track3</a
               >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-              Private by design &middot; Open source &middot; AI assistant
+              <a class="btn" href="https://github.com/domechn/track3"
+                >View on GitHub</a
+              >
             </div>
-            <p class="hero__eyebrow">
-              Crypto and stock portfolios across your devices
+            <p class="meta">
+              macOS · Windows · Linux · iOS sideload · Source available
             </p>
-            <h1>Know your portfolio, wherever you are</h1>
-            <p class="hero__copy">
-              Track crypto and stocks across exchanges, wallets, and Interactive
-              Brokers. See your history, compare periods, and ask the assistant
-              about your holdings on desktop, iPhone, or iPad.
+          </div>
+          <div class="shot">
+            <div class="win">
+              <img
+                src="images/desktop/overview.webp"
+                width="1600"
+                height="1000"
+                alt="Track3 desktop overview"
+              />
+            </div>
+            <div class="phone">
+              <img
+                src="images/ios/overview-light.webp"
+                width="600"
+                height="1298"
+                alt="Track3 on iPhone"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="sources" id="exchanges">
+        <div class="wrap">
+          <div class="row">
+            <b>Exchanges &amp; brokers</b>
+            <ul>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/binance-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Binance</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/okex-logo.svg"
+                  alt="OKX"
+                  class="wide"
+                  width="72"
+                  height="16"
+                />
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/bitget-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Bitget</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/kraken-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Kraken</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/gate-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Gate.io</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/coinbase-logo.jpg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Coinbase</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/bybit-logo.svg"
+                  alt="Bybit"
+                  class="wide"
+                  width="72"
+                  height="14"
+                />
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/htx-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>HTX</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/mexc-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>MEXC</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/backpack-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Backpack</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/ibkr-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Interactive Brokers</span>
+              </li>
+            </ul>
+          </div>
+          <div class="row">
+            <b>Wallets &amp; chains</b>
+            <ul>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/btc-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Bitcoin</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/eth-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Ethereum</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/binance-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>BNB Chain</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/sol-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Solana</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/doge-logo.webp"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>Dogecoin</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/ton-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>TON</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/sui-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>SUI</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/eth-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>EVM (Pro)</span>
+              </li>
+              <li>
+                <img
+                  loading="lazy"
+                  src="images/logos/tron-logo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                /><span>TRON (Pro)</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <section id="features">
+        <div class="wrap">
+          <div class="head">
+            <div class="kicker">What it does</div>
+            <h2>A calmer command center for your portfolio.</h2>
+            <p>
+              Your portfolio database stays on your device. Connect with
+              read-only credentials, refresh when you want, and see where every
+              balance sits.
             </p>
-            <div class="hero__actions">
-              <a href="./download.html" class="btn btn--primary">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+          </div>
+
+          <div class="feature">
+            <div class="win">
+              <img
+                loading="lazy"
+                src="images/desktop/history.webp"
+                width="1600"
+                height="1000"
+                alt="Track3 portfolio history on desktop"
+              />
+            </div>
+            <div class="copy">
+              <h3>Your whole history, one tap away.</h3>
+              <p>
+                Each successful refresh saves a snapshot. Scroll back through
+                days and months, open any day, and compare two periods side by
+                side.
+              </p>
+              <ul>
+                <li>A snapshot for every successful refresh, with change and asset counts</li>
+                <li>Automatic insights in the desktop Pro Assistant after refreshes</li>
+                <li>Compare any two snapshot dates</li>
+                <li>Per-exchange and per-wallet asset views (Pro)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="feature flip">
+            <div class="win">
+              <img
+                loading="lazy"
+                src="images/desktop/cost-basis.webp"
+                width="1600"
+                height="1000"
+                alt="Cost basis"
+              />
+            </div>
+            <div class="copy">
+              <h3>Know what you actually made.</h3>
+              <p>
+                Realized and unrealized PnL, cost basis with your chosen method,
+                and reports with CSV and JSON export — not just a balance.
+              </p>
+              <ul>
+                <li>FIFO, LIFO, HIFO and weighted average cost basis</li>
+                <li>Profit attribution by asset</li>
+                <li>Goals and alerts with notifications</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="feature" id="ai">
+            <div class="win">
+              <img
+                loading="lazy"
+                src="images/desktop/assistant.webp"
+                width="1600"
+                height="1000"
+                alt="Track3 AI assistant on desktop"
+              />
+            </div>
+            <div class="copy">
+              <h3>Ask your portfolio anything (Pro).</h3>
+              <p>
+                “How much BTC do I hold?” “What moved most this month?” The
+                assistant answers from your local data using any
+                OpenAI-compatible endpoint. Chat messages are encrypted before
+                storage; chat titles and previews are not.
+              </p>
+              <ul>
+                <li>Natural-language questions on holdings and trends</li>
+                <li>Proposed changes always need your approval</li>
+                <li>Rebalancing suggestions from your targets</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="more">
+        <div class="wrap">
+          <div class="head">
+            <div class="kicker">More to explore</div>
+            <h2>See the details behind every balance.</h2>
+            <p>Track3 has room for the daily work beyond an overview.</p>
+          </div>
+          <div class="more-grid">
+            <article class="more-card">
+              <img
+                loading="lazy"
+                src="images/desktop/wallets.webp"
+                width="1600"
+                height="1000"
+                alt="Wallet and source breakdown in Track3"
+              />
+              <div class="copy">
+                <h3>Wallets and sources</h3>
+                <p>
+                  See refresh status for each source, with retry controls in the
+                  refresh status dialog. Pro adds per-source asset views. Interactive
+                  Brokers positions import through Flex Web Service using a
+                  Query ID and Token.
+                </p>
+              </div>
+            </article>
+            <article class="more-card">
+              <img
+                loading="lazy"
+                src="images/desktop/rebalance.webp"
+                width="1600"
+                height="1000"
+                alt="Rebalance target planning in Track3"
+              />
+              <div class="copy">
+                <h3>Plan a rebalance</h3>
+                <p>
+                  Set target weights and trade constraints, review suggested
+                  changes, then export them to CSV.
+                </p>
+              </div>
+            </article>
+            <article class="more-card">
+              <img
+                loading="lazy"
+                src="images/desktop/goals.webp"
+                width="1600"
+                height="1000"
+                alt="Portfolio goals and alerts in Track3"
+              />
+              <div class="copy">
+                <h3>Goals and alerts</h3>
+                <p>
+                  Watch portfolio targets, prices and allocation drift. Review
+                  alert history and receive local notifications.
+                </p>
+              </div>
+            </article>
+            <article class="more-card">
+              <img
+                loading="lazy"
+                src="images/desktop/settings.webp"
+                width="1600"
+                height="1000"
+                alt="Track3 data and security settings"
+              />
+              <div class="copy">
+                <h3>Make it yours</h3>
+                <p>
+                  Import and export files, set up optional encrypted S3 sync,
+                  rotate the local encryption key, and choose English or
+                  Simplified Chinese.
+                </p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="tint" id="ios">
+        <div class="wrap">
+          <div class="head">
+            <div class="kicker">iPhone &amp; iPad</div>
+            <h2>The same portfolio, built for touch.</h2>
+            <p>
+              Tabs on iPhone, a sidebar and split views on iPad. The same local
+              portfolio data and encrypted sensitive settings, with a Face ID
+              app lock and Files import and export.
+            </p>
+          </div>
+          <div class="devices" id="screenshots">
+            <div>
+              <div class="dev">
+                <img
+                  loading="lazy"
+                  src="images/ios/overview-light.webp"
+                  width="600"
+                  height="1298"
+                  alt="Track3 portfolio overview on iPhone"
+                />
+              </div>
+              <p class="cap">Overview</p>
+            </div>
+            <div>
+              <div class="dev">
+                <img
+                  loading="lazy"
+                  src="images/ios/history-light.webp"
+                  width="600"
+                  height="1298"
+                  alt="Track3 portfolio history on iPhone"
+                />
+              </div>
+              <p class="cap">History</p>
+            </div>
+            <div>
+              <div class="dev">
+                <img
+                  loading="lazy"
+                  src="images/ios/assistant-light.webp"
+                  width="600"
+                  height="1298"
+                  alt="Track3 AI assistant on iPhone"
+                />
+              </div>
+              <p class="cap">Assistant (Pro)</p>
+            </div>
+            <div>
+              <div class="dev ipad">
+                <img
+                  loading="lazy"
+                  src="images/ios/pro-landscape-history-detail.webp"
+                  width="1100"
+                  height="825"
+                  alt="Track3 portfolio history detail on iPad"
+                />
+              </div>
+              <p class="cap">iPad, landscape</p>
+            </div>
+          </div>
+          <p class="note">
+            <b>Not on the App Store yet.</b> Build and sign it from the
+            repository using a Mac and Apple ID. If you build an IPA yourself,
+            AltStore or Sideloadly may sign it. Free signing generally needs
+            renewal every 7 days.
+            <a href="./download.html#ios">Step-by-step guide</a>
+          </p>
+        </div>
+      </section>
+
+      <section class="dark" id="privacy">
+        <div class="wrap">
+          <div class="head">
+            <div class="kicker">Privacy</div>
+            <h2>Your data, your control.</h2>
+            <p>
+              Portfolio records stay in a local SQLite database. Refreshes
+              contact your sources, assistant requests reach your chosen
+              provider, and optional sync uses your S3 storage. Crypto prices
+              and public wallet balances may come from public APIs such as
+              CoinGecko. Currency rates, the stablecoin list, stock prices, Pro
+              refreshes, and license checks use Track3's services. Pro wallet
+              refreshes send wallet addresses to Track3's service, and Track3
+              service requests include a persistent client ID.
+            </p>
+            <p>
+              The desktop and iOS apps send usage events for launches,
+              refreshes, and subscription-button clicks to Aptabase at
+              eu.aptabase.com. There is no in-app opt-out. Events carry a
+              persistent client ID and session ID, plus details such as OS,
+              user agent, locale, app and Tauri versions; refresh events may
+              include source IDs.
+            </p>
+          </div>
+          <div class="facts">
+            <div class="fact">
+              <b>Read-only keys</b
+              ><span
+                >Read-only API keys are enough; don't grant trade or withdrawal
+                permission.</span
+              >
+            </div>
+            <div class="fact">
+              <b>Encrypted storage</b
+              ><span
+                >Sensitive configuration and chat messages are encrypted before
+                storage; chat titles and previews are not. On desktop, set your
+                own encryption key for stronger protection. Portfolio records
+                are not app-encrypted.</span
+              >
+            </div>
+            <div class="fact">
+              <b>No wallet signatures</b
+              ><span
+                >Only public on-chain data is read. Nothing to approve.</span
+              >
+            </div>
+            <div class="fact">
+              <b>Source available</b
+              ><span
+                >Read the code on GitHub. Export and back up your data when you
+                choose.</span
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pro">
+        <div class="wrap">
+          <div class="head">
+            <div class="kicker">Track3 Pro</div>
+            <h2>More chains, fresher data.</h2>
+            <p>
+              Pro adds the AI assistant, broader EVM and TRON coverage, and
+              live values. Free Ethereum and BNB Chain tracking covers native
+              ETH and BNB; token balances need Pro.
+            </p>
+          </div>
+          <div class="plans">
+            <div class="card">
+              <h3>Monthly</h3>
+              <div class="price">$9.99<small> / month</small></div>
+              <p class="sub">Cancel any time.</p>
+            </div>
+            <div class="card">
+              <h3>Yearly</h3>
+              <div class="price">$83.99<small> / year</small></div>
+              <p class="sub">About 30% less than monthly.</p>
+            </div>
+            <div class="card limits">
+              <h3>Both plans include</h3>
+              <ul>
+                <li>AI assistant</li>
+                <li>Per-exchange and per-wallet asset views</li>
+                <li>300 ERC20 wallet refreshes per month</li>
+                <li>300 TRON asset refreshes per month</li>
+                <li>All-chain refresh on supported Pro EVM networks</li>
+                <li>Real-time portfolio value in the top bar and live prices during refresh</li>
+              </ul>
+              <p class="sub usage-note">
+                One wallet refresh counts as one use.
+              </p>
+            </div>
+          </div>
+          <p class="plan-note">
+            In-app subscriptions are not supported yet. Enter an existing Pro
+            license key in Settings → System → System Info on desktop, or
+            Settings → Pro and license on iPhone and iPad.
+          </p>
+        </div>
+      </section>
+
+      <section id="faq">
+        <div class="wrap">
+          <div class="head">
+            <div class="kicker">Common questions</div>
+            <h2>Before you start.</h2>
+          </div>
+          <div class="faq">
+            <div>
+              <h3>Which desktop platforms work?</h3>
+              <p>
+                Releases provide macOS, Windows and Linux installers. The
+                <a href="./download.html">download page</a> picks a recommended
+                package and lists every available format.
+              </p>
+            </div>
+            <div>
+              <h3>Is the iOS app on the App Store?</h3>
+              <p>
+                No. Build and sign it from the repository on a Mac. See the
+                <a href="./download.html#ios">iOS install steps</a> and
+                <a
+                  href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md"
+                  >signing notes</a
+                >.
+              </p>
+            </div>
+            <div>
+              <h3>Are all records encrypted?</h3>
+              <p>
+                Portfolio assets and transactions use a local SQLite database
+                and are not encrypted by the app. Credentials, configured wallet
+                addresses and chat messages are encrypted before storage; chat
+                titles and previews are not. On desktop, set your own encryption
+                key for stronger protection.
+                <a
+                  href="https://github.com/domechn/track3/blob/master/README.md#notice"
+                  >Privacy details</a
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Get Track3
-              </a>
-              <a
-                href="https://github.com/domechn/track3"
-                class="btn btn--outline"
-                target="_blank"
-                rel="noopener"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path
-                    d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-                  />
-                </svg>
-                View on GitHub
-              </a>
+              </p>
             </div>
-            <p class="hero__platforms">
-              Desktop downloads for macOS, Windows, and Linux · Build and sideload for iPhone and iPad
-            </p>
+            <div>
+              <h3>Can I move data between devices?</h3>
+              <p>
+                Use file import and export, a backup folder such as iCloud
+                Drive, or optional encrypted sync with S3 storage you configure.
+              </p>
+            </div>
           </div>
+        </div>
+      </section>
 
-          <aside class="hero__aside animate-in" aria-label="Track3 desktop preview">
-            <img src="images/desktop/overview.webp" alt="Track3 desktop Overview with portfolio trend, performance, and allocation charts" width="1600" height="1000" />
-            <p>Current desktop Overview · v0.9.0</p>
-          </aside>
-        </div>
-      </div>
-    </section>
-
-    <!-- Screenshots -->
-    <section class="screenshots" id="screenshots">
-      <div class="container">
-        <div class="screenshots__intro animate-in">
-          <div class="screenshots__intro-copy">
-            <p class="section__label">Preview</p>
-            <h2 class="section__title">
-              A calmer command center for your portfolio
-            </h2>
-          </div>
-          <p class="screenshots__intro-note">
-            The current desktop app includes portfolio history, comparisons,
-            cost basis, goals, rebalancing, and settings.
-          </p>
-        </div>
-      </div>
-      <div class="screenshots__frame">
-        <div class="screenshots__track" id="screenshotTrack">
-          <img src="images/desktop/overview.webp" alt="Track3 desktop Overview dashboard with portfolio trend, performance, and allocation" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/history.webp" alt="Track3 desktop History snapshots and changes" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/comparison.webp" alt="Track3 desktop Portfolio period comparison" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/wallets.webp" alt="Track3 desktop Wallet allocation and per-source analysis" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/profit.webp" alt="Track3 desktop Profit and loss summary" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/cost-basis.webp" alt="Track3 desktop Cost basis and tax-year report" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/goals.webp" alt="Track3 desktop Goals and alerts" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/rebalance.webp" alt="Track3 desktop Rebalancing targets and suggested trades" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/assistant.webp" alt="Track3 desktop AI assistant and portfolio insights" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/settings.webp" alt="Track3 desktop Settings and data sources" width="1600" height="1000" loading="lazy" />
-          <img src="images/desktop/overview-dark.webp" alt="Track3 desktop Dark theme Overview" width="1600" height="1000" loading="lazy" />
-        </div>
-        <div class="screenshots__dots" id="screenshotDots"></div>
-      </div>
-    </section>
-
-    <!-- iPhone and iPad -->
-    <section class="section" id="ios">
-      <div class="container">
-        <div class="animate-in">
-          <p class="section__label">iPhone and iPad</p>
-          <h2 class="section__title">Your portfolio fits the screen you have</h2>
-          <p class="section__desc">Track3 uses the same portfolio, encrypted configuration, sync, and assistant logic as desktop. iPhone has Overview, History, Analytics, and More tabs. iPad uses a collapsible sidebar and split views.</p>
-        </div>
-        <div class="ios__screens">
+      <section class="tint final" id="download">
+        <div class="wrap">
           <div>
-            <p class="ios__screen-label">iPhone</p>
-            <div class="screenshots__track screenshots__track--phones" id="iphoneTrack">
-              <img src="images/ios/overview-light.webp" alt="iPhone Overview portfolio chart" width="600" height="1298" loading="lazy" />
-              <img src="images/ios/history-light.webp" alt="iPhone History snapshots" width="600" height="1298" loading="lazy" />
-              <img src="images/ios/analytics-light.webp" alt="iPhone Analytics menu" width="600" height="1298" loading="lazy" />
-              <img src="images/ios/wallets-light.webp" alt="iPhone Wallets analysis" width="600" height="1298" loading="lazy" />
-              <img src="images/ios/goals-light.webp" alt="iPhone Goals and alerts" width="600" height="1298" loading="lazy" />
-              <img src="images/ios/assistant-light.webp" alt="iPhone Assistant conversation" width="600" height="1298" loading="lazy" />
-            </div>
-            <div class="screenshots__dots" id="iphoneDots"></div>
-          </div>
-          <div>
-            <p class="ios__screen-label">iPad</p>
-            <div class="screenshots__track screenshots__track--tablets" id="ipadTrack">
-              <img src="images/ios/pro-landscape-overview-light.webp" alt="iPad Overview with collapsible sidebar" width="1100" height="825" loading="lazy" />
-              <img src="images/ios/pro-landscape-history-detail.webp" alt="iPad History list and detail split view" width="1100" height="825" loading="lazy" />
-              <img src="images/ios/pro-landscape-settings.webp" alt="iPad Settings split view" width="1100" height="825" loading="lazy" />
-              <img src="images/ios/pro-landscape-assistant.webp" alt="iPad Assistant session and chat split view" width="1100" height="825" loading="lazy" />
-            </div>
-            <div class="screenshots__dots" id="ipadDots"></div>
-          </div>
-        </div>
-        <p class="ios__note">Files import and export, iCloud Drive backup folders, Face ID app lock, and local alerts are available in the iOS build. The app is not on the App Store. <a href="./download.html#ios">Follow the three community sideload steps</a> to build and sign it with a personal Apple ID. Free signing generally needs renewal every 7 days. Read the <a href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad">iOS overview</a> and <a href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">release and signing background</a>.</p>
-      </div>
-    </section>
-
-    <!-- AI Assistant -->
-    <section class="section" id="ai">
-      <div class="container">
-        <div class="animate-in">
-          <p class="section__label">&#129302; AI Assistant</p>
-          <h2 class="section__title">Ask your portfolio anything</h2>
-          <p class="section__desc">
-            Ask about holdings, allocation, and performance using your chosen
-            assistant provider. Track3 stores chat content encrypted locally;
-            prompts you send go to that provider.
-          </p>
-        </div>
-
-        <!-- AI Feature Cards -->
-        <div class="features" style="margin-bottom: 48px">
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--purple">&#128172;</div>
-            <h3>Natural Language Queries</h3>
+            <h2>Start tracking the private way.</h2>
             <p>
-              Ask questions like "How much BTC do I hold?" and use portfolio
-              context to explore the answer.
+              Free to download for desktop, or build the iPhone and iPad app.
+              Source available on GitHub.
             </p>
           </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--green">&#128202;</div>
-            <h3>Portfolio Analysis</h3>
-            <p>
-              Explore allocation, performance, and the factors behind changes
-              across connected accounts and wallets.
-            </p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--blue">&#128274;</div>
-            <h3>Your provider, your choice</h3>
-            <p>
-              Configure an assistant endpoint, key, and model. Chat content is
-              encrypted in local storage; requests go to the provider you set.
-            </p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--amber">&#128241;</div>
-            <h3>Desktop &amp; Mobile Ready</h3>
-            <p>
-              The AI chat interface is available on both desktop and iOS, so you
-              can query your portfolio and get insights wherever you are.
-            </p>
+          <div class="cta">
+            <a class="btn primary" data-primary-cta href="./download.html"
+              >Get Track3</a
+            ><a class="btn" href="./download.html">All platforms</a>
           </div>
         </div>
+      </section>
+    </main>
 
-        <!-- AI Screenshots Carousel -->
-        <div class="screenshots__frame animate-in">
-          <div class="screenshots__track screenshots__track--ai" id="aiScreenshotTrack">
-            <img src="images/desktop/assistant.webp" alt="Track3 desktop AI assistant with portfolio insights" width="1600" height="1000" loading="lazy" />
-            <img src="images/ios/assistant-light.webp" alt="Track3 iPhone AI assistant conversation" width="600" height="1298" loading="lazy" />
-            <img src="images/ios/pro-landscape-assistant.webp" alt="Track3 iPad AI assistant in a split view" width="1100" height="825" loading="lazy" />
-          </div>
-          <div class="screenshots__dots" id="aiScreenshotDots"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Features -->
-    <section class="section" id="features">
-      <div class="container">
-        <div class="animate-in">
-          <p class="section__label">&#10024; Features</p>
-          <h2 class="section__title">
-            Everything you need to track your portfolio
-          </h2>
-          <p class="section__desc">
-            From exchange balances to broker positions and on-chain wallets,
-            Track3 brings your sources and analysis together on desktop and iOS.
-          </p>
-        </div>
-        <div class="features">
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--purple">&#128274;</div>
-            <h3>Local portfolio storage</h3>
-            <p>
-              Portfolio records live in local SQLite. Sensitive configuration
-              and chat content are encrypted before storage.
-            </p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--green">&#128200;</div>
-            <h3>Rich Analytics & Charts</h3>
-            <p>
-              Explore allocation, P&amp;L, top movers, wallet breakdowns,
-              historical trends, and period comparisons.
-            </p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--blue">&#128279;</div>
-            <h3>Exchanges, Brokers & Wallets</h3>
-            <p>
-              Connect centralized exchanges with read-only API keys, import
-              Interactive Brokers positions, and track on-chain wallets in one
-              place.
-            </p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--amber">&#128176;</div>
-            <h3>Profit & Loss Tracking</h3>
-            <p>
-              Review realized and unrealized P&amp;L with FIFO, LIFO, HIFO,
-              and average cost basis, plus tax-year CSV and JSON reports.
-            </p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--rose">&#128230;</div>
-            <h3>Backup and encrypted sync</h3>
-            <p>
-              Import and export files, use incremental monthly backup folders,
-              or configure passphrase-encrypted sync with your own S3 storage.
-            </p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--cyan">&#9939;</div>
-            <h3>No Wallet Signature Required</h3>
-            <p>
-              Track3 only reads public on-chain data and exchange balances. It
-              never asks you to sign a transaction or grant fund access.
-            </p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--purple">&#127919;</div>
-            <h3>Goals and alerts</h3>
-            <p>Set portfolio or asset targets, watch price moves and allocation drift, and review alert history. iOS can deliver local notifications.</p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--green">&#9878;</div>
-            <h3>Rebalancing</h3>
-            <p>Set target weights and trade constraints, then review suggested changes and export them to CSV.</p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--blue">&#128269;</div>
-            <h3>Insights and source status</h3>
-            <p>See portfolio insights and per-source refresh status, including errors and retry controls.</p>
-          </div>
-          <div class="feature animate-in">
-            <div class="feature__icon feature__icon--amber">&#128272;</div>
-            <h3>Security and language</h3>
-            <p>Rotate the local encryption key and use Track3 in English or Simplified Chinese.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Exchanges & Chains -->
-    <section class="section" id="exchanges">
-      <div class="container" style="text-align: center">
-        <div class="animate-in">
-          <p class="section__label">&#128257; Supported Platforms</p>
-          <h2 class="section__title" style="margin-left: auto; margin-right: auto">
-            Connect exchanges, brokers, and wallets
-          </h2>
-          <p
-            class="section__desc"
-            style="margin-left: auto; margin-right: auto"
-          >
-            Track3 supports centralized exchanges, Interactive Brokers, and
-            major blockchains out of the box. Read-only access is all you need.
-          </p>
-        </div>
-        <div class="exchanges animate-in">
-          <div class="exchange">
-            <span class="exchange__logo">&#127313;</span> Binance
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127326;</span> OKX
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127313;</span> Bitget
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127322;</span> Kraken
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127318;</span> Gate.io
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127313;</span> Bybit
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127314;</span> Coinbase
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127319;</span> HTX
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127324;</span> MEXC
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#127313;</span> Backpack
-          </div>
-          <div class="exchange">
-            <span class="exchange__logo">&#128200;</span> IBKR
-          </div>
-        </div>
-
-        <div class="animate-in" style="margin-top: 64px">
-          <h3 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 8px">
-            Supported Brokers
-          </h3>
-          <p
-            style="
-              color: var(--text-muted);
-              font-size: 0.9rem;
-              margin-bottom: 20px;
-            "
-          >
-            Import stock and cash positions from Interactive Brokers through
-            Flex Web Service credentials.
-          </p>
-          <div class="chains">
-            <span class="chain">Interactive Brokers (IBKR)</span>
-          </div>
-        </div>
-
-        <div class="animate-in" style="margin-top: 64px">
-          <h3 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 8px">
-            Supported Blockchains
-          </h3>
-          <p
-            style="
-              color: var(--text-muted);
-              font-size: 0.9rem;
-              margin-bottom: 20px;
-            "
-          >
-            Base wallets: BTC, ETH, BNB, SOL, and Doge. TON and SUI fetchers
-            are also available. Pro adds TRON and broader EVM coverage.
-          </p>
-          <div class="chains">
-            <span class="chain">Bitcoin</span>
-            <span class="chain">Ethereum</span>
-            <span class="chain">BNB Chain</span>
-            <span class="chain">Solana</span>
-            <span class="chain">Dogecoin</span>
-            <span class="chain">TON</span>
-            <span class="chain">SUI</span>
-            <span
-              class="chain"
-              style="border-color: var(--accent); color: var(--accent)"
-              >TRON / TRC20 (Pro)</span
-            >
-            <span
-              class="chain"
-              style="border-color: var(--accent); color: var(--accent)"
-              >+ Polygon (Pro)</span
-            >
-            <span
-              class="chain"
-              style="border-color: var(--accent); color: var(--accent)"
-              >+ Arbitrum (Pro)</span
-            >
-            <span
-              class="chain"
-              style="border-color: var(--accent); color: var(--accent)"
-              >+ Optimism (Pro)</span
-            >
-            <span
-              class="chain"
-              style="border-color: var(--accent); color: var(--accent)"
-              >+ Avalanche (Pro)</span
-            >
-            <span
-              class="chain"
-              style="border-color: var(--accent); color: var(--accent)"
-              >+ Base (Pro)</span
-            >
-            <span
-              class="chain"
-              style="border-color: var(--accent); color: var(--accent)"
-              >+ 85+ EVM chains total (Pro)</span
-            >
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Pro Subscription -->
-    <section class="section" id="pro">
-      <div class="container pricing">
-        <div>
-          <div class="animate-in">
-            <p class="section__label">&#9889; Track3 Pro</p>
-            <h2 class="section__title">More chains, fresher portfolio data</h2>
-            <p class="section__desc">
-              Pro adds hosted refresh and price endpoints for wallets that need
-              broader chain coverage. Portfolio history stays in the local app
-              database; sensitive configuration is encrypted before storage.
-            </p>
-          </div>
-          <div class="pro-features">
-            <div class="pro-feature animate-in">
-              <h3>85+ EVM chains</h3>
-              <p>
-                Refresh ERC20 assets across 85+ supported EVM networks,
-                including Ethereum, BNB Chain, Polygon, Arbitrum, Avalanche,
-                Optimism, Base, and more.
-              </p>
-            </div>
-            <div class="pro-feature animate-in">
-              <h3>TRON / TRC20 assets</h3>
-              <p>
-                Add TRON wallets and refresh TRC20 balances through the Pro API,
-                including token values when price data is available.
-              </p>
-            </div>
-            <div class="pro-feature animate-in">
-              <h3>Per-exchange and per-wallet views</h3>
-              <p>
-                Inspect assets for each connected exchange account and wallet
-                separately, so you can see exactly where each balance is held.
-              </p>
-            </div>
-            <div class="pro-feature animate-in">
-              <h3>Real-time portfolio value</h3>
-              <p>
-                Unlock the fast top-bar view that compares live portfolio value
-                against your last saved refresh.
-              </p>
-            </div>
-            <div class="pro-feature animate-in">
-              <h3>Real-time prices for all assets</h3>
-              <p>
-                Fetch live prices across all tracked assets during refreshes, so
-                valuations stay current without waiting for the free local price
-                path.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div
-          class="plans animate-in"
-          aria-label="Track3 Pro subscription plans"
-        >
-          <div class="plan">
-            <h3>Monthly</h3>
-            <div class="plan__price">$9.99 <span>/ month</span></div>
-            <p class="plan__desc">
-              A flexible plan for active wallet tracking.
-            </p>
-            <ul class="plan__list">
-              <li>300 ERC20 wallet refreshes per month</li>
-              <li>300 TRON asset refreshes per month</li>
-              <li>All-chain asset refresh for supported Pro networks</li>
-              <li>One wallet refresh counts as one use</li>
-            </ul>
-          </div>
-          <div class="plan plan--featured">
-            <div class="plan__badge">Save ~30%</div>
-            <h3>Yearly</h3>
-            <div class="plan__price">$83.99 <span>/ year</span></div>
-            <p class="plan__desc">
-              Same Pro limits and features, billed once per year.
-            </p>
-            <ul class="plan__list">
-              <li>300 ERC20 wallet refreshes per month</li>
-              <li>300 TRON asset refreshes per month</li>
-              <li>All-chain asset refresh for supported Pro networks</li>
-              <li>Manage billing from inside Track3</li>
-            </ul>
-          </div>
-          <p class="pricing__note">
-            Desktop subscriptions are managed from System Info. On iOS, you can
-            enter an existing Pro license key in Settings → Pro and license.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Privacy -->
-    <section class="section" id="privacy">
-      <div class="container">
-        <div class="privacy-banner animate-in">
-          <p class="section__label" style="justify-content: center">
-            &#128737;&#65039; Privacy
-          </p>
-          <h2>Your data, your control</h2>
-          <p>
-            Portfolio records are stored locally. Track3 encrypts sensitive
-            configuration and chat content before storage. Refreshes contact
-            your configured sources; assistant requests go to your chosen
-            provider, and optional encrypted sync uses your S3 storage.
-          </p>
-          <div class="privacy-checks">
-            <div class="privacy-check">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Local portfolio database
-            </div>
-            <div class="privacy-check">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Encrypted sensitive settings
-            </div>
-            <div class="privacy-check">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Open source
-            </div>
-            <div class="privacy-check">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Read-only API access
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA -->
-    <section class="cta">
-      <div class="container">
-        <div class="cta__panel animate-in">
-          <p class="section__label">Download</p>
-          <h2>Start tracking your portfolio<br />the private way</h2>
-          <p>
-            Get the desktop release or follow the iOS sideload steps for iPhone
-            and iPad.
-          </p>
-          <div class="hero__actions">
-            <a href="./download.html" class="btn btn--primary">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Download for Free
-            </a>
-            <a
-              href="https://github.com/domechn/track3"
-              class="btn btn--outline"
-              target="_blank"
-              rel="noopener"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="15 3 21 3 21 9" />
-                <polyline points="9 21 3 21 3 15" />
-                <line x1="21" y1="3" x2="14" y2="10" />
-                <line x1="3" y1="21" x2="10" y2="14" />
-              </svg>
-              Star on GitHub
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Footer -->
     <footer>
-      <div class="container footer__inner">
-        <div class="footer__left">
-          &copy; 2026 Track3 &middot; Built with Tauri &amp; React
-        </div>
-        <div class="footer__links">
-          <a
-            href="https://github.com/domechn/track3"
-            target="_blank"
-            rel="noopener"
-            >GitHub</a
-          >
-          <a
-            href="https://github.com/domechn/track3/releases"
-            target="_blank"
-            rel="noopener"
-            >Releases</a
-          >
-          <a
-            href="https://deepwiki.com/domechn/track3"
-            target="_blank"
-            rel="noopener"
-            >Wiki</a
-          >
-          <a
-            href="https://github.com/domechn/track3/blob/master/LICENSE"
-            target="_blank"
-            rel="noopener"
-            >License</a
-          >
-        </div>
+      <div class="wrap">
+        <span>© 2026 Track3 · Source available</span
+        ><a href="https://github.com/domechn/track3">GitHub</a
+        ><a href="https://github.com/domechn/track3/releases">Releases</a
+        ><a href="https://deepwiki.com/domechn/track3">Wiki</a
+        ><a href="./index.html#privacy">Privacy</a
+        ><a href="https://github.com/domechn/track3/blob/master/LICENSE"
+          >License</a
+        >
       </div>
     </footer>
-
-    <script>
-      /* ── Header scroll effect ── */
-      const header = document.getElementById("header");
-      window.addEventListener(
-        "scroll",
-        () => {
-          header.classList.toggle("scrolled", window.scrollY > 20);
-        },
-        { passive: true },
-      );
-
-      /* ── Screenshot carousel dots ── */
-      function setupCarousel(trackId, dotsId) {
-        const track = document.getElementById(trackId);
-        const dotsContainer = document.getElementById(dotsId);
-        if (!track || !dotsContainer) return;
-        const images = Array.from(track.querySelectorAll("img"));
-
-        images.forEach((_, i) => {
-          const dot = document.createElement("button");
-          dot.setAttribute("aria-label", "Go to screenshot " + (i + 1));
-          if (i === 0) dot.classList.add("active");
-          dot.addEventListener("click", () => {
-            images[i].scrollIntoView({
-              behavior: "smooth",
-              inline: "center",
-              block: "nearest",
-            });
-          });
-          dotsContainer.appendChild(dot);
-        });
-
-        const ratios = images.map(() => 0);
-        const updateActive = () => {
-          const maxScroll = track.scrollWidth - track.clientWidth;
-          const active = track.scrollLeft <= 1
-            ? 0
-            : track.scrollLeft >= maxScroll - 1
-              ? images.length - 1
-              : ratios.indexOf(Math.max(...ratios));
-          dotsContainer.querySelectorAll("button").forEach((d, i) => {
-            d.classList.toggle("active", i === active);
-          });
-        };
-        const dotObserver = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((e) => {
-              ratios[images.indexOf(e.target)] = e.intersectionRatio;
-            });
-            updateActive();
-          },
-          { root: track, threshold: [0, 0.25, 0.5, 0.75, 1] },
+    <script type="module">
+      import { detectPlatform } from "./download-page.mjs";
+      import { recommendedCta } from "./site-cta.mjs";
+      const cta = recommendedCta(detectPlatform());
+      document.querySelectorAll("[data-primary-cta]").forEach((link) => {
+        link.textContent = cta.label;
+        link.href = cta.href;
+      });
+      document.querySelectorAll(".mobile-menu a").forEach((link) => {
+        link.addEventListener(
+          "click",
+          () => (link.closest("details").open = false),
         );
-        images.forEach((img) => dotObserver.observe(img));
-        track.addEventListener("scroll", updateActive, { passive: true });
-      }
-
-      setupCarousel("screenshotTrack", "screenshotDots");
-      setupCarousel("aiScreenshotTrack", "aiScreenshotDots");
-      setupCarousel("iphoneTrack", "iphoneDots");
-      setupCarousel("ipadTrack", "ipadDots");
-
-      /* ── Smooth scroll for anchor links ── */
-      document.querySelectorAll('a[href^="#"]').forEach((a) => {
-        const href = a.getAttribute("href");
-        if (!href || href === "#") return;
-
-        a.addEventListener("click", (e) => {
-          e.preventDefault();
-          const target = document.querySelector(href);
-          if (target) {
-            a.closest(".nav__menu")?.removeAttribute("open");
-            target.scrollIntoView({ behavior: "smooth" });
-          }
-        });
       });
     </script>
   </body>
