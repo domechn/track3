@@ -142,6 +142,15 @@ describe("System Info subscription management", () => {
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
     expect(screen.getAllByText(/Resets/)).toHaveLength(2);
   });
+  it("hides usage rows on iOS when an older subscription response omits usage", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    window.location.hash = "#/settings/systemInfo?section=pro";
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    await screen.findByText("Yearly");
+    expect(screen.queryByRole("heading", { name: "Monthly refresh usage" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
   it("keeps license entry but hides external subscription links on iPhone", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     window.location.hash = "#/settings/systemInfo?section=pro";

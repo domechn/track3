@@ -1074,7 +1074,7 @@
   "sync.disableFailed": "Could not disable sync. Please try again.",
   "refresh.reason.quota": "Monthly refresh limit reached",
   "refresh.preflight.title": "Refresh limit",
-  "refresh.preflight.desc": "This refresh needs {needed} {resource} wallet refreshes, with {remaining} left. {n} wallets will keep their last values.",
+  "refresh.preflight.desc": "{resource} wallet refreshes needed: {needed}; remaining: {remaining}. Wallets keeping their last values: {n}.",
   "refresh.preflight.continue": "Continue refresh",
   "system.usage.erc20": "ERC20 wallet refreshes",
   "system.usage.tron": "TRON wallet refreshes",

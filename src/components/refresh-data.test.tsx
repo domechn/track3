@@ -107,7 +107,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     });
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByRole("alertdialog", { name: "Refresh limit" })).toHaveTextContent("2 ERC20");
+    expect(await screen.findByRole("alertdialog", { name: "Refresh limit" })).toHaveTextContent("ERC20 wallet refreshes needed: 2; remaining: 1");
     expect(refreshAllData).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Continue refresh" }));
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());

@@ -7,6 +7,7 @@ import { isIOS } from "@/utils/platform";
 
 const toast = vi.hoisted(() => vi.fn());
 const loadPortfolio = vi.hoisted(() => vi.fn());
+const invalidateUsageCache = vi.hoisted(() => vi.fn());
 
 vi.mock("@/utils/platform", async (original) => ({
   ...await original<typeof import("@/utils/platform")>(), isIOS: vi.fn(() => false),
@@ -15,10 +16,12 @@ vi.mock("@/components/ui/use-toast", () => ({ useToast: () => ({ toast }) }));
 vi.mock("@/mobile/components/ui/use-toast", () => ({ useToast: () => ({ toast }) }));
 vi.mock("@/middlelayers/license", () => ({
   isProVersion: vi.fn().mockResolvedValue({ isPro: true, license: "pro" }),
+  invalidateUsageCache,
 }));
 vi.mock("@/middlelayers/datafetch/coins/erc20", () => ({
   ERC20ProAnalyzer: class { loadPortfolio = loadPortfolio; },
 }));
+vi.mock("@tauri-apps/api/path", () => ({ appCacheDir: vi.fn().mockResolvedValue("/cache") }));
 vi.mock("@/middlelayers/configuration", () => ({
   getCachedPreferCurrency: () => "USD",
   getConfiguration: vi.fn().mockResolvedValue({
@@ -54,4 +57,21 @@ it("shows the monthly quota message for iOS wallet quick look", async () => {
   await waitFor(() => expect(toast).toHaveBeenCalledWith({
     description: "Monthly refresh limit reached", variant: "destructive",
   }));
+});
+
+it("invalidates Pro usage after desktop wallet quick look", async () => {
+  loadPortfolio.mockResolvedValueOnce([]);
+  render(<DesktopConfiguration initialPreferCurrency="EUR" />);
+  fireEvent.click(await screen.findByTitle("Quick look"));
+  await waitFor(() => expect(invalidateUsageCache).toHaveBeenCalledOnce());
+});
+
+it("invalidates Pro usage after iOS wallet quick look", async () => {
+  vi.mocked(isIOS).mockReturnValue(true);
+  loadPortfolio.mockResolvedValueOnce([]);
+  window.location.hash = "#/settings/configuration?section=sources";
+  render(<HashRouter><MobileConfiguration initialPreferCurrency="EUR" /></HashRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: /More actions for ERC20 vault/i }));
+  fireEvent.click(await screen.findByRole("button", { name: "Quick look" }));
+  await waitFor(() => expect(invalidateUsageCache).toHaveBeenCalledOnce());
 });

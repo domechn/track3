@@ -50,7 +50,13 @@ Manual exports remain single JSON files. Upgraded installations still import the
 
 ## Pro Users
 
-Pro includes 300 ERC20 wallet refreshes per month and 300 TRON wallet refreshes per month. All-chain asset refresh for supported Pro networks. One wallet refresh counts as one use. Limits reset monthly on the license billing date.
+Pro includes:
+
+- 300 ERC20 wallet refreshes per month
+- 300 TRON wallet refreshes per month
+- All-chain asset refresh for supported Pro networks
+
+One wallet refresh counts as one use. Limits reset monthly on the license billing date.
 
 1. Support 85+ EVM compatible Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base, and most ERC20 tokens on these chains.
 2. Support TRON wallets and TRC20 assets.

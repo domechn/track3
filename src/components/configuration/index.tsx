@@ -28,7 +28,7 @@ import { ERC20ProAnalyzer } from "@/middlelayers/datafetch/coins/erc20";
 import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
 import { TonAnalyzer } from "@/middlelayers/datafetch/coins/ton";
 import { SUIAnalyzer } from "@/middlelayers/datafetch/coins/sui";
-import { isProVersion } from "@/middlelayers/license";
+import { invalidateUsageCache, isProVersion } from "@/middlelayers/license";
 import { getImageApiPath } from "@/utils/app";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import bluebird from "bluebird";
@@ -629,6 +629,7 @@ const App = ({
       });
       setQuickLookOpen(false);
     } finally {
+      if (wallet.type === "erc20" || wallet.type === "trc20") await invalidateUsageCache();
       setQuickLookLoading(false);
     }
   }

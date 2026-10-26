@@ -24,7 +24,7 @@ test("iOS asks before an exhausted Pro wallet refresh", async ({ page }) => {
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   const preflight = page.getByRole("alertdialog", { name: "Refresh limit" });
-  await expect(preflight).toContainText("with 0 left");
+  await expect(preflight).toContainText("ERC20 wallet refreshes needed: 1; remaining: 0");
   await expect(preflight.getByRole("button", { name: "Continue refresh" })).toBeVisible();
   await preflight.getByRole("button", { name: "Continue refresh" }).click();
   await expect(page.getByRole("alertdialog", { name: "Source status" })).toContainText("Monthly refresh limit reached");

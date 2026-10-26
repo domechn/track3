@@ -331,9 +331,9 @@ const App = ({
       {activeLicense && subscriptionInfo && subscriptionInfo.status !== "active" && <ListRow value={subscriptionStatusLabel(subscriptionInfo.status)}>{t("system.statusLabel")}</ListRow>}
       {activeLicense && subscriptionInfo?.planType && <ListRow value={t(subscriptionInfo.planType === "monthly" ? "system.monthly" : "system.yearly")}>{t("system.planLabel")}</ListRow>}
     </InsetGroup>
-    {activeLicense && subscriptionInfo?.usage && <><h2 className="ios-d3-section-heading">{t("system.usage.heading")}</h2><InsetGroup><div className="px-4 pb-4">
+    {activeLicense && subscriptionInfo?.usage && <section><h2 className="ios-d3-section-heading">{t("system.usage.heading")}</h2><InsetGroup><div className="px-4 pb-4">
       <ProUsageRows usage={subscriptionInfo.usage} t={t} locale={locale} />
-    </div></InsetGroup></>}
+    </div></InsetGroup></section>}
     {!activeLicense && <section>
       <h2 className="ios-d3-section-heading">{t("system.legacyInputTitle")}</h2>
       <div className="ios-d3-license-group">

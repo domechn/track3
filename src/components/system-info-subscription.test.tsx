@@ -142,6 +142,16 @@ describe("System Info subscription management", () => {
       process.env.TZ = originalTimeZone;
     }
   });
+
+  it("hides usage rows when an older subscription response omits usage", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    await screen.findByText("Subscription");
+    expect(screen.queryByText("ERC20 wallet refreshes")).not.toBeInTheDocument();
+    expect(screen.queryByText("TRON wallet refreshes")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
   it("keeps subscription controls available when plan data is malformed", async () => {
     mocks.getSubscriptionPlans.mockResolvedValueOnce({});
     render(<SystemInfo onProStatusChange={vi.fn()} />);

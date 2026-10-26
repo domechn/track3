@@ -112,7 +112,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     });
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByRole("alertdialog", { name: "Refresh limit" })).toHaveTextContent("1 TRON");
+    expect(await screen.findByRole("alertdialog", { name: "Refresh limit" })).toHaveTextContent("TRON wallet refreshes needed: 1; remaining: 0");
     expect(refreshAllData).not.toHaveBeenCalled();
   });
   it("shows preflight progress and starts only one refresh for two clicks during usage lookup", async () => {
