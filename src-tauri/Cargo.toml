@@ -76,4 +76,4 @@ objc2-foundation = { version = "=0.3.2", default-features = false, features = ["
 [dependencies.tauri-plugin-sql]
 default-features = false
 features = ["sqlite"] # or "postgres", or "mysql"
-version = "=2.4.0"
+version = "=2.6.0"
