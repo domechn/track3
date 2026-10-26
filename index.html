@@ -93,8 +93,7 @@
               >
             </div>
             <p class="meta">
-              macOS · Windows · Linux · iPhone &amp; iPad (sideload) · Source
-              available
+              macOS · Windows · Linux · iOS sideload · Source available
             </p>
           </div>
           <div class="shot">
@@ -299,7 +298,7 @@
                   alt=""
                   width="24"
                   height="24"
-                /><span>More EVM chains (Pro)</span>
+                /><span>EVM (Pro)</span>
               </li>
               <li>
                 <img
@@ -346,8 +345,8 @@
               </p>
               <ul>
                 <li>A snapshot for every successful refresh, with change and asset counts</li>
-                <li>Automatic insights after successful refreshes</li>
-                <li>Compare any two dates</li>
+                <li>Automatic insights in the desktop Pro Assistant after refreshes</li>
+                <li>Compare any two snapshot dates</li>
                 <li>Per-exchange and per-wallet asset views (Pro)</li>
               </ul>
             </div>
@@ -370,7 +369,7 @@
                 and reports with CSV and JSON export — not just a balance.
               </p>
               <ul>
-                <li>FIFO and other cost-basis methods</li>
+                <li>FIFO, LIFO, HIFO and weighted average cost basis</li>
                 <li>Profit attribution by asset</li>
                 <li>Goals and alerts with notifications</li>
               </ul>
@@ -391,8 +390,9 @@
               <h3>Ask your portfolio anything (Pro).</h3>
               <p>
                 “How much BTC do I hold?” “What moved most this month?” The
-                assistant answers from your local data using the provider you
-                choose; chats are stored encrypted.
+                assistant answers from your local data using any
+                OpenAI-compatible endpoint. Chat messages are encrypted before
+                storage; chat titles and previews are not.
               </p>
               <ul>
                 <li>Natural-language questions on holdings and trends</li>
@@ -423,8 +423,8 @@
               <div class="copy">
                 <h3>Wallets and sources</h3>
                 <p>
-                  Check connection and refresh status for each source, with
-                  retry controls. Pro adds per-source asset views. Interactive
+                  See refresh status for each source, with retry controls in the
+                  refresh status dialog. Pro adds per-source asset views. Interactive
                   Brokers positions import through Flex Web Service using a
                   Query ID and Token.
                 </p>
@@ -546,9 +546,10 @@
           </div>
           <p class="note">
             <b>Not on the App Store yet.</b> Build and sign it from the
-            repository using a Mac and Apple ID. An IPA can also be signed with
-            AltStore or Sideloadly. Free signing generally needs renewal every 7
-            days. <a href="./download.html#ios">Step-by-step guide</a>
+            repository using a Mac and Apple ID. If you build an IPA yourself,
+            AltStore or Sideloadly may sign it. Free signing generally needs
+            renewal every 7 days.
+            <a href="./download.html#ios">Step-by-step guide</a>
           </p>
         </div>
       </section>
@@ -564,11 +565,14 @@
               provider, and optional sync uses your S3 storage. Crypto prices
               and public wallet balances may come from public APIs such as
               CoinGecko. Currency rates, the stablecoin list, stock prices, Pro
-              refreshes, and license checks use Track3's services.
+              refreshes, and license checks use Track3's services. Pro wallet
+              refreshes send wallet addresses to Track3's service, and Track3
+              service requests include a persistent client ID.
             </p>
             <p>
-              The app also sends usage events for launches, refreshes, and
-              license actions to Aptabase at eu.aptabase.com. Events carry a
+              The desktop and iOS apps send usage events for launches,
+              refreshes, and subscription-button clicks to Aptabase at
+              eu.aptabase.com. There is no in-app opt-out. Events carry a
               persistent client ID and session ID, plus details such as OS,
               user agent, locale, app and Tauri versions; refresh events may
               include source IDs.
@@ -585,8 +589,10 @@
             <div class="fact">
               <b>Encrypted storage</b
               ><span
-                >Sensitive configuration and chat content are encrypted before
-                storage. Portfolio records are not app-encrypted.</span
+                >Sensitive configuration and chat messages are encrypted before
+                storage; chat titles and previews are not. On desktop, set your
+                own encryption key for stronger protection. Portfolio records
+                are not app-encrypted.</span
               >
             </div>
             <div class="fact">
@@ -644,9 +650,9 @@
             </div>
           </div>
           <p class="plan-note">
-            Desktop subscriptions are managed in System Info. On iPhone and
-            iPad, enter an existing Pro license key in Settings → Pro and
-            license.
+            In-app subscriptions are not supported yet. Enter an existing Pro
+            license key in Settings → System → System Info on desktop, or
+            Settings → Pro and license on iPhone and iPad.
           </p>
         </div>
       </section>
@@ -681,8 +687,10 @@
               <h3>Are all records encrypted?</h3>
               <p>
                 Portfolio assets and transactions use a local SQLite database
-                and are not encrypted by the app. Credentials, wallet addresses
-                and chats are encrypted before storage.
+                and are not encrypted by the app. Credentials, configured wallet
+                addresses and chat messages are encrypted before storage; chat
+                titles and previews are not. On desktop, set your own encryption
+                key for stronger protection.
                 <a
                   href="https://github.com/domechn/track3/blob/master/README.md#notice"
                   >Privacy details</a

@@ -5,15 +5,15 @@
     <meta name="robots" content="noindex" />
     <meta name="referrer" content="no-referrer" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Payment received — Track3 Pro</title>
+    <title>Checkout status — Track3 Pro</title>
     <meta
       name="description"
-      content="Your Track3 Pro subscription is being activated. Return to the Track3 app to start using it."
+      content="Check a Track3 Pro checkout and find your license key if one was issued."
     />
-    <meta property="og:title" content="Payment received — Track3 Pro" />
+    <meta property="og:title" content="Checkout status — Track3 Pro" />
     <meta
       property="og:description"
-      content="Your Track3 Pro subscription is being activated. Return to the Track3 app to start using it."
+      content="Check a Track3 Pro checkout and find your license key if one was issued."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://track3.domc.me/success.html" />
@@ -22,10 +22,10 @@
       content="https://track3.domc.me/images/social-overview.jpg"
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Payment received — Track3 Pro" />
+    <meta name="twitter:title" content="Checkout status — Track3 Pro" />
     <meta
       name="twitter:description"
-      content="Your Track3 Pro subscription is being activated. Return to the Track3 app to start using it."
+      content="Check a Track3 Pro checkout and find your license key if one was issued."
     />
     <meta
       name="twitter:image"
@@ -69,7 +69,7 @@
       <section class="page-section tint">
         <div class="wrap">
           <div class="notice">
-            <h1 id="pageTitle">Thanks — payment received</h1>
+            <h1 id="pageTitle">Track3 Pro checkout</h1>
             <section
               id="checkoutStatus"
               class="checkout-status"
@@ -83,11 +83,11 @@
                   class="status-spinner"
                   aria-hidden="true"
                 ></span
-                ><span id="checkoutTitle">Activating your subscription…</span>
+                ><span id="checkoutTitle">Checking checkout status…</span>
               </h2>
               <p id="checkoutMessage">
-                This usually takes a few seconds. You can leave this page and
-                use the app while we check.
+                If checkout completed, your license key will appear here when
+                it is ready.
               </p>
               <div id="licenseDetails" hidden>
                 <strong>Your license key</strong>
@@ -121,8 +121,8 @@
               </div>
             </section>
             <p>
-              Track3 Pro activates automatically after checkout. This usually
-              takes a few seconds.
+              In-app subscriptions are not supported yet. If this checkout
+              issued a license key, enter it in Track3 to enable Pro.
             </p>
             <ol>
               <li>
@@ -130,25 +130,25 @@
                 iPhone/iPad).
               </li>
               <li>
-                Open <strong>System Info</strong> (or
+                Open <strong>Settings → System → System Info</strong> (or
                 <strong>More → Settings → Pro and license</strong> on mobile).
               </li>
               <li>
-                Your Pro status refreshes automatically. If it still shows Free
-                after a minute, quit and reopen the app.
+                Enter your license key. If Pro does not appear, check the key
+                and try again.
               </li>
             </ol>
             <p>
               To use Pro on another device, open Track3 →
-              <strong>System Info</strong> (or
+              <strong>Settings → System → System Info</strong> (or
               <strong>More → Settings → Pro and license</strong> on iPhone/iPad)
               and enter
               your license key. You can use it on up to 3 devices. Keep it safe:
               anyone with the key can use it.
             </p>
             <p>
-              You can manage or cancel the subscription from System Info in the
-              desktop app.
+              If you have a subscription, you can manage or cancel it from
+              System Info in the desktop app.
             </p>
             <p>
               Trouble?
@@ -218,7 +218,7 @@
             titleText === "Checkout session expired" ||
             titleText === "Checkout could not be completed"
               ? titleText
-              : "Thanks — payment received";
+              : "Track3 Pro checkout";
           title.textContent = titleText;
           message.textContent = messageText;
           spinner.hidden = !waiting;
@@ -233,7 +233,7 @@
           if (remaining <= 0) {
             show(
               "We could not load your license",
-              "The check took too long. Your app may still activate automatically. Follow the steps below or try again.",
+              "The check took too long. Try again, or open an issue if you completed checkout and still need your license key.",
               false,
               true,
             );
@@ -275,7 +275,7 @@
                   );
               show(
                 "Your Track3 Pro license is ready",
-                "The app activates automatically. Copy this key if you want to use Pro on another device.",
+                "Copy this key and enter it in Track3 to enable Pro.",
                 false,
                 false,
               );
@@ -300,7 +300,7 @@
             if (failures >= 3) {
               show(
                 "We could not load your license",
-                "The status check is unavailable. Your app may still activate automatically. Follow the steps below or try again.",
+                "The status check is unavailable. Try again, or open an issue if you completed checkout and still need your license key.",
                 false,
                 true,
               );
@@ -321,8 +321,8 @@
           failures = 0;
           copyFeedback.textContent = "";
           show(
-            "Activating your subscription…",
-            "This usually takes a few seconds. You can leave this page and use the app while we check.",
+            "Checking checkout status…",
+            "If checkout completed, your license key will appear here when it is ready.",
             true,
             false,
           );

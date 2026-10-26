@@ -32,6 +32,19 @@ body {
   line-height: 1.55;
   font-size: 18px;
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+main {
+  flex: 1;
+}
+main:has(.notice) {
+  display: flex;
+  flex-direction: column;
+}
+main:has(.notice) > .page-section {
+  flex: 1;
 }
 img {
   display: block;
@@ -649,9 +662,6 @@ header .wrap {
   text-decoration: none;
   font-size: 16px;
 }
-.phone img {
-  border-radius: 23px;
-}
 .feature .copy a,
 .more-card a,
 .faq a {
@@ -737,7 +747,7 @@ header .wrap {
   background: var(--tint);
   padding: 2px;
   border-radius: 4px;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .download-badges {
   display: flex;
@@ -925,9 +935,6 @@ header .wrap {
   }
 }
 @media (max-width: 600px) {
-  :root {
-    --gutter: 20px;
-  }
   .more-grid,
   .faq {
     grid-template-columns: 1fr;
@@ -952,6 +959,10 @@ header .wrap {
     padding-left: 8px;
     padding-right: 8px;
     gap: 5px;
+  }
+  .recommendation__actions > *,
+  .manual-group__actions > * {
+    width: 100%;
   }
 }
 @media (max-width: 520px) {

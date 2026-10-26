@@ -115,8 +115,10 @@
               Run <code>corepack yarn tauri ios dev --open</code>. In Xcode,
               choose the Track3 iOS target and your Apple ID team under Signing
               &amp; Capabilities. Change the bundle ID if needed, select your
-              connected device, and press Run. An IPA can also be signed and
-              installed with AltStore or Sideloadly.
+              connected device, and press Run. This development build needs
+              the Mac's development server to stay running. For a standalone
+              build, use <code>corepack yarn tauri ios build</code>. If you
+              build an IPA yourself, AltStore or Sideloadly may sign it.
             </li>
             <li>With a free Apple ID, renew signing about every 7 days.</li>
           </ol>
