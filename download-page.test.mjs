@@ -84,6 +84,28 @@ test("detectPlatform identifies Windows x64 from the user agent fallback", () =>
   });
 });
 
+test("detectPlatform identifies iPhone and iPad, including iPad desktop user agents", () => {
+  assert.deepEqual(
+    detectPlatform({
+      platform: "iPhone",
+      userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
+    }),
+    { os: "ios", arch: "unknown", confidence: "high", label: "iPhone or iPad" },
+  );
+  assert.equal(
+    detectPlatform({
+      platform: "MacIntel",
+      maxTouchPoints: 5,
+      userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15",
+    }).os,
+    "ios",
+  );
+  assert.equal(
+    resolveLatestDownloadUrl({ version: "0.9.0" }, { os: "ios", arch: "unknown", kind: "dmg" }),
+    null,
+  );
+});
+
 test("buildPlatformDownloads groups installable assets and excludes signatures", () => {
   const downloads = buildPlatformDownloads(assets);
 

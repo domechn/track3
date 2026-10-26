@@ -3,26 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>
-      Download Track3 — Privacy-First Desktop Portfolio Tracker with AI
-    </title>
+    <title>Get Track3 — Desktop Downloads and iOS Sideload Steps</title>
     <meta
       name="description"
-      content="Download the latest Track3 desktop app for macOS, Windows, or Linux. Built-in AI assistant for portfolio analysis. We detect your system and recommend the best installer for your device."
+      content="Get the latest Track3 desktop installer for macOS, Windows, or Linux. For iPhone and iPad, follow community build and sideload steps with a personal Apple ID."
     />
     <meta
       property="og:title"
-      content="Download Track3 — Privacy-First Desktop Portfolio Tracker with AI"
+      content="Get Track3 — Desktop Downloads and iOS Sideload Steps"
     />
     <meta
       property="og:description"
-      content="Get the latest Track3 installer for macOS, Windows, or Linux with automatic platform recommendations. Now with AI-powered portfolio insights."
+      content="Get the latest desktop installer for macOS, Windows, or Linux. Build and sideload the iPhone and iPad app from the repository."
     />
     <meta property="og:type" content="website" />
     <meta
       property="og:url"
-      content="https://domechn.github.io/track3/download.html"
+      content="https://track3.domc.me/download.html"
     />
+    <meta property="og:image" content="https://track3.domc.me/images/social-overview.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Get Track3 — Desktop Downloads and iOS Sideload Steps" />
+    <meta name="twitter:description" content="Desktop installers and community iPhone and iPad sideload steps for Track3." />
+    <meta name="twitter:image" content="https://track3.domc.me/images/social-overview.jpg" />
+    <link rel="canonical" href="https://track3.domc.me/download.html" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -32,7 +36,7 @@
     <link
       rel="icon"
       type="image/png"
-      href="https://raw.githubusercontent.com/domechn/track3/master/src-tauri/app-icon.png"
+      href="images/app-icon.png"
     />
     <style>
       *,
@@ -51,7 +55,7 @@
         --border-strong: rgba(109, 92, 255, 0.2);
         --text: #171422;
         --text-muted: #68627d;
-        --text-soft: #8d86a3;
+        --text-soft: #5e5875;
         --accent: #6d5cff;
         --accent-hover: #5a49ed;
         --accent-soft: #efecff;
@@ -219,6 +223,16 @@
         border-color: var(--border-strong);
         background: var(--surface-soft);
       }
+      :focus-visible {
+        outline: 3px solid #4835d2;
+        outline-offset: 3px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
       .page {
         padding: 48px 0 120px;
       }
@@ -248,12 +262,12 @@
       }
       .hero h1 {
         font-family: "Space Grotesk", "Manrope", sans-serif;
-        font-size: clamp(1rem, 4.6vw, 4rem);
+        font-size: clamp(2rem, 4.6vw, 4rem);
         line-height: 0.98;
         letter-spacing: -0.05em;
         margin-bottom: 18px;
         max-width: none;
-        white-space: nowrap;
+        text-wrap: balance;
       }
       .hero h1 span {
         color: var(--accent-hover);
@@ -328,6 +342,24 @@
       .panel__text {
         color: var(--text-muted);
       }
+      .panel__text a {
+        color: #4835d2;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .ios-steps {
+        margin: 0;
+        padding-left: 1.5rem;
+        color: var(--text-muted);
+      }
+      .ios-steps li + li {
+        margin-top: 8px;
+      }
+      .ios-steps a {
+        color: #4835d2;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
       .download-badges {
         display: flex;
         flex-wrap: wrap;
@@ -344,7 +376,7 @@
         border: 1px solid var(--border);
         background: #ffffff;
         font-family: "IBM Plex Mono", monospace;
-        font-size: 0.73rem;
+        font-size: 0.75rem;
         letter-spacing: 0.06em;
         text-transform: uppercase;
         color: var(--text-soft);
@@ -375,7 +407,7 @@
       .release-meta__label {
         display: block;
         font-family: "IBM Plex Mono", monospace;
-        font-size: 0.7rem;
+        font-size: 0.75rem;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--text-soft);
@@ -476,9 +508,10 @@
           border-radius: 28px;
         }
         .shell-links {
-          width: 100%;
-          justify-content: space-between;
+          width: auto;
+          margin-left: auto;
         }
+        .shell-link--primary { display: none; }
         .shell-link,
         .shell-link--primary {
           flex: 1 1 auto;
@@ -513,8 +546,10 @@
       <div class="container shell-nav">
         <a href="./index.html" class="shell-brand">
           <img
-            src="https://raw.githubusercontent.com/domechn/track3/master/src-tauri/app-icon.png"
+            src="images/app-icon.png"
             alt="Track3 icon"
+            width="36"
+            height="36"
           />
           Track3
         </a>
@@ -536,16 +571,15 @@
         <div class="container hero__layout">
           <div class="hero__content">
             <p class="eyebrow">Download Track3</p>
-            <h1>Get the <span>right build</span> for your system</h1>
+            <h1>Get Track3 for <span>your device</span></h1>
             <div
               class="recommendation__actions hero__actions"
               id="recommendedActions"
             ></div>
             <p id="recommendedText">
-              We detect your operating system, look up the latest Track3
-              release, and recommend the best installer for macOS, Windows, or
-              Linux. Track3 now includes a built-in AI assistant for your
-              portfolio. If detection is unclear, you can still choose manually.
+              Choose a desktop installer for macOS, Windows, or Linux. On
+              iPhone and iPad, build the iOS app from the repository and
+              sideload it using your Apple ID.
             </p>
             <div class="hero__signals">
               <div class="download-badges">
@@ -567,23 +601,42 @@
               <div class="hero__meta-item">
                 <strong>Recommended installer</strong>
                 <span>
-                  We resolve the latest matching installer only after you click.
+                  Desktop buttons resolve the latest matching installer after you click.
                 </span>
               </div>
               <div class="hero__meta-item">
                 <strong>Built-in AI Assistant</strong>
                 <span>
-                  Ask your portfolio questions in natural language. AI-powered
-                  insights, allocation analysis, and market trends — all
-                  processed locally.
+                  Ask questions about your portfolio with an assistant provider
+                  you configure. Chat content is encrypted in local storage.
                 </span>
               </div>
               <div class="hero__meta-item">
                 <strong>Manual fallback included</strong>
                 <span>
-                  macOS, Windows, and Linux package buttons are always available
-                  below if you prefer to choose manually.
+                  Desktop package buttons remain available below. iOS build
+                  and signing instructions are linked alongside them.
                 </span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="section" id="ios">
+        <div class="container">
+          <section class="panel" aria-labelledby="iosDownloadTitle">
+            <div class="panel__body">
+              <div class="panel__header">
+                <p class="eyebrow">iPhone and iPad</p>
+                <h2 class="panel__title" id="iosDownloadTitle">Build and sideload the iOS app</h2>
+                <p class="panel__text">The iOS app is not on the App Store. These are community sideload steps for a Mac and a personal Apple ID; they have not been checked on a physical device.</p>
+                <ol class="ios-steps">
+                  <li>On a Mac, install Node 24 and <a href="https://v2.tauri.app/start/prerequisites/#ios">Tauri’s iOS prerequisites</a>, clone the <a href="https://github.com/domechn/track3">Track3 repository</a>, and run <code>corepack yarn</code> from its root.</li>
+                  <li>Run <code>corepack yarn tauri ios dev --open</code> to prepare and open <code>src-tauri/gen/apple/track3.xcodeproj</code> in Xcode. Select the Track3 iOS target and your personal Apple ID team under Signing &amp; Capabilities. Change the bundle ID if Xcode asks, then select your connected iPhone or iPad and press Run. If you build an IPA separately, AltStore or Sideloadly may also sign and install it.</li>
+                  <li>With a free Apple ID, renew the signing every 7 days to keep using the app.</li>
+                </ol>
+                <p class="panel__text">For background, read the <a href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad">README iOS overview</a> and <a href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">release and signing notes</a>.</p>
               </div>
             </div>
           </section>
@@ -745,6 +798,15 @@
       }
 
       function getRecommendedView(detectedPlatform) {
+        if (detectedPlatform.os === "ios") {
+          return {
+            title: "Track3 for iPhone and iPad",
+            text: "Build Track3 from the repository and sign it with a personal Apple ID. Follow the community steps below; free signing generally needs renewal every 7 days.",
+            actions: [
+              '<a class="download-button" href="#ios">See sideload steps</a>',
+            ],
+          };
+        }
         if (
           detectedPlatform.os === "macos" &&
           detectedPlatform.arch === "arm64"
@@ -915,6 +977,10 @@
         const view = getRecommendedView(platform);
         recommendedText.textContent = view.text;
         recommendedActions.innerHTML = view.actions.join("");
+        if (platform.os === "ios") {
+          statusBadge.textContent = "Build from source";
+          downloadHint.textContent = "The desktop release does not contain an iOS installer. Follow the steps below to build and sign the app.";
+        }
       }
 
       async function handleDownloadClick(event) {
