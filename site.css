@@ -117,6 +117,10 @@ section {
 section.tint {
   background: var(--tint);
 }
+#more,
+#faq {
+  padding-top: 0;
+}
 .head {
   max-width: 680px;
   margin-bottom: 56px;
@@ -448,6 +452,9 @@ section.tint {
   grid-template-columns: 1.2fr 1fr;
   gap: 56px;
   align-items: center;
+}
+.final .cta {
+  margin-top: 0;
 }
 .final h2 {
   font-size: clamp(34px, 4.4vw, 56px);
@@ -959,6 +966,14 @@ header .wrap {
     margin-right: 0;
   }
 }
+@media (max-width: 360px) {
+  header .wrap {
+    gap: 8px;
+  }
+  header .brand {
+    font-size: 18px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -971,9 +986,6 @@ header .wrap {
   }
 }
 @media (min-width: 961px) {
-  .final .cta {
-    margin-top: 0;
-  }
   .feature.flip .copy {
     order: 0;
   }
