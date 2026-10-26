@@ -15,6 +15,7 @@ const render = (ui: React.ReactElement) => testingRender(<HashRouter>{ui}</HashR
 vi.mock("@/utils/platform", () => ({ isIOS: vi.fn(() => false) }));
 
 const mocks = vi.hoisted(() => ({
+  activateLicenseOnDevice: vi.fn(),
   activeLicense: vi.fn(),
   clearLicenseCache: vi.fn(),
   cleanLicense: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 }));
 
 vi.mock("@/middlelayers/license", () => ({
+  activateLicenseOnDevice: mocks.activateLicenseOnDevice,
   clearLicenseCache: mocks.clearLicenseCache,
   LicenseCenter: {
     getInstance: () => ({
@@ -72,6 +74,9 @@ vi.mock("@/middlelayers/license", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
+  mocks.trackEventWithClientID.mockResolvedValue(undefined);
+  vi.mocked(isIOS).mockReturnValue(false);
   mocks.getVersion.mockResolvedValue("0.6.1");
   mocks.getLicenseIfIsPro.mockResolvedValue(undefined);
   mocks.createCheckoutSession.mockResolvedValue({
@@ -85,6 +90,14 @@ beforeEach(() => {
   mocks.validateLicense.mockResolvedValue({ isValid: true });
   mocks.activeLicense.mockResolvedValue({ success: true });
   mocks.saveLicense.mockResolvedValue(undefined);
+  mocks.activateLicenseOnDevice.mockImplementation(async (license: string, save: (key: string) => Promise<void>) => {
+    const valid = await mocks.validateLicense(license);
+    if (!valid.isValid) throw new Error("Invalid key");
+    const active = await mocks.activeLicense(license);
+    if (!active.success) throw new Error(active.error);
+    await save(license);
+    mocks.clearLicenseCache();
+  });
   mocks.getSubscriptionInfo.mockResolvedValue({
     planType: "yearly",
     status: "active",
@@ -180,7 +193,7 @@ describe("System Info subscription management", () => {
     expect(await screen.findByText("Free")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /view pro benefits/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /subscribe monthly/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/Enter existing license key/i)).toBeInTheDocument();
+    expect(screen.getByText(/Restore purchase/i)).toBeInTheDocument();
     vi.mocked(isIOS).mockReturnValue(false);
     window.location.hash = "";
   });
@@ -204,7 +217,7 @@ describe("System Info subscription management", () => {
       expect(await screen.findByText("Pro")).toBeInTheDocument();
       expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Enter existing license key" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Restore purchase" })).not.toBeInTheDocument();
     } finally {
       vi.mocked(isIOS).mockReturnValue(false);
       window.location.hash = "";
@@ -258,7 +271,8 @@ describe("System Info subscription management", () => {
     ).toHaveClass("mt-auto");
   });
 
-  it("tracks subscribe clicks and shows that subscriptions are not supported yet", async () => {
+  it("opens checkout and shows waiting actions on non-iOS mobile", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
     render(<SystemInfo onProStatusChange={vi.fn()} />);
 
     fireEvent.click(
@@ -266,19 +280,11 @@ describe("System Info subscription management", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.trackEventWithClientID).toHaveBeenCalledWith(
-        "subscription_subscribe_clicked",
-        { planType: "yearly" },
-      );
-      expect(mocks.toast).toHaveBeenCalledWith({
-        description:
-          "Subscription is not supported yet. Please wait for future updates.",
-      });
+      expect(mocks.openUrl).toHaveBeenCalledWith("https://checkout.stripe.test/session");
+      expect(screen.getByText(/waiting for payment/i)).toBeInTheDocument();
     });
-    expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
-    expect(mocks.openUrl).not.toHaveBeenCalledWith(
-      "https://checkout.stripe.test/session",
-    );
+    expect(screen.getByRole("button", { name: /i've paid.*check again/i })).toBeInTheDocument();
+    expect(mocks.createCheckoutSession).toHaveBeenCalledTimes(1);
   });
 
   it("clears the license cache after inactivating the device", async () => {
@@ -313,7 +319,7 @@ describe("System Info subscription management", () => {
       error: "license custom-private-license was rejected",
     });
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    fireEvent.click(await screen.findByText(/Enter existing license key/i));
+    fireEvent.click(await screen.findByText(/Restore purchase/i));
     fireEvent.change(screen.getByPlaceholderText(/license key/i), {
       target: { value: "custom-private-license" },
     });

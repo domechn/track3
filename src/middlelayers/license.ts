@@ -91,6 +91,32 @@ export async function isProVersion(): Promise<UserLicenseInfo> {
   };
 }
 
+export async function activateLicenseOnDevice(
+  license: string,
+  save: (license: string) => Promise<unknown>,
+  messages: { invalid: string; failed: string },
+): Promise<void> {
+  const center = LicenseCenter.getInstance();
+  const stored = await getLicenseIfIsPro();
+  if (stored === license) {
+    licenseCache.deleteCache(makeLicenseCacheKey(LICENSE_CACHE_KEY_PREFIXES.proStatus, license));
+  }
+  const alreadyBound = stored === license && await center.isProUser(license).catch(() => false);
+  if (!alreadyBound) {
+    const valid = await center.validateLicense(license);
+    if (!valid.isValid) throw new Error(messages.invalid);
+    const active = await center.activeLicense(license);
+    if (!active.success) {
+      // Checkout webhooks may bind the device before this request arrives.
+      licenseCache.deleteCache(makeLicenseCacheKey(LICENSE_CACHE_KEY_PREFIXES.proStatus, license));
+      const bound = await center.isProUser(license).catch(() => false);
+      if (!bound) throw new Error(active.error ?? messages.failed);
+    }
+    await save(license);
+  }
+  clearLicenseCache();
+}
+
 export class LicenseCenter {
   private static instance: LicenseCenter;
 
@@ -206,14 +232,19 @@ export class LicenseCenter {
   public async getCheckoutStatus(sessionId: string): Promise<{
     status: "pending" | "completed" | "expired";
     license?: string;
+    planType?: "monthly" | "yearly";
+    periodEnd?: string;
   }> {
     const resp = await sendHttpRequest<{
       status: "pending" | "completed" | "expired";
       license?: string;
+      planType?: "monthly" | "yearly";
+      periodEnd?: string;
     }>(
       "GET",
       `${this.stripeEndpoint}?action=checkout-status&session_id=${encodeURIComponent(sessionId)}`,
       10000,
+      { "x-track3-client-id": await getClientID() },
     );
 
     return resp;

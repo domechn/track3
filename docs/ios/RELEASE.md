@@ -14,7 +14,7 @@ Run `corepack yarn tsc --noEmit`, `corepack yarn vitest run`,
 The existing `test-on-pr` workflow tests desktop release behavior. The
 `ios-foundation.yml` web and macOS iOS jobs must pass on the release commit.
 It runs on `feat/ios-app*`, `feat/ios-folder-picker*`,
-`feat/ios-interaction-fixes*`, and `feat/ios-wide-screens*` pushes, relevant iOS
+`feat/ios-interaction-fixes*`, `feat/ios-wide-screens*`, and `feat/pro-usage-ui*` pushes, relevant iOS
 path PRs, and manual dispatch.
 Check that the simulator launch produced a rendered screenshot, the ready
 marker, no crash report, and an unsigned device IPA. Previous CI runs in the
@@ -25,8 +25,10 @@ The macOS job launches both simulator families and captures iPad portrait
 and landscape screenshots. Check both captures and the built app's device
 family and multitasking keys.
 
-Existing license-key entry unlocks paid Pro features on iOS while external
-checkout is hidden. App Store Guideline 3.1.1 may still require in-app purchase
+The desktop app opens Stripe checkout in the system browser. iOS hides the
+purchase button and offers only Manage Subscription and Restore Purchase for
+existing customers. Existing license-key entry unlocks paid Pro features on
+iOS. App Store Guideline 3.1.1 may still require in-app purchase
 or an applicable entitlement or exception. Treat App Review acceptance as
 unresolved: confirm a compliant purchase and license flow before submission.
 

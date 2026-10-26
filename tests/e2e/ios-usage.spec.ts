@@ -19,6 +19,15 @@ test("iOS Pro screen shows usage and an exhausted wallet shows quota status", as
   await expect(status).toContainText("Monthly refresh limit reached", { timeout: 15_000 });
 });
 
+test("iOS offers restore without a purchase action", async ({ page }) => {
+  const bridge = await installTauriBridge(page, { checkoutFixture: true });
+  await page.goto("/#/settings/systemInfo?section=pro");
+  await expect(page.getByRole("heading", { name: "Restore purchase" })).toBeVisible();
+  await expect(page.getByText(/Manage an existing subscription or restore a purchase/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Subscribe/ })).toHaveCount(0);
+  expect(bridge.checkoutSessions()).toBe(0);
+});
+
 test("iOS asks before an exhausted Pro wallet refresh", async ({ page }) => {
   await installTauriBridge(page, { quotaExhaustedFixture: true, preflightExhaustedFixture: true });
   await page.goto("/#/overview");

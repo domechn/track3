@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   cleanLicense,
   getLicenseIfIsPro,
@@ -11,12 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
 import { EyeOpenIcon, EyeClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import {
+  activateLicenseOnDevice,
   clearLicenseCache,
   LicenseCenter,
   type SubscriptionPlan,
   type SubscriptionPlansResponse,
   type SubscriptionInfo,
 } from "@/middlelayers/license";
+import { CheckoutFlow, type CheckoutPhase } from "@/middlelayers/checkout";
 import { ProUsageRows } from "@/components/pro-usage-rows";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
@@ -50,15 +52,19 @@ const App = ({
   const [usageEnforced, setUsageEnforced] = useState(false);
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutPhase, setCheckoutPhase] = useState<CheckoutPhase>("idle");
+  const checkoutRef = useRef<CheckoutFlow>();
   const [subscriptionPlans, setSubscriptionPlans] =
     useState<SubscriptionPlansResponse | null>(null);
   const safeError = (error: unknown) =>
     redactSecrets(error instanceof Error ? error.message : String(error), [activeLicense ?? "", inputLicense ?? ""]);
 
   useEffect(() => {
+    let current = true;
     loadVersion();
-    loadLicense();
+    void loadLicense().then(() => { if (current && !isIOS()) void checkoutRef.current?.resume(); });
     if (!isIOS()) loadSubscriptionPlans();
+    return () => { current = false; checkoutRef.current?.dispose(); };
   }, []);
 
   useEffect(() => {
@@ -80,7 +86,7 @@ const App = ({
   }
 
   function loadLicense() {
-    getLicenseIfIsPro().then((license) => {
+    return getLicenseIfIsPro().then((license) => {
       setActiveLicense(license);
       setInputLicense(license);
     });
@@ -120,17 +126,30 @@ const App = ({
   }
 
   async function activeDevice(license: string) {
-    const validRes = await LicenseCenter.getInstance().validateLicense(license);
-    if (!validRes.isValid) {
-      throw new Error(t("system.invalidLicenseKey"));
-    }
-    const activeRes = await LicenseCenter.getInstance().activeLicense(license);
-    if (!activeRes.success) {
-      throw new Error(activeRes.error ?? t("system.activeLicenseFailed"));
-    }
-    await saveLicense(license);
-    clearLicenseCache();
+    await activateLicenseOnDevice(license, saveLicense, {
+      invalid: t("system.invalidLicenseKey"),
+      failed: t("system.activeLicenseFailed"),
+    });
     onProStatusChange(true);
+  }
+
+  if (!checkoutRef.current && !isIOS()) {
+    checkoutRef.current = new CheckoutFlow(
+      LicenseCenter.getInstance(),
+      openUrl,
+      async (license) => {
+        await activeDevice(license);
+        setActiveLicense(license);
+        setInputLicense(license);
+      },
+      (phase) => {
+        setCheckoutPhase(phase);
+        if (phase === "completed") {
+          toast({ description: t("system.checkout.completed") });
+          void trackEventWithClientID("subscription_checkout_completed").catch(() => {});
+        }
+      },
+    );
   }
 
   function onSaveLicenseClick() {
@@ -188,62 +207,15 @@ const App = ({
   }
 
   async function onSubscribe(planType: "monthly" | "yearly") {
-    /*
-    setSubLoading(true);
-    try {
-      const { sessionId, url } =
-        await LicenseCenter.getInstance().createCheckoutSession(planType);
-      await openUrl(url);
-
-      const license = await pollForLicense(sessionId);
-      await activeDevice(license);
-      setActiveLicense(license);
-      toast({ description: "Pro subscription activated!" });
-    } catch (err) {
-      toast({
-        description: err instanceof Error ? err.message : "Subscription failed",
-        variant: "destructive",
-      });
-    } finally {
-      setSubLoading(false);
-    }
-    */
-
-    await trackEventWithClientID("subscription_subscribe_clicked", {
-      planType,
-    });
-    toast({
-      description:
-        t("system.subNotSupported"),
-    });
+    if (isIOS()) return;
+    void trackEventWithClientID("subscription_subscribe_clicked", { planType }).catch(() => {});
+    await checkoutRef.current?.start(planType);
   }
-
-  /*
-  async function pollForLicense(
-    sessionId: string,
-    maxAttempts = 100,
-  ): Promise<string> {
-    for (let i = 0; i < maxAttempts; i++) {
-      const result =
-        await LicenseCenter.getInstance().getCheckoutStatus(sessionId);
-      if (result.status === "completed" && result.license) {
-        return result.license;
-      }
-      if (result.status === "expired") {
-        throw new Error("Checkout session expired. Please try again.");
-      }
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
-    throw new Error(
-      "Payment verification timed out. Your license may still be processing — check back in a moment.",
-    );
-  }
-  */
 
   async function onManageSubscription() {
     setPortalLoading(true);
     try {
-      await trackEventWithClientID("subscription_open_clicked");
+      void trackEventWithClientID("subscription_open_clicked").catch(() => {});
       const { url } = await LicenseCenter.getInstance().getCustomerPortalUrl();
       await openUrl(url);
     } catch (err) {
@@ -342,10 +314,10 @@ const App = ({
       <ProUsageRows usage={subscriptionInfo.usage} enforced={usageEnforced} t={t} locale={locale} />
     </div></InsetGroup></section>}
     {!activeLicense && <section>
-      <h2 className="ios-d3-section-heading">{t("system.legacyInputTitle")}</h2>
+      <h2 className="ios-d3-section-heading">{t("system.checkout.restore")}</h2>
       <div className="ios-d3-license-group">
         <div className="ios-d3-license-field">
-          <Input id="license" aria-label={t("system.legacyInputTitle")} autoComplete="off" value={inputLicense ?? ""}
+          <Input id="license" aria-label={t("system.checkout.restore")} autoComplete="off" value={inputLicense ?? ""}
             type={showLicense ? "text" : "password"} onChange={(e) => setInputLicense(e.target.value)}
             placeholder={t("system.licensePlaceholder")} disabled={!!activeLicense} />
           <Button type="button" variant="ghost" size="icon" onClick={() => setShowLicense(!showLicense)}
@@ -354,9 +326,11 @@ const App = ({
           </Button>
         </div>
       </div>
-      {(!activeLicense || subscriptionInfo?.isLegacy) && <p className="ios-d3-settings-note">{t(activeLicense ? "system.legacyNote" : "system.legacyInputDesc")}</p>}
+      {(!activeLicense || subscriptionInfo?.isLegacy) && <p className="ios-d3-settings-note">{t(activeLicense ? "system.legacyNote" : "system.checkout.iosRestoreHint")}</p>}
       <Button className="mt-4 w-full" onClick={onSaveLicenseClick} disabled={saveLicenseLoading || !inputLicense}>{t("system.activate")}</Button>
     </section>}
+    <p className="ios-d3-settings-note">{t("system.checkout.iosNote")}</p>
+    {activeLicense && !subscriptionInfo?.isLegacy && <InsetGroup><ListRow onClick={onManageSubscription}>{t("system.manageSub")}</ListRow></InsetGroup>}
     {activeLicense && <InsetGroup><ConfirmDeleteDialog
       trigger={<button type="button" className="ios-d3-license-deactivate" disabled={inactiveLicenseLoading}>{t("system.inactivate")}</button>}
       title={t("system.inactivateTitle")} description={t("system.inactivateDescLegacy")}
@@ -412,6 +386,19 @@ const App = ({
       </div>
 
       {section !== "about" && <>
+      {!isIOS() && checkoutPhase !== "idle" && (
+        <Card>
+          <CardContent className="space-y-3 pt-6" role="status">
+            <p>{t(`system.checkout.${checkoutPhase}`)}</p>
+            {(checkoutPhase === "starting" || checkoutPhase === "waiting" || checkoutPhase === "timed-out" || checkoutPhase === "error") && (
+              <div className="flex flex-wrap gap-2">
+                {checkoutPhase !== "starting" && <Button variant="outline" onClick={() => checkoutRef.current?.checkAgain()}>{t("system.checkout.checkAgain")}</Button>}
+                <Button variant="outline" onClick={() => checkoutRef.current?.cancel()}>{t("common.cancel")}</Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {/* Active subscription details */}
       {isSubscribed && subscriptionInfo && (
         <Card>
@@ -565,7 +552,7 @@ const App = ({
                   <Button
                     className="w-full"
                     onClick={() => onSubscribe("monthly")}
-                    disabled={!monthlyPlan}
+                    disabled={!monthlyPlan || checkoutPhase === "starting" || checkoutPhase === "waiting"}
                   >
                     {t("system.subMonthly")}
                   </Button>
@@ -593,7 +580,7 @@ const App = ({
                   <Button
                     className="w-full"
                     onClick={() => onSubscribe("yearly")}
-                    disabled={!yearlyPlan}
+                    disabled={!yearlyPlan || checkoutPhase === "starting" || checkoutPhase === "waiting"}
                   >
                     {t("system.subYearly")}
                   </Button>
@@ -607,19 +594,18 @@ const App = ({
       {/* Legacy license key input — collapsed by default */}
       {!activeLicense && (
         <Card>
-          <CardHeader
-            className="pb-2 cursor-pointer"
-            onClick={() => setShowLegacyInput(!showLegacyInput)}
-          >
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-              {t("system.legacyInputTitle")}
-              <span className="text-xs">{showLegacyInput ? "▲" : "▼"}</span>
+              <button type="button" className="flex w-full items-center justify-between text-left" aria-expanded={showLegacyInput} onClick={() => setShowLegacyInput(!showLegacyInput)}>
+                {t("system.checkout.restore")}
+                <span className="text-xs" aria-hidden="true">{showLegacyInput ? "▲" : "▼"}</span>
+              </button>
             </CardTitle>
           </CardHeader>
           {showLegacyInput && (
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                {t("system.legacyInputDesc")}
+                {t("system.checkout.restoreHint")}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Input
