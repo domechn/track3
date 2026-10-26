@@ -464,7 +464,7 @@
       .screenshots {
         position: relative;
         z-index: 1;
-        padding: 32px 0 80px;
+        padding: 32px 0 24px;
         scroll-margin-top: 120px;
         background: #ffffff;
       }
@@ -599,6 +599,9 @@
         z-index: 1;
         padding: 96px 0;
         scroll-margin-top: 120px;
+      }
+      #ios {
+        padding-top: 48px;
       }
       .section + .section {
         border-top: 1px solid rgba(24, 19, 13, 0.08);
@@ -1123,7 +1126,7 @@
           padding: 10px 14px;
         }
         .hero {
-          padding: 136px 0 32px;
+          padding: 112px 0 32px;
         }
         .hero__grid {
           display: flex;
@@ -1141,9 +1144,9 @@
           margin-right: 8px;
         }
         .hero__copy { order: 2 !important; }
-        .hero__actions { order: 3 !important; }
-        .hero__platforms { order: 4 !important; }
-        .hero__aside { order: 5; }
+        .hero__aside { order: 3; }
+        .hero__actions { order: 4 !important; }
+        .hero__platforms { order: 5 !important; }
         .hero__content,
         .hero__aside,
         .privacy-banner,
@@ -1155,6 +1158,8 @@
           font-size: clamp(2.4rem, 10vw, 3.6rem);
           max-width: none;
         }
+        .hero__copy { margin-bottom: 18px; }
+        .hero__actions { margin-bottom: 16px; }
         .hero__aside img { border-radius: 16px; }
         .screenshots__track--phones img { width: min(66vw, 260px); }
         .screenshots__track--tablets img { width: min(86vw, 560px); }
@@ -1169,7 +1174,7 @@
           grid-template-columns: 1fr;
         }
         .screenshots {
-          padding-bottom: 84px;
+          padding-bottom: 24px;
         }
         .screenshots__frame {
           padding-top: 20px;
@@ -1191,6 +1196,9 @@
         }
         .section {
           padding: 72px 0;
+        }
+        #ios {
+          padding-top: 36px;
         }
         .features,
         .pro-features {
@@ -1414,7 +1422,7 @@
             <div class="screenshots__dots" id="ipadDots"></div>
           </div>
         </div>
-        <p class="ios__note">Files import and export, iCloud Drive backup folders, Face ID app lock, and local alerts are available in the iOS build. Track3 for iOS builds from the repository; the <a href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">release guide covers Xcode building and signing</a>. AltStore and Sideloadly are general sideload options, but the repository does not document their steps. Free Apple ID signing generally needs renewal every 7 days. <a href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad">Read the iOS overview</a>.</p>
+        <p class="ios__note">Files import and export, iCloud Drive backup folders, Face ID app lock, and local alerts are available in the iOS build. The app is not on the App Store. <a href="./download.html#ios">Follow the three community sideload steps</a> to build and sign it with a personal Apple ID. Free signing generally needs renewal every 7 days. Read the <a href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad">iOS overview</a> and <a href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md">release and signing background</a>.</p>
       </div>
     </section>
 
@@ -1871,7 +1879,7 @@
           <p class="section__label">Download</p>
           <h2>Start tracking your portfolio<br />the private way</h2>
           <p>
-            Get the desktop release or follow the iOS build guide for iPhone
+            Get the desktop release or follow the iOS sideload steps for iPhone
             and iPad.
           </p>
           <div class="hero__actions">
@@ -1967,7 +1975,7 @@
         const track = document.getElementById(trackId);
         const dotsContainer = document.getElementById(dotsId);
         if (!track || !dotsContainer) return;
-        const images = track.querySelectorAll("img");
+        const images = Array.from(track.querySelectorAll("img"));
 
         images.forEach((_, i) => {
           const dot = document.createElement("button");
@@ -1983,20 +1991,29 @@
           dotsContainer.appendChild(dot);
         });
 
+        const ratios = images.map(() => 0);
+        const updateActive = () => {
+          const maxScroll = track.scrollWidth - track.clientWidth;
+          const active = track.scrollLeft <= 1
+            ? 0
+            : track.scrollLeft >= maxScroll - 1
+              ? images.length - 1
+              : ratios.indexOf(Math.max(...ratios));
+          dotsContainer.querySelectorAll("button").forEach((d, i) => {
+            d.classList.toggle("active", i === active);
+          });
+        };
         const dotObserver = new IntersectionObserver(
           (entries) => {
             entries.forEach((e) => {
-              if (e.isIntersecting) {
-                const idx = Array.from(images).indexOf(e.target);
-                dotsContainer.querySelectorAll("button").forEach((d, i) => {
-                  d.classList.toggle("active", i === idx);
-                });
-              }
+              ratios[images.indexOf(e.target)] = e.intersectionRatio;
             });
+            updateActive();
           },
-          { root: track, threshold: 0.6 },
+          { root: track, threshold: [0, 0.25, 0.5, 0.75, 1] },
         );
         images.forEach((img) => dotObserver.observe(img));
+        track.addEventListener("scroll", updateActive, { passive: true });
       }
 
       setupCarousel("screenshotTrack", "screenshotDots");
