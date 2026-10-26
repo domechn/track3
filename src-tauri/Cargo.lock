@@ -5571,9 +5571,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-sql"
-version = "2.4.0"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbbdb4f17a7984ef0aa425b11e543a44d11f2fddbdee3fc61970091f8adfb914"
+checksum = "ed265036ad01e492a6bf6ae269267dd37dae4419ac0a80dbd93d275c763bb32d"
 dependencies = [
  "futures-core",
  "indexmap 2.11.4",
@@ -5705,7 +5705,7 @@ dependencies = [
  "serde_with",
  "swift-rs",
  "thiserror 2.0.18",
- "toml 0.9.12+spec-1.1.0",
+ "toml 1.1.0+spec-1.1.0",
  "url",
  "urlpattern",
  "uuid",
