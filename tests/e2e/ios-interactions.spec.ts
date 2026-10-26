@@ -223,12 +223,15 @@ test("History controls and Settings links preserve their page scroll", async ({ 
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await page.locator(".mobile-more-hub").getByRole("link", { name: "Settings" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Settings");
+  await expect(page.getByRole("navigation", { name: "Settings sections" })).toBeVisible();
   const backup = page.getByRole("navigation", { name: /settings sections/i }).getByRole("link", { name: "Backup", exact: true });
   await backup.scrollIntoViewIfNeeded();
   const settingsScroll = await page.evaluate(() => scrollY);
   expect(settingsScroll).toBeGreaterThan(0);
   await backup.click();
   await expect(page).toHaveURL(/#\/settings\/data\?section=backup$/);
+  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup");
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(settingsScroll);

@@ -47,6 +47,7 @@ const App = ({
   // subscription states
   const [subscriptionInfo, setSubscriptionInfo] =
     useState<SubscriptionInfo | null>(null);
+  const [usageEnforced, setUsageEnforced] = useState(false);
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] =
@@ -61,11 +62,17 @@ const App = ({
   }, []);
 
   useEffect(() => {
+    let current = true;
+    setUsageEnforced(false);
     if (activeLicense) {
       loadSubscriptionInfo();
+      void LicenseCenter.getInstance().getUsage().then((result) => {
+        if (current) setUsageEnforced(result?.enforced === true);
+      });
     } else {
       setSubscriptionInfo(null);
     }
+    return () => { current = false; };
   }, [activeLicense]);
 
   function loadVersion() {
@@ -332,7 +339,7 @@ const App = ({
       {activeLicense && subscriptionInfo?.planType && <ListRow value={t(subscriptionInfo.planType === "monthly" ? "system.monthly" : "system.yearly")}>{t("system.planLabel")}</ListRow>}
     </InsetGroup>
     {activeLicense && subscriptionInfo?.usage && <section><h2 className="ios-d3-section-heading">{t("system.usage.heading")}</h2><InsetGroup><div className="px-4 pb-4">
-      <ProUsageRows usage={subscriptionInfo.usage} t={t} locale={locale} />
+      <ProUsageRows usage={subscriptionInfo.usage} enforced={usageEnforced} t={t} locale={locale} />
     </div></InsetGroup></section>}
     {!activeLicense && <section>
       <h2 className="ios-d3-section-heading">{t("system.legacyInputTitle")}</h2>
@@ -399,7 +406,7 @@ const App = ({
                     : t("system.proStatus.legacy")
                   : t("system.proStatus.subPrompt")}
             </p>
-            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} t={t} locale={locale} />}
+            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} enforced={usageEnforced} t={t} locale={locale} />}
           </CardContent>
         </Card>}
       </div>

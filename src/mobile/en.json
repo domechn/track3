@@ -1272,7 +1272,7 @@
   "mobile.refreshView": "Refresh view",
   "refresh.reason.quota": "Monthly refresh limit reached",
   "refresh.preflight.title": "Refresh limit",
-  "refresh.preflight.desc": "{resource} wallet refreshes needed: {needed}; remaining: {remaining}. Wallets keeping their last values: {n}.",
+  "refresh.preflight.desc": "{resource} wallet refreshes needed: {needed}; remaining: {remaining}. {n} wallets will not be refreshed.",
   "refresh.preflight.continue": "Continue refresh",
   "system.usage.erc20": "ERC20 wallet refreshes",
   "system.usage.tron": "TRON wallet refreshes",

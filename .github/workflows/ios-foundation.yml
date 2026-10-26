@@ -272,13 +272,8 @@ jobs:
             cat artifacts/ipad-landscape-log.log
             exit 1
           fi
-          for attempt in $(seq 1 10); do
-            xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-landscape.png
-            if swift scripts/ios/check-screenshot.swift artifacts/ipad-landscape.png > artifacts/ipad-landscape-check.log 2>&1; then break; fi
-            if [ "$attempt" -eq 10 ]; then cat artifacts/ipad-landscape-check.log; exit 1; fi
-            sleep 2
-          done
-          cat artifacts/ipad-landscape-check.log
+          xcrun simctl io "$SIM_ID" screenshot artifacts/ipad-landscape.png
+          swift scripts/ios/check-screenshot.swift artifacts/ipad-landscape.png
           xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$LANDSCAPE_PID" '$1 == pid {found=1} END {exit !found}'
       - name: Build unsigned device IPA
         run: |

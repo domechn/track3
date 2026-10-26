@@ -43,6 +43,7 @@ const App = ({
   // subscription states
   const [subscriptionInfo, setSubscriptionInfo] =
     useState<SubscriptionInfo | null>(null);
+  const [usageEnforced, setUsageEnforced] = useState(false);
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] =
@@ -57,11 +58,17 @@ const App = ({
   }, []);
 
   useEffect(() => {
+    let current = true;
+    setUsageEnforced(false);
     if (activeLicense) {
       loadSubscriptionInfo();
+      void LicenseCenter.getInstance().getUsage().then((result) => {
+        if (current) setUsageEnforced(result?.enforced === true);
+      });
     } else {
       setSubscriptionInfo(null);
     }
+    return () => { current = false; };
   }, [activeLicense]);
 
   function loadVersion() {
@@ -355,7 +362,7 @@ const App = ({
                     : t("system.proStatus.legacy")
                   : t("system.proStatus.subPrompt")}
             </p>
-            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} t={t} locale={locale} />}
+            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} enforced={usageEnforced} t={t} locale={locale} />}
           </CardContent>
         </Card>
       </div>

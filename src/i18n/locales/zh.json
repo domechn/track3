@@ -1074,7 +1074,7 @@
   "sync.disableFailed": "无法停用同步，请重试。",
   "refresh.reason.quota": "本月刷新次数已用完",
   "refresh.preflight.title": "刷新次数限制",
-  "refresh.preflight.desc": "本次刷新需要 {needed} 次 {resource} 钱包刷新，剩余 {remaining} 次。{n} 个钱包将保留上次的数值。",
+  "refresh.preflight.desc": "本次刷新需要 {needed} 次 {resource} 钱包刷新，剩余 {remaining} 次。{n} 个钱包将不会刷新。",
   "refresh.preflight.continue": "继续刷新",
   "system.usage.erc20": "ERC20 钱包刷新",
   "system.usage.tron": "TRON 钱包刷新",

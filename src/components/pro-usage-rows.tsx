@@ -1,8 +1,9 @@
 import type { SubscriptionInfo } from "@/middlelayers/license";
 import { Progress } from "@/components/ui/progress";
 
-export function ProUsageRows({ usage, t, locale }: {
+export function ProUsageRows({ usage, enforced, t, locale }: {
   usage?: SubscriptionInfo["usage"];
+  enforced?: boolean;
   t: (key: string) => string;
   locale: string;
 }) {
@@ -17,10 +18,10 @@ export function ProUsageRows({ usage, t, locale }: {
           <span>{t(`system.usage.${resource}`)}</span>
           <span>{row.used} / {row.limit}</span>
         </div>
-        <Progress value={Math.min(row.used, row.limit)} max={row.limit}
+        <Progress value={Math.min(row.used, row.limit)} max={row.limit || undefined}
           className="bg-muted-foreground/25"
           aria-label={t(`system.usage.${resource}`)}
-          indicatorClassName={row.used >= row.limit ? "bg-destructive" : undefined} />
+          indicatorClassName={enforced && row.limit > 0 && row.used >= row.limit ? "bg-destructive" : undefined} />
         {Number.isFinite(date.getTime()) && <p className="text-xs text-muted-foreground">
           {t("system.usage.resetsOn").replace("{date}", date.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
             year: "numeric", month: "short", day: "numeric", timeZone: "UTC",

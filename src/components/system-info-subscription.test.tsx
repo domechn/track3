@@ -3,6 +3,11 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SystemInfo from "@/components/system-info";
 
+const exhaustedUsage = {
+  erc20: { limit: 300, used: 300, remaining: 0, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
+  tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
+};
+
 const mocks = vi.hoisted(() => ({
   activeLicense: vi.fn(),
   clearLicenseCache: vi.fn(),
@@ -13,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   getSubscriptionPlans: vi.fn(),
   getLicenseIfIsPro: vi.fn(),
   getSubscriptionInfo: vi.fn(),
+  getUsage: vi.fn(),
   getVersion: vi.fn(),
   inactiveLicense: vi.fn(),
   openUrl: vi.fn(),
@@ -51,6 +57,7 @@ vi.mock("@/middlelayers/license", () => ({
       getCustomerPortalUrl: mocks.getCustomerPortalUrl,
       getSubscriptionPlans: mocks.getSubscriptionPlans,
       getSubscriptionInfo: mocks.getSubscriptionInfo,
+      getUsage: mocks.getUsage,
       inactiveLicense: mocks.inactiveLicense,
       validateLicense: mocks.validateLicense,
     }),
@@ -79,6 +86,7 @@ beforeEach(() => {
     cancelAtPeriodEnd: false,
     isLegacy: false,
   });
+  mocks.getUsage.mockResolvedValue(undefined);
   mocks.getSubscriptionPlans.mockResolvedValue({
     plans: [
       {
@@ -103,23 +111,36 @@ beforeEach(() => {
 describe("System Info subscription management", () => {
   it("shows both metered uses and reset dates for an active Pro license", async () => {
     mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    mocks.getUsage.mockResolvedValue({ enforced: true, usage: exhaustedUsage });
     mocks.getSubscriptionInfo.mockResolvedValue({
       planType: "monthly", status: "active", currentPeriodEnd: "2026-11-03T00:00:00.000Z",
       cancelAtPeriodEnd: false, isLegacy: false,
-      usage: {
-        erc20: { limit: 300, used: 12, remaining: 288, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
-        tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
-      },
+      usage: exhaustedUsage,
     });
     render(<SystemInfo onProStatusChange={vi.fn()} />);
     expect(await screen.findByText("ERC20 wallet refreshes")).toBeInTheDocument();
     expect(screen.getByText("TRON wallet refreshes")).toBeInTheDocument();
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
-    expect(screen.getByText("12 / 300")).toBeInTheDocument();
+    expect(screen.getByText("300 / 300")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("progressbar", { name: "ERC20 wallet refreshes" }).firstElementChild).toHaveClass("bg-destructive"));
     expect(screen.getAllByText(/Resets/)).toHaveLength(2);
     const proCard = screen.getByText("Pro Status").closest(".glass");
     expect(proCard).not.toBeNull();
     expect(within(proCard as HTMLElement).getByText("ERC20 wallet refreshes")).toBeInTheDocument();
+  });
+
+  it("does not mark a full bar as blocked while the backend is in log mode", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    mocks.getUsage.mockResolvedValue({ enforced: false, usage: exhaustedUsage });
+    mocks.getSubscriptionInfo.mockResolvedValue({
+      planType: "monthly", status: "active", currentPeriodEnd: "2026-11-03",
+      cancelAtPeriodEnd: false, isLegacy: false,
+      usage: exhaustedUsage,
+    });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    expect(await screen.findByText("300 / 300")).toBeInTheDocument();
+    await waitFor(() => expect(mocks.getUsage).toHaveBeenCalled());
+    expect(screen.getByRole("progressbar", { name: "ERC20 wallet refreshes" }).firstElementChild).not.toHaveClass("bg-destructive");
   });
 
   it("shows the backend UTC reset day in time zones behind UTC", async () => {
