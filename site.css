@@ -435,6 +435,10 @@ section.tint {
 .card.limits .usage-note {
   margin-top: 16px;
 }
+.card.limits li {
+  display: flex;
+  gap: 10px;
+}
 .plan-note {
   margin-top: 24px;
   color: var(--ink-2);
@@ -444,7 +448,6 @@ section.tint {
   content: "✓";
   color: var(--good);
   font-weight: 700;
-  margin-right: 10px;
 }
 /* closing */
 .final .wrap {
@@ -732,7 +735,7 @@ header .wrap {
 .page-section code {
   font-size: 0.86em;
   background: var(--tint);
-  padding: 2px 5px;
+  padding: 2px;
   border-radius: 4px;
   overflow-wrap: anywhere;
 }

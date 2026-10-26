@@ -118,7 +118,7 @@
         </div>
       </section>
 
-      <div class="sources">
+      <div class="sources" id="exchanges">
         <div class="wrap">
           <div class="row">
             <b>Exchanges &amp; brokers</b>
@@ -299,7 +299,7 @@
                   alt=""
                   width="24"
                   height="24"
-                /><span>85+ EVM chains (Pro)</span>
+                /><span>More EVM chains (Pro)</span>
               </li>
               <li>
                 <img
@@ -334,17 +334,19 @@
                 src="images/desktop/history.webp"
                 width="1600"
                 height="1000"
-                alt="History"
+                alt="Track3 portfolio history on desktop"
               />
             </div>
             <div class="copy">
               <h3>Your whole history, one tap away.</h3>
               <p>
-                Every refresh becomes a snapshot. Scroll back through days and
-                months, open any day, and compare two periods side by side.
+                Each successful refresh saves a snapshot. Scroll back through
+                days and months, open any day, and compare two periods side by
+                side.
               </p>
               <ul>
-                <li>Daily snapshots with change and asset counts</li>
+                <li>A snapshot for every successful refresh, with change and asset counts</li>
+                <li>Automatic insights after successful refreshes</li>
                 <li>Compare any two dates</li>
                 <li>Per-exchange and per-wallet asset views (Pro)</li>
               </ul>
@@ -375,14 +377,14 @@
             </div>
           </div>
 
-          <div class="feature">
+          <div class="feature" id="ai">
             <div class="win">
               <img
                 loading="lazy"
                 src="images/desktop/assistant.webp"
                 width="1600"
                 height="1000"
-                alt="Assistant"
+                alt="Track3 AI assistant on desktop"
               />
             </div>
             <div class="copy">
@@ -492,7 +494,7 @@
               app lock and Files import and export.
             </p>
           </div>
-          <div class="devices">
+          <div class="devices" id="screenshots">
             <div>
               <div class="dev">
                 <img
@@ -500,7 +502,7 @@
                   src="images/ios/overview-light.webp"
                   width="600"
                   height="1298"
-                  alt="Overview"
+                  alt="Track3 portfolio overview on iPhone"
                 />
               </div>
               <p class="cap">Overview</p>
@@ -512,7 +514,7 @@
                   src="images/ios/history-light.webp"
                   width="600"
                   height="1298"
-                  alt="History"
+                  alt="Track3 portfolio history on iPhone"
                 />
               </div>
               <p class="cap">History</p>
@@ -524,7 +526,7 @@
                   src="images/ios/assistant-light.webp"
                   width="600"
                   height="1298"
-                  alt="Assistant"
+                  alt="Track3 AI assistant on iPhone"
                 />
               </div>
               <p class="cap">Assistant (Pro)</p>
@@ -536,7 +538,7 @@
                   src="images/ios/pro-landscape-history-detail.webp"
                   width="1100"
                   height="825"
-                  alt="iPad"
+                  alt="Track3 portfolio history detail on iPad"
                 />
               </div>
               <p class="cap">iPad, landscape</p>
@@ -559,17 +561,25 @@
             <p>
               Portfolio records stay in a local SQLite database. Refreshes
               contact your sources, assistant requests reach your chosen
-              provider, and optional sync uses your S3 storage. Prices and
-              public wallet balances come from public APIs such as CoinGecko;
-              currency rates use Track3's rate service, and Pro refresh and
-              license checks use Track3's API.
+              provider, and optional sync uses your S3 storage. Crypto prices
+              and public wallet balances may come from public APIs such as
+              CoinGecko. Currency rates, the stablecoin list, stock prices, Pro
+              refreshes, and license checks use Track3's services.
+            </p>
+            <p>
+              The app also sends usage events for launches, refreshes, and
+              license actions to Aptabase at eu.aptabase.com. Events carry a
+              persistent client ID and session ID, plus details such as OS,
+              user agent, locale, app and Tauri versions; refresh events may
+              include source IDs.
             </p>
           </div>
           <div class="facts">
             <div class="fact">
               <b>Read-only keys</b
               ><span
-                >Exchange API keys without trade or withdrawal permission.</span
+                >Read-only API keys are enough; don't grant trade or withdrawal
+                permission.</span
               >
             </div>
             <div class="fact">
@@ -626,7 +636,7 @@
                 <li>300 ERC20 wallet refreshes per month</li>
                 <li>300 TRON asset refreshes per month</li>
                 <li>All-chain refresh on supported Pro EVM networks</li>
-                <li>Live total value and prices during refresh</li>
+                <li>Real-time portfolio value in the top bar and live prices during refresh</li>
               </ul>
               <p class="sub usage-note">
                 One wallet refresh counts as one use.
