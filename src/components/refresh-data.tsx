@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import {
   refreshAllData,
   type RefreshAllDataResult,
@@ -15,7 +15,7 @@ import {
 } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
-import { updateAllCurrencyRates } from "@/middlelayers/configuration";
+import { getConfiguration, updateAllCurrencyRates } from "@/middlelayers/configuration";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -33,6 +33,9 @@ import { redactSecrets } from "@/middlelayers/security/redact";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "@/middlelayers/source-status";
 import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failure";
+import { listPortfolioSources } from "@/middlelayers/data";
+import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
+import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
 
 const retries = 3;
 const retryInterval = 3000;
@@ -62,6 +65,10 @@ const App = ({
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult>();
+  const [preflight, setPreflight] = useState<{ sourceId?: string; warnings: UsageWarning[] } | null>(null);
+  const [preflightPending, setPreflightPending] = useState(false);
+  const preflightPendingRef = useRef(false);
+  const refreshInProgress = useRef(false);
 
   const {
     setButtonLoading: setRefreshLoading,
@@ -91,7 +98,9 @@ const App = ({
   }
 
   const runRefresh = async (sourceId?: string) => {
+    if (refreshInProgress.current) return;
     if (sourceId && !lastResult?.sourceResults) return;
+    refreshInProgress.current = true;
     cancelInsightRefresh();
     setRefreshLoading(true);
     const operation: RefreshOperation = { operationUuid: uuidv4() };
@@ -179,6 +188,8 @@ const App = ({
       toast({ description: t(messageKey), variant: "destructive" });
       trackEventWithClientID("data_refreshed", { failed: "true" });
     } finally {
+      await invalidateUsageCache();
+      refreshInProgress.current = false;
       setRefreshLoading(false);
       setProgress(0);
       afterRefresh?.(succeeded);
@@ -199,6 +210,34 @@ const App = ({
         });
       }
     }
+  };
+
+  const requestRefresh = async (sourceId?: string) => {
+    if (refreshLoading || preflight || preflightPendingRef.current || refreshInProgress.current) return;
+    preflightPendingRef.current = true;
+    setPreflightPending(true);
+    try {
+      const [config, userInfo] = await Promise.all([getConfiguration(), isProVersion()]);
+      if (config && userInfo.isPro) {
+        const sourceIds = listPortfolioSources(config, userInfo)
+          .filter((source) => !sourceId || source.sourceId === sourceId)
+          .map((source) => source.sourceId);
+        if (sourceIds.some((id) => id.startsWith("erc20:") || id.startsWith("trc20:"))) {
+          const usage = await LicenseCenter.getInstance().getUsage();
+          const warnings = getUsageWarnings(sourceIds, usage);
+          if (warnings.length) {
+            setPreflight({ sourceId, warnings });
+            return;
+          }
+        }
+      }
+    } catch {
+      // Usage lookup is advisory. A refresh still runs when it is unavailable.
+    } finally {
+      preflightPendingRef.current = false;
+      setPreflightPending(false);
+    }
+    await runRefresh(sourceId);
   };
 
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
@@ -247,9 +286,9 @@ const App = ({
 
   return (
     <div className="flex items-center gap-2">
-      <span role="status" className="sr-only">{refreshLoading ? t("refresh.inProgress") : ""}</span>
-      <Button variant="outline" aria-label={t("common.refresh")} onClick={() => runRefresh()} disabled={refreshLoading}>
-        <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading ? "animate-spin motion-reduce:animate-none" : ""}`} />
+      <span role="status" className="sr-only">{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
+      <Button variant="outline" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
+        <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
         <p className="hidden sm:inline-block">{t("common.refresh")}</p>
       </Button>
       {sourceStatuses.length > 0 && (
@@ -258,12 +297,35 @@ const App = ({
           size="sm"
           className={!hasFailure && hasPartial ? "text-amber-900 dark:text-amber-300" : undefined}
           onClick={() => setStatusDialogOpen(true)}
-          disabled={refreshLoading}
+          disabled={refreshLoading || preflightPending}
         >
           {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
           {t("refresh.sourceStatus")}
         </Button>
       )}
+      <AlertDialog open={!!preflight} onOpenChange={(open) => { if (!open) setPreflight(null); }}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("refresh.preflight.title")}</AlertDialogTitle>
+            <AlertDialogDescription asChild><div className="space-y-2">
+              {preflight?.warnings.map(({ resource, needed, remaining, stale }) =>
+                <p key={resource}>{t("refresh.preflight.desc")
+                  .replace("{needed}", String(needed))
+                  .replace("{resource}", resource.toUpperCase())
+                  .replace("{remaining}", String(remaining))
+                  .replace("{n}", String(stale))}</p>)}
+            </div></AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <Button onClick={() => {
+              const sourceId = preflight?.sourceId;
+              setPreflight(null);
+              void runRefresh(sourceId);
+            }}>{t("refresh.preflight.continue")}</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
@@ -321,13 +383,13 @@ const App = ({
                     }).format(new Date(source.lastSuccessAt)))}
                   </div>}
                 </div>
-                {source.status !== "ok" && lastResult?.sourceResults && (
+                {source.status !== "ok" && source.category !== "quota" && lastResult?.sourceResults && (
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={refreshLoading}
+                    disabled={refreshLoading || preflightPending}
                     aria-label={t("refresh.retrySource").replace("{source}", displayIdentity(source))}
-                    onClick={() => runRefresh(source.sourceId)}
+                    onClick={() => requestRefresh(source.sourceId)}
                   >
                     {t("refresh.retryButton")}
                   </Button>
@@ -336,8 +398,8 @@ const App = ({
             ); })}
           </div>
           <AlertDialogFooter>
-            {failedStatuses.length > 0 && <Button variant="outline"
-              disabled={refreshLoading} onClick={() => runRefresh()}>{t("refresh.retryAllFailed")}</Button>}
+            {failedStatuses.some((source) => source.category !== "quota") && <Button variant="outline"
+              disabled={refreshLoading || preflightPending} onClick={() => requestRefresh()}>{t("refresh.retryAllFailed")}</Button>}
             <AlertDialogCancel>{t("refresh.close")}</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>

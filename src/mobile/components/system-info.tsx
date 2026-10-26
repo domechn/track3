@@ -15,7 +15,9 @@ import {
   LicenseCenter,
   type SubscriptionPlan,
   type SubscriptionPlansResponse,
+  type SubscriptionInfo,
 } from "@/middlelayers/license";
+import { ProUsageRows } from "@/components/pro-usage-rows";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
 import { getVersion, trackEventWithClientID } from "@/utils/app";
@@ -26,21 +28,13 @@ import { isIOS } from "@/utils/platform";
 import { useSearchParams } from "react-router-dom";
 import { InsetGroup, ListRow } from "@/mobile/components/mobile";
 
-type SubscriptionInfo = {
-  planType: "monthly" | "yearly" | null;
-  status: "active" | "past_due" | "canceled" | "incomplete" | null;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  isLegacy: boolean;
-};
-
 const App = ({
   onProStatusChange,
 }: {
   onProStatusChange: (active: boolean) => void;
 }) => {
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [searchParams] = useSearchParams();
   const [version, setVersion] = useState<string>("0.1.0");
   const [activeLicense, setActiveLicense] = useState<string | undefined>();
@@ -53,6 +47,7 @@ const App = ({
   // subscription states
   const [subscriptionInfo, setSubscriptionInfo] =
     useState<SubscriptionInfo | null>(null);
+  const [usageEnforced, setUsageEnforced] = useState(false);
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] =
@@ -67,11 +62,17 @@ const App = ({
   }, []);
 
   useEffect(() => {
+    let current = true;
+    setUsageEnforced(false);
     if (activeLicense) {
       loadSubscriptionInfo();
+      void LicenseCenter.getInstance().getUsage().then((result) => {
+        if (current) setUsageEnforced(result?.enforced === true);
+      });
     } else {
       setSubscriptionInfo(null);
     }
+    return () => { current = false; };
   }, [activeLicense]);
 
   function loadVersion() {
@@ -337,6 +338,9 @@ const App = ({
       {activeLicense && subscriptionInfo && subscriptionInfo.status !== "active" && <ListRow value={subscriptionStatusLabel(subscriptionInfo.status)}>{t("system.statusLabel")}</ListRow>}
       {activeLicense && subscriptionInfo?.planType && <ListRow value={t(subscriptionInfo.planType === "monthly" ? "system.monthly" : "system.yearly")}>{t("system.planLabel")}</ListRow>}
     </InsetGroup>
+    {activeLicense && subscriptionInfo?.usage && <section><h2 className="ios-d3-section-heading">{t("system.usage.heading")}</h2><InsetGroup><div className="px-4 pb-4">
+      <ProUsageRows usage={subscriptionInfo.usage} enforced={usageEnforced} t={t} locale={locale} />
+    </div></InsetGroup></section>}
     {!activeLicense && <section>
       <h2 className="ios-d3-section-heading">{t("system.legacyInputTitle")}</h2>
       <div className="ios-d3-license-group">
@@ -402,6 +406,7 @@ const App = ({
                     : t("system.proStatus.legacy")
                   : t("system.proStatus.subPrompt")}
             </p>
+            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} enforced={usageEnforced} t={t} locale={locale} />}
           </CardContent>
         </Card>}
       </div>

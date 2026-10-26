@@ -542,7 +542,7 @@
   "system.proLicense": "Pro 授权",
   "system.legacyNote": "你正在使用旧版授权，该授权可以继续无限期使用。",
   "system.upgrade": "升级到 Pro",
-  "system.upgradeDesc": "订阅以解锁实时组合跟踪、更多链支持与高级数据源。",
+  "system.upgradeDesc": "每月可刷新 ERC20 钱包 300 次。每月可刷新 TRON 钱包 300 次。支持的 Pro 网络可刷新所有链上的资产。每刷新一个钱包计为一次使用。",
   "system.viewBenefits": "查看 Pro 权益",
   "system.monthly": "按月",
   "system.yearly": "按年",
@@ -1071,5 +1071,12 @@
   "sync.pulledToast": "来自 {device} 的 {count} 个新快照",
   "sync.connection.conditions": "存储服务未执行条件写入。多设备同步需要此 S3 功能。",
   "sync.status.errorsPresent": "部分同步数据无法处理。Track3 将自动重试。",
-  "sync.disableFailed": "无法停用同步，请重试。"
+  "sync.disableFailed": "无法停用同步，请重试。",
+  "refresh.reason.quota": "本月刷新次数已用完",
+  "refresh.preflight.title": "刷新次数限制",
+  "refresh.preflight.desc": "本次刷新需要 {needed} 次 {resource} 钱包刷新，剩余 {remaining} 次。{n} 个钱包将不会刷新。",
+  "refresh.preflight.continue": "继续刷新",
+  "system.usage.erc20": "ERC20 钱包刷新",
+  "system.usage.tron": "TRON 钱包刷新",
+  "system.usage.resetsOn": "{date} 重置"
 }

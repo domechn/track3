@@ -2,7 +2,7 @@ import type { PortfolioSourceStatus } from "./portfolio-baseline";
 import { redactSecrets } from "./security/redact";
 import { safePartialEndpoint } from "./datafetch/utils/source-failure";
 
-const categories = new Set(["auth", "network", "rateLimit", "unsupported", "other"]);
+const categories = new Set(["auth", "network", "rateLimit", "quota", "unsupported", "other"]);
 const kinds = new Set(["exchange", "wallet", "broker", "others"]);
 const details = new Set(["Source timed out", "Unsupported exchange", "Invalid source holdings"]);
 const maskedHint = /^(?:[A-Za-z0-9_-]{4}…[A-Za-z0-9_-]{4}|[A-Za-z0-9_-]{6}…[A-Za-z0-9_-]{4}|#(?:[1-9]\d{0,4}))$/;

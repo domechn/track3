@@ -257,19 +257,25 @@ export async function fetchPortfolios(
   }
   const perProgressPer = sources.length ? 70 / sources.length : 70;
   const chainTasks = new Map<string, Promise<PortfolioSourceResult>>();
+  const exhausted = new Set<string>();
   const sourceResults: PortfolioSourceResult[] = await Promise.all(sources.map(async (source) => {
     const kind = source.sourceId.split(":")[0];
     const previous = chainTasks.get(kind);
     const run = async (): Promise<PortfolioSourceResult> => {
       if (previous) {
         await previous;
-        if (["btc", "doge", "ton", "erc20", "trc20"].includes(kind)) {
+        if (!exhausted.has(kind) && ["btc", "doge", "ton", "erc20", "trc20"].includes(kind)) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
       const startedAt = new Date().toISOString();
       let walletIdentities = source.walletIdentities;
       try {
+        if (exhausted.has(kind)) {
+          return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
+            hint: source.hint, walletIdentities, status: "stale", coins: [], category: "quota",
+            startedAt, finishedAt: new Date().toISOString() };
+        }
         const { coins: portfolio, partial } = await withinSourceTimeout(async () => {
           if (source.unsupported) throw new Error("Unsupported exchange");
           const analyzer = new source.AnalyzerClass(source.config, userInfo.license);
@@ -310,6 +316,7 @@ export async function fetchPortfolios(
           getMemoryCacheInstance("data-fetch").clearCache();
         }
         const category = classifySourceError(error);
+        if (category === "quota" && (kind === "erc20" || kind === "trc20")) exhausted.add(kind);
         const detail = error instanceof Error && ["Source timed out", "Unsupported exchange", "Invalid source holdings"].includes(error.message)
           ? error.message : undefined;
         return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,

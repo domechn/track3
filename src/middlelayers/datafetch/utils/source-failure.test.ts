@@ -3,6 +3,10 @@ import { HttpRequestError } from "./http";
 import { classifySourceError, recordOptionalSourceFailure, recordSourceFailure, safePartialEndpoint, takeOptionalSourceFailures, takeSourceFailure } from "./source-failure";
 
 describe("source error categories", () => {
+  it("classifies only the metering 429 as quota", () => {
+    expect(classifySourceError(new HttpRequestError("code USAGE_LIMIT_EXCEEDED", 429))).toBe("quota");
+    expect(classifySourceError(new HttpRequestError("rate limit", 429))).toBe("rateLimit");
+  });
   it("classifies transport errors as network without reading address digits", () => {
     expect(classifySourceError(new Error("Request failed (GET https://example.test/wallet/429401)"))).toBe("network");
     expect(classifySourceError(new Error("Request timed out (GET https://example.test/wallet/403)"))).toBe("network");

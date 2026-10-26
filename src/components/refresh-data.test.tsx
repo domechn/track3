@@ -4,7 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RefreshData from "@/components/refresh-data";
 import { refreshAllData } from "@/middlelayers/charts";
-import { updateAllCurrencyRates } from "@/middlelayers/configuration";
+import { getConfiguration, updateAllCurrencyRates } from "@/middlelayers/configuration";
+import { listPortfolioSources } from "@/middlelayers/data";
+import { isProVersion } from "@/middlelayers/license";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
 import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
@@ -17,6 +19,8 @@ import axe from "axe-core";
 const mockSetButtonLoading = vi.hoisted(() => vi.fn());
 const mockSetProgress = vi.hoisted(() => vi.fn());
 const mockToast = vi.hoisted(() => vi.fn());
+const mockGetUsage = vi.hoisted(() => vi.fn());
+const mockInvalidateUsageCache = vi.hoisted(() => vi.fn());
 
 vi.mock("@/components/index/index", async () => {
   const { createContext } = await import("react");
@@ -35,7 +39,14 @@ vi.mock("@/middlelayers/charts", () => ({
 }));
 
 vi.mock("@/middlelayers/configuration", () => ({
+  getConfiguration: vi.fn(),
   updateAllCurrencyRates: vi.fn(),
+}));
+vi.mock("@/middlelayers/data", () => ({ listPortfolioSources: vi.fn() }));
+vi.mock("@/middlelayers/license", () => ({
+  isProVersion: vi.fn(),
+  invalidateUsageCache: mockInvalidateUsageCache,
+  LicenseCenter: { getInstance: () => ({ getUsage: mockGetUsage }) },
 }));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
@@ -63,6 +74,9 @@ beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
   vi.mocked(updateAllCurrencyRates).mockResolvedValue(undefined as never);
+  vi.mocked(getConfiguration).mockResolvedValue(undefined);
+  vi.mocked(isProVersion).mockResolvedValue({ isPro: false });
+  vi.mocked(listPortfolioSources).mockReturnValue([]);
   vi.mocked(refreshAllData).mockResolvedValue({
     failedSources: [],
     requiresDataSourceAction: false,
@@ -77,6 +91,75 @@ beforeEach(() => {
 });
 
 describe("RefreshData — currency rates refresh ordering", () => {
+  it("asks before consuming more Pro ERC20 refreshes than remain", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
+    vi.mocked(listPortfolioSources).mockReturnValue([
+      { sourceId: "erc20:0", label: "Wallet 1" },
+      { sourceId: "erc20:1", label: "Wallet 2" },
+    ]);
+    mockGetUsage.mockResolvedValue({
+      enforced: true,
+      usage: {
+        erc20: { limit: 300, used: 299, remaining: 1, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+        tron: { limit: 300, used: 0, remaining: 300, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+      },
+    });
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alertdialog", { name: "Refresh limit" })).toHaveTextContent("ERC20 wallet refreshes needed: 2; remaining: 1");
+    expect(refreshAllData).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Continue refresh" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+  });
+
+  it("starts a Pro refresh without a usage request when no metered wallet is configured", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
+    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "btc:0", label: "Bitcoin" }]);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+    expect(mockGetUsage).not.toHaveBeenCalled();
+  });
+  it("shows preflight progress and starts only one refresh for two clicks during usage lookup", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
+    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "erc20:0", label: "Wallet" }]);
+    let finishUsage: ((value: undefined) => void) | undefined;
+    mockGetUsage.mockImplementation(() => new Promise((resolve) => { finishUsage = resolve; }));
+    render(<RefreshData loading={false} />);
+    const button = screen.getByRole("button", { name: "Refresh" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Refreshing portfolio");
+    await waitFor(() => expect(finishUsage).toBeDefined());
+    await act(async () => { finishUsage?.(undefined); });
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+  });
+  it("refreshes when the usage lookup rejects", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
+    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "erc20:0", label: "Wallet" }]);
+    mockGetUsage.mockRejectedValue(new Error("offline"));
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("alertdialog", { name: "Refresh limit" })).not.toBeInTheDocument();
+    await waitFor(() => expect(mockInvalidateUsageCache).toHaveBeenCalledOnce());
+  });
+  it("hides retry controls when every failed source has exhausted its quota", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, sourceStatuses: [{ sourceId: "erc20:0", label: "Wallet", status: "failed", category: "quota" }],
+    } as never);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
+    expect(dialog).toHaveTextContent("Monthly refresh limit reached");
+    expect(screen.queryByRole("button", { name: "Retry Wallet" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry all failed" })).not.toBeInTheDocument();
+  });
   it("announces an active refresh to assistive technology", () => {
     render(<RefreshData loading={true} />);
     expect(screen.getByRole("status")).toHaveTextContent("Refreshing portfolio");

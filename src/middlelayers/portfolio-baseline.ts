@@ -19,6 +19,7 @@ export type SourceErrorCategory =
   | "auth"
   | "network"
   | "rateLimit"
+  | "quota"
   | "unsupported"
   | "other";
 

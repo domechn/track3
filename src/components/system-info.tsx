@@ -15,7 +15,9 @@ import {
   LicenseCenter,
   type SubscriptionPlan,
   type SubscriptionPlansResponse,
+  type SubscriptionInfo,
 } from "@/middlelayers/license";
+import { ProUsageRows } from "./pro-usage-rows";
 import { useToast } from "@/components/ui/use-toast";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { getVersion, trackEventWithClientID } from "@/utils/app";
@@ -23,21 +25,13 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
 
-type SubscriptionInfo = {
-  planType: "monthly" | "yearly" | null;
-  status: "active" | "past_due" | "canceled" | "incomplete" | null;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  isLegacy: boolean;
-};
-
 const App = ({
   onProStatusChange,
 }: {
   onProStatusChange: (active: boolean) => void;
 }) => {
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [version, setVersion] = useState<string>("0.1.0");
   const [activeLicense, setActiveLicense] = useState<string | undefined>();
   const [inputLicense, setInputLicense] = useState<string | undefined>();
@@ -49,6 +43,7 @@ const App = ({
   // subscription states
   const [subscriptionInfo, setSubscriptionInfo] =
     useState<SubscriptionInfo | null>(null);
+  const [usageEnforced, setUsageEnforced] = useState(false);
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] =
@@ -63,11 +58,17 @@ const App = ({
   }, []);
 
   useEffect(() => {
+    let current = true;
+    setUsageEnforced(false);
     if (activeLicense) {
       loadSubscriptionInfo();
+      void LicenseCenter.getInstance().getUsage().then((result) => {
+        if (current) setUsageEnforced(result?.enforced === true);
+      });
     } else {
       setSubscriptionInfo(null);
     }
+    return () => { current = false; };
   }, [activeLicense]);
 
   function loadVersion() {
@@ -361,6 +362,7 @@ const App = ({
                     : t("system.proStatus.legacy")
                   : t("system.proStatus.subPrompt")}
             </p>
+            {activeLicense && <ProUsageRows usage={subscriptionInfo?.usage} enforced={usageEnforced} t={t} locale={locale} />}
           </CardContent>
         </Card>
       </div>

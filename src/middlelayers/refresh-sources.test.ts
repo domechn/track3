@@ -3,6 +3,7 @@ import { fetchPortfolios } from "./data";
 import type { GlobalConfig, WalletCoin } from "./datafetch/types";
 import { recordOptionalSourceFailure, recordSourceFailure } from "./datafetch/utils/source-failure";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
+import { HttpRequestError } from "./datafetch/utils/http";
 
 const { scenario, MockAnalyzer } = vi.hoisted(() => {
   const scenario = {
@@ -13,9 +14,10 @@ const { scenario, MockAnalyzer } = vi.hoisted(() => {
   id: string;
   constructor(config: GlobalConfig) {
     this.id = String(
-      config.exchanges?.length === 1 ? config.exchanges[0].name
+      config.erc20?.addresses?.length === 1 ? config.erc20.addresses[0]
+        : config.exchanges?.length === 1 ? config.exchanges[0].name
         : config.stockConfig?.brokers?.length === 1 ? config.stockConfig.brokers[0].initParams.queryId
-          : config.btc?.addresses?.[0] ?? config.erc20?.addresses?.[0] ?? "empty"
+          : config.btc?.addresses?.[0] ?? "empty"
     );
   }
   getAnalyzeName() { return "Mock Analyzer"; }
@@ -61,6 +63,24 @@ beforeEach(() => {
 });
 
 describe("per-source refresh", () => {
+  it("skips later Pro wallets of an exhausted resource while other chains continue", async () => {
+    scenario.load = async (id) => {
+      if (id === "erc-a") throw new HttpRequestError("code USAGE_LIMIT_EXCEEDED", 429);
+      return [coin(id)];
+    };
+    const result = await fetchPortfolios({
+      ...config,
+      btc: { addresses: [] },
+      erc20: { addresses: ["erc-a", "erc-b"] },
+      exchanges: [{ name: "binance", initParams: { apiKey: "key", secret: "secret" } }],
+    }, vi.fn(), { isPro: true, license: "pro" });
+    expect(scenario.calls).toEqual(["erc-a", "binance"]);
+    expect(result.sourceResults).toMatchObject([
+      { sourceId: "erc20:0", category: "quota" },
+      { sourceId: "erc20:1", category: "quota" },
+      { sourceId: "cex:0", status: "ok" },
+    ]);
+  });
   it("keeps the successful wallet when another wallet fails", async () => {
     scenario.load = async (id) => {
       if (id === "wallet-a") throw new Error("connection refused");

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
   refreshAllData,
   type RefreshAllDataResult,
@@ -35,7 +35,8 @@ import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "@/m
 import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failure";
 import { isIOS } from "@/utils/platform";
 import { listPortfolioSources } from "@/middlelayers/data";
-import { isProVersion } from "@/middlelayers/license";
+import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
+import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
 
 const retries = 3;
 const retryInterval = 3000;
@@ -63,6 +64,10 @@ const App = ({
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [preflight, setPreflight] = useState<{ sourceId?: string; warnings: UsageWarning[] } | null>(null);
+  const [preflightPending, setPreflightPending] = useState(false);
+  const preflightPendingRef = useRef(false);
+  const refreshInProgress = useRef(false);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult>();
   const [refreshing, setRefreshing] = useState(false);
@@ -99,8 +104,9 @@ const App = ({
   }
 
   const runRefresh = async (sourceId?: string) => {
-    if (refreshLoading) return;
+    if (refreshLoading || refreshInProgress.current) return;
     if (sourceId && !lastResult?.sourceResults) return;
+    refreshInProgress.current = true;
     if (isIOS()) setStatusDialogOpen(true);
     setRefreshing(true);
     setLiveSources([]);
@@ -200,6 +206,8 @@ const App = ({
       toast({ description: t(messageKey), variant: "destructive" });
       trackEventWithClientID("data_refreshed", { failed: "true" });
     } finally {
+      await invalidateUsageCache();
+      refreshInProgress.current = false;
       setRefreshing(false);
       setRefreshLoading(false);
       setProgress(0);
@@ -223,10 +231,38 @@ const App = ({
     }
   };
 
+  const requestRefresh = async (sourceId?: string) => {
+    if (refreshLoading || preflight || preflightPendingRef.current || refreshInProgress.current) return;
+    preflightPendingRef.current = true;
+    setPreflightPending(true);
+    try {
+      const [config, userInfo] = await Promise.all([getConfiguration(), isProVersion()]);
+      if (config && userInfo.isPro) {
+        const sourceIds = listPortfolioSources(config, userInfo)
+          .filter((source) => !sourceId || source.sourceId === sourceId)
+          .map((source) => source.sourceId);
+        if (sourceIds.some((id) => id.startsWith("erc20:") || id.startsWith("trc20:"))) {
+          const usage = await LicenseCenter.getInstance().getUsage();
+          const warnings = getUsageWarnings(sourceIds, usage);
+          if (warnings.length) {
+            setPreflight({ sourceId, warnings });
+            return;
+          }
+        }
+      }
+    } catch {
+      // Usage lookup is advisory. A refresh still runs when it is unavailable.
+    } finally {
+      preflightPendingRef.current = false;
+      setPreflightPending(false);
+    }
+    await runRefresh(sourceId);
+  };
+
   useEffect(() => {
-    refreshAction.current = () => runRefresh();
+    refreshAction.current = () => requestRefresh();
     return () => { refreshAction.current = null; };
-  }, [refreshAction, runRefresh]);
+  }, [refreshAction, requestRefresh]);
 
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
   const hasPartial = sourceStatuses.some((source) => source.status === "partial");
@@ -276,9 +312,9 @@ const App = ({
 
   return (
     <div className="flex items-center gap-2">
-      <span role="status" className="sr-only">{refreshLoading ? t("refresh.inProgress") : ""}</span>
-      <Button variant="outline" aria-label={t("common.refresh")} onClick={() => runRefresh()} disabled={refreshLoading}>
-        <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading ? "animate-spin motion-reduce:animate-none" : ""}`} />
+      <span role="status" className="sr-only">{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
+      <Button variant="outline" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
+        <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
         <p className="hidden sm:inline-block">{t("common.refresh")}</p>
       </Button>
       {sourceStatuses.length > 0 && (
@@ -287,12 +323,35 @@ const App = ({
           size="sm"
           className={!hasFailure && hasPartial ? "text-amber-900 dark:text-amber-300" : undefined}
           onClick={() => setStatusDialogOpen(true)}
-          disabled={refreshLoading}
+          disabled={refreshLoading || preflightPending}
         >
           {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
           {t("refresh.sourceStatus")}
         </Button>
       )}
+      <AlertDialog open={!!preflight} onOpenChange={(open) => { if (!open) setPreflight(null); }}>
+        <AlertDialogContent className={isIOS() ? "ios-d3-refresh-sheet bottom-0 left-0 top-auto max-h-[90dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+1rem)]" : "sm:max-w-md"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("refresh.preflight.title")}</AlertDialogTitle>
+            <AlertDialogDescription asChild><div className="space-y-2">
+              {preflight?.warnings.map(({ resource, needed, remaining, stale }) =>
+                <p key={resource}>{t("refresh.preflight.desc")
+                  .replace("{needed}", String(needed))
+                  .replace("{resource}", resource.toUpperCase())
+                  .replace("{remaining}", String(remaining))
+                  .replace("{n}", String(stale))}</p>)}
+            </div></AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <Button onClick={() => {
+              const sourceId = preflight?.sourceId;
+              setPreflight(null);
+              void runRefresh(sourceId);
+            }}>{t("refresh.preflight.continue")}</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <AlertDialogContent className={isIOS()
           ? "ios-d3-refresh-sheet bottom-0 left-0 top-auto max-h-[90dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+1rem)]"
@@ -342,7 +401,7 @@ const App = ({
                 <span className="ios-d3-refresh-row-duration text-muted-foreground">{completed?.startedAt && completed.finishedAt
                   ? `${((Date.parse(completed.finishedAt) - Date.parse(completed.startedAt)) / 1000).toFixed(1)}s`
                   : ""}</span>
-                {(previousFailed || completed?.status === "stale") && <Button size="sm" variant="secondary" disabled
+                {(previousFailed || completed?.status === "stale") && completed?.category !== "quota" && !sourceStatuses.some((source) => source.sourceId === pending.sourceId && source.category === "quota") && <Button size="sm" variant="secondary" disabled
                   aria-label={t("refresh.retrySource").replace("{source}", label)}>{t("refresh.retryButton")}</Button>}
               </div>;
             })}
@@ -365,13 +424,13 @@ const App = ({
                 {source.startedAt && source.finishedAt && <span className="ios-d3-refresh-row-duration text-muted-foreground">
                   {((Date.parse(source.finishedAt) - Date.parse(source.startedAt)) / 1000).toFixed(1)}s
                 </span>}
-                {source.status !== "ok" && lastResult?.sourceResults && (
+                {source.status !== "ok" && source.category !== "quota" && lastResult?.sourceResults && (
                   <Button
                     size="sm"
                     variant={isIOS() ? "secondary" : "outline"}
-                    disabled={refreshLoading}
+                    disabled={refreshLoading || preflightPending}
                     aria-label={t("refresh.retrySource").replace("{source}", displayIdentity(source))}
-                    onClick={() => runRefresh(source.sourceId)}
+                    onClick={() => requestRefresh(source.sourceId)}
                   >
                     {t("refresh.retryButton")}
                   </Button>
@@ -402,8 +461,8 @@ const App = ({
             ); })}
           </div>
           <AlertDialogFooter>
-            {!refreshing && failedStatuses.length > 0 && <Button variant="outline"
-              disabled={refreshLoading} onClick={() => runRefresh()}>{t("refresh.retryAllFailed")}</Button>}
+            {!refreshing && failedStatuses.some((source) => source.category !== "quota") && <Button variant="outline"
+              disabled={refreshLoading || preflightPending} onClick={() => requestRefresh()}>{t("refresh.retryAllFailed")}</Button>}
             <AlertDialogCancel>{t("refresh.close")}</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -602,7 +602,7 @@
   "system.proLicense": "Pro License",
   "system.legacyNote": "You are using a legacy license. It will continue to work indefinitely.",
   "system.upgrade": "Upgrade to Pro",
-  "system.upgradeDesc": "Subscribe to unlock real-time portfolio tracking, expanded chain support, and premium data providers.",
+  "system.upgradeDesc": "300 ERC20 wallet refreshes per month. 300 TRON wallet refreshes per month. All-chain asset refresh for supported Pro networks. One wallet refresh counts as one use.",
   "system.viewBenefits": "View Pro Benefits",
   "system.monthly": "Monthly",
   "system.yearly": "Yearly",
@@ -1269,5 +1269,13 @@
   "data.folder.ready": "Backup folder ready",
   "data.folder.autoHint": "Choose the parent folder containing track3-backup, the same folder used for Auto backup on desktop.",
   "data.folder.month": "{count} month",
-  "mobile.refreshView": "Refresh view"
+  "mobile.refreshView": "Refresh view",
+  "refresh.reason.quota": "Monthly refresh limit reached",
+  "refresh.preflight.title": "Refresh limit",
+  "refresh.preflight.desc": "{resource} wallet refreshes needed: {needed}; remaining: {remaining}. {n} wallets will not be refreshed.",
+  "refresh.preflight.continue": "Continue refresh",
+  "system.usage.erc20": "ERC20 wallet refreshes",
+  "system.usage.tron": "TRON wallet refreshes",
+  "system.usage.resetsOn": "Resets {date}",
+  "system.usage.heading": "Monthly refresh usage"
 }
