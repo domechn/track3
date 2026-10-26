@@ -34,6 +34,25 @@
     <link rel="canonical" href="https://track3.domc.me/success.html" />
     <link rel="icon" type="image/png" href="images/app-icon.png" />
     <link rel="stylesheet" href="site.css" />
+      <script>
+      /* Keep the Stripe session id out of the page URL before any third-party script can read it. */
+      (function () {
+        var p = new URLSearchParams(location.search), s = p.get("session_id");
+        if (!s) return;
+        window.__t3Session = s;
+        p.delete("session_id");
+        var q = p.toString();
+        history.replaceState(history.state, "", location.pathname + (q ? "?" + q : "") + location.hash);
+      })();
+    </script>
+    <!-- X conversion tracking base code -->
+    <script>
+      !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
+      },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
+      a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+      twq('config','rhy6t');
+    </script>
+    <!-- End X conversion tracking base code -->
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -180,7 +199,7 @@
     <script>
       (() => {
         const params = new URLSearchParams(location.search);
-        const sessionId = params.get("session_id");
+        const sessionId = window.__t3Session || params.get("session_id");
         if (params.has("session_id")) {
           params.delete("session_id");
           const query = params.toString();
