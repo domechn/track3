@@ -334,9 +334,18 @@ section.tint {
   overflow: hidden;
   background: #15122a;
 }
+.dev img {
+  border-radius: 22px;
+}
+.phone img {
+  border-radius: 19px;
+}
 .dev.ipad {
   border-radius: 22px;
   padding: 10px;
+}
+.dev.ipad img {
+  border-radius: 12px;
 }
 .devices {
   align-items: center;
