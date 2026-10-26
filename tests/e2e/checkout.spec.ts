@@ -16,3 +16,27 @@ test("desktop checkout waits, resumes after reload, and activates Pro", async ({
   await expect(page.getByText("Pro", { exact: true }).first()).toBeVisible();
   expect(bridge.checkoutSessions()).toBe(1);
 });
+
+test("desktop Cancel stays dismissed after reload and Subscribe reopens checkout", async ({ page }) => {
+  const bridge = await installTauriBridge(page, { checkoutFixture: true });
+  await page.goto("/#/settings/systemInfo");
+  await page.getByRole("button", { name: "Subscribe Monthly" }).click();
+  await expect(page.getByText(/Waiting for payment/)).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.reload();
+  await expect(page.getByText(/Waiting for payment/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Subscribe Monthly" }).click();
+  await expect(page.getByText(/Waiting for payment/)).toBeVisible();
+  expect(bridge.openedUrls().filter((url) => url === "https://checkout.stripe.test/session")).toHaveLength(2);
+  expect(bridge.checkoutSessions()).toBe(1);
+});
+
+test("desktop expired checkout can be dismissed", async ({ page }) => {
+  const bridge = await installTauriBridge(page, { checkoutFixture: true });
+  bridge.setCheckoutStatus("expired");
+  await page.goto("/#/settings/systemInfo");
+  await page.getByRole("button", { name: "Subscribe Monthly" }).click();
+  await expect(page.getByText(/Checkout session expired/)).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByText(/Checkout session expired/)).toHaveCount(0);
+});

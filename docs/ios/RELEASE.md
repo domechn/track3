@@ -14,7 +14,8 @@ Run `corepack yarn tsc --noEmit`, `corepack yarn vitest run`,
 The existing `test-on-pr` workflow tests desktop release behavior. The
 `ios-foundation.yml` web and macOS iOS jobs must pass on the release commit.
 It runs on `feat/ios-app*`, `feat/ios-folder-picker*`,
-`feat/ios-interaction-fixes*`, `feat/ios-wide-screens*`, and `feat/pro-usage-ui*` pushes, relevant iOS
+`feat/ios-interaction-fixes*`, `feat/ios-wide-screens*`, `feat/pro-usage-ui*`, and
+`feat/checkout-flow*` pushes, relevant iOS
 path PRs, and manual dispatch.
 Check that the simulator launch produced a rendered screenshot, the ready
 marker, no crash report, and an unsigned device IPA. Previous CI runs in the
@@ -28,9 +29,11 @@ family and multitasking keys.
 The desktop app opens Stripe checkout in the system browser. iOS hides the
 purchase button and offers only Manage Subscription and Restore Purchase for
 existing customers. Existing license-key entry unlocks paid Pro features on
-iOS. App Store Guideline 3.1.1 may still require in-app purchase
-or an applicable entitlement or exception. Treat App Review acceptance as
-unresolved: confirm a compliant purchase and license flow before submission.
+iOS. Manage Subscription opens the Stripe customer portal in Safari, where
+customers may be able to change plans or purchase a subscription. That portal
+is also an App Store Guideline 3.1.1 risk. In-app purchase or an applicable
+entitlement or exception may still be required. Treat App Review acceptance
+as unresolved: confirm a compliant purchase and license flow before submission.
 
 ## App Store privacy preparation
 

@@ -4,6 +4,7 @@ import { HashRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SystemInfo from "@/mobile/components/system-info";
 import { isIOS } from "@/utils/platform";
+import { checkoutPendingKey } from "@/middlelayers/checkout";
 
 const exhaustedUsage = {
   erc20: { limit: 300, used: 300, remaining: 0, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
@@ -193,6 +194,7 @@ describe("System Info subscription management", () => {
     expect(await screen.findByText("Free")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /view pro benefits/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /subscribe monthly/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /subscribe yearly/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Restore purchase/i)).toBeInTheDocument();
     vi.mocked(isIOS).mockReturnValue(false);
     window.location.hash = "";
@@ -203,6 +205,7 @@ describe("System Info subscription management", () => {
     render(<SystemInfo onProStatusChange={vi.fn()} />);
     expect(await screen.findByText("0.6.1")).toHaveClass("mobile-list-value");
     expect(screen.queryByText("Upgrade to Pro")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /subscribe/i })).not.toBeInTheDocument();
     vi.mocked(isIOS).mockReturnValue(false);
     window.location.hash = "";
   });
@@ -285,6 +288,30 @@ describe("System Info subscription management", () => {
     });
     expect(screen.getByRole("button", { name: /i've paid.*check again/i })).toBeInTheDocument();
     expect(mocks.createCheckoutSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens checkout again after Cancel on non-iOS mobile", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /subscribe monthly/i }));
+    await screen.findByText(/waiting for payment/i);
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /subscribe monthly/i }));
+    await waitFor(() => expect(mocks.openUrl).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(/waiting for payment/i)).toBeInTheDocument();
+  });
+
+  it("clears pending checkout after restoring a license on non-iOS mobile", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /subscribe monthly/i }));
+    await screen.findByText(/waiting for payment/i);
+    fireEvent.click(screen.getByText(/restore purchase/i));
+    fireEvent.change(screen.getByPlaceholderText(/license key/i), { target: { value: "restored-license" } });
+    fireEvent.click(screen.getByRole("button", { name: /^activate$/i }));
+    await waitFor(() => expect(mocks.saveLicense).toHaveBeenCalledWith("restored-license"));
+    expect(localStorage.getItem(checkoutPendingKey)).toBeNull();
+    expect(screen.queryByText(/waiting for payment/i)).not.toBeInTheDocument();
   });
 
   it("clears the license cache after inactivating the device", async () => {

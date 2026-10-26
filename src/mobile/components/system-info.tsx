@@ -37,6 +37,8 @@ const App = ({
 }) => {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [searchParams] = useSearchParams();
   const [version, setVersion] = useState<string>("0.1.0");
   const [activeLicense, setActiveLicense] = useState<string | undefined>();
@@ -53,6 +55,7 @@ const App = ({
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkoutPhase, setCheckoutPhase] = useState<CheckoutPhase>("idle");
+  const [checkoutError, setCheckoutError] = useState<string>();
   const checkoutRef = useRef<CheckoutFlow>();
   const [subscriptionPlans, setSubscriptionPlans] =
     useState<SubscriptionPlansResponse | null>(null);
@@ -127,8 +130,8 @@ const App = ({
 
   async function activeDevice(license: string) {
     await activateLicenseOnDevice(license, saveLicense, {
-      invalid: t("system.invalidLicenseKey"),
-      failed: t("system.activeLicenseFailed"),
+      invalid: tRef.current("system.invalidLicenseKey"),
+      failed: tRef.current("system.activeLicenseFailed"),
     });
     onProStatusChange(true);
   }
@@ -142,11 +145,15 @@ const App = ({
         setActiveLicense(license);
         setInputLicense(license);
       },
-      (phase) => {
+      (phase, error) => {
         setCheckoutPhase(phase);
+        setCheckoutError(error);
         if (phase === "completed") {
-          toast({ description: t("system.checkout.completed") });
+          toast({ description: tRef.current("system.checkout.completed") });
           void trackEventWithClientID("subscription_checkout_completed").catch(() => {});
+        }
+        if (phase === "expired" || phase === "timed-out" || phase === "error") {
+          void trackEventWithClientID(`subscription_checkout_${phase === "timed-out" ? "timed_out" : phase}`).catch(() => {});
         }
       },
     );
@@ -166,6 +173,7 @@ const App = ({
     setSaveLicenseLoading(true);
     activeDevice(inputLicense)
       .then(() => {
+        checkoutRef.current?.clearPending();
         setActiveLicense(inputLicense);
         toast({
           description: t("system.licenseSaved"),
@@ -210,6 +218,11 @@ const App = ({
     if (isIOS()) return;
     void trackEventWithClientID("subscription_subscribe_clicked", { planType }).catch(() => {});
     await checkoutRef.current?.start(planType);
+  }
+
+  function onCancelCheckout() {
+    checkoutRef.current?.cancel();
+    void trackEventWithClientID("subscription_checkout_cancelled").catch(() => {});
   }
 
   async function onManageSubscription() {
@@ -390,12 +403,15 @@ const App = ({
         <Card>
           <CardContent className="space-y-3 pt-6" role="status">
             <p>{t(`system.checkout.${checkoutPhase}`)}</p>
+            {checkoutPhase === "error" && checkoutError && <p>{checkoutError}</p>}
             {(checkoutPhase === "starting" || checkoutPhase === "waiting" || checkoutPhase === "timed-out" || checkoutPhase === "error") && (
               <div className="flex flex-wrap gap-2">
                 {checkoutPhase !== "starting" && <Button variant="outline" onClick={() => checkoutRef.current?.checkAgain()}>{t("system.checkout.checkAgain")}</Button>}
-                <Button variant="outline" onClick={() => checkoutRef.current?.cancel()}>{t("common.cancel")}</Button>
+                <Button variant="outline" onClick={onCancelCheckout}>{t("common.cancel")}</Button>
               </div>
             )}
+            {(checkoutPhase === "completed" || checkoutPhase === "expired") &&
+              <Button variant="outline" onClick={() => checkoutRef.current?.dismiss()}>{t("common.close")}</Button>}
           </CardContent>
         </Card>
       )}

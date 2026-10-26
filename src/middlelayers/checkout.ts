@@ -1,4 +1,5 @@
 import type { LicenseCenter } from "./license";
+import { redactSecrets } from "./security/redact";
 
 export const checkoutPendingKey = "track3-pending-checkout";
 const PENDING_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -7,7 +8,7 @@ const POLLING_LIMIT_MS = 10 * 60 * 1000;
 export type CheckoutPhase = "idle" | "starting" | "waiting" | "completed" | "expired" | "timed-out" | "error";
 
 type CheckoutApi = Pick<LicenseCenter, "createCheckoutSession" | "getCheckoutStatus">;
-type PendingCheckout = { sessionId: string; createdAt: number };
+type PendingCheckout = { sessionId: string; createdAt: number; url?: string; planType?: "monthly" | "yearly"; dismissed?: boolean };
 
 export class CheckoutFlow {
   private phase: CheckoutPhase = "idle";
@@ -19,18 +20,20 @@ export class CheckoutFlow {
   private queued = false;
   private failures = 0;
   private startedAt = 0;
+  private latestStartGeneration = 0;
+  private dismissedGeneration = 0;
 
   constructor(
     private readonly api: CheckoutApi,
     private readonly open: (url: string) => Promise<void>,
     private readonly activate: (license: string) => Promise<void>,
-    private readonly onState: (phase: CheckoutPhase) => void,
+    private readonly onState: (phase: CheckoutPhase, error?: string) => void,
     private readonly storage: Storage = localStorage,
   ) {}
 
-  private setPhase(phase: CheckoutPhase) {
+  private setPhase(phase: CheckoutPhase, error?: string) {
     this.phase = phase;
-    this.onState(phase);
+    this.onState(phase, error);
   }
 
   private readPending(): PendingCheckout | undefined {
@@ -39,6 +42,7 @@ export class CheckoutFlow {
       if (!raw) return;
       const value = JSON.parse(raw) as PendingCheckout;
       if (typeof value.sessionId === "string" && value.sessionId.length > 0 &&
+        (value.url === undefined || (typeof value.url === "string" && new URL(value.url).protocol === "https:")) &&
         Number.isFinite(value.createdAt) && value.createdAt <= Date.now() &&
         Date.now() - value.createdAt < PENDING_LIFETIME_MS) return value;
     } catch {
@@ -59,19 +63,38 @@ export class CheckoutFlow {
   async start(planType: "monthly" | "yearly") {
     if (this.phase === "starting" || this.phase === "waiting") return;
     this.lastPlan = planType;
-    if (this.readPending()) {
-      await this.resume();
-      return;
-    }
+    const pending = this.readPending();
     this.setPhase("starting");
     const generation = ++this.generation;
+    this.latestStartGeneration = generation;
     try {
+      if (pending?.planType === planType && pending.url) {
+        if (new URL(pending.url).protocol !== "https:") throw new Error("Invalid checkout URL");
+        try {
+          await this.open(pending.url);
+        } catch (error) {
+          if (generation === this.generation) this.storage.removeItem(checkoutPendingKey);
+          throw error;
+        }
+        if (generation !== this.generation) return;
+        this.storage.setItem(checkoutPendingKey, JSON.stringify({ ...pending, dismissed: false }));
+        await this.begin(pending.sessionId);
+        return;
+      }
       const { sessionId, url } = await this.api.createCheckoutSession(planType);
-      if (generation !== this.generation) return;
       if (!sessionId || !url || new URL(url).protocol !== "https:") throw new Error("Invalid checkout session");
-      await this.open(url);
+      if (generation !== this.latestStartGeneration) return;
+      this.storage.setItem(checkoutPendingKey, JSON.stringify({
+        sessionId, url, planType, createdAt: Date.now(), dismissed: generation === this.dismissedGeneration,
+      } satisfies PendingCheckout));
       if (generation !== this.generation) return;
-      this.storage.setItem(checkoutPendingKey, JSON.stringify({ sessionId, createdAt: Date.now() }));
+      try {
+        await this.open(url);
+      } catch (error) {
+        if (generation === this.generation) this.storage.removeItem(checkoutPendingKey);
+        throw error;
+      }
+      if (generation !== this.generation) return;
       await this.begin(sessionId);
     } catch {
       if (generation === this.generation) this.setPhase("error");
@@ -81,7 +104,7 @@ export class CheckoutFlow {
   async resume() {
     if (this.phase === "starting" || this.phase === "waiting") return;
     const pending = this.readPending();
-    if (pending) await this.begin(pending.sessionId);
+    if (pending && !pending.dismissed) await this.begin(pending.sessionId);
   }
 
   private async tick(generation: number) {
@@ -105,8 +128,11 @@ export class CheckoutFlow {
           if (generation !== this.generation) return;
           this.storage.removeItem(checkoutPendingKey);
           this.setPhase("completed");
-        } catch {
-          if (generation === this.generation) this.setPhase("error");
+        } catch (error) {
+          if (generation === this.generation) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.setPhase("error", redactSecrets(message, [result.license]));
+          }
         }
         return;
       }
@@ -142,10 +168,23 @@ export class CheckoutFlow {
   }
 
   cancel() {
+    this.dismissedGeneration = this.generation;
     ++this.generation;
     clearTimeout(this.timer);
     this.inFlightGeneration = undefined;
     this.queued = false;
+    const pending = this.readPending();
+    if (pending) this.storage.setItem(checkoutPendingKey, JSON.stringify({ ...pending, dismissed: true }));
+    this.setPhase("idle");
+  }
+
+  clearPending() {
+    this.cancel();
+    this.latestStartGeneration = 0;
+    this.storage.removeItem(checkoutPendingKey);
+  }
+
+  dismiss() {
     this.setPhase("idle");
   }
 
