@@ -236,6 +236,11 @@ section.tint {
   color: var(--ink);
   background: #fff;
 }
+.sources .row:nth-child(2) li {
+  padding-left: 8px;
+  padding-right: 12px;
+  gap: 6px;
+}
 .sources li img.wide {
   width: auto;
   max-width: 72px;
@@ -426,6 +431,11 @@ section.tint {
 .card.limits .usage-note {
   margin-top: 16px;
 }
+.plan-note {
+  margin-top: 24px;
+  color: var(--ink-2);
+  font-size: 16px;
+}
 .card.limits li:before {
   content: "✓";
   color: var(--good);
@@ -531,7 +541,7 @@ footer .wrap span:first-child {
   .devices {
     grid-template-columns: 1fr 1fr;
   }
-  .dev.ipad {
+  .devices > div:has(.ipad) {
     grid-column: 1/-1;
   }
   .facts {
@@ -928,6 +938,11 @@ header .wrap {
   .sources li:has(img.wide) {
     padding-right: 12px;
   }
+  .sources .row:nth-child(2) li {
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 5px;
+  }
 }
 @media (max-width: 520px) {
   .devices {
@@ -935,6 +950,13 @@ header .wrap {
   }
   .cap {
     font-size: 13px;
+  }
+  footer .wrap {
+    flex-direction: column;
+    gap: 12px;
+  }
+  footer .wrap span:first-child {
+    margin-right: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -949,6 +971,9 @@ header .wrap {
   }
 }
 @media (min-width: 961px) {
+  .final .cta {
+    margin-top: 0;
+  }
   .feature.flip .copy {
     order: 0;
   }
