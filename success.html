@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Payment received — Track3 Pro</title>
     <meta name="description" content="Your Track3 Pro subscription is being activated. Return to the Track3 app to start using it." />
@@ -540,6 +541,23 @@
       .notice li{margin-bottom:8px}
       .notice .shell-link--primary{display:inline-block;margin-top:8px}
       @media (max-width:520px){.notice{padding:32px 24px;margin:24px 16px}}
+      [hidden]{display:none!important}
+      .checkout-status{min-height:320px;margin:0 0 24px;padding:22px;border:1px solid var(--border-strong);border-radius:18px;background:var(--surface-soft)}
+      .checkout-status h2{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:1.15rem;line-height:1.35}
+      .checkout-status p{margin-bottom:12px}
+      .checkout-status a{color:#4835d2;text-decoration:underline;text-underline-offset:3px}
+      .status-spinner{flex:none;width:20px;height:20px;border:3px solid #c9c1ff;border-top-color:#4835d2;border-radius:50%;animation:status-spin .8s linear infinite}
+      @keyframes status-spin{to{transform:rotate(360deg)}}
+      .license-box{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:12px;border:1px solid var(--border-strong);border-radius:12px;background:#fff}
+      .license-box code{font-family:"IBM Plex Mono",monospace;font-size:.95rem;overflow-wrap:anywhere;user-select:all}
+      .checkout-status button{flex:none;min-height:44px;padding:8px 16px;border:1px solid #4835d2;border-radius:999px;background:#4835d2;color:#fff;cursor:pointer;font-weight:700}
+      .checkout-status button:hover{background:#3522b9}
+      .checkout-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+      .checkout-meta{display:flex;flex-wrap:wrap;gap:6px 20px}
+      .checkout-meta span{font-size:.9rem;color:var(--text-soft)}
+      .copy-feedback{min-height:1.5em;color:#236638;font-size:.9rem}
+      @media (max-width:520px){.checkout-status{min-height:460px}.license-box{align-items:stretch;flex-direction:column}.checkout-status button{align-self:flex-start}}
+      @media (prefers-reduced-motion:reduce){.status-spinner{animation:none}}
     </style>
   </head>
   <body>
@@ -564,19 +582,155 @@
       <section class="hero">
         <div class="container">
           <div class="notice">
-            <h1>Thanks — payment received</h1>
-            <p>Your Track3 Pro subscription is being activated. This usually takes a few seconds.</p>
+            <h1 id="pageTitle">Thanks — payment received</h1>
+            <section id="checkoutStatus" class="checkout-status" aria-live="polite" aria-atomic="true" hidden>
+              <h2 id="checkoutHeading" tabindex="-1"><span id="statusSpinner" class="status-spinner" aria-hidden="true"></span><span id="checkoutTitle">Activating your subscription…</span></h2>
+              <p id="checkoutMessage">This usually takes a few seconds. You can leave this page and use the app while we check.</p>
+              <div id="licenseDetails" hidden>
+                <strong>Your license key</strong>
+                <div class="license-box">
+                  <code id="licenseKey"></code>
+                  <button id="copyLicense" type="button">Copy</button>
+                </div>
+                <div class="checkout-meta">
+                  <span id="licensePlan" hidden></span>
+                  <span id="licenseRenewal" hidden></span>
+                </div>
+                <div id="copyFeedback" class="copy-feedback" role="status" aria-live="polite"></div>
+              </div>
+              <div class="checkout-actions">
+                <button id="retryCheckout" type="button" hidden>Try again</button>
+                <a id="issueHelp" href="https://github.com/domechn/track3/issues" target="_blank" rel="noopener" hidden>Open an issue</a>
+              </div>
+            </section>
+            <p>Track3 Pro activates automatically after checkout. This usually takes a few seconds.</p>
             <ol>
               <li>Switch back to the <strong>Track3</strong> app (desktop or iPhone/iPad).</li>
               <li>Open <strong>System Info</strong> (or <strong>More → Settings → Pro</strong> on mobile).</li>
               <li>Your Pro status refreshes automatically. If it still shows Free after a minute, quit and reopen the app.</li>
             </ol>
-            <p>Your license is bound to the device you started checkout from. You can manage or cancel the subscription any time from the same screen.</p>
+            <p>To use Pro on another device, open Track3 → <strong>System Info</strong> (or <strong>More → Settings → Pro</strong> on iPhone/iPad) and enter your license key. You can use it on up to 3 devices. Keep it safe: anyone with the key can use it.</p>
+            <p>You can manage or cancel the subscription any time from the same screen.</p>
             <p>Trouble? <a href="https://github.com/domechn/track3/issues" target="_blank" rel="noopener">Open an issue</a> and include the email on your Stripe receipt.</p>
             <p><a class="shell-link--primary" href="./index.html">Back to home</a></p>
           </div>
         </div>
       </section>
     </main>
+    <script>
+      (() => {
+        const params = new URLSearchParams(location.search);
+        const sessionId = params.get("session_id");
+        if (params.has("session_id")) {
+          params.delete("session_id");
+          const query = params.toString();
+          history.replaceState(history.state, "", location.pathname + (query ? "?" + query : "") + location.hash);
+        }
+        if (!sessionId || !/^cs_[A-Za-z0-9_]+$/.test(sessionId)) return;
+
+        const status = document.getElementById("checkoutStatus");
+        const pageTitle = document.getElementById("pageTitle");
+        const heading = document.getElementById("checkoutHeading");
+        const title = document.getElementById("checkoutTitle");
+        const message = document.getElementById("checkoutMessage");
+        const spinner = document.getElementById("statusSpinner");
+        const details = document.getElementById("licenseDetails");
+        const key = document.getElementById("licenseKey");
+        const plan = document.getElementById("licensePlan");
+        const renewal = document.getElementById("licenseRenewal");
+        const retry = document.getElementById("retryCheckout");
+        const issueHelp = document.getElementById("issueHelp");
+        const copy = document.getElementById("copyLicense");
+        const copyFeedback = document.getElementById("copyFeedback");
+        const endpoint = "https://track3-pro-api.domc.me/api/stripe?action=checkout-status&session_id=" + encodeURIComponent(sessionId);
+        let deadline;
+        let failures;
+        let timer;
+
+        function show(titleText, messageText, waiting, canRetry) {
+          pageTitle.textContent = titleText === "Checkout session expired" || titleText === "Checkout could not be completed" ? titleText : "Thanks — payment received";
+          title.textContent = titleText;
+          message.textContent = messageText;
+          spinner.hidden = !waiting;
+          retry.hidden = !canRetry;
+          issueHelp.hidden = !canRetry;
+          details.hidden = titleText !== "Your Track3 Pro license is ready";
+          if (!waiting) heading.focus();
+        }
+
+        async function poll() {
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) {
+            show("We could not load your license", "The check took too long. Your app may still activate automatically. Follow the steps below or try again.", false, true);
+            return;
+          }
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), Math.min(8000, remaining));
+          try {
+            const response = await fetch(endpoint, { cache: "no-store", referrerPolicy: "no-referrer", signal: controller.signal });
+            if (!response.ok) throw new Error("Checkout status unavailable");
+            const result = await response.json();
+            if (result.status === "completed" && typeof result.license === "string" && result.license.trim()) {
+              key.textContent = result.license;
+              plan.hidden = result.planType !== "monthly" && result.planType !== "yearly";
+              if (!plan.hidden) plan.textContent = "Plan: " + (result.planType === "monthly" ? "Monthly" : "Yearly");
+              const date = result.currentPeriodEnd && new Date(result.currentPeriodEnd);
+              renewal.hidden = !date || Number.isNaN(date.getTime());
+              if (!renewal.hidden) renewal.textContent = "Renewal date: " + new Intl.DateTimeFormat("en", { dateStyle: "long" }).format(date);
+              show("Your Track3 Pro license is ready", "The app activates automatically. Copy this key if you want to use Pro on another device.", false, false);
+              return;
+            }
+            if (result.status === "expired" || result.status === "failed") {
+              show(result.status === "expired" ? "Checkout session expired" : "Checkout could not be completed", "We could not confirm this checkout. Try again, or open an issue using the link below and include the email on your Stripe receipt.", false, true);
+              return;
+            }
+            if (result.status !== "pending") throw new Error("Unexpected checkout status");
+            failures = 0;
+          } catch {
+            failures++;
+            if (failures >= 3) {
+              show("We could not load your license", "The status check is unavailable. Your app may still activate automatically. Follow the steps below or try again.", false, true);
+              return;
+            }
+          } finally {
+            clearTimeout(timeout);
+          }
+          timer = setTimeout(poll, Math.min(3000, Math.max(0, deadline - Date.now())));
+        }
+
+        function start() {
+          clearTimeout(timer);
+          deadline = Date.now() + 180000;
+          failures = 0;
+          copyFeedback.textContent = "";
+          show("Activating your subscription…", "This usually takes a few seconds. You can leave this page and use the app while we check.", true, false);
+          poll();
+        }
+
+        retry.addEventListener("click", start);
+        copy.addEventListener("click", async () => {
+          try {
+            if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+            await navigator.clipboard.writeText(key.textContent);
+          } catch {
+            const field = document.createElement("textarea");
+            field.value = key.textContent;
+            field.style.cssText = "position:fixed;left:-9999px";
+            document.body.append(field);
+            field.select();
+            const copied = document.execCommand("copy");
+            field.remove();
+            copy.focus();
+            if (!copied) {
+              copyFeedback.textContent = "Could not copy automatically. Select the key above to copy it.";
+              return;
+            }
+          }
+          copyFeedback.textContent = "Copied to clipboard.";
+        });
+        status.hidden = false;
+        start();
+      })();
+    </script>
   </body>
 </html>
