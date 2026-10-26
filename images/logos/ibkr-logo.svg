@@ -1,0 +1,24 @@
+<svg version="1.1" id="svg9835" inkscape:version="0.92.0 r15299" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:svg="http://www.w3.org/2000/svg" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="-367.6 277.2 270.6 527.2" style="enable-background:new -367.6 277.2 270.6 527.2;" xml:space="preserve">
+ <style type="text/css">
+  .st0{fill:url(#polygon9702_1_);}
+	.st1{fill:#D81222;}
+ </style>
+ <sodipodi:namedview fit-margin-right="0" inkscape:document-units="mm" inkscape:current-layer="layer1" fit-margin-bottom="0" inkscape:pageopacity="0.0" inkscape:pageshadow="2" inkscape:window-width="1280" inkscape:window-height="744" inkscape:window-x="-4" inkscape:window-y="-4" inkscape:window-maximized="1" id="base" pagecolor="#ffffff" bordercolor="#666666" inkscape:zoom="1.9959945" borderopacity="1.0" inkscape:cy="32.550025" inkscape:cx="224.70002" showgrid="false" fit-margin-top="0" fit-margin-left="0">
+ </sodipodi:namedview>
+ <g id="layer1" transform="translate(12.582832,-170.97114)" inkscape:groupmode="layer" inkscape:label="Layer 1">
+  <g id="g9910" transform="translate(0.50000041,-0.50000076)">
+   <linearGradient id="polygon9702_1_" gradientUnits="userSpaceOnUse" x1="2339.2383" y1="356.8733" x2="2650.6682" y2="356.8733" gradientTransform="matrix(-0.75 0 0 -0.75 1607.0308 1115.2124)">
+    <stop offset="0" style="stop-color:#D81222">
+    </stop>
+    <stop offset="1" style="stop-color:#960B1A">
+    </stop>
+   </linearGradient>
+   <polygon id="polygon9702" class="st0" points="-380.7,975.9 -380.7,719.3 -147.1,975.9 		">
+   </polygon>
+   <circle id="circle9704" class="st1" cx="-180" cy="781.8" r="69.9">
+   </circle>
+   <polygon id="polygon9706" class="st1" points="-380.7,719.3 -380.7,975.9 -147.1,448.7 		">
+   </polygon>
+  </g>
+ </g>
+</svg>
