@@ -59,11 +59,11 @@ describe("sendHttpRequest error details", () => {
       text: vi.fn().mockResolvedValue('{"error":"ERC20 balance provider is not configured"}'),
     } as unknown as Response);
 
-    const error = await sendHttpRequest("POST", "https://track3-pro-api.domc.me/api/erc20/assetsBalances?token=secret")
+    const error = await sendHttpRequest("POST", "https://api.track3.dev/api/erc20/assetsBalances?token=secret")
       .catch((reason: unknown) => reason);
     expect(error).toMatchObject({
       status: 500,
-      endpoint: "https://track3-pro-api.domc.me/api/erc20/assetsBalances",
+      endpoint: "https://api.track3.dev/api/erc20/assetsBalances",
       serverMessage: "ERC20 balance provider is not configured",
     });
     expect(String(error)).not.toContain("token=secret");

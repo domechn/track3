@@ -66,7 +66,7 @@ describe("per-source refresh", () => {
   it("reports a Pro ERC20 provider configuration failure with an approved detail", async () => {
     scenario.load = async () => {
       throw new HttpRequestError("Request failed", 500, undefined, {
-        endpoint: "https://track3-pro-api.domc.me/api/erc20/assetsBalances",
+        endpoint: "https://api.track3.dev/api/erc20/assetsBalances",
         serverMessage: "ERC20 balance provider is not configured",
       });
     };

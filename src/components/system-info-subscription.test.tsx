@@ -270,7 +270,7 @@ describe("System Info subscription management", () => {
       await screen.findByRole("button", { name: /view pro benefits/i }),
     );
 
-    expect(mocks.openUrl).toHaveBeenCalledWith("https://track3.domc.me/#pro");
+    expect(mocks.openUrl).toHaveBeenCalledWith("https://track3.dev/#pro");
   });
 
   it("keeps both subscribe buttons aligned at the bottom of plan cards", async () => {
