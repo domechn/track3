@@ -77,7 +77,7 @@ export function compareVersions(left, right) {
   );
 }
 
-export function validateManifestForTag(manifest, releaseTag) {
+export function validateManifestForTag(manifest, releaseTag, { owner, repo }) {
   if (
     !manifest ||
     typeof manifest !== "object" ||
@@ -106,6 +106,19 @@ export function validateManifestForTag(manifest, releaseTag) {
       target.signature.length === 0
     ) {
       throw new Error(`Updater manifest is missing target ${platform}`);
+    }
+  }
+
+  const expectedUrlPrefix = `https://github.com/${owner}/${repo}/releases/download/${encodeURIComponent(releaseTag)}/`;
+  for (const [platform, target] of Object.entries(manifest.platforms)) {
+    if (
+      typeof target?.url !== "string" ||
+      target.url.includes("/untagged-") ||
+      !target.url.startsWith(expectedUrlPrefix)
+    ) {
+      throw new Error(
+        `Updater manifest has invalid URL for ${platform}: ${target?.url}`,
+      );
     }
   }
 
@@ -189,7 +202,7 @@ export async function buildManifest({
     const { updaterAsset, signatureAsset } = findTargetAssets(release, target);
     platforms[target.platform] = {
       signature: await downloadSignature(signatureAsset, repos, options),
-      url: updaterAsset.browser_download_url,
+      url: `https://github.com/${options.owner}/${options.repo}/releases/download/${encodeURIComponent(release.tag_name)}/${encodeURIComponent(updaterAsset.name)}`,
     };
   }
 
@@ -331,6 +344,7 @@ export async function main({
       repos,
     }),
     releaseTag,
+    options,
   );
   const manifestData = JSON.stringify(manifest, null, 2);
   const existingManifest = release.assets.find(
