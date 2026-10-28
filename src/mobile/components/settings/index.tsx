@@ -48,11 +48,6 @@ const settingsTabs = [
     icon: ArchiveIcon,
   },
   {
-    titleKey: "settings.tab.system",
-    href: "/settings/systemInfo",
-    icon: InfoCircledIcon,
-  },
-  {
     titleKey: "settings.tab.assistant",
     href: "/settings/assistant",
     icon: RocketIcon,
@@ -61,6 +56,11 @@ const settingsTabs = [
     titleKey: "settings.tab.sync",
     href: "/settings/sync",
     icon: UpdateIcon,
+  },
+  {
+    titleKey: "settings.tab.system",
+    href: "/settings/systemInfo",
+    icon: InfoCircledIcon,
   },
 ];
 
