@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { detectPlatform } from "./download-page.mjs";
 import { recommendedCta } from "./site-cta.mjs";
 
-test("iPhone visitors are sent to sideload instructions", () => {
+test("iPhone visitors are sent to the coming-soon section", () => {
   assert.deepEqual(recommendedCta({ os: "ios" }), {
-    label: "iPhone & iPad install steps",
-    href: "./download.html#ios",
+    label: "iPhone & iPad: coming soon",
+    href: "./index.html#ios",
   });
 });
 

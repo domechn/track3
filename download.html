@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Get Track3 — Desktop Downloads and iOS Sideload Steps</title>
+    <title>Get Track3 — Desktop Downloads (iPhone and iPad Coming Soon)</title>
     <meta
       name="description"
-      content="Get the latest Track3 desktop installer for macOS, Windows, or Linux. For iPhone and iPad, follow community build and sideload steps with a personal Apple ID."
+      content="Get the latest Track3 desktop installer for macOS, Windows, or Linux. iPhone and iPad are coming soon."
     />
     <meta
       property="og:title"
-      content="Get Track3 — Desktop Downloads and iOS Sideload Steps"
+      content="Get Track3 — Desktop Downloads (iPhone and iPad Coming Soon)"
     />
     <meta
       property="og:description"
-      content="Get the latest desktop installer for macOS, Windows, or Linux. Build and sideload the iPhone and iPad app from the repository."
+      content="Get the latest desktop installer for macOS, Windows, or Linux. iPhone and iPad are coming soon."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://track3.domc.me/download.html" />
@@ -25,11 +25,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="Get Track3 — Desktop Downloads and iOS Sideload Steps"
+      content="Get Track3 — Desktop Downloads (iPhone and iPad Coming Soon)"
     />
     <meta
       name="twitter:description"
-      content="Desktop installers and community iPhone and iPad sideload steps for Track3."
+      content="Desktop installers for Track3. iPhone and iPad are coming soon."
     />
     <meta
       name="twitter:image"
@@ -84,8 +84,8 @@
           <h1>Get Track3 for your device.</h1>
           <div class="recommendation__actions" id="recommendedActions"></div>
           <p id="recommendedText">
-            Choose a desktop installer for macOS, Windows, or Linux. On iPhone
-            and iPad, build and sign the app from the repository.
+            Choose a desktop installer for macOS, Windows, or Linux. iPhone and
+            iPad are coming soon.
           </p>
           <div class="download-badges">
             <span class="pill pill--accent" id="platformBadge"
@@ -101,47 +101,15 @@
       <section class="page-section tint" id="ios">
         <div class="wrap">
           <div class="head">
-            <div class="kicker">iPhone &amp; iPad</div>
-            <h2>Build and sideload the iOS app.</h2>
+            <div class="kicker">iPhone &amp; iPad · Coming soon</div>
+            <h2>iPhone and iPad are coming soon.</h2>
             <p>
-              The app is not on the App Store. These community steps use a Mac
-              and a personal Apple ID; they have not been checked on a physical
-              device.
+              The app is not available to install yet. Watch the
+              <a href="https://github.com/domechn/track3">GitHub repository</a>
+              for updates. Desktop installers for macOS, Windows, and Linux are
+              below.
             </p>
           </div>
-          <ol>
-            <li>
-              Install Node 24 and
-              <a href="https://v2.tauri.app/start/prerequisites/#ios"
-                >Tauri’s iOS prerequisites</a
-              >
-              on a Mac. Clone the
-              <a href="https://github.com/domechn/track3">Track3 repository</a>
-              and run <code>corepack yarn</code>.
-            </li>
-            <li>
-              Run <code>corepack yarn tauri ios dev --open</code>. In Xcode,
-              choose the Track3 iOS target and your Apple ID team under Signing
-              &amp; Capabilities. Change the bundle ID if needed, select your
-              connected device, and press Run. This development build needs
-              the Mac's development server to stay running. For a standalone
-              build, use <code>corepack yarn tauri ios build</code>. If you
-              build an IPA yourself, AltStore or Sideloadly may sign it.
-            </li>
-            <li>With a free Apple ID, renew signing about every 7 days.</li>
-          </ol>
-          <p class="note">
-            See the
-            <a
-              href="https://github.com/domechn/track3/blob/master/README.md#ios-app-iphone-and-ipad"
-              >iOS overview</a
-            >
-            and
-            <a
-              href="https://github.com/domechn/track3/blob/master/docs/ios/RELEASE.md"
-              >release and signing notes</a
-            >.
-          </p>
         </div>
       </section>
       <section class="page-section" id="manual">
@@ -299,9 +267,9 @@
         if (detectedPlatform.os === "ios") {
           return {
             title: "Track3 for iPhone and iPad",
-            text: "Build Track3 from the repository and sign it with a personal Apple ID. Follow the community steps below; free signing generally needs renewal every 7 days.",
+            text: "iPhone and iPad are coming soon. Track3 is available for macOS, Windows, and Linux today.",
             actions: [
-              '<a class="download-button" href="#ios">See sideload steps</a>',
+              '<a class="download-button" href="#ios">iPhone &amp; iPad: coming soon</a>',
             ],
           };
         }
@@ -476,9 +444,9 @@
         recommendedText.textContent = view.text;
         recommendedActions.innerHTML = view.actions.join("");
         if (platform.os === "ios") {
-          statusBadge.textContent = "Build from source";
+          statusBadge.textContent = "Coming soon";
           downloadHint.textContent =
-            "The desktop release does not contain an iOS installer. Follow the steps below to build and sign the app.";
+            "iPhone and iPad are coming soon. The desktop installers are listed below.";
         }
       }
 
