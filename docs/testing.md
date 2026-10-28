@@ -2,7 +2,7 @@
 
 ## What runs
 
-- `cd src-tauri && cargo test --locked -p track3-pure-tests --lib` compiles the original `ent.rs`, `info.rs`, `binance.rs`, and `migration.rs` through a small GTK free crate. It runs encryption, fixture parsing, a signed Binance request against a local HTTP listener, and SQLite migration tests. The test crate does not replace these source files with copies.
+- `cd src-tauri && cargo test --locked -p track3-pure-tests --lib` compiles the original `ent.rs`, `info.rs`, and `migration.rs` through a small GTK free crate. It runs encryption, price, and SQLite migration tests. The test crate does not replace these source files with copies. Binance signing and balance parsing are covered by `src/middlelayers/datafetch/coins/cex/binance.test.ts`.
 - `cd src-tauri && cargo test --locked --lib` runs the full Tauri library when GTK and GLib development libraries are available.
 - `corepack yarn test:e2e` starts Vite and headless Chromium. Playwright supplies a Tauri invoke bridge with SQL backed by in-memory `sql.js`, a test file store, and controlled HTTP replies. The smoke test opens Overview, refreshes, deletes and undoes a History snapshot while watching for a loading overlay, and renders assistant content plus `reasoning_content` from an OpenAI-compatible SSE response.
 - `corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit` checks the Playwright spec, bridge, and config; CI runs it before the browser smoke test.

@@ -1,5 +1,3 @@
-#[path = "../../src/binance.rs"]
-pub mod binance;
 #[path = "../../src/ent.rs"]
 pub mod ent;
 #[path = "../../src/info.rs"]

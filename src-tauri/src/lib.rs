@@ -2,7 +2,6 @@
 extern crate lazy_static;
 
 pub mod app;
-pub mod binance;
 pub mod database_path;
 pub mod ent;
 pub mod info;

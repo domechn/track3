@@ -26,7 +26,6 @@
 /* Begin PBXFileReference section */
 		044356FCC2227D4202C9AF5F /* track3_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = track3_iOS.entitlements; sourceTree = "<group>"; };
 		05D4A17B622483899317F02B /* app.rs */ = {isa = PBXFileReference; path = app.rs; sourceTree = "<group>"; };
-		1A67EDF1E73A6D01FA41FFA2 /* binance.rs */ = {isa = PBXFileReference; path = binance.rs; sourceTree = "<group>"; };
 		1FA0A99ECEB0D2992464B3D5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		19CF20CBEB7B40DE8848A774 /* LocalAuthentication.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = LocalAuthentication.framework; path = System/Library/Frameworks/LocalAuthentication.framework; sourceTree = SDKROOT; };
 		2048ABF31861B72F4A79F883 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
@@ -129,7 +128,6 @@
 			isa = PBXGroup;
 			children = (
 				05D4A17B622483899317F02B /* app.rs */,
-				1A67EDF1E73A6D01FA41FFA2 /* binance.rs */,
 				2A298EB02AB5B3B11CEF3EAD /* database_path.rs */,
 				B2C0F39DCD646D06CC2E71D6 /* ent.rs */,
 				78D39FDCCB4B0CEC6915C7A1 /* info.rs */,
