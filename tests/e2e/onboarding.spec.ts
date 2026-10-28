@@ -105,7 +105,9 @@ test("desktop backdrop dismissal remembers Skip", async ({ page }) => {
   await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
   await page.goto("/#/overview")
   await expect(page.getByTestId("onboarding-dialog")).toBeVisible()
-  await page.mouse.click(24, 24)
+  const overlay = page.locator(".ob-overlay")
+  await expect(overlay).toHaveCSS("opacity", "1")
+  await overlay.click({ position: { x: 24, y: 24 } })
   await expect(page.getByTestId("onboarding-dialog")).toHaveCount(0)
   expect(await page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBe("skipped")
 })
@@ -122,6 +124,17 @@ test("turning on reduced motion mid-step reveals the final illustration", async 
   await expect(illustration).toHaveAttribute("data-reduced", "true")
   const check = illustration.locator('circle[cx="282"][cy="108"]').locator("..")
   expect(await check.evaluate((node) => getComputedStyle(node).opacity)).toBe("1")
+})
+
+test("source and backup checks use the illustration accent", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
+  await page.goto("/#/overview")
+  const dialog = page.getByTestId("onboarding-dialog")
+  await dialog.press("ArrowRight")
+  await expect(page.getByTestId("onboarding-illustration-sources").locator('circle[cx="248"][cy="102"]')).toHaveCSS("fill", "rgb(99, 102, 241)")
+  for (let i = 0; i < 3; i++) await dialog.press("ArrowRight")
+  await expect(page.getByTestId("onboarding-illustration-backup").locator('circle[cx="282"][cy="108"]')).toHaveCSS("fill", "rgb(99, 102, 241)")
 })
 
 for (const theme of ["light", "dark"] as const) {

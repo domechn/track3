@@ -14,6 +14,8 @@ export default function FirstRunOnboarding({ variant, ready }: { variant: "deskt
   const checked = useRef(false)
   const openRef = useRef(false)
   const replayFocus = useRef<HTMLElement | null>(null)
+  const mounted = useRef(false)
+  const removeVisibility = useRef<(() => void) | undefined>(undefined)
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
 
@@ -46,26 +48,33 @@ export default function FirstRunOnboarding({ variant, ready }: { variant: "deskt
   }, [])
 
   useEffect(() => {
-    if (!ready || checked.current) return
-    checked.current = true
-    let removeVisibility: (() => void) | undefined
-    if (readOnboardingState()) return
-    void import("@/middlelayers/onboarding").then(({ shouldAutoStartOnboarding }) => shouldAutoStartOnboarding()).then((start) => {
-      if (!start || openRef.current || readOnboardingState()) return
-      if (document.visibilityState === "visible") {
-        show()
-      } else {
-        const onVisible = () => {
-          if (document.visibilityState !== "visible") return
-          document.removeEventListener("visibilitychange", onVisible)
-          if (readOnboardingState()) return
-          show()
-        }
-        document.addEventListener("visibilitychange", onVisible)
-        removeVisibility = () => document.removeEventListener("visibilitychange", onVisible)
+    mounted.current = true
+    if (ready && !checked.current) {
+      checked.current = true
+      if (!readOnboardingState()) {
+        void import("@/middlelayers/onboarding").then(({ shouldAutoStartOnboarding }) => shouldAutoStartOnboarding()).then((start) => {
+          if (!mounted.current || !start || openRef.current || readOnboardingState()) return
+          if (document.visibilityState === "visible") {
+            show()
+          } else {
+            const onVisible = () => {
+              if (document.visibilityState !== "visible") return
+              removeVisibility.current?.()
+              removeVisibility.current = undefined
+              if (readOnboardingState()) return
+              show()
+            }
+            document.addEventListener("visibilitychange", onVisible)
+            removeVisibility.current = () => document.removeEventListener("visibilitychange", onVisible)
+          }
+        })
       }
-    })
-    return () => removeVisibility?.()
+    }
+    return () => {
+      mounted.current = false
+      removeVisibility.current?.()
+      removeVisibility.current = undefined
+    }
   }, [ready])
 
   function close(reason: "completed" | "skipped") {

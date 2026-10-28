@@ -1,3 +1,4 @@
+import { StrictMode } from "react"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { beforeEach, expect, it, vi } from "vitest"
@@ -77,6 +78,22 @@ it("does not open after another window writes the flag while hidden", async () =
     expect(screen.queryByTestId("onboarding-dialog")).not.toBeInTheDocument()
   } finally {
     listen.mockRestore()
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" })
+  }
+})
+it("removes the deferred visibility listener after StrictMode unmount", async () => {
+  Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" })
+  const add = vi.spyOn(document, "addEventListener")
+  const remove = vi.spyOn(document, "removeEventListener")
+  try {
+    const { unmount } = render(<StrictMode><App /></StrictMode>)
+    await waitFor(() => expect(add.mock.calls.some(([name]) => name === "visibilitychange")).toBe(true))
+    const listener = add.mock.calls.find(([name]) => name === "visibilitychange")![1]
+    unmount()
+    expect(remove).toHaveBeenCalledWith("visibilitychange", listener)
+  } finally {
+    add.mockRestore()
+    remove.mockRestore()
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" })
   }
 })

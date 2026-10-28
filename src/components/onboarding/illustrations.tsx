@@ -21,7 +21,7 @@ function Bar({ x, y, width, height = 6, fill = V.bar }: { x: number; y: number; 
 }
 function Check({ x, y, r = 8, reduced, delay }: { x: number; y: number; r?: number; reduced: boolean; delay: number }) {
   return <motion.g style={{ transformBox: "fill-box", transformOrigin: "center" }} {...anim(reduced, { opacity: 0, scale: .85 }, delay, .22)}>
-    <circle cx={x} cy={y} r={r} fill={V.three} />
+    <circle cx={x} cy={y} r={r} fill={V.one} />
     <path d={`M${x - r * .38} ${y}l${r * .25} ${r * .28} ${r * .47} -${r * .55}`} stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </motion.g>
 }

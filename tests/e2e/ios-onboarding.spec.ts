@@ -63,6 +63,7 @@ test("small phone and iPad layouts are accessible", async ({ page }) => {
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()
     expect(results.violations).toEqual([])
     mkdirSync("test-results/mobile", { recursive: true })
+    await page.waitForTimeout(2700)
     await page.screenshot({ path: `test-results/mobile/onboarding-welcome-${size.width}.png` })
   }
 })
@@ -107,7 +108,9 @@ test("iPad backdrop dismissal remembers Skip", async ({ page }) => {
   await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
   await page.goto("/#/overview")
   await expect(page.getByTestId("onboarding-dialog")).toBeVisible()
-  await page.mouse.click(24, 24)
+  const overlay = page.locator(".ob-overlay")
+  await expect(overlay).toHaveCSS("opacity", "1")
+  await overlay.click({ position: { x: 24, y: 24 } })
   await expect(page.getByTestId("onboarding-dialog")).toHaveCount(0)
   expect(await page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBe("skipped")
 })
@@ -122,9 +125,15 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).toBeVisible()
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()
     expect(results.violations).toEqual([])
-    await page.setViewportSize({ width: 390, height: 430 })
+    await page.setViewportSize({ width: 844, height: 390 })
     await expect(dialog).toBeVisible()
-    expect(await dialog.evaluate((root) => root.scrollWidth <= root.clientWidth)).toBe(true)
+    expect(await dialog.evaluate((root) => {
+      const text = root.querySelector(".ob-text")!.getBoundingClientRect()
+      const button = root.querySelector('[data-testid="onboarding-next"]')!.getBoundingClientRect()
+      const card = root.getBoundingClientRect()
+      return text.height > 0 && button.top >= card.top && button.bottom <= card.bottom
+        && root.scrollWidth <= root.clientWidth
+    })).toBe(true)
     mkdirSync("test-results/mobile", { recursive: true })
     await page.waitForTimeout(2700)
     await page.screenshot({ path: `test-results/mobile/onboarding-landscape-${theme}.png` })

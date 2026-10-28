@@ -40,6 +40,7 @@ describe("onboarding guide", () => {
     fireEvent.keyDown(dialog, { key: "ArrowLeft" })
     expect(dialog).toHaveAttribute("data-step", "deeper")
     expect(screen.getByText(/Assistant answers questions/)).toBeInTheDocument()
+    expect(dialog.querySelector(".ob-pro")).toHaveTextContent("Pro")
     fireEvent.keyDown(dialog, { key: "Escape" })
     await waitFor(() => expect(onClose).toHaveBeenCalledWith("skipped"))
   })
@@ -112,6 +113,19 @@ describe("onboarding guide", () => {
       expect((await screen.findByTestId("onboarding-dialog")).getAttribute("style")).toMatch(/scale\(/)
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth })
+    }
+  })
+  it("opens a wide landscape phone sheet with opacity only", async () => {
+    const previousWidth = window.innerWidth
+    const previousHeight = window.innerHeight
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 844 })
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 390 })
+    try {
+      render(<Guide variant="ios" />)
+      expect((await screen.findByTestId("onboarding-dialog")).getAttribute("style")).not.toMatch(/scale\(/)
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth })
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: previousHeight })
     }
   })
 })

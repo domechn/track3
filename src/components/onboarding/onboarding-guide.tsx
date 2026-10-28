@@ -35,6 +35,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
   const [announcement, setAnnouncement] = useState("")
   const id = steps[step]
   const last = step === steps.length - 1
+  const fullScreenSheet = variant === "ios" && (window.innerWidth < 700 || window.innerHeight < 500)
   const count = t("onboarding.stepCount").replace("{current}", String(step + 1)).replace("{total}", String(steps.length))
 
   useEffect(() => {
@@ -90,7 +91,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
       <Dialog.Overlay asChild>
         <motion.div data-closing={closing} className={`ob-overlay ${variant === "ios" ? "ob-ios-overlay" : ""}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? .15 : .2, ease: reduced ? "linear" : "easeOut" }} />
       </Dialog.Overlay>
-      <Dialog.Content asChild onOpenAutoFocus={(event) => { event.preventDefault(); contentRef.current?.focus() }} onEscapeKeyDown={(event) => { event.preventDefault(); skip() }} onPointerDownOutside={(event) => { if (variant === "ios" && window.innerWidth < 700) event.preventDefault() }} onInteractOutside={(event) => { if (variant === "ios" && window.innerWidth < 700) event.preventDefault() }}>
+      <Dialog.Content asChild onOpenAutoFocus={(event) => { event.preventDefault(); contentRef.current?.focus() }} onEscapeKeyDown={(event) => { event.preventDefault(); skip() }} onPointerDownOutside={(event) => { if (fullScreenSheet) event.preventDefault() }} onInteractOutside={(event) => { if (fullScreenSheet) event.preventDefault() }}>
         <motion.div
           ref={contentRef}
           tabIndex={-1}
@@ -101,7 +102,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
           className={`ob-dialog ${variant === "ios" ? "ios-onboarding" : "ob-desktop"}`}
           {...(reduced
             ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: .15, ease: "linear" as const } }
-            : variant === "ios" && window.innerWidth < 700
+            : fullScreenSheet
               ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: .25, ease } }
               : getAccessibleMotionProps(false, { initial: { opacity: 0, scale: .97 }, animate: { opacity: 1, scale: 1 }, transition: { duration: .28, ease } }))}
           onKeyDown={(event) => {
@@ -139,7 +140,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
                 <li><PointIcon kind="eye" />{t("onboarding.welcome.point.readOnly")}</li>
               </ul>}
               {id === "sources" && <p className="ob-note">{t("onboarding.sources.note")}</p>}
-              {id === "deeper" && variant === "desktop" && <p className="ob-note"><span className="ob-pro">{t("app.proBadge")}</span>{t("onboarding.deeper.pro")}</p>}
+              {id === "deeper" && variant === "desktop" && <p className="ob-note"><span className="ob-pro">{t("onboarding.deeper.proBadge")}</span>{t("onboarding.deeper.pro")}</p>}
               {id === "backup" && <p className="ob-note">{t("onboarding.backup.sync")}</p>}
             </motion.div>
             <div className="ob-foot">
