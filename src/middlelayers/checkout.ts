@@ -3,6 +3,10 @@ import { redactSecrets } from "./security/redact";
 
 export const checkoutPendingKey = "track3-pending-checkout";
 const PENDING_LIFETIME_MS = 24 * 60 * 60 * 1000;
+// A saved checkout page is only reopened shortly after it was created (double clicks, Cancel then retry).
+// Older sessions are still polled for payment, but a new click creates a fresh session so the page reflects the
+// current product, branding and promotion-code settings instead of a stale one.
+const REOPEN_WINDOW_MS = 30 * 60 * 1000;
 const POLLING_LIMIT_MS = 10 * 60 * 1000;
 
 export type CheckoutPhase = "idle" | "starting" | "waiting" | "completed" | "expired" | "timed-out" | "error";
@@ -68,7 +72,7 @@ export class CheckoutFlow {
     const generation = ++this.generation;
     this.latestStartGeneration = generation;
     try {
-      if (pending?.planType === planType && pending.url) {
+      if (pending?.planType === planType && pending.url && Date.now() - pending.createdAt < REOPEN_WINDOW_MS) {
         if (new URL(pending.url).protocol !== "https:") throw new Error("Invalid checkout URL");
         try {
           await this.open(pending.url);
