@@ -128,3 +128,12 @@ jobs:
         with:
           tauriScript: corepack yarn tauri
           args: ${{ matrix.args }}
+      - name: verify the macOS app is ad-hoc code signed (mac only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          APP=$(find src-tauri/target -type d -name 'track3.app' -path '*release/bundle/macos*' | head -1)
+          test -n "$APP"
+          echo "app: $APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv "$APP" 2>&1 | tee "$RUNNER_TEMP/codesign.txt"
+          grep -q "Signature=adhoc" "$RUNNER_TEMP/codesign.txt"

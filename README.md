@@ -119,7 +119,9 @@ Thanks for these platform who provide powerful APIs without API Key. Fuck API Ke
 
 # Note
 
-1. If the following error occurs when you open the app for the first time on `Mac`, please execute this command `xattr -cr /Applications/track3.app/` to fix it.
+1. The macOS build is ad-hoc signed but not notarized by Apple (no paid developer account yet), so macOS Gatekeeper asks you to confirm the first launch:
+   - Open `track3.app` once (double-click). If macOS says it cannot verify the developer, open **System Settings → Privacy & Security**, scroll to the message about `track3` and click **Open Anyway**. You can also right-click the app and choose **Open**.
+   - If the following error occurs instead, run `xattr -cr /Applications/track3.app/` once to clear the download quarantine flag and open the app again.
 
 ```text
 “track3” is damaged and can’t be opened. You should move it to the Trash.
