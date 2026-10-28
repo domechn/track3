@@ -424,6 +424,9 @@
   .app-layout .ios-d3-settings-page .glass { overflow: hidden; border: 0; border-radius: 14px; background: hsl(var(--card)); box-shadow: none; }
   .ios-d3-settings-page .glass > div:first-child { padding: 17px 16px 10px; }
   .ios-d3-settings-page .glass > div:nth-child(2) { padding: 0 16px 18px; }
+  .ios-d3-settings-page .glass[data-ui-system-card] > div:first-child { padding: 22px 24px; }
+  .ios-d3-settings-page .glass[data-ui-system-card] > [data-system-card-body] { padding: 0; }
+  .ios-d3-settings-page .glass[data-ui-system-card] > [data-system-card-footer] { padding: 14px 24px; }
   .ios-d3-settings-page :is(input:not([type="checkbox"]), select, textarea) { min-height: 44px; border-color: transparent; border-radius: 10px; background: hsl(var(--secondary)); font-size: 16px; }
   .ios-d3-settings-page :is(input, textarea, select):focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
   .ios-d3-settings-page label { line-height: 1.35; }
@@ -476,7 +479,7 @@
   .ios-d3-folder-client, .ios-d3-folder-auto-option { display: flex; align-items: center; gap: 12px; }
   .ios-d3-folder-client { justify-content: space-between; min-height: 56px; }
   .ios-d3-folder-auto-option { min-height: 52px; }
-  .ios-d3-setting-switch-row, .ios-d3-data-action-row, .ios-d3-license-field { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 56px; gap: 12px; padding: 8px 16px; background: hsl(var(--card)); font-size: 17px; text-align: left; }
+  .ios-d3-setting-switch-row, .ios-d3-data-action-row { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 56px; gap: 12px; padding: 8px 16px; background: hsl(var(--card)); font-size: 17px; text-align: left; }
   .ios-d3-setting-switch-row:not(:last-child), .ios-d3-data-action-row:not(:last-child) { position: relative; }
   .ios-d3-setting-switch-row:not(:last-child)::after, .ios-d3-data-action-row:not(:last-child)::after { position: absolute; right: 0; bottom: 0; left: 16px; border-bottom: .5px solid var(--ios-separator); content: ""; }
   .ios-d3-setting-switch-row label { display: flex; flex: 1; align-items: center; min-height: 44px; font-size: 17px; font-weight: 400; }
@@ -1259,7 +1262,7 @@
 }
 @media (max-width: 699px) and (max-height: 700px), (max-height: 499px) {
   .ios-onboarding .ob-art { height: clamp(150px, 28dvh, 240px); }
-  .ios-onboarding .ob-text { padding-top: 16px; mask-image: linear-gradient(#000 calc(100% - 8px), transparent); }
+  .ios-onboarding .ob-text { padding-top: 16px; mask-image: linear-gradient(#000 calc(100% - 20px), transparent); }
   .ios-onboarding .ob-title { font-size: 24px; }
 }
 @media (max-width: 360px) and (min-height: 500px) and (max-height: 600px) {

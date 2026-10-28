@@ -354,5 +354,5 @@ describe("Overview semantic controls", () => {
     expect(
       await screen.findAllByRole("link", { name: /打开 BTC 详情/ }),
     ).toHaveLength(2);
-  }, 20_000);
+  });
 });

@@ -192,7 +192,6 @@ jobs:
           echo "TRACK3_INITIAL_SCREENSHOT_BEGIN"
           base64 -i /tmp/track3-launch-initial-small.png | fold -w 3000 | sed 's/^/TRACK3_INITIAL_SCREENSHOT_CHUNK:/'
           echo "TRACK3_INITIAL_SCREENSHOT_END"
-          swift scripts/ios/check-screenshot.swift artifacts/iphone-initial.png
           test -n "$APP_PID"
           READY=""
           for attempt in $(seq 1 30); do

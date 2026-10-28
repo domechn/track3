@@ -60,6 +60,9 @@ test("small phone and iPad layouts are accessible", async ({ page }) => {
     expect(await dialog.evaluate((root) => root.scrollWidth <= root.clientWidth)).toBe(true)
     const heights = await dialog.locator("button").evaluateAll((buttons) => buttons.map((button) => ({ text: button.textContent, height: button.getBoundingClientRect().height })))
     expect(heights.filter(({ height }) => height < 44), JSON.stringify(size)).toEqual([])
+    if (size.width === 320) {
+      expect(await dialog.locator(".ob-text").evaluate((text) => getComputedStyle(text).maskImage)).toContain("20px")
+    }
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()
     expect(results.violations).toEqual([])
     mkdirSync("test-results/mobile", { recursive: true })
@@ -113,6 +116,30 @@ test("iPad backdrop dismissal remembers Skip", async ({ page }) => {
   await overlay.click({ position: { x: 24, y: 24 } })
   await expect(page.getByTestId("onboarding-dialog")).toHaveCount(0)
   expect(await page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBe("skipped")
+})
+
+test("backdrop dismissal follows a compact sheet resized to iPad width", async ({ page }) => {
+  await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
+  await page.goto("/#/overview")
+  await expect(page.getByTestId("onboarding-dialog")).toBeVisible()
+  await page.setViewportSize({ width: 820, height: 1180 })
+  const overlay = page.locator(".ob-overlay")
+  await expect(overlay).toHaveCSS("opacity", "1")
+  await overlay.click({ position: { x: 24, y: 24 } })
+  await expect(page.getByTestId("onboarding-dialog")).toHaveCount(0)
+  expect(await page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBe("skipped")
+})
+
+test("phone tab order names its scrollable text before the primary action", async ({ page }) => {
+  await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
+  await page.goto("/#/overview")
+  await expect(page.getByTestId("onboarding-dialog")).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(page.getByTestId("onboarding-skip")).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(page.getByRole("region", { name: "Welcome to Track3" })).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(page.getByTestId("onboarding-next")).toBeFocused()
 })
 
 for (const theme of ["light", "dark"] as const) {

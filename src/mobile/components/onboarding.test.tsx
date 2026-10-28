@@ -29,9 +29,11 @@ beforeEach(() => {
 it("uses iPhone Refresh and Backup copy, omits Pro, and navigates to Sources", async () => {
   render(<App />)
   const dialog = await screen.findByTestId("onboarding-dialog")
-  fireEvent.click(screen.getByTestId("onboarding-next"))
-  expect(dialog).toHaveTextContent("tap Refresh or pull down")
-  for (let i = 0; i < 3; i++) fireEvent.click(screen.getByTestId("onboarding-next"))
+  for (let i = 0; i < 4; i++) {
+    expect(dialog).not.toHaveTextContent(/\bPro\b|\bsubscribe\b|\bpurchase\b/i)
+    fireEvent.click(screen.getByTestId("onboarding-next"))
+    if (i === 0) expect(dialog).toHaveTextContent("tap Refresh or pull down")
+  }
   expect(dialog).toHaveTextContent("Settings → Backup")
   expect(dialog).not.toHaveTextContent(/\bPro\b|\bsubscribe\b|\bpurchase\b/i)
   fireEvent.click(screen.getByTestId("onboarding-cta-add-source"))

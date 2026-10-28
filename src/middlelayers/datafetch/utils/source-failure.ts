@@ -1,7 +1,10 @@
 import type { PartialSourceFailure, SourceErrorCategory } from "../../portfolio-baseline";
+import { PRO_API_ENDPOINT } from "../../configuration";
+import { HttpRequestError } from "./http";
 
 const safeMessages: Record<SourceErrorCategory, string> = {
   auth: "Authentication or invalid key",
+  service: "Pro service error",
   network: "Network or timeout",
   rateLimit: "Rate limit",
   quota: "Monthly refresh limit reached",
@@ -11,12 +14,23 @@ const safeMessages: Record<SourceErrorCategory, string> = {
 
 export class SanitizedSourceError extends Error {
   readonly category: SourceErrorCategory;
+  readonly detail?: string;
 
   constructor(cause: unknown) {
     const category = classifySourceError(cause);
     super(safeMessages[category]);
     this.category = category;
+    const detail = serviceSourceDetail(cause);
+    if (detail) this.detail = detail;
   }
+}
+
+export function serviceSourceDetail(error: unknown): string | undefined {
+  if (error instanceof SanitizedSourceError) return error.detail;
+  if (!(error instanceof HttpRequestError) || classifySourceError(error) !== "service") return;
+  return error.serverMessage === "ERC20 balance provider is not configured" ||
+    error.serverMessage === "Upstream provider error"
+    ? error.serverMessage : undefined;
 }
 
 export function classifySourceError(error: unknown): SourceErrorCategory {
@@ -26,7 +40,13 @@ export function classifySourceError(error: unknown): SourceErrorCategory {
   if (status === 429 && message.includes("USAGE_LIMIT_EXCEEDED")) return "quota";
   if (status === 429) return "rateLimit";
   if (status === 401 || status === 403) return "auth";
-  if (status === 408 || (status && status >= 500)) return "network";
+  if (status === 408 || status === 504) return "network";
+  if (status && status >= 500) {
+    if (error instanceof HttpRequestError &&
+      (error.endpoint === PRO_API_ENDPOINT || error.endpoint?.startsWith(`${PRO_API_ENDPOINT}/`)) &&
+      !error.serverMessage?.startsWith("UPSTREAM_TIMEOUT")) return "service";
+    return "network";
+  }
   const detail = message.replace(/https?:\/\/[^\s)]+/gi, "");
   if (/rate.?limit|too many requests/i.test(detail)) return "rateLimit";
   if (/unauthoriz|forbidden|invalid.?key|invalid.?token|signature|credential|passphrase|password/i.test(detail)) return "auth";
@@ -60,6 +80,7 @@ const priority: Record<SourceErrorCategory, number> = {
   quota: 5,
   rateLimit: 4,
   auth: 3,
+  service: 2.5,
   network: 2,
   unsupported: 1,
   other: 0,

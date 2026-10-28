@@ -1,6 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog"
 import { motion, useReducedMotion } from "framer-motion"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useTranslation } from "@/i18n"
 import { getAccessibleMotionProps } from "@/components/motion"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
   const [reduced, setReduced] = useState(() => Boolean(initialReduced) || Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches))
   const haptic = useHaptics()
   const contentRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
   const nextRef = useRef<HTMLButtonElement>(null)
   const pointerStart = useRef<{ x: number; y: number }>()
   const closeTimer = useRef<number>()
@@ -35,8 +36,16 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
   const [announcement, setAnnouncement] = useState("")
   const id = steps[step]
   const last = step === steps.length - 1
-  const fullScreenSheet = variant === "ios" && (window.innerWidth < 700 || window.innerHeight < 500)
+  const [fullScreenSheet, setFullScreenSheet] = useState(() => variant === "ios" && (window.innerWidth < 700 || window.innerHeight < 500))
   const count = t("onboarding.stepCount").replace("{current}", String(step + 1)).replace("{total}", String(steps.length))
+
+  useEffect(() => {
+    if (variant !== "ios") return
+    const media = window.matchMedia("(max-width: 699px), (max-height: 499px)")
+    const update = () => setFullScreenSheet(media.matches)
+    media.addEventListener("change", update)
+    return () => media.removeEventListener("change", update)
+  }, [variant])
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)")
@@ -91,7 +100,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
       <Dialog.Overlay asChild>
         <motion.div data-closing={closing} className={`ob-overlay ${variant === "ios" ? "ob-ios-overlay" : ""}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? .15 : .2, ease: reduced ? "linear" : "easeOut" }} />
       </Dialog.Overlay>
-      <Dialog.Content asChild onOpenAutoFocus={(event) => { event.preventDefault(); contentRef.current?.focus() }} onEscapeKeyDown={(event) => { event.preventDefault(); skip() }} onPointerDownOutside={(event) => { if (fullScreenSheet) event.preventDefault() }} onInteractOutside={(event) => { if (fullScreenSheet) event.preventDefault() }}>
+      <Dialog.Content asChild aria-labelledby={titleId} onOpenAutoFocus={(event) => { event.preventDefault(); contentRef.current?.focus() }} onEscapeKeyDown={(event) => { event.preventDefault(); skip() }} onPointerDownOutside={(event) => { if (fullScreenSheet) event.preventDefault() }} onInteractOutside={(event) => { if (fullScreenSheet) event.preventDefault() }}>
         <motion.div
           ref={contentRef}
           tabIndex={-1}
@@ -130,9 +139,9 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
           </motion.div>
           <div className="ob-body">
             {variant === "desktop" && <div className="ob-head">{counter}<Button type="button" variant="ghost" data-testid="onboarding-skip" onClick={skip} className="text-muted-foreground">{label}</Button></div>}
-            <motion.div key={`text-${id}-${reduced}`} className="ob-text" tabIndex={variant === "ios" ? 0 : undefined} data-testid={`onboarding-step-${id}`} initial={reduced ? { opacity: 0 } : { opacity: 0, x: direction * 12 }} animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }} transition={{ duration: reduced ? .15 : .24, ease: reduced ? "linear" : ease }}>
+            <motion.div key={`text-${id}-${reduced}`} className="ob-text" role={variant === "ios" ? "region" : undefined} aria-labelledby={variant === "ios" ? titleId : undefined} tabIndex={variant === "ios" ? 0 : undefined} data-testid={`onboarding-step-${id}`} initial={reduced ? { opacity: 0 } : { opacity: 0, x: direction * 12 }} animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }} transition={{ duration: reduced ? .15 : .24, ease: reduced ? "linear" : ease }}>
               {variant === "ios" && counter}
-              <Dialog.Title className="ob-title">{t(`onboarding.${id}.title`)}</Dialog.Title>
+              <Dialog.Title id={titleId} className="ob-title">{t(`onboarding.${id}.title`)}</Dialog.Title>
               <Dialog.Description className="ob-desc">{t(`onboarding.${id}.body`)}</Dialog.Description>
               {id === "welcome" && <ul className="ob-points">
                 <li><PointIcon kind="device" />{t("onboarding.welcome.point.local")}</li>

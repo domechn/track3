@@ -189,7 +189,7 @@ for (const width of [375, 390, 430]) {
       ["/settings/configuration?section=currency", "Currency", "Base currency"],
       ["/settings/appearance?section=theme", "Appearance", "Follow system"],
       ["/settings/data?section=blacklist", "Blacklist", "Token Blacklist"],
-      ["/settings/systemInfo?section=pro", "Pro and license", "Pro status"],
+      ["/settings/systemInfo?section=pro", "Pro and license", "Track3 Pro"],
       ["/settings/assistant", "AI assistant", "Endpoint"],
       ["/settings/data?section=security", "Security", "App lock"],
       ["/settings/sync", "Backup and sync", "S3 endpoint"],

@@ -494,7 +494,11 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
         tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
       };
       const requestPath = new URL(request.url).pathname;
-      if (checkoutFixture && requestPath === "/api/stripe") {
+      if (proUsageFixture && requestPath === "/api/stripe") {
+        const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
+        if (input.action !== "customer-portal") throw new Error("unexpected Stripe portal request");
+        body = '{"url":"https://billing.stripe.test/portal"}';
+      } else if (checkoutFixture && requestPath === "/api/stripe") {
         const url = new URL(request.url);
         if (url.searchParams.get("action") === "checkout-status") {
           body = JSON.stringify(checkoutStatus === "completed"

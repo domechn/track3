@@ -181,6 +181,22 @@ describe("CheckoutFlow", () => {
     expect(localStorage.getItem(checkoutPendingKey)).toBeNull();
   });
 
+  it("reopens a recent saved checkout but creates a fresh session once it is older than 30 minutes", async () => {
+    await flow.start("monthly");
+    flow.cancel();
+    vi.setSystemTime(Date.now() + 29 * 60_000);
+    await flow.start("monthly");
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledTimes(2);
+    flow.cancel();
+    vi.setSystemTime(Date.now() + 2 * 60_000);
+    create.mockResolvedValueOnce({ sessionId: "cs_test_456", url: "https://checkout.stripe.test/session-2" });
+    await flow.start("monthly");
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(open).toHaveBeenLastCalledWith("https://checkout.stripe.test/session-2");
+    expect(JSON.parse(localStorage.getItem(checkoutPendingKey) ?? "{}").sessionId).toBe("cs_test_456");
+  });
+
   it("starts a fresh checkout if a saved browser URL is unsafe", async () => {
     localStorage.setItem(checkoutPendingKey, JSON.stringify({
       sessionId: "cs_old", url: "javascript:alert(1)", planType: "monthly", createdAt: Date.now(),

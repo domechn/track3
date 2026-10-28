@@ -3,6 +3,49 @@ import { HttpRequestError } from "./http";
 import { classifySourceError, recordOptionalSourceFailure, recordSourceFailure, safePartialEndpoint, takeOptionalSourceFailures, takeSourceFailure } from "./source-failure";
 
 describe("source error categories", () => {
+  const proEndpoint = "https://track3-pro-api.domc.me/api/erc20/assetsBalances";
+
+  it("classifies a Pro API 500 as a service failure and preserves only approved detail", () => {
+    const error = new HttpRequestError("Request failed", 500, undefined, {
+      endpoint: proEndpoint, serverMessage: "ERC20 balance provider is not configured",
+    });
+    expect(classifySourceError(error)).toBe("service");
+    const source = {};
+    recordSourceFailure(source, error);
+    expect(takeSourceFailure(source)).toMatchObject({
+      category: "service", message: "Pro service error",
+      detail: "ERC20 balance provider is not configured",
+    });
+  });
+
+  it("keeps Pro upstream timeouts and HTTP 504 as network failures", () => {
+    expect(classifySourceError(new HttpRequestError("Request failed", 500, undefined, {
+      endpoint: proEndpoint, serverMessage: "UPSTREAM_TIMEOUT, code UPSTREAM_TIMEOUT",
+    }))).toBe("network");
+    expect(classifySourceError(new HttpRequestError("Request failed", 504, undefined, {
+      endpoint: proEndpoint, serverMessage: "Upstream provider error",
+    }))).toBe("network");
+  });
+
+  it("does not reveal unapproved Pro response text as a detail", () => {
+    const source = {};
+    recordSourceFailure(source, new HttpRequestError("Request failed", 500, undefined, {
+      endpoint: proEndpoint, serverMessage: "No duneApiKey or defiApiKey or debankApiKey",
+    }));
+    const error = takeSourceFailure(source);
+    expect(error).toMatchObject({ category: "service", message: "Pro service error" });
+    expect((error as { detail?: string }).detail).toBeUndefined();
+  });
+
+  it("keeps non-Pro HTTP 500 and Pro quota classification", () => {
+    expect(classifySourceError(new HttpRequestError("Request failed", 500, undefined, {
+      endpoint: "https://api.exchange.test/balances", serverMessage: "Upstream provider error",
+    }))).toBe("network");
+    expect(classifySourceError(new HttpRequestError("code USAGE_LIMIT_EXCEEDED", 429, undefined, {
+      endpoint: proEndpoint, serverMessage: "USAGE_LIMIT_EXCEEDED",
+    }))).toBe("quota");
+  });
+
   it("classifies only the metering 429 as quota", () => {
     expect(classifySourceError(new HttpRequestError("code USAGE_LIMIT_EXCEEDED", 429))).toBe("quota");
     expect(classifySourceError(new HttpRequestError("rate limit", 429))).toBe("rateLimit");
