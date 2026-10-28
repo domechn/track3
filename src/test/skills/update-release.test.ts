@@ -310,7 +310,11 @@ describe("release finalizer", () => {
       /already public/,
     );
 
-    for (const latestTag of [appReleaseTag, "app-v0.9.0"]) {
+    // An equal latest tag and a newer latest tag must both be rejected; derive
+    // the newer one from the current version so a version bump cannot break this.
+    const [major, minor, patch] = appVersion.split(".").map(Number);
+    const newerTag = `app-v${major}.${minor}.${patch + 1}`;
+    for (const latestTag of [appReleaseTag, newerTag]) {
       const harness = makeHarness({ latestTag });
       await expect(updateModule.main(harness.dependencies)).rejects.toThrow(
         /newer than the latest published release/,
