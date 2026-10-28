@@ -106,7 +106,7 @@ response cannot be proved by mocked browser IPC.
 
 | Desktop integration | iPhone location | Implementation | Test | Status |
 | --- | --- | --- | --- | --- |
-| Binance | Settings → Data sources → Add exchange → Binance | `src/middlelayers/datafetch/coins/cex/binance.ts`, `src-tauri/src/binance.rs` | `src/middlelayers/datafetch/coins/cex/binance.test.ts` | Done |
+| Binance | Settings → Data sources → Add exchange → Binance | `src/middlelayers/datafetch/coins/cex/binance.ts` | `src/middlelayers/datafetch/coins/cex/binance.test.ts` | Done |
 | OKX | Settings → Data sources → Add exchange → OKX | `src/middlelayers/datafetch/coins/cex/okx.ts` | `src/middlelayers/datafetch/coins/cex/okx.test.ts` | Done |
 | Bitget | Settings → Data sources → Add exchange → Bitget | `src/middlelayers/datafetch/coins/cex/bitget.ts` | `src/middlelayers/datafetch/coins/cex/bitget.test.ts` | Done |
 | Gate.io | Settings → Data sources → Add exchange → Gate.io | `src/middlelayers/datafetch/coins/cex/gate.ts` | `src/middlelayers/datafetch/coins/cex/gate.test.ts` | Done |

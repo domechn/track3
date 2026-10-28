@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 import initSqlJs from "sql.js";
@@ -274,12 +274,6 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     if (cmd === "ios_haptic") { haptics++; return null; }
     if (cmd === "ios_lock_enabled") return false;
     if (cmd === "ios_set_badge") return null;
-    if (cmd === "query_binance_balance") {
-      if (args.apiKey !== "e2e-api-key" || args.apiSecret !== "e2e-api-secret") {
-        throw new Error("unexpected exchange credentials");
-      }
-      return {};
-    }
     if (cmd === "ios_share_file") {
       if (!/^\/e2e\/cache\/[0-9a-f-]{36}\/track3-export-data\.json$/.test(args.path) || !files.has(args.path)) {
         throw new Error(`invalid export file: ${args.path}`);
@@ -489,8 +483,30 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
         erc20: { limit: 300, used: preflightExhaustedFixture ? 300 : 12, remaining: preflightExhaustedFixture ? 0 : 288, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
         tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-03T00:00:00.000Z" },
       };
-      const requestPath = new URL(request.url).pathname;
-      if (proUsageFixture && requestPath === "/api/stripe") {
+      const requestUrl = new URL(request.url);
+      const requestPath = requestUrl.pathname;
+      if (requestUrl.hostname === "api.binance.com" || requestUrl.hostname === "fapi.binance.com") {
+        if (requestPath !== "/api/v3/ticker/price" && requestPath !== "/api/v3/time") {
+          const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
+          const signature = requestUrl.searchParams.get("signature");
+          const payload = requestUrl.search.slice(1).replace(/&signature=[^&]*$/, "");
+          const expected = createHmac("sha256", "e2e-api-secret").update(payload).digest("hex");
+          if (headers["x-mbx-apikey"] !== "e2e-api-key" ||
+            !signature || signature !== expected ||
+            !requestUrl.search.endsWith(`&signature=${signature}`) ||
+            !requestUrl.searchParams.has("timestamp")) {
+            throw new Error("unexpected Binance signed request");
+          }
+        }
+        if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/account" && request.method === "GET") body = '{"balances":[]}';
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/sapi/v1/asset/get-funding-asset" && request.method === "POST") body = "[]";
+        else if (requestUrl.hostname === "api.binance.com" && (requestPath === "/sapi/v1/simple-earn/locked/position" || requestPath === "/sapi/v1/simple-earn/flexible/position")) body = '{"rows":[],"total":0}';
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/sapi/v1/margin/account") body = '{"userAssets":[]}';
+        else if (requestUrl.hostname === "fapi.binance.com" && requestPath === "/fapi/v2/balance") body = "[]";
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/ticker/price") body = "[]";
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/time") body = JSON.stringify({ serverTime: Date.now() });
+        else throw new Error("unexpected Binance endpoint");
+      } else if (proUsageFixture && requestPath === "/api/stripe") {
         const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
         if (input.action !== "customer-portal") throw new Error("unexpected Stripe portal request");
         body = '{"url":"https://billing.stripe.test/portal"}';
