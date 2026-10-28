@@ -1,4 +1,10 @@
-use std::{collections::HashMap, fs::OpenOptions, io::Write, path::Path, vec};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs::OpenOptions,
+    io::{Error, ErrorKind, Write},
+    path::Path,
+    vec,
+};
 
 use coingecko::{response::coins::CoinsMarketItem, CoinGeckoClient};
 
@@ -16,6 +22,69 @@ pub struct CoinGecko {
 struct CoinGeckoCoin {
     id: String,
     symbol: String,
+}
+
+const MAX_PRICE_CANDIDATES_PER_SYMBOL: usize = 25;
+const MAX_PRICE_IDS_LENGTH: usize = 1800;
+
+fn select_price_coin<'a>(
+    candidates: &'a [CoinGeckoCoin],
+    caps: &HashMap<String, f64>,
+) -> &'a CoinGeckoCoin {
+    candidates
+        .iter()
+        .max_by(|left, right| {
+            let cap = |coin: &CoinGeckoCoin| {
+                caps.get(&coin.id)
+                    .copied()
+                    .filter(|cap| cap.is_finite() && *cap > 0.0)
+                    .unwrap_or(0.0)
+            };
+            let exact = |coin: &CoinGeckoCoin| coin.id.eq_ignore_ascii_case(&coin.symbol);
+            exact(left)
+                .cmp(&exact(right))
+                .then_with(|| cap(left).total_cmp(&cap(right)))
+                .then_with(|| right.id.cmp(&left.id))
+        })
+        .expect("coin group is nonempty")
+}
+
+fn limit_price_candidates(mut coins: Vec<CoinGeckoCoin>) -> Vec<CoinGeckoCoin> {
+    coins.sort_by(|left, right| left.id.cmp(&right.id));
+    if let Some(exact) = coins
+        .iter()
+        .position(|coin| coin.id.eq_ignore_ascii_case(&coin.symbol))
+    {
+        return vec![coins.remove(exact)];
+    }
+    coins.truncate(MAX_PRICE_CANDIDATES_PER_SYMBOL);
+    coins
+}
+
+fn price_id_batches(ids: &[String]) -> Result<Vec<Vec<&str>>, Error> {
+    let mut batches = vec![];
+    let mut batch = vec![];
+    let mut length = 0;
+    for id in ids {
+        if id.len() > MAX_PRICE_IDS_LENGTH {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "CoinGecko coin ID exceeds price URL budget",
+            ));
+        }
+        let added = id.len() + if batch.is_empty() { 0 } else { 3 }; // "%2C"
+        if length + added > MAX_PRICE_IDS_LENGTH {
+            batches.push(batch);
+            batch = vec![];
+            length = 0;
+        }
+        length += id.len() + if batch.is_empty() { 0 } else { 3 };
+        batch.push(id.as_str());
+    }
+    if !batch.is_empty() {
+        batches.push(batch);
+    }
+    Ok(batches)
 }
 
 fn map_coin_prices(
@@ -155,25 +224,38 @@ impl CoinGecko {
         &self,
         symbols: Vec<String>,
     ) -> Result<HashMap<String, f64>, Box<dyn std::error::Error>> {
-        let filter_duplicate = |coins: Vec<CoinGeckoCoin>| -> CoinGeckoCoin {
-            if let Some(coin) = coins.iter().find(|c| c.id.to_uppercase() == c.symbol) {
-                coin.clone()
-            } else {
-                coins[0].clone()
-            }
-        };
-        let all_coins = self
-            .list_all_coin_ids(symbols, Some(filter_duplicate))
-            .await?;
+        let all_coins = self.list_all_coin_ids(symbols, None).await?;
+        let mut groups = BTreeMap::<String, Vec<CoinGeckoCoin>>::new();
+        for coin in all_coins {
+            groups.entry(coin.symbol.clone()).or_default().push(coin);
+        }
+        let groups = groups
+            .into_values()
+            .map(limit_price_candidates)
+            .collect::<Vec<_>>();
 
         // todo: if there are multi coins with same symbol, we should find by tokenAddress
-        let all_ids = all_coins.iter().map(|c| &c.id).collect::<Vec<_>>();
-        let all_prices = self
-            .client
-            .price(&all_ids, &["usd"], false, false, false, false)
-            .await?;
-
-        let res = map_coin_prices(&all_coins, |id| {
+        let all_ids = groups
+            .iter()
+            .flat_map(|coins| coins.iter().map(|coin| coin.id.clone()))
+            .collect::<Vec<_>>();
+        let mut all_prices = HashMap::new();
+        for batch in price_id_batches(&all_ids)? {
+            all_prices.extend(
+                self.client
+                    .price(&batch, &["usd"], true, false, false, false)
+                    .await?,
+            );
+        }
+        let caps = all_prices
+            .iter()
+            .filter_map(|(id, price)| price.usd_market_cap.map(|cap| (id.clone(), cap)))
+            .collect();
+        let selected = groups
+            .iter()
+            .map(|coins| select_price_coin(coins, &caps).clone())
+            .collect::<Vec<_>>();
+        let res = map_coin_prices(&selected, |id| {
             all_prices.get(id).and_then(|price| price.usd)
         });
 
@@ -375,6 +457,107 @@ impl CoinGecko {
 mod tests {
     use super::*;
     use coingecko::response::simple::Price;
+
+    fn candidate(id: &str) -> CoinGeckoCoin {
+        CoinGeckoCoin {
+            id: id.to_string(),
+            symbol: "DUP".to_string(),
+        }
+    }
+
+    #[test]
+    fn exact_symbol_id_wins_even_with_a_smaller_market_cap() {
+        let coins = vec![candidate("large"), candidate("dup")];
+        let caps = HashMap::from([("large".to_string(), 100.0), ("dup".to_string(), 1.0)]);
+
+        assert_eq!(select_price_coin(&coins, &caps).id, "dup");
+        assert_eq!(
+            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps).id,
+            "dup"
+        );
+    }
+
+    #[test]
+    fn largest_valid_market_cap_wins_regardless_of_candidate_order() {
+        let coins = vec![candidate("small"), candidate("large")];
+        let caps = HashMap::from([("small".to_string(), 1.0), ("large".to_string(), 100.0)]);
+
+        assert_eq!(select_price_coin(&coins, &caps).id, "large");
+        assert_eq!(
+            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps).id,
+            "large"
+        );
+    }
+
+    #[test]
+    fn tied_or_missing_market_caps_choose_the_lowest_id() {
+        let coins = vec![candidate("z"), candidate("a")];
+        let caps = HashMap::from([("z".to_string(), 10.0), ("a".to_string(), 10.0)]);
+
+        assert_eq!(select_price_coin(&coins, &caps).id, "a");
+        assert_eq!(select_price_coin(&coins, &HashMap::new()).id, "a");
+        assert_eq!(
+            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps).id,
+            "a"
+        );
+    }
+
+    #[test]
+    fn non_finite_and_non_positive_market_caps_are_ignored() {
+        let coins = vec![
+            candidate("infinite"),
+            candidate("nan"),
+            candidate("zero"),
+            candidate("negative"),
+            candidate("valid"),
+        ];
+        let caps = HashMap::from([
+            ("infinite".to_string(), f64::INFINITY),
+            ("nan".to_string(), f64::NAN),
+            ("zero".to_string(), 0.0),
+            ("negative".to_string(), -1.0),
+            ("valid".to_string(), 2.0),
+        ]);
+
+        assert_eq!(select_price_coin(&coins, &caps).id, "valid");
+        assert_eq!(
+            select_price_coin(&[coins[4].clone(), coins[0].clone()], &caps).id,
+            "valid"
+        );
+    }
+
+    #[test]
+    fn limits_ambiguous_candidates_to_the_lowest_twenty_five_ids() {
+        let coins = (0..26)
+            .rev()
+            .map(|index| candidate(&format!("coin-{index:02}")))
+            .collect::<Vec<_>>();
+
+        let limited = limit_price_candidates(coins.clone());
+        assert_eq!(limited.len(), 25);
+        assert_eq!(limited.first().unwrap().id, "coin-00");
+        assert_eq!(limited.last().unwrap().id, "coin-24");
+
+        let mut with_exact = coins;
+        with_exact.push(candidate("dup"));
+        assert_eq!(limit_price_candidates(with_exact)[0].id, "dup");
+    }
+
+    #[test]
+    fn price_batches_keep_encoded_id_lists_within_the_url_budget() {
+        let ids = vec!["a".repeat(890), "b".repeat(890), "c".repeat(890)];
+        let batches = price_id_batches(&ids).unwrap();
+
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batches[0], vec![ids[0].as_str(), ids[1].as_str()]);
+        assert_eq!(batches[1], vec![ids[2].as_str()]);
+        assert!(batches
+            .iter()
+            .all(|batch| batch.iter().map(|id| id.len()).sum::<usize>()
+                + batch.len().saturating_sub(1) * 3
+                <= MAX_PRICE_IDS_LENGTH));
+        assert!(price_id_batches(&["x".repeat(MAX_PRICE_IDS_LENGTH + 1)]).is_err());
+    }
 
     #[test]
     fn maps_price_fixture_by_coin_id_and_omits_missing_prices() {
