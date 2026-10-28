@@ -37,7 +37,7 @@ import {
 import { SUIAnalyzer } from "./datafetch/coins/sui";
 import { StockAnalyzer } from "./datafetch/coins/stock/stock-analyzer";
 import { getAddressList } from "./datafetch/utils/address";
-import { classifySourceError, recordOptionalSourceFailure, takeOptionalSourceFailures, takeSourceFailure } from "./datafetch/utils/source-failure";
+import { classifySourceError, recordOptionalSourceFailure, serviceSourceDetail, takeOptionalSourceFailures, takeSourceFailure } from "./datafetch/utils/source-failure";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
 import { FullRefreshRequiredError } from "./refresh-error";
 import { configuredSecretValues, redactSecrets } from "./security/redact";
@@ -318,7 +318,7 @@ export async function fetchPortfolios(
         const category = classifySourceError(error);
         if (category === "quota" && (kind === "erc20" || kind === "trc20")) exhausted.add(kind);
         const detail = error instanceof Error && ["Source timed out", "Unsupported exchange", "Invalid source holdings"].includes(error.message)
-          ? error.message : undefined;
+          ? error.message : serviceSourceDetail(error);
         return { sourceId: source.sourceId, label: source.label, kind: source.kind, provider: source.provider,
           hint: source.hint, walletIdentities, status: "stale" as const, coins: [], category, detail,
           startedAt, finishedAt: new Date().toISOString() };

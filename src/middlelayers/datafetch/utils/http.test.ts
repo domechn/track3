@@ -53,6 +53,22 @@ function expectTimedRequest(timeout: number) {
 }
 
 describe("sendHttpRequest error details", () => {
+  it("keeps the safe endpoint and response detail separate from the display message", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      status: 500,
+      text: vi.fn().mockResolvedValue('{"error":"ERC20 balance provider is not configured"}'),
+    } as unknown as Response);
+
+    const error = await sendHttpRequest("POST", "https://track3-pro-api.domc.me/api/erc20/assetsBalances?token=secret")
+      .catch((reason: unknown) => reason);
+    expect(error).toMatchObject({
+      status: 500,
+      endpoint: "https://track3-pro-api.domc.me/api/erc20/assetsBalances",
+      serverMessage: "ERC20 balance provider is not configured",
+    });
+    expect(String(error)).not.toContain("token=secret");
+  });
+
   it("includes method, endpoint path, and API message for non-2xx JSON responses", async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       status: 401,

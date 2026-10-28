@@ -17,6 +17,7 @@ export type FailedPortfolioSource = {
 
 export type SourceErrorCategory =
   | "auth"
+  | "service"
   | "network"
   | "rateLimit"
   | "quota"

@@ -308,6 +308,8 @@ const App = ({
     "Source timed out": "refresh.detail.timeout",
     "Unsupported exchange": "refresh.detail.unsupported",
     "Invalid source holdings": "refresh.detail.invalidholdings",
+    "ERC20 balance provider is not configured": "refresh.detail.providerNotConfigured",
+    "Upstream provider error": "refresh.detail.upstreamProvider",
   };
 
   return (

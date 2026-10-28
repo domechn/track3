@@ -7,6 +7,19 @@ it("keeps the quota reason in refresh status", () => {
   }])[0].category).toBe("quota");
 });
 
+it("persists an approved Pro service detail and drops provider text", () => {
+  expect(normalizeSourceStatuses([
+    { sourceId: "erc20:0", label: "ERC20", status: "failed", category: "service",
+      detail: "ERC20 balance provider is not configured" },
+    { sourceId: "trc20:0", label: "TRC20", status: "failed", category: "service",
+      detail: "No duneApiKey or defiApiKey or debankApiKey" },
+  ])).toEqual([
+    { sourceId: "erc20:0", label: "ERC20", status: "failed", category: "service",
+      detail: "ERC20 balance provider is not configured" },
+    { sourceId: "trc20:0", label: "TRC20", status: "failed", category: "service" },
+  ]);
+});
+
 it("loads old saved statuses with their original label", () => {
   expect(normalizeSourceStatuses([{ sourceId: "btc:0", label: "Main", status: "failed" }]))
     .toEqual([{ sourceId: "btc:0", label: "Main", status: "failed" }]);

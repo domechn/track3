@@ -292,6 +292,32 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(screen.getByRole("button", { name: "Retry BTC wallet 1" })).toBeTruthy();
   });
 
+  it("shows the Pro service reason and approved detail with retry actions", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult,
+      sourceStatuses: [
+        { sourceId: "erc20:0", label: "ERC20 wallet 1", status: "stale", category: "service",
+          detail: "ERC20 balance provider is not configured" },
+        { sourceId: "trc20:0", label: "TRC20 wallet 1", status: "failed", category: "service",
+          detail: "No duneApiKey or defiApiKey or debankApiKey" },
+      ],
+      sourceResults: [
+        { ...failedSource, sourceId: "erc20:0", label: "ERC20 wallet 1", category: "service" },
+        { ...failedSource, sourceId: "trc20:0", label: "TRC20 wallet 1", category: "service" },
+      ],
+    } as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
+    expect(dialog).toHaveTextContent("Pro service error");
+    expect(dialog).not.toHaveTextContent("No duneApiKey or defiApiKey or debankApiKey");
+    expect(screen.getByRole("button", { name: "Retry ERC20 wallet 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry all failed" })).toBeInTheDocument();
+    await user.click(screen.getByText("Details"));
+    expect(dialog).toHaveTextContent("The Pro service has no data provider configured");
+  });
+
   it("retries one failed source and updates its status", async () => {
     vi.mocked(refreshAllData)
       .mockResolvedValueOnce(partialResult as never)
