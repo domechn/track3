@@ -2,7 +2,7 @@ name: iOS foundation
 
 on:
   push:
-    branches: ["feat/ios-app*", "feat/ios-folder-picker*", "feat/ios-interaction-fixes*", "feat/ios-wide-screens*", "feat/pro-usage-ui*", "feat/checkout-flow*"]
+    branches: ["feat/ios-app*", "feat/ios-folder-picker*", "feat/ios-interaction-fixes*", "feat/ios-wide-screens*", "feat/pro-usage-ui*", "feat/checkout-flow*", "feat/onboarding*"]
   pull_request:
     paths:
       - ".env.production"

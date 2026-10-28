@@ -26,6 +26,7 @@ import { getVersion, trackEventWithClientID } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/mobile/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
+import { requestOnboardingReplay } from "@/middlelayers/onboarding";
 import { isIOS } from "@/utils/platform";
 import { useSearchParams } from "react-router-dom";
 import { InsetGroup, ListRow } from "@/mobile/components/mobile";
@@ -315,6 +316,9 @@ const App = ({
       <ListRow value={version}>{t("system.appVersion")}</ListRow>
     </InsetGroup>
     <p className="ios-d3-settings-note">{t("system.appVersionNote")}</p>
+    <InsetGroup>
+      <ListRow onClick={requestOnboardingReplay} data-testid="onboarding-replay">{t("onboarding.replay.action")}</ListRow>
+    </InsetGroup>
   </div>;
 
   if (isIOS() && section === "pro") return <div className="ios-d3-system-settings space-y-6">

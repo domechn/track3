@@ -3,8 +3,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronLeftIcon, ChevronRightIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/mobile/i18n";
-import { iosHaptic } from "@/utils/ios-native";
 import { isIOS } from "@/utils/platform";
+import { useHaptics } from "@/utils/use-haptics";
 import "@/mobile/components/mobile/mobile.css";
 export { AnimatedAmount, Button, DeltaPill, EmptyState, IconButton, MobileCard, MobileSkeleton, Pill, SectionHeader } from "@/mobile/components/mobile/design";
 export { MobileIcon } from "@/mobile/components/mobile/icons";
@@ -15,16 +15,7 @@ export { Switch } from "@/mobile/components/ui/switch";
 
 export const MOBILE_MEDIA_QUERY = "(pointer: coarse)";
 
-export function useHaptics() {
-  return (kind: "selection" | "light" | "success" = "selection") => {
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    if (isIOS()) {
-      void iosHaptic(kind === "success" ? "success" : "light").catch(() => {});
-      return;
-    }
-    navigator.vibrate?.(kind === "success" ? [12, 28, 12] : kind === "light" ? 8 : 5);
-  };
-}
+export { useHaptics };
 
 export function useIsMobile() {
   const [mobile, setMobile] = useState(() => isIOS() || (window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false));
@@ -294,15 +285,16 @@ export function InsetGroup({ children, title, className }: React.PropsWithChildr
   </section>;
 }
 
-export function ListRow({ children, value, onClick, href, trailing, className, ariaCurrent }: React.PropsWithChildren<{
+export function ListRow({ children, value, onClick, href, trailing, className, ariaCurrent, "data-testid": testId }: React.PropsWithChildren<{
   value?: React.ReactNode; onClick?: () => void; href?: string; trailing?: React.ReactNode; className?: string;
   ariaCurrent?: "page";
+  "data-testid"?: string;
 }>) {
   const content = <><span className="mobile-list-label">{children}</span>{value && <span className="mobile-list-value">{value}</span>}{trailing ?? ((href || onClick) && <ChevronRightIcon aria-hidden="true" />)}</>;
   const classes = cn("mobile-list-row", className);
-  if (href) return <a href={href} className={classes} aria-current={ariaCurrent}>{content}</a>;
-  if (onClick) return <button type="button" onClick={onClick} className={classes}>{content}</button>;
-  return <div className={classes}>{content}</div>;
+  if (href) return <a href={href} className={classes} aria-current={ariaCurrent} data-testid={testId}>{content}</a>;
+  if (onClick) return <button type="button" onClick={onClick} className={classes} data-testid={testId}>{content}</button>;
+  return <div className={classes} data-testid={testId}>{content}</div>;
 }
 
 export type MobileRecord = {

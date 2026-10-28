@@ -22,6 +22,7 @@ import PageWrapper from "@/mobile/components/page-wrapper";
 import DatePicker from "@/mobile/components/date-picker";
 import RealTimeTotalValue from "@/components/realtime-total-value";
 import { AnimatedPage } from "@/components/motion";
+import FirstRunOnboarding from "@/components/onboarding";
 import PageLoadingOverlay from "@/mobile/components/page-loading-overlay";
 import AutoBackupIndicator from "@/mobile/components/auto-backup-indicator";
 import SyncStatusIndicator from "@/mobile/components/sync-status-indicator";
@@ -1180,6 +1181,7 @@ const App = () => {
       <SyncStatusIndicator />
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>
+          <FirstRunOnboarding variant="ios" ready={!initializing && !loadFailed} />
           <AppRoutes
           initializing={initializing}
           loadFailed={loadFailed}

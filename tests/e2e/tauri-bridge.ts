@@ -16,6 +16,7 @@ type BridgeOptions = {
   seedReviewContent?: boolean;
   seedRebalanceProfile?: boolean;
   emptyPortfolio?: boolean;
+  onboarding?: boolean;
   seedLockedSync?: boolean;
   richPortfolio?: boolean;
   slowOverview?: boolean;
@@ -57,6 +58,9 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     preflightExhaustedFixture = false,
     checkoutFixture = false,
   } = options;
+  if (!options.onboarding) {
+    await page.addInitScript(() => localStorage.setItem("track3-onboarding-v1", "completed"));
+  }
   const SQL = await initSqlJs({
     locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
   });
@@ -656,6 +660,6 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
     };
   }, richPortfolio);
-  return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares,
+  return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, httpRequests: () => requests.size, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares,
     openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; } };
 }

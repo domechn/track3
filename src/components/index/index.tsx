@@ -10,6 +10,7 @@ import {
   Tooltip as ChartTooltip,
   Legend,
 } from "chart.js";
+import FirstRunOnboarding from "@/components/onboarding";
 import {
   Tooltip,
   TooltipContent,
@@ -887,6 +888,7 @@ const App = () => {
       <SyncStatusIndicator />
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>
+          <FirstRunOnboarding variant="desktop" ready={!initializing} />
           <AppRoutes
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={handleSidebarToggle}
