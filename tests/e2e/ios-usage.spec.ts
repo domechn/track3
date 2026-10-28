@@ -32,6 +32,27 @@ test("iOS offers restore without a purchase action", async ({ page }) => {
   expect(bridge.checkoutSessions()).toBe(0);
 });
 
+test("iOS system card title stays readable without a section", async ({ page }) => {
+  await installTauriBridge(page, { checkoutFixture: true });
+  await page.goto("/#/settings/systemInfo");
+  const title = page.getByTestId("system-info-card").locator("h2, h3").first();
+  await expect(title).toHaveText("Track3 Free", { timeout: 15_000 });
+  await expect.poll(() => title.evaluate((heading) => parseFloat(getComputedStyle(heading).fontSize))).toBeGreaterThanOrEqual(16);
+});
+
+test("iOS manages an active subscription before offering deactivation", async ({ page }) => {
+  const bridge = await installTauriBridge(page, { proUsageFixture: true });
+  await page.goto("/#/settings/systemInfo?section=pro");
+  const manage = page.getByRole("button", { name: "Manage Subscription" });
+  const deactivate = page.getByRole("button", { name: "Deactivate license" });
+  await expect(manage).toBeVisible();
+  await manage.focus();
+  await page.keyboard.press("Tab");
+  await expect(deactivate).toBeFocused();
+  await manage.click();
+  await expect.poll(() => bridge.openedUrls()).toContain("https://billing.stripe.test/portal");
+});
+
 test("iOS asks before an exhausted Pro wallet refresh", async ({ page }) => {
   await installTauriBridge(page, { quotaExhaustedFixture: true, preflightExhaustedFixture: true });
   await page.goto("/#/overview");
