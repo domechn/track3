@@ -238,7 +238,7 @@ const App = ({
   }
 
   async function onViewBenefits() {
-    await openUrl("https://track3.domc.me/");
+    await openUrl("https://track3.domc.me/#pro");
   }
 
   function formatPeriodEnd(dateStr: string | null): string {
