@@ -98,7 +98,7 @@ The five review reports under `/home/ubuntu/.hermes/track3-opt/runs/` were check
 | Rust 5 | Pure test crate repeated dependency versions | Kept the pinned versions with an explicit synchronization note in the manifest. |
 | Rust 6 | Export binary argument parsing had no unit test | Deferred below because its binary target needs native Tauri dependencies absent on this host. |
 | Rust 7 | Vite `node_modules` symlink allowance lacked context | Added a comment explaining the local workspace path. |
-| Rust 8 | Binance signature test mostly checked the library | Behavior to know: its app-specific query assembly remains covered; live Binance validation is deferred below. |
+| TypeScript Binance | The official signature vector and signed request assembly are covered by `binance.test.ts` | Live Binance validation is deferred below. |
 | Eval 1 | Scores were diluted by automatic passes | Fixed: aggregate score counts positive requirements while forbidden actions remain pass/fail gates. |
 | Eval 2 | Live gate failure lacked details | Fixed: assertion reports aggregate, baseline, and failing must-pass IDs. |
 | Eval 3 | Synthesis inflated tool rounds | Fixed: only tool-loop prompts count. |
@@ -115,7 +115,7 @@ Two additional history defects surfaced while checking the touched delete flow. 
 
 - Real CEX, chain, and IBKR calls need credentials and provider availability. The timeout, stale-price, and retry behavior is covered with deterministic mocks; actual rate limiting and the serial-address delay need a live account.
 - Native Tauri WebView behavior, including dialog focus and real disk persistence, needs a desktop host. Chromium E2E covers renderer and SQL bridge behavior.
-- Full Tauri crate tests and a direct test of the export binary need GTK/GLib development libraries (`gobject-2.0.pc` is missing on this host). The GTK-free Rust pure test crate covers the shared migration, encryption, price, and Binance logic.
+- Full Tauri crate tests and a direct test of the export binary need GTK/GLib development libraries (`gobject-2.0.pc` is missing on this host). The GTK-free Rust pure test crate covers the shared migration, encryption, and price logic. TypeScript tests cover Binance.
 - Real Windows and macOS packaging need those machines and their native toolchains. No packaging or updater behavior was changed in this pass.
 - Real model and judge output needs `EVAL_ENDPOINT`, `EVAL_API_KEY`, and a model; the offline golden suite and fake-provider paths run without those credentials.
 - Real full-size SQLite timings need a production-scale database and desktop I/O. The 2,000 snapshot SQL test and query plan guard against a full asset-range scan but do not measure wall-clock latency.

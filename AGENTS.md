@@ -50,11 +50,10 @@ Additional wiring:
 Exposes Tauri commands to frontend via `invoke()`:
 
 - `query_coins_prices` — CoinGecko price queries
-- `query_binance_balance` — Binance API integration
 - `encrypt` / `decrypt` — Config encryption via magic-crypt
 - `download_coins_logos` — Coin logo caching
 
-Key files: `main.rs` (desktop entry), `app.rs` (shared commands and setup), `binance.rs`, `info.rs` (CoinGecko), `migration.rs` (DB versioning), `ent.rs` (encryption), `lib.rs` (module declarations), `types.rs` (shared Rust structs)
+Key files: `main.rs` (desktop entry), `app.rs` (shared commands and setup), `info.rs` (CoinGecko), `migration.rs` (DB versioning), `ent.rs` (encryption), `lib.rs` (module declarations), `types.rs` (shared Rust structs)
 
 ### Database
 
@@ -204,7 +203,7 @@ The user-facing language switcher lives in the **Appearance** tab of Settings (`
 
 ## Integration Points
 
-- External price and exchange integrations are split across Rust (`query_coins_prices`, Binance) and TS exchange adapters.
+- CoinGecko price integration uses Rust (`query_coins_prices`); exchange integrations, including Binance, use TypeScript adapters.
 - Data persistence uses SQLite through `@tauri-apps/plugin-sql` in `src/middlelayers/database.ts`.
 - File import/export uses `@tauri-apps/plugin-fs` in `src/middlelayers/datamanager.ts`.
 - CI and release behavior are defined in `.github/workflows/`.

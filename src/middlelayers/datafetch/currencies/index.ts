@@ -8,7 +8,7 @@ export interface CurrencyRateQuerier {
 
 export class ExchangeRate implements CurrencyRateQuerier {
 
-	private readonly queryUrl = "https://currency-rate-api.domc.me/api/currency-rate/"
+	private readonly queryUrl = "https://currency-rate-api.track3.dev/api/currency-rate/"
 	async listAllCurrencyRates(): Promise<CurrencyRate[]> {
 		const currentDate = new Date().toISOString().split('T')[0]
 		const resp = await sendHttpRequest<{

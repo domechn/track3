@@ -41,7 +41,7 @@ describe("coin price queries", () => {
     });
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "POST",
-      "https://track3-pro-api.domc.me/api/coins/price",
+      "https://api.track3.dev/api/coins/price",
       10000,
       {
         "x-track3-client-id": "client-id",

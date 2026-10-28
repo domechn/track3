@@ -91,7 +91,7 @@ describe("TRC20ProUserAnalyzer", () => {
     ]);
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "POST",
-      "https://track3-pro-api.domc.me/api/trc20/assetsBalances",
+      "https://api.track3.dev/api/trc20/assetsBalances",
       20000,
       {
         "x-track3-client-id": "client-id",
@@ -117,7 +117,7 @@ describe("TRC20ProUserAnalyzer", () => {
     expect(sendHttpRequest).toHaveBeenCalledTimes(2);
     expect(sendHttpRequest).toHaveBeenLastCalledWith(
       "POST",
-      "https://track3-pro-api.domc.me/api/trc20/assetsBalances",
+      "https://api.track3.dev/api/trc20/assetsBalances",
       20000,
       expect.objectContaining({
         "x-track3-api-key": "retry-license",

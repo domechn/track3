@@ -250,7 +250,7 @@ const App = ({
   }
 
   async function onViewBenefits() {
-    await openUrl("https://track3.domc.me/#pro");
+    await openUrl("https://track3.dev/#pro");
   }
 
   function subscriptionStatusLabel(status: string | null): string {

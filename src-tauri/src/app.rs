@@ -8,7 +8,6 @@ use std::sync::{
 use std::{collections::HashMap, io};
 
 use crate::{
-    binance::Binance,
     database_path::{
         initialize_database_if_needed, resolve_database_path, sqlite_url, DatabasePath,
     },
@@ -129,31 +128,6 @@ async fn delete_sync_snapshot(
     uuid: String,
 ) -> Result<(), String> {
     delete_sync_snapshot_atomically(&database_path.0, &uuid).await
-}
-
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-#[tauri::command]
-async fn query_binance_balance(
-    api_key: String,
-    api_secret: String,
-) -> Result<HashMap<String, f64>, String> {
-    let b = Binance::new(api_key.clone(), api_secret.clone());
-    let res = b.query_balance().await;
-    match res {
-        Ok(balances) => Ok(balances),
-        Err(e) => {
-            let mut message = sanitize_upstream_error(&e.to_string());
-            for secret in [&api_key, &api_secret] {
-                if !secret.is_empty() {
-                    message = message.replace(secret, "<REDACTED>");
-                }
-            }
-            Err(message)
-        }
-    }
 }
 
 #[cfg_attr(
@@ -669,7 +643,6 @@ pub fn run() {
     #[cfg(all(debug_assertions, target_os = "ios"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         query_coins_prices,
-        query_binance_balance,
         encrypt,
         decrypt,
         download_coins_logos,
@@ -701,7 +674,6 @@ pub fn run() {
     #[cfg(all(not(debug_assertions), target_os = "ios"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         query_coins_prices,
-        query_binance_balance,
         encrypt,
         decrypt,
         download_coins_logos,
@@ -731,7 +703,6 @@ pub fn run() {
     #[cfg(all(debug_assertions, not(target_os = "ios")))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         query_coins_prices,
-        query_binance_balance,
         encrypt,
         decrypt,
         download_coins_logos,
@@ -748,7 +719,6 @@ pub fn run() {
     #[cfg(all(not(debug_assertions), not(target_os = "ios")))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         query_coins_prices,
-        query_binance_balance,
         encrypt,
         decrypt,
         download_coins_logos,

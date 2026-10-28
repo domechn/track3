@@ -9,7 +9,6 @@ publish = false
 aes = "=0.8.4"
 aes-gcm-siv = "0.11.1"
 base64 = "0.22.1"
-binance-rs-async = {version = "1.3.3", features = ["wallet_api", "futures_api", "savings_api", "margin_api"]}
 cbc = "=0.1.2"
 coingecko = {git = "https://github.com/domechn/coingecko-rs.git", rev = "41e819e"}
 fs2 = "=0.4.3"
@@ -25,6 +24,3 @@ version-compare = "0.2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "=0.2.185"
-
-[dev-dependencies]
-ring = "0.17"

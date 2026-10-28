@@ -20,8 +20,7 @@ import { Theme } from "@/components/common/theme";
 import { runWithEncryptionWriteGate } from "./encryption-write-gate";
 import type { CostBasisMethod } from "./cost-basis";
 
-// todo: update to dedicated domain
-export const PRO_API_ENDPOINT = "https://track3-pro-api.domc.me";
+export const PRO_API_ENDPOINT = "https://api.track3.dev";
 
 const prefix = "!ent:";
 const generalFixId = "1";
