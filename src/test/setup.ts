@@ -3,6 +3,10 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, expect } from "vitest";
 
 beforeEach(() => {
+  try { localStorage.setItem("track3-onboarding-v1", "completed"); } catch {}
+});
+
+beforeEach(() => {
   if (expect.getState().testPath?.includes("/src/mobile/")) {
     Object.defineProperties(window, {
       innerWidth: { configurable: true, value: 390 },

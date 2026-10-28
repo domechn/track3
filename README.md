@@ -35,6 +35,7 @@
 4. Support stock broker positions from Interactive Brokers (IBKR) through Flex Web Service imports with Query ID and Token.
 5. Support dozens of charts to analyze data such as asset allocation, wallet proportion, position changes, profit and loss, and more.
 6. Support data backup and restore. Users can export data to local files and import them to other devices, or share them between multiple devices by cloud drive ( e.g. iCloud ).
+7. A five-step first-run guide introduces local storage, sources, history, planning tools, and backups on desktop, iPhone, and iPad. Replay it from Settings.
 
 ### Automatic backup format
 

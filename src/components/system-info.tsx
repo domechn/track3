@@ -8,7 +8,7 @@ import ViewIcon from "@/assets/icons/view-icon.png";
 import HideIcon from "@/assets/icons/hide-icon.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import {
   activateLicenseOnDevice,
@@ -27,6 +27,7 @@ import { getVersion, trackEventWithClientID } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
+import { requestOnboardingReplay } from "@/middlelayers/onboarding";
 
 const App = ({
   onProStatusChange,
@@ -427,6 +428,15 @@ const App = ({
           </div>
         </>}
       </SystemInfoCard>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">{t("onboarding.replay.title")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">{t("onboarding.replay.description")}</p>
+          <Button type="button" variant="outline" size="sm" data-testid="onboarding-replay" onClick={requestOnboardingReplay}>{t("onboarding.replay.action")}</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 
