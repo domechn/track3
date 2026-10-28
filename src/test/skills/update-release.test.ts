@@ -43,6 +43,7 @@ type UpdateModule = {
   validateManifestForTag: (
     manifest: unknown,
     releaseTag: string,
+    repository: { owner: string; repo: string },
   ) => Manifest;
 };
 
@@ -121,7 +122,7 @@ function asset(name: string, id?: number): ReleaseAsset {
   return {
     id,
     name,
-    browser_download_url: `https://example.com/${name}`,
+    browser_download_url: `https://github.com/domechn/track3/releases/download/untagged-deadbeef/${name}`,
   };
 }
 
@@ -298,8 +299,34 @@ describe("release finalizer", () => {
           },
         },
         appReleaseTag,
+        { owner: "domechn", repo: "track3" },
       ),
     ).toThrow(`app-v0.8.0 does not match release tag ${appReleaseTag}`);
+  });
+
+  it("rejects an untagged URL in a complete manifest", () => {
+    const urlPrefix = `https://github.com/domechn/track3/releases/download/${appReleaseTag}/`;
+    const platforms = Object.fromEntries(
+      [
+        "linux-x86_64",
+        "darwin-x86_64",
+        "darwin-aarch64",
+        "windows-x86_64",
+      ].map((platform) => [
+        platform,
+        { signature: "signature", url: `${urlPrefix}${platform}` },
+      ]),
+    );
+    platforms["linux-x86_64"].url =
+      "https://github.com/domechn/track3/releases/download/untagged-deadbeef/track3.AppImage";
+
+    expect(() =>
+      updateModule.validateManifestForTag(
+        { version: appVersion, platforms },
+        appReleaseTag,
+        { owner: "domechn", repo: "track3" },
+      ),
+    ).toThrow(/untagged-deadbeef/);
   });
 
   it("rejects an existing public tag and older or equal publication", async () => {
@@ -386,6 +413,19 @@ describe("release finalizer", () => {
       "linux-x86_64",
       "windows-x86_64",
     ]);
+    expect(
+      Object.fromEntries(
+        Object.entries(manifest.platforms).map(([platform, target]) => [
+          platform,
+          target.url,
+        ]),
+      ),
+    ).toEqual({
+      "darwin-aarch64": `https://github.com/domechn/track3/releases/download/${appReleaseTag}/track3_aarch64.app.tar.gz`,
+      "darwin-x86_64": `https://github.com/domechn/track3/releases/download/${appReleaseTag}/track3_x64.app.tar.gz`,
+      "linux-x86_64": `https://github.com/domechn/track3/releases/download/${appReleaseTag}/track3_${appVersion}_amd64.AppImage`,
+      "windows-x86_64": `https://github.com/domechn/track3/releases/download/${appReleaseTag}/track3_${appVersion}_x64-setup.exe`,
+    });
     const manifestUploads = harness.uploadReleaseAsset.mock.calls.filter(
       ([request]) =>
         request.release_id === 7 && request.name === "latest.json",
@@ -403,6 +443,24 @@ describe("release finalizer", () => {
         draft: false,
         make_latest: "true",
       }),
+    );
+  });
+
+  it("encodes asset names in tagged manifest URLs", async () => {
+    const originalName = `track3_${appVersion}_amd64.AppImage`;
+    const encodedName = `track3 ${appVersion}_amd64.AppImage`;
+    const release = makeRelease({
+      assets: completeAssets().map((entry) => ({
+        ...entry,
+        name: entry.name.replace(originalName, encodedName),
+      })),
+    });
+    const harness = makeHarness({ release });
+
+    const manifest = await updateModule.main(harness.dependencies);
+
+    expect(manifest.platforms["linux-x86_64"].url).toBe(
+      `https://github.com/domechn/track3/releases/download/${appReleaseTag}/track3%20${appVersion}_amd64.AppImage`,
     );
   });
 
@@ -449,6 +507,12 @@ describe("release finalizer", () => {
     expect(manifestUpload).toBeLessThan(publication);
     expect(publication).toBeLessThan(legacyDeletion);
     expect(legacyDeletion).toBeLessThan(legacyUpload);
+    const legacyUploadData = harness.uploadReleaseAsset.mock.calls.find(
+      ([request]) => request.release_id === 99 && request.name === "update.json",
+    )![0].data as string;
+    expect(JSON.parse(legacyUploadData).platforms["linux-x86_64"].url).toBe(
+      `https://github.com/domechn/track3/releases/download/${appReleaseTag}/track3_${appVersion}_amd64.AppImage`,
+    );
   });
 });
 
