@@ -13,7 +13,7 @@ test("desktop checkout waits, resumes after reload, and activates Pro", async ({
   await expect(page.getByText(/Waiting for payment/)).toBeVisible();
   bridge.setCheckoutStatus("completed");
   await expect(page.locator("#app-main-content").getByText("Pro subscription activated!", { exact: true })).toBeVisible();
-  await expect(page.getByText("Pro", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Track3 Pro" })).toBeVisible();
   expect(bridge.checkoutSessions()).toBe(1);
 });
 

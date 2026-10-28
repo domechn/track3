@@ -20,7 +20,7 @@ export type ProUsage = {
 
 export type SubscriptionInfo = {
   planType: "monthly" | "yearly" | null;
-  status: "active" | "past_due" | "canceled" | "incomplete" | null;
+  status: "active" | "trialing" | "past_due" | "canceled" | "incomplete" | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   isLegacy: boolean;

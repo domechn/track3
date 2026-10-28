@@ -123,6 +123,17 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("waits for the stored license before showing free purchase controls", async () => {
+    let resolveLicense!: (license: string) => void;
+    mocks.getLicenseIfIsPro.mockReturnValue(new Promise((resolve) => { resolveLicense = resolve; }));
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.queryByTestId("monthly-plan-card")).not.toBeInTheDocument();
+    await act(async () => resolveLicense("stored-license"));
+    expect(await screen.findByRole("heading", { name: "Track3 Pro" })).toBeInTheDocument();
+    expect(screen.queryByTestId("monthly-plan-card")).not.toBeInTheDocument();
+  });
+
   it("shows both metered uses and reset dates for an active Pro license", async () => {
     mocks.getLicenseIfIsPro.mockResolvedValue("pro");
     mocks.getUsage.mockResolvedValue({ enforced: true, usage: exhaustedUsage });
@@ -135,12 +146,13 @@ describe("System Info subscription management", () => {
     expect(await screen.findByText("ERC20 wallet refreshes")).toBeInTheDocument();
     expect(screen.getByText("TRON wallet refreshes")).toBeInTheDocument();
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
-    expect(screen.getByText("300 / 300")).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent === "300 / 300")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("progressbar", { name: "ERC20 wallet refreshes" }).firstElementChild).toHaveClass("bg-destructive"));
-    expect(screen.getAllByText(/Resets/)).toHaveLength(2);
-    const proCard = screen.getByText("Pro Status").closest(".glass");
+    expect(screen.getAllByText(/Resets/)).toHaveLength(1);
+    const proCard = screen.getByRole("heading", { name: "Track3 Pro" }).closest(".glass");
     expect(proCard).not.toBeNull();
     expect(within(proCard as HTMLElement).getByText("ERC20 wallet refreshes")).toBeInTheDocument();
+    expect(within(proCard as HTMLElement).getByText("0.6.1").parentElement).toHaveTextContent(/Track3 0.6.1/);
   });
 
   it("does not mark a full bar as blocked while the backend is in log mode", async () => {
@@ -152,7 +164,7 @@ describe("System Info subscription management", () => {
       usage: exhaustedUsage,
     });
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    expect(await screen.findByText("300 / 300")).toBeInTheDocument();
+    expect(await screen.findByText((_, element) => element?.tagName === "P" && element.textContent === "300 / 300")).toBeInTheDocument();
     await waitFor(() => expect(mocks.getUsage).toHaveBeenCalled());
     expect(screen.getByRole("progressbar", { name: "ERC20 wallet refreshes" }).firstElementChild).not.toHaveClass("bg-destructive");
   });
@@ -171,8 +183,8 @@ describe("System Info subscription management", () => {
         },
       });
       render(<SystemInfo onProStatusChange={vi.fn()} />);
-      expect(await screen.findAllByText(/Resets/)).toHaveLength(2);
-      expect(screen.getAllByText(/Nov 3, 2026/)).toHaveLength(2);
+      expect(await screen.findAllByText(/Resets/)).toHaveLength(1);
+      expect(screen.getByText(/Resets Nov 3, 2026/)).toBeInTheDocument();
     } finally {
       process.env.TZ = originalTimeZone;
     }
@@ -181,16 +193,64 @@ describe("System Info subscription management", () => {
   it("hides usage rows when an older subscription response omits usage", async () => {
     mocks.getLicenseIfIsPro.mockResolvedValue("pro");
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    await screen.findByText("Subscription");
+    await screen.findByRole("heading", { name: "Track3 Pro" });
     expect(screen.queryByText("ERC20 wallet refreshes")).not.toBeInTheDocument();
     expect(screen.queryByText("TRON wallet refreshes")).not.toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
+  it("shows legacy usage meters above the license key", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("legacy-license");
+    mocks.getSubscriptionInfo.mockResolvedValue({
+      planType: null, status: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, isLegacy: true,
+      usage: exhaustedUsage,
+    });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    await screen.findByText("Legacy");
+    expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+    expect(screen.getByPlaceholderText("License Key")).toBeInTheDocument();
+  });
+
+  it("keeps the legacy desktop license dialog and device inactivation", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("legacy-license");
+    mocks.getSubscriptionInfo.mockResolvedValue({
+      planType: null, status: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, isLegacy: true,
+    });
+    mocks.inactiveLicense.mockResolvedValue({ success: true });
+    mocks.cleanLicense.mockResolvedValue(undefined);
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    expect(await screen.findByText("Legacy")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("License Key")).toHaveAttribute("type", "password");
+    expect(screen.queryByRole("button", { name: "Manage Subscription" })).not.toBeInTheDocument();
+    const inactivate = screen.getByRole("button", { name: "Inactivate license" });
+    expect(inactivate).toHaveClass("border-destructive/40");
+    expect(inactivate).not.toHaveClass("bg-destructive");
+    fireEvent.click(inactivate);
+    expect(await screen.findByText("Current license binding on this device will be removed.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(mocks.inactiveLicense).toHaveBeenCalledWith("legacy-license"));
+  });
+
+  it("hides inactivation while subscription details are pending", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    mocks.getSubscriptionInfo.mockImplementation(() => new Promise(() => {}));
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Track3 Pro" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inactivate license" })).not.toBeInTheDocument();
+  });
+
+  it("warns that deactivation does not cancel Stripe when subscription details fail", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("subscriber-license");
+    mocks.getSubscriptionInfo.mockRejectedValue(new Error("offline"));
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Inactivate license" }));
+    expect(await screen.findByText(/This does not cancel your Stripe subscription/)).toBeInTheDocument();
+  });
+
   it("keeps subscription controls available when plan data is malformed", async () => {
     mocks.getSubscriptionPlans.mockResolvedValueOnce({});
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    expect(await screen.findByRole("heading", { name: "Upgrade to Pro" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Track3 Free" })).toBeInTheDocument();
     await waitFor(() => expect(mocks.getSubscriptionPlans).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("button", { name: /view pro benefits/i })).toBeInTheDocument();
   });
@@ -285,7 +345,7 @@ describe("System Info subscription management", () => {
     const onProStatusChange = vi.fn();
     render(<SystemInfo onProStatusChange={onProStatusChange} />);
     fireEvent.click(await screen.findByRole("button", { name: /subscribe yearly/i }));
-    await waitFor(() => expect(screen.getByText("Pro", { exact: true })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Track3 Pro" })).toBeInTheDocument());
     expect(mocks.saveLicense).toHaveBeenCalledWith("license-from-stripe");
     expect(onProStatusChange).toHaveBeenCalledWith(true);
     expect(screen.getByText(/subscription activated/i)).toBeInTheDocument();
@@ -356,7 +416,7 @@ describe("System Info subscription management", () => {
     render(<SystemInfo onProStatusChange={vi.fn()} />);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /^inactivate$/i }),
+      await screen.findByRole("button", { name: /^inactivate license$/i }),
     );
     fireEvent.click(await screen.findByRole("button", { name: /confirm/i }));
 
@@ -396,8 +456,8 @@ describe("System Info subscription management", () => {
 
     render(<SystemInfo onProStatusChange={vi.fn()} />);
 
-    expect(await screen.findByText("Subscription")).toBeInTheDocument();
-    expect(screen.getByText("Monthly")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Track3 Pro" })).toBeInTheDocument();
+    expect(screen.getByText(/Monthly plan/)).toBeInTheDocument();
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
 
     fireEvent.click(
@@ -421,5 +481,29 @@ describe("System Info subscription management", () => {
     render(<SystemInfo onProStatusChange={vi.fn()} />);
     fireEvent.click(await screen.findByRole("button", { name: /manage subscription/i }));
     await waitFor(() => expect(mocks.openUrl).toHaveBeenCalledWith("https://billing.stripe.test/portal"));
+  });
+
+  it("shows the renewal day count, keeps elapsed dates without a count, and colors past due status", async () => {
+    vi.setSystemTime(new Date("2026-10-28T12:00:00.000Z"));
+    try {
+      mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
+      mocks.getSubscriptionInfo.mockResolvedValue({
+        planType: "monthly", status: "past_due", currentPeriodEnd: "2026-10-29T00:00:00.000Z",
+        cancelAtPeriodEnd: false, isLegacy: false,
+      });
+      const view = render(<SystemInfo onProStatusChange={vi.fn()} />);
+      expect((await screen.findByText(/in 1 day/)).parentElement).toHaveTextContent("Monthly plan");
+      expect(screen.getByText("Past Due")).toHaveClass("text-amber-700");
+      view.unmount();
+      mocks.getSubscriptionInfo.mockResolvedValue({
+        planType: "monthly", status: "canceled", currentPeriodEnd: "2026-10-27T00:00:00.000Z",
+        cancelAtPeriodEnd: true, isLegacy: false,
+      });
+      render(<SystemInfo onProStatusChange={vi.fn()} />);
+      expect((await screen.findByText(/expires Oct 27, 2026/)).parentElement).toHaveTextContent("Monthly plan");
+      expect(screen.queryByText(/in 1 day/i)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
