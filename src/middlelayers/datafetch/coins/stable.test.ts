@@ -35,7 +35,7 @@ describe("stable coin queries", () => {
     ).resolves.toEqual(["USDT", "USDC"]);
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "GET",
-      "https://track3-pro-api.domc.me/api/coins/listStableCoins",
+      "https://api.track3.dev/api/coins/listStableCoins",
       10000,
       { "x-track3-client-id": "client-id" },
     );

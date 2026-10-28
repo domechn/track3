@@ -3,7 +3,7 @@ import { HttpRequestError } from "./http";
 import { classifySourceError, recordOptionalSourceFailure, recordSourceFailure, safePartialEndpoint, takeOptionalSourceFailures, takeSourceFailure } from "./source-failure";
 
 describe("source error categories", () => {
-  const proEndpoint = "https://track3-pro-api.domc.me/api/erc20/assetsBalances";
+  const proEndpoint = "https://api.track3.dev/api/erc20/assetsBalances";
 
   it("classifies a Pro API 500 as a service failure and preserves only approved detail", () => {
     const error = new HttpRequestError("Request failed", 500, undefined, {

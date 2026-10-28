@@ -195,7 +195,7 @@ describe("ERC20 analyzers", () => {
     ]);
     expect(sendHttpRequest).toHaveBeenCalledWith(
       "POST",
-      "https://track3-pro-api.domc.me/api/erc20/assetsBalances",
+      "https://api.track3.dev/api/erc20/assetsBalances",
       30000,
       {
         "x-track3-client-id": "client-id",

@@ -485,6 +485,8 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       };
       const requestUrl = new URL(request.url);
       const requestPath = requestUrl.pathname;
+      const proApi = requestUrl.origin === "https://api.track3.dev";
+      const currencyApi = requestUrl.origin === "https://currency-rate-api.track3.dev";
       if (requestUrl.hostname === "api.binance.com" || requestUrl.hostname === "fapi.binance.com") {
         if (requestPath !== "/api/v3/ticker/price" && requestPath !== "/api/v3/time") {
           const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
@@ -506,11 +508,11 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
         else if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/ticker/price") body = "[]";
         else if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/time") body = JSON.stringify({ serverTime: Date.now() });
         else throw new Error("unexpected Binance endpoint");
-      } else if (proUsageFixture && requestPath === "/api/stripe") {
+      } else if (proApi && proUsageFixture && requestPath === "/api/stripe") {
         const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
         if (input.action !== "customer-portal") throw new Error("unexpected Stripe portal request");
         body = '{"url":"https://billing.stripe.test/portal"}';
-      } else if (checkoutFixture && requestPath === "/api/stripe") {
+      } else if (proApi && checkoutFixture && requestPath === "/api/stripe") {
         const url = new URL(request.url);
         if (url.searchParams.get("action") === "checkout-status") {
           body = JSON.stringify(checkoutStatus === "completed"
@@ -524,13 +526,13 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
           checkoutSessions++;
           body = JSON.stringify({ sessionId: "cs_e2e_123", url: "https://checkout.stripe.test/session" });
         }
-      } else if (checkoutFixture && requestPath === "/api/license/validate") {
+      } else if (proApi && checkoutFixture && requestPath === "/api/license/validate") {
         body = '{"isValid":true}';
-      } else if (checkoutFixture && requestPath === "/api/license/active") {
+      } else if (proApi && checkoutFixture && requestPath === "/api/license/active") {
         body = '{"success":true}';
-      } else if (request.url.endsWith("/api/license/isPro")) {
+      } else if (proApi && requestPath === "/api/license/isPro") {
         body = '{"isPro":true}';
-      } else if (request.url.endsWith("/api/license")) {
+      } else if (proApi && requestPath === "/api/license") {
         const action = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? []))).action;
         body = action === "subscription-plans"
           ? '{"plans":[{"planType":"monthly","currency":"usd","unitAmountCents":1299,"interval":"month"},{"planType":"yearly","currency":"usd","unitAmountCents":9999,"interval":"year"}]}'
@@ -538,14 +540,16 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
             ? JSON.stringify({ enforced: true, usage })
             : JSON.stringify({ planType: "yearly", status: "active", currentPeriodEnd: "2026-12-01T00:00:00.000Z",
               cancelAtPeriodEnd: false, isLegacy: false, ...(proUsageFixture ? { usage } : {}) });
-      } else if (quotaExhaustedFixture && request.url.endsWith("/api/erc20/assetsBalances")) {
+      } else if (proApi && quotaExhaustedFixture && requestPath === "/api/erc20/assetsBalances") {
         status = 429;
         body = JSON.stringify({ error: "Monthly ERC20 wallet refresh limit reached", code: "USAGE_LIMIT_EXCEEDED",
           resource: "erc20", usage: { ...usage.erc20, used: 300, remaining: 0 } });
-      } else if (request.url.endsWith("/api/coins/price")) {
+      } else if (proApi && requestPath === "/api/coins/price") {
         body = '{"data":{"BTC":42000,"USDT":1}}';
-      } else if (request.url.endsWith("/api/coins/listStableCoins")) {
+      } else if (proApi && requestPath === "/api/coins/listStableCoins") {
         body = '{"data":[{"symbol":"USDT"},{"symbol":"USDC"}]}';
+      } else if (currencyApi && requestPath.startsWith("/api/currency-rate/")) {
+        body = '{"success":true,"base":"USD","rates":{"USD":1,"EUR":0.9}}';
       } else if (request.url.endsWith("/chat/completions")) {
         const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
         if (input.stream === true) {
