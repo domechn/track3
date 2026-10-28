@@ -1118,6 +1118,5 @@
   "onboarding.backup.sync": "Sync between devices is optional. It uses your own S3-compatible storage and is encrypted with your passphrase.",
   "onboarding.sources.body": "Add an exchange API key, a wallet address or Interactive Brokers. Then click Refresh: Track3 reads your balances and saves a snapshot.",
   "onboarding.deeper.pro": "The Assistant answers questions about your portfolio using an AI endpoint you set up.",
-  "onboarding.deeper.proBadge": "Pro",
   "onboarding.backup.body": "Your data lives on this device. Export it or choose an auto-backup folder in Settings → Data."
 }

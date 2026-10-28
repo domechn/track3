@@ -463,6 +463,7 @@
   .ios-d3-settings-page:has([id="sync-passphrase"]) button { font-size: 16px; }
   .ios-d3-settings-page .ios-d3-settings-content button { font-size: 16px; }
   .ios-d3-settings-note { margin: 8px 12px 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.4; }
+  .ios-d3-version-note { margin-bottom: 20px; }
   .ios-d3-backup-actions .mobile-inset-section { margin-bottom: 0; }
   .ios-d3-backup-actions .ios-d3-backup-import-section + .mobile-inset-section { margin-top: 26px; }
   .ios-d3-backup-actions .ios-d3-import-note { display: block; margin: 8px 12px 0; }

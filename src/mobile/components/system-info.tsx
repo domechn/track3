@@ -315,7 +315,7 @@ const App = ({
     <InsetGroup>
       <ListRow value={version}>{t("system.appVersion")}</ListRow>
     </InsetGroup>
-    <p className="ios-d3-settings-note">{t("system.appVersionNote")}</p>
+    <p className="ios-d3-settings-note ios-d3-version-note">{t("system.appVersionNote")}</p>
     <InsetGroup>
       <ListRow onClick={requestOnboardingReplay} data-testid="onboarding-replay">{t("onboarding.replay.action")}</ListRow>
     </InsetGroup>

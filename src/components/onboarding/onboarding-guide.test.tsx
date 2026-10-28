@@ -19,6 +19,7 @@ describe("onboarding guide", () => {
     expect(dialog.getAttribute("aria-labelledby")).toBe(screen.getByRole("heading", { name: "Welcome to Track3" }).id)
     expect(dialog.getAttribute("aria-describedby")).toBe(screen.getByText(/See your crypto and stocks/).id)
     expect(screen.getByTestId("onboarding-illustration-welcome")).toHaveAttribute("aria-hidden", "true")
+    expect(screen.getByRole("region", { name: "Welcome to Track3" })).toHaveAttribute("tabindex", "0")
   })
 
   it("moves forward and back with buttons and announces the new step", async () => {
@@ -40,7 +41,7 @@ describe("onboarding guide", () => {
     fireEvent.keyDown(dialog, { key: "ArrowLeft" })
     expect(dialog).toHaveAttribute("data-step", "deeper")
     expect(screen.getByText(/Assistant answers questions/)).toBeInTheDocument()
-    expect(dialog.querySelector(".ob-pro")).toHaveTextContent("Pro")
+    expect(dialog.querySelector(".ob-pro")).toHaveTextContent("PRO")
     fireEvent.keyDown(dialog, { key: "Escape" })
     await waitFor(() => expect(onClose).toHaveBeenCalledWith("skipped"))
   })

@@ -139,7 +139,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
           </motion.div>
           <div className="ob-body">
             {variant === "desktop" && <div className="ob-head">{counter}<Button type="button" variant="ghost" data-testid="onboarding-skip" onClick={skip} className="text-muted-foreground">{label}</Button></div>}
-            <motion.div key={`text-${id}-${reduced}`} className="ob-text" role={variant === "ios" ? "region" : undefined} aria-labelledby={variant === "ios" ? titleId : undefined} tabIndex={variant === "ios" ? 0 : undefined} data-testid={`onboarding-step-${id}`} initial={reduced ? { opacity: 0 } : { opacity: 0, x: direction * 12 }} animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }} transition={{ duration: reduced ? .15 : .24, ease: reduced ? "linear" : ease }}>
+            <motion.div key={`text-${id}-${reduced}`} className="ob-text" role="region" aria-labelledby={titleId} tabIndex={0} data-testid={`onboarding-step-${id}`} initial={reduced ? { opacity: 0 } : { opacity: 0, x: direction * 12 }} animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }} transition={{ duration: reduced ? .15 : .24, ease: reduced ? "linear" : ease }}>
               {variant === "ios" && counter}
               <Dialog.Title id={titleId} className="ob-title">{t(`onboarding.${id}.title`)}</Dialog.Title>
               <Dialog.Description className="ob-desc">{t(`onboarding.${id}.body`)}</Dialog.Description>
@@ -149,7 +149,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
                 <li><PointIcon kind="eye" />{t("onboarding.welcome.point.readOnly")}</li>
               </ul>}
               {id === "sources" && <p className="ob-note">{t("onboarding.sources.note")}</p>}
-              {id === "deeper" && variant === "desktop" && <p className="ob-note"><span className="ob-pro">{t("onboarding.deeper.proBadge")}</span>{t("onboarding.deeper.pro")}</p>}
+              {id === "deeper" && variant === "desktop" && <p className="ob-note"><span className="ob-pro">{t("app.proBadge")}</span>{t("onboarding.deeper.pro")}</p>}
               {id === "backup" && <p className="ob-note">{t("onboarding.backup.sync")}</p>}
             </motion.div>
             <div className="ob-foot">
