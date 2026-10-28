@@ -42,10 +42,20 @@ test("checkout status uses the new API domain", () => {
 });
 
 test("no HTML file contains the previous domain", () => {
-  const htmlFiles = readdirSync(root).filter((file) => file.endsWith(".html"));
+  // Google's verification token is plain text, not a site page.
+  const htmlFiles = readdirSync(root).filter(
+    (file) => file.endsWith(".html") && file !== "google4935d9759bd7d76d.html",
+  );
   const previousDomain = ["domc", "me"].join(".");
   assert.ok(htmlFiles.length > 0);
   for (const file of htmlFiles) {
     assert.ok(!read(file).includes(previousDomain), file);
   }
+});
+
+test("Google Search Console verification file has the exact token", () => {
+  assert.equal(
+    read("google4935d9759bd7d76d.html"),
+    "google-site-verification: google4935d9759bd7d76d.html\n",
+  );
 });
