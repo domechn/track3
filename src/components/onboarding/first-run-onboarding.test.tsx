@@ -66,6 +66,23 @@ it("defers opening while hidden", async () => {
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" })
   }
 })
+it("checks again when readiness returns after removing a deferred visibility listener", async () => {
+  Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" })
+  const listen = vi.spyOn(document, "addEventListener")
+  try {
+    const { rerender } = render(<App ready />)
+    await waitFor(() => expect(listen.mock.calls.filter(([name]) => name === "visibilitychange")).toHaveLength(1))
+    rerender(<App ready={false} />)
+    rerender(<App ready />)
+    await waitFor(() => expect(listen.mock.calls.filter(([name]) => name === "visibilitychange")).toHaveLength(2))
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" })
+    fireEvent(document, new Event("visibilitychange"))
+    await waitFor(() => expect(screen.getByTestId("onboarding-dialog")).toBeVisible())
+  } finally {
+    listen.mockRestore()
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" })
+  }
+})
 it("does not open after another window writes the flag while hidden", async () => {
   Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" })
   const listen = vi.spyOn(document, "addEventListener")

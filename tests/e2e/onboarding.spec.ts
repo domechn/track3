@@ -11,6 +11,9 @@ test("fresh desktop guide skips once, supports keyboard, and traps focus", async
   await page.goto("/#/overview")
   const dialog = page.getByTestId("onboarding-dialog")
   await expect(dialog).toHaveAttribute("data-step", "welcome")
+  mkdirSync("test-results/desktop", { recursive: true })
+  await page.waitForTimeout(2800)
+  await page.screenshot({ path: "test-results/desktop/onboarding-welcome-light-en.png" })
   for (let i = 0; i < 6; i++) {
     await page.keyboard.press("Tab")
     expect(await page.evaluate(() => document.querySelector('[data-testid="onboarding-dialog"]')?.contains(document.activeElement))).toBe(true)

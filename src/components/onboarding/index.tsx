@@ -72,8 +72,11 @@ export default function FirstRunOnboarding({ variant, ready }: { variant: "deskt
     }
     return () => {
       mounted.current = false
-      removeVisibility.current?.()
-      removeVisibility.current = undefined
+      if (removeVisibility.current) {
+        removeVisibility.current()
+        removeVisibility.current = undefined
+        checked.current = false
+      }
     }
   }, [ready])
 

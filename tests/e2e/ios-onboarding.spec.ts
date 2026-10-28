@@ -75,6 +75,10 @@ test("replay opens from mobile About", async ({ page }) => {
   await installTauriBridge(page)
   await page.goto("/#/settings/systemInfo?section=about")
   const replay = page.getByTestId("onboarding-replay")
+  await expect(replay).toBeVisible()
+  await page.waitForTimeout(350)
+  mkdirSync("test-results/mobile", { recursive: true })
+  await page.screenshot({ path: "test-results/mobile/onboarding-replay-about-light-390.png" })
   await replay.click()
   await expect(page.getByTestId("onboarding-dialog")).toHaveAttribute("data-step", "welcome")
   await page.keyboard.press("Escape")
@@ -84,7 +88,10 @@ test("replay opens from mobile About", async ({ page }) => {
 test("startup lock hides the guide", async ({ page }) => {
   await installTauriBridge(page, { lockedStartup: true, onboarding: true, emptyPortfolio: true })
   await page.goto("/#/overview")
+  await expect(page.getByRole("alert")).toContainText("Track3 is locked")
+  await page.waitForTimeout(3000)
   await expect(page.getByTestId("onboarding-dialog")).toHaveCount(0)
+  expect(await page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBeNull()
 })
 
 test("dark Chinese phone guide keeps the same layout and copy", async ({ page }) => {
