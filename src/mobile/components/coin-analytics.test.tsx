@@ -384,7 +384,7 @@ it("shows a compact phone identity, 24h price change, and an unbroken transactio
   expect(history).toHaveTextContent("Apr 15");
   fireEvent.click(history.querySelector(".mobile-list-row")!);
   expect(await screen.findByRole("dialog", { name: "Apr 15" }, { timeout: 5000 })).toHaveTextContent("2024");
-}, 15000);
+});
 
 it("anchors the prior-day coin price to the latest snapshot instead of the range end", async () => {
   mocks.queryAllDataDates.mockResolvedValue([

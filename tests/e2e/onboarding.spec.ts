@@ -140,6 +140,63 @@ test("source and backup checks use the illustration accent", async ({ page }) =>
   await expect(page.getByTestId("onboarding-illustration-backup").locator('circle[cx="282"][cy="108"]')).toHaveCSS("fill", "rgb(99, 102, 241)")
 })
 
+test("source controls stay anchored while Refresh animates", async ({ page }) => {
+  await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
+  await page.goto("/#/overview")
+  const dialog = page.getByTestId("onboarding-dialog")
+  await expect(dialog).toHaveAttribute("data-step", "welcome")
+  await dialog.press("ArrowRight")
+  await expect(dialog).toHaveAttribute("data-step", "sources")
+  await page.waitForTimeout(1550)
+  mkdirSync("test-results/desktop", { recursive: true })
+  await page.screenshot({ path: "test-results/desktop/onboarding-sources-mid-motion.png" })
+  const anchored = await page.getByTestId("onboarding-illustration-sources").evaluate((svg) => {
+    const pill = svg.querySelector<SVGRectElement>('rect[x="196"][y="31"]')!.getBoundingClientRect()
+    const icon = svg.querySelector<SVGPathElement>('path[d^="M216.5"]')!.parentElement!.getBoundingClientRect()
+    const track = svg.querySelector<SVGRectElement>('rect[x="54"][y="66"][fill="var(--ill-bar)"]')!.getBoundingClientRect()
+    const fill = svg.querySelector<SVGRectElement>('rect[x="54"][y="66"][fill="var(--ill-1)"]')!.getBoundingClientRect()
+    return {
+      iconInsidePill: icon.left >= pill.left && icon.right <= pill.right && icon.top >= pill.top && icon.bottom <= pill.bottom,
+      fillStartsAtLeft: Math.abs(fill.left - track.left) < 2,
+    }
+  })
+  expect(anchored.iconInsidePill).toBe(true)
+  expect(anchored.fillStartsAtLeft).toBe(true)
+})
+
+test("rebalance bars remain inside their tile while settling", async ({ page }) => {
+  await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
+  await page.goto("/#/overview")
+  const dialog = page.getByTestId("onboarding-dialog")
+  await expect(dialog).toHaveAttribute("data-step", "welcome")
+  for (let i = 0; i < 3; i++) await dialog.press("ArrowRight")
+  await expect(dialog).toHaveAttribute("data-step", "deeper")
+  await page.waitForTimeout(1050)
+  mkdirSync("test-results/desktop", { recursive: true })
+  await page.screenshot({ path: "test-results/desktop/onboarding-deeper-mid-motion.png" })
+  const barsInsideTile = await page.getByTestId("onboarding-illustration-deeper").evaluate((svg) => {
+    const tile = svg.querySelector<SVGRectElement>('rect[x="20"][y="124"]')!.getBoundingClientRect()
+    return [...svg.querySelectorAll<SVGRectElement>('rect[y="172"][height="34"]')].every((bar) => {
+      const rect = bar.getBoundingClientRect()
+      return rect.left >= tile.left && rect.right <= tile.right && rect.top >= tile.top && rect.bottom <= tile.bottom
+    })
+  })
+  expect(barsInsideTile).toBe(true)
+})
+
+test("shield pulse ring is hidden until its cue", async ({ page }) => {
+  await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
+  await page.goto("/#/overview")
+  const dialog = page.getByTestId("onboarding-dialog")
+  await expect(dialog).toHaveAttribute("data-step", "welcome")
+  await dialog.press("ArrowRight")
+  await dialog.press("ArrowLeft")
+  const ring = page.getByTestId("onboarding-illustration-welcome").locator('circle[cx="246"][cy="170"][r="40"]')
+  await expect(ring).toBeAttached()
+  await page.waitForTimeout(300)
+  expect(await ring.evaluate((node) => getComputedStyle(node).opacity)).toBe("0")
+})
+
 for (const theme of ["light", "dark"] as const) {
   test(`all guide steps pass axe with reduced motion in ${theme}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce", colorScheme: theme })

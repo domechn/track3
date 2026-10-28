@@ -149,6 +149,29 @@ test("phone tab order names its scrollable text before the primary action", asyn
   await expect(page.getByTestId("onboarding-next")).toBeFocused()
 })
 
+test("bell pulse ring is hidden until its cue", async ({ page }) => {
+  await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
+  await page.goto("/#/overview")
+  const dialog = page.getByTestId("onboarding-dialog")
+  await expect(dialog).toHaveAttribute("data-step", "welcome")
+  for (let i = 0; i < 3; i++) await dialog.press("ArrowRight")
+  await expect(dialog).toHaveAttribute("data-step", "deeper")
+  const ring = page.getByTestId("onboarding-illustration-deeper").locator('circle[cx="246"][cy="163"][r="10"]')
+  await expect(ring).toBeAttached()
+  await page.waitForTimeout(300)
+  mkdirSync("test-results/mobile", { recursive: true })
+  await page.screenshot({ path: "test-results/mobile/onboarding-deeper-before-bell.png" })
+  expect(await ring.evaluate((node) => getComputedStyle(node).opacity)).toBe("0")
+})
+
+test("tall phone text has no bottom fade mask", async ({ page }) => {
+  await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
+  await page.goto("/#/overview")
+  const dialog = page.getByTestId("onboarding-dialog")
+  await expect(dialog).toHaveAttribute("data-step", "welcome")
+  expect(await dialog.locator(".ob-text").evaluate((text) => getComputedStyle(text).maskImage)).toBe("none")
+})
+
 for (const theme of ["light", "dark"] as const) {
   test(`360px phone and landscape guide pass axe in ${theme}`, async ({ page }) => {
     await page.addInitScript((theme) => localStorage.setItem("track3-ui-theme", theme), theme)

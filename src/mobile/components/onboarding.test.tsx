@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
-import { beforeEach, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { I18nProvider as MobileI18nProvider } from "@/mobile/i18n"
 import { queryLastRefreshAt } from "@/middlelayers/charts"
 import { getConfiguration } from "@/middlelayers/configuration"
@@ -25,6 +25,10 @@ beforeEach(() => {
   localStorage.removeItem("track3-ui-locale")
   vi.mocked(queryLastRefreshAt).mockReset().mockResolvedValue(undefined)
   vi.mocked(getConfiguration).mockReset().mockResolvedValue(undefined)
+})
+afterEach(async () => {
+  cleanup()
+  await new Promise((resolve) => setTimeout(resolve, 0))
 })
 it("uses iPhone Refresh and Backup copy, omits Pro, and navigates to Sources", async () => {
   render(<App />)

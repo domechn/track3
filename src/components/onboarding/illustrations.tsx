@@ -20,7 +20,7 @@ function Bar({ x, y, width, height = 6, fill = V.bar }: { x: number; y: number; 
   return <rect x={x} y={y} width={width} height={height} rx={height / 2} fill={fill} />
 }
 function Check({ x, y, r = 8, reduced, delay }: { x: number; y: number; r?: number; reduced: boolean; delay: number }) {
-  return <motion.g style={{ transformBox: "fill-box", transformOrigin: "center" }} {...anim(reduced, { opacity: 0, scale: .85 }, delay, .22)}>
+  return <motion.g {...anim(reduced, { opacity: 0, scale: .85 }, delay, .22)}>
     <circle cx={x} cy={y} r={r} fill={V.one} />
     <path d={`M${x - r * .38} ${y}l${r * .25} ${r * .28} ${r * .47} -${r * .55}`} stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </motion.g>
@@ -31,17 +31,17 @@ function Svg({ id, reduced, children }: { id: StepId; reduced: boolean; children
 
 function Welcome({ reduced }: Props) {
   return <Svg id="welcome" reduced={reduced}>
-    <motion.g style={{ transformBox: "fill-box", transformOrigin: "center" }} {...anim(reduced, { opacity: 0, scale: .96 }, 0, .45)}>
+    <motion.g {...anim(reduced, { opacity: 0, scale: .96 }, 0, .45)}>
       <rect x="52" y="34" width="200" height="146" rx="14" fill={V.surface} stroke={V.line} />
       <Bar x={70} y={52} width={54} />
     </motion.g>
-    <motion.rect x="70" y="68" width="98" height="14" rx="5" fill={V.ink} style={{ transformBox: "fill-box", transformOrigin: "left center" }} {...anim(reduced, { scaleX: 0 }, .2, .42)} />
+    <motion.rect x="70" y="68" width="98" height="14" rx="5" fill={V.ink} style={{ originX: 0 }} {...anim(reduced, { scaleX: 0 }, .2, .42)} />
     {[0, 1, 2].map((i) => <motion.g key={i} {...anim(reduced, { opacity: 0, y: 10 }, .32 + i * .12, .38)}>
       <circle cx="78" cy={106 + i * 24} r="6" fill={[V.one, V.two, V.three][i]} />
       <Bar x={92} y={102.5 + i * 24} width={66 - i * 10} />
       <Bar x={198} y={102.5 + i * 24} width={38 - i * 6} />
     </motion.g>)}
-    {!reduced && <motion.circle cx="246" cy="170" r="40" stroke={V.one} strokeWidth="2" style={{ transformBox: "fill-box", transformOrigin: "center" }} initial={{ opacity: .5, scale: .8 }} animate={{ opacity: 0, scale: 1.3 }} transition={{ delay: 1.75, duration: .8, ease }} />}
+    {!reduced && <motion.circle cx="246" cy="170" r="40" stroke={V.one} strokeWidth="2" initial={{ opacity: 0, scale: .8 }} animate={{ opacity: [0, .5, 0], scale: [.8, 1.3] }} transition={{ delay: 1.75, duration: .8, times: [0, .01, 1], ease }} />}
     <motion.g {...anim(reduced, { opacity: 0, y: 10 }, .9, .45)}>
       <path d="M246 128l32 11.5v25c0 21-13.5 35-32 42.5-18.5-7.5-32-21.5-32-42.5v-25z" fill={V.one} />
       <rect x="233" y="160" width="26" height="20" rx="5" fill="#fff" />
@@ -53,15 +53,15 @@ function Welcome({ reduced }: Props) {
 
 function Sources({ reduced }: Props) {
   return <Svg id="sources" reduced={reduced}>
-    <motion.g style={{ transformBox: "fill-box", transformOrigin: "center" }} {...anim(reduced, { opacity: 0, scale: .96 }, 0, .4)}>
+    <motion.g {...anim(reduced, { opacity: 0, scale: .96 }, 0, .4)}>
       <rect x="36" y="20" width="248" height="200" rx="14" fill={V.surface} stroke={V.line} />
       <Bar x={54} y={40} width={64} height={8} />
       <rect x="54" y="66" width="212" height="4" rx="2" fill={V.bar} />
     </motion.g>
-    <motion.rect x="54" y="66" width="212" height="4" rx="2" fill={V.one} style={{ transformBox: "fill-box", transformOrigin: "left center" }} {...anim(reduced, { scaleX: 0 }, 1.35, .9, "easeInOut")} />
-    <motion.g initial={reduced ? false : { scale: 1 }} animate={reduced ? undefined : { scale: [1, .95, 1] }} transition={{ delay: 1.2, duration: .18, ease }} style={{ transformBox: "fill-box", transformOrigin: "center" }}>
+    <motion.rect x="54" y="66" width="212" height="4" rx="2" fill={V.one} style={{ originX: 0 }} {...anim(reduced, { scaleX: 0 }, 1.35, .9, "easeInOut")} />
+    <motion.g initial={reduced ? false : { scale: 1 }} animate={reduced ? undefined : { scale: [1, .95, 1] }} transition={{ delay: 1.2, duration: .18, ease }}>
       <rect x="196" y="31" width="70" height="26" rx="8" fill="hsl(var(--primary))" />
-      <motion.g initial={reduced ? false : { rotate: -360 }} animate={reduced ? undefined : { rotate: 0 }} transition={{ delay: 1.35, duration: .9, ease: "easeInOut" }} style={{ transformBox: "fill-box", transformOrigin: "center" }}>
+      <motion.g initial={reduced ? false : { rotate: -360 }} animate={reduced ? undefined : { rotate: 0 }} transition={{ delay: 1.35, duration: .9, ease: "easeInOut" }}>
         <path d="M216.5 41.2a6 6 0 1 0 1.4 4.8" stroke="hsl(var(--primary-foreground))" strokeWidth="1.8" strokeLinecap="round" />
         <path d="M217.6 37.6v3.8h-3.8" stroke="hsl(var(--primary-foreground))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </motion.g>
@@ -88,7 +88,7 @@ function History({ reduced }: Props) {
     <motion.g {...anim(reduced, { opacity: 0 }, 2.3, .3)}><rect x="122" y="29" width="50" height="16" rx="8" fill={V.one} fillOpacity=".14" /><text x="147" y="40.5" textAnchor="middle" fontSize="10" fontWeight="700" fill={V.one} fontFamily="system-ui, sans-serif">+4.2%</text></motion.g>
     <motion.path d={`${line}L282 122L36 122Z`} fill={`url(#area-${id})`} {...anim(reduced, { opacity: 0 }, .8, .5)} />
     <motion.path d={line} pathLength={1} strokeDasharray={1} stroke={V.one} strokeWidth="2.5" strokeLinecap="round" initial={reduced ? false : { pathLength: 0 }} animate={reduced ? undefined : { pathLength: 1 }} transition={{ duration: 1.2, ease: "easeInOut" }} />
-    <motion.circle cx="282" cy="54" r="4.5" fill={V.one} stroke={V.surface} strokeWidth="2" style={{ transformBox: "fill-box", transformOrigin: "center" }} {...anim(reduced, { opacity: 0, scale: .85 }, 1.15, .22)} />
+    <motion.circle cx="282" cy="54" r="4.5" fill={V.one} stroke={V.surface} strokeWidth="2" {...anim(reduced, { opacity: 0, scale: .85 }, 1.15, .22)} />
     <rect x="20" y="142" width="280" height="88" rx="14" fill={V.surface} stroke={V.line} />
     {[1, 2, 3].map((n) => {
       const y = 152 + (n - 1) * 24
@@ -109,20 +109,20 @@ function Deeper({ variant, reduced }: Props) {
   return <Svg id="deeper" reduced={reduced}>
     {[[20, 14], [166, 14], [20, 124], [166, 124]].map(([x, y], i) => <motion.rect key={i} x={x} y={y} width="134" height="102" rx="14" fill={V.surface} stroke={V.line} {...anim(reduced, { opacity: 0, y: 10 }, i * .1, .4)} />)}
     <Bar x={36} y={30} width={52} />
-    {[0, 1, 2].map((i) => <motion.rect key={i} x="36" y={52 + i * 17} width={100 - i * 18} height="11" rx="4" fill={[V.one, V.two, V.four][i]} fillOpacity=".9" style={{ transformBox: "fill-box", transformOrigin: "left center" }} {...anim(reduced, { scaleX: 0 }, .6 + i * .15, .45)} />)}
+    {[0, 1, 2].map((i) => <motion.rect key={i} x="36" y={52 + i * 17} width={100 - i * 18} height="11" rx="4" fill={[V.one, V.two, V.four][i]} fillOpacity=".9" style={{ originX: 0 }} {...anim(reduced, { scaleX: 0 }, .6 + i * .15, .45)} />)}
     <Bar x={182} y={30} width={40} />
     <circle cx="233" cy="76" r="22" stroke={V.bar} strokeWidth="7" />
     <g transform="rotate(-90 233 76)"><motion.circle cx="233" cy="76" r="22" stroke={V.one} strokeWidth="7" strokeLinecap="round" initial={reduced ? false : { strokeDasharray: "0 138.23" }} animate={reduced ? undefined : { strokeDasharray: "99.5 138.23" }} transition={{ delay: .7, duration: 1.2, ease: "easeInOut" }} strokeDasharray={reduced ? "99.5 138.23" : undefined} /></g>
     <text x="233" y="80" textAnchor="middle" fontSize="11" fontWeight="700" fill={V.ink} fontFamily="system-ui, sans-serif">72%</text>
     <Bar x={36} y={140} width={56} />
     <path d="M36 172H138" stroke="hsl(var(--muted-foreground))" strokeOpacity=".6" strokeDasharray="3 3" />
-    {[1.5, .55, .9].map((scaleY, i) => <motion.rect key={i} x={46 + i * 30} y="172" width="18" height="34" rx="4" fill={[V.one, V.two, V.three][i]} style={{ transformBox: "fill-box", transformOrigin: "center bottom" }} {...anim(reduced, { scaleY }, .9, 1.1, "easeInOut")} />)}
+    {[1.5, .55, .9].map((scaleY, i) => <motion.rect key={i} x={46 + i * 30} y="172" width="18" height="34" rx="4" fill={[V.one, V.two, V.three][i]} style={{ originY: 1 }} {...anim(reduced, { scaleY }, .9, 1.1, "easeInOut")} />)}
     <Bar x={182} y={140} width={variant === "ios" ? 44 : 36} />
     {variant === "ios" ? <>
       <path d="M233 160c-9 0-14 7-14 15v9l-4 6h36l-4-6v-9c0-8-5-15-14-15z" fill="hsl(var(--muted-foreground) / .3)" />
       <path d="M228 194a5 5 0 0 0 10 0" stroke="hsl(var(--muted-foreground) / .5)" strokeWidth="2.5" strokeLinecap="round" />
-      {!reduced && <motion.circle cx="246" cy="163" r="10" stroke={V.one} strokeWidth="2" style={{ transformBox: "fill-box", transformOrigin: "center" }} initial={{ opacity: .5, scale: .8 }} animate={{ opacity: 0, scale: 1.3 }} transition={{ delay: 1.9, duration: .7, ease }} />}
-      <motion.circle cx="246" cy="163" r="6" fill={V.one} style={{ transformBox: "fill-box", transformOrigin: "center" }} {...anim(reduced, { opacity: 0, scale: .85 }, 1.7, .24)} />
+      {!reduced && <motion.circle cx="246" cy="163" r="10" stroke={V.one} strokeWidth="2" initial={{ opacity: 0, scale: .8 }} animate={{ opacity: [0, .5, 0], scale: [.8, 1.3] }} transition={{ delay: 1.9, duration: .7, times: [0, .01, 1], ease }} />}
+      <motion.circle cx="246" cy="163" r="6" fill={V.one} {...anim(reduced, { opacity: 0, scale: .85 }, 1.7, .24)} />
     </> : <>
       <rect x="254" y="134" width="30" height="16" rx="8" stroke="hsl(var(--muted-foreground) / .6)" />
       <text x="269" y="145.5" textAnchor="middle" fontSize="9" fontWeight="600" fill={V.ink} fontFamily="system-ui, sans-serif">Pro</text>
@@ -148,8 +148,8 @@ function Backup({ reduced }: Props) {
     <g opacity=".9">
       <path d="M84 190H236" stroke="hsl(var(--muted-foreground) / .7)" strokeWidth="2" strokeDasharray="4 5" mask={`url(#sync-${id})`} />
       <motion.g {...anim(reduced, { opacity: 0, y: 10 }, 1.5, .35)}><rect x="52" y="168" width="30" height="46" rx="7" fill={V.surface} stroke={V.line} /><Bar x={62} y={207} width={10} height={2.5} /><rect x="238" y="168" width="30" height="46" rx="7" fill={V.surface} stroke={V.line} /><Bar x={248} y={207} width={10} height={2.5} /></motion.g>
-      <motion.g style={{ transformBox: "fill-box", transformOrigin: "center" }} {...anim(reduced, { opacity: 0, scale: .96 }, 1.8, .35)}><path d="M140 204h40a13 13 0 0 0 1.5-25.9A19 19 0 0 0 145 176a14 14 0 0 0-5 28z" fill={V.surface} stroke={V.line} strokeWidth="1.5" /></motion.g>
-      <motion.g style={{ transformBox: "fill-box", transformOrigin: "center" }} {...anim(reduced, { opacity: 0, scale: .85 }, 2.2, .26)}><rect x="153" y="185" width="16" height="13" rx="3" fill={V.one} /><path d="M156.5 185v-3.5a4.5 4.5 0 0 1 9 0v3.5" stroke={V.one} strokeWidth="2" strokeLinecap="round" /></motion.g>
+      <motion.g {...anim(reduced, { opacity: 0, scale: .96 }, 1.8, .35)}><path d="M140 204h40a13 13 0 0 0 1.5-25.9A19 19 0 0 0 145 176a14 14 0 0 0-5 28z" fill={V.surface} stroke={V.line} strokeWidth="1.5" /></motion.g>
+      <motion.g {...anim(reduced, { opacity: 0, scale: .85 }, 2.2, .26)}><rect x="153" y="185" width="16" height="13" rx="3" fill={V.one} /><path d="M156.5 185v-3.5a4.5 4.5 0 0 1 9 0v3.5" stroke={V.one} strokeWidth="2" strokeLinecap="round" /></motion.g>
     </g>
   </Svg>
 }

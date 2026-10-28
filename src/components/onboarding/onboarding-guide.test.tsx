@@ -41,7 +41,7 @@ describe("onboarding guide", () => {
     fireEvent.keyDown(dialog, { key: "ArrowLeft" })
     expect(dialog).toHaveAttribute("data-step", "deeper")
     expect(screen.getByText(/Assistant answers questions/)).toBeInTheDocument()
-    expect(dialog.querySelector(".ob-pro")).toHaveTextContent("PRO")
+    expect(dialog.querySelector(".ob-pro")).toHaveTextContent("Pro")
     fireEvent.keyDown(dialog, { key: "Escape" })
     await waitFor(() => expect(onClose).toHaveBeenCalledWith("skipped"))
   })
