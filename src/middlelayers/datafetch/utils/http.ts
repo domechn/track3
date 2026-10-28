@@ -6,12 +6,17 @@ const ERROR_DETAIL_MAX_LENGTH = 200;
 export class HttpRequestError extends Error {
   status?: number;
   retryAfterMs?: number;
+  endpoint?: string;
+  serverMessage?: string;
 
-  constructor(message: string, status?: number, retryAfterMs?: number) {
+  constructor(message: string, status?: number, retryAfterMs?: number,
+    details?: { endpoint: string; serverMessage?: string }) {
     super(message);
     this.name = "HttpRequestError";
     this.status = status;
     this.retryAfterMs = retryAfterMs;
+    this.endpoint = details?.endpoint;
+    this.serverMessage = details?.serverMessage;
   }
 }
 
@@ -235,6 +240,7 @@ async function performHttpRequest<T>(
         createHttpErrorMessage(method, url, response.status, responseText),
         response.status,
         retryAfterMs,
+        { endpoint: getSafeEndpoint(url), serverMessage: extractErrorDetail(responseText) },
       );
     }
 

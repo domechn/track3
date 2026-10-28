@@ -63,6 +63,24 @@ beforeEach(() => {
 });
 
 describe("per-source refresh", () => {
+  it("reports a Pro ERC20 provider configuration failure with an approved detail", async () => {
+    scenario.load = async () => {
+      throw new HttpRequestError("Request failed", 500, undefined, {
+        endpoint: "https://track3-pro-api.domc.me/api/erc20/assetsBalances",
+        serverMessage: "ERC20 balance provider is not configured",
+      });
+    };
+    const result = await fetchPortfolios({
+      ...config, btc: { addresses: [] }, erc20: { addresses: ["erc-a"] },
+    }, vi.fn(), { isPro: true, license: "pro" });
+    expect(result.sourceResults?.[0]).toMatchObject({
+      sourceId: "erc20:0", status: "stale", category: "service",
+      detail: "ERC20 balance provider is not configured",
+    });
+    expect(result.failedSources[0]).toMatchObject({ category: "service", error: "service" });
+    expect(JSON.stringify(result)).not.toContain("Request failed");
+  });
+
   it("skips later Pro wallets of an exhausted resource while other chains continue", async () => {
     scenario.load = async (id) => {
       if (id === "erc-a") throw new HttpRequestError("code USAGE_LIMIT_EXCEEDED", 429);
