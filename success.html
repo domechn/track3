@@ -16,10 +16,10 @@
       content="Check a Track3 Pro checkout and find your license key if one was issued."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://track3.domc.me/success.html" />
+    <meta property="og:url" content="https://track3.dev/success.html" />
     <meta
       property="og:image"
-      content="https://track3.domc.me/images/social-overview.jpg"
+      content="https://track3.dev/images/social-overview.jpg"
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Checkout status — Track3 Pro" />
@@ -29,9 +29,9 @@
     />
     <meta
       name="twitter:image"
-      content="https://track3.domc.me/images/social-overview.jpg"
+      content="https://track3.dev/images/social-overview.jpg"
     />
-    <link rel="canonical" href="https://track3.domc.me/success.html" />
+    <link rel="canonical" href="https://track3.dev/success.html" />
     <link rel="icon" type="image/png" href="images/app-icon.png" />
     <link rel="stylesheet" href="site.css" />
       <script>
@@ -226,7 +226,7 @@
         const copy = document.getElementById("copyLicense");
         const copyFeedback = document.getElementById("copyFeedback");
         const endpoint =
-          "https://track3-pro-api.domc.me/api/stripe?action=checkout-status&session_id=" +
+          "https://api.track3.dev/api/stripe?action=checkout-status&session_id=" +
           encodeURIComponent(sessionId);
         let deadline;
         let failures;
