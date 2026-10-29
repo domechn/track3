@@ -146,7 +146,7 @@ describe("charts asset type handling", () => {
       end: new Date("2024-04-30T00:00:00.000Z"),
     };
 
-    vi.mocked(ASSET_HANDLER.listAssetsMaxCreatedAt).mockResolvedValue([
+    vi.mocked(ASSET_HANDLER.listAssetsMaxCreatedAt).mockResolvedValueOnce([
       {
         id: 10,
         uuid: "latest-stock",
@@ -169,7 +169,7 @@ describe("charts asset type handling", () => {
         price: 100000,
         wallet: "wallet-1",
       },
-    ] as never);
+    ] as never).mockResolvedValueOnce([]);
 
     vi.mocked(ASSET_HANDLER.listAssetsMinCreatedAt).mockResolvedValue([
       {

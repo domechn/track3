@@ -1,5 +1,11 @@
 # Release review notes
 
+## Profit Summary correction
+
+Historical profit figures may change because they were wrong. Period profit now includes held coins with no balance change, starts from the last snapshot at or before the period start, prices relabeled deposits as acquisitions, and excludes paired own-wallet transfers from the buy and sell averages.
+
+With price-only changes and deposits counted at their snapshot prices, twelve calendar months add up to the year when the same snapshots and end boundaries are used. This equality is not guaranteed when there are sales and later buys: each selected range computes its own average buy price from opening holdings at that range's market price and buys within the range. Missing snapshots or prices also prevent a meaningful comparison.
+
 ## Sync acceptance follow-up (0.9.0)
 
 | Finding | Disposition |
