@@ -250,9 +250,9 @@ const App = ({
   const [costAvgPrice, setCostAvgPrice] = useState<number>(0);
   const [sellAvgPrice, setSellAvgPrice] = useState<number>(0);
 
-  const [profit, setProfit] = useState<number>(0);
+  const [profit, setProfit] = useState<number | null>(0);
   const [profitPercentage, setProfitPercentage] = useState<
-    number | undefined
+    number | null | undefined
   >();
 
   const [updateTxnId, setUpdateTxnId] = useState<number>(0);
@@ -410,6 +410,7 @@ const App = ({
   }, [transactions]);
 
   const breakevenPrice = useMemo(() => {
+    if (profit === null) return null;
     if (!lastAsset) {
       return;
     }
@@ -421,7 +422,7 @@ const App = ({
 
   const breakEvenPriceStr = useMemo(
     () =>
-      breakevenPrice === undefined
+      breakevenPrice === null ? "—" : breakevenPrice === undefined
         ? "∞"
         : currency.symbol +
           prettyPriceNumberToLocaleString(
@@ -498,7 +499,7 @@ const App = ({
 
   const profitStr = useMemo(
     () =>
-      currency.symbol +
+      profit === null ? "—" : currency.symbol +
       prettyNumberToLocaleString(currencyWrapper(currency)(profit)),
     [currency, profit],
   );
@@ -513,7 +514,7 @@ const App = ({
   );
 
   const profitRate = useMemo(
-    () => (profitPercentage ? profitPercentage.toFixed(2) : 0),
+    () => profitPercentage === null ? "—" : (profitPercentage ? profitPercentage.toFixed(2) : 0),
     [profitPercentage],
   );
 
@@ -1170,12 +1171,12 @@ const App = ({
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis"
-                    data-tone={profit > 0 ? "gain" : profit < 0 ? "loss" : "neutral"}>
-                    {isMobile ? formatPhoneMoney(currencyWrapper(currency)(profit), currency.symbol, true) : profitStr}
+                    data-tone={profit === null ? "neutral" : profit > 0 ? "gain" : profit < 0 ? "loss" : "neutral"}>
+                    {isMobile && profit !== null ? formatPhoneMoney(currencyWrapper(currency)(profit), currency.symbol, true) : profitStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
                     <div>{t("coin.profitRate")}</div>
-                    <div>{profitRate}%</div>
+                    <div>{profitRate}{profitPercentage === null ? "" : "%"}</div>
                   </div>
                 </CardContent>
               </Card>

@@ -18,6 +18,7 @@ import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { filterByAssetType } from "./charts-shared";
 import { executeWrite } from "./database";
+import { fromStoredTransactions } from "./cost-basis";
 
 const TOTAL_PROFIT_CACHE_TTL_SECONDS = 15 * 60;
 const TOTAL_PROFIT_CACHE_SESSION_ID =
@@ -26,18 +27,18 @@ const TOTAL_PROFIT_CACHE_SESSION_ID =
 
 type TotalProfit = {
   // total profit
-  total: number;
+  total: number | null;
   // total profit percentage
   // if it is undefined, means "∞"
-  percentage?: number;
+  percentage?: number | null;
   coins: {
     symbol: string;
     assetType: AssetType;
     // coin profit
-    value: number;
+    value: number | null;
     // coin profit percentage
     // if it is undefined, means "∞"
-    percentage?: number;
+    percentage?: number | null;
 
     buyAmount: number;
     sellAmount: number;
@@ -136,6 +137,9 @@ export async function calculateTotalProfit(
     )).flat(),
     assetType,
   );
+  const transferIds = new Set(fromStoredTransactions(allTransactions)
+    .filter((event) => event.type === "transfer-in" || event.type === "transfer-out")
+    .map((event) => event.id));
   // todo: handle if one asset has multiple transactions
   const allTransactionsAssetIdMap = Object.fromEntries(
     allTransactions.map((t) => [t.assetID, t]),
@@ -172,7 +176,7 @@ export async function calculateTotalProfit(
     });
 
   const groupedTransactions = Array.from(
-    allTransactions.reduce((map, txn) => {
+    allTransactions.filter((txn) => !transferIds.has(String(txn.id))).reduce((map, txn) => {
       const key = getAssetIdentity(txn);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(txn);
@@ -194,6 +198,7 @@ export async function calculateTotalProfit(
     return {
       symbol: first?.symbol ?? "",
       assetType: getAssetType(first),
+      unknownDisposal: txns.some((txn) => txn.txnType === "withdraw"),
       latest: dateRangeAssets.find(
         (a) =>
           a.symbol === first?.symbol && a.assetType === getAssetType(first),
@@ -259,18 +264,20 @@ export async function calculateTotalProfit(
       return {
         symbol: d.symbol,
         assetType: d.assetType,
-        value: realizedProfit + unrealizedProfit,
+        value: d.unknownDisposal ? null : realizedProfit + unrealizedProfit,
         realSpentValue: cost,
         buyAmount,
         sellAmount,
         costAvgPrice,
         sellAvgPrice,
-        percentage,
+        percentage: d.unknownDisposal ? null : percentage,
       };
     })
     .filter((x): x is NonNullable<typeof x> => !!x);
 
-  const total = coins.reduce((s, c) => s + c.value, 0);
+  const total = coins.some((coin) => coin.value === null)
+    ? null
+    : coins.reduce((sum, coin) => sum + (coin.value ?? 0), 0);
   const totalRealSpent = coins.reduce((s, c) => s + c.realSpentValue, 0);
 
   let lrdAsset: AssetModel | undefined;
@@ -283,8 +290,8 @@ export async function calculateTotalProfit(
 
   const resp = {
     total,
-    percentage:
-      totalRealSpent === 0 ? undefined : (total / totalRealSpent) * 100,
+    percentage: total === null ? null
+      : totalRealSpent === 0 ? undefined : (total / totalRealSpent) * 100,
     coins,
     lastRecordDate: lrd ? new Date(lrd) : undefined,
   };

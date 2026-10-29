@@ -1,5 +1,9 @@
 # Release review notes
 
+## Whole-position sell pricing
+
+Whole-position disposals now use the current refresh quote when available. Historical profit figures may change because they were wrong: vanished holdings were priced at the previous snapshot's quote. When no current quote is available, refresh records the previous positive price as a `withdraw` with unknown disposal treatment, so Profit shows `—` for the asset and affected totals, and Cost Basis does not present that price as an exact sale. This unknown Profit treatment also applies to withdrawals users previously labelled themselves. A unique matching sale and buy across consecutive refreshes within seven days is treated as a possible transfer for profit and cost basis; the cost basis report flags it for review. Same-snapshot transfers are also excluded from Profit's Cost Price, Buy Amount, and Sell Amount calculations, though the total is unchanged.
+
 ## Sync acceptance follow-up (0.9.0)
 
 | Finding | Disposition |

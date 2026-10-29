@@ -8,6 +8,8 @@ pub mod ios_backup_path;
 pub mod ios_share_path;
 #[path = "../../src/migration.rs"]
 pub mod migration;
+#[path = "../../src/refresh_persistence.rs"]
+pub mod refresh_persistence;
 #[path = "../../src/startup_security.rs"]
 pub mod startup_security;
 #[path = "../../src/sync_persistence.rs"]

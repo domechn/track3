@@ -341,7 +341,7 @@ export async function loadAlertEvaluationData(
       const result = await calculateTotalProfit({
         start: new Date(now.getTime() - windowMs[window]), end: now,
       });
-      if (result.lastRecordDate) pnl[window] = result.total;
+      if (result.lastRecordDate && result.total !== null) pnl[window] = result.total;
     }
     snapshots[0].pnl = pnl;
   }

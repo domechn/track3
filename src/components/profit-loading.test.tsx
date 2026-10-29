@@ -100,4 +100,19 @@ describe("Profit loading", () => {
     await waitFor(() => expect(title.parentElement).toHaveTextContent("2 coins"));
   });
 
+  it("shows unknown profit instead of a zero amount for an unpriced withdrawal", async () => {
+    calculateTotalProfitMock.mockResolvedValue({
+      total: null, percentage: null,
+      coins: [{ symbol: "BTC", assetType: "crypto", value: null, percentage: null,
+        buyAmount: 1, sellAmount: 0, costAvgPrice: 100, sellAvgPrice: 0 }],
+    });
+    render(<MemoryRouter><Profit
+      currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down"
+    /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3));
+    expect(screen.queryByText("+$0.00")).not.toBeInTheDocument();
+  });
+
 });

@@ -55,17 +55,17 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const { t } = useTranslation();
-  const [profit, setProfit] = useState(0);
+  const [profit, setProfit] = useState<number | null>(0);
   // note: undefined means infinite
   const [profitPercentage, setProfitPercentage] = useState<
-    number | undefined
+    number | null | undefined
   >();
   const [coinsProfit, setCoinsProfit] = useState<
     {
       symbol: string;
       assetType: "crypto" | "stock";
-      percentage?: number;
-      value: number;
+      percentage?: number | null;
+      value: number | null;
     }[]
   >([]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
@@ -89,7 +89,7 @@ const App = ({
           return;
         }
 
-        const sortedCoins = res.coins.sort((a, b) => a.value - b.value);
+        const sortedCoins = res.coins.sort((a, b) => (a.value ?? 0) - (b.value ?? 0));
         setProfit(res.total);
         setProfitPercentage(res.percentage);
         setCoinsProfit(sortedCoins);
@@ -124,28 +124,32 @@ const App = ({
   }, [coinsProfit]);
 
   const topProfitData = useMemo(
-    () => coinsProfit.slice(-5).reverse(),
+    () => coinsProfit.filter((coin) => coin.value !== null).slice(-5).reverse(),
     [coinsProfit],
   );
   const topLossData = useMemo(
-    () => coinsProfit.slice(0, 5),
+    () => coinsProfit.filter((coin) => coin.value !== null).slice(0, 5),
+    [coinsProfit],
+  );
+  const unknownProfitData = useMemo(
+    () => coinsProfit.filter((coin) => coin.value === null),
     [coinsProfit],
   );
 
   const totalToneClass = useMemo(
-    () => positiveNegativeTextClass(profit, quoteColor, 500),
+    () => profit === null ? "text-muted-foreground" : positiveNegativeTextClass(profit, quoteColor, 500),
     [profit, quoteColor],
   );
   const totalToneBadgeClass = useMemo(
-    () => getToneBadgeClass(profit, quoteColor),
+    () => profit === null ? "bg-muted text-muted-foreground" : getToneBadgeClass(profit, quoteColor),
     [profit, quoteColor],
   );
   const positiveCount = useMemo(
-    () => coinsProfit.filter((coin) => coin.value > 0).length,
+    () => coinsProfit.filter((coin) => coin.value !== null && coin.value > 0).length,
     [coinsProfit],
   );
   const negativeCount = useMemo(
-    () => coinsProfit.filter((coin) => coin.value < 0).length,
+    () => coinsProfit.filter((coin) => coin.value !== null && coin.value < 0).length,
     [coinsProfit],
   );
 
@@ -203,8 +207,8 @@ const App = ({
     rows: {
       symbol: string;
       assetType: "crypto" | "stock";
-      percentage?: number;
-      value: number;
+      percentage?: number | null;
+      value: number | null;
     }[],
     rankStart = 1,
   ) =>
@@ -236,8 +240,8 @@ const App = ({
           </Link>
         </TableCell>
         <TableCell className="text-right py-1.5">
-          <div className={`text-sm ${positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
-            {(d.value < 0 ? "-" : "+") +
+          <div className={`text-sm ${d.value === null ? "text-muted-foreground" : positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
+            {d.value === null ? "—" : (d.value < 0 ? "-" : "+") +
               currency.symbol +
               prettyNumberToLocaleString(
                 currencyWrapper(currency)(Math.abs(d.value)),
@@ -245,11 +249,12 @@ const App = ({
           </div>
           {showCoinsProfitPercentage && (
             <div className="text-xs text-muted-foreground">
+              {d.percentage === null ? "—" : <>
               {(d.percentage || 0) < 0 ? "" : "+"}
               {d.percentage === undefined
                 ? t("common.infinity")
                 : prettyNumberKeepNDigitsAfterDecimalPoint(d.percentage, 2)}
-              %
+              %</>}
             </div>
           )}
         </TableCell>
@@ -278,7 +283,7 @@ const App = ({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="space-y-1">
             <div className={`text-xl font-semibold tracking-tight ${totalToneClass}`}>
-              {(profit < 0 ? "-" : "+") +
+              {profit === null ? "—" : (profit < 0 ? "-" : "+") +
                 currency.symbol +
                 prettyNumberToLocaleString(
                   currencyWrapper(currency)(Math.abs(profit)),
@@ -291,10 +296,10 @@ const App = ({
           <div
             className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${totalToneBadgeClass}`}
           >
-            {profitPercentage === undefined
+            {profitPercentage === null ? "—" : profitPercentage === undefined
               ? t("common.infinity")
-              : prettyNumberKeepNDigitsAfterDecimalPoint(profitPercentage, 2)}
-            %
+              : `${prettyNumberKeepNDigitsAfterDecimalPoint(profitPercentage, 2)}%`}
+            {profitPercentage === undefined ? "%" : null}
           </div>
         </div>
         </>}
@@ -321,6 +326,10 @@ const App = ({
             </Table>
           </div>
         </div>
+        {unknownProfitData.length > 0 && <div className="space-y-1">
+          <div className="text-xs text-muted-foreground font-medium">{t("common.unknown")}</div>
+          <Table><TableBody>{renderRows(unknownProfitData)}</TableBody></Table>
+        </div>}
         {coinsProfit.length === 0 && (
           <div className="flex items-center justify-center text-lg text-muted-foreground py-6">
             {t("profit.noData")}
