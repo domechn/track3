@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connect an exchange safely — Track3 Docs</title>
+    <meta name="description" content="Create a read-only exchange API key for Track3, understand where it is stored, and find Binance and OKX setup guides." />
+    <meta property="og:title" content="Connect an exchange safely — Track3 Docs" />
+    <meta property="og:description" content="A practical guide to read-only exchange keys, IP restrictions, and supported exchanges in Track3." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://track3.dev/docs/index.html" />
+    <meta property="og:image" content="https://track3.dev/images/social-overview.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Connect an exchange safely — Track3 Docs" />
+    <meta name="twitter:description" content="A practical guide to read-only exchange keys, IP restrictions, and supported exchanges in Track3." />
+    <meta name="twitter:image" content="https://track3.dev/images/social-overview.jpg" />
+    <link rel="canonical" href="https://track3.dev/docs/index.html" />
+    <link rel="icon" type="image/png" href="../images/app-icon.png" />
+    <link rel="stylesheet" href="../site.css" />
+  </head>
+  <body class="docs-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header>
+      <div class="wrap">
+        <a class="brand" href="../index.html"><img src="../images/app-icon.png" alt="" width="30" height="30" />Track3</a>
+        <nav aria-label="Primary">
+          <a href="../index.html#features">Features</a><a href="../index.html#ios">iPhone &amp; iPad</a><a href="../index.html#privacy">Privacy</a><a href="../index.html#pro">Pro</a><a href="./index.html" aria-current="page">Docs</a>
+        </nav>
+        <details class="mobile-menu">
+          <summary>Menu</summary>
+          <div class="menu-links">
+            <a href="../index.html#features">Features</a><a href="../index.html#ios">iPhone &amp; iPad</a><a href="../index.html#privacy">Privacy</a><a href="../index.html#pro">Pro</a><a href="./index.html" aria-current="page">Docs</a>
+          </div>
+        </details>
+        <a class="btn primary" href="../download.html">Download</a>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-intro">
+        <div class="wrap">
+          <p class="kicker">Track3 Docs · Exchanges</p>
+          <h1>Connect an exchange safely</h1>
+          <p>Create a read-only exchange API key so Track3 can read your balances. Give the key only the access it needs.</p>
+          <p class="meta">Last checked: 2026-10-29</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="permissions">
+        <div class="wrap doc-content">
+          <h2>Choose read-only access</h2>
+          <p>Track3 reads exchange balances. Select <strong>Read</strong> or <strong>Enable Reading</strong>, according to the exchange. Never select <strong>Trade</strong>, <strong>Withdraw</strong>, or <strong>Transfer</strong> permissions for a Track3 key.</p>
+          <div class="doc-callout">
+            <strong>Check the permissions yourself.</strong> Track3 cannot currently detect whether a key has trading or withdrawal access.
+          </div>
+        </div>
+      </section>
+      <section class="page-section" id="storage">
+        <div class="wrap doc-content">
+          <h2>Where your key lives</h2>
+          <p>Track3 sends exchange requests directly from your device to the exchange, with no Track3 server in between. Exchange keys are stored locally.</p>
+          <p>If you use optional end-to-end-encrypted multi-device sync, the sync snapshot includes exchange keys only when you turn on the switch for exchange API keys and wallet addresses. Pro wallet balance queries for ERC20 and TRON are separate and do not use exchange keys.</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="ip">
+        <div class="wrap doc-content">
+          <h2>Consider an IP allowlist</h2>
+          <p>An IP allowlist limits where a key can be used. It can help on a device with a stable public IP. Home IPs can change, and a VPN or proxy changes the IP the exchange sees. Update the allowlist if your connection changes.</p>
+          <p>On iPhone and iPad, switching between Wi-Fi and cellular makes an IP allowlist impractical. A read-only key without IP binding is the practical choice on mobile. Keep every other permission off.</p>
+        </div>
+      </section>
+      <section class="page-section" id="leak">
+        <div class="wrap doc-content">
+          <h2>If a key leaks</h2>
+          <p>Delete the key on the exchange. Then create a new read-only key if you still want to connect the exchange to Track3.</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="exchanges">
+        <div class="wrap doc-content">
+          <h2>Supported exchanges</h2>
+          <p>Start with a detailed guide for Binance or OKX. Guides for the other supported exchanges are coming.</p>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead><tr><th scope="col">Exchange</th><th scope="col">Guide</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Binance</th><td><a href="./binance.html">Create a Binance key</a></td></tr>
+                <tr><th scope="row">OKX</th><td><a href="./okx.html">Create an OKX key</a></td></tr>
+                <tr><th scope="row">Bybit</th><td>Guide coming</td></tr>
+                <tr><th scope="row">Bitget</th><td>Guide coming</td></tr>
+                <tr><th scope="row">Gate</th><td>Guide coming</td></tr>
+                <tr><th scope="row">HTX</th><td>Guide coming</td></tr>
+                <tr><th scope="row">Kraken</th><td>Guide coming</td></tr>
+                <tr><th scope="row">MEXC</th><td>Guide coming</td></tr>
+                <tr><th scope="row">Coinbase</th><td>Guide coming</td></tr>
+                <tr><th scope="row">Backpack</th><td>Guide coming</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="page-section" id="limits">
+        <div class="wrap doc-content">
+          <h2>Known limits</h2>
+          <ul>
+            <li>Binance.US accounts are not supported. Track3 uses the Binance global API domains.</li>
+            <li>OKX accounts registered in the US, AU, or EU are likely not supported; this has not been tested. Those accounts require regional API domains, while Track3 uses the global OKX domain.</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <div class="wrap">
+        <span>© 2026 Track3 · Source available</span
+        ><a href="https://github.com/domechn/track3">GitHub</a
+        ><a href="https://github.com/domechn/track3/releases">Releases</a
+        ><a href="https://deepwiki.com/domechn/track3">Wiki</a
+        ><a href="../index.html#privacy">Privacy</a
+        ><a href="./index.html">Docs</a
+        ><a href="https://github.com/domechn/track3/blob/master/LICENSE">License</a>
+      </div>
+    </footer>
+  </body>
+</html>

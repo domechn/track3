@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create a read-only OKX API key — Track3 Docs</title>
+    <meta name="description" content="Create an OKX API key with Read permission and enter its key, secret, and passphrase in Track3." />
+    <meta property="og:title" content="Create a read-only OKX API key — Track3 Docs" />
+    <meta property="og:description" content="OKX key creation, Read permission, IP binding, passphrase handling, and Track3 setup." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://track3.dev/docs/okx.html" />
+    <meta property="og:image" content="https://track3.dev/images/social-overview.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Create a read-only OKX API key — Track3 Docs" />
+    <meta name="twitter:description" content="OKX key creation, Read permission, IP binding, passphrase handling, and Track3 setup." />
+    <meta name="twitter:image" content="https://track3.dev/images/social-overview.jpg" />
+    <link rel="canonical" href="https://track3.dev/docs/okx.html" />
+    <link rel="icon" type="image/png" href="../images/app-icon.png" />
+    <link rel="stylesheet" href="../site.css" />
+  </head>
+  <body class="docs-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header>
+      <div class="wrap">
+        <a class="brand" href="../index.html"><img src="../images/app-icon.png" alt="" width="30" height="30" />Track3</a>
+        <nav aria-label="Primary">
+          <a href="../index.html#features">Features</a><a href="../index.html#ios">iPhone &amp; iPad</a><a href="../index.html#privacy">Privacy</a><a href="../index.html#pro">Pro</a><a href="./index.html">Docs</a>
+        </nav>
+        <details class="mobile-menu">
+          <summary>Menu</summary>
+          <div class="menu-links">
+            <a href="../index.html#features">Features</a><a href="../index.html#ios">iPhone &amp; iPad</a><a href="../index.html#privacy">Privacy</a><a href="../index.html#pro">Pro</a><a href="./index.html">Docs</a>
+          </div>
+        </details>
+        <a class="btn primary" href="../download.html">Download</a>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-intro">
+        <div class="wrap">
+          <p class="kicker"><a href="./index.html">Track3 Docs</a> · OKX</p>
+          <h1>Create a read-only OKX API key</h1>
+          <p>Choose Read permission and keep the key, secret, and passphrase for Track3.</p>
+          <p class="meta">Last checked: 2026-10-29</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="before">
+        <div class="wrap doc-content">
+          <h2>Before you start</h2>
+          <p>Use the OKX website to create the key. You will choose a passphrase during creation, so prepare to keep it with the API key and Secret key. OKX cannot recover a lost passphrase; you must create a new key.</p>
+        </div>
+      </section>
+      <section class="page-section" id="create">
+        <div class="wrap doc-content">
+          <h2>Create the key</h2>
+          <ol>
+            <li>Sign in to OKX and open its <a href="https://www.okx.com/account/my-api">API page</a>.</li>
+            <li>Follow the page's key-creation flow and choose a passphrase. We have not verified the exact button or field names on the website.</li>
+            <li>Assign <strong>Read</strong> permission and review the key before using it in Track3.</li>
+          </ol>
+        </div>
+      </section>
+      <section class="page-section tint" id="permissions">
+        <div class="wrap doc-content">
+          <h2>Permissions: tick this, do not tick that</h2>
+          <div class="doc-callout">
+            <p><strong>Tick:</strong> Read.</p>
+            <p><strong>Do not tick:</strong> Trade or Withdraw.</p>
+          </div>
+          <p>Read covers account information, bills, and order history. Trade can place or cancel orders, move funds, and change settings; Withdraw grants withdrawal access. Track3 only needs Read.</p>
+        </div>
+      </section>
+      <section class="page-section" id="ip">
+        <div class="wrap doc-content">
+          <h2>IP restriction (optional)</h2>
+          <p>OKX strongly recommends IP binding. You can bind up to 20 addresses to a key, including IPv4, IPv6, and network segments. OKX's docs describe the 14-day inactivity expiry only for unbound Trade or Withdraw keys.</p>
+          <p>Bind a stable public IP if that fits your setup. Home IPs can change, and a VPN or proxy changes the IP OKX sees. On iPhone and iPad, switching between Wi-Fi and cellular makes an IP allowlist impractical; a read-only key without IP binding is the practical mobile choice.</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="copy">
+        <div class="wrap doc-content">
+          <h2>Copy the values</h2>
+          <p>Keep the <strong>API key</strong>, <strong>Secret key</strong>, and the <strong>Passphrase</strong> you chose during creation. If you lose the passphrase, OKX cannot recover it; create a new key. Treat all three values as sensitive. We have not verified whether the Secret key is shown again after creation.</p>
+        </div>
+      </section>
+      <section class="page-section" id="track3">
+        <div class="wrap doc-content">
+          <h2>Enter them in Track3</h2>
+          <p>These steps use the Track3 desktop app.</p>
+          <ol>
+            <li>Open <strong>Settings → Configuration → Exchanges → Add Exchange Configuration</strong>.</li>
+            <li>Under <strong>Type</strong>, use <strong>Select CEX</strong> and choose <strong>OKX</strong>.</li>
+            <li>Paste the API key into <strong>Api Key</strong> and the Secret key into <strong>Api Secret</strong>. Enter the OKX passphrase in Track3's <strong>Password</strong> field, then select <strong>Save changes</strong>.</li>
+          </ol>
+          <p>Track3 labels the OKX passphrase field “Password.” The field labeled “Passphrase” is for another exchange.</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="troubleshooting">
+        <div class="wrap doc-content">
+          <h2>Troubleshooting</h2>
+          <ul>
+            <li><strong>Clock skew:</strong> OKX rejects a request when the device clock is more than 30 seconds off (error 50102). Sync the device clock and try again.</li>
+            <li><strong>Wrong permission:</strong> Check that Read is enabled on the key. Track3 cannot currently check key permissions for you.</li>
+            <li><strong>IP not allowed:</strong> Check the bound addresses against the public IP OKX sees, especially after a home IP, VPN, or proxy change.</li>
+            <li><strong>Account type:</strong> We have not verified how unified or sub-account setups affect balances in Track3.</li>
+            <li><strong>Regional accounts:</strong> US, AU, and EU accounts are likely not supported; this has not been tested. They require regional API domains, while Track3 uses the global OKX domain.</li>
+          </ul>
+          <p>Use the <a href="https://www.okx.com/docs-v5/en/">official OKX API documentation</a> as the source of truth if the exchange screens change.</p>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <div class="wrap">
+        <span>© 2026 Track3 · Source available</span
+        ><a href="https://github.com/domechn/track3">GitHub</a
+        ><a href="https://github.com/domechn/track3/releases">Releases</a
+        ><a href="https://deepwiki.com/domechn/track3">Wiki</a
+        ><a href="../index.html#privacy">Privacy</a
+        ><a href="./index.html">Docs</a
+        ><a href="https://github.com/domechn/track3/blob/master/LICENSE">License</a>
+      </div>
+    </footer>
+  </body>
+</html>

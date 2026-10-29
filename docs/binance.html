@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create a read-only Binance API key — Track3 Docs</title>
+    <meta name="description" content="Create a System-generated Binance API key with reading access and enter its key and secret in Track3." />
+    <meta property="og:title" content="Create a read-only Binance API key — Track3 Docs" />
+    <meta property="og:description" content="Binance key creation, read-only permissions, IP restrictions, and Track3 setup." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://track3.dev/docs/binance.html" />
+    <meta property="og:image" content="https://track3.dev/images/social-overview.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Create a read-only Binance API key — Track3 Docs" />
+    <meta name="twitter:description" content="Binance key creation, read-only permissions, IP restrictions, and Track3 setup." />
+    <meta name="twitter:image" content="https://track3.dev/images/social-overview.jpg" />
+    <link rel="canonical" href="https://track3.dev/docs/binance.html" />
+    <link rel="icon" type="image/png" href="../images/app-icon.png" />
+    <link rel="stylesheet" href="../site.css" />
+  </head>
+  <body class="docs-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header>
+      <div class="wrap">
+        <a class="brand" href="../index.html"><img src="../images/app-icon.png" alt="" width="30" height="30" />Track3</a>
+        <nav aria-label="Primary">
+          <a href="../index.html#features">Features</a><a href="../index.html#ios">iPhone &amp; iPad</a><a href="../index.html#privacy">Privacy</a><a href="../index.html#pro">Pro</a><a href="./index.html">Docs</a>
+        </nav>
+        <details class="mobile-menu">
+          <summary>Menu</summary>
+          <div class="menu-links">
+            <a href="../index.html#features">Features</a><a href="../index.html#ios">iPhone &amp; iPad</a><a href="../index.html#privacy">Privacy</a><a href="../index.html#pro">Pro</a><a href="./index.html">Docs</a>
+          </div>
+        </details>
+        <a class="btn primary" href="../download.html">Download</a>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-intro">
+        <div class="wrap">
+          <p class="kicker"><a href="./index.html">Track3 Docs</a> · Binance</p>
+          <h1>Create a read-only Binance API key</h1>
+          <p>Use a System-generated key with reading access to connect Binance balances to Track3.</p>
+          <p class="meta">Last checked: 2026-10-29</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="before">
+        <div class="wrap doc-content">
+          <h2>Before you start</h2>
+          <p>Binance requires identity verification, two-factor authentication, and a deposit of any amount to your Spot wallet to activate the account before you create an API key.</p>
+          <p>Choose <strong>System-generated</strong>, the HMAC key type. Track3 signs Binance requests with HMAC-SHA256. Self-generated Ed25519 or RSA keys are not the key type Track3 uses.</p>
+        </div>
+      </section>
+      <section class="page-section" id="create">
+        <div class="wrap doc-content">
+          <h2>Create the key</h2>
+          <ol>
+            <li>Log in on the Binance website. Open your <strong>profile icon → Account → API Management → Create API</strong>.</li>
+            <li>Select <strong>System-generated</strong>, enter a label for the key, and complete the requested two-factor or passkey verification.</li>
+            <li>When the key is created, review its permissions before adding it to Track3.</li>
+          </ol>
+          <p>In the Binance app's Pro version, the documented path is <strong>More → Other → API Management → Create API</strong>.</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="permissions">
+        <div class="wrap doc-content">
+          <h2>Permissions: tick this, do not tick that</h2>
+          <div class="doc-callout">
+            <p><strong>Tick:</strong> Enable Reading.</p>
+            <p><strong>Do not tick:</strong> trading, withdrawals, internal transfer, or universal transfer permissions.</p>
+          </div>
+          <p>Track3 reads spot account, funding wallet, Simple Earn flexible and locked positions, cross-margin account, and USDⓈ-M futures balance. We have not verified the exact permission each section needs, including whether read-only futures or margin balances need their separate permission flags. Start with Enable Reading alone and check <strong>Source status</strong> after a refresh if a section is missing.</p>
+        </div>
+      </section>
+      <section class="page-section" id="ip">
+        <div class="wrap doc-content">
+          <h2>IP restriction (optional)</h2>
+          <p>A System-generated key with unrestricted IP access can have only Enable Reading. If you have a stable public IP, you can restrict the key to it. Home IPs change, and a VPN or proxy changes the IP Binance sees, so an outdated allowlist can stop requests.</p>
+          <p>On iPhone and iPad, switching between Wi-Fi and cellular makes an IP allowlist impractical. A read-only key without IP binding is the practical choice on mobile.</p>
+        </div>
+      </section>
+      <section class="page-section tint" id="copy">
+        <div class="wrap doc-content">
+          <h2>Copy the values</h2>
+          <p>Keep the <strong>API key</strong> and <strong>Secret key</strong> from your new System-generated key together until you enter them in Track3. Treat the Secret key as sensitive. Binance keys do not need a passphrase in Track3. We have not verified whether the Secret key is shown again after creation.</p>
+        </div>
+      </section>
+      <section class="page-section" id="track3">
+        <div class="wrap doc-content">
+          <h2>Enter them in Track3</h2>
+          <p>These steps use the Track3 desktop app.</p>
+          <ol>
+            <li>Open <strong>Settings → Configuration → Exchanges → Add Exchange Configuration</strong>.</li>
+            <li>Under <strong>Type</strong>, use <strong>Select CEX</strong> and choose <strong>Binance</strong>.</li>
+            <li>Paste the API key into <strong>Api Key</strong> and the Secret key into <strong>Api Secret</strong>. Then select <strong>Save changes</strong>.</li>
+          </ol>
+        </div>
+      </section>
+      <section class="page-section tint" id="troubleshooting">
+        <div class="wrap doc-content">
+          <h2>Troubleshooting</h2>
+          <ul>
+            <li><strong>Wrong permission:</strong> Confirm Enable Reading is on and trading, withdrawal, and transfer permissions are off. Track3 cannot check the key's permissions for you.</li>
+            <li><strong>A balance section is missing:</strong> After a refresh, the Source status dialog names the section. We have not verified the exact Binance permission each section needs.</li>
+            <li><strong>IP not allowed:</strong> Check that the allowed IP matches the public IP Binance sees, especially after a home IP, VPN, or proxy change.</li>
+            <li><strong>Account type:</strong> Binance.US accounts are not supported. We have not verified how sub-accounts or unified account setups affect balance visibility.</li>
+            <li><strong>Clock skew:</strong> We have not verified Binance clock-skew behavior for this guide.</li>
+          </ul>
+          <p>Use the <a href="https://www.binance.com/en/support/faq/detail/360002502072">official Binance key guide</a> and <a href="https://developers.binance.com/legacy-docs/wallet/account/api-key-permission">API permission reference</a> as the source of truth if the exchange screens change.</p>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <div class="wrap">
+        <span>© 2026 Track3 · Source available</span
+        ><a href="https://github.com/domechn/track3">GitHub</a
+        ><a href="https://github.com/domechn/track3/releases">Releases</a
+        ><a href="https://deepwiki.com/domechn/track3">Wiki</a
+        ><a href="../index.html#privacy">Privacy</a
+        ><a href="./index.html">Docs</a
+        ><a href="https://github.com/domechn/track3/blob/master/LICENSE">License</a>
+      </div>
+    </footer>
+  </body>
+</html>
