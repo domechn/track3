@@ -269,6 +269,23 @@ it("shows infinite return for a zero-cost airdrop and no breakeven after selling
   expect(screen.getByText("profit rate:").parentElement).toHaveTextContent("∞");
 });
 
+it("shows unknown profit after switching from a priced coin to an unmatched withdrawal", async () => {
+  mocks.calculateTotalProfit.mockImplementation(async (_range: TDateRange, symbol: string) =>
+    symbol === "BTC"
+      ? { total: 50, percentage: 50, coins: [{ symbol: "BTC", assetType: "crypto", value: 50, percentage: 50, buyAmount: 1, sellAmount: 0, costAvgPrice: 100, sellAvgPrice: 0 }] }
+      : { total: null, percentage: null, coins: [{ symbol: "ETH", assetType: "crypto", value: null, percentage: null, buyAmount: 2, sellAmount: 0, costAvgPrice: 300, sellAvgPrice: 0 }] });
+  mocks.queryLastAssetsBySymbol.mockImplementation(async (symbol: string) =>
+    ({ symbol, assetType: "crypto", amount: 2, price: 300, value: 600 }));
+  renderCoinAnalysis();
+  await screen.findByText("$50.00");
+  fireEvent.click(screen.getByText("Next coin"));
+  await waitFor(() => expect(screen.getByText("Avg. buy price (selected range)").closest(".rounded-xl")).toHaveTextContent("$300.00"));
+  expect(screen.getByText("Breakeven Price").closest(".rounded-xl")).toHaveTextContent("—");
+  const profitCard = screen.getByText("profit rate:").closest(".rounded-xl");
+  expect(profitCard).toHaveTextContent(/—.*—/);
+  expect(profitCard).not.toHaveTextContent("—%");
+});
+
 function renderCoinAnalysis(
   initialEntries: string[] = ["/coins/BTC"],
   currency: CurrencyRateDetail = usdCurrency,

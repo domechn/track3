@@ -33,7 +33,10 @@ export function load(
       price: h.price,
       usdValue: h.amount * h.price,
     }));
-    const drafts = genTx(uuid, s.at, before, after);
+    const drafts = genTx(uuid, s.at, before, after, [], Object.fromEntries(
+      after.filter((coin) => coin.amount > 0).map((coin) =>
+        [`${coin.assetType}:${coin.symbol}`, coin.price]),
+    ));
     // mirrors generateRefreshAssets(): current assets + 0-amount rows for removed positions
     const afterIds = new Set(after.map((a) => `${a.wallet.slice(4)}:${a.symbol}`));
     const rows: AssetModel[] = [
@@ -42,7 +45,7 @@ export function load(
         symbol: a.symbol, amount: a.amount, value: a.usdValue, price: a.price, wallet: a.wallet.slice(4),
       })),
       ...drafts
-        .filter((d) => d.txnType === "sell" && !afterIds.has(`${d.wallet}:${d.symbol}`))
+        .filter((d) => !afterIds.has(`${d.wallet}:${d.symbol}`))
         .map((d) => ({
           id: nextId++, uuid, createdAt: s.at, assetType: "crypto" as const,
           symbol: d.symbol, amount: 0, value: 0, price: d.price, wallet: d.wallet,
@@ -88,4 +91,3 @@ export const txnHandler = {
     return [...byUuid.values()];
   },
 };
-

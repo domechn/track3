@@ -1,5 +1,9 @@
 # Release review notes
 
+## Whole-position sell pricing
+
+Whole-position disposals now use the current refresh quote when available. Historical profit figures may change because they were wrong: vanished holdings were priced at the previous snapshot's quote. When no current quote is available, refresh records the previous positive price as a `withdraw` with unknown disposal treatment, so Profit shows `—` for the asset and affected totals, and Cost Basis does not present that price as an exact sale. This unknown Profit treatment also applies to withdrawals users previously labelled themselves, unless a withdrawal pairs with a deposit as an own-wallet transfer. A unique matching sale and buy across consecutive refreshes within seven days is treated as a possible transfer for profit and cost basis; the cost basis report flags it for review. Same-snapshot transfers are also excluded from Profit's Cost Price, Buy Amount, and Sell Amount calculations, though the total is unchanged.
+
 ## Unreleased PnL and cost basis correction
 
 - PnL cards now calculate percentage change from the starting value, show a zero change as a formatted zero amount, and label the 7 and 30 windows as refreshes on desktop and iPhone. Those values now compare with exactly 7 and 30 earlier refreshes (previously 8 and 31), so displayed amounts and percentages may change. The cards use refresh counts because this query reads ordered portfolio snapshots; calendar-day windows would require date-based selection.

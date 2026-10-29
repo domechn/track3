@@ -1,5 +1,6 @@
 import type { AssetModel, TransactionModel } from "./types";
 import type { AssetType } from "./datafetch/types";
+import { fromStoredTransactions } from "./cost-basis";
 
 export type AttributionAmounts = { priceEffect: number; flowEffect: number; residual: number; totalChange: number };
 export type AttributionEntry = AttributionAmounts & { symbol: string; assetType: AssetType; wallet: string };
@@ -13,7 +14,7 @@ export type AttributionSnapshot = {
   transactions: TransactionModel[];
 };
 
-type Holding = { symbol: string; assetType: AssetType; wallet: string; amount: number; value: number };
+type Holding = { symbol: string; assetType: AssetType; wallet: string; amount: number; value: number; price: number };
 const zero = (): AttributionAmounts => ({ priceEffect: 0, flowEffect: 0, residual: 0, totalChange: 0 });
 const keyOf = (item: { symbol: string; assetType: AssetType; wallet: string }) =>
   JSON.stringify([item.assetType, item.symbol.trim().toUpperCase(), item.wallet]);
@@ -24,9 +25,12 @@ function holdings(snapshot: AttributionSnapshot, blacklist: Set<string>): Map<st
     if (blacklist.has(asset.symbol.trim().toUpperCase())) continue;
     const identity = { assetType: asset.assetType ?? "crypto", symbol: asset.symbol.trim().toUpperCase(), wallet: asset.wallet ?? "" };
     const key = keyOf(identity);
-    const current = result.get(key) ?? { ...identity, amount: 0, value: 0 };
+    const current = result.get(key) ?? { ...identity, amount: 0, value: 0, price: 0 };
     current.amount += asset.amount;
     current.value += asset.value;
+    if (asset.amount === 0 && Number.isFinite(asset.price) && asset.price > 0) {
+      current.price = asset.price;
+    }
     result.set(key, current);
   }
   return result;
@@ -36,7 +40,7 @@ function holdings(snapshot: AttributionSnapshot, blacklist: Set<string>): Map<st
  * For each adjacent snapshot and wallet/asset: ΔV = q₀(p₁-p₀) + Δq_confirmed·p₁ + residual.
  * p is snapshot USD value / quantity. Transactions confirm observed signed quantity changes;
  * unmatched quantity and valuation errors remain residual. For a new asset p₀=p₁, and for
- * a disposal p₁=p₀, so the full change is flow when a matching transaction exists.
+ * a disposal p₁ comes from its zero-balance row's recorded quote when available.
  * Each interval is summed, preserving the path and classifying stablecoin depegs as price.
  * Auto-recorded buy transactions for rewards and airdrops are quantity change, not market return.
  * Blacklisted symbols are excluded from both endpoint values and every component.
@@ -48,6 +52,26 @@ export function attributeSnapshots(snapshots: AttributionSnapshot[], blacklist: 
   if (ordered.length < 2) return { entries: [], totals: zero(), startValue: 0, endValue: 0 };
   const excluded = new Set(blacklist.map((symbol) => symbol.trim().toUpperCase()));
   const entries = new Map<string, AttributionEntry>();
+  const transactions = ordered.flatMap((snapshot) => snapshot.transactions.map((txn) => ({
+    ...txn, txnCreatedAt: snapshot.createdAt,
+  })));
+  const storedById = new Map(transactions.map((txn) => [String(txn.id), txn]));
+  const transferEvents = fromStoredTransactions(transactions);
+  const outgoing = new Map(transferEvents.filter((event) =>
+    event.type === "transfer-out" && event.transferId
+  ).map((event) => [event.transferId!, event]));
+  const transferMarketEffects = new Map<string, number>();
+  for (const incoming of transferEvents.filter((event) =>
+    event.type === "transfer-in" && event.transferId
+  )) {
+    const out = outgoing.get(incoming.transferId!);
+    const storedIn = storedById.get(incoming.id);
+    const storedOut = out && storedById.get(out.id);
+    if (!out || !storedIn || !storedOut || storedIn.uuid === storedOut.uuid) continue;
+    const key = `${storedIn.uuid}:${keyOf(storedIn)}`;
+    transferMarketEffects.set(key, (transferMarketEffects.get(key) ?? 0) +
+      incoming.amount * (incoming.price - out.price));
+  }
   const first = holdings(ordered[0], excluded);
   let before = first;
 
@@ -68,13 +92,16 @@ export function attributeSnapshots(snapshots: AttributionSnapshot[], blacklist: 
       const v0 = old?.value ?? 0;
       const v1 = next?.value ?? 0;
       const p0 = q0 !== 0 ? v0 / q0 : q1 !== 0 ? v1 / q1 : 0;
-      const p1 = q1 !== 0 ? v1 / q1 : p0;
+      const p1 = q1 !== 0 ? v1 / q1 : next?.price || p0;
       const deltaQ = q1 - q0;
       const recordedQ = transactionQuantities.get(key) ?? 0;
       const confirmedQ = Math.sign(deltaQ) === Math.sign(recordedQ)
         ? Math.sign(deltaQ) * Math.min(Math.abs(deltaQ), Math.abs(recordedQ)) : 0;
-      const priceEffect = q0 * (p1 - p0);
-      const flowEffect = confirmedQ * p1;
+      const transferMarketEffect = transferMarketEffects.get(
+        `${ordered[index].transactions[0]?.uuid}:${key}`,
+      ) ?? 0;
+      const priceEffect = q0 * (p1 - p0) + transferMarketEffect;
+      const flowEffect = confirmedQ * p1 - transferMarketEffect;
       const totalChange = v1 - v0;
       const residual = totalChange - priceEffect - flowEffect;
       const identity = next ?? old!;

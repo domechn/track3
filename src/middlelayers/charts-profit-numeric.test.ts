@@ -87,7 +87,7 @@ describe("numeric profit from refresh snapshots", () => {
           end: new Date(Date.UTC(2024, month + 1, 1) - 1),
         })));
       expect(months.map((result) => result.total)).toEqual(Array(12).fill(amount * monthlyChange));
-      expect(months.reduce((sum, result) => sum + result.total, 0)).toBe(expected);
+      expect(months.reduce((sum, result) => sum + (result.total ?? 0), 0)).toBe(expected);
       expect((await calculateTotalProfit(year)).total).toBe(expected);
     }
   });
@@ -108,7 +108,7 @@ describe("numeric profit from refresh snapshots", () => {
         end: new Date(Date.UTC(2024, month + 1, 1) - 1),
       })));
     expect(months.map((result) => result.total)).toEqual([10, 10, 10, 10, 20, 20, 20, 20, 20, 20, 20, 20]);
-    expect(months.reduce((sum, result) => sum + result.total, 0)).toBe(200);
+    expect(months.reduce((sum, result) => sum + (result.total ?? 0), 0)).toBe(200);
     expect((await calculateTotalProfit(year)).total).toBe(200);
   });
 

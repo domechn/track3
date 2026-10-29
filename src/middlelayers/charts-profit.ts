@@ -27,18 +27,18 @@ const TOTAL_PROFIT_CACHE_SESSION_ID =
 
 type TotalProfit = {
   // total profit
-  total: number;
+  total: number | null;
   // total profit percentage
   // if it is undefined, means "∞"
-  percentage?: number;
+  percentage?: number | null;
   coins: {
     symbol: string;
     assetType: AssetType;
     // coin profit
-    value: number;
+    value: number | null;
     // coin profit percentage
     // if it is undefined, means "∞"
-    percentage?: number;
+    percentage?: number | null;
 
     buyAmount: number;
     sellAmount: number;
@@ -203,6 +203,7 @@ export async function calculateTotalProfit(
     return {
       symbol: first?.symbol ?? "",
       assetType: getAssetType(first),
+      unknownDisposal: txns.some((txn) => txn.txnType === "withdraw" && !pairedTransfers.has(txn.id)),
       actions: symbolTxns,
     };
   });
@@ -275,18 +276,20 @@ export async function calculateTotalProfit(
       return {
         symbol: latest.symbol,
         assetType: latest.assetType,
-        value: realizedProfit + unrealizedProfit,
+        value: txns?.unknownDisposal ? null : realizedProfit + unrealizedProfit,
         realSpentValue: cost,
         buyAmount,
         sellAmount,
         costAvgPrice,
         sellAvgPrice,
-        percentage,
+        percentage: txns?.unknownDisposal ? null : percentage,
       };
     })
     .filter((x): x is NonNullable<typeof x> => !!x);
 
-  const total = coins.reduce((s, c) => s + c.value, 0);
+  const total = coins.some((coin) => coin.value === null)
+    ? null
+    : coins.reduce((sum, coin) => sum + (coin.value ?? 0), 0);
   const totalRealSpent = coins.reduce((s, c) => s + c.realSpentValue, 0);
 
   let lrdAsset: AssetModel | undefined;
@@ -299,8 +302,8 @@ export async function calculateTotalProfit(
 
   const resp = {
     total,
-    percentage:
-      totalRealSpent === 0 ? (total === 0 ? 0 : undefined) : (total / totalRealSpent) * 100,
+    percentage: total === null ? null
+      : totalRealSpent === 0 ? (total === 0 ? 0 : undefined) : (total / totalRealSpent) * 100,
     coins,
     lastRecordDate: lrd ? new Date(lrd) : undefined,
   };

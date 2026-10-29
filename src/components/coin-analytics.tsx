@@ -245,9 +245,9 @@ const App = ({
   const [costAvgPrice, setCostAvgPrice] = useState<number>();
   const [sellAvgPrice, setSellAvgPrice] = useState<number>();
 
-  const [profit, setProfit] = useState<number>(0);
+  const [profit, setProfit] = useState<number | null>(0);
   const [profitPercentage, setProfitPercentage] = useState<
-    number | undefined
+    number | null | undefined
   >();
 
   const [updateTxnId, setUpdateTxnId] = useState<number>(0);
@@ -405,7 +405,7 @@ const App = ({
   }, [transactions]);
 
   const breakevenPrice = useMemo(() => {
-    if (!lastAsset || costAvgPrice === undefined || lastAsset.amount === 0) {
+    if (profit === null || !lastAsset || costAvgPrice === undefined || lastAsset.amount === 0) {
       return;
     }
     return (lastAsset.price * lastAsset.amount - profit) / lastAsset.amount;
@@ -492,7 +492,7 @@ const App = ({
 
   const profitStr = useMemo(
     () =>
-      currency.symbol +
+      profit === null ? "—" : currency.symbol +
       prettyNumberToLocaleString(currencyWrapper(currency)(profit)),
     [currency, profit],
   );
@@ -507,8 +507,9 @@ const App = ({
   );
 
   const profitRate = useMemo(
-    () => costAvgPrice === undefined ? "—" : profitPercentage === undefined ? "∞" : `${profitPercentage.toFixed(2)}%`,
-    [profitPercentage, costAvgPrice],
+    () => profit === null || profitPercentage === null || costAvgPrice === undefined
+      ? "—" : profitPercentage === undefined ? "∞" : `${profitPercentage.toFixed(2)}%`,
+    [profit, profitPercentage, costAvgPrice],
   );
 
   function prettyAmount(amount: number) {

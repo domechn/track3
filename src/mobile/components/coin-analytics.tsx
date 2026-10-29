@@ -250,9 +250,9 @@ const App = ({
   const [costAvgPrice, setCostAvgPrice] = useState<number>();
   const [sellAvgPrice, setSellAvgPrice] = useState<number>();
 
-  const [profit, setProfit] = useState<number>(0);
+  const [profit, setProfit] = useState<number | null>(0);
   const [profitPercentage, setProfitPercentage] = useState<
-    number | undefined
+    number | null | undefined
   >();
 
   const [updateTxnId, setUpdateTxnId] = useState<number>(0);
@@ -410,7 +410,7 @@ const App = ({
   }, [transactions]);
 
   const breakevenPrice = useMemo(() => {
-    if (!lastAsset || costAvgPrice === undefined || lastAsset.amount === 0) {
+    if (profit === null || !lastAsset || costAvgPrice === undefined || lastAsset.amount === 0) {
       return;
     }
     return (lastAsset.price * lastAsset.amount - profit) / lastAsset.amount;
@@ -499,7 +499,7 @@ const App = ({
 
   const profitStr = useMemo(
     () =>
-      currency.symbol +
+      profit === null ? "—" : currency.symbol +
       prettyNumberToLocaleString(currencyWrapper(currency)(profit)),
     [currency, profit],
   );
@@ -514,8 +514,9 @@ const App = ({
   );
 
   const profitRate = useMemo(
-    () => costAvgPrice === undefined ? "—" : profitPercentage === undefined ? "∞" : `${profitPercentage.toFixed(2)}%`,
-    [profitPercentage, costAvgPrice],
+    () => profit === null || profitPercentage === null || costAvgPrice === undefined
+      ? "—" : profitPercentage === undefined ? "∞" : `${profitPercentage.toFixed(2)}%`,
+    [profit, profitPercentage, costAvgPrice],
   );
 
   function prettyAmount(amount: number) {
@@ -1170,8 +1171,8 @@ const App = ({
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis"
-                    data-tone={profit > 0 ? "gain" : profit < 0 ? "loss" : "neutral"}>
-                    {isMobile ? formatPhoneMoney(currencyWrapper(currency)(profit), currency.symbol, true) : profitStr}
+                    data-tone={profit === null ? "neutral" : profit > 0 ? "gain" : profit < 0 ? "loss" : "neutral"}>
+                    {isMobile && profit !== null ? formatPhoneMoney(currencyWrapper(currency)(profit), currency.symbol, true) : profitStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
                     <div>{t("coin.profitRate")}</div>
