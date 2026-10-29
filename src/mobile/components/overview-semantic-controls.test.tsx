@@ -283,9 +283,8 @@ describe("Overview semantic controls", () => {
       />,
     );
 
-    const btcLink = await screen.findByRole("link", {
-      name: /open btc details/i,
-    });
+    const btcLink = (await screen.findByText(/open btc details/i)).closest("a");
+    expect(btcLink).toHaveAccessibleName(/open btc details/i);
     expect(btcLink).toHaveAttribute("href", "/coins/BTC?assetType=crypto");
   });
 
@@ -300,9 +299,8 @@ describe("Overview semantic controls", () => {
       />,
     );
 
-    const btcLink = await screen.findByRole("link", {
-      name: /open btc details/i,
-    });
+    const btcLink = (await screen.findByText(/open btc details/i)).closest("a");
+    expect(btcLink).toHaveAccessibleName(/open btc details/i);
     expect(btcLink).toHaveAttribute("href", "/coins/BTC?assetType=crypto");
   });
 
@@ -315,7 +313,8 @@ describe("Overview semantic controls", () => {
     try {
       renderWithProviders(<LatestAssetsPercentage currency={usdCurrency}
         dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }} />);
-      const link = await screen.findByRole("link", { name: /open btc details/i });
+      const link = (await screen.findByText(/open btc details/i)).closest("a");
+      expect(link).toHaveAccessibleName(/open btc details/i);
       expect(link).toHaveTextContent("55.0%");
       expect(link).toHaveTextContent("$825.00");
     } finally {
@@ -351,8 +350,12 @@ describe("Overview semantic controls", () => {
       await screen.findByText("共 10 个币种 | 上涨 5 | 下跌 5"),
     ).toBeInTheDocument();
     expect(screen.getByText("所选区间净盈亏")).toBeInTheDocument();
-    expect(
-      await screen.findAllByRole("link", { name: /打开 BTC 详情/ }),
-    ).toHaveLength(2);
+    const btcLabels = await screen.findAllByText(/打开 BTC 详情/);
+    expect(btcLabels).toHaveLength(2);
+    for (const label of btcLabels) {
+      const link = label.closest("a");
+      expect(link).toHaveAttribute("href");
+      expect(link).toHaveAccessibleName(/打开 BTC 详情/);
+    }
   });
 });
