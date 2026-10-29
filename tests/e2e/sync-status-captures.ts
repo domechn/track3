@@ -14,7 +14,8 @@ const skip = { en: "Skip for now", zh: "暂时跳过" };
 
 async function publish(page: Page, sync: Record<string, unknown>) {
   await page.evaluate(async (sync) => {
-    const { syncRuntime } = await import("/src/middlelayers/sync/runtime.ts");
+    const runtimeModule = "/src/middlelayers/sync/runtime.ts";
+    const { syncRuntime } = await import(runtimeModule);
     (syncRuntime as any).publish("ready", sync);
   }, sync);
 }
