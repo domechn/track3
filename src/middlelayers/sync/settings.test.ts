@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSyncHeader } from "./crypto";
-import { FakeS3, S3Error, writeSyncHeader } from "./object-store";
+import { FakeS3, S3Error, SyncTimeoutError, writeSyncHeader } from "./object-store";
 import { classifySyncError, testSyncConnection, validateSyncSettings, type SyncSettings } from "./settings";
 
 const settings: SyncSettings = {
@@ -44,6 +44,7 @@ describe("sync settings", () => {
   it("classifies access, missing bucket, network, and malformed header without leaking secrets", async () => {
     expect(classifySyncError(new S3Error("secret", 403))).toBe("access");
     expect(classifySyncError(new S3Error("secret", 404))).toBe("bucket");
+    expect(classifySyncError(new SyncTimeoutError())).toBe("timeout");
     expect(classifySyncError(new Error("secret network payload"))).toBe("network");
     expect(classifySyncError(new Error("Invalid S3 configuration"))).toBe("configuration");
     const store = new FakeS3();

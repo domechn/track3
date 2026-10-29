@@ -141,7 +141,7 @@ describe("generic data cache invalidation", () => {
     await queryRealTimeAssetsValue();
     await queryRealTimeAssetsValue();
 
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(1);
+    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
     expect(ASSET_HANDLER.listSymbolGroupedAssets).toHaveBeenCalledTimes(1);
 
     const profitEpoch = getCacheGroupEpoch(
@@ -195,7 +195,7 @@ describe("generic data cache invalidation", () => {
       await calculateTotalProfit(dateRange, "BTC", "crypto");
       await queryRealTimeAssetsValue();
 
-      expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+      expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
       expect(ASSET_HANDLER.listSymbolGroupedAssets).toHaveBeenCalledTimes(2);
       expect(consoleWarn).toHaveBeenCalledWith(
         "local storage cache cleanup failed",

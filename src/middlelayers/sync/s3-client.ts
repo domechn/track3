@@ -1,5 +1,9 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import { S3Error, type ListOptions, type ListPage, type S3Store, type WriteConditions } from "./object-store";
+import { S3Error, SyncTimeoutError, type ListOptions, type ListPage, type S3Store, type WriteConditions } from "./object-store";
+
+// Metadata requests are small; encrypted object transfers can be much larger.
+export const S3_METADATA_TIMEOUT_MS = 30_000;
+export const S3_OBJECT_TIMEOUT_MS = 120_000;
 
 type S3Config = {
   endpoint: string;
@@ -28,6 +32,19 @@ type SignInput = {
 };
 
 const encoder = new TextEncoder();
+function anySignal(signals: AbortSignal[]): { signal: AbortSignal; cleanup: () => void } {
+  const native = (AbortSignal as typeof AbortSignal & { any?: (signals: AbortSignal[]) => AbortSignal }).any;
+  if (native) return { signal: native(signals), cleanup: () => {} };
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  for (const signal of signals) {
+    if (signal.aborted) abort();
+    else signal.addEventListener("abort", abort, { once: true });
+  }
+  return { signal: controller.signal, cleanup: () => {
+    for (const signal of signals) signal.removeEventListener("abort", abort);
+  } };
+}
 
 function validPath(path: string): boolean {
   return path.split("/").every((part) => part !== "" && !/^(?:\.|%2e){1,2}$/i.test(part));
@@ -130,32 +147,32 @@ export function parseListObjectsV2(xml: string): ListPage {
 }
 
 async function discardResponse(response: Response): Promise<void> {
-  try { await response.body?.cancel(); } catch { /* The reader may already own the stream. */ }
+  try { void response.body?.cancel().catch(() => {}); } catch { /* The reader may already own the stream. */ }
 }
 
 async function readResponse<T>(response: Response, read: () => Promise<T>, timeoutMs: number, signal?: AbortSignal): Promise<T> {
   if (signal?.aborted) throw new Error("S3 request aborted");
   let timer: ReturnType<typeof setTimeout> | undefined;
   let onAbort: () => void = () => {};
+  const timeout = new AbortController();
+  const { signal: combined, cleanup } = anySignal(signal ? [signal, timeout.signal] : [timeout.signal]);
   const cancelled = new Promise<never>((_, reject) => {
-    onAbort = () => reject(new Error("S3 request aborted"));
-    signal?.addEventListener("abort", onAbort, { once: true });
+    onAbort = () => reject(timeout.signal.aborted ? new SyncTimeoutError() : new Error("S3 request aborted"));
+    combined.addEventListener("abort", onAbort, { once: true });
   });
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("S3 response timed out")), timeoutMs);
-  });
+  timer = setTimeout(() => timeout.abort(), timeoutMs);
   try {
     return await Promise.race([
       read().catch(() => { throw new Error("S3 response read failed"); }),
       cancelled,
-      deadline,
     ]);
   } catch (error) {
     await discardResponse(response);
     throw error;
   } finally {
     if (timer) clearTimeout(timer);
-    signal?.removeEventListener("abort", onAbort);
+    combined.removeEventListener("abort", onAbort);
+    cleanup();
   }
 }
 
@@ -198,13 +215,13 @@ export class S3Client implements S3Store {
     return url;
   }
 
-  private async request(method: string, url: URL, body = new Uint8Array(), conditions?: WriteConditions, signal?: AbortSignal): Promise<Response> {
+  private async request(method: string, url: URL, body = new Uint8Array(), conditions?: WriteConditions, signal?: AbortSignal, defaultTimeoutMs = S3_METADATA_TIMEOUT_MS): Promise<Response> {
     url.search = canonicalQuery(url);
     const headers: Record<string, string> = {};
     if (conditions?.ifMatch !== undefined) headers["if-match"] = conditions.ifMatch;
     if (conditions?.ifNoneMatch !== undefined) headers["if-none-match"] = conditions.ifNoneMatch;
     if (this.config.sessionToken) headers["x-amz-security-token"] = this.config.sessionToken;
-    const timeoutMs = this.config.timeoutMs ?? 15000;
+    const timeoutMs = this.config.timeoutMs ?? defaultTimeoutMs;
     const retryBaseMs = this.config.retryBaseMs ?? 250;
     for (let attempt = 0; ; attempt++) {
       if (signal?.aborted) throw new Error("S3 request aborted");
@@ -212,25 +229,18 @@ export class S3Client implements S3Store {
         method, url, body, headers, region: this.config.region,
         accessKeyId: this.config.accessKeyId, secretAccessKey: this.config.secretAccessKey,
       });
-      const controller = new AbortController();
+      const timeout = new AbortController();
+      const { signal: combined, cleanup } = anySignal(signal ? [signal, timeout.signal] : [timeout.signal]);
       let onAbort: () => void = () => {};
       const cancelled = new Promise<never>((_, reject) => {
         onAbort = () => {
-          controller.abort();
-          reject(new Error("S3 request aborted"));
+          reject(timeout.signal.aborted ? new SyncTimeoutError() : new Error("S3 request aborted"));
         };
-        signal?.addEventListener("abort", onAbort, { once: true });
+        combined.addEventListener("abort", onAbort, { once: true });
       });
-      if (signal?.aborted) onAbort();
+      if (combined.aborted) onAbort();
       let timer: ReturnType<typeof setTimeout> | undefined;
-      let timedOut = false;
-      const deadline = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => {
-          timedOut = true;
-          controller.abort();
-          reject(new Error("S3 request timed out"));
-        }, timeoutMs);
-      });
+      timer = setTimeout(() => timeout.abort(), timeoutMs);
       let response: Response;
       try {
         response = await Promise.race([
@@ -238,19 +248,19 @@ export class S3Client implements S3Store {
             method,
             headers: signed,
             body: method === "PUT" ? body : undefined,
-            signal: controller.signal,
+            signal: combined,
             connectTimeout: timeoutMs,
           }),
-          deadline,
           cancelled,
         ]);
       } catch {
         if (signal?.aborted) throw new Error("S3 request aborted");
-        if (timedOut) throw new Error("S3 request timed out");
+        if (timeout.signal.aborted) throw new SyncTimeoutError();
         throw new Error("S3 network request failed");
       } finally {
         if (timer) clearTimeout(timer);
-        signal?.removeEventListener("abort", onAbort);
+        combined.removeEventListener("abort", onAbort);
+        cleanup();
       }
       if ((response.status === 429 || response.status >= 500) && attempt < 3 &&
           !(response.status >= 500 && method === "PUT" && conditions &&
@@ -282,7 +292,7 @@ export class S3Client implements S3Store {
   }
 
   async putObject(key: string, body: Uint8Array, conditions?: WriteConditions, signal?: AbortSignal): Promise<{ etag: string }> {
-    const response = await this.request("PUT", this.url(key), body, conditions, signal);
+    const response = await this.request("PUT", this.url(key), body, conditions, signal, S3_OBJECT_TIMEOUT_MS);
     const etag = response.headers.get("etag");
     await discardResponse(response);
     if (!etag) throw new Error("S3 response missing ETag");
@@ -291,13 +301,13 @@ export class S3Client implements S3Store {
 
   async getObject(key: string, signal?: AbortSignal): Promise<{ body: Uint8Array; etag: string } | null> {
     try {
-      const response = await this.request("GET", this.url(key), undefined, undefined, signal);
+      const response = await this.request("GET", this.url(key), undefined, undefined, signal, S3_OBJECT_TIMEOUT_MS);
       const etag = response.headers.get("etag");
       if (!etag) {
         await discardResponse(response);
         throw new Error("S3 response missing ETag");
       }
-      const body = new Uint8Array(await readResponse(response, () => response.arrayBuffer(), this.config.timeoutMs ?? 15000, signal));
+      const body = new Uint8Array(await readResponse(response, () => response.arrayBuffer(), this.config.timeoutMs ?? S3_OBJECT_TIMEOUT_MS, signal));
       return { body, etag };
     } catch (error) {
       if (error instanceof S3Error && error.status === 404) return null;
@@ -330,7 +340,7 @@ export class S3Client implements S3Store {
     if (prefix !== undefined) url.searchParams.set("prefix", prefix);
     if (options.continuationToken !== undefined) url.searchParams.set("continuation-token", options.continuationToken);
     const response = await this.request("GET", url, undefined, undefined, options.signal);
-    const xml = await readResponse(response, () => response.text(), this.config.timeoutMs ?? 15000, options.signal);
+    const xml = await readResponse(response, () => response.text(), this.config.timeoutMs ?? S3_METADATA_TIMEOUT_MS, options.signal);
     const page = parseListObjectsV2(xml);
     if (this.config.prefix) {
       const base = `${this.config.prefix}/`;
