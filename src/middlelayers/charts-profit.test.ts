@@ -116,7 +116,7 @@ beforeEach(() => {
 async function warmProfitCache() {
   await calculateTotalProfit(dateRange, "BTC", "crypto");
   await calculateTotalProfit(dateRange, "BTC", "crypto");
-  expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(1);
+  expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
   expect(
     TRANSACTION_HANDLER.listTransactionsByDateRange,
   ).toHaveBeenCalledTimes(1);
@@ -213,7 +213,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).toHaveBeenCalledTimes(1);
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(2);
@@ -226,7 +226,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).toHaveBeenCalledTimes(1);
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(2);
@@ -245,7 +245,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).not.toHaveBeenCalled();
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(1);
+    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(1);
@@ -265,7 +265,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
       await expect(update()).resolves.toBeUndefined();
 
       await calculateTotalProfit(dateRange, "BTC", "crypto");
-      expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+      expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
       expect(
         TRANSACTION_HANDLER.listTransactionsByDateRange,
       ).toHaveBeenCalledTimes(2);

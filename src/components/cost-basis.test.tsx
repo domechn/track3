@@ -4,6 +4,8 @@ import CostBasisPage from "./cost-basis";
 import { getCostBasisMethod, saveCostBasisMethod } from "@/middlelayers/configuration";
 import { exportCostBasisReport, loadCostBasisReport } from "@/middlelayers/cost-basis-data";
 import { COST_BASIS_SETTINGS_KEY } from "@/middlelayers/ai/actions/page-settings";
+import { TRANSACTION_HANDLER } from "@/middlelayers/entities/transactions";
+import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
 import axe from "axe-core";
 
 vi.mock("@/middlelayers/configuration", () => ({
@@ -12,6 +14,12 @@ vi.mock("@/middlelayers/configuration", () => ({
 }));
 vi.mock("@/middlelayers/cost-basis-data", () => ({
   loadCostBasisReport: vi.fn(), exportCostBasisReport: vi.fn(),
+}));
+vi.mock("@/middlelayers/entities/transactions", () => ({
+  TRANSACTION_HANDLER: { listTransactions: vi.fn() },
+}));
+vi.mock("@/middlelayers/entities/assets", () => ({
+  ASSET_HANDLER: { listAssets: vi.fn() },
 }));
 vi.mock("react-chartjs-2", () => ({
   Bar: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
@@ -45,6 +53,23 @@ it("shows realized totals and data gaps from the loaded report", async () => {
   expect(screen.getByText(/Proceeds:/)).toHaveTextContent("200 USD");
   expect(screen.getByText(/Cost basis:/)).toHaveTextContent("100 USD");
 });
+
+it("shows an anniversary sale as short term through the default page report", async () => {
+  localStorage.setItem(COST_BASIS_SETTINGS_KEY, JSON.stringify({ from: "2024-01-01", to: "2024-12-31" }));
+  vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
+    { id: 1, uuid: "buy", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 1, price: 100, txnCreatedAt: "2023-01-01T08:00:00Z" },
+    { id: 2, uuid: "sell", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "sell", amount: 1, price: 200, txnCreatedAt: "2024-01-01T09:00:00Z" },
+  ] as never);
+  vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([]);
+  vi.mocked(loadCostBasisReport).mockImplementation(async (options) => {
+    const actual = await vi.importActual<typeof import("@/middlelayers/cost-basis-data")>("@/middlelayers/cost-basis-data");
+    return actual.loadCostBasisReport(options);
+  });
+  render(<CostBasisPage />);
+  fireEvent.click(await screen.findByText("Details"));
+  expect(await screen.findByText("Short-term")).toBeInTheDocument();
+});
+
 it("keeps manual setup open after a filter reload", async () => {
   render(<CostBasisPage />);
   await screen.findAllByText("BTC");
