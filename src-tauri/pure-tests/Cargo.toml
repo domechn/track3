@@ -23,4 +23,4 @@ reqwest = "=0.12.28"
 version-compare = "0.2"
 
 [target.'cfg(unix)'.dependencies]
-libc = "=0.2.185"
+libc = "=0.2.186"
