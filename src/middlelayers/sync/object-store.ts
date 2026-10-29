@@ -7,6 +7,13 @@ export class S3Error extends Error {
   }
 }
 
+export class SyncTimeoutError extends Error {
+  constructor() {
+    super("Sync timed out");
+    this.name = "SyncTimeoutError";
+  }
+}
+
 export function isS3Conflict(error: unknown): boolean {
   return error instanceof S3Error && (error.status === 409 || error.status === 412);
 }

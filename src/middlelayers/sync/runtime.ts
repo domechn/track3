@@ -44,6 +44,7 @@ const production: Dependencies = {
 export type RuntimeStatus = {
   mode: "loading" | "disabled" | "locked" | "ready" | "unreadable";
   sync: SyncStatus;
+  skipped?: boolean;
 };
 
 export class SyncRuntime {
@@ -51,6 +52,8 @@ export class SyncRuntime {
   private passphrase?: string;
   private scheduler?: SyncScheduler;
   private handle?: EngineHandle;
+  private lockedPromptClaimed = false;
+  private skipped = false;
   private listeners = new Set<() => void>();
   private snapshot: RuntimeStatus = { mode: "loading", sync: { phase: "idle" } };
 
@@ -65,8 +68,21 @@ export class SyncRuntime {
 
   getSettings(): SyncSettings { return this.settings; }
 
+  claimLockedPrompt(): boolean {
+    if (this.snapshot.mode !== "locked" || this.lockedPromptClaimed) return false;
+    this.lockedPromptClaimed = true;
+    return true;
+  }
+
+  skip(): void {
+    if (this.snapshot.mode === "locked") {
+      this.skipped = true;
+      this.publish("locked");
+    }
+  }
+
   private publish(mode: RuntimeStatus["mode"], sync: SyncStatus = this.snapshot.sync): void {
-    this.snapshot = { mode, sync };
+    this.snapshot = { mode, sync, skipped: mode === "locked" && this.skipped };
     for (const listener of this.listeners) listener();
   }
 
@@ -109,8 +125,11 @@ export class SyncRuntime {
         }
       }
       const next = { ...settings, enabled: true };
+      if (this.scheduler && !await this.scheduler.stop()) {
+        this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
+        return "timeout";
+      }
       await this.deps.save(next);
-      await this.scheduler?.stop();
       if ((["endpoint", "region", "bucket", "prefix", "pathStyle"] as const).some((key) =>
         this.settings[key] !== next[key])) {
         await this.deps.resetState?.();
@@ -134,6 +153,10 @@ export class SyncRuntime {
       } catch {
         return "passphrase";
       }
+      if (this.scheduler && !await this.scheduler.stop()) {
+        this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
+        return "timeout";
+      }
       this.activate(store, passphrase);
       return "ok";
     } catch (error) {
@@ -142,7 +165,7 @@ export class SyncRuntime {
   }
 
   private activate(store: S3Store, passphrase: string): void {
-    void this.scheduler?.stop();
+    this.skipped = false;
     this.handle?.unregister();
     this.passphrase = passphrase;
     this.handle = this.deps.engine(store, passphrase);
@@ -172,21 +195,25 @@ export class SyncRuntime {
     await this.syncNow();
   }
 
-  async disable(): Promise<void> {
-    const next = { ...this.settings, enabled: false };
+  async disable(clearSettings = false): Promise<boolean> {
+    const next = clearSettings
+      ? { ...defaultSyncSettings, categories: { ...defaultSyncSettings.categories }, deviceNames: {} }
+      : { ...this.settings, enabled: false };
     await this.deps.save(next);
     this.settings = next;
-    await this.scheduler?.stop();
-    this.scheduler = undefined;
+    const settled = (await this.scheduler?.stop()) ?? true;
+    if (settled) this.scheduler = undefined;
     this.handle?.unregister();
     this.handle = undefined;
     this.passphrase = undefined;
+    this.skipped = false;
     this.publish("disabled", { phase: "idle" });
+    return settled;
   }
 
   async forgetRemote(): Promise<void> {
-    await this.disable();
     const store = this.deps.store(this.settings);
+    if (!await this.disable()) throw new Error("Sync round has not stopped");
     const keys: string[] = [];
     let continuationToken: string | undefined;
     do {
