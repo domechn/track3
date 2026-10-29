@@ -399,6 +399,7 @@ const secondTransaction: Transaction = {
   txnCreatedAt: "2024-04-16T00:00:00.000Z",
 };
 
+// The full coverage run can delay this detail-dialog render past Vitest's 5 s default.
 it("shows a compact phone identity, 24h price change, and an unbroken transaction date", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
@@ -422,7 +423,7 @@ it("shows a compact phone identity, 24h price change, and an unbroken transactio
   expect(history).toHaveTextContent("Apr 15");
   fireEvent.click(history.querySelector(".mobile-list-row")!);
   expect(await screen.findByRole("dialog", { name: "Apr 15" }, { timeout: 5000 })).toHaveTextContent("2024");
-});
+}, 20_000);
 
 it("anchors the prior-day coin price to the latest snapshot instead of the range end", async () => {
   mocks.queryAllDataDates.mockResolvedValue([
