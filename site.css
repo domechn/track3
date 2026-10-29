@@ -609,7 +609,7 @@ footer .wrap span:first-child {
   left: 16px;
   z-index: 100;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   padding: 10px 14px;
   border-radius: 8px;
 }
@@ -1007,5 +1007,86 @@ header .wrap {
   }
   .feature.flip .win {
     order: 1;
+  }
+}
+
+/* Exchange docs use the site's page rhythm and color tokens. */
+.docs-page header,
+.docs-page .mobile-menu .menu-links {
+  background: var(--bg);
+}
+.docs-page .page-intro {
+  border-bottom: 1px solid var(--line);
+}
+.docs-page .page-intro .kicker {
+  color: var(--accent);
+  font-size: 15px;
+  margin: 0 0 14px;
+}
+.docs-page .page-intro .meta {
+  font-size: 15px;
+  color: var(--ink-3);
+}
+.docs-page .page-intro a {
+  color: var(--accent);
+}
+.doc-content {
+  max-width: 900px;
+}
+.doc-content h2 {
+  margin-bottom: 22px;
+}
+.doc-content p + p,
+.doc-content ol + p,
+.doc-content ul + p {
+  margin-top: 18px;
+}
+.doc-content ul {
+  padding-left: 24px;
+  display: grid;
+  gap: 12px;
+}
+.doc-content strong {
+  color: var(--ink);
+}
+.doc-callout {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--r);
+  padding: 22px 26px;
+  margin: 24px 0;
+  color: var(--ink-2);
+}
+.doc-table-wrap {
+  overflow-x: auto;
+  margin-top: 28px;
+}
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.doc-table th,
+.doc-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.doc-table thead {
+  background: var(--bg);
+}
+.doc-table tbody th {
+  font-weight: 600;
+}
+@media (prefers-color-scheme: dark) {
+  .docs-page {
+    --ink: #f3f1ff;
+    --ink-2: #d2cde8;
+    --ink-3: #b8b2d6;
+    --bg: #17142b;
+    --tint: #24213b;
+    --line: #494365;
+    --accent: #b4aaff;
+    --accent-ink: #17142b;
   }
 }
