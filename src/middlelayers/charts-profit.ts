@@ -18,6 +18,7 @@ import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { filterByAssetType } from "./charts-shared";
 import { executeWrite } from "./database";
+import { fromStoredTransactions } from "./cost-basis";
 
 const TOTAL_PROFIT_CACHE_TTL_SECONDS = 15 * 60;
 const TOTAL_PROFIT_CACHE_SESSION_ID =
@@ -127,6 +128,14 @@ export async function calculateTotalProfit(
     ),
     assetType,
   );
+  const priorAssets = filterByAssetType(
+    await ASSET_HANDLER.listAssetsMaxCreatedAt(
+      undefined,
+      dateRange.start,
+      symbol,
+    ),
+    assetType,
+  );
 
   const allTransactions = filterByAssetType(
     (await TRANSACTION_HANDLER.listTransactionsByDateRange(
@@ -136,41 +145,41 @@ export async function calculateTotalProfit(
     )).flat(),
     assetType,
   );
-  // todo: handle if one asset has multiple transactions
-  const allTransactionsAssetIdMap = Object.fromEntries(
-    allTransactions.map((t) => [t.assetID, t]),
-  );
-
+  const priorIdentities = new Set(priorAssets.map(getAssetIdentity));
+  const baselineAssets = [
+    ...priorAssets,
+    ...earliestAssets.filter((asset) => !priorIdentities.has(getAssetIdentity(asset))),
+  ];
   const dateRangeEarliestAssets = Array.from(
-    earliestAssets.reduce((map, asset) => {
+    baselineAssets.reduce((map, asset) => {
       const key = getAssetIdentity(asset);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(asset);
       return map;
     }, new Map<string, AssetModel[]>())
   ).map(([_, assets]) => {
-    const bsAssets = assets.filter((a) => {
-      const txn = allTransactionsAssetIdMap[a.id];
-      return !txn || isTransactionBuyOrSell(txn);
-    });
-    const allAmount = bsAssets.reduce((s, a) => s + a.amount, 0);
-    const allValue = bsAssets
-      .map(
-        (a) => (allTransactionsAssetIdMap[a.id]?.price ?? a.price) * a.amount,
-      )
-      .reduce((s, v) => s + v, 0);
-      const first = assets[0];
-      return {
-        symbol: first?.symbol ?? "",
-        assetType: getAssetType(first),
-        price: allAmount === 0 ? 0 : allValue / allAmount,
-        amount: allAmount,
-        value: allValue,
-        // all createdAt are same, so just get the first one
-        createdAt: first?.createdAt,
-      };
-    });
+    const allAmount = assets.reduce((s, a) => s + a.amount, 0);
+    const allValue = assets.reduce((s, a) => s + a.value, 0);
+    const first = assets[0];
+    return {
+      symbol: first?.symbol ?? "",
+      assetType: getAssetType(first),
+      price: allAmount === 0 ? 0 : allValue / allAmount,
+      amount: allAmount,
+      value: allValue,
+      // all createdAt are same, so just get the first one
+      createdAt: first?.createdAt,
+    };
+  });
 
+  const pairedTransfers = new Set(
+    fromStoredTransactions(allTransactions.map((txn) => ({
+      ...txn,
+      assetType: getAssetType(txn),
+    })))
+      .filter((event) => event.type === "transfer-in" || event.type === "transfer-out")
+      .map((event) => Number(event.id)),
+  );
   const groupedTransactions = Array.from(
     allTransactions.reduce((map, txn) => {
       const key = getAssetIdentity(txn);
@@ -184,7 +193,7 @@ export async function calculateTotalProfit(
       .slice()
       .sort((a, b) => a.txnCreatedAt.localeCompare(b.txnCreatedAt))
       .map((txn) => {
-        if (!isTransactionBuyOrSell(txn)) {
+        if ((!isTransactionBuyOrSell(txn) && txn.txnType !== "deposit") || pairedTransfers.has(txn.id)) {
           return;
         }
 
@@ -194,35 +203,42 @@ export async function calculateTotalProfit(
     return {
       symbol: first?.symbol ?? "",
       assetType: getAssetType(first),
-      latest: dateRangeAssets.find(
-        (a) =>
-          a.symbol === first?.symbol && a.assetType === getAssetType(first),
-      ),
       actions: symbolTxns,
     };
   });
-  const coins = groupedTransactions
+  const coinIdentities = new Set([
+    ...dateRangeAssets.map(getAssetIdentity),
+    ...earliestAssets.map(getAssetIdentity),
+    ...groupedTransactions.map(getAssetIdentity),
+  ]);
+  const coins = [...coinIdentities]
     .map((d) => {
-      if (!d.latest) {
+      const latest = dateRangeAssets.find((asset) => getAssetIdentity(asset) === d);
+      if (!latest) {
         return;
       }
+      const txns = groupedTransactions.find((group) => getAssetIdentity(group) === d);
+      const baseline = dateRangeEarliestAssets.find((asset) => getAssetIdentity(asset) === d);
+      if (latest.amount === 0 && (baseline?.amount ?? 0) === 0 && !txns?.actions.length) return;
+      const baselineInsideRange = !!baseline && baseline.createdAt >= dateRange.start.toISOString();
+      const firstSnapshotBuys = baselineInsideRange
+        ? (txns?.actions ?? []).filter(
+            (action) => action.changedAt === baseline.createdAt && action.amount > 0,
+          )
+        : [];
+      const firstSnapshotBuyAmount = firstSnapshotBuys.reduce((sum, action) => sum + action.amount, 0);
       const beforeBuyAmount =
-        dateRangeEarliestAssets.find(
-          (a) => a.symbol === d.symbol && a.assetType === d.assetType,
-        )?.amount ?? 0;
+        (baseline?.amount ?? 0) - firstSnapshotBuyAmount;
 
       const beforeCost =
-        dateRangeEarliestAssets.find(
-          (a) => a.symbol === d.symbol && a.assetType === d.assetType,
-        )?.value ?? 0;
-      const beforeCreatedAt = dateRangeEarliestAssets.find(
-        (a) => a.symbol === d.symbol && a.assetType === d.assetType,
-      )?.createdAt;
+        (baseline?.value ?? 0) - firstSnapshotBuyAmount * (baseline?.price ?? 0);
+      const beforeCreatedAt = baseline?.createdAt;
       const beforeSellAmount = 0;
       const beforeSell = 0;
       // filter out transactions before the first buy
-      const afterActions = d.actions.filter(
-        (a) => beforeCreatedAt === undefined || a.changedAt > beforeCreatedAt,
+      const afterActions = (txns?.actions ?? []).filter(
+        (a) => beforeCreatedAt === undefined || a.changedAt > beforeCreatedAt ||
+          (baselineInsideRange && a.changedAt === beforeCreatedAt && a.amount > 0),
       );
 
       const buyAmount =
@@ -245,20 +261,20 @@ export async function calculateTotalProfit(
       const costAvgPrice = buyAmount === 0 ? 0 : cost / buyAmount;
       const sellAvgPrice = sellAmount === 0 ? 0 : sell / sellAmount;
 
-      const lastPrice = d.latest.price;
+      const lastPrice = latest.price;
 
-      const lastAmount = d.latest.amount;
+      const lastAmount = latest.amount;
 
       const realizedProfit = sellAmount * (sellAvgPrice - costAvgPrice);
       const unrealizedProfit = lastAmount * (lastPrice - costAvgPrice);
 
       const percentage =
         cost === 0
-          ? undefined
+          ? (realizedProfit + unrealizedProfit === 0 ? 0 : undefined)
           : ((realizedProfit + unrealizedProfit) / cost) * 100;
       return {
-        symbol: d.symbol,
-        assetType: d.assetType,
+        symbol: latest.symbol,
+        assetType: latest.assetType,
         value: realizedProfit + unrealizedProfit,
         realSpentValue: cost,
         buyAmount,
@@ -284,7 +300,7 @@ export async function calculateTotalProfit(
   const resp = {
     total,
     percentage:
-      totalRealSpent === 0 ? undefined : (total / totalRealSpent) * 100,
+      totalRealSpent === 0 ? (total === 0 ? 0 : undefined) : (total / totalRealSpent) * 100,
     coins,
     lastRecordDate: lrd ? new Date(lrd) : undefined,
   };
