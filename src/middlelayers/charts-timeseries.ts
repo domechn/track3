@@ -61,8 +61,8 @@ export async function queryPNLTableValue(): Promise<PNLTableDate> {
   return {
     latestTotalValue: pnlData[pnlData.length - 1]?.totalValue,
     todayPNL: getPNL(1),
-    sevenTPnl: getPNL(8),
-    thirtyPNL: getPNL(31),
+    sevenTPnl: getPNL(7),
+    thirtyPNL: getPNL(30),
   };
 }
 

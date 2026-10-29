@@ -19,10 +19,10 @@ vi.mock("./datafetch/utils/cache", async (importOriginal) => {
 });
 vi.mock("./entities/assets", () => ({
   ASSET_HANDLER: {
-    listAssetsMaxCreatedAt: async (_start: Date, _end: Date, symbol?: string) =>
-      extreme("max", symbol),
-    listAssetsMinCreatedAt: async (_start: Date, _end: Date, symbol?: string) =>
-      extreme("min", symbol),
+    listAssetsMaxCreatedAt: async (start?: Date, end?: Date, symbol?: string) =>
+      extreme("max", start, end, symbol),
+    listAssetsMinCreatedAt: async (start?: Date, end?: Date, symbol?: string) =>
+      extreme("min", start, end, symbol),
   },
 }));
 vi.mock("./entities/transactions", () => ({
@@ -49,8 +49,11 @@ const range = { start: new Date(at(1)), end: new Date(at(9)) };
 const btc = (wallet: string, amount: number, price: number): Holding =>
   ({ wallet, symbol: "BTC", amount, price });
 
-function extreme(direction: "min" | "max", symbol?: string): AssetModel[] {
-  const rows = db.assets.filter((asset) => !symbol || asset.symbol === symbol);
+function extreme(direction: "min" | "max", start?: Date, end?: Date, symbol?: string): AssetModel[] {
+  const rows = db.assets.filter((asset) =>
+    (!symbol || asset.symbol === symbol) &&
+    (!start || asset.createdAt >= start.toISOString()) &&
+    (!end || asset.createdAt <= end.toISOString()));
   const ordered = rows.slice().sort((left, right) =>
     direction === "min"
       ? left.createdAt.localeCompare(right.createdAt)
@@ -217,6 +220,42 @@ describe("whole-position refresh pricing", () => {
     expect(attributeSnapshots(editedDates).totals).toEqual({
       priceEffect: 220, flowEffect: 0, residual: 0, totalChange: 220,
     });
+  });
+
+  it("excludes both transfer kinds from averages while retaining a real sale and unknown withdrawals", async () => {
+    load([
+      { at: at(1), holdings: [btc("w1", 1, 100), btc("w3", 1, 100)] },
+      { at: at(2), holdings: [btc("w2", 1, 150), btc("w3", 1, 150)] },
+      { at: at(3), holdings: [btc("w2", 1, 200)] },
+      { at: at(4), holdings: [btc("w2", 1, 210), btc("w4", 1, 210)] },
+      { at: at(5), holdings: [btc("w4", 1, 250)], prices: { "crypto:BTC": 250 } },
+    ]);
+    const withdrawal = db.txns.find((txn) => txn.uuid === "refresh-2" && txn.wallet === "w3")!;
+    const deposit = db.txns.find((txn) => txn.uuid === "refresh-3" && txn.wallet === "w4")!;
+    withdrawal.txnType = "withdraw";
+    deposit.txnType = "deposit";
+
+    const events = fromStoredTransactions(db.txns);
+    expect(events.filter((event) => event.type.startsWith("transfer")).map((event) => event.type).sort())
+      .toEqual(["transfer-in", "transfer-in", "transfer-out", "transfer-out"]);
+    const basis = calculateCostBasis(events, {
+      method: "FIFO", prices: { "crypto:BTC": 250 },
+    });
+    expect(basis.disposals).toEqual([
+      expect.objectContaining({ proceeds: 250, costBasis: 100, gainLoss: 150 }),
+    ]);
+    expect(basis.openLots).toEqual([expect.objectContaining({ amount: 1, costBasis: 100 })]);
+
+    const profit = await calculateTotalProfit(range, "BTC", "crypto");
+    expect(profit.total).toBe(300);
+    expect(profit.coins[0]).toMatchObject({
+      value: 300, buyAmount: 2, sellAmount: 1, costAvgPrice: 100, sellAvgPrice: 250,
+    });
+
+    db.txns.splice(db.txns.indexOf(deposit), 1);
+    const unpaired = await calculateTotalProfit(range, "BTC", "crypto");
+    expect(unpaired.coins[0]?.value).toBeNull();
+    expect(unpaired.total).toBeNull();
   });
 
   it("keeps an earlier sale when the next refresh has its own wallet transfer", async () => {

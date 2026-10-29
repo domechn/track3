@@ -64,34 +64,23 @@ const App = ({
   }
 
   function formatPNLValue(val?: number): string {
-    if (!val) {
+    if (val === undefined) {
       return "-";
     }
     const valStr =
       currency.symbol +
       prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(val)));
-    if (val > 0) {
-      return "+" + valStr;
-    }
-    return "-" + valStr;
+    return val > 0 ? "+" + valStr : val < 0 ? "-" + valStr : valStr;
   }
 
   function formatPNLPercentage(val?: number): string {
-    if (val === undefined) {
-      return "-";
-    }
     const latest = getLatestTotalValue();
-    if (!latest) {
-      return "-";
+    if (val === undefined || latest === undefined || !Number.isFinite(val) || !Number.isFinite(latest)) {
+      return "—";
     }
-
-    let percentage = 0;
-
-    if (val === 0) {
-      percentage = 100;
-    } else {
-      percentage = (val / latest) * 100;
-    }
+    const startingValue = latest - val;
+    if (startingValue <= 0) return "—";
+    const percentage = (val / startingValue) * 100;
 
     let percentageStr = percentage.toFixed(2) + "%";
 

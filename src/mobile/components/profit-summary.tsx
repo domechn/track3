@@ -189,7 +189,8 @@ const App = ({
               date.lastDay.getDate(),
               23,
               59,
-              59
+              59,
+              999
             ),
           });
 
@@ -233,7 +234,7 @@ const App = ({
         async (year) => {
           const { total, lastRecordDate } = await calculateTotalProfit({
             start: new Date(year, 0, 1),
-            end: new Date(year, 11, 31, 23, 59, 59),
+            end: new Date(year, 11, 31, 23, 59, 59, 999),
           });
 
           return { total, year, hasData: Boolean(lastRecordDate) };

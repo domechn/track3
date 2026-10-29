@@ -20,6 +20,9 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
     subscribe: () => () => {},
     unlock: vi.fn(async () => "ok"),
     syncNow: vi.fn(),
+    claimLockedPrompt: () => true,
+    skip: vi.fn(),
+    disable: vi.fn(),
   },
 }));
 
@@ -66,6 +69,14 @@ describe("SyncStatusIndicator", () => {
     render(<SyncStatusIndicator />);
     fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
     expect(await screen.findByText("The sync header is damaged or unsupported.")).toBeInTheDocument();
+  });
+  it("shows no invented counts before the first sync", async () => {
+    state.current.sync.phase = "idle";
+    Object.assign(state.current.sync, { report: undefined, error: undefined });
+    render(<SyncStatusIndicator />);
+    fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+    expect(await screen.findByText("Not synced yet")).toBeInTheDocument();
+    expect(screen.queryByText(/Pulled 0, pushed 0/)).not.toBeInTheDocument();
   });
   it("explains when automatic retries stop", async () => {
     state.current.sync.error = "sync";

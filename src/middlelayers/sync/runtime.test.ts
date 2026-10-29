@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSyncHeader } from "./crypto";
 import { FakeS3, readSyncHeader, writeSyncHeader } from "./object-store";
 import { SyncRuntime } from "./runtime";
@@ -8,6 +8,8 @@ const configured: SyncSettings = {
   ...defaultSyncSettings, endpoint: "https://s3.example.test", region: "us-east-1",
   bucket: "track3", accessKeyId: "key", secretAccessKey: "secret",
 };
+
+afterEach(() => vi.useRealTimers());
 
 describe("SyncRuntime", () => {
   it("shows a recovery state when saved sync settings cannot be read", async () => {
@@ -120,9 +122,48 @@ describe("SyncRuntime", () => {
     await runtime.initialize();
     await runtime.disable();
     expect(saved.enabled).toBe(false);
+    expect(saved.endpoint).toBe(configured.endpoint);
+    expect(saved.bucket).toBe(configured.bucket);
+    expect(saved.accessKeyId).toBe(configured.accessKeyId);
+    expect(saved.secretAccessKey).toBe(configured.secretAccessKey);
     expect(await readSyncHeader(s3)).not.toBeNull();
     await runtime.forgetRemote();
     expect((await s3.listObjectsV2()).objects.map((item) => item.key)).toEqual(["unrelated-file"]);
+    runtime.stop();
+  });
+
+  it("clears local sync settings only when explicitly requested", async () => {
+    let saved = { ...configured, enabled: true };
+    const runtime = new SyncRuntime({
+      load: async () => saved,
+      save: async (next) => { saved = next; },
+      store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: vi.fn() }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.disable(true);
+    expect(saved.enabled).toBe(false);
+    expect(saved.endpoint).toBe("");
+    expect(saved.bucket).toBe("");
+    expect(saved.accessKeyId).toBe("");
+    expect(saved.secretAccessKey).toBe("");
+  });
+
+  it("skips a locked session until unlock and claims the automatic prompt once", async () => {
+    const runtime = new SyncRuntime({
+      load: async () => ({ ...configured, enabled: true }),
+      save: async () => {},
+      store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: vi.fn() }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    expect(runtime.claimLockedPrompt()).toBe(true);
+    expect(runtime.claimLockedPrompt()).toBe(false);
+    runtime.skip();
+    expect(runtime.status()).toMatchObject({ mode: "locked", skipped: true });
+    expect(runtime.claimLockedPrompt()).toBe(false);
+    await runtime.initialize();
+    expect(runtime.status()).toMatchObject({ mode: "locked", skipped: true });
     runtime.stop();
   });
 
@@ -175,6 +216,63 @@ describe("SyncRuntime", () => {
     await runtime.forgetRemote();
     await running;
   });
+
+  it("keeps remote objects when an aborted round has not settled", async () => {
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    await s3.putObject("devices/a/manifest", new Uint8Array([1]));
+    let saved = { ...configured, enabled: true };
+    let finish!: (report: { pulled: number; pushed: number; tombstonesApplied: number; configChanges: number; conflicts: string[]; errors: string[] }) => void;
+    const runtime = new SyncRuntime({
+      load: async () => saved,
+      save: async (next) => { saved = next; },
+      store: () => s3,
+      engine: () => ({ engine: { syncOnce: async () => new Promise((resolve) => { finish = resolve; }) }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.unlock("correct horse battery staple");
+    vi.useFakeTimers();
+    const running = runtime.syncNow();
+    const forgetting = expect(runtime.forgetRemote()).rejects.toThrow("Sync round has not stopped");
+    await vi.advanceTimersByTimeAsync(5_000);
+    await forgetting;
+    expect((await s3.listObjectsV2({ prefix: "devices/" })).objects).toHaveLength(1);
+    expect(saved.enabled).toBe(false);
+    finish({ pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] });
+    await running;
+    await runtime.forgetRemote();
+    expect((await s3.listObjectsV2({ prefix: "devices/" })).objects).toHaveLength(0);
+  });
+
+  it("does not enable a second engine while the old round ignores abort", async () => {
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    let saved = { ...configured, enabled: true };
+    let finish!: (report: { pulled: number; pushed: number; tombstonesApplied: number; configChanges: number; conflicts: string[]; errors: string[] }) => void;
+    let engines = 0;
+    const runtime = new SyncRuntime({
+      load: async () => saved,
+      save: async (next) => { saved = next; },
+      store: () => s3,
+      engine: () => {
+        engines++;
+        return { engine: { syncOnce: async () => new Promise((resolve) => { finish = resolve; }) }, unregister: () => {} };
+      },
+    });
+    await runtime.initialize();
+    await runtime.unlock("correct horse battery staple");
+    const running = runtime.syncNow();
+    const other = { ...configured, bucket: "other" };
+    expect(await runtime.configure(other, "correct horse battery staple")).toBe("timeout");
+    expect(engines).toBe(1);
+    expect(saved.bucket).toBe(configured.bucket);
+    expect(runtime.status().sync).toMatchObject({ phase: "error", error: "timeout" });
+    finish({ pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] });
+    await running;
+    expect(await runtime.configure(other, "correct horse battery staple")).toBe("ok");
+    expect(engines).toBe(2);
+    runtime.stop();
+  }, 15_000);
 
   it("resets publication state when the bucket changes and after remote data is forgotten", async () => {
     const first = new FakeS3();

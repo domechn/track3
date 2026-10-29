@@ -316,6 +316,31 @@ describe("calculateCostBasis", () => {
     expect(result.disposals[0].term).toBe("short");
   });
 
+  it.each([
+    ["2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z", "short"],
+    ["2023-01-01T08:00:00Z", "2024-01-01T09:00:00Z", "short"],
+    ["2024-01-01T00:00:00Z", "2025-01-02T00:00:00Z", "long"],
+    ["2024-02-29T08:00:00Z", "2025-02-28T12:00:00Z", "short"],
+    ["2024-02-29T08:00:00Z", "2025-03-01T00:00:00Z", "long"],
+  ] as const)("classifies a 100-dollar lot sold for 200 from %s on %s as %s", (buy, sell, term) => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 1, 100, { date: buy }),
+      event("sell", "2025-01-01", "sell", 1, 200, { date: sell }),
+    ], { method: "FIFO" });
+    expect(result.disposals[0]).toMatchObject({ proceeds: 200, costBasis: 100, gainLoss: 100, term });
+  });
+
+  it.each([
+    ["2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z"],
+    ["2023-01-01T08:00:00Z", "2024-01-01T09:00:00Z"],
+  ] as const)("keeps a sale on the calendar anniversary short with the page's 365-day setting: %s to %s", (buy, sell) => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 1, 100, { date: buy }),
+      event("sell", "2025-01-01", "sell", 1, 200, { date: sell }),
+    ], { method: "FIFO", holdingPeriodDays: 365 });
+    expect(result.disposals[0].term).toBe("short");
+  });
+
   it("treats explicit swap legs as disposal and acquisition, including stablecoins", () => {
     const result = calculateCostBasis([
       event("usdt", "2024-01-01", "buy", 100, 1, { symbol: "USDT" }),
