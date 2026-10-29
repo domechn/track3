@@ -1,5 +1,10 @@
 # Release review notes
 
+## Unreleased PnL and cost basis correction
+
+- PnL cards now calculate percentage change from the starting value, show a zero change as a formatted zero amount, and label the 7 and 30 windows as refreshes on desktop and iPhone. Those values now compare with exactly 7 and 30 earlier refreshes (previously 8 and 31), so displayed amounts and percentages may change. The cards use refresh counts because this query reads ordered portfolio snapshots; calendar-day windows would require date-based selection.
+- Cost basis treats sales on the acquisition anniversary date as short term at the default 365-day setting, including leap-year anniversaries. Other holding-day settings retain elapsed-day thresholds. Historical short-term and long-term totals may change.
+
 ## Profit Summary correction
 
 Historical profit figures may change because they were wrong. Period profit now includes held coins with no balance change, starts from the last snapshot at or before the period start, prices relabeled deposits as acquisitions, and excludes paired own-wallet transfers from the buy and sell averages.

@@ -263,8 +263,8 @@ combines the D2 data screens and D3 feature-screen pass.
   insight, and source balances. Loading uses a reserved skeleton layout.
   The mock screenshot portfolio has seven assets, 60 daily snapshots across
   two months, both positive and negative movers, and a saved insight.
-  The 7D and 30D P&L labels replace the old 7T and 30T wording; their
-  existing calculations still use historical snapshot offsets.
+  The 7 refreshes and 30 refreshes P&L labels describe their snapshot
+  windows. Their values compare with exactly 7 and 30 refreshes earlier.
 - Browser screenshots for the Overview and shell are generated in
   `test-results/mobile/` at the compact 320×568 viewport and iPhone 14
   (390×844) in
