@@ -32,6 +32,17 @@ it("loads the full transaction history and latest local price", async () => {
   expect(report.unrealized[0].gainLoss).toBe(200);
 });
 
+it("uses the calendar anniversary when the page loads its default 365-day report", async () => {
+  vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
+    { id: 1, uuid: "buy", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 1, price: 100, txnCreatedAt: "2023-01-01T08:00:00Z" },
+    { id: 2, uuid: "sell", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "sell", amount: 1, price: 200, txnCreatedAt: "2024-01-01T09:00:00Z" },
+  ] as never);
+  vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([]);
+  const report = await loadCostBasisReport({ method: "FIFO", holdingPeriodDays: 365 });
+  expect(report.disposals[0].term).toBe("short");
+  expect(report.totals).toMatchObject({ shortTerm: 100, longTerm: 0 });
+});
+
 it("does not value open lots at a missing zero snapshot price", async () => {
   vi.mocked(TRANSACTION_HANDLER.listTransactions).mockResolvedValue([
     { id: 1, uuid: "a", assetType: "crypto", symbol: "BTC", wallet: "w", txnType: "buy", amount: 1, price: 100, txnCreatedAt: localNoon(2024, 1, 1) },

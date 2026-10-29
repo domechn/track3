@@ -63,6 +63,15 @@ function sortableTimestamp(date: string): number {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function heldMoreThanOneCalendarYear(acquiredAt: string, disposedAt: string): boolean {
+  const acquired = new Date(acquiredAt);
+  const anniversary = new Date(acquired);
+  anniversary.setUTCFullYear(acquired.getUTCFullYear() + 1);
+  if (anniversary.getUTCMonth() !== acquired.getUTCMonth()) anniversary.setUTCDate(0);
+  // "Held more than one year" means the sale date is after the acquisition date plus one calendar year.
+  return new Date(disposedAt).toISOString().slice(0, 10) > anniversary.toISOString().slice(0, 10);
+}
+
 const lotOrders = new WeakMap<CostBasisLot, number>();
 
 function lotBefore(a: CostBasisLot, b: CostBasisLot, method: CostBasisMethod): boolean {
@@ -198,12 +207,13 @@ export function calculateCostBasis(
         : lot.costBasis * amount / lot.amount;
       if (taxable) {
         const proceeds = (event.amount * event.price - (event.fee ?? 0)) * amount / event.amount;
-        const daysHeld = (Date.parse(event.date) - Date.parse(lot.acquiredAt)) / 86_400_000;
         disposals.push({
           eventId: event.id, lotId: lot.id, assetType: event.assetType, symbol,
           acquiredAt: lot.acquiredAt, disposedAt: event.date, amount,
           proceeds, costBasis, gainLoss: proceeds - costBasis,
-          term: daysHeld > (options.holdingPeriodDays ?? 365) ? "long" : "short",
+          term: options.holdingPeriodDays === undefined || options.holdingPeriodDays === 365
+            ? heldMoreThanOneCalendarYear(lot.acquiredAt, event.date) ? "long" : "short"
+            : (Date.parse(event.date) - Date.parse(lot.acquiredAt)) / 86_400_000 > options.holdingPeriodDays ? "long" : "short",
           method: options.method,
         });
       }
