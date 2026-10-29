@@ -240,10 +240,10 @@ const App = ({
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
 
-  const [buyAmount, setBuyAmount] = useState<number>(0);
-  const [sellAmount, setSellAmount] = useState<number>(0);
-  const [costAvgPrice, setCostAvgPrice] = useState<number>(0);
-  const [sellAvgPrice, setSellAvgPrice] = useState<number>(0);
+  const [buyAmount, setBuyAmount] = useState<number>();
+  const [sellAmount, setSellAmount] = useState<number>();
+  const [costAvgPrice, setCostAvgPrice] = useState<number>();
+  const [sellAvgPrice, setSellAvgPrice] = useState<number>();
 
   const [profit, setProfit] = useState<number>(0);
   const [profitPercentage, setProfitPercentage] = useState<
@@ -405,19 +405,16 @@ const App = ({
   }, [transactions]);
 
   const breakevenPrice = useMemo(() => {
-    if (!lastAsset) {
+    if (!lastAsset || costAvgPrice === undefined || lastAsset.amount === 0) {
       return;
     }
-    if (lastAsset.amount === 0) {
-      return profit > 0 ? 0 : undefined;
-    }
     return (lastAsset.price * lastAsset.amount - profit) / lastAsset.amount;
-  }, [profit, lastAsset]);
+  }, [profit, lastAsset, costAvgPrice]);
 
   const breakEvenPriceStr = useMemo(
     () =>
       breakevenPrice === undefined
-        ? "∞"
+        ? "—"
         : currency.symbol +
           prettyPriceNumberToLocaleString(
             currencyWrapper(currency)(Math.max(breakevenPrice, 0) || 0),
@@ -427,19 +424,23 @@ const App = ({
 
   const sellPriceStr = useMemo(
     () =>
-      currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellAvgPrice)),
-    [currency, sellAvgPrice],
+      sellAvgPrice === undefined || !sellAmount
+        ? "—"
+        : currency.symbol +
+          prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellAvgPrice)),
+    [currency, sellAvgPrice, sellAmount],
   );
-  const sellAmountStr = useMemo(() => prettyAmount(sellAmount), [sellAmount]);
+  const sellAmountStr = useMemo(() => sellAmount === undefined ? "—" : prettyAmount(sellAmount), [sellAmount]);
 
   const costPriceStr = useMemo(
     () =>
-      currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(costAvgPrice)),
+      costAvgPrice === undefined
+        ? "—"
+        : currency.symbol +
+          prettyPriceNumberToLocaleString(currencyWrapper(currency)(costAvgPrice)),
     [currency, costAvgPrice],
   );
-  const buyAmountStr = useMemo(() => prettyAmount(buyAmount), [buyAmount]);
+  const buyAmountStr = useMemo(() => buyAmount === undefined ? "—" : prettyAmount(buyAmount), [buyAmount]);
   const lastPrice = useMemo(() => lastAsset?.price || 0, [lastAsset]);
   const lastPriceStr = useMemo(
     () =>
@@ -506,8 +507,8 @@ const App = ({
   );
 
   const profitRate = useMemo(
-    () => (profitPercentage ? profitPercentage.toFixed(2) : 0),
-    [profitPercentage],
+    () => costAvgPrice === undefined ? "—" : profitPercentage === undefined ? "∞" : `${profitPercentage.toFixed(2)}%`,
+    [profitPercentage, costAvgPrice],
   );
 
   function prettyAmount(amount: number) {
@@ -552,6 +553,11 @@ const App = ({
       setSellAmount(detail.sellAmount);
       setCostAvgPrice(detail.costAvgPrice);
       setSellAvgPrice(detail.sellAvgPrice);
+    } else {
+      setBuyAmount(undefined);
+      setSellAmount(undefined);
+      setCostAvgPrice(undefined);
+      setSellAvgPrice(undefined);
     }
 
     setProfit(tp.total);
@@ -1013,7 +1019,7 @@ const App = ({
             <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
+                  <CardTitle title={t("coin.breakevenHelp")} className="text-sm font-medium text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
                     {t("coin.breakeven")}
                   </CardTitle>
                   <svg
@@ -1099,7 +1105,7 @@ const App = ({
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
                     <div>{t("coin.profitRate")}</div>
-                    <div>{profitRate}%</div>
+                    <div>{profitRate}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -1107,7 +1113,7 @@ const App = ({
             <FadeUp className="col-span-6 md:col-span-2 sm:col-span-3">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle title={t("coin.costPriceHelp")} className="text-sm font-medium text-muted-foreground">
                     {t("coin.costPrice")}
                   </CardTitle>
                   <svg

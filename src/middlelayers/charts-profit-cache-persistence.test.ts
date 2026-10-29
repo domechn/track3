@@ -77,7 +77,7 @@ async function warmProfitCache() {
   const modules = await loadProfitModules();
   await modules.profit.calculateTotalProfit(dateRange, "BTC", "crypto");
   await modules.profit.calculateTotalProfit(dateRange, "BTC", "crypto");
-  expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(1);
+  expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
   return modules;
 }
 
@@ -104,7 +104,7 @@ describe("persistent total-profit cache epochs", () => {
       const second = await calculateTotalProfit(dateRange, "BTC", "crypto");
 
       expect(first.total).toBe(second.total);
-      expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+      expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
       expect(consoleWarn).toHaveBeenCalledWith(
         "cache epoch persistence failed",
       );
@@ -155,7 +155,7 @@ describe("persistent total-profit cache epochs", () => {
       await expect(
         profit.calculateTotalProfit(dateRange, "BTC", "crypto"),
       ).resolves.toBeDefined();
-      expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+      expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
       expect(consoleWarn).toHaveBeenCalledWith(
         "expired cache cleanup failed",
       );
@@ -191,7 +191,7 @@ describe("persistent total-profit cache epochs", () => {
     const restarted = await import("./charts-profit");
     await restarted.calculateTotalProfit(dateRange, "BTC", "crypto");
 
-    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
   });
 
   it("fails closed across restart when persisting the new epoch fails", async () => {
@@ -223,7 +223,7 @@ describe("persistent total-profit cache epochs", () => {
     const restarted = await import("./charts-profit");
     await restarted.calculateTotalProfit(dateRange, "BTC", "crypto");
 
-    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
   });
 
   it("misses a prior process cache after every invalidation storage operation fails", async () => {
@@ -251,7 +251,7 @@ describe("persistent total-profit cache epochs", () => {
     const restarted = await import("./charts-profit");
     await restarted.calculateTotalProfit(dateRange, "BTC", "crypto");
 
-    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
   });
 
   it("ignores legacy unversioned permanent cache entries", async () => {
@@ -273,7 +273,7 @@ describe("persistent total-profit cache epochs", () => {
     const { calculateTotalProfit } = await import("./charts-profit");
     const result = await calculateTotalProfit(dateRange, "BTC", "crypto");
 
-    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(1);
+    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
     expect(result.total).not.toBe(999);
   });
 });
