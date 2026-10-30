@@ -68,6 +68,35 @@ describe.each([
     expect(screen.getByRole("button", { name: "Sync now" })).toBeEnabled();
   });
 
+  it("shows determinate upload and download progress below the running time", () => {
+    publish({ mode: "ready", sync: {
+      phase: "syncing", startedAt: Date.now() - 5000,
+      progress: { phase: "push", completed: 1240, total: 4567 },
+    } });
+    render(<Indicator />);
+    fireEvent.click(screen.getByRole("button", { name: "Syncing" }));
+    const upload = screen.getByText("Uploading 1,240 / 4,567");
+    const started = screen.getByText(/Started:/);
+    expect(started.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1240");
+    publish({ mode: "ready", sync: {
+      phase: "syncing", startedAt: Date.now() - 5000,
+      progress: { phase: "pull", completed: 3, total: 10 },
+    } });
+    expect(screen.getByText("Downloading 3 / 10")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "3");
+  });
+
+  it("caps displayed progress when known downloads exceed the current manifest", () => {
+    publish({ mode: "ready", sync: {
+      phase: "syncing", progress: { phase: "pull", completed: 12, total: 10 },
+    } });
+    render(<Indicator />);
+    fireEvent.click(screen.getByRole("button", { name: "Syncing" }));
+    expect(screen.getByText("Downloading 10 / 10")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "10");
+  });
+
   it("shows the error reason and last successful time without made-up counts", () => {
     publish({ mode: "ready", sync: { phase: "error", error: "bucket", lastSync: previous } });
     render(<Indicator />);

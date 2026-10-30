@@ -1183,6 +1183,8 @@
   "sync.status.running": "Syncing…",
   "sync.status.started": "Started: {time}",
   "sync.status.elapsed": "Elapsed: {seconds}s",
+  "sync.status.uploading": "Uploading {completed} / {total}",
+  "sync.status.downloading": "Downloading {completed} / {total}",
   "sync.status.upToDate": "Everything is up to date",
   "sync.pulledToast": "{count} new snapshots from {device}",
   "sync.connection.conditions": "The store does not enforce conditional writes. Multi-device sync needs this S3 feature.",

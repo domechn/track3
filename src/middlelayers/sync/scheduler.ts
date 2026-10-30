@@ -1,9 +1,9 @@
-import type { SyncReport } from "./engine";
+import type { SyncProgress, SyncReport } from "./engine";
 import { classifySyncError, type SyncConnectionResult } from "./settings";
 import { SyncTimeoutError } from "./object-store";
 
-// Bounds a whole sync, including database, crypto, and any transport that ignores abort.
-export const SYNC_RUN_TIMEOUT_MS = 10 * 60_000;
+export const SYNC_IDLE_TIMEOUT_MS = 3 * 60_000;
+export const SYNC_RUN_TIMEOUT_MS = 6 * 60 * 60_000;
 export const SYNC_STOP_GRACE_MS = 5_000;
 
 export type SyncStatus = {
@@ -11,6 +11,7 @@ export type SyncStatus = {
   report?: SyncReport;
   lastSync?: number;
   startedAt?: number;
+  progress?: SyncProgress;
   error?: Exclude<SyncConnectionResult, "ok"> | "sync";
   retryStopped?: boolean;
 };
@@ -29,7 +30,7 @@ export class SyncScheduler {
   private state: SyncStatus = { phase: "idle" };
 
   constructor(
-    private readonly run: (signal: AbortSignal) => Promise<SyncReport>,
+    private readonly run: (signal: AbortSignal, activity: (progress?: SyncProgress) => void) => Promise<SyncReport>,
     private readonly options: { debounceMs?: number; focusThrottleMs?: number; retryBaseMs?: number } = {},
   ) {}
 
@@ -86,25 +87,60 @@ export class SyncScheduler {
     const runId = ++this.runId;
     const controller = new AbortController();
     this.controller = controller;
-    this.setStatus({ ...this.state, phase: "syncing", startedAt: Date.now(), error: undefined, retryStopped: false });
+    this.setStatus({ ...this.state, phase: "syncing", startedAt: Date.now(), progress: undefined, error: undefined, retryStopped: false });
     const work = (async () => {
-      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      let idleWatchdog: ReturnType<typeof setTimeout> | undefined;
+      let absoluteWatchdog: ReturnType<typeof setTimeout> | undefined;
       let onAbort: () => void = () => {};
       let run: Promise<SyncReport> | undefined;
       let settled = false;
+      let lastPublished = -Infinity;
+      let pendingProgress: SyncProgress | undefined;
+      let progressTimer: ReturnType<typeof setTimeout> | undefined;
+      let reportActivity: (progress?: SyncProgress) => void = () => {};
       try {
         const timedOut = new Promise<never>((_, reject) => {
-          watchdog = setTimeout(() => {
+          const timeout = () => {
             reject(new SyncTimeoutError());
             controller.abort();
-          }, SYNC_RUN_TIMEOUT_MS);
+          };
+          const resetIdle = () => {
+            if (idleWatchdog) clearTimeout(idleWatchdog);
+            idleWatchdog = setTimeout(timeout, SYNC_IDLE_TIMEOUT_MS);
+          };
+          const publishProgress = () => {
+            if (this.stopped || runId !== this.runId || controller.signal.aborted || settled || !pendingProgress) return;
+            lastPublished = Date.now();
+            this.setStatus({ ...this.state, progress: pendingProgress });
+            pendingProgress = undefined;
+          };
+          const activity = (progress?: SyncProgress) => {
+            if (this.stopped || runId !== this.runId || controller.signal.aborted || settled) return;
+            resetIdle();
+            if (progress) {
+              pendingProgress = progress;
+              if (Date.now() - lastPublished >= 250 || progress.completed === progress.total) {
+                if (progressTimer) clearTimeout(progressTimer);
+                progressTimer = undefined;
+                publishProgress();
+              } else if (!progressTimer) {
+                progressTimer = setTimeout(() => {
+                  progressTimer = undefined;
+                  publishProgress();
+                }, 250 - (Date.now() - lastPublished));
+              }
+            }
+          };
+          resetIdle();
+          absoluteWatchdog = setTimeout(timeout, SYNC_RUN_TIMEOUT_MS);
+          reportActivity = activity;
         });
         const cancelled = new Promise<never>((_, reject) => {
           onAbort = () => reject(new Error("Sync aborted"));
           controller.signal.addEventListener("abort", onAbort, { once: true });
         });
         try {
-          run = this.run(controller.signal);
+          run = this.run(controller.signal, reportActivity);
         } catch (error) {
           run = Promise.reject(error);
         }
@@ -124,7 +160,9 @@ export class SyncScheduler {
             ? "header" : classifySyncError(error),
         );
       } finally {
-        if (watchdog) clearTimeout(watchdog);
+        if (idleWatchdog) clearTimeout(idleWatchdog);
+        if (absoluteWatchdog) clearTimeout(absoluteWatchdog);
+        if (progressTimer) clearTimeout(progressTimer);
         controller.signal.removeEventListener("abort", onAbort);
         if (runId === this.runId) {
           this.controller = undefined;
@@ -158,7 +196,7 @@ export class SyncScheduler {
   }
 
   private fail(error: Exclude<SyncConnectionResult, "ok"> | "sync", report?: SyncReport): void {
-    this.setStatus({ ...this.state, phase: "error", startedAt: undefined, report, error });
+    this.setStatus({ ...this.state, phase: "error", startedAt: undefined, progress: undefined, report, error });
     if (["header", "passphrase", "access", "configuration"].includes(error)) {
       this.pending = false;
       return;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSyncHeader, decryptObject, encryptObject, unlockSyncHeader } from "./crypto";
+import { createSyncHeader, decryptObject, encryptObject, objectName, unlockSyncHeader } from "./crypto";
 import { FakeS3, S3Error, readSyncHeader, writeSyncHeader } from "./object-store";
 import {
   SyncEngine,
@@ -65,6 +65,173 @@ async function devices(count: number, pageSize = 1000) {
 }
 
 describe("SyncEngine", () => {
+  it("keeps manifest entries in source order when concurrent uploads finish in reverse order", async () => {
+    const { s3, repos, engines } = await devices(1);
+    for (let index = 0; index < 8; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
+    const put = s3.putObject.bind(s3);
+    const started: string[] = [];
+    const finished: string[] = [];
+    s3.putObject = async (path, body, conditions, signal) => {
+      if (path.includes("/snapshot/")) {
+        const index = started.push(path) - 1;
+        await new Promise((resolve) => setTimeout(resolve, (8 - index) * 15));
+        finished.push(path);
+      }
+      return put(path, body, conditions, signal);
+    };
+    expect((await engines[0].syncOnce()).errors).toEqual([]);
+    expect(finished[0]).not.toBe(started[0]);
+    const path = `devices/${repos[0].state.deviceId}/manifest`;
+    const body = (await s3.getObject(path))!.body;
+    const key = await unlockSyncHeader((await readSyncHeader(s3))!, "passphrase");
+    const manifest = JSON.parse(new TextDecoder().decode(await decryptObject(
+      key, path, JSON.parse(new TextDecoder().decode(body)),
+    ))) as { entries: Array<{ kind: string; id: string }> };
+    expect(manifest.entries.filter((entry) => entry.kind === "snapshot").map((entry) => entry.id))
+      .toEqual(["snap-0", "snap-1", "snap-2", "snap-3", "snap-4", "snap-5", "snap-6", "snap-7"]);
+  });
+
+  it("does not start another upload after cancellation and cancels in-flight requests", async () => {
+    const { s3, repos, engines } = await devices(1);
+    for (let index = 0; index < 30; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
+    const controller = new AbortController();
+    const put = s3.putObject.bind(s3);
+    let started = 0;
+    let cancelled = 0;
+    s3.putObject = async (path, body, conditions, signal) => {
+      if (path.includes("/snapshot/")) {
+        started++;
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(resolve, started === 1 ? 10 : 100);
+          signal?.addEventListener("abort", () => {
+            clearTimeout(timer);
+            cancelled++;
+            reject(new Error("S3 request aborted"));
+          }, { once: true });
+        });
+      }
+      return put(path, body, conditions, signal);
+    };
+    await expect(engines[0].syncOnce({ signal: controller.signal, onProgress: (progress) => {
+      if (progress.phase === "push" && progress.completed === 1) controller.abort();
+    } })).rejects.toThrow("Sync aborted");
+    expect(started).toBeLessThanOrEqual(6);
+    expect(cancelled).toBeGreaterThan(0);
+    const stable = started;
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(started).toBe(stable);
+  });
+  it("stops assigning uploads after a worker throws during conflict verification", async () => {
+    const { s3, repos, engines } = await devices(1);
+    for (let index = 0; index < 30; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
+    const put = s3.putObject.bind(s3);
+    const get = s3.getObject.bind(s3);
+    let started = 0;
+    let failedPath = "";
+    s3.putObject = async (path, body, conditions, signal) => {
+      if (path.includes("/snapshot/")) {
+        started++;
+        if (started === 1) {
+          failedPath = path;
+          throw new S3Error("S3 precondition failed", 412);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return put(path, body, conditions, signal);
+    };
+    s3.getObject = async (path, signal) => {
+      if (path === failedPath) throw new Error("verification unavailable");
+      return get(path, signal);
+    };
+    await expect(engines[0].syncOnce()).rejects.toThrow("verification unavailable");
+    expect(started).toBeLessThanOrEqual(6);
+  });
+
+  it("checkpoints after 250 successful uploads even when earlier objects failed", async () => {
+    const { s3, repos, engines } = await devices(1);
+    for (let index = 0; index < 300; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
+    const put = s3.putObject.bind(s3);
+    let attempted = 0;
+    let manifests = 0;
+    s3.putObject = async (path, body, conditions, signal) => {
+      if (path.includes("/snapshot/") && ++attempted <= 50) throw new Error("temporary failure");
+      if (path.endsWith("/manifest")) manifests++;
+      return put(path, body, conditions, signal);
+    };
+    const report = await engines[0].syncOnce();
+    expect(report.pushed).toBe(250);
+    expect(manifests).toBe(1);
+    expect(repos[0].state.published).toHaveLength(250);
+  }, 30_000);
+
+  it("bounds concurrent first-push uploads and finishes a scaled 150 ms store faster than sequential uploads", async () => {
+    const { s3, repos, engines } = await devices(1);
+    for (let index = 0; index < 30; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
+    const put = s3.putObject.bind(s3);
+    let active = 0;
+    let peak = 0;
+    s3.putObject = async (path, body, conditions, signal) => {
+      if (!path.includes("/snapshot/")) return put(path, body, conditions, signal);
+      active++;
+      peak = Math.max(peak, active);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return await put(path, body, conditions, signal);
+      } finally {
+        active--;
+      }
+    };
+    const report = await engines[0].syncOnce();
+    expect(report.errors).toEqual([]);
+    expect(report.pushed).toBe(30);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(6);
+  }, 30_000);
+
+  it("checkpoints a large interrupted push so its retry avoids published objects", async () => {
+    const { s3, repos, engines } = await devices(1);
+    for (let index = 0; index < 1000; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
+    const originalPut = s3.putObject.bind(s3);
+    let manifestWrites = 0;
+    s3.putObject = async (path, body, conditions, signal) => {
+      if (path.endsWith("/manifest")) manifestWrites++;
+      return originalPut(path, body, conditions, signal);
+    };
+    const controller = new AbortController();
+    await expect(engines[0].syncOnce({ signal: controller.signal, onProgress: (progress) => {
+      if (progress.phase === "push" && progress.completed >= 600) controller.abort();
+    } })).rejects.toThrow("Sync aborted");
+    expect(manifestWrites).toBe(2);
+    expect(repos[0].state.published?.length).toBe(500);
+    const put = s3.putObject.bind(s3);
+    const get = s3.getObject.bind(s3);
+    let snapshotPuts = 0;
+    let orphanGets = 0;
+    const published = new Set(repos[0].state.published);
+    const deviceId = repos[0].state.deviceId!;
+    const namingKey = await unlockSyncHeader((await readSyncHeader(s3))!, "passphrase");
+    const publishedPaths = new Set(await Promise.all([...published].map(async (id) =>
+      `devices/${deviceId}/${await objectName(namingKey, `snapshot/${deviceId}/${id}/1`)}`)));
+    let publishedGets = 0;
+    s3.putObject = async (path, body, conditions, signal) => {
+      if (path.includes("/snapshot/")) snapshotPuts++;
+      return put(path, body, conditions, signal);
+    };
+    s3.getObject = async (path, signal) => {
+      if (path.includes("/snapshot/")) orphanGets++;
+      if (publishedPaths.has(path)) publishedGets++;
+      return get(path, signal);
+    };
+    const report = await engines[0].syncOnce();
+    expect(report.errors).toEqual([]);
+    expect(snapshotPuts).toBeLessThanOrEqual(400);
+    expect(orphanGets).toBeGreaterThanOrEqual(100);
+    expect(orphanGets).toBeLessThanOrEqual(106);
+    expect(publishedGets).toBe(0);
+    expect(new Set(repos[0].state.published).size).toBe(1000);
+    expect(published.size).toBe(500);
+    expect(manifestWrites).toBe(4);
+  }, 120_000);
   it("leaves snapshot history local when history sync is disabled", async () => {
     const { repos, engines } = await devices(2);
     repos[0].snapshots.set("a", snapshot("a"));
@@ -789,6 +956,7 @@ describe("SyncEngine", () => {
     expect(result.errors).toHaveLength(1);
     expect(result.pushed).toBe(0);
     await engines[1].syncOnce();
+    expect(repos[1].snapshots.has("one")).toBe(false);
     expect(repos[1].snapshots.size).toBe(0);
     await engines[0].syncOnce();
     await engines[1].syncOnce();
@@ -867,6 +1035,33 @@ describe("SyncEngine", () => {
     expect((await engines[0].syncOnce()).errors).toEqual([]);
     expect((await engines[1].syncOnce()).errors).toEqual([]);
     expect(repos[1].snapshots.get("large")?.assets[0].wallet).toHaveLength(17_000_000);
+  }, 60_000);
+
+  it("uploads multipart payloads one at a time", async () => {
+    const { s3, repos, engines } = await devices(1);
+    for (const id of ["large-1", "large-2"]) {
+      repos[0].snapshots.set(id, snapshot(id));
+      repos[0].snapshots.get(id)!.assets[0].wallet = "x".repeat(17_000_000);
+    }
+    const put = s3.putObject.bind(s3);
+    let active = 0;
+    let peak = 0;
+    s3.putObject = async (path, body, conditions, signal) => {
+      if (path.endsWith("/part/0")) {
+        active++;
+        peak = Math.max(peak, active);
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } finally {
+          active--;
+        }
+      }
+      return put(path, body, conditions, signal);
+    };
+    const report = await engines[0].syncOnce();
+    expect(report.errors).toEqual([]);
+    expect(report.pushed).toBe(2);
+    expect(peak).toBe(1);
   }, 60_000);
 
   it("reuses a large orphaned snapshot after local row IDs change", async () => {
@@ -1228,6 +1423,7 @@ describe("SyncEngine", () => {
   it("rejects a different local snapshot under an orphaned immutable key", async () => {
     const { s3, repos, engines } = await devices(2);
     repos[0].snapshots.set("one", snapshot("one"));
+    for (let index = 0; index < 12; index++) repos[0].snapshots.set(`other-${index}`, snapshot(`other-${index}`));
     const put = s3.putObject.bind(s3);
     let fail = true;
     s3.putObject = async (key, body, conditions) => {
@@ -1238,7 +1434,8 @@ describe("SyncEngine", () => {
     repos[0].snapshots.set("one", snapshot("one", 9));
     expect((await engines[0].syncOnce()).errors).toContain("Immutable sync object changed");
     await engines[1].syncOnce();
-    expect(repos[1].snapshots.size).toBe(0);
+    expect(repos[1].snapshots.has("one")).toBe(false);
+    expect(repos[1].snapshots.size).toBe(12);
   });
 
   it("does not import an object with a mismatched checksum", async () => {

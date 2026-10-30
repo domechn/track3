@@ -12,6 +12,50 @@ const configured: SyncSettings = {
 afterEach(() => vi.useRealTimers());
 
 describe("SyncRuntime", () => {
+  it("carries engine progress through the scheduler to the runtime status", async () => {
+    let finish!: () => void;
+    const runtime = new SyncRuntime({
+      load: async () => configured, save: async () => {}, store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: async (options) => {
+        options?.onProgress?.({ phase: "push", completed: 2, total: 5 });
+        await new Promise<void>((resolve) => { finish = resolve; });
+        return { pulled: 0, pushed: 5, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] };
+      } }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.configure(configured, "correct horse battery staple");
+    const round = runtime.syncNow();
+    await vi.waitFor(() => expect(runtime.status().sync.progress).toEqual({ phase: "push", completed: 2, total: 5 }));
+    finish();
+    await round;
+    expect(runtime.status().sync.progress).toBeUndefined();
+    runtime.stop();
+  });
+  it("keeps an active round alive when object requests complete before item progress", async () => {
+    vi.useFakeTimers();
+    let trackedStore!: FakeS3;
+    let finish!: () => void;
+    const runtime = new SyncRuntime({
+      load: async () => configured, save: async () => {}, store: () => new FakeS3(),
+      engine: (store) => {
+        trackedStore = store as FakeS3;
+        return { engine: { syncOnce: async () => {
+          await new Promise<void>((resolve) => { finish = resolve; });
+          return { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] };
+        } }, unregister: () => {} };
+      },
+    });
+    await runtime.initialize();
+    await runtime.configure(configured, "correct horse battery staple");
+    const round = runtime.syncNow();
+    await vi.advanceTimersByTimeAsync(120_000);
+    await trackedStore.getObject("sync-header");
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(runtime.status().sync.phase).toBe("syncing");
+    finish();
+    await round;
+    runtime.stop();
+  });
   it("shows a recovery state when saved sync settings cannot be read", async () => {
     const runtime = new SyncRuntime({
       load: async () => { throw new Error("decrypt failed"); },

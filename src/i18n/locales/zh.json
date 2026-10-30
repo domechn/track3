@@ -1106,6 +1106,8 @@
   "sync.status.running": "正在同步…",
   "sync.status.started": "开始时间：{time}",
   "sync.status.elapsed": "已用时：{seconds} 秒",
+  "sync.status.uploading": "正在上传 {completed} / {total}",
+  "sync.status.downloading": "正在下载 {completed} / {total}",
   "sync.status.upToDate": "所有内容均为最新",
   "sync.pulledToast": "来自 {device} 的 {count} 个新快照",
   "sync.connection.conditions": "存储服务未执行条件写入。多设备同步需要此 S3 功能。",
