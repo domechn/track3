@@ -254,6 +254,8 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   let checkoutStatus: "pending" | "completed" | "expired" = "pending";
   let checkoutSessions = 0;
   const openedUrls: string[] = [];
+  let publicIpMode: "loading" | "value" | "error" = "value";
+  let publicIpRequests = 0;
 
   const select = (query: string, values: unknown[] = []) => {
     localQueries++;
@@ -494,7 +496,20 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       const requestPath = requestUrl.pathname;
       const proApi = requestUrl.origin === "https://api.track3.dev";
       const currencyApi = requestUrl.origin === "https://currency-rate-api.track3.dev";
-      if (requestUrl.hostname === "api.binance.com" || requestUrl.hostname === "fapi.binance.com") {
+      if (requestUrl.origin === "https://api.ipify.org" || requestUrl.origin === "https://1.1.1.1") {
+        publicIpRequests++;
+        const mode = publicIpMode;
+        if (mode === "loading") await new Promise<never>(() => {});
+        if (mode === "error") {
+          status = 503;
+          body = "unavailable";
+        } else if (requestUrl.origin === "https://api.ipify.org") {
+          body = '{"ip":"8.8.8.8"}';
+        } else {
+          contentType = "text/plain";
+          body = "fl=1\nip=8.8.8.8\n";
+        }
+      } else if (requestUrl.hostname === "api.binance.com" || requestUrl.hostname === "fapi.binance.com") {
         if (requestPath !== "/api/v3/ticker/price" && requestPath !== "/api/v3/time") {
           const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
           const signature = requestUrl.searchParams.get("signature");
@@ -688,5 +703,6 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     };
   }, richPortfolio);
   return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, httpRequests: () => requests.size, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares,
-    openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; } };
+    openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; },
+    setPublicIpMode: (mode: "loading" | "value" | "error") => { publicIpMode = mode; }, publicIpRequests: () => publicIpRequests };
 }
