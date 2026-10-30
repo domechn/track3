@@ -116,7 +116,7 @@ beforeEach(() => {
 async function warmProfitCache() {
   await calculateTotalProfit(dateRange, "BTC", "crypto");
   await calculateTotalProfit(dateRange, "BTC", "crypto");
-  expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(1);
+  expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
   expect(
     TRANSACTION_HANDLER.listTransactionsByDateRange,
   ).toHaveBeenCalledTimes(1);
@@ -213,7 +213,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).toHaveBeenCalledTimes(1);
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(2);
@@ -226,7 +226,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).toHaveBeenCalledTimes(1);
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(2);
@@ -245,7 +245,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).not.toHaveBeenCalled();
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(1);
+    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(1);
@@ -265,10 +265,32 @@ describe("transaction mutations invalidate the total-profit cache", () => {
       await expect(update()).resolves.toBeUndefined();
 
       await calculateTotalProfit(dateRange, "BTC", "crypto");
-      expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+      expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
       expect(
         TRANSACTION_HANDLER.listTransactionsByDateRange,
       ).toHaveBeenCalledTimes(2);
     },
   );
+});
+
+it("counts a sale before a later same-snapshot transfer in Profit", async () => {
+  const transactions: TransactionModel[] = [
+    { ...transaction, id: 1, assetID: 1, uuid: "r0", wallet: "w1", amount: 1, price: 100, txnType: "buy", txnCreatedAt: "2024-04-01T00:00:00.000Z" },
+    { ...transaction, id: 2, assetID: 2, uuid: "r0", wallet: "w3", amount: 1, price: 100, txnType: "buy", txnCreatedAt: "2024-04-01T00:00:00.000Z" },
+    { ...transaction, id: 3, assetID: 1, uuid: "r1", wallet: "w1", amount: 1, price: 200, txnType: "sell", txnCreatedAt: "2024-04-02T00:00:00.000Z" },
+    { ...transaction, id: 4, assetID: 2, uuid: "r2", wallet: "w3", amount: 1, price: 210, txnType: "sell", txnCreatedAt: "2024-04-03T00:00:00.000Z" },
+    { ...transaction, id: 5, assetID: 3, uuid: "r2", wallet: "w2", amount: 1, price: 210, txnType: "buy", txnCreatedAt: "2024-04-03T00:00:00.000Z" },
+  ];
+  vi.mocked(ASSET_HANDLER.listAssetsMaxCreatedAt).mockImplementation(async (start) =>
+    start === undefined ? [] : [
+      { ...latestAsset, id: 3, uuid: "r2", wallet: "w2", price: 210, value: 210, createdAt: "2024-04-03T00:00:00.000Z" },
+    ]);
+  vi.mocked(ASSET_HANDLER.listAssetsMinCreatedAt).mockResolvedValue([]);
+  vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([transactions]);
+
+  const result = await calculateTotalProfit(dateRange, "BTC", "crypto");
+  expect(result.total).toBe(210);
+  expect(result.coins).toEqual([
+    expect.objectContaining({ buyAmount: 2, sellAmount: 1, value: 210 }),
+  ]);
 });

@@ -46,6 +46,15 @@ async function shot(page: Page, name: string) {
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  if (name.includes("-now-")) {
+    const pill = await page.locator(name.startsWith("mobile")
+      ? ".ios-d3-sync-indicator button[aria-label]"
+      : ".desktop-sync-status-indicator button[aria-label]").boundingBox();
+    expect(pill, `${name}: sync status pill missing`).not.toBeNull();
+    expect(pill!.x < box!.x + box!.width && pill!.x + pill!.width > box!.x &&
+      pill!.y < box!.y + box!.height && pill!.y + pill!.height > box!.y,
+    `${name}: sync status pill overlaps toast`).toBe(false);
+  }
   expect(box!.height).toBeLessThanOrEqual(name.startsWith("mobile") || page.viewportSize()!.width <= 900 ? 240 : 181);
   expect(box!.width).toBeGreaterThanOrEqual(page.viewportSize()!.width === 320 ? 280
     : page.viewportSize()!.width <= 900 ? 220 : page.viewportSize()!.width < 1000 ? 270 : 300);

@@ -245,14 +245,14 @@ const App = ({
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
   const [previousPrice, setPreviousPrice] = useState<number>();
 
-  const [buyAmount, setBuyAmount] = useState<number>(0);
-  const [sellAmount, setSellAmount] = useState<number>(0);
-  const [costAvgPrice, setCostAvgPrice] = useState<number>(0);
-  const [sellAvgPrice, setSellAvgPrice] = useState<number>(0);
+  const [buyAmount, setBuyAmount] = useState<number>();
+  const [sellAmount, setSellAmount] = useState<number>();
+  const [costAvgPrice, setCostAvgPrice] = useState<number>();
+  const [sellAvgPrice, setSellAvgPrice] = useState<number>();
 
-  const [profit, setProfit] = useState<number>(0);
+  const [profit, setProfit] = useState<number | null>(0);
   const [profitPercentage, setProfitPercentage] = useState<
-    number | undefined
+    number | null | undefined
   >();
 
   const [updateTxnId, setUpdateTxnId] = useState<number>(0);
@@ -410,19 +410,16 @@ const App = ({
   }, [transactions]);
 
   const breakevenPrice = useMemo(() => {
-    if (!lastAsset) {
+    if (profit === null || !lastAsset || costAvgPrice === undefined || lastAsset.amount === 0) {
       return;
     }
-    if (lastAsset.amount === 0) {
-      return profit > 0 ? 0 : undefined;
-    }
     return (lastAsset.price * lastAsset.amount - profit) / lastAsset.amount;
-  }, [profit, lastAsset]);
+  }, [profit, lastAsset, costAvgPrice]);
 
   const breakEvenPriceStr = useMemo(
     () =>
       breakevenPrice === undefined
-        ? "∞"
+        ? "—"
         : currency.symbol +
           prettyPriceNumberToLocaleString(
             currencyWrapper(currency)(Math.max(breakevenPrice, 0) || 0),
@@ -432,19 +429,23 @@ const App = ({
 
   const sellPriceStr = useMemo(
     () =>
-      currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellAvgPrice)),
-    [currency, sellAvgPrice],
+      sellAvgPrice === undefined || !sellAmount
+        ? "—"
+        : currency.symbol +
+          prettyPriceNumberToLocaleString(currencyWrapper(currency)(sellAvgPrice)),
+    [currency, sellAvgPrice, sellAmount],
   );
-  const sellAmountStr = useMemo(() => prettyAmount(sellAmount), [sellAmount]);
+  const sellAmountStr = useMemo(() => sellAmount === undefined ? "—" : prettyAmount(sellAmount), [sellAmount]);
 
   const costPriceStr = useMemo(
     () =>
-      currency.symbol +
-      prettyPriceNumberToLocaleString(currencyWrapper(currency)(costAvgPrice)),
+      costAvgPrice === undefined
+        ? "—"
+        : currency.symbol +
+          prettyPriceNumberToLocaleString(currencyWrapper(currency)(costAvgPrice)),
     [currency, costAvgPrice],
   );
-  const buyAmountStr = useMemo(() => prettyAmount(buyAmount), [buyAmount]);
+  const buyAmountStr = useMemo(() => buyAmount === undefined ? "—" : prettyAmount(buyAmount), [buyAmount]);
   const lastPrice = useMemo(() => lastAsset?.price || 0, [lastAsset]);
   const change24h = previousPrice && lastPrice
     ? (lastPrice - previousPrice) / previousPrice * 100 : undefined;
@@ -498,7 +499,7 @@ const App = ({
 
   const profitStr = useMemo(
     () =>
-      currency.symbol +
+      profit === null ? "—" : currency.symbol +
       prettyNumberToLocaleString(currencyWrapper(currency)(profit)),
     [currency, profit],
   );
@@ -513,8 +514,9 @@ const App = ({
   );
 
   const profitRate = useMemo(
-    () => (profitPercentage ? profitPercentage.toFixed(2) : 0),
-    [profitPercentage],
+    () => profit === null || profitPercentage === null || costAvgPrice === undefined
+      ? "—" : profitPercentage === undefined ? "∞" : `${profitPercentage.toFixed(2)}%`,
+    [profit, profitPercentage, costAvgPrice],
   );
 
   function prettyAmount(amount: number) {
@@ -579,6 +581,11 @@ const App = ({
       setSellAmount(detail.sellAmount);
       setCostAvgPrice(detail.costAvgPrice);
       setSellAvgPrice(detail.sellAvgPrice);
+    } else {
+      setBuyAmount(undefined);
+      setSellAmount(undefined);
+      setCostAvgPrice(undefined);
+      setSellAvgPrice(undefined);
     }
 
     setProfit(tp.total);
@@ -1091,18 +1098,12 @@ const App = ({
                   <CardTitle className="text-sm font-medium text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis">
                     {t("coin.breakeven")}
                   </CardTitle>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    className="h-4 w-4 text-muted-foreground"
-                  >
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" aria-label={t("coin.breakevenHelp")} className="shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-muted-foreground">i</span></button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 max-w-[calc(100vw-2rem)] text-sm">{t("coin.breakevenHelp")}</PopoverContent>
+                  </Popover>
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
@@ -1170,12 +1171,12 @@ const App = ({
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis"
-                    data-tone={profit > 0 ? "gain" : profit < 0 ? "loss" : "neutral"}>
-                    {isMobile ? formatPhoneMoney(currencyWrapper(currency)(profit), currency.symbol, true) : profitStr}
+                    data-tone={profit === null ? "neutral" : profit > 0 ? "gain" : profit < 0 ? "loss" : "neutral"}>
+                    {isMobile && profit !== null ? formatPhoneMoney(currencyWrapper(currency)(profit), currency.symbol, true) : profitStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
                     <div>{t("coin.profitRate")}</div>
-                    <div>{profitRate}%</div>
+                    <div>{profitRate}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -1186,18 +1187,12 @@ const App = ({
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     {t("coin.costPrice")}
                   </CardTitle>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    className="h-4 w-4 text-muted-foreground"
-                  >
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" aria-label={t("coin.costPriceHelp")} className="shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-muted-foreground">i</span></button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 max-w-[calc(100vw-2rem)] text-sm">{t("coin.costPriceHelp")}</PopoverContent>
+                  </Popover>
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">

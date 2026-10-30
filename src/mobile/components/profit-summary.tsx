@@ -62,14 +62,14 @@ const App = ({
 }) => {
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
-      total: number;
+      total: number | null;
       monthFirstDate: Date;
       lastRecordDate?: Date;
     }[]
   >([]);
   const [yearlyProfits, setYearlyProfits] = useState<
     {
-      total: number;
+      total: number | null;
       year: number;
       hasData: boolean;
     }[]
@@ -86,7 +86,7 @@ const App = ({
     Map<
       string,
       {
-        total: number;
+        total: number | null;
         monthFirstDate: Date;
         lastRecordDate?: Date;
       }[]
@@ -96,7 +96,7 @@ const App = ({
     Map<
       string,
       {
-        total: number;
+        total: number | null;
         year: number;
         hasData: boolean;
       }[]
@@ -189,7 +189,8 @@ const App = ({
               date.lastDay.getDate(),
               23,
               59,
-              59
+              59,
+              999
             ),
           });
 
@@ -233,7 +234,7 @@ const App = ({
         async (year) => {
           const { total, lastRecordDate } = await calculateTotalProfit({
             start: new Date(year, 0, 1),
-            end: new Date(year, 11, 31, 23, 59, 59),
+            end: new Date(year, 11, 31, 23, 59, 59, 999),
           });
 
           return { total, year, hasData: Boolean(lastRecordDate) };
@@ -321,7 +322,7 @@ const App = ({
       .filter(Boolean) as {
       month: number;
       label: string;
-      total: number;
+      total: number | null;
       hasData: boolean;
       key: string;
     }[];
@@ -330,7 +331,7 @@ const App = ({
   const yearCards = useMemo(() => {
     return availableYears.map((year) => ({
         year,
-        total: yearlyProfitsMap[year]?.total ?? 0,
+        total: yearlyProfitsMap[year] ? yearlyProfitsMap[year].total : 0,
         hasData: Boolean(yearlyProfitsMap[year]?.hasData),
       }));
   }, [availableYears, yearlyProfitsMap]);
@@ -347,6 +348,7 @@ const App = ({
         empty += 1;
         return;
       }
+      if (item.total === null) return;
       if (item.total > 0) {
         up += 1;
       } else if (item.total < 0) {
@@ -359,7 +361,8 @@ const App = ({
     return { total: data.length - empty, up, down, flat, empty };
   }, [monthCards, yearCards, summaryType]);
 
-  function renderAmount(value: number) {
+  function renderAmount(value: number | null) {
+    if (value === null) return "—";
     return (
       (value < 0 ? "-" : value > 0 ? "+" : "") +
       currency.symbol +
@@ -408,14 +411,14 @@ const App = ({
             onClick={() => onMonthClick(item.month)}
             className={cn(
               "rounded-lg border p-2 text-left transition-colors hover:bg-muted/50",
-              getToneSurfaceClass(item.total, quoteColor)
+              item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
             )}
           >
             <div className="text-xs text-muted-foreground">{item.label}</div>
             <div
               className={cn(
                 "mt-1 text-sm font-semibold tracking-tight",
-                getToneClass(item.total, quoteColor)
+                item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
               )}
             >
               {item.hasData ? renderAmount(item.total) : "—"}
@@ -434,14 +437,14 @@ const App = ({
             key={`y-profit-summary-${item.year}`}
             className={cn(
               "rounded-lg border p-2 text-left",
-              getToneSurfaceClass(item.total, quoteColor)
+              item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
             )}
           >
             <div className="text-xs text-muted-foreground">{item.year}</div>
             <div
               className={cn(
                 "mt-1 text-sm font-semibold tracking-tight",
-                getToneClass(item.total, quoteColor)
+                item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
               )}
             >
               {renderAmount(item.total)}

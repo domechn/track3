@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SyncScheduler } from "./scheduler";
 import type { SyncReport } from "./engine";
-import { S3Error } from "./object-store";
+import { FakeS3, S3Error } from "./object-store";
 
 const success: SyncReport = { pulled: 1, pushed: 2, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] };
 
@@ -159,14 +159,84 @@ describe("SyncScheduler", () => {
     scheduler.stop();
   });
 
+  it("keeps the last successful time when a later round fails", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-28T12:00:00Z"));
+    const run = vi.fn().mockResolvedValueOnce(success)
+      .mockRejectedValueOnce(new S3Error("bucket unavailable", 404));
+    const scheduler = new SyncScheduler(run);
+    await scheduler.syncNow();
+    const lastSync = scheduler.status().lastSync;
+    vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "error", error: "bucket", lastSync });
+    await scheduler.stop();
+  });
+
+  it("allows Sync now to retry after a synchronous setup failure", async () => {
+    const run = vi.fn().mockImplementationOnce(() => { throw new Error("setup failed"); })
+      .mockResolvedValueOnce(success);
+    const scheduler = new SyncScheduler(run);
+    await scheduler.syncNow();
+    expect(scheduler.status().phase).toBe("error");
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "idle", report: success });
+    await scheduler.stop();
+  });
+
   it("aborts work when stopped", async () => {
     let runningSignal: AbortSignal | undefined;
     const scheduler = new SyncScheduler(async (signal) => {
       runningSignal = signal;
-      return success;
+      return new Promise<SyncReport>((_, reject) => {
+        signal.addEventListener("abort", () => reject(new Error("aborted")));
+      });
     });
-    await scheduler.syncNow();
-    scheduler.stop();
+    const round = scheduler.syncNow();
+    await scheduler.stop();
+    await round;
     expect(runningSignal?.aborted).toBe(true);
+  });
+
+  it("returns from stop after five seconds when work ignores abort", async () => {
+    vi.useFakeTimers();
+    const scheduler = new SyncScheduler(async () => new Promise<SyncReport>(() => {}));
+    void scheduler.syncNow();
+    let stopped = false;
+    const stopping = scheduler.stop().then(() => { stopped = true; });
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(stopped).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(stopped).toBe(true);
+    await stopping;
+  });
+
+  it("does not overlap a watchdog retry with work that has not settled", async () => {
+    vi.useFakeTimers();
+    const store = new FakeS3();
+    let finishStale!: () => void;
+    store.getObject = () => new Promise((resolve) => { finishStale = () => resolve(null); });
+    const run = vi.fn()
+      .mockImplementationOnce(async (signal: AbortSignal) => {
+        await store.getObject("sync-header", signal);
+        return { ...success, pulled: 99 };
+      })
+      .mockResolvedValueOnce(success);
+    const scheduler = new SyncScheduler(run, { retryBaseMs: 10 });
+    const first = scheduler.syncNow();
+    expect(scheduler.status().phase).toBe("syncing");
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(scheduler.status()).toMatchObject({ phase: "error", error: "timeout" });
+    await first;
+    await vi.advanceTimersByTimeAsync(10);
+    expect(run).toHaveBeenCalledTimes(1);
+    await scheduler.syncNow();
+    expect(run).toHaveBeenCalledTimes(1);
+    finishStale();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(scheduler.status()).toMatchObject({ phase: "idle", report: success });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(scheduler.status().report?.pulled).toBe(1);
+    await scheduler.stop();
   });
 });

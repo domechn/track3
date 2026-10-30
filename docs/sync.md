@@ -186,6 +186,13 @@ stops automatic retry and marks the indicator accordingly. **Sync now** or a
 successful portfolio refresh starts a new attempt sequence; focus alone does
 not. It never blocks a portfolio refresh.
 
+S3 metadata requests have a 30-second deadline; encrypted object transfers
+have a 120-second deadline. A 10-minute watchdog reports a timed-out sync
+round, including work outside S3. The scheduler waits for that round to settle
+before starting another one. Stopping sync waits up to five seconds for an
+aborted round; **Forget remote data** leaves remote objects untouched if the
+round is still running and can be retried after it finishes.
+
 Malformed individual objects are reported. Partial rounds retry with exponential
 backoff; permanently damaged remote data needs repair before a retry can succeed.
 A missing remote header, invalid passphrase, access error, or invalid configuration
@@ -248,9 +255,13 @@ manifest; names assigned to other devices stay local. The current installation
 is marked **This device**. Device timestamps show the last manifest upload, which
 can be earlier than the last sync round. A snapshot deletion and Undo publish matching tombstone
 events; the delete sync waits until the Undo window ends so other devices do
-not see a transient delete when Undo is pressed. **Disable sync** stops future sync while retaining local and remote
-data. **Forget remote data** requires typing `FORGET`; it deletes `sync-header`
-and `devices/` objects inside the configured prefix, then disables sync.
+not see a transient delete when Undo is pressed. **Disable sync** in Settings
+stops future sync while retaining the saved S3 settings and local and remote
+data. **Turn off sync** in the status indicator clears this device's saved S3
+settings. Use **Forget remote data** in Settings before turning off this device
+if you need to remove data from the bucket. Forget requires typing `FORGET`;
+it deletes `sync-header` and `devices/` objects inside the configured prefix,
+then disables sync.
 It leaves local data and unrelated bucket objects untouched. Disable sync on
 other devices first; a device that remains active can upload its local data
 again. Re-enabling this device after forgetting remote data also uploads its

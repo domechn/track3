@@ -1,7 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileSources } from "@/mobile/components/configuration/mobile-sources";
 import type { ExchangeRow } from "@/components/configuration/types";
+import { detectPublicIp } from "@/middlelayers/public-ip";
+
+vi.mock("@/middlelayers/public-ip", () => ({ detectPublicIp: vi.fn() }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
+
+beforeEach(() => vi.mocked(detectPublicIp).mockReset().mockResolvedValue({ address: "8.8.8.8", version: 4 }));
 
 const props = {
   exchanges: [{ type: "binance", apiKey: "private-key-1234", secret: "secret", active: true }],
@@ -22,6 +28,39 @@ const props = {
 };
 
 describe("mobile data sources", () => {
+  it("looks up the IP only on the exchange credentials step, then copies and refreshes", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    let resolve!: (value: { address: string; version: 4 }) => void;
+    vi.mocked(detectPublicIp).mockReturnValueOnce(new Promise((done) => { resolve = done; }))
+      .mockResolvedValueOnce({ address: "1.1.1.1", version: 4 });
+    render(<MobileSources {...props} />);
+    expect(detectPublicIp).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Add exchange" }));
+    expect(detectPublicIp).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Binance" }));
+    expect(screen.getByText("Detecting IP…")).toBeInTheDocument();
+    resolve({ address: "8.8.8.8", version: 4 });
+    await waitFor(() => expect(screen.getByText("8.8.8.8")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    expect(writeText).toHaveBeenCalledWith("8.8.8.8");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.getByText("1.1.1.1")).toBeInTheDocument());
+    expect(screen.getByText(/On cellular and Wi-Fi/)).toBeInTheDocument();
+  });
+
+  it("shows an IP lookup error without disabling exchange submission", async () => {
+    vi.mocked(detectPublicIp).mockRejectedValueOnce(new Error("offline"));
+    render(<MobileSources {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add exchange" }));
+    fireEvent.click(screen.getByRole("button", { name: "Binance" }));
+    await waitFor(() => expect(screen.getByText("Couldn't detect your IP. Check your connection and retry.")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Add this address/)).not.toBeInTheDocument();
+    expect(screen.getByText(/On cellular and Wi-Fi/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
+  });
   it("keeps Pro balance preview available from a saved source", () => {
     const preview = vi.fn();
     render(<MobileSources {...props} isPro onQuickLookExchange={preview} />);
@@ -88,6 +127,7 @@ describe("mobile data sources", () => {
     fireEvent.click(screen.getByRole("button", { name: "BTC" }));
     expect(screen.getByRole("textbox", { name: "Address" })).toHaveAttribute("autocapitalize", "off");
     expect(screen.getByRole("textbox", { name: "Address" })).toHaveAttribute("autocomplete", "off");
+    expect(detectPublicIp).not.toHaveBeenCalled();
   });
 
   it("introduces the three source setup steps on an empty portfolio", () => {

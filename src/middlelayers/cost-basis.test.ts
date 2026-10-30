@@ -138,6 +138,64 @@ describe("calculateCostBasis", () => {
     ];
     const result = calculateCostBasis(fromStoredTransactions(stored), { method: "FIFO" });
     expect(result.warnings).toContainEqual(expect.objectContaining({ code: "possible-transfer", eventId: "2" }));
+    expect(result.disposals).toHaveLength(0);
+    expect(result.openLots).toEqual([expect.objectContaining({ amount: 1, costBasis: 100 })]);
+  });
+
+  it("keeps a real sale when the next snapshot has its own transfer", () => {
+    const stored: Parameters<typeof fromStoredTransactions>[0] = [
+      { id: 1, uuid: "r0", assetType: "crypto", symbol: "BTC", wallet: "w1", amount: 1, price: 100, txnType: "buy", txnCreatedAt: at("2024-01-01") },
+      { id: 2, uuid: "r0", assetType: "crypto", symbol: "BTC", wallet: "w3", amount: 1, price: 100, txnType: "buy", txnCreatedAt: at("2024-01-01") },
+      { id: 3, uuid: "r1", assetType: "crypto", symbol: "BTC", wallet: "w1", amount: 1, price: 200, txnType: "sell", txnCreatedAt: at("2024-01-02") },
+      { id: 4, uuid: "r2", assetType: "crypto", symbol: "BTC", wallet: "w3", amount: 1, price: 210, txnType: "sell", txnCreatedAt: at("2024-01-03") },
+      { id: 5, uuid: "r2", assetType: "crypto", symbol: "BTC", wallet: "w2", amount: 1, price: 210, txnType: "buy", txnCreatedAt: at("2024-01-03") },
+    ];
+    const converted = fromStoredTransactions(stored);
+    expect(converted.map(({ type, transferId }) => [type, transferId])).toEqual([
+      ["buy", undefined], ["buy", undefined], ["sell", undefined],
+      ["transfer-out", "4:5"], ["transfer-in", "4:5"],
+    ]);
+    const result = calculateCostBasis(converted, { method: "FIFO" });
+    expect(result.disposals).toEqual([
+      expect.objectContaining({ eventId: "3", disposedAt: at("2024-01-02"), proceeds: 200, costBasis: 100, gainLoss: 100 }),
+    ]);
+  });
+
+  it("pairs a transfer split across two refreshes", () => {
+    const stored: Parameters<typeof fromStoredTransactions>[0] = [
+      { id: 1, uuid: "r0", assetType: "crypto", symbol: "BTC", wallet: "w1", amount: 1, price: 100, txnType: "buy", txnCreatedAt: at("2024-01-01") },
+      { id: 2, uuid: "r1", assetType: "crypto", symbol: "BTC", wallet: "w1", amount: 1, price: 200, txnType: "sell", txnCreatedAt: at("2024-01-02") },
+      { id: 3, uuid: "r2", assetType: "crypto", symbol: "BTC", wallet: "w2", amount: 1, price: 210, txnType: "buy", txnCreatedAt: at("2024-01-03") },
+    ];
+    const converted = fromStoredTransactions(stored);
+    expect(converted.map(({ type, transferId }) => [type, transferId])).toEqual([
+      ["buy", undefined], ["transfer-out", "2:3"], ["transfer-in", "2:3"],
+    ]);
+    const result = calculateCostBasis(converted, { method: "FIFO" });
+    expect(result.disposals).toEqual([]);
+    expect(result.openLots).toEqual([expect.objectContaining({ id: "1", amount: 1, costBasis: 100 })]);
+  });
+
+  it("does not pair one cross-refresh buy with two matching sells", () => {
+    const stored: Parameters<typeof fromStoredTransactions>[0] = [
+      { id: 1, uuid: "r1", assetType: "crypto", symbol: "BTC", wallet: "w1", amount: 1, price: 200, txnType: "sell", txnCreatedAt: at("2024-01-02") },
+      { id: 2, uuid: "r1", assetType: "crypto", symbol: "BTC", wallet: "w3", amount: 1, price: 200, txnType: "sell", txnCreatedAt: at("2024-01-02") },
+      { id: 3, uuid: "r2", assetType: "crypto", symbol: "BTC", wallet: "w2", amount: 1, price: 210, txnType: "buy", txnCreatedAt: at("2024-01-03") },
+    ];
+    expect(fromStoredTransactions(stored).map(({ type, transferId }) => [type, transferId])).toEqual([
+      ["sell", undefined], ["sell", undefined], ["buy", undefined],
+    ]);
+  });
+
+  it("keeps a sale and a later re-buy distinct beyond the transfer window", () => {
+    const stored: Parameters<typeof fromStoredTransactions>[0] = [
+      { id: 1, uuid: "buy", assetType: "crypto", symbol: "BTC", wallet: "a", amount: 1, price: 100, txnType: "buy", txnCreatedAt: at("2024-01-01") },
+      { id: 2, uuid: "sale", assetType: "crypto", symbol: "BTC", wallet: "a", amount: 1, price: 150, txnType: "sell", txnCreatedAt: at("2024-02-01") },
+      { id: 3, uuid: "later-buy", assetType: "crypto", symbol: "BTC", wallet: "b", amount: 1, price: 160, txnType: "buy", txnCreatedAt: at("2024-02-10") },
+    ];
+    const result = calculateCostBasis(fromStoredTransactions(stored), { method: "FIFO" });
+    expect(result.disposals).toEqual([expect.objectContaining({ proceeds: 150, costBasis: 100, gainLoss: 50 })]);
+    expect(result.openLots).toEqual([expect.objectContaining({ amount: 1, costBasis: 160 })]);
   });
 
   it("warns when opposite wallet changes in one snapshot do not fit a transfer fee", () => {
@@ -255,6 +313,31 @@ describe("calculateCostBasis", () => {
       event("buy", "2023-01-01", "buy", 1, 100),
       event("sell", "2024-01-01", "sell", 1, 200),
     ], { method: "FIFO" });
+    expect(result.disposals[0].term).toBe("short");
+  });
+
+  it.each([
+    ["2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z", "short"],
+    ["2023-01-01T08:00:00Z", "2024-01-01T09:00:00Z", "short"],
+    ["2024-01-01T00:00:00Z", "2025-01-02T00:00:00Z", "long"],
+    ["2024-02-29T08:00:00Z", "2025-02-28T12:00:00Z", "short"],
+    ["2024-02-29T08:00:00Z", "2025-03-01T00:00:00Z", "long"],
+  ] as const)("classifies a 100-dollar lot sold for 200 from %s on %s as %s", (buy, sell, term) => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 1, 100, { date: buy }),
+      event("sell", "2025-01-01", "sell", 1, 200, { date: sell }),
+    ], { method: "FIFO" });
+    expect(result.disposals[0]).toMatchObject({ proceeds: 200, costBasis: 100, gainLoss: 100, term });
+  });
+
+  it.each([
+    ["2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z"],
+    ["2023-01-01T08:00:00Z", "2024-01-01T09:00:00Z"],
+  ] as const)("keeps a sale on the calendar anniversary short with the page's 365-day setting: %s to %s", (buy, sell) => {
+    const result = calculateCostBasis([
+      event("buy", "2024-01-01", "buy", 1, 100, { date: buy }),
+      event("sell", "2025-01-01", "sell", 1, 200, { date: sell }),
+    ], { method: "FIFO", holdingPeriodDays: 365 });
     expect(result.disposals[0].term).toBe("short");
   });
 

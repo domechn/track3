@@ -161,7 +161,7 @@ describe("Sync settings page", () => {
   it("waits for disable and confirms success", async () => {
     status.mode = "ready";
     let finish!: () => void;
-    vi.mocked(syncRuntime.disable).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    vi.mocked(syncRuntime.disable).mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(true); }));
     render(<SyncSettingsPage />);
     fireEvent.click(screen.getByRole("button", { name: "Disable sync" }));
     expect(screen.getByRole("button", { name: "Disabling…" })).toBeDisabled();
