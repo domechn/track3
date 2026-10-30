@@ -1,7 +1,8 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import ProfitSummary from "@/mobile/components/profit-summary";
+import { calculateTotalProfit } from "@/middlelayers/charts";
 
 vi.mock("@/middlelayers/charts", () => ({
   calculateTotalProfit: vi.fn().mockResolvedValue({ total: 0 }),
@@ -32,6 +33,21 @@ it("uses a dash for a month with no snapshot", async () => {
   expect(screen.getByText("Apr").closest("button")).toHaveTextContent("—");
   expect(screen.getByText("Flat 0")).toBeInTheDocument();
   expect(screen.getByText("Periods 0")).toBeInTheDocument();
+});
+
+it("keeps an unknown yearly profit as a dash", async () => {
+  vi.mocked(calculateTotalProfit).mockResolvedValue({
+    total: null, percentage: null, coins: [], lastRecordDate: new Date(2024, 3, 16),
+  });
+  render(<ProfitSummary
+    dateRange={{ start: new Date(2024, 0, 1), end: new Date(2024, 3, 16) }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down"
+  />);
+  fireEvent.click(screen.getByRole("radio", { name: "Y" }));
+  await waitFor(() => expect(screen.getByText("2024").closest(".profit-period-grid > div"))
+    .toHaveTextContent("—"));
+  expect(screen.getByText("Flat 0")).toBeInTheDocument();
 });
 
 it("lets the phone narrow a month's P&L chart to seven days", () => {

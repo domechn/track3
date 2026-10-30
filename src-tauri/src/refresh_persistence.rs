@@ -486,8 +486,8 @@ fn validate_asset(asset: &RefreshAssetInput) -> Result<(), String> {
 
 fn validate_transaction(transaction: &RefreshTransactionInput) -> Result<(), String> {
     validate_identity(&transaction.asset_type, &transaction.symbol)?;
-    if !matches!(transaction.txn_type.as_str(), "buy" | "sell") {
-        return Err("refresh transaction txn_type must be buy or sell".to_string());
+    if !matches!(transaction.txn_type.as_str(), "buy" | "sell" | "withdraw") {
+        return Err("refresh transaction txn_type must be buy, sell or withdraw".to_string());
     }
     validate_number(transaction.amount, "transaction amount", false)?;
     validate_number(transaction.price, "transaction price", true)
@@ -1250,6 +1250,31 @@ mod tests {
 
             assert_eq!(database.count("assets_v2").await, 0);
             assert_eq!(database.count("transactions").await, 0);
+        });
+    }
+
+    #[test]
+    fn accepts_withdraw_marker_for_an_unpriced_disappearance() {
+        Runtime::new().unwrap().block_on(async {
+            let database = TestDatabase::new().await;
+            let mut zero = asset("wallet-a", "BTC");
+            zero.amount = 0.0;
+            zero.value = 0.0;
+            let mut uncertain = transaction("wallet-a", "BTC");
+            uncertain.amount = 1.0;
+            uncertain.txn_type = "withdraw".to_string();
+
+            persist(&database, OPERATION_UUID, CREATED_AT, &[zero], &[uncertain])
+                .await
+                .unwrap();
+
+            let mut connection = connect(&database.path, false).await;
+            let recorded =
+                sqlx::query_as::<_, (String, f64)>("SELECT txnType, price FROM transactions")
+                    .fetch_one(&mut connection)
+                    .await
+                    .unwrap();
+            assert_eq!(recorded, ("withdraw".to_string(), 100.0));
         });
     }
 

@@ -13,7 +13,7 @@ const config = {
   sessionToken: "token-value",
 };
 
-beforeEach(() => http.mockReset());
+beforeEach(() => { http.mockReset(); });
 
 describe("SigV4", () => {
   it("matches the AWS SigV4 get-vanilla published test vector", async () => {
@@ -66,6 +66,40 @@ describe("SigV4", () => {
 });
 
 describe("S3Client", () => {
+  it.each([
+    ["HEAD", 30_000, (client: S3Client, signal: AbortSignal) => client.headObject("snap/a", signal)],
+    ["LIST", 30_000, (client: S3Client, signal: AbortSignal) => client.listObjectsV2({ signal })],
+    ["DELETE", 30_000, (client: S3Client, signal: AbortSignal) => client.deleteObject("snap/a", signal)],
+    ["GET object", 120_000, (client: S3Client, signal: AbortSignal) => client.getObject("snap/a", signal)],
+    ["PUT object", 120_000, (client: S3Client, signal: AbortSignal) => client.putObject("snap/a", new Uint8Array([1]), undefined, signal)],
+  ])("gives %s its operation deadline and cancels with the caller", async (_name, timeoutMs, start) => {
+    http.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    }));
+    const controller = new AbortController();
+    const request = start(new S3Client(config), controller.signal);
+    await vi.waitFor(() => expect(http).toHaveBeenCalledTimes(1));
+    expect(http.mock.calls[0][1]?.connectTimeout).toBe(timeoutMs);
+    controller.abort();
+    await expect(request).rejects.toThrow(/aborted/i);
+  });
+
+  it("honors caller cancellation on iOS versions without AbortSignal.any", async () => {
+    const original = (AbortSignal as typeof AbortSignal & { any?: (signals: AbortSignal[]) => AbortSignal }).any;
+    Object.defineProperty(AbortSignal, "any", { configurable: true, value: undefined });
+    try {
+      http.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      }));
+      const controller = new AbortController();
+      const request = new S3Client(config).headObject("snap/a", controller.signal);
+      await vi.waitFor(() => expect(http).toHaveBeenCalledTimes(1));
+      controller.abort();
+      await expect(request).rejects.toThrow(/aborted/i);
+    } finally {
+      Object.defineProperty(AbortSignal, "any", { configurable: true, value: original });
+    }
+  });
   it("signs If-Match on manifest updates", async () => {
     http.mockResolvedValueOnce(new Response(null, { status: 200, headers: { ETag: '"next"' } }));
     await new S3Client(config).putObject("manifest", new Uint8Array([1]), { ifMatch: '"prior"' });
@@ -285,6 +319,18 @@ describe("S3Client", () => {
     http.mockResolvedValueOnce(response);
     const request = new S3Client({ ...config, timeoutMs: 10 }).getObject("snap/a");
     await expect(Promise.race([request, new Promise((_, reject) => setTimeout(() => reject(new Error("read was ignored")), 40))]))
-      .rejects.toThrow("S3 response timed out");
+      .rejects.toThrow("Sync timed out");
+  });
+
+  it("still rejects a timed-out response when cancelling its body stalls", async () => {
+    const response = new Response("irrelevant", { status: 200, headers: { ETag: '"one"' } });
+    response.arrayBuffer = () => new Promise(() => {});
+    response.body!.cancel = () => new Promise(() => {});
+    http.mockResolvedValueOnce(response);
+    const request = new S3Client({ ...config, timeoutMs: 10 }).getObject("snap/a");
+    await expect(Promise.race([
+      request,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("cancel stalled")), 40)),
+    ])).rejects.toThrow("Sync timed out");
   });
 });

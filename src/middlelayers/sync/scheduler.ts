@@ -1,16 +1,23 @@
 import type { SyncReport } from "./engine";
 import { classifySyncError, type SyncConnectionResult } from "./settings";
+import { SyncTimeoutError } from "./object-store";
+
+// Bounds a whole sync, including database, crypto, and any transport that ignores abort.
+export const SYNC_RUN_TIMEOUT_MS = 10 * 60_000;
+export const SYNC_STOP_GRACE_MS = 5_000;
 
 export type SyncStatus = {
   phase: "idle" | "syncing" | "error";
   report?: SyncReport;
   lastSync?: number;
+  startedAt?: number;
   error?: Exclude<SyncConnectionResult, "ok"> | "sync";
   retryStopped?: boolean;
 };
 
 export class SyncScheduler {
-  private readonly controller = new AbortController();
+  private controller?: AbortController;
+  private runSettled?: Promise<SyncReport>;
   private readonly listeners = new Set<() => void>();
   private current?: Promise<void>;
   private timer?: ReturnType<typeof setTimeout>;
@@ -18,6 +25,7 @@ export class SyncScheduler {
   private failures = 0;
   private stopped = false;
   private pending = false;
+  private runId = 0;
   private state: SyncStatus = { phase: "idle" };
 
   constructor(
@@ -71,11 +79,39 @@ export class SyncScheduler {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     if (this.current) return this.current;
-    this.setStatus({ ...this.state, phase: "syncing", error: undefined, retryStopped: false });
+    if (this.runSettled) {
+      this.pending = true;
+      return Promise.resolve();
+    }
+    const runId = ++this.runId;
+    const controller = new AbortController();
+    this.controller = controller;
+    this.setStatus({ ...this.state, phase: "syncing", startedAt: Date.now(), error: undefined, retryStopped: false });
     const work = (async () => {
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      let onAbort: () => void = () => {};
+      let run: Promise<SyncReport> | undefined;
+      let settled = false;
       try {
-        const report = await this.run(this.controller.signal);
-        if (this.stopped) return;
+        const timedOut = new Promise<never>((_, reject) => {
+          watchdog = setTimeout(() => {
+            reject(new SyncTimeoutError());
+            controller.abort();
+          }, SYNC_RUN_TIMEOUT_MS);
+        });
+        const cancelled = new Promise<never>((_, reject) => {
+          onAbort = () => reject(new Error("Sync aborted"));
+          controller.signal.addEventListener("abort", onAbort, { once: true });
+        });
+        try {
+          run = this.run(controller.signal);
+        } catch (error) {
+          run = Promise.reject(error);
+        }
+        this.runSettled = run;
+        void run.then(() => { settled = true; }, () => { settled = true; });
+        const report = await Promise.race([run, timedOut, cancelled]);
+        if (this.stopped || runId !== this.runId) return;
         if (report.errors.length) {
           this.fail("sync", report);
         } else {
@@ -83,15 +119,28 @@ export class SyncScheduler {
           this.setStatus({ phase: "idle", report, lastSync: Date.now() });
         }
       } catch (error) {
-        if (!this.stopped) this.fail(
+        if (!this.stopped && runId === this.runId) this.fail(
           error instanceof Error && error.message === "Sync has not been initialized"
             ? "header" : classifySyncError(error),
         );
       } finally {
-        this.current = undefined;
-        if (this.pending && !this.stopped) {
-          this.pending = false;
-          if (!this.failures) void this.runNow();
+        if (watchdog) clearTimeout(watchdog);
+        controller.signal.removeEventListener("abort", onAbort);
+        if (runId === this.runId) {
+          this.controller = undefined;
+          this.current = undefined;
+          if (settled) this.runSettled = undefined;
+          else if (run) {
+            const staleRun = run;
+            void staleRun.then(
+              () => this.staleRunSettled(staleRun),
+              () => this.staleRunSettled(staleRun),
+            );
+          }
+          if (this.pending && !this.stopped && !this.runSettled) {
+            this.pending = false;
+            if (!this.failures) void this.runNow();
+          }
         }
       }
     })();
@@ -99,8 +148,17 @@ export class SyncScheduler {
     return work;
   }
 
+  private staleRunSettled(run: Promise<SyncReport>): void {
+    if (this.runSettled !== run) return;
+    this.runSettled = undefined;
+    if (this.pending && !this.stopped && !this.current && !this.timer) {
+      this.pending = false;
+      void this.runNow();
+    }
+  }
+
   private fail(error: Exclude<SyncConnectionResult, "ok"> | "sync", report?: SyncReport): void {
-    this.setStatus({ ...this.state, phase: "error", report, error });
+    this.setStatus({ ...this.state, phase: "error", startedAt: undefined, report, error });
     if (["header", "passphrase", "access", "configuration"].includes(error)) {
       this.pending = false;
       return;
@@ -118,10 +176,21 @@ export class SyncScheduler {
     }, delay);
   }
 
-  stop(): Promise<void> {
+  async stop(): Promise<boolean> {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
-    this.controller.abort();
-    return this.current ?? Promise.resolve();
+    this.runId++;
+    const run = this.runSettled;
+    this.controller?.abort();
+    if (!run) return true;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        run.then(() => true, () => true),
+        new Promise<boolean>((resolve) => { deadline = setTimeout(() => resolve(false), SYNC_STOP_GRACE_MS); }),
+      ]);
+    } finally {
+      if (deadline) clearTimeout(deadline);
+    }
   }
 }

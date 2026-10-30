@@ -383,6 +383,15 @@ export async function refreshAllData(
           latestBaseline,
           canonicalization,
         );
+        const currentPrices = { ...readyQueryResult.valueContext.priceMap };
+        for (const [assetType, prices] of [
+          ["crypto", readyQueryResult.stalePrices.crypto],
+          ["stock", readyQueryResult.stalePrices.stock],
+        ] as const) {
+          for (const [symbol, price] of Object.entries(prices)) {
+            currentPrices[getAssetIdentity({ assetType, symbol })] = price;
+          }
+        }
         if (readyQueryResult.failedSources.length > 0) {
           updateStalePrices(
             portfolioResult.coins,
@@ -407,6 +416,7 @@ export async function refreshAllData(
           latestBaseline,
           coins,
           readyQueryResult.blacklistedSymbols,
+          currentPrices,
         );
         const refreshAssets = generateRefreshAssets(coins, transactions);
         operation.prepared = {
@@ -451,6 +461,7 @@ export function generateTransactions(
   before: AssetModel[],
   afterCoins: WalletCoinUSD[],
   blacklistedSymbols: string[] = [],
+  currentPrices: Record<string, number> = {},
 ): RefreshTransactionDraft[] {
   const beforeAssetMap = new Map<string, AssetModel>();
   const afterAssetMap = new Map<string, WalletCoinUSD>();
@@ -481,6 +492,23 @@ export function generateTransactions(
     updatedAt: refreshCreatedAt,
   });
 
+  const makeVanishedDraft = (asset: AssetModel): RefreshTransactionDraft | undefined => {
+    const identity = getAssetIdentity(asset);
+    const quotedPrice = currentPrices[identity];
+    const currentPrice = Number.isFinite(quotedPrice) && quotedPrice > 0
+      ? quotedPrice : undefined;
+    const previousPrice = Number.isFinite(asset.price) && asset.price > 0
+      ? asset.price : asset.value / asset.amount;
+    const price = currentPrice ?? previousPrice;
+    if (!Number.isFinite(price) || price <= 0) {
+      return undefined;
+    }
+    return makeDraft(
+      getAssetType(asset), storedWallet(asset.wallet), asset.symbol, asset.amount,
+      price, currentPrice === undefined ? "withdraw" : "sell",
+    );
+  };
+
   const updatedTxns = afterCoins
     .map((a) => {
       const wallet = normalizeWalletToMD5(a.wallet);
@@ -500,6 +528,9 @@ export function generateTransactions(
       }
       if (a.amount === l.amount) {
         return undefined;
+      }
+      if (a.amount === 0 && l.amount > 0) {
+        return makeVanishedDraft(l);
       }
       return makeDraft(
         getAssetType(a),
@@ -524,14 +555,7 @@ export function generateTransactions(
       if (la.amount === 0) {
         return undefined;
       }
-      return makeDraft(
-        getAssetType(la),
-        storedWallet(la.wallet),
-        la.symbol,
-        la.amount,
-        la.price,
-        "sell",
-      );
+      return makeVanishedDraft(la);
     })
     .filter((x): x is RefreshTransactionDraft => !!x);
 
@@ -549,12 +573,17 @@ function generateRefreshAssets(
     symbol: coin.symbol,
     amount: coin.amount,
     value: coin.usdValue,
-    price: coin.price,
+    price: coin.amount === 0
+      ? transactions.find((transaction) =>
+          getTransactionIdentity(transaction) === getRefreshCoinIdentity(coin) &&
+          (transaction.txnType === "sell" || transaction.txnType === "withdraw")
+        )?.price ?? coin.price
+      : coin.price,
   }));
   const removedAssets = transactions
     .filter(
       (transaction) =>
-        transaction.txnType === "sell" &&
+        (transaction.txnType === "sell" || transaction.txnType === "withdraw") &&
         !afterIdentities.has(getTransactionIdentity(transaction)),
     )
     .map((transaction) => ({
@@ -995,6 +1024,50 @@ async function queryCoinsData(
     userProInfo,
     addProgress,
   );
+  for (const coin of portfolioResult.coins) {
+    if (portfolioResult.failedSources.some((source) =>
+      source.walletIdentities.some((wallet) => isSameWallet(wallet, coin.wallet))
+    )) continue;
+    const identity = getAssetIdentity(coin);
+    const known = valueContext.priceMap[identity];
+    if (Number.isFinite(known) && known > 0) continue;
+    const supplied = coin.price?.value;
+    const price = coin.price?.base === "usdt"
+      ? (supplied ?? 0) * (valueContext.priceMap.USDT ?? 1)
+      : supplied;
+    if (price !== undefined && Number.isFinite(price) && price > 0) {
+      valueContext.priceMap[identity] = price;
+    }
+  }
+  // This prefetch only chooses quote symbols; the write barrier rereads the baseline.
+  const latestBefore = selectLatestPersistedSnapshot(
+    await ASSET_HANDLER.listAssets(1),
+  ).assets;
+  const vanished = latestBefore.filter((asset) =>
+    asset.amount > 0 &&
+    !portfolioResult.failedSources.some((source) =>
+      source.walletIdentities.some((wallet) => isSameWallet(wallet, asset.wallet ?? ""))
+    ) &&
+    !portfolioResult.coins.some((coin) =>
+      getAssetIdentity(coin) === getAssetIdentity(asset) &&
+      isSameWallet(coin.wallet, asset.wallet ?? "")
+    ) &&
+    !(Number.isFinite(valueContext.priceMap[getAssetIdentity(asset)]) &&
+      valueContext.priceMap[getAssetIdentity(asset)] > 0)
+  );
+  const cryptoSymbols = [...new Set(vanished.filter((asset) =>
+    getAssetType(asset) === "crypto").map((asset) => asset.symbol))];
+  const stockSymbols = [...new Set(vanished.filter((asset) =>
+    getAssetType(asset) === "stock").map((asset) => asset.symbol))];
+  const [cryptoPrices, stockPrices] = await Promise.all([
+    cryptoSymbols.length ? queryCoinPrices(cryptoSymbols, userProInfo).catch(() => ({})) : Promise.resolve({}),
+    stockSymbols.length ? fetchStockPrices(stockSymbols).catch(() => ({})) : Promise.resolve({}),
+  ]);
+  for (const [assetType, prices] of [["crypto", cryptoPrices], ["stock", stockPrices]] as const) {
+    for (const [symbol, price] of Object.entries(prices)) {
+      valueContext.priceMap[getAssetIdentity({ assetType, symbol })] = price;
+    }
+  }
   const stalePrices = await queryStalePrices(portfolioResult.failedSources, userProInfo);
 
   return {

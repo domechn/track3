@@ -19,6 +19,7 @@ type BridgeOptions = {
   onboarding?: boolean;
   seedLockedSync?: boolean;
   richPortfolio?: boolean;
+  zeroCostUSDC?: boolean;
   slowOverview?: boolean;
   lockedStartup?: boolean;
   freshReviewData?: boolean;
@@ -45,6 +46,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     emptyPortfolio = false,
     seedLockedSync = false,
     richPortfolio = false,
+    zeroCostUSDC = false,
     slowOverview = false,
     lockedStartup = false,
     freshReviewData = false,
@@ -178,6 +180,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
         VALUES (?, ?, ?, ?, ?, ?, ?, 'buy', ?)`,
       ["demo-55", row[0], holding.type, holding.wallet, symbol, amount, Number(latest[0]) * 0.96, repurchasedAt]);
     }
+    if (zeroCostUSDC) db.run("UPDATE transactions SET price = 0 WHERE symbol = 'USDC' AND txnType = 'buy'");
     if (!seedReviewContent) db.run("INSERT INTO configuration (id, data) VALUES (992, ?)", [
       `!ent:e2e:${JSON.stringify({
         snapshotUuid: "demo-59", dismissedIds: [],

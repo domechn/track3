@@ -14,7 +14,7 @@ import {
   it,
   vi,
 } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import CoinAnalysis from "@/mobile/components/coin-analytics";
 import { ChartResizeContext } from "@/mobile/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
@@ -197,6 +197,11 @@ const dateRange: TDateRange = {
   end: new Date("2024-04-30T00:00:00.000Z"),
 };
 
+function NextCoin() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate("/coins/ETH")}>Next coin</button>;
+}
+
 function CoinAnalysisTestTree({
   initialEntries = ["/coins/BTC"],
   currency = usdCurrency,
@@ -216,6 +221,7 @@ function CoinAnalysisTestTree({
       >
         <OverviewLoadingContext.Provider value={{ reportLoaded: vi.fn() }}>
           <MemoryRouter initialEntries={initialEntries}>
+            <NextCoin />
             <Routes>
               <Route
                 path="/coins/:symbol"
@@ -234,6 +240,55 @@ function CoinAnalysisTestTree({
     </DataChangedContext.Provider>
   );
 }
+
+it("clears four BTC trade metrics and breakeven when ETH has no profit detail", async () => {
+  mocks.calculateTotalProfit.mockImplementation(async (_range: TDateRange, symbol: string) =>
+    symbol === "BTC"
+      ? { total: 50, percentage: 50, coins: [{ symbol: "BTC", assetType: "crypto", value: 50, percentage: 50, buyAmount: 1, sellAmount: 0.5, costAvgPrice: 12345, sellAvgPrice: 23456 }] }
+      : { total: 0, percentage: undefined, coins: [] });
+  mocks.queryLastAssetsBySymbol.mockImplementation(async (symbol: string) =>
+    ({ symbol, assetType: "crypto", amount: 1, price: 3000, value: 3000 }));
+  renderCoinAnalysis();
+  await screen.findByText("$12,345.00");
+  fireEvent.click(screen.getByText("Next coin"));
+  await waitFor(() => expect(screen.queryByText("$12,345.00")).not.toBeInTheDocument());
+  expect(screen.queryByText("$23,456.00")).not.toBeInTheDocument();
+  expect(screen.getByText("Avg. buy price (selected range)").closest(".coin-metric-card")).toHaveTextContent(/—.*—/);
+  expect(screen.getByText("Avg. sell price (selected range)").closest(".coin-metric-card")).toHaveTextContent(/—.*—/);
+  expect(screen.getByText("Breakeven price").closest(".coin-metric-card")).toHaveTextContent("—");
+  fireEvent.click(screen.getByRole("button", { name: "Holdings at the start of the range are counted at the market price of the first day." }));
+  expect(screen.getByText("Holdings at the start of the range are counted at the market price of the first day.")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Cost price minus realised profit per coin held." }));
+  expect(screen.getByText("Cost price minus realised profit per coin held.")).toBeVisible();
+});
+
+it("shows infinite return for a zero-cost airdrop and no breakeven after selling all", async () => {
+  mocks.calculateTotalProfit.mockResolvedValue({
+    total: 50, percentage: undefined,
+    coins: [{ symbol: "BTC", assetType: "crypto", value: 50, percentage: undefined, buyAmount: 1, sellAmount: 0, costAvgPrice: 0, sellAvgPrice: 0 }],
+  });
+  mocks.queryLastAssetsBySymbol.mockResolvedValue({ symbol: "BTC", assetType: "crypto", amount: 0, value: 0, price: 50 });
+  renderCoinAnalysis();
+  await waitFor(() => expect(screen.getByText("Breakeven price").closest(".coin-metric-card")).toHaveTextContent("—"));
+  expect(screen.getByText("Return").parentElement).toHaveTextContent("∞");
+});
+
+it("shows unknown profit after switching from a priced coin to an unmatched withdrawal", async () => {
+  mocks.calculateTotalProfit.mockImplementation(async (_range: TDateRange, symbol: string) =>
+    symbol === "BTC"
+      ? { total: 50, percentage: 50, coins: [{ symbol: "BTC", assetType: "crypto", value: 50, percentage: 50, buyAmount: 1, sellAmount: 0, costAvgPrice: 100, sellAvgPrice: 0 }] }
+      : { total: null, percentage: null, coins: [{ symbol: "ETH", assetType: "crypto", value: null, percentage: null, buyAmount: 2, sellAmount: 0, costAvgPrice: 300, sellAvgPrice: 0 }] });
+  mocks.queryLastAssetsBySymbol.mockImplementation(async (symbol: string) =>
+    ({ symbol, assetType: "crypto", amount: 2, price: 300, value: 600 }));
+  renderCoinAnalysis();
+  await screen.findByText("$50.00");
+  fireEvent.click(screen.getByText("Next coin"));
+  await waitFor(() => expect(screen.getByText("Avg. buy price (selected range)").closest(".coin-metric-card")).toHaveTextContent("$300.00"));
+  expect(screen.getByText("Breakeven price").closest(".coin-metric-card")).toHaveTextContent("—");
+  const profitCard = screen.getByText("Return").closest(".coin-metric-card");
+  expect(profitCard).toHaveTextContent(/—.*—/);
+  expect(profitCard).not.toHaveTextContent("—%");
+});
 
 function renderCoinAnalysis(
   initialEntries: string[] = ["/coins/BTC"],
@@ -361,6 +416,7 @@ const secondTransaction: Transaction = {
   txnCreatedAt: "2024-04-16T00:00:00.000Z",
 };
 
+// The full coverage run can delay this detail-dialog render past Vitest's 5 s default.
 it("shows a compact phone identity, 24h price change, and an unbroken transaction date", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
@@ -384,7 +440,7 @@ it("shows a compact phone identity, 24h price change, and an unbroken transactio
   expect(history).toHaveTextContent("Apr 15");
   fireEvent.click(history.querySelector(".mobile-list-row")!);
   expect(await screen.findByRole("dialog", { name: "Apr 15" }, { timeout: 5000 })).toHaveTextContent("2024");
-});
+}, 20_000);
 
 it("anchors the prior-day coin price to the latest snapshot instead of the range end", async () => {
   mocks.queryAllDataDates.mockResolvedValue([

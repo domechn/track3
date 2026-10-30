@@ -62,12 +62,12 @@ it("uses the existing expiry translation key for the date phrase", () => {
 });
 
 it("shows a trialing subscription with the active status tone", () => {
-  render(<SystemInfoCard title="Track3 Pro" status={{ label: "Trialing", value: "trialing" }} version="0.9.2" t={(key) => key} />);
+  render(<SystemInfoCard title="Track3 Pro" status={{ label: "Trialing", value: "trialing" }} version="0.9.3" t={(key) => key} />);
   expect(screen.getByText("Trialing")).toHaveClass("text-green-700");
 });
 
 it("keeps separators with the following plan segment when the summary wraps", () => {
-  render(<SystemInfoCard title="Track3 Pro" description="Yearly plan · renews Nov 28, 2026 · in 31 days" version="0.9.2" t={(key) => key} />);
+  render(<SystemInfoCard title="Track3 Pro" description="Yearly plan · renews Nov 28, 2026 · in 31 days" version="0.9.3" t={(key) => key} />);
   const segments = screen.getByText(/Yearly plan/).closest("p")!.querySelectorAll("span");
   expect(Array.from(segments, (segment) => segment.textContent)).toEqual([
     "Yearly plan", "·\u00a0renews Nov 28, 2026", "·\u00a0in 31 days",

@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { executeWrite, getDatabase } from "@/middlelayers/database";
 import { runWithEncryptionWriteGate } from "@/middlelayers/encryption-write-gate";
 import { unlockSyncHeader } from "./crypto";
-import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-store";
+import { isS3Conflict, readSyncHeader, S3Error, SyncTimeoutError, type S3Store } from "./object-store";
 import { S3Client } from "./s3-client";
 
 export type SyncCategoryName = "history" | "settings" | "secrets" | "rebalance" | "chat";
@@ -45,9 +45,10 @@ export function validateSyncSettings(settings: SyncSettings): "configuration" | 
   }
 }
 
-export type SyncConnectionResult = "ok" | "configuration" | "access" | "bucket" | "network" | "header" | "passphrase" | "conditions";
+export type SyncConnectionResult = "ok" | "configuration" | "access" | "bucket" | "network" | "timeout" | "header" | "passphrase" | "conditions";
 
 export function classifySyncError(error: unknown): Exclude<SyncConnectionResult, "ok"> {
+  if (error instanceof SyncTimeoutError) return "timeout";
   if (error instanceof Error && (error.message === "Invalid S3 configuration" ||
     error.message === "Invalid S3 virtual-host endpoint")) return "configuration";
   if (error instanceof SyntaxError || error instanceof Error && (

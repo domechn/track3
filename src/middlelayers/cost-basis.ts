@@ -63,6 +63,15 @@ function sortableTimestamp(date: string): number {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function heldMoreThanOneCalendarYear(acquiredAt: string, disposedAt: string): boolean {
+  const acquired = new Date(acquiredAt);
+  const anniversary = new Date(acquired);
+  anniversary.setUTCFullYear(acquired.getUTCFullYear() + 1);
+  if (anniversary.getUTCMonth() !== acquired.getUTCMonth()) anniversary.setUTCDate(0);
+  // "Held more than one year" means the sale date is after the acquisition date plus one calendar year.
+  return new Date(disposedAt).toISOString().slice(0, 10) > anniversary.toISOString().slice(0, 10);
+}
+
 const lotOrders = new WeakMap<CostBasisLot, number>();
 
 function lotBefore(a: CostBasisLot, b: CostBasisLot, method: CostBasisMethod): boolean {
@@ -151,7 +160,7 @@ export function calculateCostBasis(
     const key = `${event.assetType}:${symbol}`;
     const assetLots = lots.get(key) ?? { all: [], heap: [], averageAmount: 0, averageCost: 0 };
     lots.set(key, assetLots);
-    if (event.possibleTransfer && event.type === "sell") warning("possible-transfer");
+    if (event.possibleTransfer && (event.type === "sell" || event.type === "transfer-out")) warning("possible-transfer");
     if (event.type === "transfer-in" || event.type === "transfer-out") {
       if (!event.transferId || !validTransfers.has(event.transferId)) {
         warning("unmatched-transfer");
@@ -198,12 +207,13 @@ export function calculateCostBasis(
         : lot.costBasis * amount / lot.amount;
       if (taxable) {
         const proceeds = (event.amount * event.price - (event.fee ?? 0)) * amount / event.amount;
-        const daysHeld = (Date.parse(event.date) - Date.parse(lot.acquiredAt)) / 86_400_000;
         disposals.push({
           eventId: event.id, lotId: lot.id, assetType: event.assetType, symbol,
           acquiredAt: lot.acquiredAt, disposedAt: event.date, amount,
           proceeds, costBasis, gainLoss: proceeds - costBasis,
-          term: daysHeld > (options.holdingPeriodDays ?? 365) ? "long" : "short",
+          term: options.holdingPeriodDays === undefined || options.holdingPeriodDays === 365
+            ? heldMoreThanOneCalendarYear(lot.acquiredAt, event.date) ? "long" : "short"
+            : (Date.parse(event.date) - Date.parse(lot.acquiredAt)) / 86_400_000 > options.holdingPeriodDays ? "long" : "short",
           method: options.method,
         });
       }
@@ -261,21 +271,6 @@ export function fromStoredTransactions(
   });
   for (const assetEvents of byAsset.values()) {
     assetEvents.sort((a, b) => sortableTimestamp(a.event.date) - sortableTimestamp(b.event.date));
-    const pendingWithdrawals: CostBasisEvent[] = [];
-    for (const { event } of assetEvents) {
-      if (event.type === "withdraw") pendingWithdrawals.push(event);
-      if (event.type !== "deposit") continue;
-      const index = pendingWithdrawals.findIndex((out) =>
-        out.wallet !== event.wallet && matchesTransferAmount(out.amount, event.amount) &&
-        Date.parse(event.date) - Date.parse(out.date) <= 7 * 86_400_000,
-      );
-      if (index < 0) continue;
-      const out = pendingWithdrawals.splice(index, 1)[0];
-      out.type = "transfer-out";
-      event.type = "transfer-in";
-      out.transferId = event.transferId = `${out.id}:${event.id}`;
-    }
-
     const bySnapshot = new Map<string, CostBasisEvent[]>();
     for (const { event, uuid } of assetEvents) {
       const group = bySnapshot.get(uuid) ?? [];
@@ -283,7 +278,7 @@ export function fromStoredTransactions(
       bySnapshot.set(uuid, group);
     }
     const snapshots = [...bySnapshot.values()];
-    for (const [index, group] of snapshots.entries()) {
+    for (const group of snapshots) {
       for (const out of group.filter((event) => event.type === "sell")) {
         const opposite = group.filter((event) =>
           (event.type === "buy" || event.type === "transfer-in") && event.wallet !== out.wallet,
@@ -299,12 +294,37 @@ export function fromStoredTransactions(
           out.possibleTransfer = true;
         }
       }
+    }
+    const pendingWithdrawals: CostBasisEvent[] = [];
+    for (const { event } of assetEvents) {
+      if (event.type === "withdraw") pendingWithdrawals.push(event);
+      if (event.type !== "deposit") continue;
+      const index = pendingWithdrawals.findIndex((out) =>
+        out.wallet !== event.wallet && matchesTransferAmount(out.amount, event.amount) &&
+        Date.parse(event.date) - Date.parse(out.date) <= 7 * 86_400_000,
+      );
+      if (index < 0) continue;
+      const out = pendingWithdrawals.splice(index, 1)[0];
+      out.type = "transfer-out";
+      event.type = "transfer-in";
+      out.transferId = event.transferId = `${out.id}:${event.id}`;
+    }
+    for (const [index, group] of snapshots.entries()) {
       const next = snapshots[index + 1] ?? [];
       for (const out of group.filter((event) => event.type === "sell")) {
-        if (next.some((incoming) =>
+        const candidates = next.filter((incoming) =>
           incoming.type === "buy" && incoming.wallet !== out.wallet &&
-          matchesTransferAmount(out.amount, incoming.amount),
-        )) out.possibleTransfer = true;
+          matchesTransferAmount(out.amount, incoming.amount));
+        if (candidates.length === 0) continue;
+        out.possibleTransfer = true;
+        const incoming = candidates[0];
+        const gap = Date.parse(incoming.date) - Date.parse(out.date);
+        if (candidates.length !== 1 || gap < 0 || gap > 7 * 86_400_000 ||
+          group.filter((other) => other.type === "sell" &&
+            matchesTransferAmount(other.amount, incoming.amount)).length !== 1) continue;
+        out.type = "transfer-out";
+        incoming.type = "transfer-in";
+        out.transferId = incoming.transferId = `${out.id}:${incoming.id}`;
       }
     }
   }

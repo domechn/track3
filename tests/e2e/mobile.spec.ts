@@ -377,6 +377,7 @@ test("review screenshots have several assets and a multi-month trend", async ({ 
     await expect(page.locator(".overview-movers-card .mobile-delta-pill")).toHaveAttribute("data-tone", "gain");
     expect(await page.locator(".overview-movers-card .mobile-delta-pill").evaluate((node) => getComputedStyle(node).backgroundColor))
       .toBe(await page.locator(".mobile-hero-change .mobile-delta-pill").evaluate((node) => getComputedStyle(node).backgroundColor));
+    await expect(page.locator(".profit-mobile-list")).toHaveCount(2);
     const [gains, losses] = await page.locator(".profit-mobile-list").allTextContents();
     expect(gains).not.toContain("-$");
     expect(losses).not.toContain("+$");
