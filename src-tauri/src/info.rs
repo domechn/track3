@@ -1,8 +1,10 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fs::OpenOptions,
     io::{Error, ErrorKind, Write},
     path::Path,
+    sync::{Mutex, OnceLock},
+    time::Duration,
     vec,
 };
 
@@ -26,6 +28,8 @@ struct CoinGeckoCoin {
 
 const MAX_PRICE_CANDIDATES_PER_SYMBOL: usize = 25;
 const MAX_PRICE_IDS_LENGTH: usize = 1800;
+static LOGO_ATTEMPTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+const VERIFIED_BLACKLIST_HEADER: &str = "# verified-logo-blacklist-v2";
 
 fn select_price_coin<'a>(
     candidates: &'a [CoinGeckoCoin],
@@ -47,6 +51,80 @@ fn select_price_coin<'a>(
                 .then_with(|| right.id.cmp(&left.id))
         })
         .expect("coin group is nonempty")
+}
+
+// Verified against CoinGecko /coins/list on 2026-10-30.
+fn major_logo_id(symbol: &str) -> Option<&'static str> {
+    match symbol {
+        "BTC" => Some("bitcoin"),
+        "USDT" => Some("tether"),
+        "ETH" => Some("ethereum"),
+        "USDC" => Some("usd-coin"),
+        "SOL" => Some("solana"),
+        "BNB" => Some("binancecoin"),
+        "TRX" => Some("tron"),
+        "SUI" => Some("sui"),
+        "DOGE" => Some("dogecoin"),
+        "XRP" => Some("ripple"),
+        "ADA" => Some("cardano"),
+        "DOT" => Some("polkadot"),
+        "AVAX" => Some("avalanche-2"),
+        "LINK" => Some("chainlink"),
+        "MATIC" => Some("matic-network"),
+        "POL" => Some("polygon-ecosystem-token"),
+        "LTC" => Some("litecoin"),
+        "SHIB" => Some("shiba-inu"),
+        "PEPE" => Some("pepe"),
+        "WBTC" => Some("wrapped-bitcoin"),
+        "DAI" => Some("dai"),
+        "TON" => Some("the-open-network"),
+        _ => None,
+    }
+}
+
+fn select_logo_coin<'a>(
+    candidates: &'a [CoinGeckoCoin],
+    caps: &HashMap<String, f64>,
+) -> Option<&'a CoinGeckoCoin> {
+    let first = candidates.first()?;
+    major_logo_id(&first.symbol)
+        .and_then(|id| candidates.iter().find(|coin| coin.id == id))
+        .or_else(|| {
+            candidates
+                .iter()
+                .find(|coin| coin.id.eq_ignore_ascii_case(&coin.symbol))
+        })
+        .or_else(|| Some(select_price_coin(candidates, caps)))
+}
+
+fn take_unattempted_symbols(symbols: Vec<String>, attempted: &mut HashSet<String>) -> Vec<String> {
+    symbols
+        .into_iter()
+        .filter(|symbol| attempted.insert(symbol.clone()))
+        .collect()
+}
+
+#[derive(Clone, Copy)]
+enum LogoOutcome {
+    Saved,
+    NoImage,
+    Failed(&'static str),
+}
+
+fn should_blacklist_logo(outcome: LogoOutcome) -> bool {
+    matches!(outcome, LogoOutcome::NoImage)
+}
+
+fn load_verified_blacklist(path: &Path) -> Result<HashSet<String>, Error> {
+    if path.exists() {
+        let content = std::fs::read_to_string(path)?;
+        if content.lines().next() == Some(VERIFIED_BLACKLIST_HEADER) {
+            return Ok(content.lines().skip(1).map(str::to_uppercase).collect());
+        }
+    }
+    // Old entries included transient download failures; their validity cannot be trusted.
+    std::fs::write(path, format!("{VERIFIED_BLACKLIST_HEADER}\n"))?;
+    Ok(HashSet::new())
 }
 
 fn limit_price_candidates(mut coins: Vec<CoinGeckoCoin>) -> Vec<CoinGeckoCoin> {
@@ -184,6 +262,7 @@ impl CoinGecko {
         let mut res = vec![];
         let mut usdt_in = false;
         let mut btc_in = false;
+        let mut ton_in = false;
         for (s, coins) in coins_map {
             if s == "USDT" {
                 usdt_in = true;
@@ -191,6 +270,10 @@ impl CoinGecko {
             }
             if s == "BTC" {
                 btc_in = true;
+                continue;
+            }
+            if s == "TON" {
+                ton_in = true;
                 continue;
             }
             if coins.len() > 1 {
@@ -204,7 +287,7 @@ impl CoinGecko {
             }
         }
 
-        // hard fix usdt and btc id
+        // Use canonical IDs for symbols with ambiguous or outdated CoinGecko listings.
         if usdt_in {
             res.push(CoinGeckoCoin {
                 id: CoinGecko::get_usdt_id(),
@@ -215,6 +298,12 @@ impl CoinGecko {
             res.push(CoinGeckoCoin {
                 id: CoinGecko::get_btc_id(),
                 symbol: "BTC".to_string(),
+            });
+        }
+        if ton_in {
+            res.push(CoinGeckoCoin {
+                id: "the-open-network".to_string(),
+                symbol: "TON".to_string(),
             });
         }
         return Ok(res);
@@ -267,189 +356,184 @@ impl CoinGecko {
         coins: Vec<CoinWithPrice>,
         base_dir: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut paths = vec![base_dir.clone()];
-        paths.push("assets".to_string());
-        paths.push("coins".to_string());
-        let path_str = paths.join("/");
-        let download_dir = Path::new(path_str.as_str());
-        // mkdir download_dr if not exists
-        if !download_dir.exists() {
-            std::fs::create_dir_all(download_dir)?;
-        }
+        let path_str = format!("{base_dir}/assets/coins");
+        let download_dir = Path::new(&path_str);
+        std::fs::create_dir_all(download_dir)?;
 
-        let non_exists_symbols = coins
+        let invalid_record = download_dir.join("invalid_asset_icon_record.txt");
+        let blacklisted = load_verified_blacklist(&invalid_record)?;
+        let symbols = coins
             .iter()
-            .map(|c| c.symbol.clone())
-            .filter(|s| {
-                let asset_path = download_dir.join(format!("{}.png", s.to_lowercase()));
-                !asset_path.exists()
+            .map(|coin| coin.symbol.to_uppercase())
+            .filter(|symbol| {
+                !blacklisted.contains(symbol)
+                    && !download_dir
+                        .join(format!("{}.png", symbol.to_lowercase()))
+                        .exists()
             })
-            .collect::<Vec<String>>();
-
-        let invalid_asset_icon_record_file_path =
-            download_dir.join("invalid_asset_icon_record.txt");
-
-        // if non_exists_symbols in invalid_asset_icon_record_file_path, filter it
-        let non_exists_symbols = if invalid_asset_icon_record_file_path.exists() {
-            let invalid_asset_icon_record_file_content =
-                std::fs::read_to_string(invalid_asset_icon_record_file_path.clone())?;
-            let invalid_asset_icon_record_file_content = invalid_asset_icon_record_file_content
-                .split("\n")
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>();
-            non_exists_symbols
-                .into_iter()
-                .filter(|s| !invalid_asset_icon_record_file_content.contains(s))
-                .collect::<Vec<String>>()
-        } else {
-            non_exists_symbols
+            .collect();
+        let symbols = {
+            let mut attempted = LOGO_ATTEMPTS
+                .get_or_init(|| Mutex::new(HashSet::new()))
+                .lock()
+                .map_err(|_| Error::other("coin logo attempt state unavailable"))?;
+            take_unattempted_symbols(symbols, &mut attempted)
         };
-
-        if non_exists_symbols.len() == 0 {
+        if symbols.is_empty() {
             return Ok(());
         }
-        // need to filter coins with same symbol
-        let mut all_coins = self
-            .list_all_coin_ids(non_exists_symbols.clone(), None)
-            .await?;
 
-        // check if there are coins with same symbol
-        let dup_symbol_coins = all_coins
-            .iter()
-            .fold(HashMap::new(), |mut acc, coin| {
-                acc.entry(coin.symbol.clone())
-                    .or_insert(vec![])
-                    .push(coin.clone());
-                acc
+        let mut groups = BTreeMap::<String, Vec<CoinGeckoCoin>>::new();
+        for coin in self
+            .list_all_coin_ids(symbols.clone(), None)
+            .await
+            .map_err(|_| Error::other("CoinGecko coin list request failed"))?
+        {
+            groups.entry(coin.symbol.clone()).or_default().push(coin);
+        }
+
+        let cap_ids = groups
+            .values()
+            .filter(|group| {
+                group.len() > 1
+                    && !major_logo_id(&group[0].symbol)
+                        .is_some_and(|id| group.iter().any(|coin| coin.id == id))
+                    && !group
+                        .iter()
+                        .any(|coin| coin.id.eq_ignore_ascii_case(&coin.symbol))
             })
-            .iter()
-            .filter(|(_, coins)| coins.len() > 1)
-            .map(|(_, coins)| coins.clone())
-            .flatten()
+            .flat_map(|group| group.iter().map(|coin| coin.id.clone()))
             .collect::<Vec<_>>();
-
-        if dup_symbol_coins.len() > 0 {
-            let dup_coin_symbols = dup_symbol_coins
-                .iter()
-                .map(|c| c.symbol.clone())
-                .collect::<Vec<String>>();
-            // remove dup_symbol_coins from all_coins
-            all_coins = all_coins
-                .into_iter()
-                .filter(|c| !dup_coin_symbols.contains(&c.symbol))
-                .collect::<Vec<_>>();
-
-            let dup_coin_ids = dup_symbol_coins
-                .iter()
-                .map(|c| c.id.clone())
-                .collect::<Vec<_>>();
-            let dup_coin_prices = self
+        let mut caps = HashMap::new();
+        let mut failed_cap_ids = HashSet::new();
+        for batch in price_id_batches(&cap_ids)? {
+            match self
                 .client
-                .price(&dup_coin_ids, &["usd"], false, false, false, false)
-                .await?;
-            // find the coin with closest price
-            for s in dup_coin_symbols {
-                let coin_with_same_symbol = dup_symbol_coins
-                    .iter()
-                    .filter(|c| c.symbol == s)
-                    .collect::<Vec<_>>();
-                let coin = coins.iter().find(|c| c.symbol == s);
-                if let None = coin {
-                    continue;
-                }
-                let want_price = coin.unwrap().price;
-                let mut closest = coin_with_same_symbol[0].clone();
-                for coin in coin_with_same_symbol {
-                    if let Some(price) = dup_coin_prices.get(&coin.id) {
-                        let closest_price = dup_coin_prices.get(&closest.id);
-                        if let Some(closest_price) = closest_price {
-                            if let Some(closest_price) = closest_price.usd {
-                                if let Some(price) = price.usd {
-                                    if (want_price - price).abs()
-                                        < (want_price - closest_price).abs()
-                                    {
-                                        closest = coin.clone();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                all_coins.push(closest);
+                .price(&batch, &["usd"], true, false, false, false)
+                .await
+            {
+                Ok(prices) => caps.extend(
+                    prices
+                        .into_iter()
+                        .filter_map(|(id, price)| price.usd_market_cap.map(|cap| (id, cap))),
+                ),
+                Err(_) => failed_cap_ids.extend(batch.into_iter().map(str::to_string)),
             }
         }
 
-        // key: symbol, value: id
-        let non_exists_ids = all_coins
+        let failed_cap_groups = groups
+            .values()
+            .filter(|group| group.iter().any(|coin| failed_cap_ids.contains(&coin.id)))
+            .map(|group| group[0].symbol.clone())
+            .collect::<HashSet<_>>();
+        let selected = groups
+            .values()
+            .filter(|group| !failed_cap_groups.contains(&group[0].symbol))
+            .filter_map(|group| select_logo_coin(group, &caps).cloned())
+            .collect::<Vec<_>>();
+        let mut newly_invalid = symbols
             .iter()
-            .map(|c| c.id.clone())
-            .collect::<Vec<String>>();
-
-        let page_size = std::cmp::min(non_exists_ids.len(), 250) as i64;
-
-        let markets = self
-            .client
-            .coins_markets(
-                "usd",
-                &non_exists_ids,
-                None,
-                coingecko::params::MarketsOrder::MarketCapDesc,
-                page_size,
-                1,
-                false,
-                &[],
-            )
-            .await?;
-
-        let markets_size = markets.len() as i64;
-
-        for m in markets {
-            let _ = self.download_coin_logo(download_dir, m.clone()).await;
-        }
-
-        if markets_size >= page_size {
-            // full load
-
-            // check if file is not exists for each symbol
-            // if not exists, make an empty file
-
-            for symbol in non_exists_symbols {
-                let asset_path = download_dir.join(format!("{}.png", symbol.to_lowercase()));
-                if !asset_path.exists() {
-                    let mut file = OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .append(true)
-                        .open(invalid_asset_icon_record_file_path.clone())?;
-                    // append to invalid asset icon record file
-                    file.write_all(format!("{}\n", symbol).as_bytes())?;
+            .filter(|symbol| !groups.contains_key(*symbol))
+            .cloned()
+            .collect::<Vec<_>>();
+        let http = reqwest::Client::builder()
+            .timeout(Duration::from_secs(15))
+            .build()?;
+        let mut failed_downloads = failed_cap_groups.len();
+        for chunk in selected.chunks(250) {
+            let ids = chunk.iter().map(|coin| coin.id.clone()).collect::<Vec<_>>();
+            let mut markets = HashMap::new();
+            let mut failed_market_ids = HashSet::new();
+            for batch in price_id_batches(&ids)? {
+                match self
+                    .client
+                    .coins_markets(
+                        "usd",
+                        &batch,
+                        None,
+                        coingecko::params::MarketsOrder::MarketCapDesc,
+                        batch.len() as i64,
+                        1,
+                        false,
+                        &[],
+                    )
+                    .await
+                {
+                    Ok(items) => {
+                        markets.extend(items.into_iter().map(|item| (item.id.clone(), item)))
+                    }
+                    Err(_) => failed_market_ids.extend(batch.into_iter().map(str::to_string)),
                 }
             }
+            for coin in chunk {
+                let outcome = if failed_market_ids.contains(&coin.id) {
+                    LogoOutcome::Failed("CoinGecko logo metadata request failed")
+                } else {
+                    match markets.get(&coin.id) {
+                        Some(item) => {
+                            self.download_coin_logo(&http, download_dir, &coin.symbol, item)
+                                .await
+                        }
+                        None => LogoOutcome::Failed("CoinGecko omitted logo metadata"),
+                    }
+                };
+                if should_blacklist_logo(outcome) {
+                    newly_invalid.push(coin.symbol.clone());
+                } else if let LogoOutcome::Failed(reason) = outcome {
+                    failed_downloads += 1;
+                    eprintln!("coin logo download failed: {reason}");
+                }
+            }
+        }
+        if !newly_invalid.is_empty() {
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(invalid_record)?;
+            for symbol in newly_invalid {
+                writeln!(file, "{symbol}")?;
+            }
+        }
+        if failed_downloads > 0 {
+            return Err(
+                Error::other(format!("{failed_downloads} coin logo downloads failed")).into(),
+            );
         }
         Ok(())
     }
 
     async fn download_coin_logo(
         &self,
+        http: &reqwest::Client,
         download_dir: &Path,
-        m: CoinsMarketItem,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut res = reqwest::get(m.image).await;
-        if let Err(_) = res {
-            let url = format!(
-                "https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/{}.png",
-                m.symbol.to_lowercase()
-            );
-            res = reqwest::get(url).await;
+        symbol: &str,
+        item: &CoinsMarketItem,
+    ) -> LogoOutcome {
+        if item.image.trim().is_empty() {
+            return LogoOutcome::NoImage;
         }
-        let logo = res?.bytes().await?;
-
-        std::fs::write(
-            download_dir.join(format!("{}.png", m.symbol.to_lowercase())),
-            logo,
-        )?;
-        Ok(())
+        let response = match http.get(&item.image).send().await {
+            Ok(response) => response,
+            Err(_) => return LogoOutcome::Failed("image request failed"),
+        };
+        let response = match response.error_for_status() {
+            Ok(response) => response,
+            Err(_) => return LogoOutcome::Failed("image server returned an error"),
+        };
+        let logo = match response.bytes().await {
+            Ok(logo) if !logo.is_empty() => logo,
+            Ok(_) => return LogoOutcome::Failed("image response was empty"),
+            Err(_) => return LogoOutcome::Failed("image response failed"),
+        };
+        let path = download_dir.join(format!("{}.png", symbol.to_lowercase()));
+        let partial_path = path.with_extension("png.part");
+        if std::fs::write(&partial_path, logo).is_err() {
+            return LogoOutcome::Failed("image file write failed");
+        }
+        if std::fs::rename(partial_path, path).is_err() {
+            return LogoOutcome::Failed("image file rename failed");
+        }
+        LogoOutcome::Saved
     }
 }
 
@@ -524,6 +608,350 @@ mod tests {
             select_price_coin(&[coins[4].clone(), coins[0].clone()], &caps).id,
             "valid"
         );
+    }
+
+    #[test]
+    fn logo_exact_id_wins_for_unpinned_symbol() {
+        let coins = vec![
+            CoinGeckoCoin {
+                id: "other".into(),
+                symbol: "DUP".into(),
+            },
+            CoinGeckoCoin {
+                id: "dup".into(),
+                symbol: "DUP".into(),
+            },
+        ];
+        let caps = HashMap::from([("other".into(), 100.0)]);
+
+        assert_eq!(select_logo_coin(&coins, &caps).unwrap().id, "dup");
+    }
+
+    #[test]
+    fn dot_logo_uses_polkadot_even_when_dot_is_listed() {
+        let coins = vec![
+            CoinGeckoCoin {
+                id: "dot".into(),
+                symbol: "DOT".into(),
+            },
+            CoinGeckoCoin {
+                id: "polkadot".into(),
+                symbol: "DOT".into(),
+            },
+        ];
+
+        assert_eq!(
+            select_logo_coin(&coins, &HashMap::new()).unwrap().id,
+            "polkadot"
+        );
+    }
+
+    #[test]
+    fn logo_major_pin_wins_over_larger_market_cap() {
+        let coins = vec![
+            CoinGeckoCoin {
+                id: "bridged-ether".into(),
+                symbol: "ETH".into(),
+            },
+            CoinGeckoCoin {
+                id: "ethereum".into(),
+                symbol: "ETH".into(),
+            },
+        ];
+        let caps = HashMap::from([
+            ("bridged-ether".into(), 1_000_000.0),
+            ("ethereum".into(), 1.0),
+        ]);
+
+        assert_eq!(select_logo_coin(&coins, &caps).unwrap().id, "ethereum");
+    }
+
+    #[test]
+    fn logo_largest_cap_then_lowest_id_and_no_candidates() {
+        let coins = vec![candidate("z"), candidate("a"), candidate("large")];
+        let caps = HashMap::from([("z".into(), 5.0), ("a".into(), 5.0), ("large".into(), 6.0)]);
+
+        assert_eq!(select_logo_coin(&coins, &caps).unwrap().id, "large");
+        assert_eq!(select_logo_coin(&coins[..2], &caps).unwrap().id, "a");
+        assert!(select_logo_coin(&[], &caps).is_none());
+    }
+
+    #[test]
+    fn ton_logo_uses_canonical_id() {
+        let coins = vec![
+            CoinGeckoCoin {
+                id: "atnt-ondo-tokenized-stock".into(),
+                symbol: "TON".into(),
+            },
+            CoinGeckoCoin {
+                id: "the-open-network".into(),
+                symbol: "TON".into(),
+            },
+        ];
+        let caps = HashMap::from([("atnt-ondo-tokenized-stock".into(), 1_000_000.0)]);
+
+        assert_eq!(
+            select_logo_coin(&coins, &caps).unwrap().id,
+            "the-open-network"
+        );
+    }
+
+    #[test]
+    fn ton_coin_list_replaces_unrelated_ids_with_canonical_id() {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 512];
+            stream.read(&mut request).unwrap();
+            let body = r#"[{"id":"atnt-ondo-tokenized-stock","symbol":"ton","name":"AT&T Ondo Stock"},
+                {"id":"tac-bridged-ton-tac","symbol":"ton","name":"TAC Bridged TON"},
+                {"id":"the-open-network","symbol":"gram","name":"Gram (prev. Toncoin)"}]"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        });
+        let host = Box::leak(format!("http://{address}").into_boxed_str());
+        let provider = CoinGecko {
+            client: CoinGeckoClient::new(host),
+        };
+        let coins = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(provider.list_all_coin_ids(vec!["TON".into()], None))
+            .unwrap();
+
+        server.join().unwrap();
+        assert_eq!(coins.len(), 1);
+        assert_eq!(coins[0].id, "the-open-network");
+        assert_eq!(coins[0].symbol, "TON");
+    }
+
+    #[test]
+    fn major_logo_ids_are_plausible_coingecko_ids() {
+        let ids = [
+            ("BTC", "bitcoin"),
+            ("USDT", "tether"),
+            ("ETH", "ethereum"),
+            ("USDC", "usd-coin"),
+            ("SOL", "solana"),
+            ("BNB", "binancecoin"),
+            ("TRX", "tron"),
+            ("SUI", "sui"),
+            ("DOGE", "dogecoin"),
+            ("XRP", "ripple"),
+            ("ADA", "cardano"),
+            ("DOT", "polkadot"),
+            ("AVAX", "avalanche-2"),
+            ("LINK", "chainlink"),
+            ("MATIC", "matic-network"),
+            ("POL", "polygon-ecosystem-token"),
+            ("LTC", "litecoin"),
+            ("SHIB", "shiba-inu"),
+            ("PEPE", "pepe"),
+            ("WBTC", "wrapped-bitcoin"),
+            ("DAI", "dai"),
+            ("TON", "the-open-network"),
+        ];
+        for (symbol, expected_id) in ids {
+            assert_eq!(major_logo_id(symbol), Some(expected_id));
+            assert!(expected_id
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'));
+        }
+    }
+
+    #[test]
+    fn failed_logo_download_is_not_blacklisted_but_missing_image_is() {
+        assert!(!should_blacklist_logo(LogoOutcome::Failed("HTTP error")));
+        assert!(should_blacklist_logo(LogoOutcome::NoImage));
+        assert!(!should_blacklist_logo(LogoOutcome::Saved));
+    }
+
+    #[test]
+    fn failed_market_cap_request_still_processes_pinned_logo() {
+        use std::io::{Read, Write};
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let address = listener.local_addr().unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let server_stop = Arc::clone(&stop);
+        let server = std::thread::spawn(move || {
+            while !server_stop.load(Ordering::Relaxed) {
+                let Ok((mut stream, _)) = listener.accept() else {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                };
+                let mut request = [0; 2048];
+                let size = stream.read(&mut request).unwrap();
+                let path = String::from_utf8_lossy(&request[..size]);
+                let (status, body) = if path.contains("/coins/list?") {
+                    (
+                        "200 OK",
+                        r#"[{"id":"dot","symbol":"dot","name":"Dot"},
+                            {"id":"polkadot","symbol":"dot","name":"Polkadot"},
+                            {"id":"alpha","symbol":"zzqa","name":"Alpha"},
+                            {"id":"beta","symbol":"zzqa","name":"Beta"}]"#,
+                    )
+                } else if path.contains("/simple/price?") {
+                    ("503 Service Unavailable", "temporary failure")
+                } else if path.contains("/coins/markets?") {
+                    (
+                        "200 OK",
+                        r#"[{"id":"polkadot","symbol":"dot","name":"Polkadot","image":"",
+                            "market_cap_rank":null,"fully_diluted_valuation":null,"roi":null}]"#,
+                    )
+                } else {
+                    ("404 Not Found", "{}")
+                };
+                write!(
+                    stream,
+                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                    body.len()
+                )
+                .unwrap();
+            }
+        });
+        let host = Box::leak(format!("http://{address}").into_boxed_str());
+        let provider = CoinGecko {
+            client: CoinGeckoClient::new(host),
+        };
+        let dir = std::env::temp_dir().join(format!("track3-logo-{}", uuid::Uuid::new_v4()));
+        let result =
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(provider.download_coins_logos(
+                    vec![
+                        CoinWithPrice {
+                            symbol: "DOT".into(),
+                            price: 1.0,
+                        },
+                        CoinWithPrice {
+                            symbol: "ZZQA".into(),
+                            price: 1.0,
+                        },
+                    ],
+                    dir.to_str().unwrap().to_string(),
+                ));
+        stop.store(true, Ordering::Relaxed);
+        server.join().unwrap();
+
+        let record =
+            std::fs::read_to_string(dir.join("assets/coins/invalid_asset_icon_record.txt"))
+                .unwrap();
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "1 coin logo downloads failed"
+        );
+        assert!(record.lines().any(|line| line == "DOT"));
+        assert!(!record.lines().any(|line| line == "ZZQA"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn failed_image_responses_do_not_create_cached_logos() {
+        use std::io::{Read, Write};
+
+        for (response, expected_error) in [
+            (
+                b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".as_slice(),
+                "image response was empty",
+            ),
+            (
+                b"HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\n\r\n".as_slice(),
+                "image server returned an error",
+            ),
+            (
+                b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n".as_slice(),
+                "image server returned an error",
+            ),
+        ] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 512];
+                stream.read(&mut request).unwrap();
+                stream.write_all(response).unwrap();
+            });
+            let market: CoinsMarketItem = serde_json::from_value(serde_json::json!({
+                "id": "ethereum", "symbol": "eth", "name": "Ethereum",
+                "image": format!("http://{address}/image.png"),
+                "market_cap_rank": null, "fully_diluted_valuation": null, "roi": null
+            }))
+            .unwrap();
+            let dir = std::env::temp_dir().join(format!("track3-logo-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir_all(&dir).unwrap();
+
+            let outcome = tokio::runtime::Runtime::new().unwrap().block_on(async {
+                CoinGecko::new()
+                    .download_coin_logo(&reqwest::Client::new(), &dir, "ETH", &market)
+                    .await
+            });
+
+            server.join().unwrap();
+            assert!(matches!(outcome, LogoOutcome::Failed(reason) if reason == expected_error));
+            assert!(!should_blacklist_logo(outcome));
+            assert!(!dir.join("eth.png").exists());
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
+    #[test]
+    fn successful_metadata_without_image_is_blacklisted() {
+        let market: CoinsMarketItem = serde_json::from_value(serde_json::json!({
+            "id": "ethereum", "symbol": "eth", "name": "Ethereum",
+            "image": "", "market_cap_rank": null,
+            "fully_diluted_valuation": null, "roi": null
+        }))
+        .unwrap();
+        let outcome = tokio::runtime::Runtime::new().unwrap().block_on(async {
+            CoinGecko::new()
+                .download_coin_logo(&reqwest::Client::new(), Path::new("unused"), "ETH", &market)
+                .await
+        });
+
+        assert!(should_blacklist_logo(outcome));
+    }
+
+    #[test]
+    fn logo_attempts_are_bounded_once_per_process_for_each_symbol() {
+        let mut attempted = std::collections::HashSet::new();
+        let symbols = vec!["ETH".to_string(), "ETH".to_string(), "USDC".to_string()];
+
+        assert_eq!(
+            take_unattempted_symbols(symbols.clone(), &mut attempted),
+            vec!["ETH", "USDC"]
+        );
+        assert!(take_unattempted_symbols(symbols, &mut attempted).is_empty());
+    }
+
+    #[test]
+    fn legacy_blacklist_entries_are_retried_then_new_invalid_entries_persist() {
+        let path = std::env::temp_dir().join(format!("track3-invalid-{}", uuid::Uuid::new_v4()));
+        std::fs::write(&path, "ETH\nBOGUS\n").unwrap();
+
+        assert!(load_verified_blacklist(&path).unwrap().is_empty());
+        assert!(!std::fs::read_to_string(&path).unwrap().contains("ETH"));
+        writeln!(
+            OpenOptions::new().append(true).open(&path).unwrap(),
+            "BOGUS"
+        )
+        .unwrap();
+        assert_eq!(
+            load_verified_blacklist(&path).unwrap(),
+            HashSet::from(["BOGUS".to_string()])
+        );
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
