@@ -12,6 +12,7 @@ import { Switch } from "@/mobile/components/ui/switch";
 import { getWalletLogo } from "@/lib/utils";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import type { ExchangeRow, StockBrokerRow, WalletRow, SelectOption } from "@/components/configuration/types";
+import { PublicIpInfo } from "@/components/configuration/public-ip-info";
 
 export type MobileSourcesProps = {
   exchanges: ExchangeRow[];
@@ -258,6 +259,7 @@ export function MobileSources(props: MobileSourcesProps) {
               <Field id="mobile-query-id" label={t("config.queryId")} value={(editor.draft as StockBrokerRow).queryId} onChange={(value) => update({ queryId: value })} onPaste={editor.original ? undefined : () => void paste("queryId")} readOnly={!!editor.original} invalid={errorField === "queryId"} error={errorField === "queryId" ? error : undefined} />
             </>}
             </div>
+            {editor.kind === "exchange" && <PublicIpInfo t={t} mobile />}
             {error && !errorField && <p id="mobile-source-error" role="alert" className="text-sm text-destructive">{error}</p>}
             <Button className="ios-d3-editor-primary min-h-12 w-full" disabled={saving} onClick={() => void save()}>{t(editor.original ? "config.saveChanges" : "mobile.sources.add")}</Button>
           </>}

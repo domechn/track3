@@ -43,6 +43,7 @@ import { useTranslation } from "@/i18n";
 import { getWalletLogo } from "@/lib/utils";
 import { maskSensitive } from "@/utils/attach-to";
 import type { ExchangeSectionProps } from "./types";
+import { PublicIpInfo } from "./public-ip-info";
 
 const CONFIG_LIST_PAGE_SIZE = 30;
 
@@ -247,6 +248,7 @@ const ExchangeSection = memo(function ExchangeSection({
                     />
                   </div>
                 )}
+                {addExchangeConfig?.type && <PublicIpInfo t={t} />}
               </div>
               <DialogFooter>
                 <Button
