@@ -225,7 +225,7 @@ describe("SyncScheduler", () => {
     const scheduler = new SyncScheduler(run, { retryBaseMs: 10 });
     const first = scheduler.syncNow();
     expect(scheduler.status().phase).toBe("syncing");
-    await vi.advanceTimersByTimeAsync(600_000);
+    await vi.advanceTimersByTimeAsync(180_000);
     expect(scheduler.status()).toMatchObject({ phase: "error", error: "timeout" });
     await first;
     await vi.advanceTimersByTimeAsync(10);
@@ -237,6 +237,137 @@ describe("SyncScheduler", () => {
     expect(scheduler.status()).toMatchObject({ phase: "idle", report: success });
     expect(run).toHaveBeenCalledTimes(2);
     expect(scheduler.status().report?.pulled).toBe(1);
+    await scheduler.stop();
+  });
+
+  it("keeps a progressing round alive past ten minutes and publishes bounded progress updates", async () => {
+    vi.useFakeTimers();
+    let finish!: (report: SyncReport) => void;
+    let activity!: (progress?: { phase: "pull" | "push"; completed: number; total: number }) => void;
+    const scheduler = new SyncScheduler((_signal, pulse) => {
+      activity = pulse;
+      return new Promise<SyncReport>((resolve) => { finish = resolve; });
+    });
+    const round = scheduler.syncNow();
+    for (let minute = 1; minute <= 12; minute++) {
+      await vi.advanceTimersByTimeAsync(60_000);
+      activity({ phase: "push", completed: minute, total: 12 });
+      expect(scheduler.status().phase).toBe("syncing");
+    }
+    expect(scheduler.status().progress).toEqual({ phase: "push", completed: 12, total: 12 });
+    finish(success);
+    await round;
+    expect(scheduler.status().phase).toBe("idle");
+    expect(scheduler.status().progress).toBeUndefined();
+    await scheduler.stop();
+  });
+
+  it("aborts a round after three minutes without progress or a completed request", async () => {
+    vi.useFakeTimers();
+    let signal!: AbortSignal;
+    const scheduler = new SyncScheduler((runningSignal) => {
+      signal = runningSignal;
+      return new Promise<SyncReport>(() => {});
+    });
+    const round = scheduler.syncNow();
+    await vi.advanceTimersByTimeAsync(179_999);
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await round;
+    expect(signal.aborted).toBe(true);
+    expect(scheduler.status()).toMatchObject({ phase: "error", error: "timeout" });
+    const stopping = scheduler.stop();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await stopping;
+  });
+
+  it("uses completed requests to keep a round alive before object progress exists", async () => {
+    vi.useFakeTimers();
+    let finish!: (report: SyncReport) => void;
+    let activity!: (progress?: { phase: "pull" | "push"; completed: number; total: number }) => void;
+    const scheduler = new SyncScheduler((_signal, pulse) => {
+      activity = pulse;
+      return new Promise<SyncReport>((resolve) => { finish = resolve; });
+    });
+    const round = scheduler.syncNow();
+    await vi.advanceTimersByTimeAsync(120_000);
+    activity();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(scheduler.status().phase).toBe("syncing");
+    finish(success);
+    await round;
+    await scheduler.stop();
+  });
+
+  it("aborts even a progressing round at the six-hour cap", async () => {
+    vi.useFakeTimers();
+    let activity!: () => void;
+    let signal!: AbortSignal;
+    const scheduler = new SyncScheduler((runningSignal, pulse) => {
+      signal = runningSignal;
+      activity = pulse;
+      return new Promise<SyncReport>(() => {});
+    });
+    const round = scheduler.syncNow();
+    for (let interval = 1; interval < 180; interval++) {
+      await vi.advanceTimersByTimeAsync(120_000);
+      activity();
+      expect(signal.aborted).toBe(false);
+    }
+    await vi.advanceTimersByTimeAsync(120_000);
+    await round;
+    expect(signal.aborted).toBe(true);
+    expect(scheduler.status().error).toBe("timeout");
+    const stopping = scheduler.stop();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await stopping;
+  });
+
+  it("limits status notifications to about four progress updates per second", async () => {
+    vi.useFakeTimers();
+    let activity!: (progress?: { phase: "pull" | "push"; completed: number; total: number }) => void;
+    let finish!: (report: SyncReport) => void;
+    const scheduler = new SyncScheduler((_signal, pulse) => {
+      activity = pulse;
+      return new Promise<SyncReport>((resolve) => { finish = resolve; });
+    });
+    let updates = 0;
+    scheduler.subscribe(() => { updates++; });
+    const round = scheduler.syncNow();
+    for (let count = 1; count <= 20; count++) {
+      activity({ phase: "push", completed: count, total: 100 });
+      await vi.advanceTimersByTimeAsync(10);
+    }
+    expect(updates).toBeLessThanOrEqual(2);
+    await vi.advanceTimersByTimeAsync(50);
+    activity({ phase: "push", completed: 21, total: 100 });
+    expect(scheduler.status().progress?.completed).toBe(20);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(scheduler.status().progress?.completed).toBe(21);
+    finish(success);
+    await round;
+    await scheduler.stop();
+  });
+
+  it("publishes the latest incomplete progress after the throttle window", async () => {
+    vi.useFakeTimers();
+    let activity!: (progress?: { phase: "pull" | "push"; completed: number; total: number }) => void;
+    let finish!: (report: SyncReport) => void;
+    const scheduler = new SyncScheduler((_signal, pulse) => {
+      activity = pulse;
+      return new Promise<SyncReport>((resolve) => { finish = resolve; });
+    });
+    const round = scheduler.syncNow();
+    activity({ phase: "push", completed: 1, total: 10 });
+    await vi.advanceTimersByTimeAsync(10);
+    activity({ phase: "push", completed: 2, total: 10 });
+    await vi.advanceTimersByTimeAsync(10);
+    activity({ phase: "push", completed: 3, total: 10 });
+    expect(scheduler.status().progress?.completed).toBe(1);
+    await vi.advanceTimersByTimeAsync(230);
+    expect(scheduler.status().progress?.completed).toBe(3);
+    finish(success);
+    await round;
     await scheduler.stop();
   });
 });

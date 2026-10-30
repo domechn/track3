@@ -7,7 +7,7 @@ import {
   saveSyncSettings, testSyncConnection, validateSyncSettings,
   type SyncConnectionResult, type SyncSettings,
 } from "./settings";
-import type { SyncOptions, SyncReport } from "./engine";
+import type { SyncOptions, SyncProgress, SyncReport } from "./engine";
 import { resetSyncState } from "./engine";
 import { SqliteSyncRepository } from "./sqlite-repository";
 
@@ -168,11 +168,22 @@ export class SyncRuntime {
     this.skipped = false;
     this.handle?.unregister();
     this.passphrase = passphrase;
-    this.handle = this.deps.engine(store, passphrase);
-    this.scheduler = new SyncScheduler(async (signal) => {
+    let activity: (progress?: SyncProgress) => void = () => {};
+    const completed = <T,>(request: Promise<T>): Promise<T> => request.finally(() => activity());
+    const trackedStore: S3Store = {
+      putObject: (key, body, conditions, signal) => completed(store.putObject(key, body, conditions, signal)),
+      getObject: (key, signal) => completed(store.getObject(key, signal)),
+      headObject: (key, signal) => completed(store.headObject(key, signal)),
+      deleteObject: (key, signal) => completed(store.deleteObject(key, signal)),
+      listObjectsV2: (options) => completed(store.listObjectsV2(options)),
+    };
+    this.handle = this.deps.engine(trackedStore, passphrase);
+    this.scheduler = new SyncScheduler(async (signal, reportActivity) => {
+      activity = reportActivity;
       const currentId = await this.deps.deviceId?.();
       return this.handle!.engine.syncOnce({
-        signal, categories: this.settings.categories, deviceName: this.settings.deviceNames[currentId ?? ""],
+        signal, onProgress: reportActivity, categories: this.settings.categories,
+        deviceName: this.settings.deviceNames[currentId ?? ""],
       });
     });
     this.scheduler.subscribe(() => this.publish("ready", this.scheduler!.status()));

@@ -47,6 +47,12 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
   const cases = [
     { name: "never", phase: "idle", pill: pill[locale].idle, sync: { phase: "idle" } },
     { name: "running", phase: "syncing", pill: pill[locale].syncing, sync: { phase: "syncing", startedAt: Date.now() - 5000 } },
+    { name: "uploading", phase: "syncing", pill: pill[locale].syncing, sync: {
+      phase: "syncing", startedAt: Date.now() - 5000, progress: { phase: "push", completed: 1240, total: 4567 },
+    } },
+    { name: "downloading", phase: "syncing", pill: pill[locale].syncing, sync: {
+      phase: "syncing", startedAt: Date.now() - 5000, progress: { phase: "pull", completed: 82, total: 400 },
+    } },
     { name: "error", phase: "error", pill: pill[locale].error, sync: { phase: "error", error: "bucket", lastSync: Date.parse("2026-10-28T12:00:00Z") } },
     { name: "up-to-date", phase: "idle", pill: pill[locale].idle, sync: { phase: "idle", report: { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] }, lastSync: Date.parse("2026-10-28T12:00:00Z") } },
     { name: "changed", phase: "idle", pill: pill[locale].idle, sync: { phase: "idle", report: { pulled: 2, pushed: 1, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] }, lastSync: Date.parse("2026-10-28T12:00:00Z") } },
@@ -54,8 +60,25 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
   for (const item of cases) {
     await publish(page, item.sync);
     await button(item.pill).click();
+    if (item.name === "uploading" || item.name === "downloading") {
+      await expect(page.getByRole("progressbar")).toHaveAttribute("aria-valuenow",
+        item.name === "uploading" ? "1240" : "82");
+      await expect(page.getByRole("dialog")).toContainText(item.name === "uploading"
+        ? locale === "en" ? "Uploading 1,240 / 4,567" : "正在上传 1,240 / 4,567"
+        : locale === "en" ? "Downloading 82 / 400" : "正在下载 82 / 400");
+    }
     await capture(item.name);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
+  if (platform === "mobile") {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await publish(page, { phase: "syncing", startedAt: Date.now() - 5000,
+      progress: { phase: "push", completed: 1240, total: 4567 } });
+    await button(pill[locale].syncing).click();
+    const box = (await page.getByRole("dialog").boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(320);
+    await capture("uploading-320");
   }
 }
