@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
 import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -48,6 +49,8 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
     .replace("{conflicts}", String(report.conflicts.length))
     .replace("{errors}", String(report.errors.length));
   const locked = status.mode === "locked";
+  const progressCompleted = status.sync.progress
+    ? Math.min(status.sync.progress.completed, status.sync.progress.total) : 0;
 
   async function unlock() {
     if (busy) return;
@@ -137,6 +140,13 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
                 {t("sync.status.started").replace("{time}", new Date(status.sync.startedAt).toLocaleString())}
                 {" · "}{t("sync.status.elapsed").replace("{seconds}", String(Math.max(0, Math.floor((now - status.sync.startedAt) / 1000))))}
               </p>}
+              {status.sync.progress && status.sync.progress.total > 0 && <div className="space-y-1.5">
+                <p id="sync-progress-label">{t(status.sync.progress.phase === "push" ? "sync.status.uploading" : "sync.status.downloading")
+                  .replace("{completed}", progressCompleted.toLocaleString("en-US"))
+                  .replace("{total}", status.sync.progress.total.toLocaleString("en-US"))}</p>
+                <Progress value={progressCompleted} max={status.sync.progress.total}
+                  aria-labelledby="sync-progress-label" />
+              </div>}
             </> : <>
               {status.sync.retryStopped
                 ? <p className="text-destructive">{t("sync.status.retryStopped")}</p>

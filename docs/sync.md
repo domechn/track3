@@ -167,10 +167,12 @@ older tombstones and masked snapshot objects be removed.
    milliseconds, counter, device UUID) and sessions by message ID.
    Remote clocks more than 24 hours ahead of the local clock are rejected
    and retried on a later round.
-4. Write new local objects with `If-None-Match: *`. Write the encrypted local
-   manifest **last**, with `If-Match` against the prior ETag (or
-   `If-None-Match: *` on creation). A failed write leaves an unreferenced
-   object; the next round verifies and reuses it.
+4. Write new local objects with `If-None-Match: *`. Rewrite the encrypted
+   local manifest after each batch of 250 successful object writes and after
+   the final batch. Each rewrite uses `If-Match` against the ETag returned by
+   the previous manifest write (`If-None-Match: *` on creation). A failed
+   object write leaves an unreferenced object; the next round verifies and
+   reuses it.
 5. Persist local sync state and notify the app through the soft refresh event.
 
 `SyncEngine.syncOnce({ signal, onProgress, categories })` returns counts,
@@ -187,11 +189,13 @@ successful portfolio refresh starts a new attempt sequence; focus alone does
 not. It never blocks a portfolio refresh.
 
 S3 metadata requests have a 30-second deadline; encrypted object transfers
-have a 120-second deadline. A 10-minute watchdog reports a timed-out sync
-round, including work outside S3. The scheduler waits for that round to settle
-before starting another one. Stopping sync waits up to five seconds for an
-aborted round; **Forget remote data** leaves remote objects untouched if the
-round is still running and can be retried after it finishes.
+have a 120-second deadline. The scheduler times out a round after three minutes
+without progress or a completed S3 request, and caps every round at six hours.
+The idle limit also covers local work before the first request. The scheduler
+waits for a timed-out round to settle before starting another one. Stopping
+sync waits up to five seconds for an aborted round; **Forget remote data**
+leaves remote objects untouched if the round is still running and can be
+retried after it finishes.
 
 Malformed individual objects are reported. Partial rounds retry with exponential
 backoff; permanently damaged remote data needs repair before a retry can succeed.
