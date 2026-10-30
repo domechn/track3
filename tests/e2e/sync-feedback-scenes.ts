@@ -30,7 +30,7 @@ mkdirSync(artifactDir, { recursive: true });
 async function shot(page: Page, name: string) {
   if (!name.startsWith("mobile") && (name.includes("-now-success") || name.includes("-now-error"))) {
     await page.getByRole("button", { name: /^(Sync now|立即同步)$/ })
-      .evaluate((node) => node.scrollIntoView({ block: "center", behavior: "instant" }));
+      .evaluate((node) => node.scrollIntoView({ block: "center", behavior: "auto" }));
   }
   const toast = page.locator(`${name.startsWith("mobile") ? ".ios-d3-toast-viewport" : ".desktop-toast-viewport"} > li[data-state=open]`).last();
   await expect(toast).toBeVisible();
