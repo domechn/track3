@@ -11,7 +11,7 @@ test("connection test uses a fake S3 bucket", async ({ page }) => {
   await page.getByLabel("Access key ID").fill("key");
   await page.getByLabel("Secret access key").fill("secret");
   await page.getByRole("button", { name: "Test connection" }).click();
-  await expect(page.getByRole("alert")).toHaveText("Connection successful.");
+  await expect(page.locator(".desktop-toast-viewport").getByText("Connection successful.")).toBeVisible();
   await page.getByLabel("Sync passphrase", { exact: true }).fill("correct horse battery staple");
   await page.getByLabel("Confirm sync passphrase").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Enable sync" }).click();

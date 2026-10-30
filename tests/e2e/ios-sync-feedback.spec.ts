@@ -1,0 +1,3 @@
+import { registerSyncFeedbackScenes } from "./sync-feedback-scenes";
+
+registerSyncFeedbackScenes("mobile");

@@ -4,12 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/mobile/components/ui/switch";
-import { isIOS } from "@/utils/platform";
+import { useToast } from "@/mobile/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
+import { isIOS } from "@/utils/platform";
+import { SyncActionButton } from "@/components/settings/sync-action-button";
+import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/mobile/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import {
-  classifySyncError, validateSyncSettings, type SyncCategoryName, type SyncConnectionResult, type SyncSettings,
+  validateSyncSettings, type SyncCategoryName, type SyncConnectionResult, type SyncSettings,
 } from "@/middlelayers/sync/settings";
 
 const categories: SyncCategoryName[] = ["history", "settings", "secrets", "rebalance", "chat"];
@@ -41,6 +44,8 @@ function invalidConfigurationFields(form: SyncSettings): Set<Field> {
 
 export default function SyncSettingsPage() {
   const { t } = useTranslation();
+  const { toast } = useToast();
+  const { busy, statusMessage, clearStatus, error, success, result, run } = useSyncFeedback(t, toast);
   const status = useSyncExternalStore(syncRuntime.subscribe, syncRuntime.status);
   const [form, setForm] = useState<SyncSettings>(() => syncRuntime.getSettings());
   const awaitingSettings = useRef(status.mode === "loading");
@@ -48,9 +53,9 @@ export default function SyncSettingsPage() {
   const [confirmation, setConfirmation] = useState("");
   const [forgetText, setForgetText] = useState("");
   const [forgetOpen, setForgetOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string>();
   const [configurationInvalid, setConfigurationInvalid] = useState<Set<Field>>(() => new Set());
+  const [unsavedCategories, setUnsavedCategories] = useState(false);
+  const [unsavedPathStyle, setUnsavedPathStyle] = useState(false);
   const [devices, setDevices] = useState<Awaited<ReturnType<typeof syncRuntime.devices>>>([]);
   const [configConflicts, setConfigConflicts] = useState<Array<{ id: string }>>([]);
 
@@ -69,111 +74,131 @@ export default function SyncSettingsPage() {
     if (status.mode === "ready") void syncRuntime.configConflicts().then(setConfigConflicts).catch(() => {});
   }, [status.mode, status.sync.report]);
 
+  useEffect(() => {
+    if (status.mode === "unreadable") error(t("sync.unreadable"));
+  }, [status.mode]);
+
+  useEffect(() => {
+    if (!busy) return;
+    const frame = requestAnimationFrame(() => {
+      const button = document.querySelector(".sync-settings-page button[aria-busy=true]");
+      const toast = document.querySelector(".ios-d3-toast-viewport .sync-toast");
+      const tab = document.querySelector(".mobile-tab-bar");
+      if (!button || !toast || !tab) return;
+      const bounds = button.getBoundingClientRect();
+      if (bounds.top < toast.getBoundingClientRect().bottom + 8 ||
+          bounds.bottom > tab.getBoundingClientRect().top) {
+        button.scrollIntoView({ block: "center" });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [busy]);
+
   async function resolveConfigConflict(id: string, choice: "local" | "remote") {
-    setBusy(true);
-    try {
+    await run(`conflict-${id}-${choice}`, async () => {
       await syncRuntime.resolveConfigConflict(id, choice);
       setConfigConflicts(await syncRuntime.configConflicts());
-    } catch {
-      setMessage(t("sync.configConflict.failed"));
-    } finally {
-      setBusy(false);
-    }
+      success(t("sync.configConflict.resolved"), false, "sync.toast.resolved");
+    }, "sync.configConflict.failed");
   }
 
   function updateField(name: typeof fields[number], value: string) {
     setForm((current) => ({ ...current, [name]: value }));
     setConfigurationInvalid(new Set());
-    setMessage(undefined);
+    clearStatus();
   }
 
-  function showResult(result: SyncConnectionResult) {
-    setConfigurationInvalid(result === "configuration" ? invalidConfigurationFields(form) : new Set());
-    setMessage(t(`sync.connection.${result}`));
+  function showResult(outcome: SyncConnectionResult, successText: string, titleKey: string) {
+    setConfigurationInvalid(outcome === "configuration" ? invalidConfigurationFields(form) : new Set());
+    result(outcome, successText, true, titleKey);
+  }
+
+  function showConfigurationError(titleKey?: string) {
+    setConfigurationInvalid(invalidConfigurationFields(form));
+    error(t("sync.connection.configuration"), titleKey);
   }
 
   async function testConnection() {
-    if (validateSyncSettings(form)) { showResult("configuration"); return; }
-    setBusy(true);
-    try {
-      showResult(await syncRuntime.test(form, passphrase));
-    } finally {
-      setBusy(false);
-    }
+    if (validateSyncSettings(form)) { showConfigurationError("sync.toast.connectionFailed"); return; }
+    await run("test", async () => {
+      showResult(await syncRuntime.test(form, passphrase), t("sync.connection.ok"), "sync.toast.connectionOk");
+    });
   }
 
   async function enable() {
-    if (validateSyncSettings(form)) { showResult("configuration"); return; }
+    if (validateSyncSettings(form)) { showConfigurationError(); return; }
     if (status.mode !== "ready" && status.mode !== "locked") {
-      if (passphrase.length < 16) { setMessage(t("sync.passphrase.weak")); return; }
+      if (passphrase.length < 16) { error(t("sync.passphrase.weak")); return; }
     }
-    setBusy(true);
-    try {
+    await run("save", async () => {
       if (status.mode !== "ready" && status.mode !== "locked" &&
           (!await syncRuntime.hasHeader(form) || confirmation) && passphrase !== confirmation) {
-        setMessage(t("sync.passphrase.mismatch"));
+        error(t("sync.passphrase.mismatch"));
         return;
       }
-      const result = await syncRuntime.configure(form, passphrase);
-      showResult(result);
-      if (result === "ok") {
+      const outcome = await syncRuntime.configure(form, passphrase);
+      showResult(outcome, t(status.mode === "ready" ? "sync.settingsSaved" : "sync.enabled"),
+        status.mode === "ready" ? "sync.toast.settingsSaved" : "sync.toast.enabled");
+      if (outcome === "ok") {
         setPassphrase("");
         setConfirmation("");
+        setUnsavedCategories(false);
+        setUnsavedPathStyle(false);
       }
-    } catch (error) {
-      showResult(classifySyncError(error));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function unlock() {
-    setBusy(true);
-    try {
-      const result = await syncRuntime.unlock(passphrase);
-      showResult(result);
-      if (result === "ok") setPassphrase("");
-    } finally {
-      setBusy(false);
-    }
+    await run("unlock", async () => {
+      const outcome = await syncRuntime.unlock(passphrase);
+      showResult(outcome, t("sync.unlocked"), "sync.toast.unlocked");
+      if (outcome === "ok") setPassphrase("");
+    });
   }
 
   async function forget() {
-    setBusy(true);
-    try {
+    await run("forget", async () => {
       await syncRuntime.forgetRemote();
-      setMessage(t("sync.forgotten"));
+      success(t("sync.forgotten"), true, "sync.toast.forgotten");
       setForgetOpen(false);
       setForgetText("");
-    } catch {
-      setMessage(t("sync.connection.network"));
-    } finally {
-      setBusy(false);
-    }
+    }, "sync.connection.network");
   }
 
   async function disable() {
-    if (busy) return;
-    setBusy(true);
-    try {
+    await run("disable", async () => {
       await syncRuntime.disable();
-      setMessage(undefined);
-    } catch {
-      setMessage(t("sync.disableFailed"));
-    } finally {
-      setBusy(false);
-    }
+      success(t("sync.disabled"), false, "sync.toast.disabled");
+    }, "sync.disableFailed");
+  }
+
+  async function syncNow() {
+    await run("now", async () => {
+      await syncRuntime.syncNow();
+      await waitForSyncResult();
+      const latest = syncRuntime.status().sync;
+      if (latest.phase === "error") {
+        error(t(latest.error === "sync" || !latest.error
+          ? "sync.status.errorsPresent" : `sync.connection.${latest.error}`));
+      } else if (latest.phase === "idle") {
+        const pulled = latest.report?.pulled ?? 0;
+        const pushed = latest.report?.pushed ?? 0;
+        success(pulled === 0 && pushed === 0 ? t("sync.nowUpToDate")
+          : pulled === 0 ? t("sync.nowPushed").replace("{pushed}", String(pushed))
+          : pushed === 0 ? t("sync.nowPulled").replace("{pulled}", String(pulled))
+          : t("sync.nowSuccess").replace("{pulled}", String(pulled)).replace("{pushed}", String(pushed)),
+        false, "sync.toast.complete");
+      }
+    });
   }
 
   return (
-    <div className={`space-y-5 ${isIOS() ? "ios-d3-sync-settings" : ""}`}>
+    <div className={`sync-settings-page space-y-5 ${isIOS() ? "ios-d3-sync-settings" : ""}`}>
+      {status.mode === "unreadable" && <p role="alert" className="text-sm text-muted-foreground">{t("sync.unreadable")}</p>}
       <Card>
         <CardHeader>
           <CardTitle>{t("sync.title")}</CardTitle>
           <p className="text-sm text-muted-foreground">{t("sync.intro")}</p>
-          {status.mode === "unreadable" && (
-            <p role="alert" className="text-sm text-destructive">{t("sync.unreadable")}</p>
-          )}
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -185,8 +210,8 @@ export default function SyncSettingsPage() {
                   placeholder={t(`sync.placeholder.${field}`)}
                   type={field === "secretAccessKey" || field === "accessKeyId" ? "password" : "text"}
                   autoComplete="off"
+                  disabled={!!busy}
                   aria-invalid={configurationInvalid.has(field)}
-                  aria-describedby={configurationInvalid.has(field) && message ? "sync-settings-message" : undefined}
                   value={form[field]}
                   onChange={(event) => updateField(field, event.target.value)}
                 />
@@ -195,13 +220,19 @@ export default function SyncSettingsPage() {
           </div>
           <div className="flex items-center justify-between gap-4">
             <Label htmlFor="sync-path-style">{t("sync.pathStyle")}</Label>
-            <Switch id="sync-path-style" checked={form.pathStyle}
-              onCheckedChange={(checked) => setForm((current) => ({ ...current, pathStyle: checked }))} />
+            <Switch id="sync-path-style" checked={form.pathStyle} disabled={!!busy}
+              onCheckedChange={(checked) => {
+                setForm((current) => ({ ...current, pathStyle: checked }));
+                setUnsavedPathStyle(true);
+              }} />
           </div>
+          {unsavedPathStyle && <p role="status" className="text-sm text-muted-foreground">{t("sync.categories.unsaved")}</p>}
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" disabled={busy} onClick={() => void testConnection()}>{t("sync.test")}</Button>
+            <SyncActionButton variant="outline" disabled={!!busy} pending={busy === "test"}
+              pendingLabel={t("sync.pending.test")} onClick={() => void testConnection()}>{t("sync.test")}</SyncActionButton>
             {status.mode === "ready" ? (
-              <Button disabled={busy} onClick={() => void enable()}>{t("sync.save")}</Button>
+              <SyncActionButton disabled={!!busy} pending={busy === "save"}
+                pendingLabel={t("sync.pending.save")} onClick={() => void enable()}>{t("sync.save")}</SyncActionButton>
             ) : null}
           </div>
         </CardContent>
@@ -210,7 +241,7 @@ export default function SyncSettingsPage() {
       <Card>
         <CardHeader><CardTitle>{t("sync.passphrase.title")}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div role="note" className="rounded-lg border-2 border-destructive bg-destructive/10 p-4 font-semibold text-destructive">
+          <div role="note" className="rounded-lg border-2 border-destructive bg-destructive/10 p-4 font-semibold text-destructive dark:border-red-400 dark:text-red-300">
             {t("sync.passphrase.warning")}
           </div>
           {status.mode === "ready" ? (
@@ -219,14 +250,14 @@ export default function SyncSettingsPage() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="sync-passphrase">{t("sync.passphrase.label")}</Label>
-                <Input id="sync-passphrase" type="password" autoComplete="new-password" value={passphrase}
+                <Input id="sync-passphrase" type="password" autoComplete="new-password" value={passphrase} disabled={!!busy}
                   onChange={(event) => setPassphrase(event.target.value)} />
               </div>
               {status.mode !== "locked" && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="sync-confirm">{t("sync.passphrase.confirm")}</Label>
-                    <Input id="sync-confirm" type="password" autoComplete="new-password" value={confirmation}
+                    <Input id="sync-confirm" type="password" autoComplete="new-password" value={confirmation} disabled={!!busy}
                       onChange={(event) => setConfirmation(event.target.value)} />
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -236,9 +267,11 @@ export default function SyncSettingsPage() {
                   </p>
                 </>
               )}
-              <Button disabled={busy} onClick={() => void (status.mode === "locked" ? unlock() : enable())}>
+              <SyncActionButton disabled={!!busy} pending={busy === (status.mode === "locked" ? "unlock" : "save")}
+                pendingLabel={t(status.mode === "locked" ? "sync.pending.unlock" : "sync.pending.enable")}
+                onClick={() => void (status.mode === "locked" ? unlock() : enable())}>
                 {t(status.mode === "locked" ? "sync.unlock" : "sync.enable")}
-              </Button>
+              </SyncActionButton>
             </>
           )}
         </CardContent>
@@ -256,13 +289,19 @@ export default function SyncSettingsPage() {
                 <Label htmlFor={`sync-category-${category}`}>{t(`sync.categories.${category}`)}</Label>
                 {category === "secrets" && <p className="text-xs text-muted-foreground">{t("sync.categories.secretsWarning")}</p>}
               </div>
-              <Switch id={`sync-category-${category}`} checked={form.categories[category]}
-                onCheckedChange={(checked) => setForm((current) => ({
-                  ...current, categories: { ...current.categories, [category]: checked },
-                }))} />
+              <Switch id={`sync-category-${category}`} checked={form.categories[category]} disabled={!!busy}
+                onCheckedChange={(checked) => {
+                  setForm((current) => ({
+                    ...current, categories: { ...current.categories, [category]: checked },
+                  }));
+                  setUnsavedCategories(true);
+                }} />
             </div>
           ))}
-          {status.mode === "ready" && <Button variant="outline" disabled={busy} onClick={() => void enable()}>{t("sync.save")}</Button>}
+          {unsavedCategories && <p role="status" className="text-sm text-muted-foreground">{t("sync.categories.unsaved")}</p>}
+          {status.mode === "ready" && <SyncActionButton variant="outline" disabled={!!busy}
+            pending={busy === "save"} pendingLabel={t("sync.pending.save")}
+            onClick={() => void enable()}>{t("sync.save")}</SyncActionButton>}
         </CardContent>
       </Card>
 
@@ -279,10 +318,12 @@ export default function SyncSettingsPage() {
                   ? t(`sync.configConflict.name.${configConflictNames[id]}`)
                   : t("sync.configConflict.key").replace("{id}", id)}</span>
                 <div className="flex gap-2">
-                  <Button variant="outline" disabled={busy}
-                    onClick={() => void resolveConfigConflict(id, "local")}>{t("sync.configConflict.local")}</Button>
-                  <Button variant="outline" disabled={busy}
-                    onClick={() => void resolveConfigConflict(id, "remote")}>{t("sync.configConflict.remote")}</Button>
+                  <SyncActionButton variant="outline" disabled={!!busy} pending={busy === `conflict-${id}-local`}
+                    pendingLabel={t("sync.pending.resolve")}
+                    onClick={() => void resolveConfigConflict(id, "local")}>{t("sync.configConflict.local")}</SyncActionButton>
+                  <SyncActionButton variant="outline" disabled={!!busy} pending={busy === `conflict-${id}-remote`}
+                    pendingLabel={t("sync.pending.resolve")}
+                    onClick={() => void resolveConfigConflict(id, "remote")}>{t("sync.configConflict.remote")}</SyncActionButton>
                 </div>
               </div>
             ))}
@@ -302,43 +343,55 @@ export default function SyncSettingsPage() {
               <div key={device.id} className="grid items-center gap-2 sm:grid-cols-[1fr_auto]">
                 <div className="space-y-1">
                   <Input aria-label={t("sync.devices.name").replace("{device}", device.id.slice(0, 8))}
-                    defaultValue={device.name} maxLength={60}
-                    onBlur={(event) => void syncRuntime.renameDevice(device.id, event.target.value)
-                      .catch(() => setMessage(t("sync.devices.renameFailed")))} />
+                    defaultValue={device.name} maxLength={60} disabled={!!busy}
+                    onBlur={(event) => {
+                      if (event.target.value === device.name) return;
+                      const name = event.target.value;
+                      void run(`rename-${device.id}`, async () => {
+                        await syncRuntime.renameDevice(device.id, name);
+                        setDevices((current) => current.map((item) => item.id === device.id
+                          ? { ...item, name: name.trim() || device.id.slice(0, 8) } : item));
+                        success(t("sync.devices.renamed"), false, "sync.toast.settingsSaved");
+                      }, "sync.devices.renameFailed");
+                    }} />
                   {device.current && <span className="text-xs text-muted-foreground">{t("sync.devices.current")}</span>}
                 </div>
-                <span className="text-xs text-muted-foreground">
+                <span className="sync-device-last-upload text-xs text-muted-foreground">
                   {device.lastUpload
                     ? t("sync.devices.lastUpload").replace("{time}", new Date(device.lastUpload).toLocaleString())
                     : t("sync.devices.never")}
                 </span>
               </div>
             ))}
-            <div className="flex flex-wrap gap-2 pt-2">
+            <div className="sync-device-actions flex flex-wrap gap-2 pt-2">
               {status.mode !== "disabled" && <>
-                <Button disabled={busy || status.mode !== "ready"} onClick={() => void syncRuntime.syncNow()}>{t("sync.now")}</Button>
-                <Button variant="outline" disabled={busy} onClick={() => void disable()}>{t("sync.disable")}</Button>
+                <SyncActionButton disabled={!!busy || status.mode !== "ready"} pending={busy === "now"}
+                  pendingLabel={t("sync.pending.now")} onClick={() => void syncNow()}>{t("sync.now")}</SyncActionButton>
+                <SyncActionButton variant="outline" disabled={!!busy} pending={busy === "disable"}
+                  pendingLabel={t("sync.pending.disable")} onClick={() => void disable()}>{t("sync.disable")}</SyncActionButton>
               </>}
               <ConfirmDeleteDialog
-                trigger={<Button variant="destructive" disabled={busy}>{t("sync.forget")}</Button>}
+                trigger={<Button variant="destructive" disabled={!!busy}>{t("sync.forget")}</Button>}
                 open={forgetOpen}
                 onOpenChange={(open) => { setForgetOpen(open); if (!open) setForgetText(""); }}
                 title={t("sync.forget")}
                 description={t("sync.forgetWarning")}
                 cancelLabel={t("common.cancel")}
-                actions={[{ label: t("sync.forget"), disabled: forgetText !== "FORGET", onClick: () => { void forget(); } }]}
+                actions={[{ label: busy === "forget" ? t("sync.pending.forget") : t("sync.forget"),
+                  disabled: forgetText !== "FORGET" || !!busy, pending: busy === "forget",
+                  keepOpen: true, onClick: () => { void forget(); } }]}
               >
                 <div className="space-y-3">
                   <Label htmlFor="sync-forget-confirm">{t("sync.forgetType")}</Label>
-                  <Input id="sync-forget-confirm" value={forgetText} onChange={(event) => setForgetText(event.target.value)} />
+                  <Input id="sync-forget-confirm" value={forgetText} disabled={!!busy}
+                    onChange={(event) => setForgetText(event.target.value)} />
                 </div>
               </ConfirmDeleteDialog>
             </div>
           </CardContent>
         </Card>
       )}
-      <span role="status" className="sr-only">{busy ? t("common.loading") : ""}</span>
-      {message && <p id="sync-settings-message" role="alert" className="text-sm text-foreground">{message}</p>}
+      {statusMessage && <p role="status" className="text-sm text-foreground">{statusMessage}</p>}
     </div>
   );
 }

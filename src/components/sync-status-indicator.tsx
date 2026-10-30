@@ -47,7 +47,7 @@ export default function SyncStatusIndicator() {
   }
 
   return (
-    <div className="fixed bottom-14 right-4 z-50">
+    <div className="desktop-sync-status-indicator fixed bottom-14 right-4 z-50">
       <span role="status" aria-live="polite" className="sr-only">
         {busy ? t("common.loading") : t(`sync.status.${phase}`)}
       </span>

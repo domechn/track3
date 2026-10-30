@@ -156,6 +156,23 @@
   body canvas { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .mobile-toast { flex-direction: column; align-items: stretch; gap: 8px; padding-right: 56px; overflow-wrap: anywhere; }
   .mobile-toast > .mobile-toast-action { align-self: flex-end; max-width: 100%; margin-left: 0 !important; }
+  .sync-toast [toast-close] { color: inherit; opacity: 1; }
+  .sync-action-pending {
+    background: hsl(var(--muted)) !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+    opacity: 1 !important;
+  }
+  body:has(.sync-settings-page) .ios-d3-toast-viewport {
+    top: calc(3.8rem + env(safe-area-inset-top));
+    right: 0;
+    bottom: auto;
+    max-width: min(100vw, 390px);
+    max-height: calc(100dvh - 6rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    flex-direction: column;
+  }
+  .sync-settings-page { padding-bottom: 8rem; }
+  .sync-settings-page .sync-device-actions { padding-right: 7rem; }
   html { scroll-behavior: auto; overscroll-behavior-y: contain; }
   .app-layout .glass { background: hsl(var(--card)); border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .app-layout .font-mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; }
@@ -1033,6 +1050,10 @@
 .mobile-split-view[data-selected="true"] > .mobile-split-master { display: none; }
 
 @media (min-width: 700px) {
+  body:has(.sync-settings-page) .ios-d3-toast-viewport {
+    top: calc(3.8rem + env(safe-area-inset-top));
+    max-width: 330px;
+  }
   .app-layout { --mobile-sidebar-width: 216px; }
   .app-layout[data-sidebar-collapsed="true"] { --mobile-sidebar-width: calc(64px + var(--mobile-safe-left)); }
   .mobile-tab-bar { display: none; }
