@@ -26,11 +26,32 @@ jobs:
   web:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - name: Check owner-applied format exception
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.labels | any(.name == "format-exception-approved")')"
+          last_event="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/events" --paginate --jq '.[] | select((.event == "labeled" or .event == "unlabeled") and .label.name == "format-exception-approved") | [.event, .actor.login] | @tsv' | tail -n 1)"
+          if [[ "$current" == "true" && "$last_event" == $'labeled\tdomechn' ]]; then
+            echo "FORMAT_EXCEPTION_APPROVED=true" >> "$GITHUB_ENV"
+          fi
+      - name: Check UI refactor boundaries
+        if: github.event_name == 'pull_request'
+        run: node scripts/ui-refactor-guard.mjs "origin/${{ github.base_ref }}"
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.94.1

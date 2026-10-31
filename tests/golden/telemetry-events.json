@@ -1,0 +1,9 @@
+[
+  "`subscription_checkout_${phase === \"timed-out\" ? \"timed_out\" : phase}`",
+  "app_started",
+  "data_refreshed",
+  "subscription_checkout_cancelled",
+  "subscription_checkout_completed",
+  "subscription_open_clicked",
+  "subscription_subscribe_clicked"
+]

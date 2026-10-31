@@ -1,0 +1,71 @@
+{
+  "literals": [
+    "track3-alerts-changed",
+    "track3-assistant-app-action",
+    "track3-assistant-comparison-dates",
+    "track3-assistant-date-range",
+    "track3-auto-backup.json",
+    "track3-backup",
+    "track3-cache-epoch/",
+    "track3-connection-probe",
+    "track3-cost-basis-settings",
+    "track3-current-comparison-dates",
+    "track3-current-date-range",
+    "track3-export-data",
+    "track3-export-data.json",
+    "track3-insight-question",
+    "track3-insights-changed",
+    "track3-onboarding-v1",
+    "track3-pending-assistant-question",
+    "track3-pending-checkout",
+    "track3-prefer-currency",
+    "track3-realized-gains.${format}",
+    "track3-rebalance",
+    "track3-rebalance-options",
+    "track3-rebalance.csv",
+    "track3-refresh-source-statuses",
+    "track3-sync-key-check-v1",
+    "track3-sync-object-v${VERSION}:${path}",
+    "track3-sync-v1",
+    "track3-ui-locale",
+    "track3-ui-theme",
+    "track3-web@${appVersion}"
+  ],
+  "constants": {
+    "src/i18n/index.tsx:localeLocalStorageKey": "track3-ui-locale",
+    "src/middlelayers/ai/actions/index.ts:DATE_RANGE_KEY": "track3-assistant-date-range",
+    "src/middlelayers/ai/actions/index.ts:COMPARISON_DATES_KEY": "track3-assistant-comparison-dates",
+    "src/middlelayers/ai/actions/index.ts:CURRENT_DATE_RANGE_KEY": "track3-current-date-range",
+    "src/middlelayers/ai/actions/index.ts:CURRENT_COMPARISON_DATES_KEY": "track3-current-comparison-dates",
+    "src/middlelayers/ai/actions/page-settings.ts:COST_BASIS_SETTINGS_KEY": "track3-cost-basis-settings",
+    "src/middlelayers/ai/actions/page-settings.ts:REBALANCE_OPTIONS_KEY": "track3-rebalance-options",
+    "src/middlelayers/ai/pending-question.ts:PENDING_ASSISTANT_QUESTION_KEY": "track3-pending-assistant-question",
+    "src/middlelayers/alerts.ts:ALERT_SOURCE_STATUS_STORAGE_KEY": "track3-refresh-source-statuses",
+    "src/middlelayers/configuration.ts:preferCurrencyLocalStorageKey": "track3-prefer-currency",
+    "src/middlelayers/configuration.ts:themeLocalStorageKey": "track3-ui-theme",
+    "src/middlelayers/insights-service.ts:INSIGHT_QUESTION_STORAGE_KEY": "track3-insight-question",
+    "src/middlelayers/onboarding-storage.ts:ONBOARDING_STORAGE_KEY": "track3-onboarding-v1",
+    "src/utils/app.ts:APTABASE_APP_KEY": "A-EU-6972874637",
+    "src/utils/wallet-treemap.ts:OTHERS_AGGREGATED_KEY": "__others_aggregated__"
+  },
+  "theme": [
+    "dark",
+    "light",
+    "system"
+  ],
+  "mobileTheme": [
+    "dark",
+    "light",
+    "system"
+  ],
+  "locale": [
+    "en",
+    "zh"
+  ],
+  "mobileLocaleSource": "@/i18n",
+  "onboarding": [
+    "completed",
+    "skipped",
+    "existing"
+  ]
+}
