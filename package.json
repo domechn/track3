@@ -19,6 +19,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "eval": "node ./scripts/eval.mjs",
+    "golden:update": "node ./scripts/update-ui-goldens.mjs --update",
     "preview": "vite preview",
     "update-release": "node ./scripts/update.mjs",
     "tauri": "tauri"

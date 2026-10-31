@@ -27,6 +27,7 @@ vi.mock("./datafetch/utils/cache", () => ({
 
 vi.mock("./database", () => ({
   executeWrite: vi.fn(),
+  selectFromDatabaseWithSql: vi.fn(),
 }));
 
 vi.mock("./entities/assets", () => ({
@@ -47,10 +48,11 @@ vi.mock("./entities/transactions", () => ({
 
 import {
   calculateTotalProfit,
+  queryPreviousProfitSnapshotDate,
   updateTransactionPrice,
   updateTransactionTxnType,
 } from "./charts-profit";
-import { executeWrite } from "./database";
+import { executeWrite, selectFromDatabaseWithSql } from "./database";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 
@@ -111,6 +113,20 @@ beforeEach(() => {
   );
   vi.mocked(TRANSACTION_HANDLER.createOrUpdate).mockResolvedValue(undefined);
   vi.mocked(executeWrite).mockResolvedValue({ rowsAffected: 1 });
+});
+
+it("finds the opening baseline, skipping a prior snapshot when one exists at month start", async () => {
+  vi.mocked(selectFromDatabaseWithSql).mockResolvedValueOnce([
+    { createdAt: "2026-04-04T12:00:00.000Z" },
+  ]);
+  const start = new Date(2026, 9, 1);
+  expect(await queryPreviousProfitSnapshotDate(start)).toEqual(new Date("2026-04-04T12:00:00.000Z"));
+  expect(selectFromDatabaseWithSql).toHaveBeenCalledWith(
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM assets_v2 WHERE createdAt = ?)
+      THEN NULL ELSE MAX(createdAt) END AS createdAt
+      FROM assets_v2 WHERE createdAt < ?`,
+    [start.toISOString(), start.toISOString()],
+  );
 });
 
 async function warmProfitCache() {

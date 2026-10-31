@@ -1,4 +1,5 @@
 import { calculateTotalProfit } from "@/middlelayers/charts";
+import { queryPreviousProfitSnapshotDate } from "@/middlelayers/charts-profit";
 import {
   CurrencyRateDetail,
   QuoteColor,
@@ -64,18 +65,22 @@ const App = ({
       total: number | null;
       monthFirstDate: Date;
       lastRecordDate?: Date;
+      baselineDate?: Date;
     }[]
   >([]);
+  const [loadedMonthlyKey, setLoadedMonthlyKey] = useState<string | null>(null);
   const [yearlyProfits, setYearlyProfits] = useState<
     {
       total: number | null;
       year: number;
+      hasData: boolean;
     }[]
   >([]);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
   const [clickedMonth, setClickedMonth] = useState<number | null>(null);
-  const { t } = useTranslation();
+  const [explainedMonth, setExplainedMonth] = useState<number | null>(null);
+  const { t, locale } = useTranslation();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
   const monthlyCacheRef = useRef<
@@ -85,6 +90,7 @@ const App = ({
         total: number | null;
         monthFirstDate: Date;
         lastRecordDate?: Date;
+        baselineDate?: Date;
       }[]
     >
   >(new Map());
@@ -94,6 +100,7 @@ const App = ({
       {
         total: number | null;
         year: number;
+        hasData: boolean;
       }[]
     >
   >(new Map());
@@ -102,6 +109,7 @@ const App = ({
     [dateRange.start, dateRange.end]
   );
   const dataChangedVersion = useDataChangedVersion();
+  const monthlyKey = `${rangeKey}-${selectedYear}-${dataChangedVersion}`;
 
   useEffect(() => {
     if (summaryType !== "month") {
@@ -159,6 +167,7 @@ const App = ({
     if (cached) {
       if (gen === loadGenRef.current) {
         setMonthlyProfits(cached);
+        setLoadedMonthlyKey(cacheKey);
         reportLoaded();
       }
       return;
@@ -188,8 +197,10 @@ const App = ({
               ? new Date(lastRecordDate)
               : lastRecordDate
             : undefined;
-
-          return { total, monthFirstDate: date.firstDay, lastRecordDate: lrd };
+          const baselineDate = lrd
+            ? await queryPreviousProfitSnapshotDate(date.firstDay)
+            : undefined;
+          return { total, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate };
         },
         { concurrency: 4 }
       );
@@ -199,6 +210,7 @@ const App = ({
       }
       monthlyCacheRef.current.set(cacheKey, profits);
       setMonthlyProfits(profits);
+      setLoadedMonthlyKey(cacheKey);
     } finally {
       if (gen === loadGenRef.current) {
         reportLoaded();
@@ -221,12 +233,12 @@ const App = ({
       const profits = await bluebird.map(
         years,
         async (year) => {
-          const { total } = await calculateTotalProfit({
+          const { total, lastRecordDate } = await calculateTotalProfit({
             start: new Date(year, 0, 1),
             end: new Date(year, 11, 31, 23, 59, 59, 999),
           });
 
-          return { total, year };
+          return { total, year, hasData: Boolean(lastRecordDate) };
         },
         { concurrency: 3 }
       );
@@ -294,7 +306,9 @@ const App = ({
           return null;
         }
         const key = `${selectedYear}-${month}`;
-        const p = monthlyProfitsMap[key] ?? {
+        const loaded = loadedMonthlyKey === monthlyKey;
+        const result = loaded ? monthlyProfitsMap[key] : undefined;
+        const p = result ?? {
           total: 0,
           monthFirstDate: new Date(selectedYear, month, 1),
         };
@@ -303,6 +317,12 @@ const App = ({
           month,
           label: getMonthAbbreviation(month + 1),
           total: p.total,
+          hasData: Boolean(p.lastRecordDate),
+          noSnapshot: Boolean(result && !result.lastRecordDate),
+          inRange: new Date(selectedYear, month, 1) <= dateRange.end
+            && new Date(selectedYear, month + 1, 1) > dateRange.start,
+          gapDate: p.baselineDate && p.baselineDate < new Date(selectedYear, month - 1, 1)
+            ? p.baselineDate : undefined,
           key: `m-profit-summary-${p.monthFirstDate.getTime()}`,
         };
       })
@@ -310,24 +330,32 @@ const App = ({
       month: number;
       label: string;
       total: number | null;
+      hasData: boolean;
+      noSnapshot: boolean;
+      inRange: boolean;
+      gapDate?: Date;
       key: string;
     }[];
-  }, [monthlyProfitsMap, selectedYear]);
+  }, [monthlyProfitsMap, loadedMonthlyKey, monthlyKey, selectedYear, dateRange.start, dateRange.end]);
 
   const yearCards = useMemo(() => {
     return availableYears.map((year) => ({
         year,
         total: yearlyProfitsMap[year] ? yearlyProfitsMap[year].total : 0,
+        hasData: Boolean(yearlyProfitsMap[year]?.hasData),
       }));
   }, [availableYears, yearlyProfitsMap]);
 
   const visibleSummaryStats = useMemo(() => {
-    const data = summaryType === "month" ? monthCards : yearCards;
+    const data = summaryType === "month" ? monthCards.filter((item) => item.inRange) : yearCards;
     let up = 0;
     let down = 0;
     let flat = 0;
+    let total = 0;
 
     data.forEach((item) => {
+      if (!item.hasData) return;
+      total += 1;
       if (item.total === null) return;
       if (item.total > 0) {
         up += 1;
@@ -338,7 +366,7 @@ const App = ({
       }
     });
 
-    return { total: data.length, up, down, flat };
+    return { total, shown: data.length, up, down, flat };
   }, [monthCards, yearCards, summaryType]);
 
   function renderAmount(value: number | null) {
@@ -348,6 +376,13 @@ const App = ({
       currency.symbol +
       simplifyNumber(currencyWrapper(currency)(Math.abs(value)))
     );
+  }
+
+  function gapHint(date: Date, year: number) {
+    const formatted = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+      day: "numeric", month: "short", ...(date.getFullYear() !== year ? { year: "numeric" } : {}),
+    }).format(date);
+    return t("profitSummary.since").replace("{date}", formatted);
   }
 
   function renderMonthSummary() {
@@ -379,21 +414,29 @@ const App = ({
           <button
             key={item.key}
             type="button"
-            onClick={() => onMonthClick(item.month)}
+            disabled={!item.hasData && !item.noSnapshot}
+            onClick={() => item.hasData ? onMonthClick(item.month) : setExplainedMonth(item.month)}
+            aria-label={item.noSnapshot ? `${item.label}: ${t("profitSummary.noSnapshot")}` : undefined}
+            title={item.noSnapshot ? t("profitSummary.noSnapshot") : undefined}
             className={cn(
-              "rounded-lg border p-2 text-left transition-colors hover:bg-muted/50",
-              item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
+              "group flex flex-col justify-start rounded-lg border p-2 text-left transition-colors enabled:hover:bg-muted/50",
+              !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
             )}
           >
             <div className="text-xs text-muted-foreground">{item.label}</div>
             <div
               className={cn(
                 "mt-1 text-sm font-semibold tracking-tight",
-                item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
+                !item.hasData || item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
               )}
             >
-              {renderAmount(item.total)}
+              {item.hasData ? renderAmount(item.total) : "—"}
             </div>
+            {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
+            {item.noSnapshot && <div className={cn("mt-1 text-xs text-muted-foreground",
+              explainedMonth === item.month ? "" : "hidden group-hover:block group-focus:block")}>
+              {t("profitSummary.noSnapshot")}
+            </div>}
           </button>
         ))}
       </div>
@@ -408,17 +451,17 @@ const App = ({
             key={`y-profit-summary-${item.year}`}
             className={cn(
               "rounded-lg border p-2 text-left",
-              item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
+              !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
             )}
           >
             <div className="text-xs text-muted-foreground">{item.year}</div>
             <div
               className={cn(
                 "mt-1 text-sm font-semibold tracking-tight",
-                item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
+                !item.hasData || item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
               )}
             >
-              {renderAmount(item.total)}
+              {item.hasData ? renderAmount(item.total) : "—"}
             </div>
           </div>
         ))}
@@ -465,7 +508,8 @@ const App = ({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>{t("profitSummary.periods").replace("{n}", String(visibleSummaryStats.total))}</span>
+          <span>{t(visibleSummaryStats.total < visibleSummaryStats.shown ? "profitSummary.periodsOf" : "profitSummary.periods")
+            .replace("{n}", String(visibleSummaryStats.total)).replace("{total}", String(visibleSummaryStats.shown))}</span>
           <span>{t("profitSummary.up").replace("{n}", String(visibleSummaryStats.up))}</span>
           <span>{t("profitSummary.down").replace("{n}", String(visibleSummaryStats.down))}</span>
           <span>{t("profitSummary.flat").replace("{n}", String(visibleSummaryStats.flat))}</span>
