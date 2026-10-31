@@ -17,7 +17,7 @@ import { CACHE_GROUP_KEYS } from "./consts";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { filterByAssetType } from "./charts-shared";
-import { executeWrite } from "./database";
+import { executeWrite, selectFromDatabaseWithSql } from "./database";
 import { fromStoredTransactions } from "./cost-basis";
 
 const TOTAL_PROFIT_CACHE_TTL_SECONDS = 15 * 60;
@@ -70,6 +70,16 @@ export async function queryTransactionsBySymbolAndDateRange(
       txnType: m.txnType,
       txnCreatedAt: m.txnCreatedAt,
     }));
+}
+
+export async function queryPreviousProfitSnapshotDate(start: Date): Promise<Date | undefined> {
+  const rows = await selectFromDatabaseWithSql<{ createdAt: string | null }>(
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM assets_v2 WHERE createdAt = ?)
+      THEN NULL ELSE MAX(createdAt) END AS createdAt
+      FROM assets_v2 WHERE createdAt < ?`,
+    [start.toISOString(), start.toISOString()],
+  );
+  return rows[0]?.createdAt ? new Date(rows[0].createdAt) : undefined;
 }
 
 // calculate total profit from transactions

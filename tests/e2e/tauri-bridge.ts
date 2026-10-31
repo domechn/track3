@@ -19,6 +19,7 @@ type BridgeOptions = {
   onboarding?: boolean;
   seedLockedSync?: boolean;
   richPortfolio?: boolean;
+  sparseProfitHistory?: boolean;
   zeroCostUSDC?: boolean;
   slowOverview?: boolean;
   lockedStartup?: boolean;
@@ -46,6 +47,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     emptyPortfolio = false,
     seedLockedSync = false,
     richPortfolio = false,
+    sparseProfitHistory = false,
     zeroCostUSDC = false,
     slowOverview = false,
     lockedStartup = false,
@@ -188,6 +190,22 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
           data: { symbol: "SOL", value: 7298.27 } }],
       })}`,
     ]);
+  }
+  if (sparseProfitHistory) {
+    db.run("DELETE FROM transactions");
+    db.run("DELETE FROM assets_v2");
+    for (const [uuid, createdAt, value] of [
+      ["sparse-dec", "2025-12-31T12:00:00.000Z", 760000],
+      ["sparse-jan", "2026-01-04T12:00:00.000Z", 758900],
+      ["sparse-apr", "2026-04-04T12:00:00.000Z", 763100],
+      ["sparse-oct", "2026-10-04T12:00:00.000Z", 681200],
+    ] as const) {
+      db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+        VALUES (?, ?, 'sparse-wallet', 'crypto', 'BTC', 1, ?, ?)`, [uuid, createdAt, value, value]);
+    }
+    const firstId = db.exec("SELECT id FROM assets_v2 WHERE uuid = 'sparse-dec'")[0].values[0][0];
+    db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+      VALUES ('sparse-dec', ?, 'crypto', 'sparse-wallet', 'BTC', 1, 760000, 'buy', '2025-12-31T12:00:00.000Z')`, [firstId]);
   }
   if (seedReviewContent) {
     db.run(`INSERT INTO chat_sessions (id, title, createdAt, updatedAt, pinned, messageCount, preview)
