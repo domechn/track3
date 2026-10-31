@@ -251,9 +251,9 @@ it("clears four BTC trade metrics and breakeven when ETH has no profit detail", 
   fireEvent.click(screen.getByText("Next coin"));
   await waitFor(() => expect(screen.queryByText("$12,345.00")).not.toBeInTheDocument());
   expect(screen.queryByText("$23,456.00")).not.toBeInTheDocument();
-  expect(screen.getByText("Avg. buy price (selected range)").closest(".rounded-xl")).toHaveTextContent(/—.*—/);
-  expect(screen.getByText("Avg. sell price (selected range)").closest(".rounded-xl")).toHaveTextContent(/—.*—/);
-  expect(screen.getByText("Breakeven Price").closest(".rounded-xl")).toHaveTextContent("—");
+  expect(screen.getByText("Avg. buy price (selected range)").closest("[data-ui-card]")).toHaveTextContent(/—.*—/);
+  expect(screen.getByText("Avg. sell price (selected range)").closest("[data-ui-card]")).toHaveTextContent(/—.*—/);
+  expect(screen.getByText("Breakeven Price").closest("[data-ui-card]")).toHaveTextContent("—");
   expect(screen.getByText("Avg. buy price (selected range)")).toHaveAttribute("title", "Holdings at the start of the range are counted at the market price of the first day.");
   expect(screen.getByText("Breakeven Price")).toHaveAttribute("title", "Cost price minus realised profit per coin held.");
 });
@@ -265,7 +265,7 @@ it("shows infinite return for a zero-cost airdrop and no breakeven after selling
   });
   mocks.queryLastAssetsBySymbol.mockResolvedValue({ symbol: "BTC", assetType: "crypto", amount: 0, value: 0, price: 50 });
   renderCoinAnalysis();
-  await waitFor(() => expect(screen.getByText("Breakeven Price").closest(".rounded-xl")).toHaveTextContent("—"));
+  await waitFor(() => expect(screen.getByText("Breakeven Price").closest("[data-ui-card]")).toHaveTextContent("—"));
   expect(screen.getByText("profit rate:").parentElement).toHaveTextContent("∞");
 });
 
@@ -279,9 +279,9 @@ it("shows unknown profit after switching from a priced coin to an unmatched with
   renderCoinAnalysis();
   await screen.findByText("$50.00");
   fireEvent.click(screen.getByText("Next coin"));
-  await waitFor(() => expect(screen.getByText("Avg. buy price (selected range)").closest(".rounded-xl")).toHaveTextContent("$300.00"));
-  expect(screen.getByText("Breakeven Price").closest(".rounded-xl")).toHaveTextContent("—");
-  const profitCard = screen.getByText("profit rate:").closest(".rounded-xl");
+  await waitFor(() => expect(screen.getByText("Avg. buy price (selected range)").closest("[data-ui-card]")).toHaveTextContent("$300.00"));
+  expect(screen.getByText("Breakeven Price").closest("[data-ui-card]")).toHaveTextContent("—");
+  const profitCard = screen.getByText("profit rate:").closest("[data-ui-card]");
   expect(profitCard).toHaveTextContent(/—.*—/);
   expect(profitCard).not.toHaveTextContent("—%");
 });

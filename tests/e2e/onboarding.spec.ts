@@ -135,9 +135,17 @@ test("source and backup checks use the illustration accent", async ({ page }) =>
   await page.goto("/#/overview")
   const dialog = page.getByTestId("onboarding-dialog")
   await dialog.press("ArrowRight")
-  await expect(page.getByTestId("onboarding-illustration-sources").locator('circle[cx="248"][cy="102"]')).toHaveCSS("fill", "rgb(99, 102, 241)")
+  const accent = await page.evaluate(() => {
+    const sample = document.createElement("span")
+    sample.style.color = "hsl(var(--accent-data))"
+    document.body.append(sample)
+    const color = getComputedStyle(sample).color
+    sample.remove()
+    return color
+  })
+  await expect(page.getByTestId("onboarding-illustration-sources").locator('circle[cx="248"][cy="102"]')).toHaveCSS("fill", accent)
   for (let i = 0; i < 3; i++) await dialog.press("ArrowRight")
-  await expect(page.getByTestId("onboarding-illustration-backup").locator('circle[cx="282"][cy="108"]')).toHaveCSS("fill", "rgb(99, 102, 241)")
+  await expect(page.getByTestId("onboarding-illustration-backup").locator('circle[cx="282"][cy="108"]')).toHaveCSS("fill", accent)
 })
 
 test("source controls stay anchored while Refresh animates", async ({ page }) => {

@@ -15,7 +15,7 @@ import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
-import { positiveNegativeColor, positiveNegativeTextClass } from "@/utils/color";
+import { positiveNegativeTone, positiveNegativeTextClass } from "@/utils/color";
 import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
@@ -34,12 +34,12 @@ import ProfitAttribution from "@/mobile/components/profit-attribution";
 import { DeltaPill, ListRow, SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
 
 function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
-  const tone = positiveNegativeColor(value, quoteColor);
+  const tone = positiveNegativeTone(value, quoteColor);
   if (tone === "green") {
-    return "bg-emerald-500/15 text-emerald-500";
+    return "bg-positive/15 text-positive";
   }
   if (tone === "red") {
-    return "bg-rose-500/15 text-rose-500";
+    return "bg-negative/15 text-negative";
   }
   return "bg-muted text-muted-foreground";
 }

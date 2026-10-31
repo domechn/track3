@@ -612,10 +612,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fontsource-variable/outfit@npm:^5.2.8":
-  version: 5.2.8
-  resolution: "@fontsource-variable/outfit@npm:5.2.8"
-  checksum: 10c0/0d8e3cf0153780d794c28bde93384ed22691a95c5e743489c3c43d4e4ec88d1c6e6a0684bc890bbbb04fb292e1505785636c60b3748e835375617e2af2e6c230
+"@fontsource-variable/public-sans@npm:^5.3.0":
+  version: 5.3.0
+  resolution: "@fontsource-variable/public-sans@npm:5.3.0"
+  checksum: 10c0/51c95e6f31d9ca2a11931d2c3ef5300ef303f107cef18c6cac0a0f364d9adfe81e2e4aa6e26f81206953bfe914cc06f27e839c420c965c97be4d062e0f2f01e6
   languageName: node
   linkType: hard
 
@@ -6249,7 +6249,7 @@ __metadata:
     "@actions/github": "npm:^9.1.0"
     "@axe-core/playwright": "npm:^4.14.0"
     "@fontsource-variable/jetbrains-mono": "npm:^5.2.8"
-    "@fontsource-variable/outfit": "npm:^5.2.8"
+    "@fontsource-variable/public-sans": "npm:^5.3.0"
     "@playwright/test": "npm:^1.64.1"
     "@radix-ui/react-alert-dialog": "npm:^1.1.7"
     "@radix-ui/react-checkbox": "npm:^1.3.1"

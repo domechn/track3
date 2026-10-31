@@ -16,7 +16,7 @@ import { getImageApiPath } from "@/utils/app";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { downloadCoinLogos } from "@/middlelayers/data";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeTone } from "@/utils/color";
 import { StaggerContainer, FadeUp } from "./motion";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
@@ -483,12 +483,12 @@ const App = ({
       return "text-muted-foreground";
     }
 
-    const color = positiveNegativeColor(percent, quoteColor);
+    const color = positiveNegativeTone(percent, quoteColor);
     if (color === "green") {
-      return "text-emerald-500";
+      return "text-positive";
     }
     if (color === "red") {
-      return "text-rose-500";
+      return "text-negative";
     }
     return "text-muted-foreground";
   }

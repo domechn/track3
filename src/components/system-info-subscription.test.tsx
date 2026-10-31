@@ -149,7 +149,7 @@ describe("System Info subscription management", () => {
     expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent === "300 / 300")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("progressbar", { name: "ERC20 wallet refreshes" }).firstElementChild).toHaveClass("bg-destructive"));
     expect(screen.getAllByText(/Resets/)).toHaveLength(1);
-    const proCard = screen.getByRole("heading", { name: "Track3 Pro" }).closest(".glass");
+    const proCard = screen.getByRole("heading", { name: "Track3 Pro" }).closest("[data-ui-card]");
     expect(proCard).not.toBeNull();
     expect(within(proCard as HTMLElement).getByText("ERC20 wallet refreshes")).toBeInTheDocument();
     expect(within(proCard as HTMLElement).getByText("0.6.1").parentElement).toHaveTextContent(/Track3 0.6.1/);

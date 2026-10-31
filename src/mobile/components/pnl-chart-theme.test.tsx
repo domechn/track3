@@ -48,23 +48,23 @@ beforeEach(() => {
 it("updates phone P&L bar colors when the theme changes", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
   renderChart();
-  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("#34c759"));
+  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("hsl(158 60% 30%)"));
   fireEvent.click(document.querySelector("button")!);
-  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("#30d158"));
+  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("hsl(156 46% 57%)"));
 });
 
 it("keeps the desktop P&L bar colors on a theme change", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
   renderChart();
-  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("rgba(16,185,129,0.8)"));
+  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("hsla(158, 60%, 30%, 0.8)"));
   fireEvent.click(document.querySelector("button")!);
-  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("rgba(16,185,129,0.8)"));
+  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("hsla(156, 46%, 57%, 0.8)"));
 });
 
 it("places phone P&L dates below the plot so bars can use its full width", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
   renderChart();
-  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("#34c759"));
+  await waitFor(() => expect(barProps.current?.data.datasets[0].backgroundColor).toBe("hsl(158 60% 30%)"));
   expect(barProps.current?.options.scales.x.ticks.display).toBe(false);
   expect(screen.getByText(/Apr 15/)).toBeInTheDocument();
   expect(screen.getByText(/Apr 16/)).toBeInTheDocument();

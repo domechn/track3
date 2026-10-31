@@ -12,23 +12,19 @@ import { Skeleton } from "@/mobile/components/ui/skeleton";
 import { useTheme } from "@/mobile/components/common/theme";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/mobile/components/mobile";
-import { phoneChartFontFamily } from "@/mobile/chart-theme";
+import { getChartPalette, phoneChartFontFamily } from "@/mobile/chart-theme";
+import { chartThemeColor } from "@/utils/chart-theme";
 
-const chartPalette = () => document.documentElement.classList.contains("dark")
-  ? ["#6d97fa", "#85ade0", "#79b6ac", "#b9a3cb", "#bda887", "#929bb1"]
-  : ["#315cbe", "#5f8cce", "#79aaa5", "#b39ac4", "#c4aa89", "#8e94a8"];
-const tone = (positive: boolean, quoteColor: QuoteColor, mobile: boolean) => {
+const chartPalette = (theme: "light" | "dark") => getChartPalette(true, theme).map((color) => color.main);
+const tone = (positive: boolean, quoteColor: QuoteColor, theme: "light" | "dark", opacity?: number) => {
   const gain = positive === (quoteColor === "green-up-red-down");
-  if (!mobile) return gain
-    ? document.documentElement.classList.contains("dark") ? "#30d158" : "#248a3d"
-    : document.documentElement.classList.contains("dark") ? "#ff453a" : "#d70015";
-  return getComputedStyle(document.documentElement).getPropertyValue(gain ? "--ios-gain" : "--ios-loss").trim();
+  return chartThemeColor(gain ? "positive" : "negative", opacity, theme);
 };
 function useChartOptions() {
   const { resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
-  const dark = resolvedTheme === "dark";
-  const text = dark ? "#aeaeb2" : "#636366";
+  const text = chartThemeColor("faint", undefined, resolvedTheme);
+  const rule = chartThemeColor("border", undefined, resolvedTheme);
   const tickFont = { size: 12, family: isMobile ? phoneChartFontFamily : undefined };
   return {
     responsive: true, maintainAspectRatio: false,
@@ -36,8 +32,8 @@ function useChartOptions() {
     animation: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? false as const : undefined,
     plugins: { legend: { display: false, labels: { color: text } }, datalabels: { display: false } },
     scales: {
-      x: { ticks: { color: text, font: tickFont, maxTicksLimit: 4 }, grid: { color: dark ? "#ffffff1a" : "#00000012", display: true } },
-      y: { ticks: { color: text, font: tickFont, maxTicksLimit: 4 }, grid: { color: dark ? "#ffffff1a" : "#00000012" } },
+      x: { ticks: { color: text, font: tickFont, maxTicksLimit: 4 }, grid: { color: rule, display: true } },
+      y: { ticks: { color: text, font: tickFont, maxTicksLimit: 4 }, grid: { color: rule } },
     },
   };
 }
@@ -89,8 +85,9 @@ export function FinanceChartSkeleton() {
 
 export function CostCharts({ report, quoteColor }: { report: CostBasisReport; quoteColor: QuoteColor }) {
   const { t } = useTranslation();
+  const { resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
-  const palette = chartPalette();
+  const palette = chartPalette(resolvedTheme);
   const chartOptions = useChartOptions();
   const visual = costBasisVisuals(report, 8, t("finance.other"));
   return <>
@@ -103,7 +100,7 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
       ].map(({ key, value, rate, rateKey }) => <Card key={key} className="min-w-0">
         <CardContent className="space-y-1 p-3">
           <p className="cost-metric-label text-xs text-muted-foreground">{t(key)}</p>
-          <p className="cost-metric-value truncate text-lg font-semibold tabular-nums" style={{ color: value === 0 ? undefined : tone(value > 0, quoteColor, isMobile) }}>
+          <p className="cost-metric-value truncate text-lg font-semibold tabular-nums" style={{ color: value === 0 ? undefined : tone(value > 0, quoteColor, resolvedTheme) }}>
             {isMobile
               ? `${value > 0 ? "+" : value < 0 ? "−" : ""}$${Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               : `${value > 0 ? "+" : ""}${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD`}
@@ -117,24 +114,24 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
         <Bar aria-label={visual.gains.map((row) => `${row.label}: ${row.value.toFixed(2)} USD`).join("; ")}
           role="img" data={{ labels: visual.gains.map((row) => row.label), datasets: [{
             data: visual.gains.map((row) => row.value),
-            backgroundColor: visual.gains.map((row) => tone(row.value >= 0, quoteColor, isMobile)),
+            backgroundColor: visual.gains.map((row) => tone(row.value >= 0, quoteColor, resolvedTheme)),
             borderRadius: 3,
           }] }} options={{ ...chartOptions, indexAxis: "y" as const }} />
       </ChartPanel>
       <ChartPanel title={t("finance.cumulativeGains")} empty={!visual.cumulative.length}>
         <Line aria-label={visual.cumulative.map((row) => `${row.date}: ${row.value.toFixed(2)} USD`).join("; ")}
           role="img" data={{ labels: visual.cumulative.map((row) => row.date), datasets: [{
-            data: visual.cumulative.map((row) => row.value), borderColor: tone(true, quoteColor, isMobile),
-            backgroundColor: `${tone(true, quoteColor, isMobile)}20`, fill: true, tension: 0.2, pointRadius: 2,
+            data: visual.cumulative.map((row) => row.value), borderColor: tone(true, quoteColor, resolvedTheme),
+            backgroundColor: tone(true, quoteColor, resolvedTheme, 0.12), fill: true, tension: 0.2, pointRadius: 2,
           }] }} options={chartOptions} plugins={[{
             id: "tax-year-markers",
             afterDraw(chart: ChartJS<"line">) {
               const { ctx, chartArea, scales } = chart;
               if (!chartArea) return;
               ctx.save();
-              ctx.strokeStyle = "#94a3b8";
-              ctx.fillStyle = "#64748b";
-              ctx.font = "10px sans-serif";
+              ctx.strokeStyle = chartThemeColor("border", undefined, resolvedTheme);
+              ctx.fillStyle = chartThemeColor("faint", undefined, resolvedTheme);
+              ctx.font = `12px ${phoneChartFontFamily}`;
               ctx.setLineDash([3, 3]);
               for (const marker of visual.taxYears) {
                 const x = scales.x.getPixelForValue(marker.index);
@@ -177,8 +174,9 @@ export function GoalChart({ rules, snapshots, portfolioValues = [] }: {
   rules: AlertRule[]; snapshots: AlertSnapshot[]; portfolioValues?: Array<{ date: string; value: number }>;
 }) {
   const { t, locale } = useTranslation();
+  const { resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
-  const palette = chartPalette();
+  const palette = chartPalette(resolvedTheme);
   const chartOptions = useChartOptions();
   const visual = goalVisuals(rules, snapshots);
   const values = portfolioValues.length ? portfolioValues : visual.values;
@@ -190,7 +188,7 @@ export function GoalChart({ rules, snapshots, portfolioValues = [] }: {
         const date = new Date(`${row.date}T00:00:00Z`);
         return Number.isNaN(date.getTime()) ? row.date : dateFormatter.format(date);
       }), datasets: [
-        { label: t("finance.portfolioValue"), data: values.map((row) => row.value), borderColor: palette[0], backgroundColor: `${palette[0]}18`, fill: true, tension: 0.2, pointRadius: 1 },
+        { label: t("finance.portfolioValue"), data: values.map((row) => row.value), borderColor: palette[0], backgroundColor: chartThemeColor("accent-data", 0.12, resolvedTheme), fill: true, tension: 0.2, pointRadius: 1 },
         ...visual.goals.filter((goal) => goal.kind === "total_value_target").map((goal) => ({
           label: t("finance.goalThreshold"), data: values.map(() => goal.target),
           borderColor: palette[2], borderDash: [5, 4], pointRadius: 0,
@@ -211,8 +209,9 @@ export function RebalanceCharts({ result, quoteColor, tolerancePercent }: {
   result: RebalanceResult; quoteColor: QuoteColor; tolerancePercent: number;
 }) {
   const { t } = useTranslation();
+  const { resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
-  const palette = chartPalette();
+  const palette = chartPalette(resolvedTheme);
   const chartOptions = useChartOptions();
   const visual = rebalanceVisuals(result);
   const rowHeight = Math.max(176, visual.labels.length * 32 + 48);
@@ -231,7 +230,7 @@ export function RebalanceCharts({ result, quoteColor, tolerancePercent }: {
       <Bar role="img" aria-label={`${visual.labels.map((label, index) => `${label}: ${visual.deviations[index].toFixed(1)} ${t("rebalance.percentagePoints")}`).join("; ")}; ${t("finance.toleranceBand")} ±${tolerancePercent}%`}
         data={{ labels: visual.labels, datasets: [{
           data: visual.deviations,
-          backgroundColor: visual.deviations.map((value) => tone(value >= 0, quoteColor, isMobile)),
+          backgroundColor: visual.deviations.map((value) => tone(value >= 0, quoteColor, resolvedTheme)),
         }] }} options={labeledOptions}
         plugins={[{
           id: "tolerance-band",

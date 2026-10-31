@@ -236,7 +236,7 @@ function Layout({
   onRefreshSuccess,
 }: LayoutProps) {
   const { t } = useTranslation();
-  const sidebarWidth = sidebarCollapsed ? 52 : 200;
+  const sidebarWidth = sidebarCollapsed ? 56 : 216;
 
   return (
     <div className="min-h-screen">
@@ -262,7 +262,7 @@ function Layout({
         />
 
         {/* Main content */}
-        <main id="app-main-content" tabIndex={-1} className="p-5">
+        <main id="app-main-content" tabIndex={-1} className="mx-auto w-full max-w-[1560px] px-7 py-5">
           <div className="relative min-h-[400px]" aria-busy={initializing}>
             <React.Suspense
               fallback={<RouteLoadingFallback hidden={initializing} />}
@@ -527,6 +527,9 @@ const App = () => {
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
+  useEffect(() => {
+    document.documentElement.dataset.quote = quoteColor === "red-up-green-down" ? "red-up" : "green-up";
+  }, [quoteColor]);
 
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
 

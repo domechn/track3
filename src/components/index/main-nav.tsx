@@ -30,16 +30,22 @@ export function MainNav({
 
   return (
     <nav
-      className={cn("flex items-center space-x-4 lg:space-x-6", className)}
+      className={cn("flex flex-wrap items-center gap-4", className)}
       {...props}
     >
       <CustomLink to="/overview">{t("nav.overview")}</CustomLink>
-      <CustomLink to="/summary">{t("nav.summary")}</CustomLink>
-      <CustomLink to="/wallets">{t("nav.wallets")}</CustomLink>
-      <CustomLink to="/comparison">{t("nav.comparison")}</CustomLink>
-      <CustomLink to="/rebalance">{t("nav.rebalance")}</CustomLink>
-      <CustomLink to="/goals">{t("nav.goals")}{unread > 0 && <><span aria-hidden="true" className="ml-1 rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground">{unread}</span>{" "}<span className="sr-only">{t("goals.unread").replace("{count}", String(unread))}</span></>}</CustomLink>
-      <CustomLink to="/history">{t("nav.history")}</CustomLink>
+      <div role="group" aria-label={t("nav.analyze")} className="flex flex-wrap items-center gap-4">
+        <CustomLink to="/summary">{t("nav.summary")}</CustomLink>
+        <CustomLink to="/wallets">{t("nav.wallets")}</CustomLink>
+        <CustomLink to="/comparison">{t("nav.comparison")}</CustomLink>
+        <CustomLink to="/cost-basis">{t("nav.costBasis")}</CustomLink>
+      </div>
+      <div role="group" aria-label={t("nav.manage")} className="flex flex-wrap items-center gap-4">
+        <CustomLink to="/history">{t("nav.history")}</CustomLink>
+        <CustomLink to="/rebalance">{t("nav.rebalance")}</CustomLink>
+        <CustomLink to="/goals">{t("nav.goals")}{unread > 0 && <><span aria-hidden="true" className="ml-1 rounded-full bg-negative px-1.5 text-xs text-background">{unread}</span>{" "}<span className="sr-only">{t("goals.unread").replace("{count}", String(unread))}</span></>}</CustomLink>
+        <CustomLink to="/assistant">{t("nav.assistant")}</CustomLink>
+      </div>
       <CustomLink to="/settings">{t("nav.settings")}</CustomLink>
     </nav>
   );

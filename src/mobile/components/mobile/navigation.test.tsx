@@ -10,17 +10,20 @@ function Path() {
 }
 
 describe("mobile navigation", () => {
-  it("uses the same roots and alert badge in the sidebar", () => {
+  it("shows grouped routes and the unread alert on the regular-width rail", () => {
     render(<MemoryRouter initialEntries={["/goals"]}>
       <MobileSidebar unread={3} />
       <Routes><Route path="*" element={<Path />} /></Routes>
     </MemoryRouter>);
     const sidebar = document.querySelector(".mobile-sidebar")!;
-    expect(sidebar).toHaveAttribute("aria-label", "Tabs");
-    const more = sidebar.querySelector('a[href="/more"]')!;
-    expect(more).toHaveAttribute("aria-current", "page");
-    expect(more).toHaveTextContent("3");
-    expect(more).toHaveAccessibleName("More, 3 unread alerts");
+    expect(sidebar).toHaveAttribute("aria-label", "Main navigation");
+    expect(sidebar).toHaveTextContent("Analyze");
+    expect(sidebar).toHaveTextContent("Manage");
+    expect(sidebar.querySelector('a[href="/cost-basis"]')).toBeTruthy();
+    const goals = sidebar.querySelector('a[href="/goals"]')!;
+    expect(goals).toHaveAttribute("aria-current", "page");
+    expect(goals).toHaveTextContent("3");
+    expect(goals).toHaveAccessibleName("Goals & Alerts 3 unread alerts");
     fireEvent.click(sidebar.querySelector('a[href="/history"]')!);
     expect(screen.getByText("/history")).toBeInTheDocument();
   });

@@ -12,13 +12,13 @@ const Progress = React.forwardRef<
     value={value}
     max={max}
     className={cn(
-      "relative h-2 w-full overflow-hidden rounded-full bg-primary/20",
+      "relative h-1 w-full overflow-hidden rounded-full bg-control",
       className
     )}
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className={cn("h-full w-full flex-1 bg-primary transition-all", indicatorClassName)}
+      className={cn("h-full w-full flex-1 bg-accent-data transition-all", indicatorClassName)}
       style={minimumFill
         ? { width: value && value > 0 ? `${Math.min(100, value / (max || 100) * 100)}%` : "0%", minWidth: value && value > 0 ? "8px" : undefined }
         : { transform: `translateX(-${100 - (max && max > 0 ? (value || 0) / max * 100 : (value || 0))}%)` }}

@@ -264,7 +264,7 @@ describe("Overview semantic controls", () => {
       await screen.findByTestId("line-chart");
       const chart = vi.mocked(Line).mock.calls.at(-1)?.[0];
       expect(chart?.options?.scales?.y?.ticks).toEqual(expect.objectContaining({
-        font: expect.objectContaining({ family: expect.stringContaining("-apple-system") }),
+        font: expect.objectContaining({ family: expect.stringContaining("Public Sans") }),
       }));
     } finally {
       window.matchMedia = oldMatchMedia;

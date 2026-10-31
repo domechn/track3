@@ -818,6 +818,9 @@ const App = () => {
   // todo: auto update this value, if user active or inactive
   const [isProUser, setIsProUser] = useState(false);
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
+  useEffect(() => {
+    document.documentElement.dataset.quote = quoteColor === "red-up-green-down" ? "red-up" : "green-up";
+  }, [quoteColor]);
 
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
 

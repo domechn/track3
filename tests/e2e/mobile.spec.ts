@@ -413,7 +413,7 @@ test("Overview cards and source labels fit the phone layout", async ({ browser }
     await expect(pnl.locator(".overview-pnl-metric").nth(1)).toHaveCSS("border-right-width", "0px");
     await expect(pnl.locator(".overview-pnl-metric").last()).toHaveCSS("border-right-width", "0px");
     expect(await pnl.locator(".overview-pnl-metric-value").first().evaluate((node) => getComputedStyle(node).fontFamily))
-      .toMatch(/^-apple-system/);
+      .toContain("Public Sans");
     expect((await pnl.boundingBox())!.y + (await pnl.boundingBox())!.height)
       .toBeLessThanOrEqual((await wrapper.boundingBox())!.y + (await wrapper.boundingBox())!.height + 1);
     for (const row of await page.locator(".overview-source-row").all()) {
@@ -900,7 +900,7 @@ test("the portfolio date range opens a native date sheet on phones", async ({ br
     const sheet = page.getByRole("dialog", { name: "Choose date range" });
     await expect(sheet).toBeVisible();
     await expect(sheet.locator('input[type="date"]')).toHaveCount(2);
-    expect(await sheet.evaluate((node) => getComputedStyle(node).fontFamily)).toMatch(/^-apple-system/);
+    expect(await sheet.evaluate((node) => getComputedStyle(node).fontFamily)).toContain("Public Sans");
   } finally {
     await context.close();
   }

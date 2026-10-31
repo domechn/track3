@@ -85,7 +85,7 @@ export function generateRandomColors(size: number): { R: number; G: number; B: n
 	return colors
 }
 
-export function positiveNegativeColor(val: number, quoteColor: QuoteColor = 'green-up-red-down') {
+export function positiveNegativeTone(val: number, quoteColor: QuoteColor = 'green-up-red-down') {
 	if (val === 0) {
 		return "gray"
 	} else if (val > 0) {
@@ -95,21 +95,16 @@ export function positiveNegativeColor(val: number, quoteColor: QuoteColor = 'gre
 	}
 }
 
+export function positiveNegativeColor(val: number, _quoteColor: QuoteColor = "green-up-red-down") {
+	if (val === 0) return "hsl(var(--muted-foreground))"
+	return val > 0 ? "hsl(var(--gain))" : "hsl(var(--loss))"
+}
+
 export function positiveNegativeTextClass(
 	val: number,
-	quoteColor: QuoteColor = "green-up-red-down",
-	shade: 500 | 600 | 700 = 600
+	_quoteColor: QuoteColor = "green-up-red-down",
+	_shade: 500 | 600 | 700 = 600
 ) {
-	const tone = positiveNegativeColor(val, quoteColor)
-	if (tone === "gray") {
-		return "text-muted-foreground"
-	}
-
-	if (shade === 500) {
-		return tone === "green" ? "text-emerald-500" : "text-rose-500"
-	}
-	if (shade === 600) {
-		return tone === "green" ? "text-emerald-600" : "text-rose-600"
-	}
-	return tone === "green" ? "text-emerald-700" : "text-rose-700"
+	if (val === 0) return "text-muted-foreground"
+	return val > 0 ? "text-gain" : "text-loss"
 }

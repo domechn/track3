@@ -10,7 +10,7 @@
   transition: opacity 150ms linear !important;
 }
 .ob-dialog {
-  --ill-1: rgb(99 102 241);
+  --ill-1: hsl(var(--accent-data));
   --ill-2: rgb(56 189 248);
   --ill-3: rgb(16 185 129);
   --ill-4: rgb(168 85 247);
@@ -25,9 +25,8 @@
   outline: none;
 }
 .dark .ob-dialog {
-  --ill-1: rgb(129 140 248);
-  --ill-surface: hsl(222 47% 9%);
-  --ill-line: hsl(217 33% 22%);
+  --ill-surface: hsl(var(--card));
+  --ill-line: hsl(var(--border));
   --ill-bar: hsl(var(--muted-foreground) / .28);
 }
 .ob-desktop {
