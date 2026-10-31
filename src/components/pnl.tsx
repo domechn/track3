@@ -22,10 +22,12 @@ const App = ({
   currency,
   dateRange,
   quoteColor,
+  compact = false,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  compact?: boolean;
 }) => {
   const { t } = useTranslation();
   const { needResize } = useContext(ChartResizeContext);
@@ -100,13 +102,13 @@ const App = ({
   }
 
   return (
-    <div className="h-full">
-      <Card className="flex h-full flex-col">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <div className={compact ? "t3-pnl-compact" : "h-full"}>
+      <Card className={compact ? "t3-pnl-compact-card" : "flex h-full flex-col"}>
+        {!compact && <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("pnl.title")}
           </CardTitle>
-        </CardHeader>
+        </CardHeader>}
         <CardContent className="flex flex-1 flex-col">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <div
@@ -170,12 +172,12 @@ const App = ({
               </p>
             </div>
           </div>
-          <PNLChart
+          {!compact && <PNLChart
             currency={currency}
             dateRange={dateRange}
             quoteColor={quoteColor}
             className="min-h-[120px] flex-1"
-          />
+          />}
         </CardContent>
       </Card>
     </div>

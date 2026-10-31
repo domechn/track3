@@ -193,11 +193,15 @@ const App = ({
       <Popover onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger asChild>
           <button type="button" aria-label={t("realtime.open")}
-            className="flex h-5 w-5 touch:h-11 touch:w-11 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <LightningBoltIcon aria-hidden="true" height={20} width={20} />
+            className="t3-live-trigger flex min-h-9 touch:min-h-11 items-center justify-center gap-2 rounded-md text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <LightningBoltIcon aria-hidden="true" height={16} width={16} />
+            <span className="t3-live-label">{t("realtime.design.live")}</span>
+            {realtimeAssetValues.length > 0 && <strong className="t3-live-label">
+              {currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(realtimeTotalValue))}
+            </strong>}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-[calc(100vw-1rem)] max-w-80 p-4" collisionPadding={8}>
+        <PopoverContent className="t3-live-popover w-[calc(100vw-1rem)] max-w-80 p-4" collisionPadding={8}>
           <div className="relative min-h-[110px]">
             <RealtimeView />
             <div

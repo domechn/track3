@@ -106,7 +106,7 @@ export async function captureSyncStatusWithToast(page: Page, platform: Platform)
   expect(pillBox.x < toastBox.x + toastBox.width && pillBox.x + pillBox.width > toastBox.x &&
     pillBox.y < toastBox.y + toastBox.height && pillBox.y + pillBox.height > toastBox.y).toBe(false);
   if (!mobile) {
-    for (const name of ["Collapse sidebar", "Expand sidebar"]) {
+    for (const name of ["Expand sidebar", "Collapse sidebar"]) {
       const currentPill = (await pill.boundingBox())!;
       const collapse = (await page.getByRole("button", { name }).boundingBox())!;
       expect(currentPill.x < collapse.x + collapse.width && currentPill.x + currentPill.width > collapse.x &&

@@ -9,10 +9,14 @@ import { ChartResizeContext } from "@/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 
+const chartData = vi.hoisted(() => ({ datasets: [] as { label: string; data: number[] }[] }));
 vi.mock("react-chartjs-2", async () => {
   const React = await import("react");
   return {
-    Line: () => <div data-testid="line-chart" />,
+    Line: ({ data }: { data: { datasets: { label: string; data: number[] }[] } }) => {
+      chartData.datasets = data.datasets;
+      return <div data-testid="line-chart" />;
+    },
     Bar: () => <div data-testid="bar-chart" />,
     Doughnut: React.forwardRef<HTMLDivElement>((_props, _ref) => (
       <div data-testid="doughnut-chart" />
@@ -210,6 +214,37 @@ beforeEach(() => {
 });
 
 describe("Overview semantic controls", () => {
+  it("places overview metrics ahead of the total value trend", async () => {
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" metrics={<div data-testid="overview-metrics">Latest change</div>} />);
+    const metrics = await screen.findByTestId("overview-metrics");
+    const chart = screen.getByTestId("line-chart");
+    expect(metrics.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("labels the all time high from snapshot totals", async () => {
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" ath={{ timestamp: Date.parse("2024-04-15"), value: 1300, distanceFromAth: -50 / 1300 * 100 }} />);
+    expect(await screen.findByText("All-time high")).toBeInTheDocument();
+    expect(screen.getByText("$1,300.00")).toBeInTheDocument();
+    expect(screen.getByText(/3.85% below/i)).toBeInTheDocument();
+  });
+
+  it("draws the all time high reference and annotates the best change day", async () => {
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down"
+      ath={{ timestamp: Date.parse("2024-04-15"), value: 1300 }}
+      bestDay={{ timestamp: Date.parse("2024-04-16"), value: 250 }} />);
+    await screen.findByTestId("line-chart");
+    expect(chartData.datasets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "All-time high", data: [1300, 1300] }),
+    ]));
+    expect(screen.getByText(/best day/i)).toHaveTextContent("250");
+  });
+
   it("renders labeled buttons for total value chart controls", async () => {
     renderWithProviders(
       <TotalValue

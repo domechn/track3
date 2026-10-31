@@ -105,21 +105,17 @@ beforeEach(() => {
 });
 
 describe("Overview card alignment", () => {
-  it("lets the total value and pnl cards fill the same desktop grid row height", () => {
+  it("places PnL metrics inside the total value card", () => {
     renderOverview();
 
     const totalValueCard = screen
-      .getByText("Total Value In USD")
-      .closest("[data-ui-card]");
-    const pnlCard = screen.getByText("PNL Analysis").closest("[data-ui-card]");
+      .getByText("Total value")
+      .closest<HTMLElement>("[data-ui-card]");
+    const pnlCard = screen.getByText("Last PNL").closest<HTMLElement>("[data-ui-card]");
 
     expect(totalValueCard).not.toBeNull();
     expect(pnlCard).not.toBeNull();
-    expect(totalValueCard).toHaveClass("h-full");
-    expect(pnlCard).toHaveClass("h-full");
-    expect(totalValueCard?.parentElement).toHaveClass("h-full");
-    expect(pnlCard?.parentElement).toHaveClass("h-full");
-    expect(totalValueCard?.parentElement?.parentElement).toHaveClass("h-full");
-    expect(pnlCard?.parentElement?.parentElement).toHaveClass("h-full");
+    expect(totalValueCard).toContainElement(pnlCard);
+    expect(totalValueCard?.closest(".t3-grid-hero")).not.toBeNull();
   });
 });

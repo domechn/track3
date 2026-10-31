@@ -46,7 +46,7 @@ test("phone Sync keeps grouped card styling", async ({ page }) => {
   await expect(card.locator("input").first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
 });
 
-test("phone and iPad keep unpadded portfolio cards flat", async ({ page }) => {
+test("phone and iPad keep the Overview hero inset and other unpadded cards flat", async ({ page }) => {
   await installTauriBridge(page, { richPortfolio: true });
   for (const width of [390, 834]) {
     await page.setViewportSize({ width, height: 844 });
@@ -59,8 +59,8 @@ test("phone and iPad keep unpadded portfolio cards flat", async ({ page }) => {
     const borderWidth = await hero.evaluate((node) => parseFloat(getComputedStyle(node).borderLeftWidth));
     expect(cardBox).not.toBeNull();
     expect(labelBox).not.toBeNull();
-    expect(borderWidth === 0 || labelBox!.x - cardBox!.x >= 16).toBe(true);
-    await expect(hero).toHaveCSS("border-left-width", "0px");
+    expect(labelBox!.x - cardBox!.x).toBeGreaterThanOrEqual(16);
+    expect(borderWidth).toBe(1);
 
     await page.goto("/#/history");
     const records = page.locator(".history-records-card");

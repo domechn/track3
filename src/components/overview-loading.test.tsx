@@ -41,7 +41,10 @@ function createReporter(key: keyof typeof mockReportCounts) {
 }
 
 vi.mock("@/components/total-value-and-change", () => ({
-  default: createReporter("totalValue"),
+  default: ({ metrics }: { metrics?: React.ReactNode }) => {
+    const Reporter = createReporter("totalValue");
+    return <><Reporter />{metrics}</>;
+  },
 }));
 
 vi.mock("@/components/pnl", () => ({

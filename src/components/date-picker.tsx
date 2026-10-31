@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Calendar } from "./ui/calendar";
 import { CalendarIcon } from "@radix-ui/react-icons";
-import { endOfDay, isSameDay, startOfDay } from "date-fns";
+import { endOfDay, format, isSameDay, startOfDay } from "date-fns";
 import { useMemo, useState } from "react";
 import { useTranslation } from "@/i18n";
 
@@ -22,6 +22,14 @@ const App = ({
   const [date, setDate] = useState<DateRange | undefined>(value);
   // whether need to use start or end of selected dates
   const [exact, setExact] = useState<boolean>(true);
+
+  function handleOpenChange(open: boolean) {
+    if (open) {
+      setDate(value);
+      setExact(true);
+    }
+    setCalendarOpen(open);
+  }
 
   const selectDates = useMemo(() => {
     return {
@@ -83,14 +91,17 @@ const App = ({
   }
 
   return (
-    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+    <Popover open={calendarOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button type="button" aria-label={t("datePicker.open")}
-          className="flex h-6 w-6 touch:h-11 touch:w-11 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <CalendarIcon aria-hidden="true" className="h-6 w-6" />
+          aria-description={value?.from && value.to ? `${format(value.from, "MMM d")} – ${format(value.to, "MMM d, yyyy")}` : undefined}
+          className="t3-date-trigger flex min-h-9 touch:min-h-11 items-center justify-center gap-2 rounded-md border border-border px-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <CalendarIcon aria-hidden="true" className="h-4 w-4" />
+          <span className="t3-date-range-display" aria-hidden="true"
+            data-range={value?.from && value.to ? `${format(value.from, "MMM d")} – ${format(value.to, "MMM d, yyyy")}` : ""} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto touch:w-[calc(100vw-1rem)] max-w-max max-h-[calc(100dvh-1rem)] overflow-auto p-0" align={window.matchMedia("(pointer: coarse)").matches ? "end" : "start"} collisionPadding={8}>
+      <PopoverContent className="t3-date-popover w-auto touch:w-[calc(100vw-1rem)] max-w-max max-h-[calc(100dvh-1rem)] overflow-auto p-0" align="end" collisionPadding={8}>
         <div className="flex touch:flex-col">
           <Calendar
             mode="range"
@@ -100,7 +111,7 @@ const App = ({
             initialFocus
             disabled={isDayDisabled}
           />
-          <div className="px-3 py-5 space-y-2">
+          <div className="t3-date-presets px-3 py-5 space-y-2">
             <div className="text-muted-foreground text-sm">
               {t("datePicker.predefined")}
             </div>

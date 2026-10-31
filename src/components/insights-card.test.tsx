@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import InsightsCard from "./insights-card";
 import { dismissInsight, formatInsight, loadInsightCard, refreshInsights, INSIGHTS_CHANGED_EVENT } from "@/middlelayers/insights-service";
 import type { InsightCard } from "@/middlelayers/insights-service";
+import { loadAIConfig } from "@/middlelayers/configuration";
 import axe from "axe-core";
 
 vi.mock("@/middlelayers/insights-service", () => ({
@@ -13,6 +14,7 @@ vi.mock("@/middlelayers/insights-service", () => ({
   refreshInsights: vi.fn(),
   formatInsight: vi.fn((insight: { messageKey: string; data: { symbol: string } }) => `${insight.messageKey} ${insight.data.symbol}`),
 }));
+vi.mock("@/middlelayers/configuration", () => ({ loadAIConfig: vi.fn() }));
 
 const card: InsightCard = { snapshotUuid: "snapshot-a", dismissedIds: [], insights: [
   { id: "new:crypto:BTC", severity: "info", messageKey: "insights.newAsset", data: { symbol: "BTC", value: 100 } },
@@ -29,6 +31,14 @@ beforeEach(() => {
 });
 
 describe("InsightsCard", () => {
+  it("shows an honest Overview empty state without loading AI configuration", async () => {
+    vi.mocked(loadInsightCard).mockResolvedValue(undefined);
+    vi.mocked(loadAIConfig).mockRejectedValue(new Error("no AI configuration"));
+    render(<InsightsCard />);
+    expect(await screen.findByText(/No significant changes yet/)).toBeVisible();
+    expect(screen.queryByText("Insights are turned off")).not.toBeInTheDocument();
+    expect(loadAIConfig).not.toHaveBeenCalled();
+  });
   it("names the populated insight controls and passes axe", async () => {
     vi.mocked(loadInsightCard).mockResolvedValue(card);
     const { container } = render(<InsightsCard />);

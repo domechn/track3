@@ -268,7 +268,13 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           }, { mobile, locale });
           await shot(page, `${prefix}-long-error`);
           if (!mobile) {
-            await page.getByRole("button", { name: /Collapse sidebar|收起侧边栏/ }).click();
+            const expand = page.getByRole("button", { name: /Expand sidebar|展开侧边栏/ });
+            const collapse = page.getByRole("button", { name: /Collapse sidebar|收起侧边栏/ });
+            await expect(expand).toBeVisible();
+            await expand.click();
+            await expect(collapse).toBeVisible();
+            await collapse.click();
+            await expect(expand).toBeVisible();
             await page.waitForTimeout(350);
             await shot(page, `${prefix}-collapsed-long-error`);
           }

@@ -7,6 +7,7 @@ import {
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import { useAlertBadge } from "../use-alert-badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const overview = { to: "/overview", labelKey: "nav.overview", icon: DashboardIcon };
 const analyze = [
@@ -32,9 +33,9 @@ function NavItem({ item, collapsed, unread }: { item: NavEntry; collapsed: boole
   const match = useMatch({ path: resolved.pathname, end: false });
   const unreadText = unread ? t("goals.unread").replace("{count}", String(unread)) : "";
   const Icon = item.icon;
-  return <Link to={item.to}
+  const link = <Link to={item.to}
     aria-label={collapsed ? `${label}${unreadText ? ` ${unreadText}` : ""}` : undefined}
-    title={collapsed ? label : undefined} aria-current={match ? "page" : undefined}
+    aria-current={match ? "page" : undefined}
     className={cn(
       "group relative flex h-9 touch:min-h-11 items-center gap-3 rounded-md px-[9px] text-[13px] font-medium whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       "hover:bg-raised hover:text-foreground",
@@ -49,6 +50,8 @@ function NavItem({ item, collapsed, unread }: { item: NavEntry; collapsed: boole
     )}>{unread > 99 ? "99+" : unread}</span>}
     {!!unread && !collapsed && <span className="sr-only"> {unreadText}</span>}
   </Link>;
+  return collapsed ? <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger>
+    <TooltipContent side="right" sideOffset={10}>{label}</TooltipContent></Tooltip> : link;
 }
 
 function NavGroup({ label, items, collapsed, unread }: {
@@ -75,12 +78,12 @@ export default function Sidebar({ collapsed, onToggle, isProUser }: {
       {!collapsed && <span className="truncate text-[15px] font-bold">{t("app.brand")}</span>}
       {isProUser && !collapsed && <span className="rounded-pill bg-accent-data/15 px-2 text-xs text-foreground dark:text-accent-data">{t("app.proBadge")}</span>}
     </div>
-    <nav aria-label={t("nav.main", "Main navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-[10px] touch:px-[5px] pb-2">
+    <TooltipProvider delayDuration={220}><nav aria-label={t("nav.main", "Main navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-[10px] touch:px-[5px] pb-2">
       <NavItem item={overview} collapsed={collapsed} />
       <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} />
       <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} />
       <div className="mt-auto border-t border-border pt-2"><NavItem item={settings} collapsed={collapsed} /></div>
-    </nav>
+    </nav></TooltipProvider>
     <div className="border-t px-[10px] touch:px-[5px] py-2">
       <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}
         aria-expanded={!collapsed} onClick={onToggle}

@@ -26,6 +26,14 @@ const App = ({
   // whether need to use start or end of selected dates
   const [exact, setExact] = useState<boolean>(true);
 
+  function handleOpenChange(open: boolean) {
+    if (open) {
+      setDate(value);
+      setExact(true);
+    }
+    setCalendarOpen(open);
+  }
+
   const selectDates = useMemo(() => {
     return {
       from: date?.from
@@ -88,12 +96,14 @@ const App = ({
   return (
     <>
     {isMobile && <div className="date-picker-mobile">
-      <button type="button" aria-label={t("datePicker.open")} onClick={() => setCalendarOpen(true)}
-        className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <CalendarIcon aria-hidden="true" className="h-6 w-6" />
+      <button type="button" aria-label={t("datePicker.open")} onClick={() => handleOpenChange(true)}
+        className="t3-date-trigger flex h-11 min-w-11 items-center justify-center gap-2 rounded-md border border-border px-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <CalendarIcon aria-hidden="true" className="h-4 w-4" />
       </button>
-      <BottomSheet open={calendarOpen} onOpenChange={setCalendarOpen} title={t("datePicker.open")}>
+      <BottomSheet open={calendarOpen} onOpenChange={handleOpenChange} title={t("datePicker.open")} initialDetent="large" className="t3-date-sheet">
         <div className="space-y-4">
+          <Calendar className="t3-mobile-calendar mx-auto" mode="range" defaultMonth={date?.to} selected={date}
+            onSelect={(next) => setDataRange(next, false)} disabled={isDayDisabled} />
           <div className="grid gap-3">
             <label className="grid gap-1 text-sm">{t("datePicker.from")}
               <input type="date" className="mobile-date-input" value={date?.from ? format(date.from, "yyyy-MM-dd") : ""}
@@ -114,19 +124,22 @@ const App = ({
               onClick={() => handlePredefinedTimesClick(amount)}>{t(amount < 0 ? "datePicker.all" : `datePicker.last${amount}`)}</button>)}
           </div>
           <p className="text-sm text-muted-foreground">{t("datePicker.selected")} {selectTimes} {t("common.times")}</p>
-          <Button className="min-h-11 w-full" disabled={selectTimes === 0} onClick={handleSubmitClick}>{t("common.submit")}</Button>
+          <Button className="t3-date-submit min-h-11 w-full" disabled={selectTimes === 0} onClick={handleSubmitClick}>{t("common.submit")}</Button>
         </div>
       </BottomSheet>
     </div>}
     {!isMobile && <div className="date-picker-desktop">
-    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+    <Popover open={calendarOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button type="button" aria-label={t("datePicker.open")}
-          className="flex h-6 w-6 touch:h-11 touch:w-11 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <CalendarIcon aria-hidden="true" className="h-6 w-6" />
+          aria-description={value?.from && value.to ? `${format(value.from, "MMM d")} – ${format(value.to, "MMM d, yyyy")}` : undefined}
+          className="t3-date-trigger flex min-h-9 touch:min-h-11 items-center justify-center gap-2 rounded-md border border-border px-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <CalendarIcon aria-hidden="true" className="h-4 w-4" />
+          <span className="t3-date-range-display" aria-hidden="true"
+            data-range={value?.from && value.to ? `${format(value.from, "MMM d")} – ${format(value.to, "MMM d, yyyy")}` : ""} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto touch:w-[calc(100vw-1rem)] max-w-max max-h-[calc(100dvh-1rem)] overflow-auto p-0" align={window.matchMedia("(pointer: coarse)").matches ? "end" : "start"} collisionPadding={8}>
+      <PopoverContent className="t3-date-popover w-auto touch:w-[calc(100vw-1rem)] max-w-max max-h-[calc(100dvh-1rem)] overflow-auto p-0" align="end" collisionPadding={8}>
         <div className="flex touch:flex-col">
           <Calendar
             mode="range"
@@ -136,7 +149,7 @@ const App = ({
             initialFocus
             disabled={isDayDisabled}
           />
-          <div className="px-3 py-5 space-y-2">
+          <div className="t3-date-presets px-3 py-5 space-y-2">
             <div className="text-muted-foreground text-sm">
               {t("datePicker.predefined")}
             </div>
