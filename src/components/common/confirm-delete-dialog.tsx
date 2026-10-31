@@ -1,4 +1,5 @@
 import { useState, type MouseEvent, type ReactElement, type ReactNode } from "react";
+import { ReloadIcon } from "@radix-ui/react-icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +22,7 @@ type ConfirmDeleteDialogProps = {
   description: ReactNode;
   children?: ReactNode;
   cancelLabel: string;
-  actions: { label: string; onClick: () => void; disabled?: boolean }[];
+  actions: { label: string; onClick: () => void; disabled?: boolean; pending?: boolean; keepOpen?: boolean }[];
 };
 
 export default function ConfirmDeleteDialog({
@@ -69,15 +70,18 @@ export default function ConfirmDeleteDialog({
           <AlertDialogCancel onClick={stopPropagation}>
             {cancelLabel}
           </AlertDialogCancel>
-          {actions.map(({ label, onClick, disabled }, index) => (
+          {actions.map(({ label, onClick, disabled, pending, keepOpen }, index) => (
             <AlertDialogAction
               key={index}
               disabled={disabled}
+              aria-busy={pending}
               onClick={(event) => {
                 event.stopPropagation();
+                if (keepOpen) event.preventDefault();
                 onClick();
               }}
             >
+              {pending && <ReloadIcon aria-hidden="true" className="mr-2 h-4 w-4 motion-safe:animate-spin" />}
               {label}
             </AlertDialogAction>
           ))}

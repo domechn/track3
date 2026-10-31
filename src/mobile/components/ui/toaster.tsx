@@ -13,13 +13,14 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
+      {toasts.map(function ({ id, title, description, action, syncStatus, ...props }) {
         return (
-          <Toast key={id} {...props} className="mobile-toast">
+          <Toast key={id} {...props} syncStatus={syncStatus} className="mobile-toast">
             <div data-selectable="" className="mobile-toast-copy grid min-w-0 gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
+              {title && <ToastTitle className={syncStatus ? "text-sm font-bold" : ""}>{title}</ToastTitle>}
               {description && (
-                <ToastDescription>{description}</ToastDescription>
+                <ToastDescription
+                  className={syncStatus ? "line-clamp-3 !text-sm leading-5 opacity-100" : ""}>{description}</ToastDescription>
               )}
             </div>
             {action}

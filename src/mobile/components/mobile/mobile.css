@@ -156,6 +156,26 @@
   body canvas { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .mobile-toast { flex-direction: column; align-items: stretch; gap: 8px; padding-right: 56px; overflow-wrap: anywhere; }
   .mobile-toast > .mobile-toast-action { align-self: flex-end; max-width: 100%; margin-left: 0 !important; }
+  .sync-toast [toast-close] { color: inherit; opacity: 1; }
+  .sync-action-pending {
+    background: hsl(var(--muted)) !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+    opacity: 1 !important;
+  }
+  body:has(.sync-settings-page) .ios-d3-toast-viewport {
+    top: calc(3.8rem + env(safe-area-inset-top));
+    right: 0;
+    bottom: auto;
+    max-width: min(100vw, 390px);
+    max-height: calc(100dvh - 6rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    flex-direction: column;
+  }
+  .sync-settings-page { padding-bottom: 8rem; }
+  .sync-settings-page .sync-device-actions { padding-right: 7rem; }
+  .sync-settings-page .sync-device-row { display: flex; flex-wrap: wrap; }
+  .sync-settings-page .sync-device-row > :first-child { flex: 1 1 200px; min-width: 200px; }
+  .sync-settings-page .sync-device-last-upload { flex: none; max-width: 100%; }
   html { scroll-behavior: auto; overscroll-behavior-y: contain; }
   .app-layout .glass { background: hsl(var(--card)); border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .app-layout .font-mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; }
@@ -1178,6 +1198,19 @@
     background: hsl(var(--primary) / .12); color: hsl(var(--primary));
   }
   #app-main-content:has(.mobile-analytics-hub[data-open-sheet="profit"]) .d2-summary .profit-summary-card { display: none; }
+}
+
+@media (min-width: 1100px) {
+  .app-layout:not([data-sidebar-collapsed="true"]):has(.sync-settings-page) { --mobile-sidebar-width: 200px; }
+  .more-split .ios-d3-settings .mobile-split-view:has(.sync-settings-page) { grid-template-columns: minmax(0, 1fr); }
+  .ios-d3-settings .mobile-split-view:has(.sync-settings-page) > .mobile-split-master { display: none !important; }
+  .ios-d3-settings .mobile-split-detail:has(.sync-settings-page) { padding-right: 346px; }
+  body:has(.sync-settings-page) .ios-d3-toast-viewport { max-width: 362px; }
+  body:has(.sync-settings-page) .ios-d3-toast-viewport > li { min-width: 0; padding: 44px 12px 12px; }
+}
+
+@media (min-width: 701px) and (max-width: 1099px) {
+  body:has(.sync-settings-page) .ios-d3-toast-viewport { top: 0; }
 }
 
 

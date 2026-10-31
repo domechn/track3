@@ -82,3 +82,38 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
     await capture("uploading-320");
   }
 }
+
+export async function captureSyncStatusWithToast(page: Page, platform: Platform) {
+  const mobile = platform === "mobile";
+  await page.setViewportSize({ width: mobile ? 390 : 1280, height: mobile ? 844 : 800 });
+  await installTauriBridge(page, { seedLockedSync: true });
+  await page.goto("/#/settings/sync");
+  await page.getByRole("button", { name: "Skip for now" }).click();
+  await publish(page, { phase: "error", error: "bucket" });
+  await page.evaluate(async (mobile) => {
+    const { toast } = await import(/* @vite-ignore */ (mobile
+      ? "/src/mobile/components/ui/use-toast.ts" : "/src/components/ui/use-toast.ts"));
+    toast({ title: "Sync failed", description: "The sync store did not finish the request.",
+      variant: "destructive", syncStatus: "error", duration: 8000 });
+  }, mobile);
+  const toast = page.locator(mobile ? ".ios-d3-toast-viewport .sync-toast" : ".desktop-toast-viewport .sync-toast");
+  const pill = page.locator(mobile ? ".ios-d3-sync-indicator button[aria-label]" : ".desktop-sync-status-indicator button[aria-label]");
+  await expect(toast).toBeVisible();
+  await expect(pill).toBeVisible();
+  await expect(pill).toHaveAttribute("aria-label", "Sync error");
+  const toastBox = (await toast.boundingBox())!;
+  const pillBox = (await pill.boundingBox())!;
+  expect(pillBox.x < toastBox.x + toastBox.width && pillBox.x + pillBox.width > toastBox.x &&
+    pillBox.y < toastBox.y + toastBox.height && pillBox.y + pillBox.height > toastBox.y).toBe(false);
+  if (!mobile) {
+    for (const name of ["Collapse sidebar", "Expand sidebar"]) {
+      const currentPill = (await pill.boundingBox())!;
+      const collapse = (await page.getByRole("button", { name }).boundingBox())!;
+      expect(currentPill.x < collapse.x + collapse.width && currentPill.x + currentPill.width > collapse.x &&
+        currentPill.y < collapse.y + collapse.height && currentPill.y + currentPill.height > collapse.y).toBe(false);
+      await page.getByRole("button", { name }).click();
+    }
+  }
+  mkdirSync(".local/sync-status", { recursive: true });
+  await page.screenshot({ path: `.local/sync-status/${platform}-pill-toast-${mobile ? 390 : 1280}.png`, animations: "disabled" });
+}

@@ -85,7 +85,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
   }
 
   return (
-    <div className={mobile ? "ios-d3-sync-indicator fixed bottom-14 right-4 z-50" : "fixed bottom-14 right-4 z-50"}
+    <div className={mobile ? "ios-d3-sync-indicator fixed bottom-14 right-4 z-50" : "desktop-sync-status-indicator fixed bottom-14 right-4 z-50"}
       style={mobile ? { bottom: "calc(env(safe-area-inset-bottom) + 5rem)" } : undefined}>
       <span role="status" aria-live="polite" className="sr-only">
         {busy ? t("common.loading") : t(`sync.status.${phase}`)}

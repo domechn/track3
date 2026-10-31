@@ -2,6 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
+body:has(.sync-settings-page) .desktop-toast-viewport {
+  top: auto;
+  right: 0;
+  bottom: 0;
+  flex-direction: column;
+  max-width: min(100vw, 380px, 35vw);
+}
+
+body:has(.desktop-toast-viewport) .sync-settings-page {
+  margin-right: min(380px, 35vw);
+  padding-bottom: 8rem;
+}
+
+body:has(.sync-settings-page) .desktop-sync-status-indicator {
+  right: auto;
+  left: calc(var(--sidebar-width) + 1rem);
+  bottom: 1rem;
+}
+
+@media (max-width: 900px) {
+  body:has(.sync-settings-page) .desktop-toast-viewport {
+    max-width: min(100vw, 380px, 35vw);
+  }
+  body:has(.desktop-toast-viewport) .sync-settings-page {
+    margin-right: min(380px, 35vw);
+  }
+  body:has(.desktop-toast-viewport) .sync-settings-page .sm\:grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body:has(.desktop-toast-viewport) .sync-settings-page .sm\:col-span-2 {
+    grid-column: auto;
+  }
+  .sync-settings-page .sync-device-row {
+    display: block;
+  }
+  .sync-settings-page .sync-device-last-upload {
+    display: block;
+    margin-top: .5rem;
+  }
+}
+
+body:has(.sync-settings-page) .desktop-toast-viewport > li {
+  min-width: 0;
+  padding-right: 56px;
+  overflow-wrap: anywhere;
+}
+
+body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  opacity: 1;
+}
+
+.sync-toast [toast-close] {
+  color: inherit;
+  opacity: 1;
+}
+
+.sync-action-pending {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+  opacity: 1 !important;
+}
+
 @media (pointer: coarse) {
   .table-scroll > table.sticky-first-column > :is(thead, tbody, tfoot) > tr > :first-child {
     position: sticky;

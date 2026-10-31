@@ -5,6 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/mobile/i18n"
+import { SyncToastIcon, syncToastStyle, type SyncToastStatus } from "@/components/ui/sync-toast-visual"
 
 const ToastProvider = ToastPrimitives.Provider
 
@@ -42,14 +43,18 @@ const toastVariants = cva(
 const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
-    VariantProps<typeof toastVariants>
->(({ className, variant, ...props }, ref) => {
+    VariantProps<typeof toastVariants> & { syncStatus?: SyncToastStatus }
+>(({ className, variant, syncStatus, children, ...props }, ref) => {
   return (
     <ToastPrimitives.Root
       ref={ref}
-      className={cn(toastVariants({ variant }), className)}
+      className={cn(toastVariants({ variant }), syncStatus && syncToastStyle(syncStatus), className)}
+      data-sync-status={syncStatus}
       {...props}
-    />
+    >
+      {syncStatus && <SyncToastIcon status={syncStatus} />}
+      {children}
+    </ToastPrimitives.Root>
   )
 })
 Toast.displayName = ToastPrimitives.Root.displayName

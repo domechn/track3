@@ -497,7 +497,7 @@ const routes = [
 
 for (const [name, width, height] of viewports) {
   for (const theme of ["light", "dark"] as const) {
-    test(`${name} ${theme} route matrix fits the window`, async ({ browser }) => {
+    test(`${name} ${theme} route matrix fits the window without clipped text`, async ({ browser }) => {
       const context = await browser.newContext({
         userAgent: iPhoneUserAgent, viewport: { width, height }, hasTouch: true, isMobile: true,
         colorScheme: theme, reducedMotion: "reduce",
@@ -513,6 +513,7 @@ for (const [name, width, height] of viewports) {
         for (const route of routes) {
           await page.goto(`/#/${route}`);
           await expect(page.locator("#app-main-content")).toBeVisible();
+          if (route === "settings/sync") await expect(page.locator(".sync-settings-page")).toBeVisible();
           await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
           await page.evaluate(({ left, right, top, bottom }) => {
             document.documentElement.style.setProperty("--mobile-safe-left", `${left}px`);
@@ -666,6 +667,11 @@ for (const [name, width, height] of viewports) {
             && ["overview", "history", "summary", "settings/appearance?section=theme"].includes(route)) {
             mkdirSync("test-results/mobile", { recursive: true });
             await page.screenshot({ path: `test-results/mobile/wide-${name}-${theme}-${route.replaceAll("/", "-").replace("?", "-")}.png` });
+          }
+          if (route === "settings/sync" &&
+            ["ipad-mini-landscape", "ipad-13-portrait", "fold-spanned"].includes(name)) {
+            mkdirSync("test-results/mobile/sync-layout", { recursive: true });
+            await page.screenshot({ path: `test-results/mobile/sync-layout/${name}-${theme}.png`, fullPage: true });
           }
         }
       } finally {

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
-import { captureSyncStates } from "./sync-status-captures";
+import { captureSyncStates, captureSyncStatusWithToast } from "./sync-status-captures";
 
 test.use({
   isMobile: true,
@@ -52,4 +52,8 @@ test("mobile locked prompt dismisses and turn-off requires confirmation", async 
   await page.getByRole("button", { name: "Turn off sync on this device" }).click();
   await page.getByRole("button", { name: "Turn off sync", exact: true }).click();
   await expect(pill).toHaveCount(0);
+});
+
+test("mobile pill clears the toast", async ({ page }) => {
+  await captureSyncStatusWithToast(page, "mobile");
 });

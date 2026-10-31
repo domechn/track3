@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { captureSyncStates } from "./sync-status-captures";
+import { captureSyncStates, captureSyncStatusWithToast } from "./sync-status-captures";
 import { installTauriBridge } from "./tauri-bridge";
 
 for (const theme of ["light", "dark"] as const) {
@@ -32,4 +32,8 @@ test("desktop locked prompt dismisses and turn-off requires confirmation", async
   await page.getByRole("button", { name: "Turn off sync on this device" }).click();
   await page.getByRole("button", { name: "Turn off sync", exact: true }).click();
   await expect(pill).toHaveCount(0);
+});
+
+test("desktop pill clears the toast and sidebar collapse control", async ({ page }) => {
+  await captureSyncStatusWithToast(page, "desktop");
 });
