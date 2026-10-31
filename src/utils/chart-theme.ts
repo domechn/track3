@@ -1,61 +1,66 @@
 import { ChartArea } from "chart.js";
 
-// Ordered for hue spread so the first 6+1 slots used by the stacked-bar
-// and donut charts read as distinct. The first slot also serves as the
-// "primary" brand color used by Total Value and the inline sparkline.
-export const chartColors = [
-  { main: "rgba(99,102,241,1)", bg: "rgba(99,102,241,0.15)" },     // indigo (primary)
-  { main: "rgba(56,189,248,1)", bg: "rgba(56,189,248,0.15)" },     // sky
-  { main: "rgba(16,185,129,1)", bg: "rgba(16,185,129,0.15)" },     // emerald
-  { main: "rgba(244,63,94,1)", bg: "rgba(244,63,94,0.15)" },       // rose
-  { main: "rgba(168,85,247,1)", bg: "rgba(168,85,247,0.15)" },     // violet
-  { main: "rgba(20,184,166,1)", bg: "rgba(20,184,166,0.15)" },     // teal
-  { main: "rgba(217,70,239,1)", bg: "rgba(217,70,239,0.15)" },     // fuchsia
-  { main: "rgba(148,163,184,1)", bg: "rgba(148,163,184,0.15)" },   // slate  (neutral / "Other")
-];
+const fallbacks: Record<string, [string, string]> = {
+  "accent-data": ["213 63% 43%", "213 63% 56%"],
+  positive: ["158 60% 30%", "156 46% 57%"],
+  negative: ["349 70% 40%", "349 81% 67%"],
+  warning: ["37 79% 32%", "39 66% 55%"],
+  "muted-foreground": ["240 4% 34%", "225 5% 72%"],
+  faint: ["240 4% 38%", "225 4% 62%"],
+  border: ["240 5% 84%", "240 3% 14%"],
+  control: ["240 5% 64%", "240 3% 24%"],
+  card: ["0 0% 100%", "252 12% 8%"],
+  "chart-blue-soft": ["204 48% 43%", "204 48% 64%"],
+  "chart-green-soft": ["165 30% 38%", "165 30% 60%"],
+};
 
-// Shared scale options for glassmorphism charts
+export function chartThemeColor(name: string, opacity?: number, theme?: "light" | "dark") {
+  const activeTheme = typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light";
+  const chosenTheme = theme ?? activeTheme;
+  const fallback = fallbacks[name]?.[chosenTheme === "dark" ? 1 : 0] ?? fallbacks["accent-data"][1];
+  const value = typeof document === "undefined" || (theme && theme !== activeTheme)
+    ? "" : getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();
+  const channels = value || fallback;
+  return opacity === undefined ? `hsl(${channels})` : `hsla(${channels.trim().split(/\s+/).join(", ")}, ${opacity})`;
+}
+
+export const chartTokenColor = chartThemeColor;
+
+const series = ["accent-data", "negative", "positive", "warning", "muted-foreground", "chart-blue-soft", "chart-green-soft", "faint"];
+export const chartColors = series.map((name) => ({
+  get main() { return chartThemeColor(name); },
+  get bg() { return chartThemeColor(name, 0.12); },
+}));
+
 export const glassScaleOptions = {
-  grid: {
-    color: "rgba(148,163,184,0.08)",
-    drawBorder: false,
-  },
+  grid: { color: () => chartThemeColor("border"), drawBorder: false },
   ticks: {
-    color: "rgba(148,163,184,0.5)",
-    font: { size: 11 },
+    color: () => chartThemeColor("faint"),
+    font: { size: 12, family: '"Public Sans Variable", "Public Sans", system-ui, sans-serif' },
   },
 };
 
-// Gradient fill helper for line chart areas
 export function createGradientFill(
   ctx: CanvasRenderingContext2D,
   chartArea: ChartArea,
-  rgbaColor: string,
-  topOpacity = 0.35,
+  color: string,
+  topOpacity = 0.12,
   bottomOpacity = 0.0
 ): CanvasGradient {
-  const gradient = ctx.createLinearGradient(
-    0,
-    chartArea.top,
-    0,
-    chartArea.bottom
-  );
-  // Extract r,g,b from rgba string
-  const match = rgbaColor.match(/[\d.]+/g);
-  if (match) {
-    const [r, g, b] = match;
-    gradient.addColorStop(0, `rgba(${r},${g},${b},${topOpacity})`);
-    gradient.addColorStop(1, `rgba(${r},${g},${b},${bottomOpacity})`);
-  }
+  const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+  const fill = (opacity: number) => color.startsWith("hsl(")
+    ? color.replace(/\)$/, ` / ${opacity})`)
+    : color.replace(/rgba?\(([^)]+)\)/, (_, channels: string) => `rgba(${channels.split(",").slice(0, 3).join(",")},${opacity})`);
+  gradient.addColorStop(0, fill(topOpacity));
+  gradient.addColorStop(1, fill(bottomOpacity));
   return gradient;
 }
 
-// Glass-style tooltip config
 export const glassTooltip = {
-  backgroundColor: "rgba(15,23,42,0.85)",
-  borderColor: "rgba(148,163,184,0.2)",
+  get backgroundColor() { return chartThemeColor("card"); },
+  get borderColor() { return chartThemeColor("control"); },
   borderWidth: 1,
-  cornerRadius: 8,
+  cornerRadius: 6,
   padding: 10,
   titleFont: { size: 12 },
   bodyFont: { size: 12 },

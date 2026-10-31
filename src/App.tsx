@@ -24,7 +24,7 @@ function Shell() {
   );
 
   return (
-    <ThemeProvider defaultTheme="light" storageKey={themeLocalStorageKey}>
+    <ThemeProvider defaultTheme="dark" storageKey={themeLocalStorageKey}>
       <div className="min-h-dvh" onContextMenu={renderRightClickMenu}>
         <a
           href="#app-main-content"

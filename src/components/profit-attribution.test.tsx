@@ -38,7 +38,7 @@ describe("profit attribution", () => {
     render(view());
     expect(await screen.findByText("Top contributors")).toBeInTheDocument();
     expect(screen.getByText("Top detractors")).toBeInTheDocument();
-    expect(screen.getAllByText("+€240.00")[0]).toHaveClass("text-rose-500");
+    expect(screen.getAllByText("+€240.00")[0]).toHaveClass("text-gain");
     expect(screen.getByRole("figure", { name: "Top attribution contributors and detractors" })).toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getAllByText("BTC").length).toBeGreaterThan(0);

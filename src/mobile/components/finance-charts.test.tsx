@@ -99,8 +99,8 @@ it("maps calculator gains and composition to charts without Cartesian axes on th
   });
   rerender(<CostCharts report={report} quoteColor="red-up-green-down" />);
   const line = vi.mocked(Line).mock.calls.at(-1)?.[0];
-  expect(line?.data.datasets[0].borderColor).toBe("#d70015");
-  expect(line?.data.datasets[0].backgroundColor).toBe("#d7001520");
+  expect(line?.data.datasets[0].borderColor).toBe("hsl(349 70% 40%)");
+  expect(line?.data.datasets[0].backgroundColor).toBe("hsla(349, 70%, 40%, 0.12)");
 });
 
 it("maps deviations from the calculator and includes the configured tolerance", () => {
@@ -137,10 +137,10 @@ it("maps portfolio values and a total value goal to separate line datasets", () 
   expect(chart.data.labels).toEqual(["Jan 1", "Jan 2"]);
   expect(chart.options?.scales?.y?.ticks).toEqual(expect.objectContaining({ callback: expect.any(Function) }));
   expect(chart.options?.scales?.x?.ticks).toEqual(expect.objectContaining({
-    font: expect.objectContaining({ family: expect.stringContaining("-apple-system") }),
+    font: expect.objectContaining({ family: expect.stringContaining("Public Sans") }),
   }));
   expect(chart.options?.scales?.y?.ticks).toEqual(expect.objectContaining({
-    font: expect.objectContaining({ family: expect.stringContaining("-apple-system") }),
+    font: expect.objectContaining({ family: expect.stringContaining("Public Sans") }),
   }));
   expect(chart.options?.scales?.x?.grid?.display).toBe(false);
   expect(chart.data.datasets.map((series) => series.data)).toEqual([[100, 120], [150, 150]]);

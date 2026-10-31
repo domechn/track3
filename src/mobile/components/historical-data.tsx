@@ -59,7 +59,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { resolveAssetLogoSrc } from "@/utils/assets";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeColor, positiveNegativeTone } from "@/utils/color";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
 import { useOptimisticDelete } from "@/mobile/components/common/use-optimistic-delete";
 import { StaggerContainer, FadeUp } from "@/components/motion";
@@ -974,7 +974,7 @@ const App = ({
                               imageWidth={18} imageHeight={18} />
                             {t("history.assetCount").replace("{n}", String(row.assetCount))}
                           </span>
-                          <span className="history-mobile-snapshot-delta ios-money" data-tone={row.change === null ? "neutral" : positiveNegativeColor(row.change, quoteColor) === "green" ? "gain" : "loss"}>
+                          <span className="history-mobile-snapshot-delta ios-money" data-tone={row.change === null ? "neutral" : positiveNegativeTone(row.change, quoteColor) === "green" ? "gain" : "loss"}>
                             {row.change === null ? "—" : `${row.change > 0 ? "+" : row.change < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(row.change)))}`}
                           </span>
                         </span>

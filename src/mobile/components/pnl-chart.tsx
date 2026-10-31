@@ -10,7 +10,9 @@ import {
   QuoteColor,
   TDateRange,
 } from "@/middlelayers/types";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeTone } from "@/utils/color";
+import { chartTokenColor } from "@/utils/chart-theme";
+import { useTheme } from "@/mobile/components/common/theme";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { glassScaleOptions, glassTooltip } from "@/mobile/chart-theme";
 import { timeToDateStr } from "@/utils/date";
@@ -21,7 +23,6 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
 import { useTranslation } from "@/mobile/i18n";
 import { useHaptics, useIsMobile } from "@/mobile/components/mobile";
-import { useTheme } from "@/mobile/components/common/theme";
 
 const chartName = "PNL of Asset";
 
@@ -54,11 +55,11 @@ const App = ({
 }) => {
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
+  const { resolvedTheme } = useTheme();
   const haptic = useHaptics();
   const lastScrubIndex = useRef<number | null>(null);
   const chartRef = useRef<ChartJS<"bar", (number | undefined)[]> | null>(null);
   const [scrub, setScrub] = useState<{ index: number; left: number } | null>(null);
-  const { resolvedTheme } = useTheme();
   const { needResize } = useContext(ChartResizeContext);
   const [pnlChartData, setPnlChartData] = useState<PNLChartData>([]);
   const [chartWidth, setChartWidth] = useState(600);
@@ -223,13 +224,8 @@ const App = ({
   }
 
   function pnlBackgroundColor(val: "positive" | "negative"): string {
-    const c = positiveNegativeColor(val === "positive" ? 1 : -1, quoteColor);
-    if (!isMobile) {
-      return c === "green" ? "rgba(16,185,129,0.8)" : "rgba(244,63,94,0.8)";
-    }
-    return c === "green"
-      ? resolvedTheme === "dark" ? "#30d158" : "#34c759"
-      : resolvedTheme === "dark" ? "#ff453a" : "#ff3b30";
+    const c = positiveNegativeTone(val === "positive" ? 1 : -1, quoteColor);
+    return chartTokenColor(c === "green" ? "positive" : "negative", isMobile ? undefined : 0.8, resolvedTheme);
   }
 
   function lineData() {
@@ -291,7 +287,7 @@ const App = ({
         {isMobile && scrub && plottedPNL[scrub.index] && <div className="pnl-scrub-chip" style={{ left: scrub.left }}>
           <span>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
             { month: "short", day: "numeric" }).format(new Date(plottedPNL[scrub.index].timestamp))}</span>
-          <strong data-tone={positiveNegativeColor(plottedPNL[scrub.index].change, quoteColor) === "green" ? "gain" : "loss"}>
+          <strong data-tone={positiveNegativeTone(plottedPNL[scrub.index].change, quoteColor) === "green" ? "gain" : "loss"}>
             {plottedPNL[scrub.index].change < 0 ? "−" : "+"}{currency.symbol}{Math.abs(plottedPNL[scrub.index].change).toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </strong>
         </div>}

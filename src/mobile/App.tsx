@@ -5,7 +5,7 @@ import React from "react";
 import { ThemeProvider } from "@/mobile/components/common/theme";
 import { themeLocalStorageKey } from "@/middlelayers/configuration";
 import { I18nProvider, useTranslation } from "@/mobile/i18n";
-import { isIOS, PlatformProvider } from "@/utils/platform";
+import { PlatformProvider } from "@/utils/platform";
 import IOSKeyRecoveryNotice from "@/mobile/components/ios-key-recovery-notice";
 import AppErrorBoundary from "@/mobile/components/app-error-boundary";
 import IOSStartupGate from "@/mobile/components/ios-startup-gate";
@@ -27,7 +27,7 @@ function Shell() {
   );
 
   return (
-    <ThemeProvider defaultTheme={isIOS() ? "system" : "light"} storageKey={themeLocalStorageKey}>
+    <ThemeProvider defaultTheme="dark" storageKey={themeLocalStorageKey}>
       <div className="min-h-dvh">
         <a
           href="#app-main-content"

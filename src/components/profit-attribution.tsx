@@ -6,7 +6,7 @@ import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { positiveNegativeColor, positiveNegativeTextClass } from "@/utils/color";
+import { positiveNegativeTone, positiveNegativeTextClass } from "@/utils/color";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 
@@ -38,7 +38,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   const groups = useMemo(() => data ? groupAttribution(data.attribution.entries, dimension, data.aliases, t("profit.attribution.stock")) : [], [data, dimension, t]);
   const format = (value: number) => `${value > 0 ? "+" : value < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(value)))}`;
   const tone = (value: number) => positiveNegativeTextClass(value, quoteColor, 500);
-  const barTone = (value: number) => positiveNegativeColor(value, quoteColor) === "green" ? "bg-emerald-500" : "bg-rose-500";
+  const barTone = (value: number) => positiveNegativeTone(value, quoteColor) === "green" ? "bg-positive" : "bg-negative";
   const label = (key: string) => t(`profit.attribution.${key}`);
   const displayGroup = (group: { key: string; label: string }) =>
     (dimension === "source" || dimension === "wallet") && group.label === "unknown" ? t("common.unknown") : group.label;

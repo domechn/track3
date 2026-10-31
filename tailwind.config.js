@@ -18,7 +18,8 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: [
-          "Outfit Variable",
+          "Public Sans Variable",
+          "Public Sans",
           "ui-sans-serif",
           "system-ui",
           "-apple-system",
@@ -71,11 +72,23 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        positive: "hsl(var(--positive))",
+        negative: "hsl(var(--negative))",
+        warning: "hsl(var(--warning))",
+        "accent-data": "hsl(var(--accent-data))",
+        gain: "hsl(var(--gain))",
+        loss: "hsl(var(--loss))",
+        raised: "hsl(var(--raised))",
+        sunken: "hsl(var(--sunken))",
+        control: "hsl(var(--control))",
+        rule: "hsl(var(--rule))",
       },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
+        md: "var(--radius)",
         sm: "calc(var(--radius) - 4px)",
+        pill: "var(--radius-pill)",
+        overlay: "var(--radius-overlay)",
       },
       keyframes: {
         "accordion-down": {
@@ -93,6 +106,9 @@ module.exports = {
       },
       boxShadow: {
         glass: "0 8px 32px rgba(0, 0, 0, 0.06)",
+        card: "var(--shadow-card)",
+        overlay: "var(--shadow-overlay)",
+        focus: "var(--focus-ring)",
       },
       width: {
         sidebar: "var(--sidebar-width)",

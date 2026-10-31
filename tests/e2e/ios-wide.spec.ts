@@ -549,7 +549,7 @@ for (const [name, width, height] of viewports) {
             const box = node.getBoundingClientRect();
             return { width: box.width, height: box.height };
           }));
-          expect(targets).toHaveLength(4);
+          expect(targets).toHaveLength(size === "compact" ? 4 : 10);
           for (const box of targets) {
             expect(box.width, `${name} ${theme} ${route} nav target`).toBeGreaterThanOrEqual(44);
             expect(box.height, `${name} ${theme} ${route} nav target`).toBeGreaterThanOrEqual(44);

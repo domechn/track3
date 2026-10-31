@@ -8,6 +8,8 @@ vi.mock("./use-alert-badge", () => ({ useAlertBadge: () => 3 }));
 
 it("announces unread alerts in the main navigation without reading a bare count", () => {
   render(<MemoryRouter><MainNav /></MemoryRouter>);
+  expect(screen.getByRole("group", { name: "Analyze" })).toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "Manage" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Goals & Alerts 3 unread alerts" })).toBeInTheDocument();
   expect(screen.getByText("3")).toHaveAttribute("aria-hidden", "true");
 });

@@ -12,7 +12,7 @@ import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
 import { cn } from "@/lib/utils";
-import { positiveNegativeColor } from "@/utils/color";
+import { positiveNegativeTone } from "@/utils/color";
 import {
   Select,
   SelectContent,
@@ -36,18 +36,18 @@ function getToneClass(value: number, quoteColor: QuoteColor) {
     return "text-muted-foreground";
   }
   const positiveIsGreen = quoteColor === "green-up-red-down";
-  const positiveClass = positiveIsGreen ? "text-emerald-500" : "text-rose-500";
-  const negativeClass = positiveIsGreen ? "text-rose-500" : "text-emerald-500";
+  const positiveClass = positiveIsGreen ? "text-positive" : "text-negative";
+  const negativeClass = positiveIsGreen ? "text-negative" : "text-positive";
   return value > 0 ? positiveClass : negativeClass;
 }
 
 function getToneSurfaceClass(value: number, quoteColor: QuoteColor) {
-  const tone = positiveNegativeColor(value, quoteColor);
+  const tone = positiveNegativeTone(value, quoteColor);
   if (tone === "green") {
-    return "bg-emerald-500/10 border-emerald-500/20";
+    return "bg-positive/10 border-positive/20";
   }
   if (tone === "red") {
-    return "bg-rose-500/10 border-rose-500/20";
+    return "bg-negative/10 border-negative/20";
   }
   return "bg-muted/40 border-border/40";
 }

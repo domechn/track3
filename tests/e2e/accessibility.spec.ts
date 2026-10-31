@@ -10,15 +10,26 @@ const routes = [
   "/settings/systemInfo", "/settings/assistant", "/settings/sync",
 ];
 
-async function contrastOnWhite(text: Locator): Promise<number> {
+async function contrastWithBackground(text: Locator): Promise<number> {
   return text.evaluate((node) => {
-    const [red, green, blue, opacity = 1] = getComputedStyle(node).color.match(/[\d.]+/g)!.map(Number);
-    const linear = (value: number) => {
-      const channel = (value * opacity + 255 * (1 - opacity)) / 255;
-      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-    };
-    const luminance = 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue);
-    return 1.05 / (luminance + 0.05);
+    const channels = (color: string) => color.match(/[\d.]+/g)!.map(Number);
+    const blend = (front: number[], back: number[]) =>
+      front.slice(0, 3).map((channel, index) => channel * (front[3] ?? 1) + back[index] * (1 - (front[3] ?? 1)));
+    const layers: number[][] = [];
+    for (let parent: Element | null = node; parent; parent = parent.parentElement) {
+      const background = channels(getComputedStyle(parent).backgroundColor);
+      if ((background[3] ?? 1) > 0) layers.push(background);
+    }
+    const background = layers.reverse().reduce((back, front) => blend(front, back), [255, 255, 255]);
+    const foreground = blend(channels(getComputedStyle(node).color), background);
+    const luminance = (rgb: number[]) => rgb.slice(0, 3).reduce((sum, value, index) => {
+      const channel = value / 255;
+      const linear = channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      return sum + linear * [0.2126, 0.7152, 0.0722][index];
+    }, 0);
+    const fg = luminance(foreground);
+    const bg = luminance(background);
+    return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
   });
 }
 
@@ -72,8 +83,11 @@ test("shared delete dialog stays in the viewport and restores focus after Escape
   await installTauriBridge(page);
   await page.goto("/#/history");
   await expect(page.getByText("Total 2 records")).toBeVisible();
+  const collapse = page.getByRole("button", { name: "Collapse sidebar" });
+  await expect(collapse).toBeInViewport();
+  await collapse.click();
   const trigger = page.getByTestId("history-delete-latest");
-  await trigger.locator("xpath=ancestor::tr").hover();
+  await trigger.locator("xpath=ancestor::tr").locator("td").first().hover();
   await trigger.click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toBeVisible();
@@ -227,7 +241,7 @@ test("small muted text in assistant sessions and expanded Overview meets AA cont
   await page.goto("/#/assistant");
   await expect(page.getByText("Pinned portfolio review")).toBeVisible();
   for (const label of ["Pinned", "Recent"]) {
-    expect(await contrastOnWhite(page.getByText(label, { exact: true })), label).toBeGreaterThanOrEqual(4.5);
+    expect(await contrastWithBackground(page.getByText(label, { exact: true })), label).toBeGreaterThanOrEqual(4.5);
   }
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Show More" }).click();
@@ -236,7 +250,7 @@ test("small muted text in assistant sessions and expanded Overview meets AA cont
     page.getByText("Value % · Price %"),
     page.locator("[data-testid='tcpc-header-price']"),
     page.locator("[data-testid='tcpc-price'][data-active='false']").first(),
-  ]) expect(await contrastOnWhite(locator)).toBeGreaterThanOrEqual(4.5);
+  ]) expect(await contrastWithBackground(locator)).toBeGreaterThanOrEqual(4.5);
 });
 
 test.describe("coarse pointer", () => {

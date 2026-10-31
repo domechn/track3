@@ -30,7 +30,7 @@ import {
 import { ChartResizeContext } from "@/App";
 import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
-import { chartColors, glassTooltip } from "@/utils/chart-theme";
+import { chartColors, chartThemeColor, glassTooltip } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import AssetLabel from "@/components/common/asset-label";
 import {
@@ -167,7 +167,7 @@ const App = ({
         font: {
           size: 13,
         },
-        labels: { font: {} },
+        labels: { font: {}, color: chartThemeColor("muted-foreground") },
         onHover: (e: any, legendItem: { index: number }, legend: any) =>
           offsetHoveredItemWrapper(chartRef.current)(e, legendItem, legend),
         // disable onclick

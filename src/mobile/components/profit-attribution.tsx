@@ -6,7 +6,7 @@ import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/mobile/i18n";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { positiveNegativeColor, positiveNegativeTextClass } from "@/utils/color";
+import { positiveNegativeTone, positiveNegativeTextClass } from "@/utils/color";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
@@ -45,7 +45,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
   const rounded = (value: number) => Math.round(currencyWrapper(currency)(value) * 100) / 100;
   const format = (value: number) => `${rounded(value) > 0 ? "+" : rounded(value) < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(Math.abs(rounded(value)))}`;
   const tone = (value: number) => positiveNegativeTextClass(rounded(value), quoteColor, 500);
-  const barTone = (value: number) => positiveNegativeColor(value, quoteColor) === "green" ? "var(--ios-gain)" : "var(--ios-loss)";
+  const barTone = (value: number) => positiveNegativeTone(value, quoteColor) === "green" ? "var(--ios-gain)" : "var(--ios-loss)";
   const label = (key: string) => t(`profit.attribution.${key}`);
   const displayGroup = (group: { key: string; label: string }) =>
     (dimension === "source" || dimension === "wallet") && group.label === "unknown" ? t("common.unknown") : group.label;

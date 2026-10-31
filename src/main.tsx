@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "@/App";
-import "@fontsource-variable/outfit";
+import "@fontsource-variable/public-sans";
 import "@fontsource-variable/jetbrains-mono";
 import "./style.css";
 import { trackEventWithClientID } from "./utils/app";
