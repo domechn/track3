@@ -85,8 +85,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
   }
 
   return (
-    <div className={mobile ? "ios-d3-sync-indicator fixed bottom-14 right-4 z-50" : "desktop-sync-status-indicator fixed bottom-14 right-4 z-50"}
-      style={mobile ? { bottom: "calc(env(safe-area-inset-bottom) + 5rem)" } : undefined}>
+    <div className={mobile ? "ios-d3-sync-indicator t3-topbar-sync" : "desktop-sync-status-indicator t3-topbar-sync"}>
       <span role="status" aria-live="polite" className="sr-only">
         {busy ? t("common.loading") : t(`sync.status.${phase}`)}
       </span>
@@ -94,16 +93,19 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
         <PopoverTrigger asChild>
           <button type="button" aria-label={t(`sync.status.${phase}`)} title={muted ? t("sync.status.skipped") : undefined}
             className={muted
-              ? "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-full border border-border bg-background/70 text-muted-foreground shadow-sm opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              : "flex min-h-9 touch:min-h-11 items-center gap-2 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-foreground shadow-sm backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"}>
+              ? "t3-topbar-sync-button flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-full border border-border bg-background/70 text-muted-foreground opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              : "t3-topbar-sync-button flex min-h-9 touch:min-h-11 items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"}>
             {muted ? <LockClosedIcon aria-hidden="true" /> : <>
               <span aria-hidden="true" className={`h-2 w-2 rounded-full ${phase === "error" || phase === "unreadable" ? "bg-destructive" : phase === "conflict" ? "bg-amber-500" : phase === "syncing" ? "bg-primary animate-pulse motion-reduce:animate-none" : "bg-muted-foreground"}`} />
               {t(`sync.status.${phase}`)}
             </>}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" side="top" collisionPadding={16}
-          className={`w-[calc(100vw-2rem)] max-w-72 space-y-3 text-sm ${mobile ? "ios-d3-sync-popover" : ""}`}>
+        <PopoverContent align="end" side="bottom" collisionPadding={16}
+          onInteractOutside={(event) => {
+            if (document.querySelector('[role="alertdialog"]')) event.preventDefault();
+          }}
+          className={`t3-sync-popover w-[calc(100vw-2rem)] max-w-80 space-y-3 text-sm ${mobile ? "ios-d3-sync-popover" : ""}`}>
           <h2 className="font-semibold">{t("sync.status.details")}</h2>
           {status.mode === "unreadable" ? <>
             <p role="alert" className="text-destructive">{t("sync.unreadable")}</p>

@@ -130,6 +130,7 @@ function TopBar({
   const { t } = useTranslation();
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
+  const selectedSnapshots = availableDates.filter((date) => dateRange?.from && dateRange.to && date >= dateRange.from && date <= dateRange.to).length;
 
   return (
     <div className="sticky top-0 z-10 glass-subtle border-b relative">
@@ -143,6 +144,18 @@ function TopBar({
           </div>
         )}
         <div className="ml-auto flex items-center space-x-3">
+          {availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")}>
+            {([10, 30, 50, 100, -1] as const).map((count) => {
+              const selected = count < 0 ? availableDates : availableDates.slice(-count);
+              return <button key={count} type="button"
+                aria-label={count < 0 ? `${t("datePicker.all")} ${t("datePicker.predefined")}` : t(`datePicker.last${count}`)}
+                aria-pressed={count < 0 ? selectedSnapshots === availableDates.length : count <= availableDates.length && selectedSnapshots === count}
+                onClick={() => onDatePickerValueChange(selected.length, { from: selected[0], to: selected[selected.length - 1] })}>
+                {count < 0 ? t("datePicker.all") : count}
+              </button>;
+            })}
+          </div>}
+          <SyncStatusIndicator />
           <DatePicker
             availableDates={availableDates}
             value={dateRange}
@@ -369,6 +382,7 @@ function AppRoutes({
                   currency={currentCurrency}
                   dateRange={tDateRange}
                   quoteColor={quoteColor}
+                  allTimeRange={maxDateRange}
                 />
               </PageWrapper>
             </AnimatedPage>
@@ -553,9 +567,7 @@ const App = () => {
   // Single mount guard reused by both boot and background effects.
   const activeRef = useRef(true);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 640,
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const sidebarResizeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -887,7 +899,6 @@ const App = () => {
   return (
     <div>
       <AutoBackupIndicator status={autoBackupStatus} />
-      <SyncStatusIndicator />
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>
           <FirstRunOnboarding variant="desktop" ready={!initializing} />

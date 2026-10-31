@@ -187,14 +187,14 @@ test("regular and wide Overview charts keep their date labels inside the card", 
     for (const [width, height] of [[744, 1133], [1376, 1032]]) {
       await page.setViewportSize({ width, height });
       await page.goto("/#/overview");
-      await expect(page.locator(".overview-pnl-dates")).toBeVisible();
+      await expect(page.locator(".mobile-hero-dates")).toBeVisible();
       const bounds = await page.evaluate(() => {
-        const card = document.querySelector(".overview-pnl-card")!.getBoundingClientRect();
-        const plot = document.querySelector(".overview-pnl-plot")!.getBoundingClientRect();
-        const dates = document.querySelector(".overview-pnl-dates")!.getBoundingClientRect();
+        const card = document.querySelector(".mobile-hero-card")!.getBoundingClientRect();
+        const plot = document.querySelector(".mobile-hero-chart")!.getBoundingClientRect();
+        const dates = document.querySelector(".mobile-hero-dates")!.getBoundingClientRect();
         return { plotBottom: plot.bottom, datesBottom: dates.bottom, cardBottom: card.bottom, plotHeight: plot.height };
       });
-      expect(bounds.plotHeight).toBeGreaterThanOrEqual(220);
+      expect(bounds.plotHeight).toBeGreaterThanOrEqual(160);
       expect(bounds.plotBottom).toBeLessThanOrEqual(bounds.cardBottom);
       expect(bounds.datesBottom).toBeLessThanOrEqual(bounds.cardBottom);
     }
@@ -586,7 +586,7 @@ for (const [name, width, height] of viewports) {
           })));
           expect(smallTargets, `${name} ${theme} ${route} touch targets`).toEqual([]);
           const overlap = await page.evaluate(() => {
-            for (const selector of [".overview-main-grid", ".profit-metrics-mobile", ".analytics-tile-grid",
+            for (const selector of [".t3-overview-grid", ".profit-metrics-mobile", ".analytics-tile-grid",
               ".cost-metric-grid", ".coin-metric-grid", ".comparison-total-grid", ".ath-metrics",
               ".profit-period-grid", ".history-detail-tools"]) {
               const grid = document.querySelector<HTMLElement>(selector);
@@ -603,24 +603,19 @@ for (const [name, width, height] of viewports) {
           });
           expect(overlap, `${name} ${theme} ${route}`).toBeNull();
           if (route === "overview" && size === "wide") {
-            const columns = await page.locator(".overview-main-grid").evaluate((node) =>
+            const columns = await page.locator(".t3-overview-grid").evaluate((node) =>
               getComputedStyle(node).gridTemplateColumns.split(" ").length);
-            expect(columns).toBe(2);
-            const allocation = await page.evaluate(() => {
-              const chart = document.querySelector(".overview-sections .overview-allocation-card .mobile-allocation-chart")!.getBoundingClientRect();
-              const rows = document.querySelector(".overview-sections .overview-allocation-card .mobile-allocation-rows")!.getBoundingClientRect();
-              return { chartRight: chart.right, rowsLeft: rows.left,
-                verticalOverlap: Math.min(chart.bottom, rows.bottom) - Math.max(chart.top, rows.top) };
-            });
-            expect(allocation.chartRight, `${name} ${theme} allocation columns`).toBeLessThan(allocation.rowsLeft);
-            expect(allocation.verticalOverlap, `${name} ${theme} allocation columns`).toBeGreaterThan(50);
+            expect(columns).toBe(12);
+            const holdings = page.locator(".t3-grid-holdings");
+            await expect(holdings.locator(".t3-holdings-row").first()).toBeVisible();
+            expect(await holdings.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
           }
           if (route === "overview" && size !== "compact") {
-            await expect(page.locator(".overview-pnl-dates")).toBeVisible();
+            await expect(page.locator(".mobile-hero-dates")).toBeVisible();
             const chart = await page.evaluate(() => {
-              const card = document.querySelector(".overview-pnl-card")!.getBoundingClientRect();
-              const plot = document.querySelector(".overview-pnl-plot")!.getBoundingClientRect();
-              const dates = document.querySelector(".overview-pnl-dates")!.getBoundingClientRect();
+              const card = document.querySelector(".mobile-hero-card")!.getBoundingClientRect();
+              const plot = document.querySelector(".mobile-hero-chart")!.getBoundingClientRect();
+              const dates = document.querySelector(".mobile-hero-dates")!.getBoundingClientRect();
               return { plotBottom: plot.bottom, datesBottom: dates.bottom, cardBottom: card.bottom };
             });
             expect(chart.plotBottom, `${name} ${theme} plot`).toBeLessThanOrEqual(chart.cardBottom);

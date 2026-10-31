@@ -50,9 +50,11 @@ const chartName = "Percentage of Assets";
 const App = ({
   currency,
   dateRange,
+  holdings = false,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
+  holdings?: boolean;
 }) => {
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
@@ -101,6 +103,7 @@ const App = ({
   useEffect(() => resizeChart(chartName), [needResize]);
 
   useEffect(() => {
+    if (holdings) return;
     let active = true;
 
     // download coin logos
@@ -123,7 +126,7 @@ const App = ({
     return () => {
       active = false;
     };
-  }, [latestAssetsPercentageData]);
+  }, [latestAssetsPercentageData, holdings]);
 
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
@@ -380,6 +383,25 @@ const App = ({
       </div>}
     </>;
   }
+
+  if (holdings) return (
+    <Card className="t3-overview-panel t3-holdings-panel">
+      <header className="t3-overview-panel-heading">
+        <h2>{t("overview.design.holdings")}</h2>
+        <span>{t("overview.design.assetCount").replace("{count}", String(latestAssetsPercentageData.length))}</span>
+      </header>
+      <div className="t3-holdings-head"><span>{t("overview.design.asset")}</span><span>{t("overview.design.amount")}</span><span>{t("overview.design.value")}</span></div>
+      <div className="t3-holdings-body">
+        {latestAssetsPercentageData.map((asset) => <Link key={getAssetLogoKey({ symbol: asset.coin, assetType: asset.assetType })}
+          to={buildAssetDetailsPath({ symbol: asset.coin, assetType: asset.assetType })}
+          className="t3-holdings-row">
+          <span><span className="sr-only">{t("common.openAssetDetails").replace("{asset}", formatAssetLabel({ symbol: asset.coin, assetType: asset.assetType }))} </span><strong>{asset.coin}</strong><small>{asset.percentage.toFixed(1)}%</small></span>
+          <span>{asset.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+          <span>{currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(asset.value))}</span>
+        </Link>)}
+      </div>
+    </Card>
+  );
 
   return (
     <div>

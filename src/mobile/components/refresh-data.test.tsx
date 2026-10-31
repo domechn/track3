@@ -15,6 +15,8 @@ import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-s
 import axe from "axe-core";
 import { isIOS } from "@/utils/platform";
 import { isProVersion } from "@/middlelayers/license";
+import { RefreshButtonLoadingContext } from "@/mobile/components/index";
+import { writeStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 vi.mock("@/utils/platform", async (original) => ({
   ...await original<typeof import("@/utils/platform")>(), isIOS: vi.fn(() => false),
 }));
@@ -641,7 +643,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     const indicator = await screen.findByRole("button", { name: "Source status" });
-    expect(indicator).toHaveClass("text-amber-900");
+    expect(indicator).toHaveAttribute("data-tone", "warn");
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(mockToast).toHaveBeenCalledTimes(1);
     expect(mockToast.mock.calls[0][0].description).toContain("Partial sources: Coinbase");
@@ -710,6 +712,27 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(screen.getByRole("button", { name: "Source status" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Source status" }));
     expect(screen.getByText("Private wallet")).toBeInTheDocument();
+  });
+
+  it("keeps saved source status available while refresh is running", async () => {
+    writeStoredStatuses([
+      { sourceId: "btc:0", label: "Private wallet", status: "failed", category: "network" },
+    ]);
+    vi.mocked(refreshAllData).mockImplementation(() => new Promise(() => {}));
+    function RefreshWithLoadingState() {
+      const [loading, setLoading] = React.useState(false);
+      return <RefreshButtonLoadingContext.Provider value={{
+        buttonLoading: loading, setButtonLoading: setLoading, progress: 0, setProgress: vi.fn(), refreshAction: mockRefreshAction,
+      }}><RefreshData loading={loading} /></RefreshButtonLoadingContext.Provider>;
+    }
+    render(<RefreshWithLoadingState />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled());
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+    const status = screen.getByRole("button", { name: "Source status" });
+    expect(status).toBeEnabled();
+    fireEvent.click(status);
+    expect(screen.getByRole("alertdialog", { name: "Source status" })).toHaveTextContent("Refreshing portfolio");
   });
 
   it("offers a full retry of failed sources after restarting", async () => {

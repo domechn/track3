@@ -23,10 +23,12 @@ const App = ({
   currency,
   dateRange,
   quoteColor,
+  compact = false,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  compact?: boolean;
 }) => {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -102,13 +104,13 @@ const App = ({
   }
 
   return (
-    <div className={isMobile ? "" : "h-full"}>
-      <Card className={`flex flex-col overview-pnl-card${isMobile ? "" : " h-full"}`}>
-        <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2 overview-pnl-card-header${isMobile ? " hidden" : ""}`}>
+    <div className={compact ? "t3-pnl-compact" : isMobile ? "" : "h-full"}>
+      <Card className={compact ? "t3-pnl-compact-card overview-pnl-card" : `flex flex-col overview-pnl-card${isMobile ? "" : " h-full"}`}>
+        {!compact && <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2 overview-pnl-card-header${isMobile ? " hidden" : ""}`}>
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("pnl.title")}
           </CardTitle>
-        </CardHeader>
+        </CardHeader>}
         <CardContent className="flex flex-1 flex-col overview-pnl-card-content">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 overview-pnl-metrics">
             <div
@@ -172,12 +174,12 @@ const App = ({
               </p>
             </div>
           </div>
-          <PNLChart
+          {!compact && <PNLChart
             currency={currency}
             dateRange={dateRange}
             quoteColor={quoteColor}
             className="overview-pnl-chart min-h-[120px] flex-1"
-          />
+          />}
         </CardContent>
       </Card>
     </div>

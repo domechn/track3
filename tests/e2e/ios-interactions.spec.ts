@@ -82,13 +82,13 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
-  await expect(page.locator(".overview-source-row").first()).toBeVisible();
-  await page.locator(".overview-source-row").first().scrollIntoViewIfNeeded();
+  await expect(page.locator(".t3-holdings-row").first()).toBeVisible();
+  await page.locator(".t3-holdings-row").first().scrollIntoViewIfNeeded();
   await page.evaluate(() => scrollTo(0, Math.max(scrollY, 450)));
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
   const before = await page.evaluate(() => scrollY);
-  await page.locator(".overview-source-row").first().click();
-  await expect(page).toHaveURL(/#\/wallets$/);
+  await page.locator(".t3-holdings-row").first().click();
+  await expect(page).toHaveURL(/#\/coins\//);
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
@@ -116,7 +116,7 @@ test("Back to an expanded Overview rank list restores its scroll", async ({ page
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Show More" }).click();
+  await page.getByRole("button", { name: "Show More: More analytics" }).click();
   const row = page.locator(".top-coins-rank-mobile .mobile-list-row").first();
   await row.scrollIntoViewIfNeeded();
   const before = await page.evaluate(() => scrollY);
@@ -125,10 +125,10 @@ test("Back to an expanded Overview rank list restores its scroll", async ({ page
   await expect(page).toHaveURL(/#\/coins\//);
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect(page).toHaveURL(/#\/overview$/);
-  await expect(page.getByRole("button", { name: "Show Less" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show Less: Less analytics" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
-  await expect(page.getByRole("button", { name: "Show More" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show More: More analytics" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
 });
 
@@ -424,7 +424,7 @@ test("an active root tap clears a route fragment and scrolls to the top", async 
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview#details");
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-  await expect(page.locator(".overview-source-row").first()).toBeVisible();
+  await expect(page.locator(".t3-holdings-row").first()).toBeVisible();
   await page.evaluate(() => scrollTo(0, 220));
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(220);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();

@@ -83,9 +83,9 @@ test("shared delete dialog stays in the viewport and restores focus after Escape
   await installTauriBridge(page);
   await page.goto("/#/history");
   await expect(page.getByText("Total 2 records")).toBeVisible();
-  const collapse = page.getByRole("button", { name: "Collapse sidebar" });
-  await expect(collapse).toBeInViewport();
-  await collapse.click();
+  const expand = page.getByRole("button", { name: "Expand sidebar" });
+  await expect(expand).toBeInViewport();
+  await expand.click();
   const trigger = page.getByTestId("history-delete-latest");
   await trigger.locator("xpath=ancestor::tr").locator("td").first().hover();
   await trigger.click();
@@ -547,6 +547,7 @@ test("refresh status dialog fits and has no axe violations", async ({ page }) =>
   await page.getByRole("button", { name: "Refresh" }).click();
   const trigger = page.getByRole("button", { name: "Source status" });
   await expect(trigger).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh" })).toBeEnabled();
   await trigger.click();
   const dialog = page.getByRole("alertdialog", { name: "Source status" });
   await expect(dialog).toBeVisible();

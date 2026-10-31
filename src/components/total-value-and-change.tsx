@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AssetChangeData,
   CurrencyRateDetail,
@@ -26,7 +26,7 @@ import { ChartResizeContext } from "@/App";
 import { positiveNegativeTextClass } from "@/utils/color";
 import {
   chartColors,
-  createGradientFill,
+  chartThemeColor,
   glassScaleOptions,
   glassTooltip,
 } from "@/utils/chart-theme";
@@ -170,10 +170,16 @@ const App = ({
   currency,
   dateRange,
   quoteColor,
+  metrics,
+  ath,
+  bestDay,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  metrics?: ReactNode;
+  ath?: { timestamp: number; value: number; distanceFromAth?: number };
+  bestDay?: { timestamp: number; value: number };
 }) => {
   const lineColor = chartColors[0].main;
   const { t } = useTranslation();
@@ -359,6 +365,7 @@ const App = ({
     () => ({
       maintainAspectRatio: false,
       responsive: true,
+      animation: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? false : { duration: 350 },
       onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
       hover: {
         mode: "index",
@@ -382,6 +389,7 @@ const App = ({
         },
         tooltip: {
           ...glassTooltip,
+          filter: (item: { datasetIndex: number }) => item.datasetIndex === 0,
           callbacks: {
             label: (context: { parsed: { y: number } }) => {
               const v = context.parsed.y.toLocaleString();
@@ -462,6 +470,10 @@ const App = ({
   );
 
   const lineDataMemo = useMemo(() => {
+    const high = !ath || btcAsBase || !plottedTimestamps.length ? undefined
+      : showPercentageInChart
+        ? firstTotalValue ? ath.value / firstTotalValue * 100 - 100 : undefined
+        : currencyWrapper(currency)(ath.value);
     return {
       labels: plottedTimestamps.map((x) => timeToDateStr(x)),
       datasets: [
@@ -469,34 +481,36 @@ const App = ({
           label: "Value",
           data: plottedIndices.map((index) => lineValues[index]),
           borderColor: lineColor,
-          backgroundColor: (context: any) => {
-            const { chart } = context;
-            const { ctx, chartArea } = chart;
-            if (!chartArea) {
-              return chartColors[0].bg;
-            }
-            return createGradientFill(ctx, chartArea, lineColor);
-          },
+          backgroundColor: "transparent",
           borderWidth: 2,
-          tension: 0.4,
+          tension: 0,
           pointRadius: 0,
           pointStyle: "rotRect",
-          fill: "start",
+          fill: false,
         },
+        ...(high === undefined ? [] : [{
+          label: t("overview.design.ath"),
+          data: plottedTimestamps.map(() => high),
+          borderColor: chartThemeColor("faint", 0.6),
+          borderWidth: 1,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          fill: false,
+        }]),
       ],
     };
-  }, [plottedTimestamps, plottedIndices, lineValues, lineColor]);
+  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t]);
 
   return (
-    <div className="h-full">
+    <div className={metrics ? "h-full t3-total-overview" : "h-full"}>
       <Card
-        className="flex h-full flex-col"
+        className="flex h-full flex-col t3-hero-card"
         onMouseEnter={() => setShowValue(true)}
         onMouseLeave={() => setShowValue(false)}
       >
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-row items-center justify-between pb-2 t3-hero-header">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t("totalValue.title").replace("{currency}", totalValueShower.currencyName())}
+            {metrics ? t("overview.design.totalValue") : t("totalValue.title").replace("{currency}", totalValueShower.currencyName())}
           </CardTitle>
           <div className="flex space-x-2">
             <Button
@@ -552,11 +566,11 @@ const App = ({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col">
-          <div className="text-2xl font-semibold font-mono tabular-nums tracking-tight">
+        <CardContent className="flex flex-1 flex-col t3-hero-content">
+          <div className="text-2xl font-semibold font-mono tabular-nums tracking-tight t3-hero-value">
             {totalValueShower.formatTotalValue()}
           </div>
-          <p className="text-xs text-muted-foreground mb-2">
+          <p className="text-xs text-muted-foreground mb-2 t3-hero-change">
             <span
               className={`tabular-nums ${changePercentageColorClass(
                 totalValueShower,
@@ -568,13 +582,24 @@ const App = ({
             </span>{" "}
             {t("totalValue.from").replace("{date}", firstDate)}
           </p>
-          <div className="min-h-[120px] flex-1">
+          {metrics}
+          <div className="min-h-[120px] flex-1 t3-hero-chart">
+            {bestDay && <div className="t3-chart-best-day">{t("overview.design.bestDay")
+              .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" }))
+              .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(bestDay.value)))}`)}</div>}
             <Line role="img" aria-label={t("totalValue.chartSummary")
               .replace("{value}", totalValueShower.formatTotalValue())
               .replace("{change}", changedValueOrPercentage)
               .replace("{date}", firstDate)}
               options={options as any} data={lineDataMemo} />
           </div>
+          {ath && <div className="t3-ath-note">
+            <span>{t("overview.design.ath")}</span>
+            <strong>{currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(ath.value))}</strong>
+            <span>{new Date(ath.timestamp).toLocaleDateString()}</span>
+            <span>{ath.distanceFromAth === undefined ? "—" : t("overview.design.belowAth")
+              .replace("{percent}", Math.abs(ath.distanceFromAth).toFixed(2))}</span>
+          </div>}
         </CardContent>
       </Card>
     </div>

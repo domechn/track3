@@ -9,7 +9,7 @@ vi.mock("@/middlelayers/charts", () => ({
   queryPNLTableValue: vi.fn(),
   resizeChart: vi.fn(),
 }));
-vi.mock("./pnl-chart", () => ({ default: () => null }));
+vi.mock("./pnl-chart", () => ({ default: () => <div data-testid="pnl-chart" /> }));
 
 const currency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 const dateRange = { start: new Date("2024-01-01"), end: new Date("2024-02-01") };
@@ -44,6 +44,13 @@ it.each([
   if (change === 0) {
     expect(screen.getByText("Last PNL").parentElement?.querySelector("p")).toHaveTextContent("$0.00");
   }
+});
+
+it("renders metrics without a second chart inside the overview hero", async () => {
+  vi.mocked(queryPNLTableValue).mockResolvedValue({ latestTotalValue: 100, todayPNL: { value: 10, timestamp: 1 } });
+  render(<ChartResizeContext.Provider value={resize}><PNL currency={currency} dateRange={dateRange} quoteColor="green-up-red-down" compact /></ChartResizeContext.Provider>);
+  await waitFor(() => expect(screen.getByText("Last PNL").parentElement).toHaveTextContent("+11.11%"));
+  expect(screen.queryByTestId("pnl-chart")).not.toBeInTheDocument();
 });
 
 it.each([

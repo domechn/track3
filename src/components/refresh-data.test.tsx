@@ -531,7 +531,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     const indicator = await screen.findByRole("button", { name: "Source status" });
-    expect(indicator).toHaveClass("text-amber-900");
+    expect(indicator).toHaveAttribute("data-tone", "warn");
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(mockToast).toHaveBeenCalledTimes(1);
     expect(mockToast.mock.calls[0][0].description).toContain("Partial sources: Coinbase");

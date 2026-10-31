@@ -93,36 +93,36 @@ test("data screens expose grouped history and analytics destinations", async ({ 
   }
 });
 
-test("phone P&L bars expose a value chip while scrubbing", async ({ browser }) => {
+test("phone Overview trend exposes a value chip while scrubbing", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
-    const plot = page.locator(".overview-pnl-plot").first();
+    const plot = page.locator(".mobile-hero-chart").first();
     await expect(plot.locator("canvas")).toBeVisible();
     await plot.scrollIntoViewIfNeeded();
     const box = (await plot.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(plot.locator(".pnl-scrub-chip")).toBeVisible();
-    await expect(plot.locator(".pnl-scrub-chip")).toContainText("$");
+    await expect(plot.locator(".mobile-chart-chip")).toBeVisible();
+    await expect(plot.locator(".mobile-chart-chip")).toContainText("$");
   } finally {
     await context.close();
   }
 });
 
-test("a phone tap on P&L bars keeps the value chip visible", async ({ browser }) => {
+test("a phone tap on the Overview trend keeps the value chip visible", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
-    const plot = page.locator(".overview-pnl-plot").first();
+    const plot = page.locator(".mobile-hero-chart").first();
     await expect(plot.locator("canvas")).toBeVisible();
     await plot.scrollIntoViewIfNeeded();
     const box = (await plot.boundingBox())!;
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(plot.locator(".pnl-scrub-chip")).toBeVisible();
+    await expect(plot.locator(".mobile-chart-chip")).toBeVisible();
   } finally {
     await context.close();
   }
@@ -347,40 +347,27 @@ test("review screenshots have several assets and a multi-month trend", async ({ 
   try {
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
-    await expect(page.locator(".mobile-allocation-row")).toHaveCount(5, { timeout: 5_000 });
-    await expect(page.locator(".overview-source-row")).toHaveCount(3);
-    await expect(page.locator(".overview-source-row").first()).toContainText("$");
-    await expect(page.locator(".overview-source-row").first()).toContainText("%");
-    await expect(page.locator(".overview-source-row").first()).toContainText(/BTC|Coinbase|IBKR/);
-    await expect(page.locator(".overview-source-row img").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Next token holdings page" })).toBeVisible();
+    await expect(page.locator(".t3-holdings-row")).toHaveCount(7, { timeout: 5_000 });
+    await expect(page.locator(".t3-holdings-row").first()).toContainText("$");
+    await expect(page.locator(".t3-holdings-row").first()).toContainText("%");
+    await expect(page.locator(".t3-holdings-panel")).toContainText("BTC");
+    await expect(page.locator(".t3-holdings-panel")).toContainText("USDC");
     await expect(page.locator(".mobile-hero-value")).not.toContainText("$42,000.00");
     await expect(page.locator(".mobile-hero-dates")).toContainText("Aug 24");
     await expect(page.locator(".mobile-hero-dates")).toContainText("Oct 22");
-    const movers = (await page.locator(".profit-mobile-list").allTextContents()).join(" ");
-    expect(movers).toMatch(/\+\$/);
-    expect(movers).toMatch(/-\$/);
-    const chart = page.locator(".overview-main-grid canvas").last();
+    const movers = (await page.locator(".t3-moved-list").allTextContents()).join(" ");
+    expect(movers).toMatch(/[+−]\$/);
+    const chart = page.locator(".mobile-hero-chart canvas");
     const initialHeight = (await chart.boundingBox())?.height;
     expect(initialHeight).toBeGreaterThanOrEqual(150);
     expect(initialHeight).toBeLessThanOrEqual(190);
     await page.waitForTimeout(500);
     expect((await chart.boundingBox())?.height).toBe(initialHeight);
-    expect(await page.locator(".mobile-hero-value").evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(44);
-    await expect(page.locator(".mobile-allocation-row .mobile-allocation-swatch")).toHaveCount(5);
-    await expect(page.locator(".mobile-allocation-center")).toContainText("$");
-    await expect(page.locator(".mobile-allocation-rows")).toContainText("6,400");
-    await expect(page.locator(".overview-main-grid > :nth-child(2)")).not.toContainText("PNL Analysis");
-    await expect(page.locator(".mobile-allocation-center")).not.toContainText("Allocation");
-    await expect(page.locator(".overview-movers-card")).toContainText("Net P&L for selected range");
-    await expect(page.locator(".overview-movers-card .mobile-movers-total > div:last-child")).toContainText(/[+-]\d/);
-    await expect(page.locator(".overview-movers-card .mobile-delta-pill")).toHaveAttribute("data-tone", "gain");
-    expect(await page.locator(".overview-movers-card .mobile-delta-pill").evaluate((node) => getComputedStyle(node).backgroundColor))
-      .toBe(await page.locator(".mobile-hero-change .mobile-delta-pill").evaluate((node) => getComputedStyle(node).backgroundColor));
-    await expect(page.locator(".profit-mobile-list")).toHaveCount(2);
-    const [gains, losses] = await page.locator(".profit-mobile-list").allTextContents();
-    expect(gains).not.toContain("-$");
-    expect(losses).not.toContain("+$");
+    expect(await page.locator(".mobile-hero-value").evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(32);
+    await expect(page.locator(".t3-daily-column")).toHaveCount(59);
+    await expect(page.locator(".t3-moved-list li")).toHaveCount(7);
+    await expect(page.locator(".t3-top-row")).toHaveCount(3);
+    await expect(page.locator(".t3-sources-panel")).toContainText("Refresh to see source status.");
     await expect(page.getByRole("region", { name: "Insights" })).not.toContainText("No significant changes yet");
     await expect(page.getByRole("region", { name: "Insights" })).toContainText("$7,298.27");
     await expect(page.locator(".mobile-hero-change")).not.toContainText("2026-");
@@ -404,29 +391,17 @@ test("Overview cards and source labels fit the phone layout", async ({ browser }
   try {
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
-    await expect(page.locator(".overview-source-row")).toHaveCount(3);
-    const pnl = page.locator(".overview-pnl-card");
-    const wrapper = page.locator(".overview-pnl-section");
-    await expect(pnl).toHaveCount(1);
-    await expect(wrapper).toHaveCount(1);
-    await expect(pnl.locator(".overview-pnl-card-content")).toHaveCSS("padding-right", "18px");
-    await expect(pnl.locator(".overview-pnl-metric").nth(1)).toHaveCSS("border-right-width", "0px");
-    await expect(pnl.locator(".overview-pnl-metric").last()).toHaveCSS("border-right-width", "0px");
-    expect(await pnl.locator(".overview-pnl-metric-value").first().evaluate((node) => getComputedStyle(node).fontFamily))
-      .toContain("Public Sans");
-    expect((await pnl.boundingBox())!.y + (await pnl.boundingBox())!.height)
-      .toBeLessThanOrEqual((await wrapper.boundingBox())!.y + (await wrapper.boundingBox())!.height + 1);
-    for (const row of await page.locator(".overview-source-row").all()) {
-      const title = row.locator(".overview-source-name strong");
-      const subtitle = row.locator(".overview-source-name span");
-      await expect(title).toHaveCount(1);
-      await expect(subtitle).toHaveCount(1);
-      await expect(title).toHaveCSS("text-overflow", "ellipsis");
-      expect(await title.evaluate((node) => node.scrollHeight)).toBeLessThanOrEqual(
-        await title.evaluate((node) => node.clientHeight + 1));
+    const hero = page.locator(".mobile-hero-card");
+    await expect(hero).toBeVisible();
+    await expect(hero.locator(".overview-pnl-metric")).toHaveCount(3);
+    expect(await hero.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+    await expect(page.locator(".t3-holdings-row")).toHaveCount(7);
+    for (const row of await page.locator(".t3-holdings-row").all()) {
+      expect(await row.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
     }
-    expect(await page.locator(".overview-source-name strong").first().evaluate((node) => node.scrollWidth))
-      .toBeLessThanOrEqual(await page.locator(".overview-source-name strong").first().evaluate((node) => node.clientWidth + 1));
+    const sourceCard = page.locator(".t3-sources-panel");
+    await expect(sourceCard).toBeVisible();
+    await expect(sourceCard.getByRole("link", { name: "Manage sources" })).toBeVisible();
   } finally {
     await context.close();
   }
@@ -438,7 +413,7 @@ test("scrolled bars keep text behind them quiet when blur is unavailable", async
   try {
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
-    await expect(page.locator(".mobile-allocation-row")).toHaveCount(5);
+    await expect(page.locator(".t3-holdings-row")).toHaveCount(7);
     await page.evaluate(() => window.scrollTo(0, 700));
     await expect(page.locator("#app-top-bar")).toHaveClass(/mobile-topbar-collapsed/);
     for (const selector of ["#app-top-bar", ".mobile-tab-bar"]) {
@@ -652,7 +627,7 @@ for (const size of sizes) {
         }
         if (route === "overview") {
           await expect(page.locator(".mobile-hero-value")).toBeVisible();
-          await expect(page.locator(".mobile-allocation-row")).toHaveCount(5);
+          await expect(page.locator(".t3-holdings-row")).toHaveCount(7);
         }
         await page.evaluate(() => document.fonts.ready);
         const screenshot = await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-${route.replace("/", "-")}.png` });
@@ -699,16 +674,16 @@ for (const size of sizes) {
       if (size.width === 320 || size.width === 375 || size.width === 390 || size.width === 430) {
         await page.goto("/#/overview");
         await page.reload();
-        await expect(page.locator(".mobile-allocation-row")).toHaveCount(5);
-        await page.locator(".overview-main-grid > :nth-child(2)").evaluate((card) =>
+        await expect(page.locator(".t3-holdings-row")).toHaveCount(7);
+        await page.locator(".t3-grid-holdings").evaluate((card) =>
           window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
-        await expect.poll(() => page.locator(".overview-main-grid > :nth-child(2)")
+        await expect.poll(() => page.locator(".t3-grid-holdings")
           .evaluate((card) => Math.round(card.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-performance.png` });
-        await page.locator(".overview-allocation-card").scrollIntoViewIfNeeded();
-        await page.locator(".overview-allocation-card").evaluate((card) =>
+        await page.locator(".t3-grid-daily").scrollIntoViewIfNeeded();
+        await page.locator(".t3-grid-daily").evaluate((card) =>
           window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
-        await expect.poll(() => page.locator(".overview-allocation-card")
+        await expect.poll(() => page.locator(".t3-grid-daily")
           .evaluate((card) => Math.round(card.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await expect(page.locator(".mobile-header-total-value")).toBeVisible();
         await expect(page.locator(".mobile-header-total-value")).toHaveText(
@@ -717,10 +692,10 @@ for (const size of sizes) {
         expect(await page.locator(".mobile-header-total-value").evaluate((node) =>
           node.scrollWidth <= node.clientWidth + 1)).toBe(true);
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-details.png` });
-        await page.locator(".overview-movers-card").evaluate((card) =>
+        await page.locator(".t3-grid-moved").evaluate((card) =>
           window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-movers.png` });
-        await page.locator(".overview-source-teaser").scrollIntoViewIfNeeded();
+        await page.locator(".t3-grid-sources").scrollIntoViewIfNeeded();
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-bottom.png` });
         await page.emulateMedia({ colorScheme: "dark" });
         await page.evaluate(() => localStorage.setItem("track3-ui-theme", "system"));
@@ -756,23 +731,23 @@ for (const size of sizes) {
         }
         await page.goto("/#/overview");
         await page.reload();
-        await expect(page.locator(".mobile-allocation-row")).toHaveCount(5);
-        await page.locator(".overview-main-grid > :nth-child(2)").evaluate((card) =>
+        await expect(page.locator(".t3-holdings-row")).toHaveCount(7);
+        await page.locator(".t3-grid-holdings").evaluate((card) =>
           window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
-        await expect.poll(() => page.locator(".overview-main-grid > :nth-child(2)")
+        await expect.poll(() => page.locator(".t3-grid-holdings")
           .evaluate((card) => Math.round(card.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-performance-dark.png` });
-        await page.locator(".overview-allocation-card").scrollIntoViewIfNeeded();
-        await page.locator(".overview-allocation-card").evaluate((card) =>
+        await page.locator(".t3-grid-daily").scrollIntoViewIfNeeded();
+        await page.locator(".t3-grid-daily").evaluate((card) =>
           window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
-        await expect.poll(() => page.locator(".overview-allocation-card")
+        await expect.poll(() => page.locator(".t3-grid-daily")
           .evaluate((card) => Math.round(card.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await expect(page.locator(".mobile-header-total-value")).toBeVisible();
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-details-dark.png` });
-        await page.locator(".overview-movers-card").evaluate((card) =>
+        await page.locator(".t3-grid-moved").evaluate((card) =>
           window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-movers-dark.png` });
-        await page.locator(".overview-source-teaser").scrollIntoViewIfNeeded();
+        await page.locator(".t3-grid-sources").scrollIntoViewIfNeeded();
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-bottom-dark.png` });
       }
     } finally {

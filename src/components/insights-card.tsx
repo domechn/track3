@@ -65,7 +65,7 @@ export default function InsightsCard({ currency }: { currency?: CurrencyRateDeta
   };
 
   return (
-    <Card className="min-h-[104px]" role="region" aria-label={t("insights.title")}>
+    <Card className="t3-insights-card min-h-[104px]" role="region" aria-label={t("insights.title")}>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 pb-2 pt-4 sm:px-6">
         <CardTitle className="text-base">{t("insights.title")}</CardTitle>
         <Button size="sm" variant="ghost" onClick={() => void regenerate()} disabled={regenerating}

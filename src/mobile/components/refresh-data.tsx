@@ -8,6 +8,7 @@ import type { PortfolioSourceResult, PortfolioSourceStatus } from "@/middlelayer
 import { v4 as uuidv4 } from "uuid";
 import { trackRefreshEvent } from "@/middlelayers/ui-state/telemetry";
 import { retries, retryInterval, readStoredStatuses, writeStoredStatuses, retryRefresh, mobileRefreshOptions } from "@/middlelayers/ui-state/source-status-store";
+import { publishSourceStatuses } from "@/components/source-status-event";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -122,6 +123,7 @@ const App = ({
         } catch {
           // The current session still shows the warning when storage is unavailable.
         }
+        publishSourceStatuses(statuses);
       }
       setLastResult(result);
       if (succeeded) {
@@ -245,10 +247,10 @@ const App = ({
   const failedNames = failedStatuses.map(displayIdentity).join(", ");
   const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
-    ok: "border-green-600/30 bg-green-600/10 text-green-800 dark:text-green-300",
-    stale: "border-amber-600/30 bg-amber-600/10 text-amber-900 dark:text-amber-300",
-    partial: "border-amber-600/30 bg-amber-600/10 text-amber-900 dark:text-amber-300",
-    failed: "border-red-600/30 bg-red-600/10 text-red-800 dark:text-red-300",
+    ok: "t3-pill t3-refresh-status-pill",
+    stale: "t3-pill t3-refresh-status-pill",
+    partial: "t3-pill t3-refresh-status-pill",
+    failed: "t3-pill t3-refresh-status-pill",
   };
   const statusIcon = { ok: CheckIcon, stale: ExclamationTriangleIcon,
     partial: ExclamationTriangleIcon, failed: CrossCircledIcon };
@@ -270,26 +272,27 @@ const App = ({
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="t3-refresh-controls flex items-center gap-2">
       <span role="status" className="sr-only">{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
-      <Button variant="outline" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
+      <Button variant="outline" className="t3-refresh-button" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
         <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
         <p className="hidden sm:inline-block">{t("common.refresh")}</p>
       </Button>
       {sourceStatuses.length > 0 && (
         <Button
-          variant={hasFailure ? "destructive" : "outline"}
+          variant="outline"
           size="sm"
-          className={!hasFailure && hasPartial ? "text-amber-900 dark:text-amber-300" : undefined}
+          className="t3-refresh-source-trigger"
+          data-tone={hasFailure ? "err" : hasPartial ? "warn" : "ok"}
           onClick={() => setStatusDialogOpen(true)}
-          disabled={refreshLoading || preflightPending}
+          disabled={preflightPending}
         >
           {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
           {t("refresh.sourceStatus")}
         </Button>
       )}
       <AlertDialog open={!!preflight} onOpenChange={(open) => { if (!open) setPreflight(null); }}>
-        <AlertDialogContent className={isIOS() ? "ios-d3-refresh-sheet bottom-0 left-0 top-auto max-h-[90dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+1rem)]" : "sm:max-w-md"}>
+        <AlertDialogContent overlayProps={isIOS() ? undefined : { className: "t3-refresh-overlay" }} className={isIOS() ? "ios-d3-refresh-sheet t3-refresh-popover bottom-0 left-0 top-auto max-h-[90dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+1rem)]" : "t3-refresh-popover sm:max-w-md"}>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("refresh.preflight.title")}</AlertDialogTitle>
             <AlertDialogDescription asChild><div className="space-y-2">
@@ -312,9 +315,9 @@ const App = ({
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <AlertDialogContent className={isIOS()
-          ? "ios-d3-refresh-sheet bottom-0 left-0 top-auto max-h-[90dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+1rem)]"
-          : "sm:max-w-md"}>
+        <AlertDialogContent overlayProps={isIOS() ? undefined : { className: "t3-refresh-overlay" }} className={isIOS()
+          ? "ios-d3-refresh-sheet t3-refresh-popover bottom-0 left-0 top-auto max-h-[90dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+          : "t3-refresh-popover sm:max-w-md"}>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("refresh.sourceStatus")}</AlertDialogTitle>
             <AlertDialogDescription>
@@ -349,7 +352,7 @@ const App = ({
               const StatusIcon = completed?.status === "stale" || completed?.status === "partial" ? ExclamationTriangleIcon
                   : completed ? CheckIcon : UpdateIcon;
               const label = sourceLabel(pending);
-              return <div key={pending.sourceId} data-source-status-row role="group" aria-label={label} className="ios-d3-refresh-row flex items-center justify-between gap-3 px-4 py-3">
+              return <div key={pending.sourceId} data-source-status-row role="group" aria-label={label} className="ios-d3-refresh-row t3-refresh-source-row flex items-center justify-between gap-3 px-4 py-3">
                 <div className="ios-d3-refresh-row-main">
                   <StatusIcon aria-hidden="true" className={`h-5 w-5 shrink-0 ${completed ? completed.status === "stale" || completed.status === "partial" ? "text-amber-600" : "text-green-600 dark:text-green-400" : "animate-spin text-primary motion-reduce:animate-none"}`} />
                   <div className="ios-d3-refresh-row-content">
@@ -369,7 +372,7 @@ const App = ({
               const StatusIcon = statusIcon[source.status];
               return (
               <div key={source.sourceId} role="group" aria-label={displayIdentity(source)}
-                data-source-status-row className="ios-d3-refresh-row flex items-center justify-between gap-3 px-4 py-3">
+                data-source-status-row className="ios-d3-refresh-row t3-refresh-source-row flex items-center justify-between gap-3 px-4 py-3">
                 <div className="ios-d3-refresh-row-main">
                   {isIOS() && <StatusIcon aria-hidden="true" className={`mt-1 h-5 w-5 shrink-0 ${source.status === "ok" ? "text-green-600 dark:text-green-400" : source.status === "failed" ? "text-destructive" : "text-amber-600"}`} />}
                   <div className="ios-d3-refresh-row-content">
@@ -396,7 +399,7 @@ const App = ({
                 )}
                 <div className="ios-d3-refresh-condition flex flex-wrap items-center gap-1.5 text-xs">
                     {isIOS() ? <span className="text-muted-foreground">{t(`refresh.status.${source.status}`)}</span>
-                      : <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${statusStyle[source.status]}`}>
+                      : <span data-tone={source.status === "ok" ? "ok" : source.status === "failed" ? "err" : "warn"} className={`inline-flex items-center gap-1 font-medium ${statusStyle[source.status]}`}>
                         <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />
                         {t(`refresh.status.${source.status}`)}
                       </span>}

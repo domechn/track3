@@ -189,6 +189,7 @@ function TopBar({
           </div>
         )}
         <div className="ml-auto flex items-center space-x-3">
+          <SyncStatusIndicator />
           {(!mobile || (overview && availableDates.length > 0)) && <DatePicker
             availableDates={availableDates}
             value={dateRange}
@@ -657,6 +658,7 @@ function AppRoutes({
                   currency={currentCurrency}
                   dateRange={tDateRange}
                   quoteColor={quoteColor}
+                  allTimeRange={maxDateRange}
                   expanded={overviewExpanded}
                   onExpandedChange={setOverviewExpanded}
                 />
@@ -1180,7 +1182,6 @@ const App = () => {
   return (
     <div>
       <AutoBackupIndicator status={autoBackupStatus} />
-      <SyncStatusIndicator />
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>
           <FirstRunOnboarding variant="ios" ready={!initializing && !loadFailed} />

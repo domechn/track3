@@ -15,7 +15,7 @@ test("mouse layout stays compact at narrow and wide desktop widths", async ({ pa
     expect((await page.getByRole("button", { name: "Enable sync" }).boundingBox())!.height).toBeCloseTo(34, 2);
     const sidebar = page.locator("aside").getByRole("link", { name: "Overview" });
     expect((await sidebar.boundingBox())!.height).toBeLessThanOrEqual(38.01);
-    expect((await page.locator("aside").boundingBox())!.width).toBe(216);
+    expect((await page.locator("aside").boundingBox())!.width).toBe(56);
     await page.goto("/#/settings/configuration");
     const labels = page.locator('label[for="groupUSD"], label[for="hideInactive"]');
     await expect(labels).toHaveCount(2);
@@ -52,19 +52,20 @@ test("mouse session actions keep their compact size and hover reveal", async ({ 
   expect(await pin.locator("xpath=..").evaluate((node) => getComputedStyle(node).opacity)).toBe("0");
 });
 
-test("mouse date popover opens with the original start alignment", async ({ page }) => {
+test("mouse date popover opens with the overview end alignment", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await installTauriBridge(page);
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Choose date range" }).click();
-  await expect(page.locator("[data-radix-popper-content-wrapper] [data-align]")).toHaveAttribute("data-align", "start");
-  const options = page.getByRole("button", { name: /^(Last (10|30|50|100) Times|All)$/ });
+  await expect(page.locator("[data-radix-popper-content-wrapper] [data-align]")).toHaveAttribute("data-align", "end");
+  const options = page.locator("[data-radix-popper-content-wrapper]")
+    .getByRole("button", { name: /^(Last (10|30|50|100) Times|All)$/ });
   await expect(options).toHaveCount(5);
   const positions = await options.evaluateAll((buttons) => buttons.map((button) => ({
     x: button.getBoundingClientRect().x,
     y: button.getBoundingClientRect().y,
   })));
-  expect(new Set(positions.map(({ x }) => x)).size).toBe(1);
+  expect(Math.max(...positions.map(({ x }) => x)) - Math.min(...positions.map(({ x }) => x))).toBeLessThanOrEqual(1);
   expect(new Set(positions.map(({ y }) => y)).size).toBe(5);
   expect((await page.locator("[data-radix-popper-content-wrapper]").boundingBox())!.width).toBeLessThan(450);
 });
@@ -139,7 +140,7 @@ test("mouse alert dialogs retain their original overflow", async ({ page }) => {
 test("collapsed mouse sidebar keeps its rail padding", async ({ page }) => {
   await installTauriBridge(page);
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
   expect(await page.locator("aside nav").evaluate((node) => getComputedStyle(node).paddingLeft)).toBe("10px");
 });
 

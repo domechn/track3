@@ -288,8 +288,8 @@
   .mobile-allocation-center strong { font-size: 17px; font-weight: 600; }
   .mobile-allocation-rows { width: 100%; }
   .mobile-allocation-row { gap: 12px; padding: 10px 20px; }
-  .mobile-allocation-row:not(:last-child), .overview-source-row { position: relative; border-bottom: 0; }
-  .mobile-allocation-row:not(:last-child)::after, .overview-source-row::after { content: ""; position: absolute; right: 0; bottom: 0; height: .5px; background: var(--ios-separator); }
+  .mobile-allocation-row:not(:last-child) { position: relative; border-bottom: 0; }
+  .mobile-allocation-row:not(:last-child)::after { content: ""; position: absolute; right: 0; bottom: 0; height: .5px; background: var(--ios-separator); }
   .mobile-allocation-row:not(:last-child)::after { left: 88px; }
   .mobile-allocation-swatch { width: 7px; height: 28px; flex: none; border-radius: 4px; }
   .mobile-allocation-row img { width: 36px; height: 36px; flex: none; border-radius: 50%; }
@@ -300,18 +300,6 @@
   .mobile-allocation-name span, .mobile-allocation-value span { color: hsl(var(--muted-foreground)); font-size: 13px; }
   .mobile-allocation-value { align-items: flex-end; }
   .mobile-allocation-pagination { display: flex; width: 100%; align-items: center; justify-content: center; gap: 16px; padding: 8px 8px 16px; color: hsl(var(--muted-foreground)); }
-  .overview-source-teaser { padding: 0; overflow: hidden; }
-  .overview-source-row::after { left: 60px; }
-  .overview-source-row .mobile-list-label { display: flex; align-items: center; gap: 12px; }
-  .overview-source-row .mobile-list-label img { width: 32px; height: 32px; flex: none; border-radius: 50%; }
-  .overview-source-name { display: flex; min-width: 0; flex: 1; flex-direction: column; }
-  .overview-source-name > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .overview-source-name strong { font-size: 15px; font-weight: 600; }
-  .overview-source-name span { color: hsl(var(--muted-foreground)); font-size: 13px; }
-  .overview-source-row .mobile-list-value { flex: none; }
-  .overview-source-value { display: flex; flex-direction: column; align-items: flex-end; font-size: 15px; }
-  .overview-source-value strong { color: hsl(var(--foreground)); font-weight: 600; }
-  .overview-source-value span { font-size: 13px; }
   .overview-loading.overview-loading { align-items: flex-start; padding: 24px 0 0; border-radius: 0; background: hsl(var(--background)); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .overview-loading > .overview-skeleton { display: grid; width: 100%; max-width: none; gap: 24px; margin: 0; }
   .overview-skeleton-hero { height: 370px; background: transparent; }
@@ -333,7 +321,6 @@
   .overview-pnl-card .overview-pnl-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .overview-pnl-card .overview-pnl-metric:nth-child(2) { border-right: 0; }
   .overview-pnl-card .overview-pnl-metric:last-child { grid-column: 1 / -1; border-top: .5px solid var(--ios-separator); }
-  .overview-source-row > svg:last-child { display: none; }
   .comparison-date-button { padding-left: 4px; padding-right: 4px; }
   .comparison-date-button svg { display: none; }
   .ios-d3-backup-folder-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
@@ -1103,6 +1090,51 @@
   .d2-wallets .wallet-change-controls { flex: 1 1 360px; max-width: 360px; }
   .d2-wallets .wallet-change-controls .mobile-segment,
   .d2-comparison .comparison-quick-segments .mobile-segment { min-width: max-content; }
+}
+
+/* The mobile Overview uses the same dashboard cards as desktop. */
+.overview-sections.t3-overview-grid { display: grid; gap: 12px; }
+.overview-sections .t3-total-overview > .mobile-hero-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card)) !important;
+  box-shadow: var(--shadow-card);
+}
+.overview-sections .t3-total-overview .mobile-hero-header { display: flex; padding: 16px 16px 0; }
+.overview-sections .t3-total-overview .mobile-hero-content { order: 0; padding: 0 16px 16px; }
+.overview-sections .t3-total-overview .mobile-hero-tools { order: 0; width: auto; margin: 0; }
+.overview-sections .t3-total-overview .mobile-hero-value { font-size: clamp(32px, 9vw, 48px); }
+.overview-sections .t3-total-overview .mobile-hero-chart { height: 166px; min-height: 166px; }
+.overview-sections .t3-pnl-compact { margin: 10px 0; }
+.overview-sections .t3-pnl-compact-card { border: 0; border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); border-radius: 0; box-shadow: none; background: transparent; }
+.overview-sections .t3-pnl-compact-card > div { padding: 8px 0 !important; }
+.overview-sections .t3-pnl-compact-card > div > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.overview-sections .t3-pnl-compact-card .overview-pnl-metric { grid-column: auto; min-height: 60px; align-items: flex-start; padding: 2px 6px !important; border: 0; border-right: 1px solid hsl(var(--border)); text-align: left; }
+.overview-sections .t3-pnl-compact-card .overview-pnl-metric:first-child { padding-left: 0 !important; }
+.overview-sections .t3-pnl-compact-card .overview-pnl-metric:last-child { border-right: 0; }
+.overview-sections .t3-pnl-compact-card .overview-pnl-metric-value { font-size: clamp(14px, 4vw, 18px); }
+.overview-sections .t3-overview-panel { border: 1px solid hsl(var(--border)); background: hsl(var(--card)); box-shadow: var(--shadow-card); }
+.overview-sections .overview-insights { display: flex; flex-direction: column; height: 100%; }
+.overview-sections .overview-insights .mobile-section-header { min-height: 0; margin: 0; }
+.overview-sections .overview-insights-card { flex: 1; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); box-shadow: var(--shadow-card); }
+.t3-date-sheet .t3-date-submit { position: sticky; bottom: 0; z-index: 2; box-shadow: 0 -8px 12px hsl(var(--card)); }
+.mobile-pull-indicator { color: hsl(var(--accent-data)); }
+body:has(#app-top-bar .t3-topbar-sync-button):not(:has(.sync-settings-page)) .ios-d3-toast-viewport {
+  top: calc(env(safe-area-inset-top) + 64px);
+}
+body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-state="open"] {
+  animation: none;
+}
+@media (max-width: 699px) {
+  .overview-sections.t3-overview-grid > * { grid-column: 1; }
+  .overview-sections .t3-total-overview .mobile-hero-header { display: block; }
+  .overview-sections .t3-total-overview .mobile-hero-tools { margin-top: 4px; }
+  .overview-sections .t3-top-head, .overview-sections .t3-top-row { grid-template-columns: minmax(62px, 1fr) 42px 56px 76px; }
+  #app-top-bar .t3-topbar-sync-button { display: grid; width: 44px; min-width: 44px; height: 44px; padding: 0; place-content: center; font-size: 0; }
+  #app-top-bar .t3-topbar-sync-button > span { width: 9px; height: 9px; }
 }
 
 @container (min-width: 700px) {
