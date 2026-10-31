@@ -2,14 +2,18 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
+import { CACHE_GROUP_KEYS } from "../../src/middlelayers/consts";
 import { installTauriBridge } from "./tauri-bridge";
 
 const exportGolden = JSON.parse(readFileSync(resolve("tests/golden/export-0.9.4.json"), "utf8"));
-const storageKeys = JSON.parse(readFileSync(resolve("src/test/golden/storage-keys.json"), "utf8")) as {
-  exact: string[]; prefixes: string[];
+const storageKeys = JSON.parse(readFileSync(resolve("tests/golden/storage-keys.json"), "utf8")) as {
+  literals: string[];
 };
-const frozenStorageKeys = new Set(storageKeys.exact);
-const frozenStorageKeyPrefixes = storageKeys.prefixes;
+const frozenStorageKeys = new Set(storageKeys.literals);
+const frozenStorageKeyPrefixes = [
+  ...storageKeys.literals.filter((key) => key.endsWith("/")),
+  `${CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY}/`,
+];
 
 test("Settings export keeps the 0.9.4 JSON shape", async ({ page }) => {
   const bridge = await installTauriBridge(page, { goldenHistory: true, appVersion: "0.9.4" });

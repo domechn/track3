@@ -21,8 +21,8 @@
   ],
   "src/components/assistant/chat-page.tsx": [
     "import { INSIGHT_QUESTION_STORAGE_KEY } from \"@/middlelayers/insights-service\";",
-    "function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {",
-    "function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {",
+    "export function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {",
+    "export function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {",
     "setInitialMsgs(session.messages.map(persistedToRuntime));",
     "const persistedExchange = exchange.map(runtimeToPersisted);",
     "const question = sessionStorage.getItem(INSIGHT_QUESTION_STORAGE_KEY);",
@@ -203,8 +203,8 @@
   ],
   "src/mobile/components/assistant/chat-page.tsx": [
     "import { INSIGHT_QUESTION_STORAGE_KEY } from \"@/middlelayers/insights-service\";",
-    "function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {",
-    "function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {",
+    "export function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {",
+    "export function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {",
     "setInitialMsgs(session.messages.map(persistedToRuntime));",
     "const persistedExchange = exchange.map(runtimeToPersisted);",
     "const question = sessionStorage.getItem(INSIGHT_QUESTION_STORAGE_KEY);",
