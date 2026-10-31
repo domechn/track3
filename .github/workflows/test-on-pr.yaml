@@ -29,7 +29,7 @@ jobs:
           fi
       - name: Check UI refactor boundaries
         run: |
-          node --test scripts/ui-refactor-guard.test.mjs
+          node --test scripts/ui-refactor-guard.test.mjs scripts/update-ui-goldens.test.mjs
           node scripts/ui-refactor-guard.mjs "origin/${{ github.base_ref }}"
       - name: enable corepack
         run: |

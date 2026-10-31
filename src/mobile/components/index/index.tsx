@@ -50,11 +50,12 @@ import {
   autoImportHistoricalData,
 } from "@/middlelayers/data";
 import { DateRange } from "react-day-picker";
-import { format, isValid, parseISO } from "date-fns";
+import { isValid, parseISO } from "date-fns";
 import { invalidateCacheGroups } from "@/middlelayers/datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
-import { ASSISTANT_APP_ACTION_EVENT, CURRENT_DATE_RANGE_KEY, DATE_RANGE_KEY, validateActionArgs } from "@/middlelayers/ai/actions";
+import { ASSISTANT_APP_ACTION_EVENT, validateActionArgs } from "@/middlelayers/ai/actions";
+import { setCurrentDateRange, readAssistantDateRange, clearAssistantDateRange } from "@/middlelayers/ui-state/page-prefs";
 import { useTranslation } from "@/mobile/i18n";
 import { DataChangedContext } from "@/contexts/data-changed";
 import { processAlerts } from "@/middlelayers/alerts";
@@ -940,9 +941,7 @@ const App = () => {
   );
   useEffect(() => {
     if (dateRange?.from && dateRange.to && isValid(dateRange.from) && isValid(dateRange.to)) {
-      localStorage.setItem(CURRENT_DATE_RANGE_KEY, JSON.stringify({
-        from: format(dateRange.from, "yyyy-MM-dd"), to: format(dateRange.to, "yyyy-MM-dd"),
-      }));
+      setCurrentDateRange(dateRange.from, dateRange.to);
     }
   }, [dateRange]);
 
@@ -964,13 +963,13 @@ const App = () => {
     const applyAssistantAction = () => {
       loadConfiguration();
       try {
-        const raw = localStorage.getItem(DATE_RANGE_KEY);
-        if (!raw) return;
-        const dates = validateActionArgs("set_date_range", JSON.parse(raw));
-        localStorage.removeItem(DATE_RANGE_KEY);
+        const raw = readAssistantDateRange();
+        if (raw === undefined) return;
+        const dates = validateActionArgs("set_date_range", raw);
+        clearAssistantDateRange();
         setDateRange({ from: parseISO(String(dates.from)), to: parseISO(String(dates.to)) });
       } catch {
-        localStorage.removeItem(DATE_RANGE_KEY);
+        clearAssistantDateRange();
       }
     };
     window.addEventListener(ASSISTANT_APP_ACTION_EVENT, applyAssistantAction);
@@ -1100,7 +1099,7 @@ const App = () => {
     _selectedTimes: number,
     nextDateRange: DateRange | undefined,
   ) {
-    localStorage.removeItem(DATE_RANGE_KEY);
+    clearAssistantDateRange();
     setDateRange((prev) => {
       const prevFrom = prev?.from?.getTime() ?? 0;
       const prevTo = prev?.to?.getTime() ?? 0;
@@ -1133,14 +1132,14 @@ const App = () => {
       if (!preserveDateRange) {
         let assistantDates: DateRange | undefined;
         try {
-          const stored = localStorage.getItem(DATE_RANGE_KEY);
-          if (stored) {
-            const dates = validateActionArgs("set_date_range", JSON.parse(stored));
+          const stored = readAssistantDateRange();
+          if (stored !== undefined) {
+            const dates = validateActionArgs("set_date_range", stored);
             assistantDates = { from: parseISO(String(dates.from)), to: parseISO(String(dates.to)) };
-            localStorage.removeItem(DATE_RANGE_KEY);
+            clearAssistantDateRange();
           }
         } catch {
-          localStorage.removeItem(DATE_RANGE_KEY);
+          clearAssistantDateRange();
         }
         setDateRange((prev) => {
           if (assistantDates) return assistantDates;

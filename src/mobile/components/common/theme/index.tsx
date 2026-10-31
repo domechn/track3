@@ -1,7 +1,8 @@
 import { themeLocalStorageKey } from '@/middlelayers/configuration'
 import { createContext, useContext, useEffect, useState } from "react";
+import { readStoredTheme, writeStoredTheme, type Theme } from "@/middlelayers/ui-state/appearance";
 
-export type Theme = "dark" | "light" | "system";
+export type { Theme } from "@/middlelayers/ui-state/appearance";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
@@ -45,7 +46,7 @@ export function ThemeProvider({
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const stored = (localStorage.getItem(storageKey) as Theme) || defaultTheme;
+    const stored = readStoredTheme(storageKey, defaultTheme);
     // Apply theme synchronously during state initialization to prevent flash
     applyThemeToDOM(stored);
     return stored;
@@ -74,7 +75,7 @@ export function ThemeProvider({
       ? window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" as const : "light" as const
       : theme,
     setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
+      writeStoredTheme(storageKey, theme);
       setTheme(theme);
     },
   };

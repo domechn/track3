@@ -10,36 +10,10 @@ import { SyncActionButton } from "@/components/settings/sync-action-button";
 import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { syncCategories as categories, syncFields as fields, configConflictNames, invalidConfigurationFields, syncFormWithField, syncFormWithCategory, syncFormWithPathStyle, type SyncField as Field } from "@/middlelayers/ui-state/config-form";
 import {
-  validateSyncSettings, type SyncCategoryName, type SyncConnectionResult, type SyncSettings,
+  validateSyncSettings, type SyncConnectionResult, type SyncSettings,
 } from "@/middlelayers/sync/settings";
-
-const categories: SyncCategoryName[] = ["history", "settings", "secrets", "rebalance", "chat"];
-const fields = ["endpoint", "region", "bucket", "prefix", "accessKeyId", "secretAccessKey"] as const;
-type Field = typeof fields[number];
-const configConflictNames: Record<string, string> = {
-  "6": "querySize", "7": "currency", "8": "quoteColor", "10": "exchanges",
-  "11": "wallets", "12": "general", "20": "stockBroker", "993": "costBasis",
-  "994": "assistant", "995": "blacklist", rebalance: "rebalance",
-};
-
-function invalidConfigurationFields(form: SyncSettings): Set<Field> {
-  const invalid = new Set<Field>();
-  let endpoint: URL | undefined;
-  try { endpoint = new URL(form.endpoint.trim()); } catch { invalid.add("endpoint"); }
-  if (endpoint && ((endpoint.protocol !== "https:" && !(endpoint.protocol === "http:" &&
-    ["localhost", "127.0.0.1"].includes(endpoint.hostname))) ||
-    endpoint.username || endpoint.password || endpoint.search || endpoint.hash ||
-    (!form.pathStyle && (endpoint.pathname !== "/" ||
-      ["localhost", "127.0.0.1"].includes(endpoint.hostname))))) invalid.add("endpoint");
-  if (!form.region.trim()) invalid.add("region");
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(form.bucket.trim())) invalid.add("bucket");
-  const prefix = form.prefix.trim().replace(/^\/+|\/+$/g, "");
-  if (prefix && prefix.split("/").some((part) => !part || /^(?:\.|%2e){1,2}$/i.test(part))) invalid.add("prefix");
-  if (!form.accessKeyId.trim()) invalid.add("accessKeyId");
-  if (!form.secretAccessKey) invalid.add("secretAccessKey");
-  return invalid;
-}
 
 export default function SyncSettingsPage() {
   const { t } = useTranslation();
@@ -94,7 +68,7 @@ export default function SyncSettingsPage() {
   }
 
   function updateField(name: typeof fields[number], value: string) {
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => syncFormWithField(current, name, value));
     setConfigurationInvalid(new Set());
     clearStatus();
   }
@@ -212,7 +186,7 @@ export default function SyncSettingsPage() {
             <Label htmlFor="sync-path-style">{t("sync.pathStyle")}</Label>
             <Switch id="sync-path-style" checked={form.pathStyle} disabled={!!busy}
               onCheckedChange={(checked) => {
-                setForm((current) => ({ ...current, pathStyle: checked }));
+                setForm((current) => syncFormWithPathStyle(current, checked));
                 setUnsavedPathStyle(true);
               }} />
           </div>
@@ -281,9 +255,7 @@ export default function SyncSettingsPage() {
               </div>
               <Switch id={`sync-category-${category}`} checked={form.categories[category]} disabled={!!busy}
                 onCheckedChange={(checked) => {
-                  setForm((current) => ({
-                    ...current, categories: { ...current.categories, [category]: checked },
-                  }));
+                  setForm((current) => syncFormWithCategory(current, category, checked));
                   setUnsavedCategories(true);
                 }} />
             </div>

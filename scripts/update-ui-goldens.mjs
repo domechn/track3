@@ -37,10 +37,16 @@ function storageKeys() {
       constants[`${file}:${match[1]}`] = match[3];
     }
   }
-  const theme = [...read("src/components/common/theme/index.tsx")
-    .match(/export type Theme = ([^;]+);/)[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
-  const mobileTheme = [...read("src/mobile/components/common/theme/index.tsx")
-    .match(/export type Theme = ([^;]+);/)[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  const themeValues = () => [...read("src/middlelayers/ui-state/appearance.ts")
+    .match(/export const THEME_VALUES = \[([^\]]+)\]/)[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  const providerTheme = (file) => {
+    const provider = read(file);
+    return /export type \{ Theme \} from "@\/middlelayers\/ui-state\/appearance"/.test(provider)
+      ? themeValues()
+      : [...provider.match(/export type Theme = ([^;]+);/)[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  };
+  const theme = providerTheme("src/components/common/theme/index.tsx");
+  const mobileTheme = providerTheme("src/mobile/components/common/theme/index.tsx");
   const locale = [...read("src/i18n/index.tsx")
     .match(/export const SUPPORTED_LOCALES:[^=]+=\s*\[([^\]]+)\]/)[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
   const mobileLocaleSource = read("src/mobile/i18n.tsx")

@@ -16,7 +16,7 @@ import yaml from "yaml";
 import { CURRENCY_RATE_HANDLER } from "./entities/currency";
 import { ASSET_HANDLER } from "./entities/assets";
 import { DateRange } from "react-day-picker";
-import { Theme } from "@/components/common/theme";
+import type { Theme } from "@/middlelayers/ui-state/appearance";
 import { runWithEncryptionWriteGate } from "./encryption-write-gate";
 import type { CostBasisMethod } from "./cost-basis";
 

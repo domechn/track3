@@ -11,7 +11,8 @@ import {
 } from "@/middlelayers/configuration";
 import { QuoteColor } from "@/middlelayers/types";
 import { reloadApp } from "@/utils/app";
-import { Theme, useTheme } from "./common/theme";
+import { useTheme } from "./common/theme";
+import { type Theme } from "@/middlelayers/ui-state/appearance";
 import {
   LOCALE_LABELS,
   SUPPORTED_LOCALES,

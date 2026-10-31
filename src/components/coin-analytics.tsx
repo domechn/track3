@@ -1,3 +1,4 @@
+import { persistedTransactionPrice } from "@/middlelayers/ui-state/transaction-price";
 import {
   calculateTotalProfit,
   listAllowedSymbols,
@@ -611,9 +612,7 @@ const App = ({
     const act = transactions[txnIndex];
     const editSession = editSessionRef.current;
 
-    const usdPrice = updatePriceDirty
-      ? quotePrice / updatePriceRate
-      : updatePriceOriginalValue;
+    const usdPrice = persistedTransactionPrice(updatePriceDirty, quotePrice, updatePriceRate, updatePriceOriginalValue);
     if (!Number.isFinite(usdPrice) || usdPrice < 0) {
       toast({
         description: t("coin.invalidPrice"),

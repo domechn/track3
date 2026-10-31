@@ -20,13 +20,9 @@
     "import { remove } from \"@tauri-apps/plugin-fs\";"
   ],
   "src/components/assistant/chat-page.tsx": [
-    "import { INSIGHT_QUESTION_STORAGE_KEY } from \"@/middlelayers/insights-service\";",
-    "export function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {",
-    "export function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {",
+    "import { takeInsightQuestion, persistedToRuntime, runtimeToPersisted } from \"@/middlelayers/ui-state/chat-persist\";",
     "setInitialMsgs(session.messages.map(persistedToRuntime));",
-    "const persistedExchange = exchange.map(runtimeToPersisted);",
-    "const question = sessionStorage.getItem(INSIGHT_QUESTION_STORAGE_KEY);",
-    "sessionStorage.removeItem(INSIGHT_QUESTION_STORAGE_KEY);"
+    "const persistedExchange = exchange.map(runtimeToPersisted);"
   ],
   "src/components/assistant/use-chat-sessions.ts": [
     "await deleteSessionApi(id);"
@@ -48,36 +44,12 @@
     "await updateTransactionPrice(act.id, usdPrice);",
     "await updateTransactionTxnType(act.id, txnType);"
   ],
-  "src/components/common/theme/index.tsx": [
-    "const stored = (localStorage.getItem(storageKey) as Theme) || defaultTheme;",
-    "localStorage.setItem(storageKey, theme);"
-  ],
   "src/components/common/use-optimistic-delete.tsx": [
     "const recorded = recordSnapshotDeleted(syncSnapshotUuid).catch(showError);",
     "if (syncSnapshotUuid) void recordSnapshotUndone(syncSnapshotUuid).catch(showError).finally(() => syncRuntime.trigger(\"refresh\"));"
   ],
-  "src/components/comparison.tsx": [
-    "import { ASSISTANT_APP_ACTION_EVENT, COMPARISON_DATES_KEY, CURRENT_COMPARISON_DATES_KEY, validateActionArgs } from \"@/middlelayers/ai/actions\";",
-    "if (base && head) localStorage.setItem(CURRENT_COMPARISON_DATES_KEY, JSON.stringify({ base, head }));",
-    "const raw = localStorage.getItem(COMPARISON_DATES_KEY);",
-    "const dates = validateActionArgs(\"set_comparison_dates\", JSON.parse(raw));",
-    "localStorage.removeItem(COMPARISON_DATES_KEY);",
-    "localStorage.removeItem(COMPARISON_DATES_KEY);",
-    "localStorage.removeItem(COMPARISON_DATES_KEY);",
-    "localStorage.removeItem(COMPARISON_DATES_KEY);"
-  ],
   "src/components/configuration/index.tsx": [
-    "apiKey: ex.initParams.apiKey,",
-    "secret: ex.initParams.secret,",
-    "password: ex.initParams.password,",
-    "passphrase: ex.initParams.passphrase,",
-    "token: broker.initParams.token,",
-    "queryId: broker.initParams.queryId,",
-    "const globalConfig = convertFormDataToConfigurationData();",
     "saveConfiguration(globalConfig)",
-    "function convertFormDataToConfigurationData(): GlobalConfig {",
-    "initParams: {",
-    "initParams: {",
     "initParams: {",
     "initParams: {",
     "saveQuerySize(newVal)",
@@ -89,9 +61,6 @@
     "initParams: {"
   ],
   "src/components/cost-basis.tsx": [
-    "import { ASSISTANT_APP_ACTION_EVENT, COST_BASIS_SETTINGS_KEY } from \"@/middlelayers/ai/actions/page-settings\";",
-    "const stored = JSON.parse(localStorage.getItem(COST_BASIS_SETTINGS_KEY) ?? \"{}\") as Record<string, unknown>;",
-    "localStorage.setItem(COST_BASIS_SETTINGS_KEY, JSON.stringify({ from, to, holdingPeriodDays }));",
     "await saveCostBasisMethod(next);"
   ],
   "src/components/data-management.tsx": [
@@ -101,9 +70,7 @@
     "undo: () => saveAutoBackupDirectory(path),"
   ],
   "src/components/goals-alerts.tsx": [
-    "cooldownSeconds: draft.cooldownMinutes.trim() ? Number(draft.cooldownMinutes) * 60 : Number.NaN,",
     "await saveAlertRule(toRule());",
-    "cooldownMinutes: String(rule.cooldownSeconds / 60),",
     "actions={[{ label: t(\"common.delete\"), onClick: () => void mutate(() => deleteAlertRule(rule.id)) }]}"
   ],
   "src/components/historical-data.tsx": [
@@ -111,19 +78,8 @@
     "await deleteHistoricalDataDetailById(id);"
   ],
   "src/components/index/index.tsx": [
-    "import { ASSISTANT_APP_ACTION_EVENT, CURRENT_DATE_RANGE_KEY, DATE_RANGE_KEY, validateActionArgs } from \"@/middlelayers/ai/actions\";",
-    "localStorage.setItem(CURRENT_DATE_RANGE_KEY, JSON.stringify({",
-    "const raw = localStorage.getItem(DATE_RANGE_KEY);",
-    "const dates = validateActionArgs(\"set_date_range\", JSON.parse(raw));",
-    "localStorage.removeItem(DATE_RANGE_KEY);",
-    "localStorage.removeItem(DATE_RANGE_KEY);",
     "localStorage: [CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY],",
-    "memory: [CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY],",
-    "localStorage.removeItem(DATE_RANGE_KEY);",
-    "const stored = localStorage.getItem(DATE_RANGE_KEY);",
-    "const dates = validateActionArgs(\"set_date_range\", JSON.parse(stored));",
-    "localStorage.removeItem(DATE_RANGE_KEY);",
-    "localStorage.removeItem(DATE_RANGE_KEY);"
+    "memory: [CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY],"
   ],
   "src/components/onboarding/index.tsx": [
     "ONBOARDING_STORAGE_KEY,",
@@ -132,15 +88,10 @@
   "src/components/rebalance.tsx": [
     "import { save as saveFile } from \"@tauri-apps/plugin-dialog\";",
     "import { writeTextFile } from \"@tauri-apps/plugin-fs\";",
-    "import { ASSISTANT_APP_ACTION_EVENT, REBALANCE_OPTIONS_KEY } from \"@/middlelayers/ai/actions/page-settings\";",
-    "const value: unknown = JSON.parse(sessionStorage.getItem(REBALANCE_OPTIONS_KEY) ?? \"{}\");",
-    "if (optionsValid) sessionStorage.setItem(REBALANCE_OPTIONS_KEY, JSON.stringify({ mode, injectedCash, minimumTradeValue, ignoreBelowValue }));",
     "function updateTarget(index: number, next: RebalanceTarget & { previousAsset?: { assetType: AssetType; symbol: string } }) {",
-    "await saveRebalanceProfile({ targets: cleanTargets, tolerancePercent: tolerance });",
+    "await saveRebalanceProfile(profile);",
     "await deleteRebalanceProfile();",
-    "const filePath = await saveFile({",
-    "defaultPath: \"track3-rebalance.csv\",",
-    "filters: [{ name: \"track3-rebalance\", extensions: [\"csv\"] }],",
+    "const filePath = await saveFile(rebalanceCsvDialogOptions());",
     "if (filePath) await writeTextFile(filePath, suggestionsToCsv(result, currency.currency, t));",
     "updateTarget(index, event.target.value === \"cash\"",
     "onChange={(event) => updateTarget(index, { ...target, assetType: event.target.value as AssetType })}>",
@@ -148,34 +99,14 @@
     "onChange={(event) => updateTarget(index, { ...target, percent: numberOrZero(event.target.value) })} />"
   ],
   "src/components/refresh-data.tsx": [
-    "import { trackEventWithClientID } from \"../utils/app\";",
-    "import { ALERT_SOURCE_STATUS_STORAGE_KEY, processAlerts } from \"@/middlelayers/alerts\";",
-    "const sourceStatusStorageKey = ALERT_SOURCE_STATUS_STORAGE_KEY;",
-    "const stored = localStorage.getItem(sourceStatusStorageKey);",
-    "const statuses = normalizeSourceStatuses(JSON.parse(stored));",
-    "if (stored !== JSON.stringify(statuses)) localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));",
-    "await updateAllCurrencyRates().catch(() => {});",
-    "localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));",
-    "trackEventWithClientID(\"data_refreshed\", {",
-    "trackEventWithClientID(\"data_refreshed\", { failed: \"true\" });"
+    "await updateAllCurrencyRates().catch(() => {});"
   ],
   "src/components/settings/assistant.tsx": [
-    "return JSON.stringify(advanced, null, 2);",
-    "parsed = JSON.parse(trimmed);",
-    "const value = JSON.parse(currentAdvanced()) as { headers?: Record<string, unknown> };",
     "await saveAIConfig(cfg);"
   ],
   "src/components/settings/sync.tsx": [
     "function updateField(name: typeof fields[number], value: string) {",
     "onChange={(event) => updateField(field, event.target.value)}"
-  ],
-  "src/components/system-info.tsx": [
-    "import { getVersion, trackEventWithClientID } from \"@/utils/app\";",
-    "void trackEventWithClientID(\"subscription_checkout_completed\").catch(() => {});",
-    "void trackEventWithClientID(`subscription_checkout_${phase === \"timed-out\" ? \"timed_out\" : phase}`).catch(() => {});",
-    "void trackEventWithClientID(\"subscription_subscribe_clicked\", { planType }).catch(() => {});",
-    "void trackEventWithClientID(\"subscription_checkout_cancelled\").catch(() => {});",
-    "void trackEventWithClientID(\"subscription_open_clicked\").catch(() => {});"
   ],
   "src/components/wallet-assets-percentage.tsx": [
     "OTHERS_AGGREGATED_KEY,",
@@ -202,48 +133,20 @@
     "import { remove } from \"@tauri-apps/plugin-fs\";"
   ],
   "src/mobile/components/assistant/chat-page.tsx": [
-    "import { INSIGHT_QUESTION_STORAGE_KEY } from \"@/middlelayers/insights-service\";",
-    "export function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {",
-    "export function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {",
+    "import { takeInsightQuestion, persistedToRuntime, runtimeToPersisted } from \"@/middlelayers/ui-state/chat-persist\";",
     "setInitialMsgs(session.messages.map(persistedToRuntime));",
-    "const persistedExchange = exchange.map(runtimeToPersisted);",
-    "const question = sessionStorage.getItem(INSIGHT_QUESTION_STORAGE_KEY);",
-    "sessionStorage.removeItem(INSIGHT_QUESTION_STORAGE_KEY);"
+    "const persistedExchange = exchange.map(runtimeToPersisted);"
   ],
   "src/mobile/components/coin-analytics.tsx": [
     "await updateTransactionPrice(act.id, usdPrice);",
     "await updateTransactionTxnType(act.id, txnType);"
   ],
-  "src/mobile/components/common/theme/index.tsx": [
-    "const stored = (localStorage.getItem(storageKey) as Theme) || defaultTheme;",
-    "localStorage.setItem(storageKey, theme);"
-  ],
   "src/mobile/components/common/use-optimistic-delete.tsx": [
     "const recorded = recordSnapshotDeleted(syncSnapshotUuid).catch(showError);",
     "if (syncSnapshotUuid) void recordSnapshotUndone(syncSnapshotUuid).catch(showError).finally(() => syncRuntime.trigger(\"refresh\"));"
   ],
-  "src/mobile/components/comparison.tsx": [
-    "import { ASSISTANT_APP_ACTION_EVENT, COMPARISON_DATES_KEY, CURRENT_COMPARISON_DATES_KEY, validateActionArgs } from \"@/middlelayers/ai/actions\";",
-    "if (base && head) localStorage.setItem(CURRENT_COMPARISON_DATES_KEY, JSON.stringify({ base, head }));",
-    "const raw = localStorage.getItem(COMPARISON_DATES_KEY);",
-    "const dates = validateActionArgs(\"set_comparison_dates\", JSON.parse(raw));",
-    "localStorage.removeItem(COMPARISON_DATES_KEY);",
-    "localStorage.removeItem(COMPARISON_DATES_KEY);",
-    "localStorage.removeItem(COMPARISON_DATES_KEY);",
-    "localStorage.removeItem(COMPARISON_DATES_KEY);"
-  ],
   "src/mobile/components/configuration/index.tsx": [
-    "apiKey: ex.initParams.apiKey,",
-    "secret: ex.initParams.secret,",
-    "password: ex.initParams.password,",
-    "passphrase: ex.initParams.passphrase,",
-    "token: broker.initParams.token,",
-    "queryId: broker.initParams.queryId,",
-    "const globalConfig = convertFormDataToConfigurationData();",
     "saveConfiguration(globalConfig)",
-    "function convertFormDataToConfigurationData(): GlobalConfig {",
-    "initParams: {",
-    "initParams: {",
     "initParams: {",
     "initParams: {",
     "saveQuerySize(newVal)",
@@ -258,9 +161,6 @@
     "async function saveMobileBroker(value: StockBrokerRow, original?: StockBrokerRow) {"
   ],
   "src/mobile/components/cost-basis.tsx": [
-    "import { ASSISTANT_APP_ACTION_EVENT, COST_BASIS_SETTINGS_KEY } from \"@/middlelayers/ai/actions/page-settings\";",
-    "const stored = JSON.parse(localStorage.getItem(COST_BASIS_SETTINGS_KEY) ?? \"{}\") as Record<string, unknown>;",
-    "localStorage.setItem(COST_BASIS_SETTINGS_KEY, JSON.stringify({ from, to, holdingPeriodDays }));",
     "await saveCostBasisMethod(next);"
   ],
   "src/mobile/components/data-management.tsx": [
@@ -277,9 +177,7 @@
     "await saveAutoBackupDirectory(isIOS() && isIOSDocumentsBackupChoice(path, await documentsBackupLocation()) ? iosDocumentsBackupMarker : path);"
   ],
   "src/mobile/components/goals-alerts.tsx": [
-    "cooldownSeconds: draft.cooldownMinutes.trim() ? Number(draft.cooldownMinutes) * 60 : Number.NaN,",
     "await saveAlertRule(toRule());",
-    "cooldownMinutes: String(rule.cooldownSeconds / 60),",
     "actions={[{ label: t(\"common.delete\"), onClick: () => void mutate(() => deleteAlertRule(rule.id)) }]}"
   ],
   "src/mobile/components/historical-data.tsx": [
@@ -287,29 +185,14 @@
     "await deleteHistoricalDataDetailById(id);"
   ],
   "src/mobile/components/index/index.tsx": [
-    "import { ASSISTANT_APP_ACTION_EVENT, CURRENT_DATE_RANGE_KEY, DATE_RANGE_KEY, validateActionArgs } from \"@/middlelayers/ai/actions\";",
-    "localStorage.setItem(CURRENT_DATE_RANGE_KEY, JSON.stringify({",
-    "const raw = localStorage.getItem(DATE_RANGE_KEY);",
-    "const dates = validateActionArgs(\"set_date_range\", JSON.parse(raw));",
-    "localStorage.removeItem(DATE_RANGE_KEY);",
-    "localStorage.removeItem(DATE_RANGE_KEY);",
     "localStorage: [CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY],",
-    "memory: [CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY],",
-    "localStorage.removeItem(DATE_RANGE_KEY);",
-    "const stored = localStorage.getItem(DATE_RANGE_KEY);",
-    "const dates = validateActionArgs(\"set_date_range\", JSON.parse(stored));",
-    "localStorage.removeItem(DATE_RANGE_KEY);",
-    "localStorage.removeItem(DATE_RANGE_KEY);"
+    "memory: [CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY],"
   ],
   "src/mobile/components/rebalance.tsx": [
     "import { writeTextFile } from \"@tauri-apps/plugin-fs\";",
-    "import { ASSISTANT_APP_ACTION_EVENT, REBALANCE_OPTIONS_KEY } from \"@/middlelayers/ai/actions/page-settings\";",
-    "const value: unknown = JSON.parse(sessionStorage.getItem(REBALANCE_OPTIONS_KEY) ?? \"{}\");",
-    "if (optionsValid) sessionStorage.setItem(REBALANCE_OPTIONS_KEY, JSON.stringify({ mode, injectedCash, minimumTradeValue, ignoreBelowValue }));",
     "function updateTarget(index: number, next: RebalanceTarget & { previousAsset?: { assetType: AssetType; symbol: string } }) {",
-    "await saveRebalanceProfile({ targets: cleanTargets, tolerancePercent: tolerance });",
+    "await saveRebalanceProfile(profile);",
     "await deleteRebalanceProfile();",
-    "await exportFile(\"track3-rebalance.csv\", [\"csv\"], (path) =>",
     "writeTextFile(path, suggestionsToCsv(result, currency.currency, t)));",
     "updateTarget(index, event.target.value === \"cash\"",
     "onChange={(event) => updateTarget(index, { ...target, assetType: event.target.value as AssetType })}>",
@@ -320,34 +203,14 @@
     "onClick={() => updateTarget(index, { ...target, percent: stepPercent(target.percent, 1) })}>+</Button>"
   ],
   "src/mobile/components/refresh-data.tsx": [
-    "import { trackEventWithClientID } from \"@/utils/app\";",
-    "import { ALERT_SOURCE_STATUS_STORAGE_KEY, processAlerts } from \"@/middlelayers/alerts\";",
-    "const sourceStatusStorageKey = ALERT_SOURCE_STATUS_STORAGE_KEY;",
-    "const stored = localStorage.getItem(sourceStatusStorageKey);",
-    "const statuses = normalizeSourceStatuses(JSON.parse(stored));",
-    "if (stored !== JSON.stringify(statuses)) localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));",
-    "await updateAllCurrencyRates().catch(() => {});",
-    "localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));",
-    "trackEventWithClientID(\"data_refreshed\", {",
-    "trackEventWithClientID(\"data_refreshed\", { failed: \"true\" });"
+    "await updateAllCurrencyRates().catch(() => {});"
   ],
   "src/mobile/components/settings/assistant.tsx": [
-    "return JSON.stringify(advanced, null, 2);",
-    "parsed = JSON.parse(trimmed);",
-    "const value = JSON.parse(currentAdvanced()) as { headers?: Record<string, unknown> };",
     "await saveAIConfig(cfg);"
   ],
   "src/mobile/components/settings/sync.tsx": [
     "function updateField(name: typeof fields[number], value: string) {",
     "onChange={(event) => updateField(field, event.target.value)}"
-  ],
-  "src/mobile/components/system-info.tsx": [
-    "import { getVersion, trackEventWithClientID } from \"@/utils/app\";",
-    "void trackEventWithClientID(\"subscription_checkout_completed\").catch(() => {});",
-    "void trackEventWithClientID(`subscription_checkout_${phase === \"timed-out\" ? \"timed_out\" : phase}`).catch(() => {});",
-    "void trackEventWithClientID(\"subscription_subscribe_clicked\", { planType }).catch(() => {});",
-    "void trackEventWithClientID(\"subscription_checkout_cancelled\").catch(() => {});",
-    "void trackEventWithClientID(\"subscription_open_clicked\").catch(() => {});"
   ],
   "src/mobile/components/wallet-assets-percentage.tsx": [
     "OTHERS_AGGREGATED_KEY,",

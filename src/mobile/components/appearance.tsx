@@ -10,7 +10,8 @@ import {
   saveTheme,
 } from "@/middlelayers/configuration";
 import { QuoteColor } from "@/middlelayers/types";
-import { Theme, useTheme } from "@/mobile/components/common/theme";
+import { useTheme } from "@/mobile/components/common/theme";
+import { type Theme, THEME_VALUES, QUOTE_COLOR_VALUES } from "@/middlelayers/ui-state/appearance";
 import {
   LOCALE_LABELS,
   SUPPORTED_LOCALES,
@@ -79,7 +80,7 @@ const App = ({
   if (isIOS()) return <div className="ios-d3-mobile-appearance">
     {showTheme && <>
       <InsetGroup title={t("appearance.theme")}>
-        {(["system", "light", "dark"] as const).map((value) => <ListRow key={value} className="ios-d3-choice-row" onClick={() => {
+        {[...THEME_VALUES].reverse().map((value) => <ListRow key={value} className="ios-d3-choice-row" onClick={() => {
           setSelectedTheme(value);
           currentTheme.setTheme(value);
           void saveTheme(value);
@@ -88,7 +89,7 @@ const App = ({
         </ListRow>)}
       </InsetGroup>
       <InsetGroup title={t("appearance.quoteColor")}>
-        {(["green-up-red-down", "red-up-green-down"] as const).map((value) => <ListRow key={value} className="ios-d3-choice-row" onClick={() => void handleQuoteColorValueChange(value)} trailing={<span className="ios-d3-choice-check" aria-hidden="true">{quoteColor === value ? "✓" : ""}</span>}>
+        {QUOTE_COLOR_VALUES.map((value) => <ListRow key={value} className="ios-d3-choice-row" onClick={() => void handleQuoteColorValueChange(value)} trailing={<span className="ios-d3-choice-check" aria-hidden="true">{quoteColor === value ? "✓" : ""}</span>}>
           {t(value === "green-up-red-down" ? "appearance.quoteColorGreenUp" : "appearance.quoteColorRedUp")}
         </ListRow>)}
       </InsetGroup>

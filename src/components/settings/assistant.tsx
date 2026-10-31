@@ -17,64 +17,9 @@ import {
   saveAIConfig,
 } from "@/middlelayers/configuration";
 import { probeConnection } from "@/middlelayers/ai";
-import type { AIAdvancedOptions, AIConfig } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
-import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
-
-const ALLOWED_ADVANCED_KEYS = [
-  "temperature",
-  "top_p",
-  "headers",
-  "extraBody",
-  "provider",
-] as const;
-
-type AllowedKey = (typeof ALLOWED_ADVANCED_KEYS)[number];
-
-function serializeAdvanced(advanced?: AIAdvancedOptions): string {
-  if (!advanced) return "";
-  // Stable JSON so the textarea does not reshuffle keys on every render.
-  return JSON.stringify(advanced, null, 2);
-}
-
-function parseAdvanced(
-  raw: string,
-): { value?: AIAdvancedOptions; error?: string; warnings: string[] } {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return { value: undefined, warnings: [] };
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return {
-      error: "settings.assistant.invalidJson",
-      warnings: [],
-    };
-  }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { error: "settings.assistant.invalidAdvancedObject", warnings: [] };
-  }
-  const warnings: string[] = [];
-  const value: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-    if ((ALLOWED_ADVANCED_KEYS as readonly string[]).includes(k)) {
-      if (
-        ((k === "temperature" || k === "top_p") && (typeof v !== "number" || !Number.isFinite(v))) ||
-        (k === "provider" && !["openai", "anthropic", "custom"].includes(String(v))) ||
-        (k === "headers" && (v === null || typeof v !== "object" || Array.isArray(v) || Object.values(v).some((header) => typeof header !== "string"))) ||
-        (k === "extraBody" && (v === null || typeof v !== "object" || Array.isArray(v)))
-      ) {
-        return { error: "settings.assistant.invalidAdvancedValue", warnings: [] };
-      }
-      value[k] = v as never;
-    } else {
-      warnings.push(k);
-    }
-  }
-  return { value: value as AIAdvancedOptions, warnings };
-}
+import { redactSecrets } from "@/middlelayers/security/redact";
+import { serializeAdvanced, parseAdvanced, assistantConfigFromForm, assistantPriceInvalid, assistantSettingsSecrets } from "@/middlelayers/ui-state/config-form";
 
 const App = () => {
   const { t } = useTranslation();
@@ -90,14 +35,7 @@ const App = () => {
   const [priceError, setPriceError] = useState(false);
   const advancedRef = useRef<HTMLTextAreaElement>(null);
   const currentAdvanced = () => advancedRef.current?.value ?? "";
-  const settingsSecrets = () => {
-    try {
-      const value = JSON.parse(currentAdvanced()) as { headers?: Record<string, unknown> };
-      return [...configuredSecretValues(value), ...Object.values(value.headers ?? {}).filter((item): item is string => typeof item === "string")];
-    } catch {
-      return [];
-    }
-  };
+  const settingsSecrets = () => assistantSettingsSecrets(currentAdvanced());
   const [advancedWarnings, setAdvancedWarnings] = useState<string[]>([]);
   const [advancedError, setAdvancedError] = useState<string | undefined>();
   const [showKey, setShowKey] = useState(false);
@@ -144,9 +82,7 @@ const App = () => {
 
   async function onSave() {
     if (saving) return;
-    const inputTokenPrice = inputPrice.trim() === "" ? undefined : Number(inputPrice);
-    const outputTokenPrice = outputPrice.trim() === "" ? undefined : Number(outputPrice);
-    const invalidPrice = [inputTokenPrice, outputTokenPrice].some((price) => price !== undefined && (!Number.isFinite(price) || price < 0));
+    const invalidPrice = assistantPriceInvalid(inputPrice, outputPrice);
     setPriceError(invalidPrice);
     const parsed = parseAdvanced(currentAdvanced());
     if (parsed.error) {
@@ -157,19 +93,8 @@ const App = () => {
     if (invalidPrice) return;
     setAdvancedWarnings(parsed.warnings.map((warning) => redactSecrets(warning, [currentKey(), ...settingsSecrets()])));
 
-    const cfg: AIConfig = {
-      endpoint: endpoint.trim(),
-      apiKey: currentKey(),
-      model: model.trim(),
-      contextSize: Number.isFinite(contextSize)
-        ? Math.max(1, Math.floor(contextSize))
-        : DEFAULT_AI_CONTEXT_SIZE,
-      allowActions,
-      inputPricePerMillionTokens: inputTokenPrice,
-      outputPricePerMillionTokens: outputTokenPrice,
-      advanced: parsed.value,
-      proactiveInsightsSummary,
-    };
+    const cfg = assistantConfigFromForm({ endpoint, apiKey: currentKey(), model, contextSize, allowActions,
+      inputPrice, outputPrice, advanced: parsed.value, proactiveInsightsSummary });
 
     setSaving(true);
     try {

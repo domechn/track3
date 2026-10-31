@@ -23,7 +23,8 @@ import { ProUsageRows } from "@/components/pro-usage-rows";
 import { SystemInfoCard, subscriptionSummary } from "@/components/system-info-card";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
-import { getVersion, trackEventWithClientID } from "@/utils/app";
+import { getVersion } from "@/utils/app";
+import { trackCheckoutCompleted, trackCheckoutPhase, trackSubscribeClicked, trackCheckoutCancelled, trackOpenClicked } from "@/middlelayers/ui-state/telemetry";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/mobile/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
@@ -157,10 +158,10 @@ const App = ({
         setCheckoutError(error);
         if (phase === "completed") {
           toast({ description: tRef.current("system.checkout.completed") });
-          void trackEventWithClientID("subscription_checkout_completed").catch(() => {});
+          void trackCheckoutCompleted().catch(() => {});
         }
         if (phase === "expired" || phase === "timed-out" || phase === "error") {
-          void trackEventWithClientID(`subscription_checkout_${phase === "timed-out" ? "timed_out" : phase}`).catch(() => {});
+          void trackCheckoutPhase(phase).catch(() => {});
         }
       },
     );
@@ -223,19 +224,19 @@ const App = ({
 
   async function onSubscribe(planType: "monthly" | "yearly") {
     if (isIOS()) return;
-    void trackEventWithClientID("subscription_subscribe_clicked", { planType }).catch(() => {});
+    void trackSubscribeClicked({ planType }).catch(() => {});
     await checkoutRef.current?.start(planType);
   }
 
   function onCancelCheckout() {
     checkoutRef.current?.cancel();
-    void trackEventWithClientID("subscription_checkout_cancelled").catch(() => {});
+    void trackCheckoutCancelled().catch(() => {});
   }
 
   async function onManageSubscription() {
     setPortalLoading(true);
     try {
-      void trackEventWithClientID("subscription_open_clicked").catch(() => {});
+      void trackOpenClicked().catch(() => {});
       const { url } = await LicenseCenter.getInstance().getCustomerPortalUrl();
       await openUrl(url);
     } catch (err) {
