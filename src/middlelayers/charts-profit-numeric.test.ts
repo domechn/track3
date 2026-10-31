@@ -201,4 +201,113 @@ describe("numeric profit from refresh snapshots", () => {
     ], generate);
     expect((await calculateTotalProfit(range("2024-01-01T00:00:00.000Z", "2024-01-31T23:59:59.999Z"))).total).toBe(100);
   });
+
+  it("uses the midnight snapshot as the opening baseline when refresh is exactly at month start", async () => {
+    fixture.load([
+      { at: "2024-01-31T12:00:00.000Z", holdings: [holding("w1", 1, 100)] },
+      { at: "2024-02-01T00:00:00.000Z", holdings: [holding("w1", 1, 150)] },
+      { at: "2024-02-28T12:00:00.000Z", holdings: [holding("w1", 1, 160)] },
+    ], generate);
+    expect((await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"))).total).toBe(10);
+  });
+
+  it("shows only January, April and October for three snapshots", async () => {
+    fixture.load([
+      { at: "2024-01-04T12:00:00.000Z", holdings: [holding("w1", 1, 100)] },
+      { at: "2024-04-04T12:00:00.000Z", holdings: [holding("w1", 1, 140)] },
+      { at: "2024-10-04T12:00:00.000Z", holdings: [holding("w1", 1, 200)] },
+    ], generate);
+    const results = await Promise.all(Array.from({ length: 10 }, (_, month) =>
+      calculateTotalProfit(range(
+        new Date(Date.UTC(2024, month, 1)).toISOString(),
+        new Date(Date.UTC(2024, month + 1, 1) - 1).toISOString(),
+      ))));
+    expect(results.map((result) => result.lastRecordDate ? result.total : "—"))
+      .toEqual([0, "—", "—", 40, "—", "—", "—", "—", "—", 60]);
+  });
+
+  it("shows a value in every month with one snapshot per month", async () => {
+    fixture.load(Array.from({ length: 12 }, (_, month) => ({
+      at: new Date(Date.UTC(2024, month, 15, 12)).toISOString(),
+      holdings: [holding("w1", 1, 100 + month * 10)],
+    })), generate);
+    const results = await Promise.all(Array.from({ length: 12 }, (_, month) =>
+      calculateTotalProfit(range(
+        new Date(Date.UTC(2024, month, 1)).toISOString(),
+        new Date(Date.UTC(2024, month + 1, 1) - 1).toISOString(),
+      ))));
+    expect(results.map((result) => result.lastRecordDate ? result.total : "—"))
+      .toEqual([0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]);
+  });
+
+  it("uses the latest of several snapshots in each month", async () => {
+    fixture.load([
+      { at: "2024-01-01T12:00:00.000Z", holdings: [holding("w1", 1, 100)] },
+      { at: "2024-01-15T12:00:00.000Z", holdings: [holding("w1", 1, 110)] },
+      { at: "2024-01-31T12:00:00.000Z", holdings: [holding("w1", 1, 120)] },
+      { at: "2024-02-02T12:00:00.000Z", holdings: [holding("w1", 1, 130)] },
+      { at: "2024-02-15T12:00:00.000Z", holdings: [holding("w1", 1, 140)] },
+      { at: "2024-02-28T12:00:00.000Z", holdings: [holding("w1", 1, 150)] },
+    ], generate);
+    expect((await calculateTotalProfit(range("2024-01-01T00:00:00.000Z", "2024-01-31T23:59:59.999Z"))).total).toBe(20);
+    expect((await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"))).total).toBe(30);
+  });
+
+  it.each(["Asia/Shanghai", "Etc/GMT+8"])("assigns first and last day refreshes to local months in %s", async (tz) => {
+    const previousTZ = process.env.TZ;
+    process.env.TZ = tz;
+    try {
+      const at = (month: number, day: number, hour: number, minute: number, second: number) =>
+        new Date(2024, month, day, hour, minute, second).toISOString();
+      const janLast = at(0, 31, 23, 59, 59);
+      const febFirst = at(1, 1, 0, 0, 0);
+      fixture.load([
+        { at: at(0, 1, 0, 0, 0), holdings: [holding("w1", 1, 100)] },
+        { at: janLast, holdings: [holding("w1", 1, 120)] },
+        { at: febFirst, holdings: [holding("w1", 1, 150)] },
+        { at: at(1, 29, 23, 59, 59), holdings: [holding("w1", 1, 160)] },
+      ], generate);
+      const jan = await calculateTotalProfit({ start: new Date(2024, 0, 1), end: new Date(new Date(2024, 1, 1).getTime() - 1) });
+      const feb = await calculateTotalProfit({ start: new Date(2024, 1, 1), end: new Date(new Date(2024, 2, 1).getTime() - 1) });
+      expect(jan.lastRecordDate).toEqual(new Date(janLast));
+      expect(jan.total).toBe(20);
+      expect(feb.lastRecordDate).toEqual(new Date(at(1, 29, 23, 59, 59)));
+      expect(feb.total).toBe(10);
+    } finally {
+      if (previousTZ === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTZ;
+    }
+  });
+
+  it("reads every month despite more than 20 snapshots in January", async () => {
+    fixture.load([
+      ...Array.from({ length: 25 }, (_, day) => ({
+        at: new Date(Date.UTC(2024, 0, day + 1, 12)).toISOString(),
+        holdings: [holding("w1", 1, 100 + day)],
+      })),
+      { at: "2024-02-10T12:00:00.000Z", holdings: [holding("w1", 1, 130)] },
+    ], generate);
+    expect((await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"))).total).toBe(6);
+  });
+
+  it("does not present a transactions-only month as a valued snapshot", async () => {
+    fixture.load([
+      { at: "2024-01-04T12:00:00.000Z", holdings: [holding("w1", 1, 100)] },
+    ], generate);
+    fixture.db.txns.push({
+      id: 99, assetID: fixture.db.assets[0].id, uuid: "transaction-only",
+      assetType: "crypto", wallet: "w1", symbol: "BTC", amount: 1, price: 100,
+      txnType: "deposit", txnCreatedAt: "2024-02-04T12:00:00.000Z",
+      createdAt: "2024-02-04T12:00:00.000Z", updatedAt: "2024-02-04T12:00:00.000Z",
+    });
+    fixture.db.txns.push({
+      id: 100, assetID: fixture.db.assets[0].id, uuid: "transaction-only",
+      assetType: "crypto", wallet: "w1", symbol: "BTC", amount: 1, price: 100,
+      txnType: "withdraw", txnCreatedAt: "2024-02-05T12:00:00.000Z",
+      createdAt: "2024-02-05T12:00:00.000Z", updatedAt: "2024-02-05T12:00:00.000Z",
+    });
+    const result = await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"));
+    expect(result.lastRecordDate).toBeUndefined();
+    expect(result.total).toBe(0);
+  });
 });
