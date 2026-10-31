@@ -1,0 +1,492 @@
+{
+  "desktop.configuration": {
+    "configs": {
+      "groupUSD": true,
+      "hideInactive": false
+    },
+    "exchanges": [
+      {
+        "name": "binance",
+        "alias": "Alias binance",
+        "initParams": {
+          "apiKey": "key-binance",
+          "secret": "secret-binance"
+        },
+        "active": true
+      },
+      {
+        "name": "okex",
+        "alias": "Alias okex",
+        "initParams": {
+          "apiKey": "key-okex",
+          "secret": "secret-okex",
+          "password": "okx-password"
+        },
+        "active": true
+      },
+      {
+        "name": "bitget",
+        "alias": "Alias bitget",
+        "initParams": {
+          "apiKey": "key-bitget",
+          "secret": "secret-bitget",
+          "passphrase": "bitget-passphrase"
+        },
+        "active": true
+      },
+      {
+        "name": "gate",
+        "alias": "Alias gate",
+        "initParams": {
+          "apiKey": "key-gate",
+          "secret": "secret-gate"
+        },
+        "active": true
+      },
+      {
+        "name": "kraken",
+        "alias": "Alias kraken",
+        "initParams": {
+          "apiKey": "key-kraken",
+          "secret": "secret-kraken"
+        },
+        "active": true
+      },
+      {
+        "name": "coinbase",
+        "alias": "Alias coinbase",
+        "initParams": {
+          "apiKey": "key-coinbase",
+          "secret": "secret-coinbase"
+        },
+        "active": true
+      },
+      {
+        "name": "bybit",
+        "alias": "Alias bybit",
+        "initParams": {
+          "apiKey": "key-bybit",
+          "secret": "secret-bybit"
+        },
+        "active": true
+      },
+      {
+        "name": "htx",
+        "alias": "Alias htx",
+        "initParams": {
+          "apiKey": "key-htx",
+          "secret": "secret-htx"
+        },
+        "active": true
+      },
+      {
+        "name": "mexc",
+        "alias": "Alias mexc",
+        "initParams": {
+          "apiKey": "key-mexc",
+          "secret": "secret-mexc"
+        },
+        "active": true
+      },
+      {
+        "name": "backpack",
+        "alias": "Alias backpack",
+        "initParams": {
+          "apiKey": "key-backpack",
+          "secret": "secret-backpack"
+        },
+        "active": true
+      }
+    ],
+    "stockConfig": {
+      "brokers": [
+        {
+          "name": "ibkr",
+          "alias": "Stocks",
+          "initParams": {
+            "token": "broker-token",
+            "queryId": "broker-query"
+          },
+          "active": true
+        }
+      ]
+    },
+    "btc": {
+      "addresses": [
+        {
+          "alias": "Bitcoin",
+          "address": "btc-wallet",
+          "active": true
+        }
+      ]
+    },
+    "erc20": {
+      "addresses": [
+        {
+          "alias": "EVM",
+          "address": "evm-wallet",
+          "active": true
+        }
+      ]
+    },
+    "sol": {
+      "addresses": [
+        {
+          "alias": "Solana",
+          "address": "sol-wallet",
+          "active": true
+        }
+      ]
+    },
+    "doge": {
+      "addresses": [
+        {
+          "alias": "Dogecoin",
+          "address": "doge-wallet",
+          "active": true
+        }
+      ]
+    },
+    "trc20": {
+      "addresses": [
+        {
+          "alias": "Tron",
+          "address": "tron-wallet",
+          "active": true
+        }
+      ]
+    },
+    "ton": {
+      "addresses": [
+        {
+          "alias": "Ton",
+          "address": "ton-wallet",
+          "active": true
+        }
+      ]
+    },
+    "sui": {
+      "addresses": [
+        {
+          "alias": "Sui",
+          "address": "sui-wallet",
+          "active": true
+        }
+      ]
+    },
+    "others": [
+      {
+        "symbol": "OTHER",
+        "alias": "Manual",
+        "amount": 2.5,
+        "attachTo": {
+          "kind": "wallet",
+          "type": "btc",
+          "identity": "btc-wallet"
+        }
+      }
+    ]
+  },
+  "mobile.configuration": {
+    "configs": {
+      "groupUSD": true,
+      "hideInactive": false
+    },
+    "exchanges": [
+      {
+        "name": "binance",
+        "alias": "Alias binance",
+        "initParams": {
+          "apiKey": "key-binance",
+          "secret": "secret-binance"
+        },
+        "active": true
+      },
+      {
+        "name": "okex",
+        "alias": "Alias okex",
+        "initParams": {
+          "apiKey": "key-okex",
+          "secret": "secret-okex",
+          "password": "okx-password"
+        },
+        "active": true
+      },
+      {
+        "name": "bitget",
+        "alias": "Alias bitget",
+        "initParams": {
+          "apiKey": "key-bitget",
+          "secret": "secret-bitget",
+          "passphrase": "bitget-passphrase"
+        },
+        "active": true
+      },
+      {
+        "name": "gate",
+        "alias": "Alias gate",
+        "initParams": {
+          "apiKey": "key-gate",
+          "secret": "secret-gate"
+        },
+        "active": true
+      },
+      {
+        "name": "kraken",
+        "alias": "Alias kraken",
+        "initParams": {
+          "apiKey": "key-kraken",
+          "secret": "secret-kraken"
+        },
+        "active": true
+      },
+      {
+        "name": "coinbase",
+        "alias": "Alias coinbase",
+        "initParams": {
+          "apiKey": "key-coinbase",
+          "secret": "secret-coinbase"
+        },
+        "active": true
+      },
+      {
+        "name": "bybit",
+        "alias": "Alias bybit",
+        "initParams": {
+          "apiKey": "key-bybit",
+          "secret": "secret-bybit"
+        },
+        "active": true
+      },
+      {
+        "name": "htx",
+        "alias": "Alias htx",
+        "initParams": {
+          "apiKey": "key-htx",
+          "secret": "secret-htx"
+        },
+        "active": true
+      },
+      {
+        "name": "mexc",
+        "alias": "Alias mexc",
+        "initParams": {
+          "apiKey": "key-mexc",
+          "secret": "secret-mexc"
+        },
+        "active": true
+      },
+      {
+        "name": "backpack",
+        "alias": "Alias backpack",
+        "initParams": {
+          "apiKey": "key-backpack",
+          "secret": "secret-backpack"
+        },
+        "active": true
+      }
+    ],
+    "stockConfig": {
+      "brokers": [
+        {
+          "name": "ibkr",
+          "alias": "Stocks",
+          "initParams": {
+            "token": "broker-token",
+            "queryId": "broker-query"
+          },
+          "active": true
+        }
+      ]
+    },
+    "btc": {
+      "addresses": [
+        {
+          "alias": "Bitcoin",
+          "address": "btc-wallet",
+          "active": true
+        }
+      ]
+    },
+    "erc20": {
+      "addresses": [
+        {
+          "alias": "EVM",
+          "address": "evm-wallet",
+          "active": true
+        }
+      ]
+    },
+    "sol": {
+      "addresses": [
+        {
+          "alias": "Solana",
+          "address": "sol-wallet",
+          "active": true
+        }
+      ]
+    },
+    "doge": {
+      "addresses": [
+        {
+          "alias": "Dogecoin",
+          "address": "doge-wallet",
+          "active": true
+        }
+      ]
+    },
+    "trc20": {
+      "addresses": [
+        {
+          "alias": "Tron",
+          "address": "tron-wallet",
+          "active": true
+        }
+      ]
+    },
+    "ton": {
+      "addresses": [
+        {
+          "alias": "Ton",
+          "address": "ton-wallet",
+          "active": true
+        }
+      ]
+    },
+    "sui": {
+      "addresses": [
+        {
+          "alias": "Sui",
+          "address": "sui-wallet",
+          "active": true
+        }
+      ]
+    },
+    "others": [
+      {
+        "symbol": "OTHER",
+        "alias": "Manual",
+        "amount": 2.5,
+        "attachTo": {
+          "kind": "wallet",
+          "type": "btc",
+          "identity": "btc-wallet"
+        }
+      }
+    ]
+  },
+  "desktop.chat": [
+    {
+      "role": "user",
+      "content": "What changed?"
+    },
+    {
+      "role": "assistant",
+      "usage": {
+        "promptTokens": 12,
+        "completionTokens": 7,
+        "source": "reported"
+      },
+      "contextTokens": 2048,
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "Your holdings increased."
+        },
+        {
+          "kind": "pending_action",
+          "id": "action-1",
+          "toolCallId": "call-1",
+          "name": "set_date_range",
+          "args": {
+            "from": "2024-04-01",
+            "to": "2024-04-16"
+          },
+          "preview": {
+            "before": "Old dates",
+            "after": "New dates"
+          },
+          "risk": "low",
+          "status": "pending",
+          "createdAt": "2024-04-16T12:00:00.000Z",
+          "expiresAt": "2024-04-16T13:00:00.000Z"
+        }
+      ]
+    }
+  ],
+  "mobile.chat": [
+    {
+      "role": "user",
+      "content": "What changed?"
+    },
+    {
+      "role": "assistant",
+      "usage": {
+        "promptTokens": 12,
+        "completionTokens": 7,
+        "source": "reported"
+      },
+      "contextTokens": 2048,
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "Your holdings increased."
+        },
+        {
+          "kind": "pending_action",
+          "id": "action-1",
+          "toolCallId": "call-1",
+          "name": "set_date_range",
+          "args": {
+            "from": "2024-04-01",
+            "to": "2024-04-16"
+          },
+          "preview": {
+            "before": "Old dates",
+            "after": "New dates"
+          },
+          "risk": "low",
+          "status": "pending",
+          "createdAt": "2024-04-16T12:00:00.000Z",
+          "expiresAt": "2024-04-16T13:00:00.000Z"
+        }
+      ]
+    }
+  ],
+  "desktop.alert": {
+    "id": 0,
+    "kind": "total_value_target",
+    "assetType": null,
+    "symbol": null,
+    "comparator": "gte",
+    "threshold": 1000,
+    "window": null,
+    "enabled": true,
+    "cooldownSeconds": 2700,
+    "lastTriggeredAt": null,
+    "lastValue": null,
+    "armed": true
+  },
+  "mobile.alert": {
+    "id": 0,
+    "kind": "total_value_target",
+    "assetType": null,
+    "symbol": null,
+    "comparator": "gte",
+    "threshold": 1000,
+    "window": null,
+    "enabled": true,
+    "cooldownSeconds": 2700,
+    "lastTriggeredAt": null,
+    "lastValue": null,
+    "armed": true
+  },
+  "desktop.comparison": "{\"base\":\"2024-04-15\",\"head\":\"2024-04-16\"}",
+  "desktop.costBasis": "{\"from\":\"2024-01-01\",\"to\":\"2024-12-31\",\"holdingPeriodDays\":400}",
+  "desktop.rebalance": "{\"mode\":\"buys\",\"injectedCash\":42.5,\"minimumTradeValue\":3,\"ignoreBelowValue\":2}",
+  "desktop.sourceStatuses": "[{\"sourceId\":\"wallet:btc\",\"label\":\"Bitcoin\",\"status\":\"stale\",\"category\":\"network\",\"kind\":\"wallet\",\"lastSuccessAt\":\"2024-04-15T00:00:00.000Z\"}]",
+  "mobile.comparison": "{\"base\":\"2024-04-15\",\"head\":\"2024-04-16\"}",
+  "mobile.costBasis": "{\"from\":\"2024-01-01\",\"to\":\"2024-12-31\",\"holdingPeriodDays\":400}",
+  "mobile.rebalance": "{\"mode\":\"buys\",\"injectedCash\":42.5,\"minimumTradeValue\":3,\"ignoreBelowValue\":2}",
+  "mobile.sourceStatuses": "[{\"sourceId\":\"wallet:btc\",\"label\":\"Bitcoin\",\"status\":\"stale\",\"category\":\"network\",\"kind\":\"wallet\",\"lastSuccessAt\":\"2024-04-15T00:00:00.000Z\"}]"
+}

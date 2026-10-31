@@ -170,8 +170,9 @@ mod sync_tests {
 #[cfg(test)]
 mod init_schema_tests {
     use super::migration::run_migrations;
+    use sha2::{Digest, Sha256};
     use sqlx::{Connection, Executor, SqliteConnection};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     const NEW_TABLE_SCRIPTS: [(&str, &str, &str); 4] = [
         ("rebalance_profiles_up.sql", include_str!("../../migrations/init/rebalance_profiles_up.sql"), include_str!("../../migrations/v08t09/rebalance_profiles_up.sql")),
@@ -180,12 +181,24 @@ mod init_schema_tests {
         ("sync_state_up.sql", include_str!("../../migrations/init/sync_state_up.sql"), include_str!("../../migrations/v08t09/sync_state_up.sql")),
     ];
 
+    fn initialization_scripts() -> Vec<&'static str> {
+        include_str!("../../src/database_path.rs")
+            .split_once("const INITIALIZATION_SCRIPTS:")
+            .unwrap()
+            .1
+            .split_once("];")
+            .unwrap()
+            .0
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix('"')?.split('"').next())
+            .collect()
+    }
+
     #[test]
     fn init_and_v08t09_copies_of_the_new_tables_are_identical_and_registered() {
-        let database_path_rs = include_str!("../../src/database_path.rs");
         for (name, init, versioned) in NEW_TABLE_SCRIPTS {
             assert_eq!(init, versioned, "{name} differs between init and v08t09");
-            assert!(database_path_rs.contains(&format!("\"{name}\"")), "{name} missing from INITIALIZATION_SCRIPTS");
+            assert!(initialization_scripts().contains(&name), "{name} missing from INITIALIZATION_SCRIPTS");
         }
     }
 
@@ -198,19 +211,9 @@ mod init_schema_tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime.block_on(async {
             let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
-            for sql in [
-                include_str!("../../migrations/init/configuration_up.sql"),
-                include_str!("../../migrations/init/assets_v2_up.sql"),
-                include_str!("../../migrations/init/currency_rates_up.sql"),
-                include_str!("../../migrations/init/asset_prices_up.sql"),
-                include_str!("../../migrations/init/transactions_up.sql"),
-                include_str!("../../migrations/init/chat_sessions_up.sql"),
-                include_str!("../../migrations/init/cloud_sync_up.sql"),
-            ] {
-                db.execute(sql).await.unwrap();
-            }
-            for (_, init, _) in NEW_TABLE_SCRIPTS {
-                db.execute(init).await.unwrap();
+            for name in initialization_scripts() {
+                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap();
+                db.execute(sql.as_str()).await.unwrap();
             }
             db.close().await.unwrap();
             run_migrations(&db_path, &resource_dir, "0.9.0").await.unwrap();
@@ -224,6 +227,82 @@ mod init_schema_tests {
             db.close().await.unwrap();
         });
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    // Regenerate only against the released 0.9.4 code: UPDATE_GOLDEN=1 cargo test --locked -p track3-pure-tests schema_dump_matches_0_9_4
+    #[test]
+    fn schema_dump_matches_0_9_4() {
+        let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let fixture_dir = resource_dir.join("tests/fixtures");
+        let root =
+            std::env::temp_dir().join(format!("track3-schema-golden-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let db_path = root.join("fresh.db");
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let schema = runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            for name in initialization_scripts() {
+                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap();
+                db.execute(sql.as_str()).await.unwrap();
+            }
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.4")
+                .await
+                .unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display()))
+                .await
+                .unwrap();
+            let rows: Vec<(String, String, String, Option<String>)> =
+                sqlx::query_as("SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY name")
+                    .fetch_all(&mut db)
+                    .await
+                    .unwrap();
+            db.close().await.unwrap();
+            rows.into_iter()
+                .map(|row| serde_json::to_string(&row).unwrap())
+                .collect::<Vec<_>>()
+                .join("\n")
+                + "\n"
+        });
+        std::fs::remove_dir_all(root).unwrap();
+
+        fn collect_sql_files(dir: &Path, scripts: &mut Vec<PathBuf>) {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    collect_sql_files(&path, scripts);
+                } else if path.extension().is_some_and(|ext| ext == "sql") {
+                    scripts.push(path);
+                }
+            }
+        }
+        let mut scripts = Vec::new();
+        collect_sql_files(&resource_dir.join("migrations"), &mut scripts);
+        scripts.sort();
+        let hashes = scripts
+            .iter()
+            .map(|path| {
+                let hash = Sha256::digest(std::fs::read(path).unwrap());
+                let relative = path.strip_prefix(&resource_dir).unwrap();
+                format!("{hash:x}  {}", relative.display())
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        if std::env::var("UPDATE_GOLDEN").as_deref() == Ok("1") {
+            std::fs::create_dir_all(&fixture_dir).unwrap();
+            std::fs::write(fixture_dir.join("schema-0.9.4.txt"), &schema).unwrap();
+            std::fs::write(fixture_dir.join("migrations.sha256"), &hashes).unwrap();
+        }
+        assert_eq!(
+            schema,
+            std::fs::read_to_string(fixture_dir.join("schema-0.9.4.txt")).unwrap()
+        );
+        assert_eq!(
+            hashes,
+            std::fs::read_to_string(fixture_dir.join("migrations.sha256")).unwrap()
+        );
     }
 }
 

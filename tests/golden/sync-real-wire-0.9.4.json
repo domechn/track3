@@ -1,0 +1,139 @@
+{
+  "devices/00000000-0000-4000-8000-000000000001/config/02cebc1d99ad9e1a88db0082537a04b20888493f5e1771a6ac334c86143dd87c": {
+    "value": "{\"targets\":\"[{\\\"symbol\\\":\\\"BTC\\\",\\\"percent\\\":50}]\",\"tolerance_percent\":2.5}",
+    "clock": {
+      "ms": 1713272400000,
+      "counter": 2,
+      "deviceId": "00000000-0000-4000-8000-000000000001"
+    }
+  },
+  "devices/00000000-0000-4000-8000-000000000001/config/2731a8de7b8312ad9a3d13c7ca6b9720545c16c06ca294b487e82da319f92811": {
+    "value": "fake-secret-json",
+    "clock": {
+      "ms": 1713272400000,
+      "counter": 1,
+      "deviceId": "00000000-0000-4000-8000-000000000001"
+    }
+  },
+  "devices/00000000-0000-4000-8000-000000000001/config/69d69c504ad968340cd813538ba3d600cd65e116475e4e27bbdaf61429330f96": {
+    "value": "USD",
+    "clock": {
+      "ms": 1713272400000,
+      "counter": 0,
+      "deviceId": "00000000-0000-4000-8000-000000000001"
+    }
+  },
+  "devices/00000000-0000-4000-8000-000000000001/manifest": {
+    "version": 1,
+    "deviceId": "00000000-0000-4000-8000-000000000001",
+    "name": "Golden device",
+    "entries": [
+      {
+        "kind": "snapshot",
+        "id": "snapshot-000000",
+        "version": "1",
+        "bytes": 1184,
+        "sha256": "17d2b2915680841da27b9b1416337a0fbfefde6f708a605e71657798983e055a"
+      },
+      {
+        "kind": "config",
+        "id": "7",
+        "version": "1713272400000-0",
+        "bytes": 220,
+        "sha256": "3b4be286960d5b6949865b188d8fa625401c6e3c913c1fa8c8ed206b43f5f11e"
+      },
+      {
+        "kind": "config",
+        "id": "10",
+        "version": "1713272400000-1",
+        "bytes": 236,
+        "sha256": "debcf412eb2ad5444def4c6ae21f2eeb2f486abfb211e40880287bc02e60e5b8"
+      },
+      {
+        "kind": "config",
+        "id": "rebalance",
+        "version": "1713272400000-2",
+        "bytes": 340,
+        "sha256": "9d0a50cd63c5cc10c24af7c7039fe3acd236f54bca0bc3c652add6cdd08eea2c"
+      },
+      {
+        "kind": "session",
+        "id": "session-golden",
+        "version": "867495d234a9252c8246c803cd57570b99c3437c0c647c1919827f7e29ef0317",
+        "bytes": 464,
+        "sha256": "9a109f276d124b75a844dfb7dc74b45f2d3834c053293c7e29391e850094b85b"
+      }
+    ]
+  },
+  "devices/00000000-0000-4000-8000-000000000001/session/826aa64aaba68785297656dad8f8c5c1a0b5eba466674edc2c778ed0bd46b0e2": {
+    "id": "session-golden",
+    "title": "Golden chat",
+    "createdAt": "2022-01-01T00:00:00.000Z",
+    "updatedAt": "2022-01-01T00:00:00.000Z",
+    "pinned": 0,
+    "messageCount": 1,
+    "preview": "Hello",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello",
+        "id": "590c76015a351d60063318f190843d4f",
+        "at": "2022-01-01T00:00:00.000Z"
+      }
+    ]
+  },
+  "devices/00000000-0000-4000-8000-000000000001/snapshot/abdef40a5a970aa373c28a067b5b685440bbb25c5e9de2835b8afdb7c4f3578f": {
+    "uuid": "snapshot-000000",
+    "assets": [
+      {
+        "id": 1,
+        "uuid": "snapshot-000000",
+        "createdAt": "2022-01-01T00:00:00.000Z",
+        "wallet": "wallet-golden",
+        "asset_type": "crypto",
+        "symbol": "ASSET0",
+        "amount": 1,
+        "value": 1,
+        "price": 1
+      },
+      {
+        "id": 2,
+        "uuid": "snapshot-000000",
+        "createdAt": "2022-01-01T00:00:00.000Z",
+        "wallet": "wallet-golden",
+        "asset_type": "crypto",
+        "symbol": "ASSET1",
+        "amount": 1,
+        "value": 2,
+        "price": 2
+      }
+    ],
+    "prices": [
+      {
+        "id": 1,
+        "uuid": "snapshot-000000",
+        "assetID": 1,
+        "symbol": "ASSET0",
+        "price": 1,
+        "assetCreatedAt": "2022-01-01T00:00:00.000Z",
+        "updatedAt": "2022-01-01T00:00:00.000Z"
+      }
+    ],
+    "transactions": [
+      {
+        "id": 1,
+        "uuid": "snapshot-000000",
+        "assetID": 1,
+        "asset_type": "crypto",
+        "wallet": "wallet-golden",
+        "symbol": "ASSET0",
+        "amount": 1,
+        "price": 1,
+        "txnType": "buy",
+        "txnCreatedAt": "2022-01-01T00:00:00.000Z",
+        "createdAt": "2022-01-01T00:00:00.000Z",
+        "updatedAt": "2022-01-01T00:00:00.000Z"
+      }
+    ]
+  }
+}

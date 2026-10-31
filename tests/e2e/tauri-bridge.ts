@@ -5,6 +5,7 @@ import type { Page } from "@playwright/test";
 import initSqlJs from "sql.js";
 import md5 from "md5";
 import { FakeS3, S3Error } from "../../src/middlelayers/sync/object-store";
+import { hourlyHistory } from "../../src/test/history-fixtures";
 
 const schemaFiles = [
   "assets_v2", "asset_prices", "transactions", "chat_sessions",
@@ -32,6 +33,8 @@ type BridgeOptions = {
   quotaExhaustedFixture?: boolean;
   preflightExhaustedFixture?: boolean;
   checkoutFixture?: boolean;
+  goldenHistory?: boolean;
+  appVersion?: string;
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
@@ -59,6 +62,8 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     quotaExhaustedFixture = false,
     preflightExhaustedFixture = false,
     checkoutFixture = false,
+    goldenHistory = false,
+    appVersion = "0.8.2",
   } = options;
   if (!options.onboarding) {
     await page.addInitScript(() => localStorage.setItem("track3-onboarding-v1", "completed"));
@@ -83,6 +88,20 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       (994, '!ent:e2e:ai'),
       (998, 'e2e-client');
   `);
+  if (goldenHistory) {
+    db.run("DELETE FROM assets_v2");
+    db.run("DELETE FROM sqlite_sequence WHERE name = 'assets_v2'");
+    db.run("UPDATE configuration SET data = 'golden-client' WHERE id = 998");
+    for (const snapshot of hourlyHistory(2, 2)) {
+      for (const asset of snapshot.assets) {
+        db.run("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES (?, ?, 'wallet-golden', 'crypto', ?, ?, ?, ?)",
+          [snapshot.id, snapshot.createdAt, asset.symbol, asset.amount, asset.value, asset.price]);
+      }
+    }
+    db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt)
+      VALUES ('snapshot-000001', 3, 'crypto', 'wallet-golden', 'ASSET0', 1, 2, 'buy',
+      '2022-01-01T01:00:00.000Z', '2022-01-01T01:00:00.000Z', '2022-01-01T01:00:00.000Z')`);
+  }
   if (checkoutFixture) db.run("DELETE FROM configuration WHERE id = 997");
   db.run("INSERT INTO configuration (id, data) VALUES (12, ?)",
     ["configs:\n  groupUSD: false\nothers:\n  - symbol: BTC\n    amount: 2\n"]);
@@ -333,7 +352,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       return exportedPath;
     }
     if (cmd === "plugin:dialog|open") return exportedPath;
-    if (cmd === "plugin:app|version") return "0.8.2";
+    if (cmd === "plugin:app|version") return appVersion;
     if (cmd === "plugin:app|tauri_version") return "2.11.1";
     if (cmd === "plugin:updater|check") return null;
     if (cmd === "plugin:event|listen") return nextRid++;
@@ -703,6 +722,12 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     };
   }, richPortfolio);
   return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, httpRequests: () => requests.size, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares,
+    historyIds: () => select("SELECT DISTINCT uuid FROM assets_v2 ORDER BY uuid").map((row) => row.uuid),
+    exportedFile: () => exportedPath === null ? null : files.get(exportedPath) ?? null,
+    setImportFile: (text: string) => {
+      exportedPath = "/e2e/documents/track3-import-golden.json";
+      files.set(exportedPath, text);
+    },
     openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; },
     setPublicIpMode: (mode: "loading" | "value" | "error") => { publicIpMode = mode; }, publicIpRequests: () => publicIpRequests };
 }

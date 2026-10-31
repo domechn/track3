@@ -119,7 +119,7 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
   );
 }
 
-function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {
+export function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {
   if (msg.role === "user") {
     return { role: "user", content: msg.content };
   }
@@ -133,7 +133,7 @@ function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {
   };
 }
 
-function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
+export function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
   if (msg.role === "user") {
     return { role: "user", content: msg.content };
   }

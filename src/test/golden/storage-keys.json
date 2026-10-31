@@ -1,0 +1,19 @@
+{
+  "exact": [
+    "track3-ui-theme",
+    "track3-ui-locale",
+    "track3-prefer-currency",
+    "track3-onboarding-v1",
+    "track3-current-date-range",
+    "track3-current-comparison-dates",
+    "track3-assistant-date-range",
+    "track3-assistant-comparison-dates",
+    "track3-cost-basis-settings",
+    "track3-rebalance-options",
+    "track3-refresh-source-statuses",
+    "track3-insight-question",
+    "track3-pending-assistant-question",
+    "track3-pending-checkout"
+  ],
+  "prefixes": ["track3-cache-epoch/", "total-profit/"]
+}

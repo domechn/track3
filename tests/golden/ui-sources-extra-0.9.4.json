@@ -1,0 +1,82 @@
+{
+  "desktop": {
+    "hideInactive": true,
+    "inactiveExchange": {
+      "name": "binance",
+      "alias": "Inactive exchange",
+      "initParams": {
+        "apiKey": "key-binance",
+        "secret": "secret-binance"
+      },
+      "active": false
+    },
+    "others": [
+      {
+        "symbol": "OTHER",
+        "alias": "Manual",
+        "amount": 2.5,
+        "attachTo": {
+          "kind": "wallet",
+          "type": "btc",
+          "identity": "btc-wallet"
+        }
+      },
+      {
+        "symbol": "CEXOTHER",
+        "alias": "Exchange manual",
+        "amount": 3,
+        "attachTo": {
+          "kind": "cex",
+          "type": "binance",
+          "identity": "binance-account"
+        }
+      },
+      {
+        "symbol": "FREEOTHER",
+        "alias": "Unattached manual",
+        "amount": 4
+      }
+    ]
+  },
+  "mobile": {
+    "hideInactive": true,
+    "inactiveExchange": {
+      "name": "binance",
+      "alias": "Inactive exchange",
+      "initParams": {
+        "apiKey": "key-binance",
+        "secret": "secret-binance"
+      },
+      "active": false
+    },
+    "others": [
+      {
+        "symbol": "OTHER",
+        "alias": "Manual",
+        "amount": 2.5,
+        "attachTo": {
+          "kind": "wallet",
+          "type": "btc",
+          "identity": "btc-wallet"
+        }
+      },
+      {
+        "symbol": "CEXOTHER",
+        "alias": "Exchange manual",
+        "amount": 3,
+        "attachTo": {
+          "kind": "cex",
+          "type": "binance",
+          "identity": "binance-account"
+        }
+      },
+      {
+        "symbol": "FREEOTHER",
+        "alias": "Unattached manual",
+        "amount": 4
+      }
+    ]
+  },
+  "desktop.refreshedStatus": "[{\"sourceId\":\"cex:0\",\"label\":\"Exchange\",\"status\":\"stale\",\"category\":\"network\",\"kind\":\"exchange\",\"lastSuccessAt\":\"2024-04-15T00:00:00.000Z\"}]",
+  "mobile.refreshedStatus": "[{\"sourceId\":\"cex:0\",\"label\":\"Exchange\",\"status\":\"stale\",\"category\":\"network\",\"kind\":\"exchange\",\"lastSuccessAt\":\"2024-04-15T00:00:00.000Z\"}]"
+}

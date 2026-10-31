@@ -1,0 +1,17 @@
+{
+  "id": "session-golden",
+  "title": "Golden chat",
+  "createdAt": "2022-01-01T00:00:00.000Z",
+  "updatedAt": "2022-01-01T00:00:00.000Z",
+  "pinned": 0,
+  "messageCount": 1,
+  "preview": "Hello",
+  "messages": [
+    {
+      "id": "message-golden",
+      "at": "2022-01-01T00:00:00.000Z",
+      "role": "user",
+      "content": "Hello"
+    }
+  ]
+}
