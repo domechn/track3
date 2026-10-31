@@ -12,10 +12,7 @@ import {
 import { useToast } from "@/mobile/components/ui/use-toast";
 import {
   Analyzer,
-  GlobalConfig,
   OtherAttachment,
-  StockConfig,
-  TokenConfig,
 } from "@/middlelayers/datafetch/types";
 import { CurrencyRateDetail } from "@/middlelayers/types";
 import { listAllCurrencyRates } from "@/middlelayers/configuration";
@@ -47,6 +44,7 @@ import {
 import { useTranslation } from "@/mobile/i18n";
 import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
 import { classifySourceError } from "@/middlelayers/datafetch/utils/source-failure";
+import { configurationFromForm, configurationToForm, initialConfiguration } from "@/middlelayers/ui-state/config-form";
 import { isIOS } from "@/utils/platform";
 import { useSearchParams } from "react-router-dom";
 
@@ -75,25 +73,6 @@ import type {
 // ============================================================================
 // Constants (unchanged from original)
 // ============================================================================
-
-const initialConfiguration: GlobalConfig = {
-  configs: {
-    groupUSD: true,
-    hideInactive: false,
-  },
-  exchanges: [],
-  stockConfig: {
-    brokers: [],
-  },
-  erc20: { addresses: [] },
-  btc: { addresses: [] },
-  sol: { addresses: [] },
-  doge: { addresses: [] },
-  trc20: { addresses: [] },
-  ton: { addresses: [] },
-  sui: { addresses: [] },
-  others: [],
-};
 
 const defaultExChangeConfig = {
   type: "binance",
@@ -387,57 +366,13 @@ const App = ({
       .then((d) => {
         const globalConfig = d ?? initialConfiguration;
 
-        setGroupUSD(!!globalConfig.configs.groupUSD);
-        setHideInactive(!!globalConfig.configs.hideInactive);
-
-        setExchanges(
-          (globalConfig.exchanges || []).map((ex) => ({
-              type: ex.name,
-              alias: ex.alias,
-              apiKey: ex.initParams.apiKey,
-              secret: ex.initParams.secret,
-              password: ex.initParams.password,
-              passphrase: ex.initParams.passphrase,
-              active: ex.active ?? true,
-            })),
-        );
-
-        setStockBrokers(
-          ((globalConfig.stockConfig?.brokers ?? [])).map((broker) => ({
-              type: broker.name,
-              alias: broker.alias,
-              token: broker.initParams.token,
-              queryId: broker.initParams.queryId,
-              active: broker.active ?? true,
-            })),
-        );
-
-        setWallets(
-          Object.keys(globalConfig)
-            .filter(k => supportCoins.includes(k))
-            .flatMap((k: string) => {
-              const v = (globalConfig as any)[k];
-              const addresses = v?.addresses || [];
-              return addresses.map((a: any) => {
-                  if (typeof a === "string") {
-                    return { type: k, address: a, active: true };
-                  }
-                  const na = a as {
-                    address: string;
-                    alias?: string;
-                    active?: boolean;
-                  };
-                  return {
-                    type: k,
-                    address: na.address,
-                    alias: na.alias,
-                    active: na.active ?? true,
-                  };
-                });
-            })
-        );
-
-        setOthers(globalConfig.others);
+        const form = configurationToForm(globalConfig);
+        setGroupUSD(form.groupUSD);
+        setHideInactive(form.hideInactive);
+        setExchanges(form.exchanges);
+        setStockBrokers(form.stockBrokers);
+        setWallets(form.wallets);
+        setOthers(form.others);
       })
       .catch((e) => {
         toast({
@@ -458,7 +393,7 @@ const App = ({
   }
 
   function submitConfiguration() {
-    const globalConfig = convertFormDataToConfigurationData();
+    const globalConfig = configurationFromForm({ exchanges, stockBrokers, wallets, groupUSD, hideInactive, others });
     let saveError: Error | undefined;
     saveConfiguration(globalConfig)
       .then(() => notifyConfigurationSaved())
@@ -471,53 +406,6 @@ const App = ({
           });
         }
       });
-  }
-
-  function convertFormDataToConfigurationData(): GlobalConfig {
-    const exchangesData = exchanges.map((ex) => ({
-        name: ex.type,
-        alias: ex.alias,
-        initParams: {
-          apiKey: ex.apiKey,
-          secret: ex.secret,
-          password: ex.type !== "okex" ? undefined : ex.password,
-          passphrase: ex.type !== "bitget" ? undefined : ex.passphrase,
-        },
-        active: ex.active,
-      }));
-
-    const stockBrokerData: StockConfig = {
-      brokers: stockBrokers.map((broker) => ({
-          name: broker.type,
-          alias: broker.alias,
-          initParams: {
-            token: broker.token,
-            queryId: broker.queryId,
-          },
-          active: broker.active,
-        })),
-    };
-
-    const walletData = wallets.reduce<Record<string, { addresses: Array<{ alias?: string; address: string; active?: boolean }> }>>((acc, w) => {
-      if (!acc[w.type]) {
-        acc[w.type] = { addresses: [] }
-      }
-      acc[w.type].addresses.push({
-        alias: w.alias,
-        address: w.address,
-        active: w.active,
-      })
-      return acc
-    }, {}) as any as TokenConfig;
-
-    return {
-      configs: { groupUSD, hideInactive },
-      exchanges: exchangesData,
-      stockConfig: stockBrokerData,
-      ...Object.fromEntries(supportCoins.map((c) => [c, { addresses: [] }])),
-      ...walletData,
-      others,
-    };
   }
 
   async function buildLogoMap(

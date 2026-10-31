@@ -4,7 +4,7 @@ import { useTranslation } from "@/mobile/i18n";
 import {
   ALERTS_CHANGED_EVENT, acknowledgeAlert, acknowledgeAllAlerts, clearAlertHistory,
   deleteAlertRule, listAlertHistory, listAlertRules, loadAlertEvaluationData,
-  measureRule, saveAlertRule, setAlertRuleEnabled, validateAlertRule,
+  measureRule, saveAlertRule, setAlertRuleEnabled,
   type AlertComparator, type AlertHistory, type AlertKind, type AlertPrices,
   type AlertRule, type AlertSnapshot, type AlertWindow,
 } from "@/middlelayers/alerts";
@@ -12,6 +12,7 @@ import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlel
 import { formatAlert } from "@/middlelayers/alert-notifications";
 import type { RebalanceProfile } from "@/middlelayers/rebalance";
 import type { AssetType } from "@/middlelayers/datafetch/types";
+import { alertRuleFromDraft, alertDraftFromRule, needsAsset, needsWindow, type AlertDraft } from "@/middlelayers/ui-state/alert-draft";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Button } from "@/components/ui/button";
 import { formatPhoneMoney } from "@/mobile/currency";
@@ -33,17 +34,10 @@ import {
 import { isIOS } from "@/utils/platform";
 import { ModalPage } from "@/mobile/components/mobile/overlays";
 
-type Draft = {
-  id: number; kind: AlertKind; assetType: AssetType; symbol: string;
-  comparator: AlertComparator; threshold: string; window: AlertWindow;
-  cooldownMinutes: string;
-};
-const emptyDraft: Draft = {
+const emptyDraft: AlertDraft = {
   id: 0, kind: "total_value_target", assetType: "crypto", symbol: "",
   comparator: "gte", threshold: "", window: "24h", cooldownMinutes: "60",
 };
-const needsAsset = (kind: AlertKind) => ["asset_value_target", "asset_price_target", "asset_price_move", "allocation_deviation"].includes(kind);
-const needsWindow = (kind: AlertKind) => kind === "asset_price_move" || kind === "period_pnl" || kind === "portfolio_value_change";
 const templates: AlertKind[] = ["total_value_target", "asset_value_target", "asset_price_target", "asset_price_move", "allocation_deviation", "period_pnl", "portfolio_value_change"];
 const ruleIcons = {
   total_value_target: DashboardIcon,
@@ -60,7 +54,7 @@ const historySeverity = (kind: AlertKind) =>
 export default function GoalsAlerts() {
   const { t } = useTranslation();
   const dataChangedVersion = useDataChangedVersion();
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [draft, setDraft] = useState<AlertDraft>(emptyDraft);
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [history, setHistory] = useState<AlertHistory[]>([]);
   const [snapshots, setSnapshots] = useState<AlertSnapshot[]>([]);
@@ -114,19 +108,7 @@ export default function GoalsAlerts() {
   }, []);
 
   function toRule(): AlertRule {
-    const rule: AlertRule = {
-      id: draft.id, kind: draft.kind,
-      assetType: needsAsset(draft.kind) ? draft.assetType : null,
-      symbol: needsAsset(draft.kind) ? draft.symbol.trim() : null,
-      comparator: draft.comparator,
-      threshold: draft.threshold.trim() ? Number(draft.threshold) : Number.NaN,
-      window: needsWindow(draft.kind) ? draft.window : null,
-      enabled: true,
-      cooldownSeconds: draft.cooldownMinutes.trim() ? Number(draft.cooldownMinutes) * 60 : Number.NaN,
-      lastTriggeredAt: null, lastValue: null, armed: true,
-    };
-    validateAlertRule(rule);
-    return rule;
+    return alertRuleFromDraft(draft);
   }
 
   async function save() {
@@ -148,12 +130,7 @@ export default function GoalsAlerts() {
   }
 
   function edit(rule: AlertRule) {
-    setDraft({
-      id: rule.id, kind: rule.kind, assetType: rule.assetType ?? "crypto",
-      symbol: rule.symbol ?? "", comparator: rule.comparator,
-      threshold: String(rule.threshold), window: rule.window ?? "24h",
-      cooldownMinutes: String(rule.cooldownSeconds / 60),
-    });
+    setDraft(alertDraftFromRule(rule));
     setStatus("");
     if (isIOS()) setManualOpen(true);
     else document.getElementById("goal-rule-editor")?.scrollIntoView?.({ behavior: "smooth" });

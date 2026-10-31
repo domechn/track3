@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
-import { ASSISTANT_APP_ACTION_EVENT, COMPARISON_DATES_KEY, CURRENT_COMPARISON_DATES_KEY, validateActionArgs } from "@/middlelayers/ai/actions";
+import { ASSISTANT_APP_ACTION_EVENT, validateActionArgs } from "@/middlelayers/ai/actions";
+import { setCurrentComparisonDates, readAssistantComparisonDates, clearAssistantComparisonDates } from "@/middlelayers/ui-state/page-prefs";
 import bluebird from "bluebird";
 import {
   currencyWrapper,
@@ -83,24 +84,24 @@ const App = ({
   useEffect(() => {
     const base = dateOptions.find((option) => option.value === baseId)?.label;
     const head = dateOptions.find((option) => option.value === headId)?.label;
-    if (base && head) localStorage.setItem(CURRENT_COMPARISON_DATES_KEY, JSON.stringify({ base, head }));
+    if (base && head) setCurrentComparisonDates(base, head);
   }, [baseId, headId, dateOptions]);
   useEffect(() => {
     const applyAssistantDates = () => {
       try {
-        const raw = localStorage.getItem(COMPARISON_DATES_KEY);
-        if (!raw) return;
-        const dates = validateActionArgs("set_comparison_dates", JSON.parse(raw));
+        const raw = readAssistantComparisonDates();
+        if (raw === undefined) return;
+        const dates = validateActionArgs("set_comparison_dates", raw);
         const base = dateOptions.find((option) => option.label === dates.base);
         const head = dateOptions.find((option) => option.label === dates.head);
         if (base && head) {
-          localStorage.removeItem(COMPARISON_DATES_KEY);
+          clearAssistantComparisonDates();
           setCurrentQuickCompare(null);
           setBaseId(base.value);
           setHeadId(head.value);
         }
       } catch {
-        localStorage.removeItem(COMPARISON_DATES_KEY);
+        clearAssistantComparisonDates();
       }
     };
     applyAssistantDates();
@@ -401,7 +402,7 @@ const App = ({
   }
 
   function onDateChange(id: string, type: "base" | "head") {
-    localStorage.removeItem(COMPARISON_DATES_KEY);
+    clearAssistantComparisonDates();
     setCurrentQuickCompare(null);
     if (type === "base") {
       setBaseId(id);
@@ -496,7 +497,7 @@ const App = ({
   }
 
   function onQuickCompareButtonClick(type: QuickCompareType) {
-    localStorage.removeItem(COMPARISON_DATES_KEY);
+    clearAssistantComparisonDates();
     setCurrentQuickCompare(type);
     if (isMobile) haptic("selection");
   }

@@ -6,7 +6,8 @@ import {
 import type { RefreshOperation } from "@/middlelayers/charts-refresh";
 import type { PortfolioSourceResult, PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
 import { v4 as uuidv4 } from "uuid";
-import { trackEventWithClientID } from "@/utils/app";
+import { trackRefreshEvent } from "@/middlelayers/ui-state/telemetry";
+import { retries, retryInterval, readStoredStatuses, writeStoredStatuses, retryRefresh, mobileRefreshOptions } from "@/middlelayers/ui-state/source-status-store";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +28,7 @@ import {
 } from "@/mobile/components/ui/alert-dialog";
 import { useTranslation } from "@/mobile/i18n";
 import { FullRefreshRequiredError } from "@/middlelayers/refresh-error";
-import { ALERT_SOURCE_STATUS_STORAGE_KEY, processAlerts } from "@/middlelayers/alerts";
+import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
@@ -37,22 +38,6 @@ import { isIOS } from "@/utils/platform";
 import { listPortfolioSources } from "@/middlelayers/data";
 import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
-
-const retries = 3;
-const retryInterval = 3000;
-const sourceStatusStorageKey = ALERT_SOURCE_STATUS_STORAGE_KEY;
-
-function readStoredStatuses(): PortfolioSourceStatus[] {
-  try {
-    const stored = localStorage.getItem(sourceStatusStorageKey);
-    if (!stored) return [];
-    const statuses = normalizeSourceStatuses(JSON.parse(stored));
-    if (stored !== JSON.stringify(statuses)) localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
-    return statuses;
-  } catch {
-    return [];
-  }
-}
 
 const App = ({
   loading: refreshLoading,
@@ -81,23 +66,11 @@ const App = ({
     progress,
   } = useContext(RefreshButtonLoadingContext);
 
-  const retry = async <T,>(
-    fn: () => Promise<T>,
-    times: number,
-    interval: number,
-  ): Promise<T> => {
-    try {
-      return await fn();
-    } catch (error) {
-      if (error instanceof FullRefreshRequiredError ||
-        (error instanceof Error && error.message.startsWith("no configuration found"))) throw error;
-      if (times === 0) throw error;
-      await new Promise((resolve) => setTimeout(resolve, interval));
+  const retry = <T,>(fn: () => Promise<T>, times: number, interval: number): Promise<T> =>
+    retryRefresh(fn, times, interval, (attempt) => {
       // Never show raw upstream errors: request URLs and exception text may contain credentials.
-      toast({ description: `${t("refresh.retry")}${retries - times + 1}` });
-      return retry(fn, times - 1, interval);
-    }
-  };
+      toast({ description: `${t("refresh.retry")}${attempt}` });
+    });
 
   function setProgress(p: number) {
     setRefreshProgress(Math.min(Math.max(p, 0), 100));
@@ -129,24 +102,8 @@ const App = ({
       setProgress(0);
       const result = await refreshAllData(
         setProgress,
-        sourceId
-          ? {
-              retrySourceId: sourceId,
-              onSourceResult: (source) => setLiveSources((current) => [...current.filter((item) => item.sourceId !== source.sourceId), source]),
-              previousSourceResults: lastResult!.sourceResults,
-              previousSourceStatuses: sourceStatuses,
-              ...(lastResult?.portfolioInputGeneration !== undefined
-                ? { previousInputGeneration: lastResult.portfolioInputGeneration }
-                : {}),
-              ...(lastResult?.refreshCreatedAt
-                ? { previousRefreshCreatedAt: lastResult.refreshCreatedAt }
-                : {}),
-              previousSnapshotId: lastResult?.snapshotId ?? null,
-              previousSnapshotKey: lastResult?.snapshotKey,
-            }
-          : { ...(sourceStatuses.length ? { previousSourceStatuses: sourceStatuses } : {}),
-              onSourceResult: (source: PortfolioSourceResult) => setLiveSources((current) =>
-                [...current.filter((item) => item.sourceId !== source.sourceId), source]) },
+        mobileRefreshOptions(sourceId, lastResult, sourceStatuses,
+          (source) => setLiveSources((current) => [...current.filter((item) => item.sourceId !== source.sourceId), source])),
         operation,
         (attempt) => retry(attempt, retries, retryInterval),
       );
@@ -161,7 +118,7 @@ const App = ({
         insightStatuses = statuses;
         setStatusDialogOpen(statuses.some((source) => source.status === "failed" || source.status === "stale"));
         try {
-          localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
+          writeStoredStatuses(statuses);
         } catch {
           // The current session still shows the warning when storage is unavailable.
         }
@@ -191,7 +148,7 @@ const App = ({
         toast({ description: unavailable ? t(key).replace("{sources}", unavailable) : t(`${key}Generic`),
           variant: "destructive" });
       }
-      trackEventWithClientID("data_refreshed", {
+      trackRefreshEvent({
         failedSources: result.sourceStatuses?.filter((source) => source.status === "stale" || source.status === "failed")
           .map((source) => source.sourceId).join(",") ?? "",
         partialSources: result.sourceStatuses?.filter((source) => source.status === "partial")
@@ -204,7 +161,7 @@ const App = ({
           ? "refresh.noConfiguration"
           : "refresh.unexpectedError";
       toast({ description: t(messageKey), variant: "destructive" });
-      trackEventWithClientID("data_refreshed", { failed: "true" });
+      trackRefreshEvent({ failed: "true" });
     } finally {
       await invalidateUsageCache();
       refreshInProgress.current = false;

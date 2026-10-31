@@ -25,30 +25,8 @@ import { resolveAction } from "@/middlelayers/ai/actions/lifecycle";
 import { claimSessionAction, finishSessionAction } from "@/middlelayers/ai/sessions";
 import { queryPreferCurrency } from "@/middlelayers/configuration";
 
-// Agent-activity block rendered when the orchestrator decomposes a
-// complex query into multiple sub-tasks.
-export type AgentActivity = {
-  taskId: string;
-  skillName: string;
-  description: string;
-  status: "running" | "completed" | "failed";
-  resultPreview?: string;
-};
-
-export type AgentActivityBlock = {
-  kind: "agent_activity";
-  activities: AgentActivity[];
-};
-
-export type AssistantBlock =
-  | { kind: "text"; text: string }
-  | { kind: "think"; text: string }
-  | AgentActivityBlock
-  | PendingAction;
-
-export type ChatMessage =
-  | { role: "user"; content: string }
-  | { role: "assistant"; blocks: AssistantBlock[]; usage?: TokenUsage; contextTokens?: number };
+import type { AgentActivity, AgentActivityBlock, AssistantBlock, ChatMessage } from "@/middlelayers/ui-state/chat-persist";
+export type { AgentActivity, AgentActivityBlock, AssistantBlock, ChatMessage } from "@/middlelayers/ui-state/chat-persist";
 
 export type UseChatOptions = {
   config: AIConfig;

@@ -21,7 +21,10 @@ import type { AssetType } from "@/middlelayers/datafetch/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { Button } from "./ui/button";
 import AISetupCard from "./common/ai-setup-card";
-import { ASSISTANT_APP_ACTION_EVENT, REBALANCE_OPTIONS_KEY } from "@/middlelayers/ai/actions/page-settings";
+import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions/page-settings";
+import { readRebalanceOptions, setRebalanceOptions } from "@/middlelayers/ui-state/page-prefs";
+import { profileFromTargets } from "@/middlelayers/ui-state/rebalance-profile";
+import { rebalanceCsvDialogOptions } from "@/middlelayers/ui-state/rebalance-export";
 import { FinanceChartSkeleton, RebalanceCharts } from "./finance-charts";
 import { rebalanceVisuals } from "./finance-visuals";
 import type { QuoteColor } from "@/middlelayers/types";
@@ -36,13 +39,6 @@ import {
 type TargetDraft = RebalanceTarget & { id: number; previousAsset?: { assetType: AssetType; symbol: string } };
 
 const numberOrZero = (raw: string) => raw === "" ? Number.NaN : Number(raw);
-function storedOptions(): Partial<RebalanceOptions> {
-  try {
-    const value: unknown = JSON.parse(sessionStorage.getItem(REBALANCE_OPTIONS_KEY) ?? "{}");
-    return value && typeof value === "object" && !Array.isArray(value) ? value as Partial<RebalanceOptions> : {};
-  } catch { return {}; }
-}
-
 export default function Rebalance({ currency, quoteColor = "green-up-red-down" }: { currency: CurrencyRateDetail; quoteColor?: QuoteColor }) {
   const { t } = useTranslation();
   const labelFor = (target: RebalanceTarget) =>
@@ -60,10 +56,10 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   const [profileReady, setProfileReady] = useState(false);
   const [status, setStatus] = useState("");
   const [normalizeError, setNormalizeError] = useState(false);
-  const [mode, setMode] = useState<"full" | "buys">(() => storedOptions().mode ?? "full");
-  const [injectedCash, setInjectedCash] = useState(() => storedOptions().injectedCash ?? 0);
-  const [minimumTradeValue, setMinimumTradeValue] = useState(() => storedOptions().minimumTradeValue ?? 0);
-  const [ignoreBelowValue, setIgnoreBelowValue] = useState(() => storedOptions().ignoreBelowValue ?? 0);
+  const [mode, setMode] = useState<"full" | "buys">(() => readRebalanceOptions().mode ?? "full");
+  const [injectedCash, setInjectedCash] = useState(() => readRebalanceOptions().injectedCash ?? 0);
+  const [minimumTradeValue, setMinimumTradeValue] = useState(() => readRebalanceOptions().minimumTradeValue ?? 0);
+  const [ignoreBelowValue, setIgnoreBelowValue] = useState(() => readRebalanceOptions().ignoreBelowValue ?? 0);
   const [manualOpen, setManualOpen] = useState(true);
   const manualInitialized = useRef(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -76,7 +72,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   useEffect(() => {
     const changed = () => {
       profileLoaded.current = false;
-      const options = storedOptions();
+      const options = readRebalanceOptions();
       setMode(options.mode ?? "full");
       setInjectedCash(options.injectedCash ?? 0);
       setMinimumTradeValue(options.minimumTradeValue ?? 0);
@@ -88,7 +84,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   }, []);
 
   useEffect(() => {
-    if (optionsValid) sessionStorage.setItem(REBALANCE_OPTIONS_KEY, JSON.stringify({ mode, injectedCash, minimumTradeValue, ignoreBelowValue }));
+    if (optionsValid) setRebalanceOptions({ mode, injectedCash, minimumTradeValue, ignoreBelowValue });
   }, [mode, injectedCash, minimumTradeValue, ignoreBelowValue]);
 
   useEffect(() => {
@@ -179,15 +175,9 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   async function save() {
     if (validation || !targets.length) return;
     try {
-      const cleanTargets: RebalanceTarget[] = targets.map((target) =>
-        target.kind === "asset"
-          ? { kind: "asset", assetType: target.assetType, symbol: target.symbol.trim().toUpperCase(), percent: target.percent }
-          : target.kind === "type"
-            ? { kind: "type", assetType: target.assetType, percent: target.percent }
-            : { kind: "cash", percent: target.percent },
-      );
-      await saveRebalanceProfile({ targets: cleanTargets, tolerancePercent: tolerance });
-      setTargets(cleanTargets.map((target, index) => ({ ...target, id: targets[index].id })));
+      const profile = profileFromTargets(targets, tolerance);
+      await saveRebalanceProfile(profile);
+      setTargets(profile.targets.map((target, index) => ({ ...target, id: targets[index].id })));
       setSaved(true);
       setProfileLoadError(false);
       setStatus(t("rebalance.saved"));
@@ -212,10 +202,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   async function exportCsv() {
     if (!result) return;
     try {
-      const filePath = await saveFile({
-        defaultPath: "track3-rebalance.csv",
-        filters: [{ name: "track3-rebalance", extensions: ["csv"] }],
-      });
+      const filePath = await saveFile(rebalanceCsvDialogOptions());
       if (filePath) await writeTextFile(filePath, suggestionsToCsv(result, currency.currency, t));
     } catch {
       setStatus(t("rebalance.exportError"));

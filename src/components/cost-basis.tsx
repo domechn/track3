@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { toast } from "./ui/use-toast";
 import AISetupCard from "./common/ai-setup-card";
-import { ASSISTANT_APP_ACTION_EVENT, COST_BASIS_SETTINGS_KEY } from "@/middlelayers/ai/actions/page-settings";
+import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions/page-settings";
+import { readCostBasisSettings, setCostBasisSettingsFromPage } from "@/middlelayers/ui-state/page-prefs";
 import { CostCharts, FinanceChartSkeleton } from "./finance-charts";
 import type { QuoteColor } from "@/middlelayers/types";
 
@@ -72,7 +73,7 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
         if (!active) return;
         setMethod(saved);
         try {
-          const stored = JSON.parse(localStorage.getItem(COST_BASIS_SETTINGS_KEY) ?? "{}") as Record<string, unknown>;
+          const stored = readCostBasisSettings();
           if (typeof stored.from === "string") setFrom(stored.from);
           if (typeof stored.to === "string") setTo(stored.to);
           if (typeof stored.from === "string" && typeof stored.to === "string") {
@@ -105,7 +106,7 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
           ? previous : { from, to, holdingPeriodDays },
       );
       if (manualFilterEdit.current) {
-        localStorage.setItem(COST_BASIS_SETTINGS_KEY, JSON.stringify({ from, to, holdingPeriodDays }));
+        setCostBasisSettingsFromPage({ from, to, holdingPeriodDays });
       }
     }, 300);
     return () => clearTimeout(timeout);

@@ -20,7 +20,9 @@ import en from "@/i18n/locales/en.json";
 import zh from "@/i18n/locales/zh.json";
 import { localeLocalStorageKey } from "@/i18n";
 import type { PendingAction } from "./lifecycle";
-import { ASSISTANT_APP_ACTION_EVENT, COST_BASIS_SETTINGS_KEY, REBALANCE_OPTIONS_KEY } from "./page-settings";
+import { ASSISTANT_APP_ACTION_EVENT } from "./page-settings";
+import { getCurrentDateRange, getCurrentComparisonDates, getRebalanceOptionsRaw, readRebalanceOptions, mergeRebalanceOptions, readCostBasisSettingsForAssistant, setCostBasisSettingsFromAssistant, setAssistantDateRange, setAssistantComparisonDates } from "@/middlelayers/ui-state/page-prefs";
+import { rebalanceCsvFilename } from "@/middlelayers/ui-state/rebalance-export";
 export { ASSISTANT_APP_ACTION_EVENT, COST_BASIS_SETTINGS_KEY, REBALANCE_OPTIONS_KEY } from "./page-settings";
 
 export const actionNames = [
@@ -240,19 +242,19 @@ export async function prepareAction(name: string, raw: unknown, toolCallId: stri
     before = JSON.stringify((await getRebalanceProfile()) ?? null);
     after = JSON.stringify(draft);
   } else if (action === "set_rebalance_options") {
-    before = sessionStorage.getItem(REBALANCE_OPTIONS_KEY) ?? "{}";
-    after = JSON.stringify({ ...readStored(REBALANCE_OPTIONS_KEY, sessionStorage), ...args });
+    before = getRebalanceOptionsRaw() ?? "{}";
+    after = JSON.stringify({ ...readRebalanceOptions(), ...args });
   } else if (action === "export_rebalance") {
     before = "assistant.action.preview.noFile";
-    after = "track3-rebalance.csv";
+    after = rebalanceCsvFilename;
   } else if (action === "set_cost_basis_settings") {
-    const current: Record<string, unknown> = { method: await getCostBasisMethod(), ...readStored(COST_BASIS_SETTINGS_KEY) };
+    const current: Record<string, unknown> = { method: await getCostBasisMethod(), ...readCostBasisSettingsForAssistant() };
     const next: Record<string, unknown> = { ...current, ...args };
     if (next.from && next.to && String(next.from) > String(next.to)) throw new Error("Invalid date range");
     before = JSON.stringify(current);
     after = JSON.stringify(next);
   } else if (action === "export_report" && args.report === "realized_gains") {
-    const settings = readStored(COST_BASIS_SETTINGS_KEY);
+    const settings = readCostBasisSettingsForAssistant();
     before = JSON.stringify({ method: await getCostBasisMethod(), ...settings });
     after = JSON.stringify({
       report: args.report, format: args.format,
@@ -290,7 +292,7 @@ export async function prepareAction(name: string, raw: unknown, toolCallId: stri
       const dates = new Set((await queryAllDataDates()).map((entry) => entry.date));
       if (!dates.has(String(args.base)) || !dates.has(String(args.head))) throw new Error("Comparison dates have no snapshots");
     }
-    before = localStorage.getItem(action === "set_date_range" ? CURRENT_DATE_RANGE_KEY : CURRENT_COMPARISON_DATES_KEY) ?? "assistant.action.preview.current";
+    before = (action === "set_date_range" ? getCurrentDateRange() : getCurrentComparisonDates()) ?? "assistant.action.preview.current";
     after = JSON.stringify(args);
   } else {
     before = "assistant.action.preview.noFile";
@@ -305,15 +307,6 @@ export async function prepareAction(name: string, raw: unknown, toolCallId: stri
     risk: actionRegistry[action].risk,
     status: "pending", createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 5 * 60_000).toISOString(),
   };
-}
-
-function readStored(key: string, storage: Storage = localStorage): Record<string, unknown> {
-  try {
-    const value: unknown = JSON.parse(storage.getItem(key) ?? "{}");
-    return record(value) ? value : {};
-  } catch {
-    return {};
-  }
 }
 
 async function rebalancePreset(preset: "equal_weight" | "current_holdings"): Promise<RebalanceProfile> {
@@ -360,12 +353,12 @@ export async function executeAction(name: string, raw: unknown): Promise<string>
     case "blacklist_add": await addToBlacklist(String(args.symbol)); return "assistant.action.result.done";
     case "blacklist_remove": await removeFromBlacklist(String(args.symbol)); return "assistant.action.result.done";
     case "set_date_range":
-      localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(args)); notifyApp(); return "assistant.action.result.done";
+      setAssistantDateRange(args); notifyApp(); return "assistant.action.result.done";
     case "set_comparison_dates":
-      localStorage.setItem(COMPARISON_DATES_KEY, JSON.stringify(args)); notifyApp(); return "assistant.action.result.done";
+      setAssistantComparisonDates(args); notifyApp(); return "assistant.action.result.done";
     case "export_report":
       if (args.report === "realized_gains") {
-        const settings = readStored(COST_BASIS_SETTINGS_KEY);
+        const settings = readCostBasisSettingsForAssistant();
         const report = await loadCostBasisReport({
           method: await getCostBasisMethod(),
           from: (args.from ?? settings.from) as string | undefined,
@@ -383,28 +376,26 @@ export async function executeAction(name: string, raw: unknown): Promise<string>
       await saveRebalanceProfile(await rebalancePreset(args.preset as "equal_weight" | "current_holdings"));
       notifyApp(); return "assistant.action.result.done";
     case "set_rebalance_options":
-      sessionStorage.setItem(REBALANCE_OPTIONS_KEY, JSON.stringify({ ...readStored(REBALANCE_OPTIONS_KEY, sessionStorage), ...args }));
+      mergeRebalanceOptions(args);
       notifyApp(); return "assistant.action.result.done";
     case "export_rebalance": {
       const profile = await getRebalanceProfile();
       if (!profile) throw new Error("No rebalance targets to export");
       const currency = await queryPreferCurrency();
       const { holdings, stablecoinSymbols } = await loadRebalanceHoldings(currency);
-      const options = readStored(REBALANCE_OPTIONS_KEY, sessionStorage);
+      const options = readRebalanceOptions();
       const result = calculateRebalance(holdings, profile.targets, { ...options, tolerancePercent: profile.tolerancePercent, stablecoinSymbols });
       const dictionary: Record<string, string> = localStorage.getItem(localeLocalStorageKey) === "zh" ? zh : en;
-      return await exportFile("track3-rebalance.csv", ["csv"], (path) =>
+      return await exportFile(rebalanceCsvFilename, ["csv"], (path) =>
         writeTextFile(path, suggestionsToCsv(result, currency.currency, (key) => dictionary[key] ?? en[key as keyof typeof en] ?? key)))
         ? "assistant.action.result.exported" : "assistant.action.result.canceled";
     }
     case "set_cost_basis_settings": {
-      const current: Record<string, unknown> = { method: await getCostBasisMethod(), ...readStored(COST_BASIS_SETTINGS_KEY) };
+      const current: Record<string, unknown> = { method: await getCostBasisMethod(), ...readCostBasisSettingsForAssistant() };
       const next: Record<string, unknown> = { ...current, ...args };
       if (next.from && next.to && String(next.from) > String(next.to)) throw new Error("Invalid date range");
       if (args.method !== undefined) await saveCostBasisMethod(args.method as "FIFO" | "LIFO" | "HIFO" | "AVERAGE");
-      localStorage.setItem(COST_BASIS_SETTINGS_KEY, JSON.stringify({
-        holdingPeriodDays: next.holdingPeriodDays, from: next.from, to: next.to,
-      }));
+      setCostBasisSettingsFromAssistant(next);
       notifyApp(); return "assistant.action.result.done";
     }
     case "create_alert":

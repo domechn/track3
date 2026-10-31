@@ -38,7 +38,6 @@ import {
   onSessionUpdate,
   notifySessionUpdate,
 } from "@/middlelayers/ai";
-import type { PersistedBlock, PersistedChatMessage } from "@/middlelayers/ai";
 import SessionSidebar from "./session-sidebar";
 import { useChatSessions } from "./use-chat-sessions";
 import type { AIConfig, CurrencyRateDetail } from "@/middlelayers/types";
@@ -47,7 +46,8 @@ import type { ChatMessage, AssistantBlock } from "./use-chat";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
 import UsageLabel from "./usage-label";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
-import { INSIGHT_QUESTION_STORAGE_KEY } from "@/middlelayers/insights-service";
+import { takeInsightQuestion, persistedToRuntime, runtimeToPersisted } from "@/middlelayers/ui-state/chat-persist";
+export * from "@/middlelayers/ui-state/chat-persist";
 import { takePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
 
 type LoadState =
@@ -117,34 +117,6 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
       baseCurrency={state.baseCurrency}
     />
   );
-}
-
-export function persistedToRuntime(msg: PersistedChatMessage): ChatMessage {
-  if (msg.role === "user") {
-    return { role: "user", content: msg.content };
-  }
-  return {
-    role: "assistant",
-    ...(msg.usage ? { usage: msg.usage } : {}),
-    ...(msg.contextTokens !== undefined ? { contextTokens: msg.contextTokens } : {}),
-    blocks: msg.blocks
-      .filter((b) => b.kind === "text" || b.kind === "pending_action")
-      .map((b) => b as AssistantBlock),
-  };
-}
-
-export function runtimeToPersisted(msg: ChatMessage): PersistedChatMessage {
-  if (msg.role === "user") {
-    return { role: "user", content: msg.content };
-  }
-  return {
-    role: "assistant",
-    ...(msg.usage ? { usage: msg.usage } : {}),
-    ...(msg.contextTokens !== undefined ? { contextTokens: msg.contextTokens } : {}),
-    blocks: msg.blocks
-      .filter((b) => b.kind === "pending_action" || (b.kind === "text" && b.text.trim().length > 0))
-      .map((b) => b as PersistedBlock),
-  };
 }
 
 function ReadyChat({
@@ -462,9 +434,8 @@ function ChatContent({
           return;
         }
       }
-      const question = sessionStorage.getItem(INSIGHT_QUESTION_STORAGE_KEY);
+      const question = takeInsightQuestion();
       if (question) {
-        sessionStorage.removeItem(INSIGHT_QUESTION_STORAGE_KEY);
         chat.setInput(question);
       }
     } catch {
