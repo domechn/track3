@@ -13,6 +13,7 @@
 [![release][release-image]][release-url]
 [![last commit][last-commit-image]][last-commit-url]
 [![wiki][wiki-image]][wiki-url]
+[![website][website-image]][website-url]
 
 [author-image]: https://img.shields.io/badge/author-domechn-blue.svg
 [author-url]: https://github.com/domechn
@@ -24,18 +25,22 @@
 [last-commit-url]: https://github.com/domechn/track3/commits
 [wiki-image]: https://img.shields.io/badge/wiki-by%20deepwiki-green?style=flat
 [wiki-url]: https://deepwiki.com/domechn/track3
+[website-image]: https://img.shields.io/badge/website-track3.dev-blue.svg
+[website-url]: https://track3.dev
 
 </div>
 
 ## Features
 
 1. **Local-first desktop app. Portfolio assets and transactions are stored in a local SQLite database by default; no Track3 account is required.**
-2. Support Binance, OKX, Bitget, Kraken, Gate.io, Coinbase, Bybit, HTX and MEXC. **Readonly access is enough**. API key setup references: [Binance](https://www.binance.com/en-BH/support/faq/how-to-create-api-360002502072), [OKX](https://use.autoview.com/hc/en-us/articles/360004576632-OKEx-Creating-an-API), [Gate.io](https://www.gate.io/help/guide/common/17521/how-to-utilize-api), [MEXC](https://www.mexc.com/user/openapi)
-3. Support BTC, ETH, BNB, SOL and Doge ( Base Users ).
+2. Connect Binance, OKX, Bitget, Kraken, Gate.io, Coinbase, Bybit, HTX, MEXC and Backpack. **Read-only access is enough.** Track3 shows your public IP in the exchange form to help with IP allowlists. API key guides: [Track3 docs](https://track3.dev/docs/), [Binance](https://track3.dev/docs/binance.html), [OKX](https://track3.dev/docs/okx.html), [Gate.io](https://www.gate.io/help/guide/common/17521/how-to-utilize-api), [MEXC](https://www.mexc.com/user/openapi).
+3. Track BTC, ETH, BNB, SOL, DOGE, TON and SUI wallets without Pro.
 4. Support stock broker positions from Interactive Brokers (IBKR) through Flex Web Service imports with Query ID and Token.
-5. Support dozens of charts to analyze data such as asset allocation, wallet proportion, position changes, profit and loss, and more.
+5. Charts show asset allocation, wallet proportion, position changes, and profit and loss.
 6. Support data backup and restore. Users can export data to local files and import them to other devices, or share them between multiple devices by cloud drive ( e.g. iCloud ).
 7. A five-step first-run guide introduces local storage, sources, history, planning tools, and backups on desktop, iPhone, and iPad. Replay it from Settings.
+8. Optional [end-to-end encrypted multi-device sync](docs/sync.md) needs an S3-compatible bucket you own (for example, Cloudflare R2, MinIO, or AWS S3) and a sync passphrase. Goals and alerts stay on each device.
+9. Goals and alerts, rebalance trade suggestions, cost basis and realized P&L, P&L attribution, and a Pro AI assistant using a model endpoint you configure.
 
 ### Automatic backup format
 
@@ -45,8 +50,8 @@ Manual exports remain single JSON files. Upgraded installations still import the
 
 ## Supported Sources
 
-- Centralized exchanges: Binance, OKX, Bitget, Kraken, Gate.io, Coinbase, Bybit, HTX, MEXC
-- Wallets: BTC, ETH, BNB, SOL, Doge
+- Centralized exchanges: Binance, OKX, Bitget, Kraken, Gate.io, Coinbase, Bybit, HTX, MEXC, Backpack
+- Wallets: BTC, ETH, BNB, SOL, DOGE, TON, SUI; TRON/TRC20 with Pro
 - Stock brokers: Interactive Brokers (IBKR)
 
 ## Pro Users
@@ -55,24 +60,24 @@ Pro includes:
 
 - 300 ERC20 wallet refreshes per month
 - 300 TRON wallet refreshes per month
-- All-chain asset refresh for supported Pro networks
+- Asset refreshes on supported EVM networks and for ERC20 tokens
+- TRON wallet and TRC20 asset support
+- Per-exchange and per-wallet Quick Look
+- Real-time portfolio value in the top bar (desktop)
+- Pro price source during refresh
 
-One wallet refresh counts as one use. Limits reset monthly on the license billing date.
-On desktop, open Settings → System Info to subscribe in the system browser or restore a purchase with the license key from the Track3 success page.
-
-1. Support 85+ EVM compatible Chains: Ethereum, BSC, Polygon, Fantom, Arbitrum, Avalanche, Gnosis, Celo, OKC, Cronos, Optimism, Cardano, Terra 2.0, Cosmos, Osmosis, Base, and most ERC20 tokens on these chains.
-2. Support TRON wallets and TRC20 assets.
-3. Support per-exchange and per-wallet asset views.
-4. Support real-time portfolio value in the top bar.
-5. Support real-time prices for all tracked assets during refresh.
+One wallet refresh counts as one use; the app shows the reset date returned by the Pro service when available.
+On desktop, open Settings → System. The single Pro card contains plan and renewal or expiry details, monthly refresh usage when available, and Manage Subscription for existing subscriptions. Subscribe in the system browser or restore a purchase with the license key from the Track3 success page.
+On iOS, open Settings → Pro and license to manage an existing subscription or restore Pro with a license key. There is no purchase button in the app.
 
 ## iOS app (iPhone and iPad)
 
-Track3 for iPhone and iPad builds from this repository with the same portfolio, sync,
-assistant, and encrypted configuration logic as the desktop app. Its interface
-uses Overview, History, Analytics, and More tabs on narrow windows and a
-collapsible sidebar on iPad and other wide windows. Touch charts and iOS Files
-support import and export. Desktop releases keep their existing interface.
+Track3 for iPhone and iPad is not on the App Store yet; build it from source.
+It uses the same portfolio, sync, assistant, and encrypted configuration logic
+as the desktop app. Its interface uses Overview, History, Analytics, and More
+tabs on narrow windows and a collapsible sidebar on iPad and other wide
+windows. Touch charts and iOS Files support import and export. Desktop releases
+keep their existing interface.
 
 See the [iOS feature inventory](docs/ios/FEATURE_PARITY.md),
 [build instructions](docs/ios/RELEASE.md), and
