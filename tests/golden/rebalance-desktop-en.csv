@@ -1,0 +1,5 @@
+﻿"Symbol","Current %","Target %","Deviation","Action","Value (USD)","Quantity","Note"
+"BTC","50.00","60.00","-10.00","Buy","15.25","0.25416667",""
+"'=DANGEROUS,""ticker""","50.00","40.00","10.00","Sell","-12.50","-0.41666667","Below threshold"
+"SOL","0.00","0.00","0.00","No trade","0.00","","Price unavailable"
+"CASH","0.00","0.00","0.00","Unallocated cash (27.25 USD)","27.25","27.25000000",""

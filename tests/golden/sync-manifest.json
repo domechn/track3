@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "deviceId": "00000000-0000-4000-8000-000000000001",
+  "name": "Golden device",
+  "entries": [
+    {
+      "kind": "snapshot",
+      "id": "snapshot-000000",
+      "version": "1",
+      "bytes": 1184,
+      "sha256": "17d2b2915680841da27b9b1416337a0fbfefde6f708a605e71657798983e055a"
+    },
+    {
+      "kind": "config",
+      "id": "7",
+      "version": "1713272400000-0",
+      "bytes": 220,
+      "sha256": "3b4be286960d5b6949865b188d8fa625401c6e3c913c1fa8c8ed206b43f5f11e"
+    },
+    {
+      "kind": "session",
+      "id": "session-golden",
+      "version": "419f18f589d090ae87b89ef687fe0d20a26d6f50b9a7224545fd3df0075af239",
+      "bytes": 440,
+      "sha256": "83bf51063cfe97dc4089f70fe7563bad58507feed9c6d967a8bf07d143528ca4"
+    }
+  ]
+}
