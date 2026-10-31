@@ -913,7 +913,7 @@
   .d2-summary .profit-summary-card > :last-child { min-width: 0; padding: 4px 16px 16px; }
   .d2-summary .profit-period-grid > button, .d2-profit-sheet .profit-period-grid > button { min-height: 68px; border: 0; border-radius: 12px; background: hsl(var(--secondary)); padding: 12px; }
   .d2-summary .profit-period-grid, .d2-profit-sheet .profit-period-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .d2-summary .profit-period-grid > button > :last-child { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .d2-summary .profit-period-grid > button > :nth-child(2) { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .d2-summary .profit-period-grid > button:active { transform: scale(.97); opacity: .7; }
   body:has(.d2-summary) #app-top-bar .mobile-header-total { display: none; }
   .d2-summary .profit-metrics-card { border: 0; background: transparent; box-shadow: none; }
