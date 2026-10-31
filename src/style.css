@@ -10,7 +10,7 @@ body:has(.sync-settings-page) .desktop-toast-viewport {
   max-width: min(100vw, 380px, 35vw);
 }
 
-.sync-settings-page {
+body:has(.desktop-toast-viewport) .sync-settings-page {
   margin-right: min(380px, 35vw);
   padding-bottom: 8rem;
 }
@@ -33,9 +33,6 @@ body:has(.sync-settings-page) .desktop-sync-status-indicator {
   }
   body:has(.desktop-toast-viewport) .sync-settings-page .sm\:col-span-2 {
     grid-column: auto;
-  }
-  .sync-settings-page {
-    margin-right: 0;
   }
   .sync-settings-page .sync-device-row {
     display: block;

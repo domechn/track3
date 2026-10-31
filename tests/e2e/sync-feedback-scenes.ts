@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { FakeS3, S3Error } from "../../src/middlelayers/sync/object-store";
 import { installTauriBridge } from "./tauri-bridge";
 
-class ControlledS3 extends FakeS3 {
+export class ControlledS3 extends FakeS3 {
   private held?: Promise<void>;
   private releaseHold?: () => void;
   failList = false;
@@ -24,7 +24,7 @@ class ControlledS3 extends FakeS3 {
   }
 }
 
-const artifactDir = resolve("artifacts/sync-feedback");
+const artifactDir = resolve("test-results/sync-feedback");
 mkdirSync(artifactDir, { recursive: true });
 
 async function shot(page: Page, name: string) {

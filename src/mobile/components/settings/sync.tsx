@@ -81,6 +81,10 @@ export default function SyncSettingsPage() {
   useEffect(() => {
     if (!busy) return;
     const frame = requestAnimationFrame(() => {
+      if (window.innerWidth > 700 && window.innerWidth < 1100) {
+        window.scrollTo(0, 0);
+        return;
+      }
       const button = document.querySelector(".sync-settings-page button[aria-busy=true]");
       const toast = document.querySelector(".ios-d3-toast-viewport .sync-toast");
       const tab = document.querySelector(".mobile-tab-bar");
@@ -340,7 +344,7 @@ export default function SyncSettingsPage() {
           <CardContent className="space-y-3">
             {devices.length === 0 && <p className="text-sm text-muted-foreground">{t("sync.devices.empty")}</p>}
             {devices.map((device) => (
-              <div key={device.id} className="grid items-center gap-2 sm:grid-cols-[1fr_auto]">
+              <div key={device.id} className="sync-device-row grid items-center gap-2 sm:grid-cols-[1fr_auto]">
                 <div className="space-y-1">
                   <Input aria-label={t("sync.devices.name").replace("{device}", device.id.slice(0, 8))}
                     defaultValue={device.name} maxLength={60} disabled={!!busy}
