@@ -204,7 +204,8 @@
     "onClick={() => updateTarget(index, { ...target, percent: stepPercent(target.percent, 1) })}>+</Button>"
   ],
   "src/mobile/components/refresh-data.tsx": [
-    "await updateAllCurrencyRates().catch(() => {});"
+    "await updateAllCurrencyRates().catch(() => {});",
+    "? invoke(\"ios_auto_retry_allowed\").then((allowed) => allowed === true ? runRefreshRef.current(sourceId, true) : undefined)"
   ],
   "src/mobile/components/settings/assistant.tsx": [
     "await saveAIConfig(cfg);"

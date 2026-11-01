@@ -45,3 +45,34 @@ describe("WalletStatusBanner", () => {
     }
   });
 });
+
+it("shows the in-memory next automatic try for a failed wallet", () => {
+  const at = new Date(2026, 10, 1, 10, 11).getTime();
+  render(<WalletStatusBanner statuses={[{ sourceId: "btc:0", label: "BTC", status: "failed", category: "network" }]}
+    nextBySource={{ "btc:0": at }} locale="en"
+    t={(key) => key === "refresh.autoRetry.next" ? "Next automatic try at {time}" : key} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("Next automatic try at 10:11");
+});
+
+it("shows the next automatic try when a source fell back to stale data", () => {
+  const at = new Date(2026, 10, 1, 10, 11).getTime();
+  render(<WalletStatusBanner statuses={[{ sourceId: "btc:0", label: "BTC", status: "stale", category: "network" }]}
+    nextBySource={{ "btc:0": at }} locale="en"
+    t={(key) => key === "refresh.autoRetry.next" ? "Next automatic try at {time}" : key} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("Next automatic try at 10:11");
+});
+
+it("uses the same clock format for the next try and last good time", () => {
+  const next = new Date(2026, 10, 1, 11, 54).getTime();
+  render(<WalletStatusBanner statuses={[{
+    sourceId: "btc:0", label: "BTC", status: "failed", category: "network",
+    lastSuccessAt: new Date(2026, 10, 1, 10, 53).toISOString(),
+  }]} nextBySource={{ "btc:0": next }} locale="en"
+    t={(key) => ({
+      "refresh.autoRetry.next": "Next automatic try at {time}",
+      "wallets.lastGood": "Last good {time}",
+    }[key] ?? key)} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("Next automatic try at 11:54");
+  expect(screen.getByRole("alert")).toHaveTextContent("Last good 10:53");
+  expect(screen.getByRole("alert")).not.toHaveTextContent("AM");
+});

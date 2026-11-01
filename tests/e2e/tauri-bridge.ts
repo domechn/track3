@@ -319,6 +319,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     if (cmd === "ios_prepare_backup_folder" || cmd === "ios_clear_backup_folder" || cmd === "ios_undo_clear_backup_folder") return null;
     if (cmd === "ios_haptic") { haptics++; return null; }
     if (cmd === "ios_lock_enabled") return false;
+    if (cmd === "ios_auto_retry_allowed") return true;
     if (cmd === "ios_set_badge") return null;
     if (cmd === "ios_share_file") {
       if (!/^\/e2e\/cache\/[0-9a-f-]{36}\/track3-export-data\.json$/.test(args.path) || !files.has(args.path)) {

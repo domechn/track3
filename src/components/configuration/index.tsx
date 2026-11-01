@@ -46,6 +46,7 @@ import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/r
 import { classifySourceError } from "@/middlelayers/datafetch/utils/source-failure";
 import { configurationFromForm, configurationToForm, initialConfiguration } from "@/middlelayers/ui-state/config-form";
 
+import { AutoRetrySetting } from "@/components/configuration/auto-retry-setting";
 import { SummaryCards } from "./summary-cards";
 import { GeneralSettings } from "./general-settings";
 import { ExchangeSection } from "./exchange-section";
@@ -1094,6 +1095,7 @@ const App = ({
         onUpdateCurrencyRatesClick={onUpdateCurrencyRatesClick}
       />}
 
+      {section === "sources" && <AutoRetrySetting t={t} />}
       {section === "sources" && <>
       <p className="text-sm text-muted-foreground">{t("settings.phase6.sourceSummary").replace("{count}", String(exchanges.length + wallets.length + stockBrokers.length + others.length))}</p>
       <div role="group" aria-label={t("settings.phase6.sources")} className="t3-settings-source-tabs">
