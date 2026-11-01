@@ -35,6 +35,7 @@ import AssetLabel from "@/components/common/asset-label";
 import { useWindowSize } from "@/utils/hook";
 import { WALLET_DETAIL_URLS } from "@/middlelayers/constants";
 import { useTranslation } from "@/mobile/i18n";
+import { SourceAllocationList } from "@/components/source-allocation-list";
 import { MobileRecordList } from "@/mobile/components/mobile";
 import {
   classifyWalletType,
@@ -195,12 +196,16 @@ const App = ({
   symbol,
   assetType,
   displayAmount,
+  selectedSource,
+  onSelectSource,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   symbol?: string;
   assetType?: AssetType;
   displayAmount?: boolean;
+  selectedSource?: string | null;
+  onSelectSource?: (source: string | null) => void;
 }) => {
   const size = useWindowSize();
   const loadGenRef = useRef(0);
@@ -320,10 +325,12 @@ const App = ({
     () => [...walletAssetsPercentage].sort((a, b) => b.value - a.value),
     [walletAssetsPercentage],
   );
+  const showTreemap = !symbol && !onSelectSource;
 
   // Wallets ≥1% get their own tile; the <1% tail is grouped into "Others".
   // When nothing reaches 1% we fall back to MAX_TILES so the treemap stays readable.
   const groupedWallets = useMemo<WalletAssetsPercentageData>(() => {
+    if (!showTreemap) return [];
     const MIN_PCT = 1;
     const above = sortedWallets.filter((w) => w.percentage >= MIN_PCT);
     const below = sortedWallets.filter((w) => w.percentage < MIN_PCT);
@@ -387,7 +394,7 @@ const App = ({
         chartColor: "transparent",
       },
     ];
-  }, [sortedWallets]);
+  }, [sortedWallets, showTreemap]);
 
   const isMobile = (size.width ?? 0) < MOBILE_BREAKPOINT;
 
@@ -485,6 +492,9 @@ const App = ({
     () => sortedWallets.reduce((sum, w) => sum + w.value, 0),
     [sortedWallets],
   );
+  const displayedTotalValue = selectedSource && onSelectSource
+    ? sortedWallets.find((wallet) => wallet.wallet === selectedSource)?.value ?? totalValue
+    : totalValue;
 
   const top3Percentage = useMemo(() => {
     if (sortedWallets.length === 0) {
@@ -518,7 +528,12 @@ const App = ({
       );
 
   return (
-    <Card data-card-boundary="true">
+    <Card data-card-boundary="true" className="analyze-wallet-allocation">
+      {!symbol && onSelectSource && <nav className="analyze-source-picker" aria-label={t("wallets.h1")}>
+        <button type="button" aria-pressed={selectedSource === null} onClick={() => onSelectSource(null)}>{t("wallets.allSources")}</button>
+        {sortedWallets.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
+          onClick={() => onSelectSource(wallet.wallet)}>{getWalletDisplayName(wallet, isMobile)}</button>)}
+      </nav>}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
         <CardTitle className="flex flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground">
           {symbol ? (
@@ -556,12 +571,29 @@ const App = ({
             <span className="text-foreground mono">
               {currency.symbol}
               {prettyNumberToLocaleString(
-                currencyWrapper(currency)(totalValue),
+                currencyWrapper(currency)(displayedTotalValue),
               )}
             </span>
           </div>
         </div>
 
+        {!symbol && onSelectSource && <SourceAllocationList
+          wallets={sortedWallets}
+          selectedSource={selectedSource ?? null}
+          currency={currency}
+          name={(wallet) => getWalletDisplayName(wallet, isMobile)}
+          title={t("wallets.sourceAllocation")}
+        />}
+        {symbol && <div className="analyze-coin-source-list"><SourceAllocationList
+          wallets={sortedWallets}
+          selectedSource={null}
+          currency={currency}
+          name={(wallet) => getWalletDisplayName(wallet, isMobile)}
+          title={t("wallets.sourceAllocation")}
+          showQuantity
+        /></div>}
+
+        {showTreemap && <>
         <div
           ref={containerRef}
           role="group"
@@ -795,6 +827,7 @@ const App = ({
               ))}
           </div>
         )}
+        </>}
       </CardContent>
     </Card>
   );

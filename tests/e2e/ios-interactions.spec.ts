@@ -200,7 +200,7 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await page.goto("/#/summary");
   const tile = page.locator(".analytics-tile").getByText("Top coins");
   await expect(tile).toBeVisible();
-  await page.evaluate(() => scrollTo(0, 20));
+  await tile.scrollIntoViewIfNeeded();
   const summaryScroll = await page.evaluate(() => scrollY);
   expect(summaryScroll).toBeGreaterThan(0);
   await tile.click();

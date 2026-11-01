@@ -14,6 +14,7 @@ import { positiveNegativeTextClass } from "@/utils/color";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/mobile/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { athDistance, athDistanceText } from "@/components/analyze-values";
 import { useIsMobile } from "@/mobile/components/mobile";
 
 const App = ({
@@ -69,16 +70,6 @@ const App = ({
     }
   }
 
-  const percentageFromATH = useMemo(() => {
-    if (maxTotalValueData.totalValue === 0) {
-      return 0;
-    }
-    return (
-      ((totalValueData.totalValue - maxTotalValueData.totalValue) /
-        maxTotalValueData.totalValue) *
-      100
-    );
-  }, [totalValueData, maxTotalValueData]);
   const currentTotalValueText = useMemo(
     () =>
       currency.symbol +
@@ -95,64 +86,31 @@ const App = ({
       ),
     [currency, maxTotalValueData]
   );
+  const distance = athDistance(totalValueData.totalValue, maxTotalValueData.totalValue);
+  const distanceText = athDistanceText(distance, currency);
 
   return (
-    <Card className="ath-card">
-      <CardHeader className="space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+    <Card className="ath-card analyze-ath-card">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold">
           {t("ath.title")}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="mt-2">
-          <div className="ath-metrics space-y-3">
-            <div className="ath-current-metric space-y-1 pb-2 border-b border-border/40">
-              <div className="text-[11px] text-muted-foreground">
-                {t("ath.currentValue")}
-              </div>
-              <div
-                className="ath-current-value text-sm md:text-base font-semibold tabular-nums whitespace-nowrap overflow-x-auto leading-snug"
-                title={currentTotalValueText}
-              >
-                {currentTotalValueText}
-              </div>
-            </div>
-            <div className="space-y-1 pb-2 border-b border-border/40">
-              <div className="text-[11px] text-muted-foreground">
-                {t("ath.athValue")}
-              </div>
-              <div
-                className="text-sm md:text-base font-semibold tabular-nums whitespace-nowrap overflow-x-auto leading-snug"
-                title={athTotalValueText}
-              >
-                {athTotalValueText}
-              </div>
-            </div>
-            <div className="space-y-1 pb-2 border-b border-border/40">
-              <div className="text-[11px] text-muted-foreground">
-                {t("ath.athDate")}
-              </div>
-              <div className="text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto">
-                {isMobile ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
-                  { month: "short", day: "numeric" }).format(new Date(maxTotalValueData.date))
-                  : timeToDateStr(maxTotalValueData.date)}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-[11px] text-muted-foreground">
-                {t("ath.fromAth")}
-              </div>
-              <div
-                className={`text-sm md:text-base font-semibold whitespace-nowrap overflow-x-auto ${positiveNegativeTextClass(
-                  percentageFromATH,
-                  quoteColor,
-                  700
-                )}`}
-              >
-                {percentageFromATH.toFixed(2)}%
-              </div>
-            </div>
-          </div>
+      <CardContent className="space-y-4">
+        <div>
+          <div className="text-xs text-muted-foreground">{t("ath.athValue")}</div>
+          <div className="text-3xl font-semibold tabular-nums" title={athTotalValueText}>{athTotalValueText}</div>
+          <div className="text-xs text-muted-foreground">{t("ath.athDate")} · {isMobile
+            ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" }).format(new Date(maxTotalValueData.date))
+            : timeToDateStr(maxTotalValueData.date)}</div>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={t("ath.progress")} aria-valuenow={distance?.progressPercent ?? 0} aria-valuemin={0} aria-valuemax={100}>
+          <div className="h-full bg-accent-data" style={{ width: `${Math.min(100, distance?.progressPercent ?? 0)}%` }} />
+        </div>
+        <div className="space-y-0">
+          <div className="flex justify-between gap-3 border-b py-2 text-sm"><span className="text-muted-foreground">{t("ath.distance")}</span><strong className={positiveNegativeTextClass(distance?.distance ?? 0, quoteColor, 500)}>{distanceText}</strong></div>
+          <div className="flex justify-between gap-3 border-b py-2 text-sm"><span className="text-muted-foreground">{t("ath.gainNeeded")}</span><strong>{distance ? `+${distance.gainNeededPercent.toFixed(2)}%` : "—"}</strong></div>
+          <div className="flex justify-between gap-3 py-2 text-sm"><span className="text-muted-foreground">{t("ath.currentValue")}</span><strong className="ath-current-value tabular-nums">{currentTotalValueText}</strong></div>
         </div>
       </CardContent>
     </Card>

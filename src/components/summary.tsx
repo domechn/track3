@@ -58,18 +58,19 @@ const App = ({
 
   return (
     <OverviewLoadingContext.Provider value={overviewLoadingContext}>
-      <div className="relative min-h-[400px]" aria-busy={pageLoading}>
-        <h1 className="sr-only">{t("summary.h1")}</h1>
-        <StaggerContainer className="space-y-3">
+      <div className="analyze-summary relative min-h-[400px]" aria-busy={pageLoading}>
+        <h1 className="analyze-page-title">{t("summary.h1")}</h1>
+        <StaggerContainer className="analyze-summary-stack space-y-3">
           {hasValidRange && (
             <>
-              <FadeUp className="grid gap-3 grid-cols-1 xl:grid-cols-2">
-                <AthValue
+              <FadeUp className="analyze-summary-hero grid gap-3 grid-cols-1 xl:grid-cols-2">
+                <Profit
                   currency={currency}
                   dateRange={dateRange}
                   quoteColor={quoteColor}
+                  showCoinsProfitPercentage={true}
                 />
-                <ProfitMetrics
+                <AthValue
                   currency={currency}
                   dateRange={dateRange}
                   quoteColor={quoteColor}
@@ -83,11 +84,10 @@ const App = ({
                 />
               </FadeUp>
               <FadeUp>
-                <Profit
+                <ProfitMetrics
                   currency={currency}
                   dateRange={dateRange}
                   quoteColor={quoteColor}
-                  showCoinsProfitPercentage={true}
                 />
               </FadeUp>
             </>

@@ -92,15 +92,172 @@ test("wide history marks the open snapshot in the list", async ({ browser }) => 
   }
 });
 
-test("wide coin detail keeps a single wallet treemap compact", async ({ browser }) => {
+test("wide coin detail shows a compact source allocation row", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1194, height: 834 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   try {
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/coins/BTC");
-    const treemap = page.getByTestId("wallet-treemap-container");
-    await expect(treemap.getByTestId("wallet-treemap-tile")).toHaveCount(1);
-    expect(await treemap.evaluate((node) => node.getBoundingClientRect().height)).toBeLessThanOrEqual(300);
+    const allocation = page.locator(".d2-coin .analyze-source-list");
+    await expect(allocation.locator("li")).toHaveCount(1);
+    await expect(page.getByTestId("wallet-treemap-container")).toHaveCount(0);
+    expect(await allocation.evaluate((node) => node.getBoundingClientRect().height)).toBeLessThanOrEqual(300);
+  } finally {
+    await context.close();
+  }
+});
+
+test("mobile Summary shows attribution once", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 744, height: 1133 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await page.locator(".d2-summary .analyze-profit-card").getByRole("radio", { name: "Attribution" }).click();
+    await expect(page.locator(".d2-summary .attribution-totals")).toHaveCount(1);
+    await expect(page.locator(".d2-summary .analyze-attribution-section")).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});
+
+test("iPad Summary uses one card gap between Portfolio history and Returns", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 744, height: 1133 }, hasTouch: true, isMobile: true, reducedMotion: "reduce" });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await expect(page.locator(".d2-summary > .summary-stack")).toHaveCSS("opacity", "1");
+    const history = (await page.locator(".d2-summary .ath-card").boundingBox())!;
+    const returns = (await page.locator(".d2-summary .profit-summary-card").boundingBox())!;
+    expect(returns.y - history.y - history.height).toBeLessThanOrEqual(25);
+  } finally {
+    await context.close();
+  }
+});
+
+test("iPad portrait Summary keeps Profit and attribution amounts on one line", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 768, height: 1024 }, hasTouch: true, isMobile: true, reducedMotion: "reduce" });
+  const page = await context.newPage();
+  try {
+    await page.clock.setFixedTime(new Date("2026-12-15T12:00:00Z"));
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await expect(page.locator(".d2-summary")).toBeVisible();
+    for (const width of [744, 768, 834, 1024, 1032]) {
+      await page.setViewportSize({ width, height: 1024 });
+      const amounts = page.locator(".d2-summary .analyze-profit-card .profit-mobile-list .ios-money");
+      await expect(amounts.first()).toBeVisible();
+      const lines = await amounts.evaluateAll((nodes) => nodes.map((node) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return range.getClientRects().length;
+      }));
+      expect(lines.length, `${width} has Profit amounts`).toBeGreaterThan(0);
+      expect(lines, `${width} Profit amount lines`).toEqual(lines.map(() => 1));
+      await page.locator(".d2-summary .analyze-profit-card").getByRole("radio", { name: "Attribution" }).click();
+      const totals = page.locator(".d2-summary .analyze-profit-card .attribution-total");
+      await expect(totals.first()).toBeVisible();
+      const wrappedTotals = await totals.evaluateAll((nodes) => nodes
+        .filter((node) => {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          return range.getClientRects().length !== 1;
+        })
+        .map((node) => node.textContent));
+      expect(wrappedTotals, `${width} wrapped attribution totals`).toEqual([]);
+      const attributionLayout = await page.locator(".d2-summary .analyze-profit-card").evaluate((card) => {
+        const grid = card.querySelector<HTMLElement>(".attribution-totals")!;
+        const values = [...card.querySelectorAll<HTMLElement>(".attribution-total")];
+        return {
+          cardWidth: card.getBoundingClientRect().width,
+          columns: getComputedStyle(grid).gridTemplateColumns.split(" ").length,
+          overflowing: values.filter((value) => {
+            const range = document.createRange();
+            range.selectNodeContents(value);
+            return range.getBoundingClientRect().right > value.parentElement!.getBoundingClientRect().right + 1;
+          }).map((value) => value.textContent),
+        };
+      });
+      if (attributionLayout.cardWidth < 560) expect(attributionLayout.columns, `${width} attribution columns`).toBe(2);
+      expect(attributionLayout.overflowing, `${width} overflowing attribution totals`).toEqual([]);
+      await page.locator(".d2-summary .analyze-profit-card").getByRole("radio", { name: "Summary" }).click();
+      const overlap = await page.locator(".d2-summary .analyze-profit-card .mobile-movers-total").evaluate((node) => {
+        const value = node.querySelector(".ios-money")!.getBoundingClientRect();
+        const pill = node.querySelector(".mobile-delta-pill")!.getBoundingClientRect();
+        return Math.min(value.right, pill.right) - Math.max(value.left, pill.left) > 1 &&
+          Math.min(value.bottom, pill.bottom) - Math.max(value.top, pill.top) > 1;
+      });
+      expect(overlap, `${width} Profit total and percentage overlap`).toBe(false);
+      if (width === 744 || width === 834) {
+        await expect(page.locator(".d2-summary > .summary-stack")).toHaveCSS("opacity", "1");
+        mkdirSync("test-results/mobile", { recursive: true });
+        await page.screenshot({ path: `test-results/mobile/summary-portrait-${width}.png`, fullPage: true });
+      }
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("iPad portrait Summary shows full Profit symbols", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 768, height: 1024 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await page.clock.setFixedTime(new Date("2026-12-15T12:00:00Z"));
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await expect(page.locator(".d2-summary")).toBeVisible();
+    for (const width of [744, 768, 834, 1024, 1032]) {
+      await page.setViewportSize({ width, height: 1024 });
+      const symbols = page.locator(".d2-summary .analyze-profit-card .profit-mobile-list .truncate");
+      await expect(symbols.first()).toBeVisible();
+      const clippedSymbols = await symbols.evaluateAll((nodes) => nodes
+        .filter((node) => node.scrollWidth > node.clientWidth + 1)
+        .map((node) => node.textContent));
+      expect(clippedSymbols, `${width} clipped Profit symbols`).toEqual([]);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("iPad portrait attribution shows full contributor names", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 744, height: 1133 }, hasTouch: true, isMobile: true, reducedMotion: "reduce" });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await page.locator(".d2-summary .analyze-profit-card").getByRole("radio", { name: "Attribution" }).click();
+    for (const width of [744, 834]) {
+      await page.setViewportSize({ width, height: 1133 });
+      const names = page.locator(".d2-summary .analyze-profit-card .attribution-rank-button .truncate");
+      await expect(names.first()).toBeVisible();
+      const clipped = await names.evaluateAll((nodes) => nodes
+        .filter((node) => node.scrollWidth > node.clientWidth + 1)
+        .map((node) => node.textContent));
+      expect(clipped, `${width} clipped contributor names`).toEqual([]);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("iPad Cost basis keeps secondary metrics aligned", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 768, height: 1024 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/cost-basis");
+    const metrics = page.locator(".d2-cost .cost-dashboard-secondary > div");
+    await expect(metrics).toHaveCount(3);
+    const positions = await metrics.evaluateAll((nodes) => nodes.map((node) => ({
+      x: node.getBoundingClientRect().x,
+      y: node.getBoundingClientRect().y,
+    })));
+    expect(positions[2].y).toBe(positions[0].y);
+    expect(positions[1].x).toBeGreaterThan(positions[0].x);
+    expect(positions[2].x).toBeGreaterThan(positions[1].x);
   } finally {
     await context.close();
   }
@@ -308,7 +465,7 @@ test("wallet sort labels remain fully visible on tablet and landscape widths", a
   }
 });
 
-test("wide Analytics detail leaves space before the portfolio cards", async ({ browser }) => {
+test("wide Analytics detail follows the summary cards", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   try {
@@ -318,7 +475,7 @@ test("wide Analytics detail leaves space before the portfolio cards", async ({ b
     const gap = await page.evaluate(() => {
       const detail = document.querySelector(".mobile-analytics-hub")!.getBoundingClientRect();
       const summary = document.querySelector(".d2-summary")!.getBoundingClientRect();
-      return summary.top - detail.bottom;
+      return detail.top - summary.bottom;
     });
     expect(gap).toBeGreaterThanOrEqual(16);
     await expect(page.locator(".d2-summary .profit-summary-card")).toBeHidden();
@@ -585,9 +742,12 @@ for (const [name, width, height] of viewports) {
             height: Math.round(node.getBoundingClientRect().height),
           })));
           expect(smallTargets, `${name} ${theme} ${route} touch targets`).toEqual([]);
+          if (route === "summary") {
+            await expect(page.locator(".ath-card [role='progressbar'] + div")).toHaveCount(1);
+          }
           const overlap = await page.evaluate(() => {
             for (const selector of [".t3-overview-grid", ".profit-metrics-mobile", ".analytics-tile-grid",
-              ".cost-metric-grid", ".coin-metric-grid", ".comparison-total-grid", ".ath-metrics",
+              ".cost-dashboard-primary", ".coin-metric-grid", ".comparison-total-grid", ".ath-card [role='progressbar'] + div",
               ".profit-period-grid", ".history-detail-tools"]) {
               const grid = document.querySelector<HTMLElement>(selector);
               if (!grid || !grid.getClientRects().length) continue;
@@ -633,9 +793,9 @@ for (const [name, width, height] of viewports) {
             }
           }
           if (route === "cost-basis") {
-            const columns = await page.locator(".cost-metric-grid").evaluate((node) =>
+            const columns = await page.locator(".cost-dashboard-primary").evaluate((node) =>
               getComputedStyle(node).gridTemplateColumns.split(" ").length);
-            expect(columns).toBe(size === "compact" ? 2 : 4);
+            expect(columns).toBe(2);
           }
           if (route === "coins/BTC") {
             const span = await page.locator(".coin-metric-grid > :first-child").evaluate((node) =>

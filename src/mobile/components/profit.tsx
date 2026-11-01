@@ -31,6 +31,7 @@ import {
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import ProfitAttribution from "@/mobile/components/profit-attribution";
+import { profitRanks } from "@/components/analyze-values";
 import { DeltaPill, ListRow, SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
 
 function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
@@ -131,13 +132,9 @@ const App = ({
     });
   }, [coinsProfit]);
 
-  const topProfitData = useMemo(
-    () => (isMobile ? coinsProfit.filter((coin) => coin.value !== null && coin.value > 0) : coinsProfit.filter((coin) => coin.value !== null)).slice(-5).reverse(),
-    [coinsProfit, isMobile],
-  );
-  const topLossData = useMemo(
-    () => (isMobile ? coinsProfit.filter((coin) => coin.value !== null && coin.value < 0) : coinsProfit.filter((coin) => coin.value !== null)).slice(0, 5),
-    [coinsProfit, isMobile],
+  const { gainers: topProfitData, decliners: topLossData } = useMemo(
+    () => profitRanks(coinsProfit),
+    [coinsProfit],
   );
   const unknownProfitData = useMemo(
     () => coinsProfit.filter((coin) => coin.value === null),
@@ -299,12 +296,12 @@ const App = ({
   </div>;
 
   return (
-    <Card className={isMobile ? "overview-movers-card" : undefined}>
+    <Card className={isMobile ? "overview-movers-card analyze-profit-card" : "analyze-profit-card"}>
       <CardHeader className={`space-y-2 pb-2${isMobile ? " mobile-movers-header" : ""}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {!isMobile && <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("profit.title")}
-          </CardTitle>}
+          </CardTitle>
           {!isMobile && view === "summary" && <div className="text-xs text-muted-foreground">
             {t("profit.totalLabel")
               .replace("{n}", String(coinsProfit.length))
@@ -352,7 +349,7 @@ const App = ({
         {view === "attribution" ? (
           <ProfitAttribution currency={currency} dateRange={selectedDateRange} quoteColor={quoteColor} logoMap={logoMap} />
         ) : <>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="profit-movers-grid grid grid-cols-1 md:grid-cols-2 gap-4">
           {topProfitData.length > 0 && <div className="space-y-1">
             <div className="text-xs text-muted-foreground font-medium">
               {t(isMobile ? "overview.gainers" : "profit.topProfit")}

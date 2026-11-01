@@ -38,6 +38,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { BottomSheet, DeltaPill, SegmentedControl, useHaptics, useIsMobile } from "@/mobile/components/mobile";
 import { isSameDay } from "date-fns";
 import { useTranslation } from "@/mobile/i18n";
+import ComparisonMoversPanel from "@/components/comparison-movers-panel";
 
 type MetricRow = {
   base: number;
@@ -505,7 +506,7 @@ const App = ({
   const hasData = coinComparisons.length > 0;
 
   return (
-    <div className="d2-comparison relative min-h-[400px]" aria-busy={pageLoading}>
+    <div className="d2-comparison analyze-comparison relative min-h-[400px]" aria-busy={pageLoading}>
       {!isMobile && <h1 className="sr-only">{t("comparison.h1")}</h1>}
       <StaggerContainer className="space-y-3">
         <FadeUp>
@@ -535,20 +536,16 @@ const App = ({
                     )}
                     {isMobile && <span>{t(shouldMaskValue ? "comparison.showValues" : "comparison.hideValues")}</span>}
                   </Button>
-                  <div className="comparison-date-controls flex items-center touch:grid touch:w-full touch:min-w-0 touch:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2">
-                    <ComparisonDatePicker
-                      label={t("comparison.baseDate")}
-                      value={baseId}
-                      dateOptions={dateOptions}
-                      onChange={onBaseDateChange}
-                    />
-                    <span className="text-muted-foreground text-sm">vs</span>
-                    <ComparisonDatePicker
-                      label={t("comparison.headDate")}
-                      value={headId}
-                      dateOptions={dateOptions}
-                      onChange={onHeadDateChange}
-                    />
+                  <div className="comparison-date-controls flex items-center gap-2">
+                    <div className="comparison-date-field"><span>{t("comparison.baseDate")}</span>
+                      <ComparisonDatePicker label={t("comparison.baseDate")} value={baseId}
+                        dateOptions={dateOptions} onChange={onBaseDateChange} />
+                    </div>
+                    {!isMobile && <span className="text-muted-foreground text-sm">vs</span>}
+                    <div className="comparison-date-field"><span>{t("comparison.headDate")}</span>
+                      <ComparisonDatePicker label={t("comparison.headDate")} value={headId}
+                        dateOptions={dateOptions} onChange={onHeadDateChange} />
+                    </div>
                   </div>
                 </div>
                 <div className="comparison-quick-control flex items-center touch:min-w-0 touch:flex-wrap gap-2">
@@ -695,6 +692,9 @@ const App = ({
                   />
                 ))}
               </div>
+            </FadeUp>
+            <FadeUp>
+              <ComparisonMoversPanel rows={coinComparisons} currency={currency} quoteColor={quoteColor} t={t} shouldMaskValue={shouldMaskValue} />
             </FadeUp>
           </>
         )}

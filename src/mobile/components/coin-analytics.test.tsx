@@ -359,6 +359,10 @@ afterEach(() => {
 });
 
 describe("CoinAnalysis allowSymbols population", () => {
+  it("links to the existing cost basis route", () => {
+    renderCoinAnalysis();
+    expect(screen.getByRole("button", { name: "Open cost basis" })).toBeInTheDocument();
+  });
   it("populates allowSymbols on first mount so the rank is computed", async () => {
     renderCoinAnalysis();
 

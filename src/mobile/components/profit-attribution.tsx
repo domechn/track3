@@ -92,7 +92,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
   return <div className="space-y-4">
     {status === "error" && error}
     <p className="text-xs text-muted-foreground">{label("method")}</p>
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div className="attribution-totals grid grid-cols-2 gap-2 sm:grid-cols-4">
       {(["totalChange", "priceEffect", "flowEffect", "residual"] as const).map((key) => (
         <div key={key} className="min-w-0 rounded-md border border-border/50 bg-muted/20 p-2">
           <div className="text-xs text-muted-foreground">{label(key)}</div>

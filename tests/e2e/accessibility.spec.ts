@@ -181,7 +181,7 @@ async function checkAttributionAccessibility(page: Page, width: number) {
     await expect(page.getByRole("heading", { name: "Summary", exact: true })).toBeAttached();
     await page.getByRole("radio", { name: "Attribution" }).click();
     await expect(page.getByRole("radio", { name: "Attribution" })).toHaveAttribute("data-state", "checked");
-    await expect(page.getByText("Attribution details")).toBeAttached();
+    await expect(page.locator(".analyze-profit-card").getByText("Attribution details")).toBeAttached();
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     expect(results.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -495,6 +495,7 @@ test("wide cost basis tables keep their first column visible while scrolling", a
 
 test("summary detail dialog fits and passes axe", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page);
   await page.goto("/#/summary");
   await page.getByRole("button", { name: "2", exact: true }).click();

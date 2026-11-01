@@ -5,15 +5,15 @@ test("320px Wallets labels and change controls fit without wrapping words", asyn
   await page.setViewportSize({ width: 320, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/wallets");
-  await expect(page.locator("[data-testid='wallet-treemap-tile']").first()).toBeVisible();
-  const tileLabels = await page.locator("[data-testid='wallet-treemap-tile'] .line-clamp-2").evaluateAll((nodes) =>
+  await expect(page.locator(".d2-wallets .analyze-source-list li").first()).toBeVisible();
+  const tileLabels = await page.locator(".d2-wallets .analyze-source-list-name").evaluateAll((nodes) =>
     nodes.map((node) => ({
       text: node.textContent?.trim(),
       overflow: node.scrollWidth > node.clientWidth,
-      wrap: getComputedStyle(node).overflowWrap,
+      wrap: getComputedStyle(node).whiteSpace,
     })));
   expect(tileLabels.length).toBeGreaterThan(0);
-  expect(tileLabels.every(({ overflow, wrap }) => !overflow && wrap === "normal"), JSON.stringify(tileLabels)).toBe(true);
+  expect(tileLabels.every(({ overflow, wrap }) => !overflow && wrap === "nowrap"), JSON.stringify(tileLabels)).toBe(true);
   await expect(page.getByPlaceholder("Search wallets")).toBeVisible();
   const segments = page.locator(".wallet-change-controls .mobile-segment");
   await expect(segments).toHaveText(["Value", "%", "Volatility"]);
@@ -96,8 +96,8 @@ test("rich dark Analytics drawdown has readable loss text", async ({ page }) => 
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/summary");
   await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
-  const drawdown = page.locator(".ath-card").getByText("% from ATH").locator("..").locator("div").last();
-  await expect(drawdown).toContainText("-");
+  const drawdown = page.locator(".ath-card").getByText("Distance from ATH").locator("..").locator("strong");
+  await expect(drawdown).toContainText("−");
   const contrast = await drawdown.evaluate((node) => {
     const rgb = (color: string) => color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
     const luminance = (color: string) => {
