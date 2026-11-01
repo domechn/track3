@@ -1,0 +1,17 @@
+{
+  "data": "{\"applyingConfig\":{},\"clock\":{\"counter\":2,\"deviceId\":\"00000000-0000-4000-8000-000000000001\",\"ms\":1713272400000},\"config\":{\"10\":{\"clock\":{\"counter\":1,\"deviceId\":\"00000000-0000-4000-8000-000000000001\",\"ms\":1713272400000},\"hash\":\"60939920bacb9d996f174252b3a51134385e33dfe24a13f92c6f6d8e33a8832d\"},\"7\":{\"clock\":{\"counter\":0,\"deviceId\":\"00000000-0000-4000-8000-000000000001\",\"ms\":1713272400000},\"hash\":\"3c6fc722dd9636ed26ade478f4135f898bd6276b9bc1c910cc77e6b8966c1024\"},\"rebalance\":{\"clock\":{\"counter\":2,\"deviceId\":\"00000000-0000-4000-8000-000000000001\",\"ms\":1713272400000},\"hash\":\"bc25d5cae63130eb258bc2de01942c76f845fce145135b2dd9b6565e47246bb6\"}},\"configConflicts\":{},\"configResolutions\":{},\"deviceId\":\"00000000-0000-4000-8000-000000000001\",\"deviceIds\":[\"00000000-0000-4000-8000-000000000001\"],\"deviceListAt\":1713272400000,\"headerId\":\"76a77dad476ecbd8811f06e976797d8c2cd92a35b793583c92690e7e540abe62\",\"headerSalt\":\"MDEyMzQ1Njc4OUFCQ0RFRg==\",\"known\":[\"00000000-0000-4000-8000-000000000001:config:7:1713272400000-0\",\"00000000-0000-4000-8000-000000000001:config:10:1713272400000-1\",\"00000000-0000-4000-8000-000000000001:config:rebalance:1713272400000-2\",\"00000000-0000-4000-8000-000000000001:session:session-golden:867495d234a9252c8246c803cd57570b99c3437c0c647c1919827f7e29ef0317\"],\"lastSync\":1713272400000,\"pendingConfig\":{},\"pendingSessionDeletions\":{},\"pendingTombstones\":{},\"probe\":{\"checkedAt\":1713272400000,\"identity\":\"37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f\"},\"sessionDeletions\":{},\"sessionHashes\":{\"session-golden\":\"867495d234a9252c8246c803cd57570b99c3437c0c647c1919827f7e29ef0317\"},\"snapshotRevision\":6,\"tombstones\":{},\"trackedSessions\":[\"session-golden\"]}",
+  "rows": [
+    {
+      "assetRows": "[\"799f5b78cfcd0d1e975366a78a29e1055ce1995cf90744ada2a36b1d658470f0\",\"2f14dc93b0dd23ce90d0f7445e1bdb2e61e5fc1dc7692e9a6fd95f49e449985a\"]",
+      "known": "[\"00000000-0000-4000-8000-000000000001:snapshot:snapshot-000000:1\"]",
+      "pendingSnapshotEdit": null,
+      "published": 1,
+      "rowEvents": null,
+      "snapshotEdit": null,
+      "snapshotHash": "beece2bf0bcecc0825b7faa586de60251781e36002c16fab3a1025b4c1152012",
+      "snapshotId": "snapshot-000000",
+      "transactionEvents": null,
+      "transactionRows": "{\"4ac33f9f31fdd3eeed4dee580c1223d3dff17992093be0f305e08355cff35451\":{\"price\":1,\"txnType\":\"buy\"}}"
+    }
+  ]
+}

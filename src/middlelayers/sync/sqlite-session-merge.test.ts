@@ -68,9 +68,30 @@ vi.mock("@tauri-apps/plugin-fs", async (importOriginal) => ({
 }));
 vi.mock("@tauri-apps/api/core", async (importOriginal) => ({
   ...await importOriginal<object>(),
-  invoke: async (command: string, args: { data: string }) => {
+  invoke: async (command: string, args: { data: string; rows?: Array<Record<string, string | number | null>>;
+    deletedIds?: string[]; clearSnapshots?: boolean }) => {
     if (command === "encrypt") return `encrypted:${args.data}`;
     if (command === "decrypt") return args.data.slice("encrypted:".length);
+    if (command === "save_sync_state") {
+      write("BEGIN");
+      try {
+        if (args.clearSnapshots) write("DELETE FROM sync_snapshot_state");
+        for (const id of args.deletedIds ?? []) write("DELETE FROM sync_snapshot_state WHERE snapshot_id = ?", [id]);
+        for (const row of args.rows ?? []) write(
+          `INSERT OR REPLACE INTO sync_snapshot_state
+           (snapshot_id, snapshot_hash, snapshot_edit, pending_snapshot_edit, published, known,
+            asset_rows, transaction_rows, row_events, transaction_events) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ["snapshotId", "snapshotHash", "snapshotEdit", "pendingSnapshotEdit", "published", "known",
+            "assetRows", "transactionRows", "rowEvents", "transactionEvents"].map((key) => row[key]),
+        );
+        write("INSERT OR REPLACE INTO sync_state (id, data) VALUES (1, ?)", [args.data]);
+        write("COMMIT");
+      } catch (error) {
+        write("ROLLBACK");
+        throw error;
+      }
+      return;
+    }
     throw new Error(`Unexpected command: ${command}`);
   },
 }));
@@ -84,6 +105,9 @@ it("converges SQLite backed session merges on two devices without ping pong", as
       messageCount INTEGER, preview TEXT
     );
     CREATE TABLE sync_state (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
+    CREATE TABLE sync_snapshot_state (snapshot_id TEXT PRIMARY KEY, snapshot_hash TEXT, snapshot_edit TEXT,
+      pending_snapshot_edit TEXT, published INTEGER, known TEXT, asset_rows TEXT, transaction_rows TEXT,
+      row_events TEXT, transaction_events TEXT);
     CREATE TABLE sync_manifest_cache (owner TEXT, header_salt TEXT, etag TEXT, body TEXT, last_modified TEXT, PRIMARY KEY (owner, etag));
     CREATE TABLE assets_v2 (uuid TEXT);
     CREATE TABLE transactions (uuid TEXT);
@@ -140,6 +164,9 @@ it("does not execute an action again on another device after its approval syncs"
       messageCount INTEGER, preview TEXT
     );
     CREATE TABLE sync_state (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
+    CREATE TABLE sync_snapshot_state (snapshot_id TEXT PRIMARY KEY, snapshot_hash TEXT, snapshot_edit TEXT,
+      pending_snapshot_edit TEXT, published INTEGER, known TEXT, asset_rows TEXT, transaction_rows TEXT,
+      row_events TEXT, transaction_events TEXT);
     CREATE TABLE sync_manifest_cache (owner TEXT, header_salt TEXT, etag TEXT, body TEXT, last_modified TEXT, PRIMARY KEY (owner, etag));
     CREATE TABLE assets_v2 (uuid TEXT);
     CREATE TABLE transactions (uuid TEXT);
