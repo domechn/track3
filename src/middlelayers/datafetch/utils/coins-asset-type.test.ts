@@ -3,6 +3,15 @@ import { combineCoinLists, calculateTotalValue } from "./coins";
 import { WalletCoin } from "../types";
 
 describe("asset type aware coin utilities", () => {
+  it("keeps the first available rule when duplicate custom rows are combined", () => {
+    const price = { kind: "manual" as const, usd: 0.42, setAt: "2026-11-01T10:00:00.000Z" };
+    const result = combineCoinLists([[
+      { wallet: "others", symbol: "NOVA", amount: 2, assetType: "crypto" },
+      { wallet: "others", symbol: "NOVA", amount: 3, assetType: "crypto", customPrice: price },
+    ]]);
+    expect(result).toEqual([expect.objectContaining({ symbol: "NOVA", amount: 5, customPrice: price })]);
+  });
+
   it("does not merge stock and crypto assets with the same wallet and symbol", () => {
     const result = combineCoinLists([
       [

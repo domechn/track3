@@ -38,6 +38,7 @@ type BridgeOptions = {
   goldenHistory?: boolean;
   seedEditLog?: boolean;
   seedPartialSnapshot?: boolean;
+  customPriceFixture?: boolean;
   appVersion?: string;
 };
 
@@ -71,6 +72,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     goldenHistory = false,
     seedEditLog = false,
     seedPartialSnapshot = false,
+    customPriceFixture = false,
     appVersion = "0.8.2",
   } = options;
   if (!options.onboarding) {
@@ -283,6 +285,15 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       (snapshot_uuid, edited_at, origin, target, action, asset_type, symbol, wallet, old_value, new_value)
       VALUES (?, '2026-11-01T10:02:00.000Z', 'local', 'asset', 'restore', 'crypto', 'ETH', 'hashed-wallet', NULL, '{"amount":3.8,"value":12000,"price":3157.89}')`,
     [uuid]);
+  }
+  if (customPriceFixture) {
+    db.run("UPDATE configuration SET data = ? WHERE id = 12", [
+      `configs:\n  groupUSD: false\nothers:\n  - symbol: NOVA\n    amount: 1200\n    price:\n      kind: manual\n      usd: 0.42\n      setAt: '2026-11-01T10:00:00.000Z'\n      note: OTC\n  - symbol: STBTC\n    amount: 0.5\n    price:\n      kind: follow\n      assetType: crypto\n      symbol: BTC\n      ratio: 1\n`,
+    ]);
+    db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('demo-59', '2026-10-22T00:00:00.000Z', ?, 'crypto', 'NOVA', 1200, 504, 0.42)`, [md5("others")]);
+    db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('demo-59', '2026-10-22T00:00:00.000Z', ?, 'crypto', 'STBTC', 0.5, 21000, 42000)`, [md5("others")]);
   }
   const config = JSON.stringify({
     endpoint: "https://assistant.test/v1",

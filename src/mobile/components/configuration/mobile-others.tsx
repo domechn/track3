@@ -9,9 +9,13 @@ import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import { getWalletLogo } from "@/lib/utils";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import type { OtherRow } from "@/components/configuration/types";
+import { CustomPriceFields, parsePriceDraft, priceDraft } from "@/components/configuration/custom-price-fields";
+import type { PriceDraft } from "@/components/configuration/custom-price-fields";
+import { validateCustomPrice } from "@/middlelayers/custom-price";
 
 export function MobileOthers(props: {
   others: OtherRow[];
+  baseCurrency?: { currency: string; rate: number };
   onSave: (index: number | null, value: OtherRow) => void;
   onRemove: (index: number) => void;
   onAttach: (index: number) => void;
@@ -20,13 +24,14 @@ export function MobileOthers(props: {
   onAddRequestHandled?: () => void;
 }) {
   const { t } = useTranslation();
-  const [editor, setEditor] = useState<{ index: number | null; value: OtherRow; amount: string }>();
+  const [editor, setEditor] = useState<{ index: number | null; value: OtherRow; amount: string; priceDraft: PriceDraft }>();
   const [removal, setRemoval] = useState<number | null>(null);
   const [menu, setMenu] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const customSymbols = props.others.map((row) => row.symbol);
   const open = (index: number | null) => {
     const value = index === null ? { symbol: "", amount: 0, alias: "" } : props.others[index];
-    setEditor({ index, value: { ...value, alias: value.alias ?? "" }, amount: String(value.amount) });
+    setEditor({ index, value: { ...value, alias: value.alias ?? "" }, amount: String(value.amount), priceDraft: priceDraft(value.price, props.baseCurrency?.rate) });
     setError("");
   };
   useEffect(() => {
@@ -42,7 +47,12 @@ export function MobileOthers(props: {
       setError(t("mobile.others.invalid"));
       return;
     }
-    props.onSave(editor.index, { ...editor.value, symbol: editor.value.symbol.trim().toUpperCase(), amount });
+    const parsed = parsePriceDraft(editor.priceDraft, props.others, editor.value.symbol, editor.value.price, props.baseCurrency?.rate);
+    if (!parsed.valid) { setError(t("config.customPrice.invalid")); return; }
+    const value = { ...editor.value, symbol: editor.value.symbol.trim().toUpperCase(), amount };
+    if (parsed.price) value.price = parsed.price;
+    else delete value.price;
+    props.onSave(editor.index, value);
     setEditor(undefined);
   };
   return <section className={`ios-d3-others space-y-2${props.hideEmpty ? " ios-d3-others-empty" : ""}`}>
@@ -58,7 +68,10 @@ export function MobileOthers(props: {
         </span>
         <button className="min-h-11 min-w-0 flex-1 text-left" aria-label={`${t("goals.edit")} ${other.symbol}`} onClick={() => open(index)}>
           <span className="block truncate font-medium">{other.alias || other.symbol}</span>
-          <span className="block truncate text-xs text-muted-foreground">{other.amount.toLocaleString()} {other.symbol}</span>
+          <span className="block truncate text-xs text-muted-foreground">{other.amount.toLocaleString()} {other.symbol}
+            {!other.attachTo && other.price ? ` · ${t(validateCustomPrice(other.price, customSymbols, other.symbol)
+              ? `config.customPrice.${other.price.kind}` : "config.customPrice.invalidRule")}` : ""}
+          </span>
         </button>
         <button className="ios-d3-source-more" aria-label={t("mobile.sources.moreActions").replace("{source}", other.symbol)} onClick={() => setMenu(index)}><DotsHorizontalIcon aria-hidden="true" /></button>
       </div>)}
@@ -77,6 +90,9 @@ export function MobileOthers(props: {
         <div className="space-y-2"><Label htmlFor="other-alias">{t("config.formAlias")}</Label><Input id="other-alias" className="min-h-12 text-base" autoComplete="off" value={editor.value.alias ?? ""} onChange={(event) => setEditor({ ...editor, value: { ...editor.value, alias: event.target.value } })} /></div>
         <div className="space-y-2"><Label htmlFor="other-symbol">{t("config.formSymbol")}</Label><Input id="other-symbol" className="min-h-12 text-base" autoComplete="off" autoCapitalize="characters" value={editor.value.symbol} onChange={(event) => setEditor({ ...editor, value: { ...editor.value, symbol: event.target.value } })} /></div>
         <div className="space-y-2"><Label htmlFor="other-amount">{t("config.formAmount")}</Label><Input id="other-amount" className="min-h-12 text-base" inputMode="decimal" value={editor.amount} onChange={(event) => setEditor({ ...editor, amount: event.target.value })} /></div>
+        {!editor.value.attachTo && <CustomPriceFields draft={editor.priceDraft}
+          onChange={(next) => setEditor({ ...editor, priceDraft: next })} t={t}
+          currency={props.baseCurrency?.currency} rate={props.baseCurrency?.rate} />}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </div>
     </ModalPage>}

@@ -20,6 +20,7 @@ const baseProps = {
   pagedOthersStartIndex: 0,
   otherAmountDraftMap: {},
   onAdd: vi.fn(),
+  onPriceChange: vi.fn(),
   onOthersChange: vi.fn(),
   onOtherAmountInputChange: vi.fn(),
   onCommitOtherAmountInput: vi.fn(),
@@ -65,5 +66,34 @@ describe("OthersSection", () => {
     expect(onRemove).not.toHaveBeenCalled();
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
     expect(onRemove).toHaveBeenCalledWith(0);
+  });
+
+  it("edits a custom row's manual price without changing its holding", () => {
+    const onPriceChange = vi.fn();
+    render(<OthersSection {...baseProps} onPriceChange={onPriceChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /Set price for BTC/ }));
+    fireEvent.click(screen.getByRole("radio", { name: "Your price" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "USD per unit" }), { target: { value: "0.42" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onPriceChange).toHaveBeenCalledWith(0, expect.objectContaining({ kind: "manual", usd: 0.42 }));
+  });
+
+  it("converts the selected base currency before storing the price", () => {
+    const onPriceChange = vi.fn();
+    render(<OthersSection {...baseProps} baseCurrency={{ currency: "EUR", rate: 0.9 }} onPriceChange={onPriceChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /Set price for BTC/ }));
+    fireEvent.click(screen.getByRole("radio", { name: "Your price" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "EUR per unit" }), { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onPriceChange).toHaveBeenCalledWith(0, expect.objectContaining({ kind: "manual", usd: 10 }));
+  });
+
+  it("marks a follow rule invalid after its target becomes a custom row", () => {
+    const others: OtherRow[] = [
+      { symbol: "NOVA", amount: 1, price: { kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 1 } },
+      { symbol: "BTC", amount: 1 },
+    ];
+    render(<OthersSection {...baseProps} others={others} pagedOthers={others} />);
+    expect(screen.getByRole("button", { name: /Set price for NOVA, Invalid price rule/ })).toBeInTheDocument();
   });
 });

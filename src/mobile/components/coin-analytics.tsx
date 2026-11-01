@@ -90,6 +90,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTranslation } from "@/mobile/i18n";
+import CoinCustomPrice from "@/components/coin-custom-price";
 import { BottomSheet, DeltaPill, MobileRecordList, useIsMobile } from "@/mobile/components/mobile";
 
 function formatEditablePrice(value: number): string {
@@ -941,6 +942,7 @@ const App = ({
             </div>
           </BottomSheet>
           <p className="coin-detail-price ios-money">{lastPriceStr}</p>
+          <CoinCustomPrice symbol={symbol} assetType={assetType} locale={locale} t={t} />
           <div className="coin-detail-change">
             <DeltaPill value={change24h ?? 0}>{change24h === undefined ? "—" : `${change24h > 0 ? "+" : ""}${change24h.toFixed(2)}%`}</DeltaPill>
             <span>{t("coin.change24h")}</span>

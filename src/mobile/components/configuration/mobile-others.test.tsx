@@ -34,3 +34,36 @@ it("opens the custom holding editor from the first-source picker", () => {
   view.rerender(<MobileOthers {...actions} addRequest={1} />);
   expect(screen.getByRole("dialog", { name: "Add custom asset" })).toBeInTheDocument();
 });
+
+it("saves a listed asset follow rule with the custom holding", () => {
+  const save = vi.fn();
+  render(<MobileOthers others={[{ symbol: "NOVA", amount: 10 }]} onSave={save} onRemove={vi.fn()} onAttach={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Edit NOVA" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Follow a listed asset" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Listed symbol" }), { target: { value: "btc" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenCalledWith(0, expect.objectContaining({
+    price: { kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 1 },
+  }));
+});
+
+it("accepts a manual price in the selected base currency", () => {
+  const save = vi.fn();
+  render(<MobileOthers others={[{ symbol: "NOVA", amount: 10 }]}
+    baseCurrency={{ currency: "EUR", rate: 0.9 }} onSave={save} onRemove={vi.fn()} onAttach={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Edit NOVA" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Your price" }));
+  fireEvent.change(screen.getByRole("spinbutton", { name: "EUR per unit" }), { target: { value: "9" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenCalledWith(0, expect.objectContaining({
+    price: expect.objectContaining({ kind: "manual", usd: 10 }),
+  }));
+});
+
+it("labels a follow rule invalid after its target becomes a custom row", () => {
+  render(<MobileOthers others={[
+    { symbol: "NOVA", amount: 1, price: { kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 1 } },
+    { symbol: "BTC", amount: 1 },
+  ]} onSave={vi.fn()} onRemove={vi.fn()} onAttach={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Edit NOVA" })).toHaveTextContent("Invalid price rule");
+});

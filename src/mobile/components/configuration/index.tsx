@@ -203,6 +203,10 @@ const App = ({
     () => currencies.find((c) => c.currency === preferCurrency),
     [currencies, preferCurrency],
   );
+  const customPriceCurrency = useMemo(() => ({
+    currency: preferCurrency,
+    rate: preferredCurrencyDetail?.rate ?? (preferCurrency === "USD" ? 1 : Number.NaN),
+  }), [preferCurrency, preferredCurrencyDetail?.rate]);
 
   const visibleExchanges = useMemo(
     () => exchanges.filter((e) => e.active || !hideInactive),
@@ -1123,6 +1127,7 @@ const App = ({
       />}
       {(mobileSection !== "sources" || sourceTab === "custom" || exchanges.length + wallets.length + stockBrokers.length + others.length === 0) && <MobileOthers
         others={others}
+        baseCurrency={customPriceCurrency}
         addRequest={addOtherRequest}
         onAddRequestHandled={() => setAddOtherRequest(0)}
         hideEmpty={exchanges.length + wallets.length + stockBrokers.length + others.length === 0}
@@ -1271,12 +1276,17 @@ const App = ({
 
       <OthersSection
         others={others}
+        baseCurrency={customPriceCurrency}
         othersPage={othersPage}
         othersPageCount={othersPageCount}
         pagedOthers={pagedOthers}
         pagedOthersStartIndex={pagedOthersStartIndex}
         otherAmountDraftMap={otherAmountDraftMap}
         onAdd={handleAddOther}
+        onPriceChange={(idx, price) => {
+          setOthers((current) => current.map((item, index) => index === idx ? { ...item, price } : item));
+          markFormChanged();
+        }}
         onOthersChange={handleOthersChange}
         onOtherAmountInputChange={handleOtherAmountInputChange}
         onCommitOtherAmountInput={commitOtherAmountInput}

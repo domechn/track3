@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import initSqlJs, { type Database } from "sql.js";
+import yaml from "yaml";
 import { describe, expect, it, vi } from "vitest";
 import type { ExportData } from "@/middlelayers/datamanager";
 
@@ -10,6 +11,7 @@ const state = vi.hoisted(() => ({
   db: undefined as Database | undefined,
   files: new Map<string, string>(),
   dirs: new Set<string>(),
+  configExport: undefined as string | undefined,
 }));
 
 function rows(sql: string, values: unknown[] = []): Record<string, unknown>[] {
@@ -28,7 +30,15 @@ const writeDb = {
     return { rowsAffected: state.db!.getRowsModified() };
   },
 };
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: async (command: string, args: { data: string }) => {
+    if (command === "encrypt") return `!ent:compat:${args.data}`;
+    if (command === "decrypt") return args.data.slice("!ent:compat:".length);
+    throw new Error(`Unexpected command: ${command}`);
+  },
+}));
 vi.mock("@/middlelayers/database", () => ({
+  getDatabase: async () => writeDb,
   selectFromDatabaseWithSql: async (sql: string, values: unknown[]) => rows(sql, values),
   selectFromDatabase: async (
     table: string, where: Record<string, unknown>, limit = 0,
@@ -78,7 +88,17 @@ vi.mock("@/utils/app", () => ({
   getClientID: async () => "compat-producer",
   getVersion: async () => JSON.parse(readFileSync("package.json", "utf8")).version,
 }));
-vi.mock("@/middlelayers/configuration", () => ({ exportConfigurationString: async () => undefined }));
+vi.mock("@/middlelayers/configuration", () => ({
+  exportConfigurationString: async () => state.configExport,
+  parseRawConfiguration: async (data: string) => yaml.parse(data),
+  runWithPreparedConfigurationWrite: async (
+    config: { configs: unknown; others: unknown },
+    callback: (db: typeof writeDb, write: () => Promise<void>) => Promise<unknown>,
+  ) => callback(writeDb, async () => {
+    state.db!.run("INSERT OR REPLACE INTO configuration (id, data) VALUES (12, ?)",
+      [yaml.stringify({ configs: config.configs, others: config.others })]);
+  }),
+}));
 vi.mock("@/middlelayers/charts", async () => ({
   queryHistoricalData: (await import("@/middlelayers/charts-history")).queryHistoricalData,
 }));
@@ -115,6 +135,7 @@ function loadBackup(directory: string) {
 describe.skipIf(!mode)("cross-version export and backup", () => {
   it.skipIf(mode !== "produce")("writes new-build export and backup fixtures", async () => {
     await freshDb();
+    state.configExport = undefined;
     state.files.clear();
     state.dirs.clear();
     state.db!.run("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES ('compat-snapshot', '2024-04-16T13:00:00.000Z', 'wallet-compat', 'crypto', 'BTC', 2, 4, 2)");
@@ -125,9 +146,16 @@ describe.skipIf(!mode)("cross-version export and backup", () => {
     state.db!.run(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
       VALUES ('compat-snapshot', 2, '[{"wallet":"ddf7fe606e048ac89f8a8c62bf23c4be","kind":"exchange","provider":"OKX","category":"network"}]',
       'last_known', '2024-04-16T13:00:00.000Z')`);
-    await DATA_MANAGER.exportHistoricalData("/forward.json", false);
+    state.configExport = yaml.stringify({
+      configs: { groupUSD: false }, exchanges: [], others: [
+        { symbol: "NOVA", amount: 10, price: { kind: "manual", usd: 0.42, setAt: "2026-11-01T10:00:00.000Z" } },
+        { symbol: "STBTC", amount: 1, price: { kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 0.5 } },
+      ],
+    });
+    await DATA_MANAGER.exportHistoricalData("/forward.json", true);
     const extended = JSON.parse(state.files.get("/forward.json")!) as ExportData;
     expect(extended.historicalData[0].partial?.missing[0].provider).toBe("OKX");
+    expect(yaml.parse(extended.configuration!).others[0].price.usd).toBe(0.42);
     writeFileSync(fixture("export-forward.json"), JSON.stringify(extended));
     await writeBackupV2("/backup", "compat-producer", "0.9.5", extended.historicalData);
     for (const [path, text] of state.files) {
@@ -152,6 +180,23 @@ describe.skipIf(!mode)("cross-version export and backup", () => {
     await DATA_MANAGER.importHistoricalData("REPLACE", extended);
     expect(rows("SELECT uuid, createdAt, wallet, asset_type, symbol, amount, value, price FROM assets_v2 ORDER BY id")).toStrictEqual(baseRows.assets);
     expect(rows("SELECT uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt FROM transactions ORDER BY id")).toStrictEqual(baseRows.transactions);
+    expect(yaml.parse(rows("SELECT data FROM configuration WHERE id=12")[0].data as string).others)
+      .toStrictEqual(yaml.parse(extended.configuration!).others);
+  });
+
+  it.skipIf(mode !== "consume")("0.9.4 imports and resaves custom price fields", async () => {
+    const extended = JSON.parse(readFileSync(fixture("export-forward.json"), "utf8")) as ExportData;
+    await freshDb();
+    const released = await vi.importActual<typeof import("@/middlelayers/configuration")>("@/middlelayers/configuration");
+    await released.importRawConfiguration(extended.configuration!);
+    const imported = await released.getConfiguration();
+    expect(imported?.others.map((row) => row.price)).toStrictEqual(yaml.parse(extended.configuration!).others.map((row: { price: unknown }) => row.price));
+    await released.saveConfiguration({
+      ...imported!,
+      others: imported!.others.map((row, index) => index === 0 ? { ...row, amount: row.amount + 1 } : row),
+    });
+    expect(yaml.parse(rows("SELECT data FROM configuration WHERE id=12")[0].data as string).others.map((row: { price: unknown }) => row.price))
+      .toStrictEqual(imported?.others.map((row) => row.price));
   });
 
   it.skipIf(mode !== "consume")("0.9.4 lists and imports forward backup records", async () => {

@@ -49,6 +49,9 @@
     "const recorded = recordSnapshotDeleted(syncSnapshotUuid).catch(showError);",
     "if (syncSnapshotUuid) void recordSnapshotUndone(syncSnapshotUuid).catch(showError).finally(() => syncRuntime.trigger(\"refresh\"));"
   ],
+  "src/components/configuration/custom-price-fields.tsx": [
+    "<RadioGroupItem value={kind} aria-label={t(`config.customPrice.${kind}`)} />"
+  ],
   "src/components/configuration/index.tsx": [
     "saveConfiguration(globalConfig)",
     "initParams: {",

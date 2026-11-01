@@ -77,6 +77,50 @@
       }
     ]
   },
+  "desktop.customPrice": [
+    {
+      "symbol": "NOVA",
+      "amount": 1200,
+      "price": {
+        "kind": "manual",
+        "usd": 0.42,
+        "setAt": "2026-11-01T10:00:00.000Z",
+        "note": "OTC"
+      }
+    },
+    {
+      "symbol": "STBTC",
+      "amount": 0.5,
+      "price": {
+        "kind": "follow",
+        "assetType": "crypto",
+        "symbol": "BTC",
+        "ratio": 1
+      }
+    }
+  ],
+  "mobile.customPrice": [
+    {
+      "symbol": "NOVA",
+      "amount": 1200,
+      "price": {
+        "kind": "manual",
+        "usd": 0.42,
+        "setAt": "2026-11-01T10:00:00.000Z",
+        "note": "OTC"
+      }
+    },
+    {
+      "symbol": "STBTC",
+      "amount": 0.5,
+      "price": {
+        "kind": "follow",
+        "assetType": "crypto",
+        "symbol": "BTC",
+        "ratio": 1
+      }
+    }
+  ],
   "desktop.refreshedStatus": "[{\"sourceId\":\"cex:0\",\"label\":\"Exchange\",\"status\":\"stale\",\"category\":\"network\",\"kind\":\"exchange\",\"lastSuccessAt\":\"2024-04-15T00:00:00.000Z\"}]",
   "mobile.refreshedStatus": "[{\"sourceId\":\"cex:0\",\"label\":\"Exchange\",\"status\":\"stale\",\"category\":\"network\",\"kind\":\"exchange\",\"lastSuccessAt\":\"2024-04-15T00:00:00.000Z\"}]"
 }

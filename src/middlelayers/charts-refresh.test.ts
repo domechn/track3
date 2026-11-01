@@ -204,6 +204,46 @@ beforeEach(() => {
   vi.mocked(isProVersion).mockResolvedValue({ isPro: false });
 });
 
+describe("custom asset refresh prices", () => {
+  it("queries a follow target and saves its ratio price only for the custom row", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{
+        assetType: "crypto", wallet: "others", symbol: "NOVA", amount: 10,
+        customPrice: { kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 0.5 },
+      }],
+      failedSources: [],
+    } as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 100, USDT: 1 });
+
+    await refreshAllData(vi.fn(), {}, operation);
+
+    expect(queryCoinPrices).toHaveBeenCalledWith(expect.arrayContaining(["NOVA", "BTC"]), { isPro: false });
+    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; price: number }> };
+    expect(payload.assets).toContainEqual(expect.objectContaining({ symbol: "NOVA", price: 50 }));
+  });
+
+  it("does not save a zero row when an existing unpriced follow target has no quote", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 41, uuid: "old-snapshot", createdAt: "2026-07-13T01:02:03.000Z",
+      assetType: "crypto", wallet: md5("others"), symbol: "NOVA",
+      amount: 10, value: 0, price: 0,
+    }]] as never);
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{
+        assetType: "crypto", wallet: "others", symbol: "NOVA", amount: 10,
+        customPrice: { kind: "follow", assetType: "crypto", symbol: "MISSING", ratio: 1 },
+      }],
+      failedSources: [],
+    } as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ USDT: 1, BTC: 100 });
+
+    await refreshAllData(vi.fn(), {}, operation);
+
+    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string }> };
+    expect(payload.assets.map((asset) => asset.symbol)).not.toContain("NOVA");
+  });
+});
+
 describe("generateTransactions", () => {
   it("uses the refresh timestamp and identity for new, changed, and removed assets", () => {
     const before = [

@@ -5,6 +5,7 @@ import {
   TokenConfig,
   WalletCoin,
 } from "../types";
+import { validateCustomPrice } from "@/middlelayers/custom-price";
 
 // Static map from chain analyzer type to the `chain` value the matching
 // analyzer emits. Used only as informational metadata on the merged entry.
@@ -86,6 +87,7 @@ export class OthersAnalyzer implements Analyzer {
   }
 
   async loadPortfolio(): Promise<WalletCoin[]> {
+    const customSymbols = (this.config.others ?? []).map((item) => item.symbol);
     return (this.config.others ?? [])
       .map((o) => {
         const attached = o.attachTo
@@ -97,6 +99,8 @@ export class OthersAnalyzer implements Analyzer {
           amount: +o.amount,
           wallet: attached?.wallet ?? OthersAnalyzer.wallet,
           chain: attached?.chain ?? "unknown",
+          ...(o.attachTo || !o.price || !validateCustomPrice(o.price, customSymbols, o.symbol)
+            ? {} : { customPrice: o.price }),
         };
       });
   }

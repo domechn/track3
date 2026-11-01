@@ -24,6 +24,24 @@ beforeEach(() => {
 });
 
 describe("OthersAnalyzer", () => {
+  it("passes valid custom rules only for unattached rows", async () => {
+    const manual = { kind: "manual" as const, usd: 0.42, setAt: "2026-11-01T10:00:00.000Z" };
+    const analyzer = new OthersAnalyzer(makeConfig({
+      btc: { addresses: ["bc1xxx"] },
+      others: [
+        { symbol: "NOVA", amount: 10, price: manual },
+        { symbol: "CEX", amount: 1, price: manual, attachTo: { kind: "wallet", type: "btc", identity: "bc1xxx" } },
+        { symbol: "BAD", amount: 1, price: { kind: "follow", assetType: "crypto", symbol: "NOVA", ratio: 1 } },
+        { symbol: "MISSING", amount: 1, price: manual, attachTo: { kind: "wallet", type: "btc", identity: "removed" } },
+      ],
+    }));
+    const coins = await analyzer.loadPortfolio();
+    expect(coins[0].customPrice).toStrictEqual(manual);
+    expect(coins[1].customPrice).toBeUndefined();
+    expect(coins[2].customPrice).toBeUndefined();
+    expect(coins[3].customPrice).toBeUndefined();
+  });
+
   it("emits unattached rows under the 'others' wallet", async () => {
     const analyzer = new OthersAnalyzer(
       makeConfig({

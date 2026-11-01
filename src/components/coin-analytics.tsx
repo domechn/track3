@@ -88,6 +88,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { useTranslation } from "@/i18n";
+import CoinCustomPrice from "./coin-custom-price";
 
 function formatEditablePrice(value: number): string {
   if (!Number.isFinite(value)) {
@@ -214,7 +215,7 @@ const App = ({
   const { symbol } = useParams() as { symbol: string };
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const pageSize = 20;
   const LOAD_COUNT = 3; // loadSymbolData, CoinsAmountAndValueChange, WalletAssetsPercentage
   const assetType = parseAssetTypeSearchParam(searchParams.get("assetType"));
@@ -885,6 +886,7 @@ const App = ({
           <div className="coin-price-strip-primary">
             <span>{t("common.priceLabel")}</span>
             <strong>{lastPriceStr}</strong>
+            <CoinCustomPrice symbol={symbol} assetType={assetType} locale={locale} t={t} />
           </div>
           <div><span>{t("walletAllocation.totalValue")}</span><strong>{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(lastAsset?.value ?? 0))}</strong></div>
         </Card>
