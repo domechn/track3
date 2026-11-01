@@ -102,7 +102,7 @@ async function seededRepository() {
   const SQL = await initSqlJs();
   const db = new SQL.Database();
   state.db = db;
-  for (const table of ["assets_v2", "asset_prices", "transactions", "configuration", "rebalance_profiles", "sync_state"]) {
+  for (const table of ["assets_v2", "asset_prices", "transactions", "configuration", "rebalance_profiles", "sync_state", "sync_manifest_cache"]) {
     db.run(readFileSync(resolve(`src-tauri/migrations/init/${table}_up.sql`), "utf8"));
   }
   const snapshot = [...hourlyHistory(1, 2)][0];

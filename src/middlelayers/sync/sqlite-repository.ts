@@ -36,6 +36,35 @@ export class SqliteSyncRepository implements SyncRepository {
     return new TextEncoder().encode(data).length;
   }
 
+  async loadManifestCache(owner: string, salt: string): Promise<{ etag: string; manifest: unknown; lastModified?: string } | null> {
+    const db = await getDatabase();
+    const rows = await db.select<Array<{ etag: string; body: string; last_modified: string | null }>>(
+      "SELECT etag, body, last_modified FROM sync_manifest_cache WHERE owner = ? AND header_salt = ? ORDER BY rowid DESC LIMIT 1",
+      [owner, salt],
+    );
+    if (!rows[0]) return null;
+    try {
+      return { etag: rows[0].etag, manifest: JSON.parse(rows[0].body), lastModified: rows[0].last_modified ?? undefined };
+    } catch {
+      await this.clearManifestCache(owner);
+      return null;
+    }
+  }
+
+  async saveManifestCache(owner: string, salt: string, etag: string, manifest: unknown, lastModified?: string): Promise<void> {
+    await executeWrite("DELETE FROM sync_manifest_cache WHERE owner = ? AND etag <> ?", [owner, etag]);
+    await executeWrite(
+      "INSERT INTO sync_manifest_cache (owner, header_salt, etag, body, last_modified) VALUES (?, ?, ?, ?, ?) " +
+      "ON CONFLICT(owner, etag) DO UPDATE SET header_salt = excluded.header_salt, body = excluded.body, last_modified = excluded.last_modified",
+      [owner, salt, etag, JSON.stringify(manifest), lastModified ?? null],
+    );
+  }
+
+  async clearManifestCache(owner?: string): Promise<void> {
+    await executeWrite(owner === undefined ? "DELETE FROM sync_manifest_cache" : "DELETE FROM sync_manifest_cache WHERE owner = ?",
+      owner === undefined ? [] : [owner]);
+  }
+
   async listSnapshotIds(): Promise<string[]> {
     const db = await getDatabase();
     const rows = await db.select<Array<{ uuid: string }>>(

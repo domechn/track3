@@ -237,4 +237,8 @@ export class SyncScheduler {
       if (deadline) clearTimeout(deadline);
     }
   }
+
+  async waitForSettlement(): Promise<void> {
+    await this.runSettled?.catch(() => {});
+  }
 }

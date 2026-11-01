@@ -17,6 +17,15 @@ vi.setConfig({ testTimeout: 20_000 });
 
 class MemoryRepository implements SyncRepository {
   state: SyncState = {};
+  manifestCache = new Map<string, { etag: string; manifest: unknown; lastModified?: string }>();
+  async loadManifestCache(owner: string) { return this.manifestCache.get(owner) ?? null; }
+  async saveManifestCache(owner: string, _salt: string, etag: string, manifest: unknown, lastModified?: string) {
+    this.manifestCache.set(owner, { etag, manifest: structuredClone(manifest), lastModified });
+  }
+  async clearManifestCache(owner?: string) {
+    if (owner) this.manifestCache.delete(owner);
+    else this.manifestCache.clear();
+  }
   snapshots = new Map<string, Snapshot>();
   config = new Map<string, string>();
   sessions = new Map<string, SyncSession>();
@@ -61,10 +70,383 @@ async function devices(count: number, pageSize = 1000) {
   const engines = repos.map((repo, i) => new SyncEngine(s3, repo, "passphrase", {
     now: () => Date.parse("2026-01-02T00:00:00.000Z") + i * 100,
   }));
+  for (const engine of engines) {
+    const sync = engine.syncOnce.bind(engine);
+    engine.syncOnce = (options = {}) => sync({ manual: true, ...options });
+  }
   return { s3, repos, engines };
 }
 
 describe("SyncEngine", () => {
+  it("uses only the header and N conditional manifest GETs on a no-change round", async () => {
+    const { engines } = await devices(3);
+    for (const engine of engines) await engine.syncOnce({ manual: true, deviceName: "Device" });
+    const discovered = await engines[0].syncOnce({ manual: true });
+    expect(discovered.diagnostics?.requests.LIST.count).toBe(1);
+    expect(discovered.diagnostics?.requests.GET.count).toBe(4);
+    const report = await engines[0].syncOnce({ manual: false });
+    expect(report.errors).toEqual([]);
+    expect(report.diagnostics?.requests.GET.count).toBe(4);
+    expect(report.diagnostics?.requests.GET.outcomes.notModified.count).toBe(3);
+    expect(report.diagnostics?.requests.LIST.count).toBe(0);
+    expect(report.diagnostics?.requests.PUT.count).toBe(0);
+    expect(report.diagnostics?.requests.DELETE.count).toBe(0);
+  });
+
+  it("refreshes a stale device list on manual sync", async () => {
+    const { engines } = await devices(2);
+    await engines[0].syncOnce({ deviceName: "First" });
+    await engines[1].syncOnce({ deviceName: "Second" });
+    expect((await engines[0].syncOnce({ manual: false })).devices).toHaveLength(1);
+    const report = await engines[0].syncOnce({ manual: true });
+    expect(report.devices).toHaveLength(2);
+    expect(report.diagnostics?.requests.LIST.count).toBe(1);
+  });
+  it("takes device upload times from manifest GET metadata", async () => {
+    const { s3, repos, engines } = await devices(1);
+    await engines[0].syncOnce({ deviceName: "Device" });
+    const path = `devices/${repos[0].state.deviceId}/manifest`;
+    const metadata = await s3.getObject(path);
+    const report = await engines[0].syncOnce({ manual: false });
+    expect(report.devices?.[0].lastUpload).toBe(metadata?.lastModified);
+    expect(report.diagnostics?.requests.GET.outcomes.notModified.count).toBe(1);
+  });
+
+  it("falls back to a full listing when the store ignores delimiter", async () => {
+    const { s3, repos, engines } = await devices(1);
+    await engines[0].syncOnce({ deviceName: "First" });
+    repos[0].snapshots.set("pending", snapshot("pending"));
+    const original = s3.listObjectsV2.bind(s3);
+    let delimited = 0;
+    s3.listObjectsV2 = (options) => {
+      if (options?.delimiter) delimited++;
+      return original({ ...options, delimiter: undefined });
+    };
+    const report = await engines[0].syncOnce({ manual: true });
+    expect(delimited).toBe(1);
+    expect(report.errors).toEqual([]);
+    expect(report.devices).toHaveLength(1);
+    expect(report.pushed).toBe(1);
+    expect(repos[0].state.published).toContain("pending");
+    expect((await engines[0].syncOnce({ manual: true })).devices).toHaveLength(1);
+    expect(delimited).toBe(1);
+  });
+  it("remembers a delimiter rejection for the session", async () => {
+    const { s3, repos, engines } = await devices(1);
+    await engines[0].syncOnce({ deviceName: "Device" });
+    repos[0].snapshots.set("pending", snapshot("pending"));
+    const original = s3.listObjectsV2.bind(s3);
+    let rejected = 0;
+    s3.listObjectsV2 = (options) => {
+      if (options?.delimiter) {
+        rejected++;
+        throw new S3Error("delimiter unsupported", 400);
+      }
+      return original(options);
+    };
+    const report = await engines[0].syncOnce({ manual: true });
+    expect(report.errors).toEqual([]);
+    expect(report.devices).toHaveLength(1);
+    expect(report.pushed).toBe(1);
+    expect(repos[0].state.published).toContain("pending");
+    expect(rejected).toBe(1);
+    expect((await engines[0].syncOnce({ manual: true })).devices).toHaveLength(1);
+    expect(rejected).toBe(1);
+  });
+  it("downloads pulls with at most four requests in flight and applies them in manifest order", async () => {
+    const { s3, repos, engines } = await devices(2);
+    for (let i = 0; i < 10; i++) repos[0].snapshots.set(`snap-${i}`, snapshot(`snap-${i}`));
+    await engines[0].syncOnce();
+    const get = s3.getObject.bind(s3);
+    let active = 0;
+    let peak = 0;
+    s3.getObject = (async (path: string, signal?: AbortSignal, etag?: string) => {
+      if (path.includes("/snapshot/")) {
+        active++;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active--;
+      }
+      return etag === undefined ? get(path, signal) : get(path, signal, etag);
+    }) as FakeS3["getObject"];
+    const order: string[] = [];
+    const original = repos[1].importSnapshot.bind(repos[1]);
+    repos[1].importSnapshot = async (value) => { order.push(value.uuid); return original(value); };
+    expect((await engines[1].syncOnce()).pulled).toBe(10);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(order).toEqual(Array.from({ length: 10 }, (_, i) => `snap-${i}`));
+  });
+  it("does not prefetch multipart bodies ahead of an earlier pull", async () => {
+    const { s3, repos, engines } = await devices(2);
+    repos[0].snapshots.set("small", snapshot("small"));
+    for (const id of ["large-1", "large-2"]) {
+      repos[0].snapshots.set(id, snapshot(id));
+      repos[0].snapshots.get(id)!.assets[0].wallet = "x".repeat(17_000_000);
+    }
+    expect((await engines[0].syncOnce()).errors).toEqual([]);
+    const deviceId = repos[0].state.deviceId!;
+    const namingKey = await unlockSyncHeader((await readSyncHeader(s3))!, "passphrase");
+    const smallPath = `devices/${deviceId}/${await objectName(namingKey, `snapshot/${deviceId}/small/1`)}`;
+    const get = s3.getObject.bind(s3);
+    let entered!: () => void;
+    let release!: () => void;
+    const reached = new Promise<void>((resolve) => { entered = resolve; });
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    let partReads = 0;
+    s3.getObject = (async (path: string, signal?: AbortSignal, etag?: string) => {
+      if (path === smallPath) { entered(); await blocked; }
+      if (path.endsWith("/part/0")) partReads++;
+      return etag === undefined ? get(path, signal) : get(path, signal, etag);
+    }) as FakeS3["getObject"];
+    const pulling = engines[1].syncOnce();
+    await reached;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const prefetchedParts = partReads;
+    release();
+    const report = await pulling;
+    expect(prefetchedParts).toBe(0);
+    expect(report.errors).toEqual([]);
+    expect(report.pulled).toBe(3);
+    expect(partReads).toBe(2);
+  }, 60_000);
+  it("keeps the pull limit when a snapshot is masked by a tombstone", async () => {
+    const { s3, repos, engines } = await devices(2);
+    for (let i = 0; i < 10; i++) repos[0].snapshots.set(`snap-${i}`, snapshot(`snap-${i}`));
+    await engines[0].syncOnce();
+    repos[0].snapshots.delete("snap-0");
+    await engines[0].recordDeletion("snap-0");
+    await engines[0].syncOnce();
+    const get = s3.getObject.bind(s3);
+    let active = 0;
+    let peak = 0;
+    s3.getObject = (async (path: string, signal?: AbortSignal, etag?: string) => {
+      if (path.includes("/snapshot/")) {
+        active++;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        active--;
+      }
+      return etag === undefined ? get(path, signal) : get(path, signal, etag);
+    }) as FakeS3["getObject"];
+    expect((await engines[1].syncOnce()).pulled).toBe(9);
+    expect(peak).toBeLessThanOrEqual(4);
+  });
+
+  it("quarantines a damaged entry after one report and one download", async () => {
+    const { s3, repos, engines } = await devices(2);
+    repos[0].snapshots.set("broken", snapshot("broken"));
+    await engines[0].syncOnce();
+    const original = s3.getObject.bind(s3);
+    let downloads = 0;
+    s3.getObject = (async (path: string, signal?: AbortSignal, etag?: string) => {
+      const result = etag === undefined ? await original(path, signal) : await original(path, signal, etag);
+      if (path.includes("/snapshot/") && result && "body" in result) {
+        downloads++;
+        return { ...result, body: new Uint8Array([1]) };
+      }
+      return result;
+    }) as FakeS3["getObject"];
+    expect((await engines[1].syncOnce()).errors).toContain("Failed to pull snapshot object");
+    expect((await engines[1].syncOnce()).errors).toEqual([]);
+    expect(downloads).toBe(1);
+    const later = new SyncEngine(s3, repos[1], "passphrase", { now: () => Date.parse("2026-01-03T00:00:00.101Z") + 1 });
+    expect((await later.syncOnce()).errors).toContain("Failed to pull snapshot object");
+    expect(downloads).toBe(2);
+  });
+  it("retries a transient pull failure on the next round", async () => {
+    const { s3, repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    const get = s3.getObject.bind(s3);
+    let failed = false;
+    s3.getObject = async (path, signal) => {
+      if (!failed && path.includes("/snapshot/")) {
+        failed = true;
+        throw new S3Error("temporary", 503);
+      }
+      return get(path, signal);
+    };
+    expect((await engines[1].syncOnce()).errors).toContain("Failed to pull snapshot object");
+    expect((await engines[1].syncOnce()).pulled).toBe(1);
+  });
+
+  it("reuses a successfully unlocked key until disposal", async () => {
+    const { s3, repos } = await devices(1);
+    const header = (await readSyncHeader(s3))!;
+    const key = await unlockSyncHeader(header, "passphrase");
+    const engine = new SyncEngine(s3, repos[0], "wrong");
+    engine.primeKey(header, key);
+    expect((await engine.syncOnce()).errors).toEqual([]);
+    engine.dispose();
+    await expect(engine.syncOnce()).rejects.toThrow();
+  });
+  it("invalidates the cached key when the header salt changes", async () => {
+    const { s3, repos } = await devices(1);
+    const header = (await readSyncHeader(s3))!;
+    const key = await unlockSyncHeader(header, "passphrase");
+    const engine = new SyncEngine(s3, repos[0], "wrong");
+    engine.primeKey(header, key);
+    await s3.putObject("sync-header", new TextEncoder().encode(JSON.stringify((await createSyncHeader("passphrase")).header)));
+    await expect(engine.syncOnce()).rejects.toThrow();
+  });
+  it("rejects a migrated header before writing with a cached key", async () => {
+    const { s3, repos, engines } = await devices(1);
+    expect((await engines[0].syncOnce()).errors).toEqual([]);
+    const header = (await readSyncHeader(s3))!;
+    repos[0].snapshots.set("one", snapshot("one"));
+    await s3.putObject("sync-header", new TextEncoder().encode(JSON.stringify({ ...header, version: 2 })));
+    const put = s3.putObject.bind(s3);
+    let writes = 0;
+    s3.putObject = async (path, body, conditions, signal) => {
+      writes++;
+      return put(path, body, conditions, signal);
+    };
+    await expect(engines[0].syncOnce()).rejects.toThrow("Unsupported sync header");
+    expect(writes).toBe(0);
+  });
+  it("validates a primed header before using its cached key", async () => {
+    const { s3, repos } = await devices(1);
+    const header = (await readSyncHeader(s3))!;
+    const key = await unlockSyncHeader(header, "passphrase");
+    const migrated = { ...header, version: 2 };
+    const engine = new SyncEngine(s3, repos[0], "wrong");
+    engine.primeKey(migrated, key);
+    await s3.putObject("sync-header", new TextEncoder().encode(JSON.stringify(migrated)));
+    const put = vi.spyOn(s3, "putObject");
+    repos[0].snapshots.set("one", snapshot("one"));
+    await expect(engine.syncOnce()).rejects.toThrow("Unsupported sync header");
+    expect(put).not.toHaveBeenCalled();
+  });
+  it("checks the header key check even when a key is cached", async () => {
+    const { s3, repos } = await devices(1);
+    const header = (await readSyncHeader(s3))!;
+    const key = await unlockSyncHeader(header, "passphrase");
+    const damaged = { ...header, keyCheck: { ...header.keyCheck, ciphertext: "AAAA" } };
+    const engine = new SyncEngine(s3, repos[0], "wrong");
+    engine.primeKey(damaged, key);
+    await s3.putObject("sync-header", new TextEncoder().encode(JSON.stringify(damaged)));
+    const put = vi.spyOn(s3, "putObject");
+    repos[0].snapshots.set("one", snapshot("one"));
+    await expect(engine.syncOnce()).rejects.toThrow("Incorrect sync passphrase or damaged header");
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("skips the probe on later change rounds for the same store identity", async () => {
+    const { repos, engines } = await devices(1);
+    repos[0].snapshots.set("one", snapshot("one"));
+    const first = await engines[0].syncOnce();
+    expect(first.diagnostics?.requests.GET.count).toBe(1);
+    expect(first.diagnostics?.requests.LIST.count).toBe(1);
+    expect(first.diagnostics?.requests.PUT.count).toBe(5);
+    expect(first.diagnostics?.requests.DELETE.count).toBe(1);
+    repos[0].snapshots.set("one", snapshot("one", 2));
+    const second = await engines[0].syncOnce({ manual: false });
+    expect(second.errors).toEqual([]);
+    expect(second.diagnostics?.requests.GET.count).toBe(2);
+    expect(second.diagnostics?.requests.GET.outcomes.notModified.count).toBe(1);
+    expect(second.diagnostics?.requests.LIST.count).toBe(0);
+    expect(second.diagnostics?.requests.PUT.count).toBe(2);
+    expect(second.diagnostics?.requests.DELETE.count).toBe(0);
+    expect(repos[0].state.probe?.identity).toMatch(/^[a-f0-9]{64}$/);
+  });
+  it("rechecks conditional writes after 24 hours or a store identity change", async () => {
+    const { s3, repos } = await devices(1);
+    let now = Date.parse("2026-01-02T00:00:00Z");
+    const first = new SyncEngine(s3, repos[0], "passphrase", { now: () => now, storeIdentity: "first" });
+    repos[0].snapshots.set("one", snapshot("one"));
+    await first.syncOnce();
+    now += 24 * 60 * 60_000 + 1;
+    repos[0].snapshots.set("one", snapshot("one", 2));
+    const expired = await first.syncOnce();
+    expect(expired.diagnostics?.requests.PUT.count).toBe(5);
+    expect(expired.diagnostics?.requests.DELETE.count).toBe(1);
+    const second = new SyncEngine(s3, repos[0], "passphrase", { now: () => now, storeIdentity: "second" });
+    repos[0].snapshots.set("one", snapshot("one", 3));
+    const changed = await second.syncOnce();
+    expect(changed.diagnostics?.requests.PUT.count).toBe(5);
+    expect(changed.diagnostics?.requests.DELETE.count).toBe(2);
+    expect(JSON.stringify(repos[0].state)).not.toContain("second");
+  });
+
+  it("discards a corrupt cached manifest and fetches a fresh copy on the next round", async () => {
+    const { repos, engines } = await devices(1);
+    await engines[0].syncOnce({ deviceName: "Device" });
+    const owner = repos[0].state.deviceId!;
+    repos[0].manifestCache.set(owner, { ...repos[0].manifestCache.get(owner)!, manifest: { invalid: true } });
+    expect((await engines[0].syncOnce({ manual: false })).errors).toContain("Failed to read sync manifest");
+    expect(repos[0].manifestCache.has(owner)).toBe(false);
+    const report = await engines[0].syncOnce({ manual: false });
+    expect(report.errors).toEqual([]);
+    expect(report.diagnostics?.requests.GET.outcomes.notModified.count).toBe(0);
+  });
+  it("continues reading other manifests when clearing one failed cache row throws", async () => {
+    const { repos, engines } = await devices(2);
+    await engines[0].syncOnce({ deviceName: "First" });
+    await engines[1].syncOnce({ deviceName: "Second" });
+    await engines[0].syncOnce({ manual: true });
+    const owner = repos[0].state.deviceId!;
+    repos[0].manifestCache.set(owner, { ...repos[0].manifestCache.get(owner)!, manifest: { invalid: true } });
+    repos[0].clearManifestCache = async () => { throw new Error("cache delete failed"); };
+    const report = await engines[0].syncOnce({ manual: false });
+    expect(report.errors).toContain("Failed to read sync manifest");
+    expect(report.devices?.map((device) => device.id)).toContain(repos[1].state.deviceId);
+  });
+  it("replaces a cached manifest when its ETag changes", async () => {
+    const { s3, repos, engines } = await devices(1);
+    await engines[0].syncOnce({ deviceName: "Device" });
+    const owner = repos[0].state.deviceId!;
+    const path = `devices/${owner}/manifest`;
+    const before = (await s3.getObject(path))!;
+    const after = await s3.putObject(path, before.body, { ifMatch: before.etag });
+    const report = await engines[0].syncOnce({ manual: false });
+    expect(report.errors).toEqual([]);
+    expect(report.diagnostics?.requests.GET.outcomes.notModified.count).toBe(0);
+    expect(repos[0].manifestCache.get(owner)?.etag).toBe(after.etag);
+  });
+  it("keeps a published checkpoint when saving its manifest cache fails", async () => {
+    const { repos, engines } = await devices(1);
+    repos[0].snapshots.set("one", snapshot("one"));
+    const save = repos[0].saveManifestCache.bind(repos[0]);
+    let fail = true;
+    repos[0].saveManifestCache = async (...args) => {
+      if (fail) { fail = false; throw new Error("cache unavailable"); }
+      await save(...args);
+    };
+    const first = await engines[0].syncOnce();
+    expect(first.errors).toEqual([]);
+    expect(first.pushed).toBe(1);
+    expect(repos[0].state.published).toContain("one");
+    const second = await engines[0].syncOnce({ manual: false });
+    expect(second.errors).toEqual([]);
+    expect(second.pushed).toBe(0);
+    expect(second.diagnostics?.requests.PUT.count).toBe(0);
+  });
+  it("clears unfinished push after a checkpoint despite an unrelated round error", async () => {
+    const { repos, engines } = await devices(1);
+    repos[0].takeReadErrors = () => ({ configIds: ["7"], sessionIds: [] });
+    repos[0].snapshots.set("one", snapshot("one"));
+    const first = await engines[0].syncOnce();
+    expect(first.errors).toContain("Failed to read local config");
+    expect(first.pushed).toBe(1);
+    repos[0].snapshots.set("two", snapshot("two"));
+    const second = await engines[0].syncOnce({ manual: false });
+    expect(second.pushed).toBe(1);
+    expect(second.diagnostics?.requests.LIST.count).toBe(0);
+    expect(repos[0].state.unfinishedPush).toBeUndefined();
+  });
+
+  it("re-lists devices after six hours", async () => {
+    const { s3, repos, engines } = await devices(2);
+    let now = Date.parse("2026-01-02T00:00:00Z");
+    const first = new SyncEngine(s3, repos[0], "passphrase", { now: () => now });
+    await first.syncOnce({ deviceName: "First" });
+    await engines[1].syncOnce({ deviceName: "Second" });
+    expect((await first.syncOnce()).devices).toHaveLength(1);
+    now += 6 * 60 * 60_000 + 1;
+    expect((await first.syncOnce()).devices).toHaveLength(2);
+  });
+
   it("reports round timings, traffic, and in-memory state size without changing stored state", async () => {
     const { repos, engines } = await devices(1);
     const report = await engines[0].syncOnce();
@@ -126,7 +508,7 @@ describe("SyncEngine", () => {
     await expect(engines[0].syncOnce({ signal: controller.signal, onProgress: (progress) => {
       if (progress.phase === "push" && progress.completed === 1) controller.abort();
     } })).rejects.toThrow("Sync aborted");
-    expect(started).toBeLessThanOrEqual(6);
+    expect(started).toBeLessThanOrEqual(4);
     expect(cancelled).toBeGreaterThan(0);
     const stable = started;
     await new Promise((resolve) => setTimeout(resolve, 120));
@@ -155,10 +537,10 @@ describe("SyncEngine", () => {
       return get(path, signal);
     };
     await expect(engines[0].syncOnce()).rejects.toThrow("verification unavailable");
-    expect(started).toBeLessThanOrEqual(6);
+    expect(started).toBeLessThanOrEqual(4);
   });
 
-  it("checkpoints after 250 successful uploads even when earlier objects failed", async () => {
+  it("publishes 250 successful uploads below the 1000-object checkpoint when earlier objects failed", async () => {
     const { s3, repos, engines } = await devices(1);
     for (let index = 0; index < 300; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
     const put = s3.putObject.bind(s3);
@@ -196,12 +578,12 @@ describe("SyncEngine", () => {
     expect(report.errors).toEqual([]);
     expect(report.pushed).toBe(30);
     expect(peak).toBeGreaterThan(1);
-    expect(peak).toBeLessThanOrEqual(6);
+    expect(peak).toBeLessThanOrEqual(4);
   }, 30_000);
 
   it("checkpoints a large interrupted push so its retry avoids published objects", async () => {
     const { s3, repos, engines } = await devices(1);
-    for (let index = 0; index < 1000; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
+    for (let index = 0; index < 1200; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
     const originalPut = s3.putObject.bind(s3);
     let manifestWrites = 0;
     s3.putObject = async (path, body, conditions, signal) => {
@@ -210,10 +592,10 @@ describe("SyncEngine", () => {
     };
     const controller = new AbortController();
     await expect(engines[0].syncOnce({ signal: controller.signal, onProgress: (progress) => {
-      if (progress.phase === "push" && progress.completed >= 600) controller.abort();
+      if (progress.phase === "push" && progress.completed >= 1100) controller.abort();
     } })).rejects.toThrow("Sync aborted");
-    expect(manifestWrites).toBe(2);
-    expect(repos[0].state.published?.length).toBe(500);
+    expect(manifestWrites).toBe(1);
+    expect(repos[0].state.published?.length).toBe(1000);
     const put = s3.putObject.bind(s3);
     const get = s3.getObject.bind(s3);
     let snapshotPuts = 0;
@@ -235,13 +617,13 @@ describe("SyncEngine", () => {
     };
     const report = await engines[0].syncOnce();
     expect(report.errors).toEqual([]);
-    expect(snapshotPuts).toBeLessThanOrEqual(400);
+    expect(snapshotPuts).toBeLessThanOrEqual(100);
     expect(orphanGets).toBeGreaterThanOrEqual(100);
     expect(orphanGets).toBeLessThanOrEqual(106);
     expect(publishedGets).toBe(0);
-    expect(new Set(repos[0].state.published).size).toBe(1000);
-    expect(published.size).toBe(500);
-    expect(manifestWrites).toBe(4);
+    expect(new Set(repos[0].state.published).size).toBe(1200);
+    expect(published.size).toBe(1000);
+    expect(manifestWrites).toBe(2);
   }, 120_000);
   it("leaves snapshot history local when history sync is disabled", async () => {
     const { repos, engines } = await devices(2);
@@ -510,6 +892,13 @@ describe("SyncEngine", () => {
     await Promise.all(engines.map((engine) => engine.syncOnce()));
     expect(repos.map((repo) => [...repo.snapshots.keys()].sort())).toEqual(Array(3).fill(0).map(() => ["snapshot-0", "snapshot-1", "snapshot-2"]));
     expect((await engines[0].syncOnce()).pulled).toBe(0);
+    repos[0].snapshots.set("late", snapshot("late"));
+    expect((await engines[0].syncOnce({ manual: false })).pushed).toBe(1);
+    const cached = await Promise.all(engines.slice(1).map((engine) => engine.syncOnce({ manual: false })));
+    expect(cached.map((report) => report.pulled)).toEqual([1, 1]);
+    expect(cached.map((report) => report.diagnostics?.requests.LIST.count)).toEqual([0, 0]);
+    expect(repos.map((repo) => [...repo.snapshots.keys()].sort())).toEqual(Array(3).fill(0)
+      .map(() => ["late", "snapshot-0", "snapshot-1", "snapshot-2"]));
   });
 
   it("applies a delete over a concurrent keep, then restores on newer undo", async () => {
@@ -1353,17 +1742,24 @@ describe("SyncEngine", () => {
   });
 
   it("skips a snapshot already deleted by a tombstone in the same first round", async () => {
-    const { repos, engines } = await devices(2);
+    const { s3, repos, engines } = await devices(2);
     repos[0].snapshots.set("one", snapshot("one"));
     await engines[0].syncOnce();
     repos[0].snapshots.delete("one");
     await engines[0].recordDeletion("one");
     await engines[0].syncOnce();
+    const get = s3.getObject.bind(s3);
+    let snapshotReads = 0;
+    s3.getObject = (async (path: string, signal?: AbortSignal, etag?: string) => {
+      if (path.includes("/snapshot/")) snapshotReads++;
+      return etag === undefined ? get(path, signal) : get(path, signal, etag);
+    }) as FakeS3["getObject"];
     let imports = 0;
     const importSnapshot = repos[1].importSnapshot.bind(repos[1]);
     repos[1].importSnapshot = async (value) => { imports++; return importSnapshot(value); };
     const report = await engines[1].syncOnce();
     expect(imports).toBe(0);
+    expect(snapshotReads).toBe(0);
     expect(report.pulled).toBe(0);
     expect(repos[1].snapshots.has("one")).toBe(false);
   });
@@ -1603,6 +1999,7 @@ describe("SyncEngine", () => {
     const put = s3.putObject.bind(s3);
     s3.putObject = async (key, body) => put(key, body);
     await expect(engines[0].syncOnce()).rejects.toThrow(/conditional writes/i);
+    expect(repos[0].state.probe).toBeUndefined();
     expect((await s3.listObjectsV2({ prefix: "devices/" })).objects).toEqual([]);
   });
 
@@ -1671,11 +2068,11 @@ describe("SyncEngine", () => {
     const fast = new SyncEngine(s3, repos[0], "passphrase", { now: () => 3_600_000 });
     const slow = new SyncEngine(s3, repos[1], "passphrase", { now: () => 1_000 });
     repos[0].config.set("7", "USD");
-    await fast.syncOnce();
-    await slow.syncOnce();
+    await fast.syncOnce({ manual: true });
+    await slow.syncOnce({ manual: true });
     repos[1].config.set("7", "EUR");
-    await slow.syncOnce();
-    await fast.syncOnce();
+    await slow.syncOnce({ manual: true });
+    await fast.syncOnce({ manual: true });
     expect(repos[0].config.get("7")).toBe("EUR");
   });
 

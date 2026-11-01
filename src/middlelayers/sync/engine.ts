@@ -1,8 +1,11 @@
-import { decryptObject, encryptObject, objectName, unlockSyncHeader } from "./crypto";
+import { decryptObject, encryptObject, objectName, unlockSyncHeader, validateSyncHeader, verifySyncHeaderKey, type SyncHeader } from "./crypto";
 import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-store";
-import { compareClock, nextClock, validRemoteClock, type Hlc } from "./clock";
+import { compareClock, MAX_REMOTE_SKEW_MS, nextClock, validRemoteClock, type Hlc } from "./clock";
 import { syncCategory, type SyncCategory } from "./config-keys";
 import { createSyncDiagnostics, type SyncDiagnostics } from "./diagnostics";
+
+class InvalidRemoteEntry extends Error {}
+class FutureRemoteEntry extends Error {}
 
 export type Snapshot = {
   uuid: string;
@@ -35,6 +38,7 @@ export type SyncState = {
   deviceId?: string;
   clock?: Hlc;
   headerSalt?: string;
+  headerId?: string;
   known?: string[];
   published?: string[];
   config?: Record<string, ConfigMarker>;
@@ -57,6 +61,11 @@ export type SyncState = {
   transactionRows?: Record<string, Record<string, { price: number; txnType: string }>>;
   transactionEvents?: Record<string, TransactionEvents>;
   lastSync?: number;
+  deviceIds?: string[];
+  deviceListAt?: number;
+  probe?: { identity: string; checkedAt: number };
+  failedPulls?: Record<string, number>;
+  unfinishedPush?: boolean;
 };
 
 export function resetSyncState(state: SyncState): SyncState {
@@ -73,6 +82,9 @@ export function resetSyncState(state: SyncState): SyncState {
 export interface SyncRepository {
   loadState(): Promise<SyncState>;
   saveState(state: SyncState): Promise<void | number>;
+  loadManifestCache?(owner: string, salt: string): Promise<{ etag: string; manifest: unknown; lastModified?: string } | null>;
+  saveManifestCache?(owner: string, salt: string, etag: string, manifest: unknown, lastModified?: string): Promise<void>;
+  clearManifestCache?(owner?: string): Promise<void>;
   listSnapshotIds(): Promise<string[]>;
   listChangedSnapshotIds?(since?: number): Promise<{ ids: string[]; revision: number }>;
   readSnapshot(uuid: string): Promise<Snapshot>;
@@ -102,6 +114,7 @@ export type SyncOptions = {
   categories?: Partial<Record<SyncCategory | "chat" | "history", boolean>>;
   dryRun?: boolean;
   deviceName?: string;
+  manual?: boolean;
   onDiagnostics?: (diagnostics: SyncDiagnostics) => void;
 };
 
@@ -111,8 +124,8 @@ const MAX_OBJECT_BYTES = 32 * 1024 * 1024;
 const MAX_PAYLOAD_BYTES = 256 * 1024 * 1024;
 const PART_BYTES = 8 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
-const PUSH_CONCURRENCY = 6;
-const PUSH_CHECKPOINT_SIZE = 250;
+const PUSH_CONCURRENCY = 4;
+const PUSH_CHECKPOINT_SIZE = 1000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function validEntry(value: Entry): boolean {
@@ -268,13 +281,26 @@ export class SyncEngine {
   private tombstoneQueue: Promise<void> = Promise.resolve();
   private activeState?: SyncState;
   private roundDiagnostics?: ReturnType<typeof createSyncDiagnostics>;
+  private cachedKey?: { header: string; key: Uint8Array };
+  private discovered = false;
+  private delimiterUnsupported = false;
 
   constructor(
     private store: S3Store,
     private readonly repo: SyncRepository,
     private readonly passphrase: string,
-    private readonly environment: { now?: () => number } = {},
+    private readonly environment: { now?: () => number; storeIdentity?: string } = {},
   ) {}
+
+  dispose(): void {
+    this.cachedKey?.key.fill(0);
+    this.cachedKey = undefined;
+  }
+
+  primeKey(header: SyncHeader, key: Uint8Array): void {
+    this.dispose();
+    this.cachedKey = { header: JSON.stringify(header), key: key.slice() };
+  }
 
   private now() { return this.environment.now?.() ?? Date.now(); }
 
@@ -378,12 +404,24 @@ export class SyncEngine {
     const header = await readSyncHeader(this.store);
     if (!header) throw new Error("Sync has not been initialized");
     this.roundDiagnostics?.phase("keyDerivation");
-    const key = await unlockSyncHeader(header, this.passphrase);
+    validateSyncHeader(header);
+    const keyId = JSON.stringify(header);
+    if (this.cachedKey?.header !== keyId) this.dispose();
+    if (this.cachedKey) await verifySyncHeaderKey(header, this.cachedKey.key);
+    const key = this.cachedKey?.key ?? await unlockSyncHeader(header, this.passphrase);
+    this.cachedKey ??= { header: keyId, key };
     if (options.signal?.aborted) throw new Error("Sync aborted");
     const stateReady = this.tombstoneQueue.then(async () => {
       let state = await this.repo.loadState();
-      if (state.headerSalt && state.headerSalt !== header.kdf.salt) state = resetSyncState(state);
+      const headerId = await digest(encoder.encode(keyId));
+      if (state.headerSalt && state.headerSalt !== header.kdf.salt ||
+          state.headerId && state.headerId !== headerId) {
+        await this.repo.clearManifestCache?.();
+        state = resetSyncState(state);
+        this.discovered = false;
+      }
       state.headerSalt = header.kdf.salt;
+      state.headerId = headerId;
       this.activeState = state;
       return state;
     });
@@ -399,7 +437,13 @@ export class SyncEngine {
       return Array.from(new Uint8Array(await crypto.subtle.sign("HMAC", secretKey, encoder.encode(value))),
         (byte) => byte.toString(16).padStart(2, "0")).join("");
     };
-    const validClock = (value: Hlc, owner: string) => validRemoteClock(value, owner, this.now());
+    const validClock = (value: Hlc, owner: string) => {
+      if (validRemoteClock(value, owner, this.now())) return true;
+      if (value && Number.isSafeInteger(value.ms) && value.ms > this.now() + MAX_REMOTE_SKEW_MS) {
+        throw new FutureRemoteEntry();
+      }
+      throw new InvalidRemoteEntry();
+    };
     this.roundDiagnostics?.phase("localScan");
     await this.device(state, !options.dryRun);
     state.known ??= [];
@@ -454,64 +498,144 @@ export class SyncEngine {
     };
     const readBytes = async (path: string, bytes: number, sha256: string): Promise<Uint8Array> => {
       const object = await this.store.getObject(path, options.signal);
-      if (!object || object.body.length !== bytes || object.body.length > MAX_OBJECT_BYTES ||
-          await digest(object.body) !== sha256) throw new Error("Invalid sync object checksum");
-      return decryptObject(key, path, JSON.parse(decoder.decode(object.body)));
+      if (!object || !("body" in object) || object.body.length !== bytes || object.body.length > MAX_OBJECT_BYTES ||
+          await digest(object.body) !== sha256) throw new InvalidRemoteEntry();
+      try { return await decryptObject(key, path, JSON.parse(decoder.decode(object.body))); }
+      catch { throw new InvalidRemoteEntry(); }
     };
-    const readRoot = async (owner: string, entry: Entry): Promise<unknown> =>
-      JSON.parse(decoder.decode(await readBytes(await pathFor(owner, entry), entry.bytes, entry.sha256)));
-    const read = async <T>(owner: string, entry: Entry): Promise<T> => {
-      const root = await readRoot(owner, entry);
-      if (!root || typeof root !== "object" || !("multipart" in root)) return root as T;
-      const descriptor = root as ObjectParts;
-      if (!validObjectParts(descriptor)) throw new Error("Invalid sync object parts");
-      const result = new Uint8Array(descriptor.total);
-      const rootPath = await pathFor(owner, entry);
-      let offset = 0;
-      for (const [index, part] of descriptor.parts.entries()) {
-        const bytes = await readBytes(`${rootPath}/part/${index}`, part.bytes, part.sha256);
-        if (offset + bytes.length > result.length) throw new Error("Invalid sync object parts");
-        result.set(bytes, offset);
-        offset += bytes.length;
+    const readRoot = async (owner: string, entry: Entry): Promise<unknown> => {
+      try { return JSON.parse(decoder.decode(await readBytes(await pathFor(owner, entry), entry.bytes, entry.sha256))); }
+      catch (error) {
+        if (error instanceof SyntaxError) throw new InvalidRemoteEntry();
+        throw error;
       }
-      if (offset !== result.length) throw new Error("Invalid sync object parts");
-      return JSON.parse(decoder.decode(result)) as T;
+    };
+    const fetchEntry = async <T>(owner: string, entry: Entry): Promise<{ value: T } | { load: () => Promise<T> }> => {
+      const root = await readRoot(owner, entry);
+      if (!root || typeof root !== "object" || !("multipart" in root)) return { value: root as T };
+      const descriptor = root as ObjectParts;
+      if (!validObjectParts(descriptor)) throw new InvalidRemoteEntry();
+      return { load: async () => {
+        const result = new Uint8Array(descriptor.total);
+        const rootPath = await pathFor(owner, entry);
+        let offset = 0;
+        for (const [index, part] of descriptor.parts.entries()) {
+          const bytes = await readBytes(`${rootPath}/part/${index}`, part.bytes, part.sha256);
+          if (offset + bytes.length > result.length) throw new InvalidRemoteEntry();
+          result.set(bytes, offset);
+          offset += bytes.length;
+        }
+        if (offset !== result.length) throw new InvalidRemoteEntry();
+        try { return JSON.parse(decoder.decode(result)) as T; }
+        catch { throw new InvalidRemoteEntry(); }
+      } };
+    };
+    let currentPullIndex = -1;
+    let fillPulls = () => {};
+    const pendingPulls = new Map<number, Promise<{ value: unknown } | { load: () => Promise<unknown> } | { error: unknown }>>();
+    const read = async <T>(owner: string, entry: Entry): Promise<T> => {
+      const pending = pendingPulls.get(currentPullIndex);
+      const result = pending ? await pending : await fetchEntry<T>(owner, entry);
+      if (pending) {
+        pendingPulls.delete(currentPullIndex);
+        fillPulls();
+      }
+      if ("error" in result) throw result.error;
+      return "load" in result ? await result.load() as T : result.value as T;
     };
     const manifests: Array<{ owner: string; manifest: Manifest; etag: string }> = [];
     const listedKeys = new Set<string>();
+    let fullListingCompleted = false;
     report.devices = [];
     let manifestReadFailed = false;
-    let continuationToken: string | undefined;
     this.roundDiagnostics?.phase("discover");
-    do {
-      aborted();
-      const page = await this.store.listObjectsV2({ prefix: "devices/", continuationToken, signal: options.signal });
-      for (const item of page.objects) {
-        if (item.key.startsWith(`devices/${state.deviceId}/`)) listedKeys.add(item.key);
-        const match = /^devices\/([0-9a-f-]{36})\/manifest$/.exec(item.key);
-        if (!match) continue;
+    if (!this.discovered || options.manual || !state.deviceListAt || this.now() - state.deviceListAt >= 6 * 60 * 60_000) {
+      const ids = new Set<string>();
+      let continuationToken: string | undefined;
+      let fullListing = this.delimiterUnsupported;
+      for (;;) {
+        aborted();
+        let page;
         try {
-          this.roundDiagnostics?.phase("manifestsDownload");
-          if (item.size > MAX_MANIFEST_BYTES) throw new Error("Invalid sync manifest");
-          const object = await this.store.getObject(item.key, options.signal);
-          if (!object || object.body.length > MAX_MANIFEST_BYTES) throw new Error("Invalid sync manifest");
-          const manifest = JSON.parse(decoder.decode(await decryptObject(key, item.key, JSON.parse(decoder.decode(object.body))))) as Manifest;
-          if (!UUID_PATTERN.test(match[1]) || manifest.version !== 1 || manifest.deviceId !== match[1] ||
-              (manifest.name !== undefined && (typeof manifest.name !== "string" || !manifest.name.trim() ||
-                manifest.name.length > 60)) ||
-              !Array.isArray(manifest.entries) || manifest.entries.length > 100_000 ||
-              !manifest.entries.every(validEntry)) throw new Error("Invalid sync manifest");
-          manifests.push({ owner: match[1], manifest, etag: object.etag });
-          report.devices.push({ id: match[1], name: manifest.name, lastUpload: item.lastModified });
-        } catch {
-          manifestReadFailed = true;
-          report.errors.push("Failed to read sync manifest");
-        } finally {
-          this.roundDiagnostics?.phase("discover");
+          page = await this.store.listObjectsV2({
+            prefix: "devices/", ...(!fullListing ? { delimiter: "/" } : {}), continuationToken, signal: options.signal,
+          });
+        } catch (error) {
+          if (!fullListing && error instanceof S3Error && [400, 501].includes(error.status)) {
+            this.delimiterUnsupported = true;
+            fullListing = true;
+            continuationToken = undefined;
+            ids.clear();
+            continue;
+          }
+          throw error;
         }
+        if (!fullListing && !page.commonPrefixes?.length && page.objects.length) {
+          this.delimiterUnsupported = true;
+          fullListing = true;
+          continuationToken = undefined;
+          ids.clear();
+          continue;
+        }
+        for (const prefix of page.commonPrefixes ?? []) {
+          const match = /^devices\/([0-9a-f-]{36})\/$/.exec(prefix);
+          if (match && UUID_PATTERN.test(match[1])) ids.add(match[1]);
+        }
+        if (fullListing) for (const item of page.objects) {
+          if (item.key.startsWith(`devices/${state.deviceId}/`)) listedKeys.add(item.key);
+          const match = /^devices\/([0-9a-f-]{36})\/manifest$/.exec(item.key);
+          if (match && UUID_PATTERN.test(match[1])) ids.add(match[1]);
+        }
+        continuationToken = page.nextContinuationToken;
+        if (!continuationToken) break;
       }
-      continuationToken = page.nextContinuationToken;
-    } while (continuationToken);
+      fullListingCompleted = fullListing;
+      state.deviceIds = [...ids];
+      state.deviceListAt = this.now();
+      this.discovered = true;
+    }
+    for (const owner of state.deviceIds ?? []) {
+      aborted();
+      const path = `devices/${owner}/manifest`;
+      try {
+        this.roundDiagnostics?.phase("manifestsDownload");
+        let cached = await this.repo.loadManifestCache?.(owner, header.kdf.salt);
+        let object = cached
+          ? await this.store.getObject(path, options.signal, cached.etag)
+          : await this.store.getObject(path, options.signal);
+        if (object && "notModified" in object) {
+          if (!cached || cached.etag !== object.etag) {
+            await this.repo.clearManifestCache?.(owner);
+            object = await this.store.getObject(path, options.signal);
+            cached = null;
+          }
+        }
+        if (!object) {
+          if (await this.store.headObject(path, options.signal)) throw new Error("Missing sync manifest");
+          await this.repo.clearManifestCache?.(owner);
+          state.deviceIds = state.deviceIds?.filter((id) => id !== owner);
+          continue;
+        }
+        const manifest = "notModified" in object ? cached?.manifest as Manifest :
+          JSON.parse(decoder.decode(await decryptObject(key, path, JSON.parse(decoder.decode(object.body))))) as Manifest;
+        if (!manifest || manifest.version !== 1 || manifest.deviceId !== owner ||
+            (manifest.name !== undefined && (typeof manifest.name !== "string" || !manifest.name.trim() ||
+              manifest.name.length > 60)) ||
+            !Array.isArray(manifest.entries) || manifest.entries.length > 100_000 ||
+            !manifest.entries.every(validEntry) ||
+            ("body" in object && object.body.length > MAX_MANIFEST_BYTES)) throw new Error("Invalid sync manifest");
+        if ("body" in object) await this.repo.saveManifestCache?.(owner, header.kdf.salt, object.etag, manifest, object.lastModified);
+        manifests.push({ owner, manifest, etag: object.etag });
+        report.devices.push({ id: owner, name: manifest.name,
+          lastUpload: "notModified" in object ? object.lastModified ?? cached?.lastModified : object.lastModified });
+      } catch {
+        try { await this.repo.clearManifestCache?.(owner); } catch { /* Retrying this manifest must not fail the round. */ }
+        manifestReadFailed = true;
+        report.errors.push("Failed to read sync manifest");
+      } finally {
+        this.roundDiagnostics?.phase("discover");
+      }
+    }
     const own = manifests.find((item) => item.owner === state.deviceId);
     const entries = manifests.flatMap(({ owner, manifest }) => manifest.entries.map((entry) => ({ owner, entry })));
     this.roundDiagnostics!.diagnostics.entries = entries.length;
@@ -519,6 +643,9 @@ export class SyncEngine {
     if (!manifestReadFailed) {
       const visible = new Set(entries.map(({ owner, entry }) => entryToken(owner, entry)));
       for (const token of known) if (!visible.has(token)) known.delete(token);
+      for (const token of Object.keys(state.failedPulls ?? {})) {
+        if (!visible.has(token)) delete state.failedPulls![token];
+      }
     }
     const blockedConfig = new Set<string>();
     for (const [id, source] of Object.entries(state.applyingConfig)) {
@@ -551,10 +678,34 @@ export class SyncEngine {
     const remoteRowEvents = new Map<string, Record<string, Tombstone>>();
     const remoteTransactionEvents = new Map<string, TransactionEvents>();
     this.roundDiagnostics?.phase("pull");
-    for (const { owner, entry } of entries.slice().sort((a, b) =>
-      Number(b.entry.kind === "tombstone") - Number(a.entry.kind === "tombstone"))) {
+    const orderedPulls = entries.slice().sort((a, b) =>
+      Number(b.entry.kind === "tombstone") - Number(a.entry.kind === "tombstone"));
+    const tombstonedSnapshotIds = new Set(entries
+      .filter(({ entry }) => entry.kind === "tombstone").map(({ entry }) => entry.id));
+    let nextPull = 0;
+    fillPulls = () => {
+      while (pendingPulls.size < 4 && nextPull < orderedPulls.length) {
+        const index = nextPull++;
+        const { owner, entry } = orderedPulls[index];
+        const token = entryToken(owner, entry);
+        if (known.has(token) || state.failedPulls?.[token] && state.failedPulls[token] > this.now() ||
+            entry.kind === "snapshot" && tombstonedSnapshotIds.has(entry.id) ||
+            !enabled("history") && ["snapshot", "edit", "tombstone"].includes(entry.kind) ||
+            !enabled("chat") && ["session", "session-delete"].includes(entry.kind) ||
+            entry.kind === "config" && (!syncCategory(entry.id) || !enabled(syncCategory(entry.id)!) || blockedConfig.has(entry.id))) continue;
+        pendingPulls.set(index, fetchEntry(owner, entry).catch((error) => ({ error })));
+      }
+    };
+    fillPulls();
+    for (const [index, { owner, entry }] of orderedPulls.entries()) {
+      currentPullIndex = index;
       aborted();
       const token = entryToken(owner, entry);
+      if (state.failedPulls?.[token] && state.failedPulls[token] > this.now()) {
+        pendingPulls.delete(index);
+        fillPulls();
+        continue;
+      }
       if (known.has(token) && !(entry.kind === "config" && state.configConflicts[entry.id])) continue;
       if (!enabled("history") && ["snapshot", "edit", "tombstone"].includes(entry.kind)) continue;
       try {
@@ -562,12 +713,12 @@ export class SyncEngine {
         if (entry.kind === "config") {
           if (!syncCategory(entry.id) || !enabled(syncCategory(entry.id)!) || blockedConfig.has(entry.id)) continue;
           const value = await read<ConfigVersion>(owner, entry);
-          if (!validClock(value.clock, owner) || typeof value.value !== "string" && value.value !== null) throw new Error();
+          if (!validClock(value.clock, owner) || typeof value.value !== "string" && value.value !== null) throw new InvalidRemoteEntry();
           const old = remoteConfig.get(entry.id);
           if (!old || compareClock(value.clock, old.value.clock) > 0) remoteConfig.set(entry.id, { value, owner, entry });
         } else if (entry.kind === "tombstone") {
           const value = await read<Tombstone>(owner, entry);
-          if (!validClock(value.clock, owner) || typeof value.deleted !== "boolean") throw new Error();
+          if (!validClock(value.clock, owner) || typeof value.deleted !== "boolean") throw new InvalidRemoteEntry();
           const old = remoteTombstones.get(entry.id);
           if (!old || compareClock(value.clock, old.clock) > 0) remoteTombstones.set(entry.id, value);
         } else if (entry.kind === "snapshot") {
@@ -577,7 +728,7 @@ export class SyncEngine {
             ? remoteTombstone.deleted : tombstone?.deleted;
           if (!deleted) {
             const value = await read<Snapshot>(owner, entry);
-            if (value.uuid !== entry.id || !Array.isArray(value.assets) || !Array.isArray(value.prices) || !Array.isArray(value.transactions)) throw new Error();
+            if (value.uuid !== entry.id || !Array.isArray(value.assets) || !Array.isArray(value.prices) || !Array.isArray(value.transactions)) throw new InvalidRemoteEntry();
             if (options.dryRun) {
               if (!localIdsBeforePull.has(entry.id)) report.pulled++;
             } else {
@@ -600,16 +751,16 @@ export class SyncEngine {
           const value = await read<SnapshotEdit>(owner, entry);
           if (!validClock(value.clock, owner) || value.snapshot?.uuid !== entry.id ||
               !Array.isArray(value.snapshot.assets) || !Array.isArray(value.snapshot.prices) ||
-              !Array.isArray(value.snapshot.transactions)) throw new Error();
+              !Array.isArray(value.snapshot.transactions)) throw new InvalidRemoteEntry();
           for (const [rowKey, event] of Object.entries(value.rowEvents ?? {})) {
             if (!/^[a-f0-9]{64}$/.test(rowKey) || !validClock(event.clock, event.clock?.deviceId) ||
-                !UUID_PATTERN.test(event.clock.deviceId) || typeof event.deleted !== "boolean") throw new Error();
+                !UUID_PATTERN.test(event.clock.deviceId) || typeof event.deleted !== "boolean") throw new InvalidRemoteEntry();
             const events = remoteRowEvents.get(entry.id) ?? {};
             if (!events[rowKey] || compareClock(event.clock, events[rowKey].clock) > 0) events[rowKey] = event;
             remoteRowEvents.set(entry.id, events);
           }
           for (const [rowKey, event] of Object.entries(value.txnEvents ?? {})) {
-            if (!/^[a-f0-9]{64}$/.test(rowKey) || !event || typeof event !== "object") throw new Error();
+            if (!/^[a-f0-9]{64}$/.test(rowKey) || !event || typeof event !== "object") throw new InvalidRemoteEntry();
             const events = remoteTransactionEvents.get(entry.id) ?? {};
             const fields = events[rowKey] ?? {};
             for (const name of ["price", "txnType"] as const) {
@@ -617,7 +768,7 @@ export class SyncEngine {
               if (!field) continue;
               if (!validClock(field.clock, field.clock?.deviceId) || !UUID_PATTERN.test(field.clock.deviceId) ||
                   name === "price" && (typeof field.value !== "number" || !Number.isFinite(field.value)) ||
-                  name === "txnType" && typeof field.value !== "string") throw new Error();
+                  name === "txnType" && typeof field.value !== "string") throw new InvalidRemoteEntry();
               const previous = fields[name];
               if (!previous || compareClock(field.clock, previous.clock) > 0) {
                 fields[name] = field as never;
@@ -630,18 +781,26 @@ export class SyncEngine {
           if (!old || compareClock(value.clock, old.clock) > 0) remoteEdits.set(entry.id, value);
         } else if (entry.kind === "session" && enabled("chat")) {
           const value = await read<SyncSession>(owner, entry);
-          if (value.id !== entry.id || !Array.isArray(value.messages)) throw new Error();
+          if (value.id !== entry.id || !Array.isArray(value.messages)) throw new InvalidRemoteEntry();
           remoteSessions.set(value.id, mergeSessions(remoteSessions.get(value.id), value));
         } else if (entry.kind === "session-delete" && enabled("chat")) {
           const value = await read<{ clock: Hlc }>(owner, entry);
-          if (!validClock(value.clock, owner)) throw new Error();
+          if (!validClock(value.clock, owner)) throw new InvalidRemoteEntry();
           const old = remoteSessionDeletions.get(entry.id);
           if (!old || compareClock(value.clock, old) > 0) remoteSessionDeletions.set(entry.id, value.clock);
         }
         if (!options.dryRun) known.add(token);
+        delete state.failedPulls?.[token];
         options.onProgress?.({ phase: "pull", completed: known.size, total: entries.length });
-      } catch {
+      } catch (error) {
         report.errors.push(`Failed to pull ${entry.kind} object`);
+        if (!options.dryRun && error instanceof InvalidRemoteEntry) {
+          (state.failedPulls ??= {})[token] = this.now() + 24 * 60 * 60_000;
+        }
+      } finally {
+        if (pendingPulls.has(index)) await pendingPulls.get(index);
+        pendingPulls.delete(index);
+        fillPulls();
       }
     }
     aborted();
@@ -1081,23 +1240,40 @@ export class SyncEngine {
     }
     this.roundDiagnostics?.phase("push");
     if (writes.length) {
-      const probe = `devices/${state.deviceId}/probe/${crypto.randomUUID()}`;
-      const content = encoder.encode("conditional-write-probe");
-      try {
-        await this.store.putObject(probe, content, { ifNoneMatch: "*" }, options.signal);
-        for (const conditions of [{ ifNoneMatch: "*" as const }, { ifMatch: '"stale-etag"' }]) {
-          let rejected = false;
-          try {
-            await this.store.putObject(probe, content, conditions, options.signal);
-          } catch (error) {
-            if (!isS3Conflict(error)) throw error;
-            rejected = true;
+      const identity = await digest(encoder.encode(this.environment.storeIdentity ?? "default"));
+      if (state.probe?.identity !== identity || this.now() - state.probe.checkedAt >= 24 * 60 * 60_000) {
+        const probe = `devices/${state.deviceId}/probe/${crypto.randomUUID()}`;
+        const content = encoder.encode("conditional-write-probe");
+        try {
+          await this.store.putObject(probe, content, { ifNoneMatch: "*" }, options.signal);
+          for (const conditions of [{ ifNoneMatch: "*" as const }, { ifMatch: '"stale-etag"' }]) {
+            let rejected = false;
+            try {
+              await this.store.putObject(probe, content, conditions, options.signal);
+            } catch (error) {
+              if (!isS3Conflict(error)) throw error;
+              rejected = true;
+            }
+            if (!rejected) throw new Error("Sync store does not enforce conditional writes");
           }
-          if (!rejected) throw new Error("Sync store does not enforce conditional writes");
+        } finally {
+          await this.store.deleteObject(probe, options.signal);
         }
-      } finally {
-        await this.store.deleteObject(probe, options.signal);
+        state.probe = { identity, checkedAt: this.now() };
+        await this.saveState(state);
       }
+      if (state.unfinishedPush && !fullListingCompleted) {
+        let continuationToken: string | undefined;
+        do {
+          const page = await this.store.listObjectsV2({
+            prefix: `devices/${state.deviceId}/`, continuationToken, signal: options.signal,
+          });
+          for (const item of page.objects) listedKeys.add(item.key);
+          continuationToken = page.nextContinuationToken;
+        } while (continuationToken);
+      }
+      state.unfinishedPush = true;
+      await this.saveState(state);
     }
     let ownEntries = [...(own?.manifest.entries ?? [])];
     let manifestEtag = own?.etag;
@@ -1228,6 +1404,11 @@ export class SyncEngine {
         this.roundDiagnostics?.phase("push");
         manifestEtag = result.etag;
         ownEntries = manifestEntries;
+        state.deviceIds = [...new Set([...(state.deviceIds ?? []), state.deviceId!])];
+        try {
+          await this.repo.saveManifestCache?.(state.deviceId!, header.kdf.salt, result.etag,
+            { version: 1, deviceId: state.deviceId!, name: deviceName, entries: manifestEntries }, new Date(this.now()).toISOString());
+        } catch { /* A cache failure cannot undo the published manifest. */ }
         const currentDevice = report.devices!.find((device) => device.id === state.deviceId);
         if (currentDevice) {
           currentDevice.lastUpload = new Date(this.now()).toISOString();
@@ -1329,8 +1510,12 @@ export class SyncEngine {
         checkpointFailed = !await checkpoint(pending.splice(0, PUSH_CHECKPOINT_SIZE));
       }
     }
-    if (!checkpointFailed && (pending.length || !written)) await checkpoint(pending);
+    if (!checkpointFailed && (pending.length || !written)) checkpointFailed = !await checkpoint(pending);
     aborted();
+    if (!checkpointFailed && state.unfinishedPush) {
+      delete state.unfinishedPush;
+      if (report.errors.length) await this.saveState(state);
+    }
     if (!report.errors.length) {
       for (const id of Object.keys(state.sessionDeletions)) {
         if (!state.pendingSessionDeletions[id]) delete state.sessionHashes[id];

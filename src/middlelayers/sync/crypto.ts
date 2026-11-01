@@ -126,19 +126,30 @@ export async function createSyncHeader(passphrase: string): Promise<{ header: Sy
   };
 }
 
-export async function unlockSyncHeader(header: SyncHeader, passphrase: string): Promise<Uint8Array> {
+export function validateSyncHeader(header: SyncHeader): Uint8Array {
   if (header.version !== VERSION || header.kdf?.name !== "argon2id" ||
     header.kdf.memoryKiB !== MEMORY_KIB || header.kdf.iterations !== ITERATIONS ||
     header.kdf.parallelism !== PARALLELISM) {
     throw new Error("Unsupported sync header");
   }
-  const key = await deriveKey(passphrase, decode64(header.kdf.salt));
+  const salt = decode64(header.kdf.salt);
+  if (salt.length !== 16) throw new Error("Invalid sync format");
+  return salt;
+}
+
+export async function verifySyncHeaderKey(header: SyncHeader, key: Uint8Array): Promise<void> {
   try {
     const check = await decryptObject(key, "sync-header", header.keyCheck);
     if (new TextDecoder().decode(check) !== "track3-sync-key-check-v1") throw new Error();
   } catch {
     throw new Error("Incorrect sync passphrase or damaged header");
   }
+}
+
+export async function unlockSyncHeader(header: SyncHeader, passphrase: string): Promise<Uint8Array> {
+  const salt = validateSyncHeader(header);
+  const key = await deriveKey(passphrase, salt);
+  await verifySyncHeaderKey(header, key);
   return key;
 }
 

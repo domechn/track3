@@ -1,6 +1,6 @@
-import { createSyncHeader, unlockSyncHeader } from "./crypto";
+import { createSyncHeader, unlockSyncHeader, type SyncHeader } from "./crypto";
 import { createSqliteSyncEngine } from "./index";
-import { isS3Conflict, readSyncHeader, writeSyncHeader, type S3Store } from "./object-store";
+import { isS3Conflict, readSyncHeader, writeSyncHeader, type NotModifiedObject, type S3Store, type StoredObject } from "./object-store";
 import { SyncScheduler, type SyncStatus } from "./scheduler";
 import {
   classifySyncError, createSyncStore, defaultSyncSettings, loadSyncSettings,
@@ -14,6 +14,7 @@ import { SqliteSyncRepository } from "./sqlite-repository";
 type EngineHandle = {
   engine: {
     syncOnce(options?: SyncOptions): Promise<SyncReport>;
+    primeKey?(header: SyncHeader, key: Uint8Array): void;
     configConflicts?(): Promise<Array<{ id: string }>>;
     resolveConfigConflict?(id: string, choice: "local" | "remote"): Promise<void>;
   };
@@ -24,8 +25,9 @@ type Dependencies = {
   load(): Promise<SyncSettings>;
   save(settings: SyncSettings): Promise<void>;
   store(settings: SyncSettings): S3Store;
-  engine(store: S3Store, passphrase: string): EngineHandle;
+  engine(store: S3Store, passphrase: string, storeIdentity?: string): EngineHandle;
   resetState?(): Promise<void>;
+  clearCache?(): Promise<void>;
   deviceId?(): Promise<string | undefined>;
 };
 
@@ -36,8 +38,10 @@ const production: Dependencies = {
   engine: createSqliteSyncEngine,
   resetState: async () => {
     const repo = new SqliteSyncRepository();
+    await repo.clearManifestCache();
     await repo.saveState(resetSyncState(await repo.loadState()));
   },
+  clearCache: async () => new SqliteSyncRepository().clearManifestCache(),
   deviceId: async () => (await new SqliteSyncRepository().loadState()).deviceId,
 };
 
@@ -111,19 +115,28 @@ export class SyncRuntime {
     const store = this.deps.store(settings);
     const result = await testSyncConnection(store, secret);
     if (result !== "ok") return result;
+    let key: Uint8Array | undefined;
     try {
-      if (!await readSyncHeader(store)) {
-        const { header } = await createSyncHeader(secret);
+      let header = await readSyncHeader(store);
+      if (!header) {
+        const created = await createSyncHeader(secret);
+        header = created.header;
+        key = created.key;
         try {
           await writeSyncHeader(store, header);
         } catch (error) {
           if (!isS3Conflict(error)) throw error;
           const current = await readSyncHeader(store);
           if (!current) return "header";
-          try { await unlockSyncHeader(current, secret); }
+          try {
+            const currentKey = await unlockSyncHeader(current, secret);
+            key.fill(0);
+            key = currentKey;
+            header = current;
+          }
           catch { return "passphrase"; }
         }
-      }
+      } else key = await unlockSyncHeader(header, secret);
       const next = { ...settings, enabled: true };
       if (this.scheduler && !await this.scheduler.stop()) {
         this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
@@ -135,21 +148,24 @@ export class SyncRuntime {
         await this.deps.resetState?.();
       }
       this.settings = next;
-      this.activate(store, secret);
+      this.activate(store, secret, header, key);
       return "ok";
     } catch (error) {
       return classifySyncError(error);
+    } finally {
+      key?.fill(0);
     }
   }
 
   async unlock(passphrase: string): Promise<SyncConnectionResult> {
     if (!this.settings.enabled) return "configuration";
+    let key: Uint8Array | undefined;
     try {
       const store = this.deps.store(this.settings);
       const header = await readSyncHeader(store);
       if (!header) return "header";
       try {
-        await unlockSyncHeader(header, passphrase);
+        key = await unlockSyncHeader(header, passphrase);
       } catch {
         return "passphrase";
       }
@@ -157,34 +173,45 @@ export class SyncRuntime {
         this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
         return "timeout";
       }
-      this.activate(store, passphrase);
+      this.activate(store, passphrase, header, key);
       return "ok";
     } catch (error) {
       return classifySyncError(error);
+    } finally {
+      key?.fill(0);
     }
   }
 
-  private activate(store: S3Store, passphrase: string): void {
+  private activate(store: S3Store, passphrase: string, header?: SyncHeader, key?: Uint8Array): void {
     this.skipped = false;
     this.handle?.unregister();
     this.passphrase = passphrase;
     let activity: (progress?: SyncProgress) => void = () => {};
     const completed = <T,>(request: Promise<T>): Promise<T> => request.finally(() => activity());
+    function getObject(key: string, signal?: AbortSignal): Promise<StoredObject | null>;
+    function getObject(key: string, signal: AbortSignal | undefined, ifNoneMatch: string): Promise<StoredObject | NotModifiedObject | null>;
+    function getObject(key: string, signal?: AbortSignal, ifNoneMatch?: string): Promise<StoredObject | NotModifiedObject | null> {
+      return completed(ifNoneMatch === undefined ? store.getObject(key, signal) : store.getObject(key, signal, ifNoneMatch));
+    }
     const trackedStore: S3Store = {
       putObject: (key, body, conditions, signal) => completed(store.putObject(key, body, conditions, signal)),
-      getObject: (key, signal) => completed(store.getObject(key, signal)),
+      getObject,
       headObject: (key, signal) => completed(store.headObject(key, signal)),
       deleteObject: (key, signal) => completed(store.deleteObject(key, signal)),
       listObjectsV2: (options) => completed(store.listObjectsV2(options)),
       observeRetries: (listener) => store.observeRetries?.(listener) ?? (() => {}),
     };
-    this.handle = this.deps.engine(trackedStore, passphrase);
+    this.handle = this.deps.engine(trackedStore, passphrase,
+      JSON.stringify([this.settings.endpoint, this.settings.bucket, this.settings.region, this.settings.prefix, this.settings.pathStyle]));
+    if (header && key) this.handle.engine.primeKey?.(header, key);
     this.scheduler = new SyncScheduler(async (signal, reportActivity, onDiagnostics) => {
       activity = reportActivity;
       const currentId = await this.deps.deviceId?.();
+      const manual = this.manualDiscovery;
+      this.manualDiscovery = false;
       return this.handle!.engine.syncOnce({
         signal, onProgress: reportActivity, onDiagnostics, categories: this.settings.categories,
-        deviceName: this.settings.deviceNames[currentId ?? ""],
+        deviceName: this.settings.deviceNames[currentId ?? ""], manual,
       });
     });
     this.scheduler.subscribe(() => this.publish("ready", this.scheduler!.status()));
@@ -194,7 +221,14 @@ export class SyncRuntime {
 
   trigger(kind: "refresh" | "focus"): void { this.scheduler?.trigger(kind); }
 
-  async syncNow(): Promise<void> { await this.scheduler?.syncNow(); }
+  private manualDiscovery = false;
+
+  async syncNow(): Promise<void> {
+    if (!this.scheduler) return;
+    this.manualDiscovery = true;
+    await this.scheduler.syncNow();
+    if (this.manualDiscovery) await this.scheduler.syncNow();
+  }
 
   async configConflicts(): Promise<Array<{ id: string }>> {
     return this.handle?.engine.configConflicts?.() ?? [];
@@ -213,13 +247,24 @@ export class SyncRuntime {
       : { ...this.settings, enabled: false };
     await this.deps.save(next);
     this.settings = next;
-    const settled = (await this.scheduler?.stop()) ?? true;
-    if (settled) this.scheduler = undefined;
-    this.handle?.unregister();
-    this.handle = undefined;
+    const scheduler = this.scheduler;
+    const settled = (await scheduler?.stop()) ?? true;
+    const handle = this.handle;
+    if (settled) {
+      handle?.unregister();
+      this.scheduler = undefined;
+      this.handle = undefined;
+    } else void scheduler?.waitForSettlement().then(async () => {
+      if (this.scheduler !== scheduler) return;
+      handle?.unregister();
+      this.scheduler = undefined;
+      this.handle = undefined;
+      await this.deps.clearCache?.();
+    }).catch(() => {});
     this.passphrase = undefined;
     this.skipped = false;
     this.publish("disabled", { phase: "idle" });
+    if (settled) await this.deps.clearCache?.();
     return settled;
   }
 
@@ -255,8 +300,13 @@ export class SyncRuntime {
   }
 
   stop(): void {
-    this.scheduler?.stop();
-    this.handle?.unregister();
+    const scheduler = this.scheduler;
+    const handle = this.handle;
+    if (scheduler) void scheduler.stop().then(async () => {
+      await scheduler.waitForSettlement();
+      handle?.unregister();
+    });
+    else handle?.unregister();
     this.scheduler = undefined;
     this.handle = undefined;
     this.passphrase = undefined;
