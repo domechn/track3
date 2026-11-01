@@ -195,10 +195,19 @@ mod init_schema_tests {
     }
 
     #[test]
-    fn init_and_v08t09_copies_of_the_new_tables_are_identical_and_registered() {
+    fn init_and_versioned_copies_of_the_new_tables_are_identical_and_registered() {
         for (name, init, versioned) in NEW_TABLE_SCRIPTS {
             assert_eq!(init, versioned, "{name} differs between init and v08t09");
             assert!(initialization_scripts().contains(&name), "{name} missing from INITIALIZATION_SCRIPTS");
+        }
+        let additive = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../migrations/v094t095");
+        for entry in std::fs::read_dir(additive).unwrap() {
+            let entry = entry.unwrap();
+            let name = entry.file_name().into_string().unwrap();
+            if !name.ends_with("_up.sql") { continue }
+            let init = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../migrations/init").join(&name);
+            assert_eq!(std::fs::read(entry.path()).unwrap(), std::fs::read(init).unwrap(), "{name} differs from init");
+            assert!(initialization_scripts().contains(&name.as_str()), "{name} missing from INITIALIZATION_SCRIPTS");
         }
     }
 
@@ -229,9 +238,67 @@ mod init_schema_tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    // Regenerate only against the released 0.9.4 code: UPDATE_GOLDEN=1 cargo test --locked -p track3-pure-tests schema_dump_matches_0_9_4
     #[test]
-    fn schema_dump_matches_0_9_4() {
+    fn v094t095_repair_applies_registered_scripts_idempotently() {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let root = std::env::temp_dir().join(format!("track3-additive-migration-{}", uuid::Uuid::new_v4()));
+        let db_path = root.join("database.db");
+        for directory in ["init", "v08t09"] {
+            let destination = root.join("migrations").join(directory);
+            std::fs::create_dir_all(&destination).unwrap();
+            for file in std::fs::read_dir(source.join("migrations").join(directory)).unwrap() {
+                let file = file.unwrap();
+                std::fs::copy(file.path(), destination.join(file.file_name())).unwrap();
+            }
+        }
+        let additive = root.join("migrations/v094t095");
+        std::fs::create_dir_all(&additive).unwrap();
+        std::fs::write(additive.join("compat_probe_up.sql"), "CREATE TABLE IF NOT EXISTS compat_probe (id INTEGER PRIMARY KEY);").unwrap();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            for name in initialization_scripts() {
+                let sql = std::fs::read_to_string(root.join("migrations/init").join(name)).unwrap();
+                db.execute(sql.as_str()).await.unwrap();
+            }
+            db.close().await.unwrap();
+            run_migrations(&db_path, &root, "0.9.4").await.unwrap();
+            run_migrations(&db_path, &root, "0.9.5").await.unwrap();
+            run_migrations(&db_path, &root, "0.9.5").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='compat_probe'")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(count, 1);
+            db.close().await.unwrap();
+        });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn write_forward_database_fixture() {
+        let Ok(directory) = std::env::var("TRACK3_COMPAT_FORWARD") else { return };
+        let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let db_path = PathBuf::from(directory).join("migrated.db");
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            for name in initialization_scripts() {
+                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap();
+                db.execute(sql.as_str()).await.unwrap();
+            }
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.4").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            db.execute("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES ('db-compat', '2024-04-16T13:00:00.000Z', 'wallet-compat', 'crypto', 'BTC', 2, 4, 2)").await.unwrap();
+            db.execute("INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType) VALUES ('db-compat', 1, 'crypto', 'wallet-compat', 'BTC', 2, 2, 'buy')").await.unwrap();
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.5").await.unwrap();
+        });
+    }
+
+    // The 0.9.4 schema stays frozen; additions require their own reviewed fixture.
+    #[test]
+    fn schema_is_frozen_0_9_4_subset_plus_reviewed_additions() {
         let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let fixture_dir = resource_dir.join("tests/fixtures");
         let root =
@@ -290,19 +357,29 @@ mod init_schema_tests {
             .collect::<Vec<_>>()
             .join("\n")
             + "\n";
+        let frozen_schema = std::fs::read_to_string(fixture_dir.join("schema-0.9.4.txt")).unwrap();
+        let actual_lines = schema.lines().collect::<std::collections::BTreeSet<_>>();
+        let frozen_lines = frozen_schema.lines().collect::<std::collections::BTreeSet<_>>();
+        assert!(frozen_lines.is_subset(&actual_lines), "a 0.9.4 schema object changed or disappeared");
+        let additions = actual_lines.difference(&frozen_lines).copied().collect::<Vec<_>>().join("\n");
+        let additions = format!("{additions}{}", if additions.is_empty() { "" } else { "\n" });
         if std::env::var("UPDATE_GOLDEN").as_deref() == Ok("1") {
-            std::fs::create_dir_all(&fixture_dir).unwrap();
-            std::fs::write(fixture_dir.join("schema-0.9.4.txt"), &schema).unwrap();
-            std::fs::write(fixture_dir.join("migrations.sha256"), &hashes).unwrap();
+            std::fs::write(fixture_dir.join("schema-0.9.5-additions.txt"), &additions).unwrap();
         }
-        assert_eq!(
-            schema,
-            std::fs::read_to_string(fixture_dir.join("schema-0.9.4.txt")).unwrap()
-        );
-        assert_eq!(
-            hashes,
-            std::fs::read_to_string(fixture_dir.join("migrations.sha256")).unwrap()
-        );
+        let reviewed_schema = std::fs::read_to_string(fixture_dir.join("schema-0.9.5-additions.txt")).unwrap();
+        assert_eq!(additions, reviewed_schema);
+
+        let frozen_hashes = std::fs::read_to_string(fixture_dir.join("migrations.sha256")).unwrap();
+        let actual_hashes = hashes.lines().collect::<std::collections::BTreeSet<_>>();
+        let frozen_hash_lines = frozen_hashes.lines().collect::<std::collections::BTreeSet<_>>();
+        assert!(frozen_hash_lines.is_subset(&actual_hashes), "a 0.9.4 migration SQL file changed or disappeared");
+        let new_hashes = actual_hashes.difference(&frozen_hash_lines).copied().collect::<Vec<_>>().join("\n");
+        let new_hashes = format!("{new_hashes}{}", if new_hashes.is_empty() { "" } else { "\n" });
+        if std::env::var("UPDATE_GOLDEN").as_deref() == Ok("1") {
+            std::fs::write(fixture_dir.join("migrations-0.9.5-additions.sha256"), &new_hashes).unwrap();
+        }
+        let reviewed_hashes = std::fs::read_to_string(fixture_dir.join("migrations-0.9.5-additions.sha256")).unwrap();
+        assert_eq!(new_hashes, reviewed_hashes);
     }
 }
 

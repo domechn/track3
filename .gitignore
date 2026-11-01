@@ -38,3 +38,5 @@ src-tauri/target/
 .ent-key
 .env
 .worktrees/
+.compat/
+tests/compat/forward/
