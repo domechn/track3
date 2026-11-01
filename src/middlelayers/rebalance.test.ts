@@ -110,6 +110,28 @@ describe("rebalance calculator", () => {
     ]);
   });
 
+  it("gives stablecoins no cash credit and includes them in crypto type targets when the list is empty", () => {
+    const current = [
+      { symbol: "BTC", assetType: "crypto" as const, amount: 2, value: 60, price: 30 },
+      { symbol: "USDC", assetType: "crypto" as const, amount: 40, value: 40, price: 1 },
+    ];
+    const cashTargets: RebalanceTarget[] = [
+      { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+      { kind: "cash", percent: 50 },
+    ];
+    expect(calculateRebalance(current, cashTargets, { stablecoinSymbols: ["USDC"] }).rows
+      .map((row) => [row.symbol, row.targetPercent, row.tradeValue]))
+      .toEqual([["BTC", 50, -10], ["USDC", 40, 0], ["CASH", 10, 10]]);
+    expect(calculateRebalance(current, cashTargets, { stablecoinSymbols: [] }).rows
+      .map((row) => [row.symbol, row.targetPercent, row.tradeValue]))
+      .toEqual([["BTC", 50, -10], ["USDC", 0, -40], ["CASH", 50, 50]]);
+    expect(calculateRebalance(current, [
+      { kind: "type", assetType: "crypto", percent: 50 },
+      { kind: "cash", percent: 50 },
+    ], { stablecoinSymbols: [] }).rows.map((row) => [row.symbol, row.targetPercent]))
+      .toEqual([["BTC", 30], ["USDC", 20], ["CASH", 50]]);
+  });
+
   it("sells only the stablecoin surplus to fund a full cash-bucket rebalance", () => {
     const result = calculateRebalance([
       { symbol: "USDT", assetType: "crypto", amount: 80, value: 80, price: 1 },

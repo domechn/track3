@@ -138,6 +138,27 @@ it("exports rebalance suggestions using the session's cash option", async () => 
   await executePreparedAction(action);
   expect(writeTextFile).toHaveBeenCalledWith("/tmp/rebalance.csv", expect.stringContaining('"BTC","100.00","100.00","0.00","Buy","1000.00"'));
 });
+it("exports stablecoins as ordinary holdings when the page switch is off", async () => {
+  vi.mocked(getRebalanceProfile).mockResolvedValue({
+    targets: [
+      { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+      { kind: "cash", percent: 50 },
+    ], tolerancePercent: 0,
+  });
+  vi.mocked(loadRebalanceHoldings).mockResolvedValue({
+    holdings: [
+      { assetType: "crypto", symbol: "BTC", amount: 2, price: 30, value: 60 },
+      { assetType: "crypto", symbol: "USDC", amount: 40, price: 1, value: 40 },
+    ], stablecoinSymbols: ["USDC"],
+  });
+  sessionStorage.setItem(REBALANCE_OPTIONS_KEY, '{"stablecoinsAsCash":false}');
+  vi.mocked(save).mockResolvedValue("/tmp/rebalance.csv");
+  await executePreparedAction(await prepareAction("export_rebalance", {}, "call-export-off"));
+  expect(writeTextFile).toHaveBeenCalledWith("/tmp/rebalance.csv",
+    expect.stringContaining('"USDC","40.00","0.00","40.00","Sell","-40.00"'));
+  expect(writeTextFile).toHaveBeenCalledWith("/tmp/rebalance.csv",
+    expect.stringContaining('"CASH","0.00","50.00","-50.00","Unallocated cash (50.00 USD)","50.00"'));
+});
 it("clears alert history only after confirmation", async () => {
   const action = await prepareAction("clear_alert_history", {}, "call-clear");
   expect(clearAlertHistory).not.toHaveBeenCalled();

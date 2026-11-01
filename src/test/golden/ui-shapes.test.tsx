@@ -317,6 +317,16 @@ describe("0.9.4 UI persistence shapes", () => {
       }
     });
 
+    it(`${tree} writes the off-only stablecoin rebalance option`, async () => {
+      sessionStorage.setItem("track3-rebalance-options",
+        '{"mode":"buys","injectedCash":42.5,"minimumTradeValue":3,"ignoreBelowValue":2}');
+      render(<Rebalance currency={usd} />);
+      fireEvent.click(await screen.findByRole("switch", { name: "Treat USDT and USDC as cash" }));
+      await waitFor(() => expect(sessionStorage.getItem("track3-rebalance-options"))
+        .toBe('{"mode":"buys","injectedCash":42.5,"minimumTradeValue":3,"ignoreBelowValue":2,"stablecoinsAsCash":false}'));
+      pinShape(`${tree}.rebalanceStablecoinsOff`, sessionStorage.getItem("track3-rebalance-options"));
+    });
+
     it(`${tree} writes the exact normalized source status JSON`, () => {
       localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([{
         sourceId: "wallet:btc", label: "Bitcoin", status: "stale",
