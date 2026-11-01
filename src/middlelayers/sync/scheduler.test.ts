@@ -8,6 +8,17 @@ const success: SyncReport = { pulled: 1, pushed: 2, tombstonesApplied: 0, config
 afterEach(() => vi.useRealTimers());
 
 describe("SyncScheduler", () => {
+  it("keeps last round diagnostics when the round throws", async () => {
+    const diagnostics = { wallMs: 42, retries: 2 } as NonNullable<SyncReport["diagnostics"]>;
+    const scheduler = new SyncScheduler(async (_signal, _activity, onDiagnostics) => {
+      onDiagnostics(diagnostics);
+      throw new S3Error("private object name", 503);
+    }, { retryBaseMs: 60_000 });
+    await scheduler.syncNow();
+    expect(scheduler.status().phase).toBe("error");
+    expect(scheduler.status().diagnostics).toBe(diagnostics);
+    await scheduler.stop();
+  });
   it("debounces start and refresh triggers into one round", async () => {
     vi.useFakeTimers();
     const run = vi.fn(async () => success);
@@ -279,6 +290,23 @@ describe("SyncScheduler", () => {
     const stopping = scheduler.stop();
     await vi.advanceTimersByTimeAsync(5_000);
     await stopping;
+  });
+
+  it("keeps partial diagnostics when a timed-out round settles", async () => {
+    vi.useFakeTimers();
+    let finish!: () => void;
+    const diagnostics = { wallMs: 180_000, retries: 3 } as NonNullable<SyncReport["diagnostics"]>;
+    const scheduler = new SyncScheduler((_signal, _activity, onDiagnostics) =>
+      new Promise<SyncReport>((resolve) => {
+        finish = () => { onDiagnostics(diagnostics); resolve(success); };
+      }), { retryBaseMs: 60_000 });
+    const round = scheduler.syncNow();
+    await vi.advanceTimersByTimeAsync(180_000);
+    await round;
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(scheduler.status().diagnostics).toBe(diagnostics);
+    await scheduler.stop();
   });
 
   it("uses completed requests to keep a round alive before object progress exists", async () => {

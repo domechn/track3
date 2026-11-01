@@ -6,11 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
+import { ConfigConflictChoices } from "@/components/sync-conflict-choices";
 import { SyncActionButton } from "@/components/settings/sync-action-button";
 import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
-import { syncCategories as categories, syncFields as fields, configConflictNames, invalidConfigurationFields, syncFormWithField, syncFormWithCategory, syncFormWithPathStyle, type SyncField as Field } from "@/middlelayers/ui-state/config-form";
+import { syncCategories as categories, syncFields as fields, invalidConfigurationFields, syncFormWithField, syncFormWithCategory, syncFormWithPathStyle, type SyncField as Field } from "@/middlelayers/ui-state/config-form";
 import {
   validateSyncSettings, type SyncConnectionResult, type SyncSettings,
 } from "@/middlelayers/sync/settings";
@@ -277,21 +278,9 @@ export default function SyncSettingsPage() {
             <p className="text-sm text-muted-foreground">{t("sync.configConflict.description")}</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {configConflicts.map(({ id }) => (
-              <div key={id} className="flex flex-wrap items-center justify-between gap-3">
-                <span>{configConflictNames[id]
-                  ? t(`sync.configConflict.name.${configConflictNames[id]}`)
-                  : t("sync.configConflict.key").replace("{id}", id)}</span>
-                <div className="flex gap-2">
-                  <SyncActionButton variant="outline" disabled={!!busy} pending={busy === `conflict-${id}-local`}
-                    pendingLabel={t("sync.pending.resolve")}
-                    onClick={() => void resolveConfigConflict(id, "local")}>{t("sync.configConflict.local")}</SyncActionButton>
-                  <SyncActionButton variant="outline" disabled={!!busy} pending={busy === `conflict-${id}-remote`}
-                    pendingLabel={t("sync.pending.resolve")}
-                    onClick={() => void resolveConfigConflict(id, "remote")}>{t("sync.configConflict.remote")}</SyncActionButton>
-                </div>
-              </div>
-            ))}
+            {configConflicts.map(({ id }) => <ConfigConflictChoices key={id} id={id} t={t}
+              disabled={!!busy} pending={busy === `conflict-${id}-local` ? "local" : busy === `conflict-${id}-remote` ? "remote" : undefined}
+              resolve={(key, choice) => { void resolveConfigConflict(key, choice); }} />)}
           </CardContent>
         </Card>
       )}

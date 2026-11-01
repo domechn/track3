@@ -12,6 +12,21 @@ const configured: SyncSettings = {
 afterEach(() => vi.useRealTimers());
 
 describe("SyncRuntime", () => {
+  it("publishes the last round diagnostics through runtime status", async () => {
+    const runtime = new SyncRuntime({
+      load: async () => configured, save: async () => {}, store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: async (options) => {
+        const diagnostics = { wallMs: 42, retries: 2 } as NonNullable<Awaited<ReturnType<SyncRuntime["status"]>>["sync"]["diagnostics"]>;
+        options?.onDiagnostics?.(diagnostics);
+        return { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [], diagnostics };
+      } }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.configure(configured, "correct horse battery staple");
+    await runtime.syncNow();
+    expect(runtime.status().sync.diagnostics?.retries).toBe(2);
+    runtime.stop();
+  });
   it("carries engine progress through the scheduler to the runtime status", async () => {
     let finish!: () => void;
     const runtime = new SyncRuntime({

@@ -27,11 +27,13 @@ export class SqliteSyncRepository implements SyncRepository {
     return rows[0] ? JSON.parse(rows[0].data) as SyncState : {};
   }
 
-  async saveState(state: SyncState): Promise<void> {
+  async saveState(state: SyncState): Promise<number> {
+    const data = JSON.stringify(state);
     await executeWrite(
       "INSERT INTO sync_state (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data",
-      [JSON.stringify(state)],
+      [data],
     );
+    return new TextEncoder().encode(data).length;
   }
 
   async listSnapshotIds(): Promise<string[]> {

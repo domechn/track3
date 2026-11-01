@@ -15,6 +15,14 @@ vi.mock("../ai/sessions", () => ({
   stableSyncMessage: (_id: string, _createdAt: string, _index: number, message: unknown) => message,
 }));
 
+it("reports the UTF-8 size of the JSON saved in sync_state", async () => {
+  const state = { deviceId: "device", known: ["标记"] };
+  const bytes = await new SqliteSyncRepository().saveState(state);
+  const saved = vi.mocked(executeWrite).mock.calls.at(-1)?.[1]?.[0] as string;
+  expect(saved).toBe(JSON.stringify(state));
+  expect(bytes).toBe(new TextEncoder().encode(saved).length);
+});
+
 it("decrypts local secrets for the sync payload and reencrypts pulled secrets", async () => {
   vi.mocked(getDatabase).mockResolvedValue({
     select: async () => [{ id: 10, data: "!ent:local-ciphertext" }, { id: 7, data: "USD" }],

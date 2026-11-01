@@ -1,5 +1,5 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import { S3Error, SyncTimeoutError, type ListOptions, type ListPage, type S3Store, type WriteConditions } from "./object-store";
+import { S3Error, SyncTimeoutError, listResponseBytes, type ListOptions, type ListPage, type S3Store, type StoreRetry, type WriteConditions } from "./object-store";
 
 // Metadata requests are small; encrypted object transfers can be much larger.
 export const S3_METADATA_TIMEOUT_MS = 30_000;
@@ -179,6 +179,12 @@ async function readResponse<T>(response: Response, read: () => Promise<T>, timeo
 export class S3Client implements S3Store {
   private readonly endpoint: URL;
   private readonly config: S3Config;
+  private readonly retryListeners = new Set<(retry: StoreRetry) => void>();
+
+  observeRetries(listener: (retry: StoreRetry) => void): () => void {
+    this.retryListeners.add(listener);
+    return () => this.retryListeners.delete(listener);
+  }
 
   constructor(config: S3Config) {
     let endpoint: URL;
@@ -215,7 +221,7 @@ export class S3Client implements S3Store {
     return url;
   }
 
-  private async request(method: string, url: URL, body = new Uint8Array(), conditions?: WriteConditions, signal?: AbortSignal, defaultTimeoutMs = S3_METADATA_TIMEOUT_MS): Promise<Response> {
+  private async request(method: string, url: URL, body = new Uint8Array(), conditions?: WriteConditions, signal?: AbortSignal, defaultTimeoutMs = S3_METADATA_TIMEOUT_MS, diagnosticVerb: StoreRetry["verb"] = method as StoreRetry["verb"]): Promise<Response> {
     url.search = canonicalQuery(url);
     const headers: Record<string, string> = {};
     if (conditions?.ifMatch !== undefined) headers["if-match"] = conditions.ifMatch;
@@ -265,22 +271,34 @@ export class S3Client implements S3Store {
       if ((response.status === 429 || response.status >= 500) && attempt < 3 &&
           !(response.status >= 500 && method === "PUT" && conditions &&
             (conditions.ifMatch !== undefined || conditions.ifNoneMatch !== undefined))) {
+        const receivedLength = Number(response.headers.get("content-length") ?? 0);
         await discardResponse(response);
         const retryAfter = Number(response.headers.get("retry-after"));
         const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
           ? Math.min(retryAfter * 1000, 30000)
           : Math.min(retryBaseMs * 2 ** attempt, 30000);
-        await new Promise<void>((resolve, reject) => {
-          const wait = setTimeout(() => {
-            signal?.removeEventListener("abort", cancel);
-            resolve();
-          }, waitMs);
-          const cancel = () => {
-            clearTimeout(wait);
-            reject(new Error("S3 request aborted"));
-          };
-          signal?.addEventListener("abort", cancel, { once: true });
-        });
+        const waitStarted = performance.now();
+        let resumed = false;
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const wait = setTimeout(() => {
+              signal?.removeEventListener("abort", cancel);
+              resolve();
+            }, waitMs);
+            const cancel = () => {
+              clearTimeout(wait);
+              reject(new Error("S3 request aborted"));
+            };
+            signal?.addEventListener("abort", cancel, { once: true });
+          });
+          resumed = true;
+        } finally {
+          for (const listener of this.retryListeners) listener({
+            verb: diagnosticVerb, status: response.status, bytesSent: body.length,
+            bytesReceived: Number.isFinite(receivedLength) && receivedLength >= 0 ? receivedLength : 0,
+            waitMs: performance.now() - waitStarted, resumed,
+          });
+        }
         continue;
       }
       if (!response.ok) {
@@ -339,9 +357,10 @@ export class S3Client implements S3Store {
     const prefix = this.config.prefix ? `${this.config.prefix}/${options.prefix ?? ""}` : options.prefix;
     if (prefix !== undefined) url.searchParams.set("prefix", prefix);
     if (options.continuationToken !== undefined) url.searchParams.set("continuation-token", options.continuationToken);
-    const response = await this.request("GET", url, undefined, undefined, options.signal);
+    const response = await this.request("GET", url, undefined, undefined, options.signal, S3_METADATA_TIMEOUT_MS, "LIST");
     const xml = await readResponse(response, () => response.text(), this.config.timeoutMs ?? S3_METADATA_TIMEOUT_MS, options.signal);
     const page = parseListObjectsV2(xml);
+    Object.defineProperty(page, listResponseBytes, { value: new TextEncoder().encode(xml).length });
     if (this.config.prefix) {
       const base = `${this.config.prefix}/`;
       page.objects = page.objects.filter((item) => item.key.startsWith(base))

@@ -65,6 +65,17 @@ async function devices(count: number, pageSize = 1000) {
 }
 
 describe("SyncEngine", () => {
+  it("reports round timings, traffic, and in-memory state size without changing stored state", async () => {
+    const { repos, engines } = await devices(1);
+    const report = await engines[0].syncOnce();
+    expect(report.diagnostics?.wallMs).toBeGreaterThan(0);
+    expect(report.diagnostics?.requests.GET.count).toBeGreaterThanOrEqual(1);
+    expect(report.diagnostics?.requests.LIST.count).toBeGreaterThanOrEqual(1);
+    expect(report.diagnostics?.syncStateBytes).toBe(new TextEncoder().encode(JSON.stringify(repos[0].state)).length);
+    expect(report.diagnostics?.knownTokens).toBe(repos[0].state.known?.length ?? 0);
+    expect(report.diagnostics?.slowest.length).toBeLessThanOrEqual(5);
+    expect(repos[0].state).not.toHaveProperty("diagnostics");
+  });
   it("keeps manifest entries in source order when concurrent uploads finish in reverse order", async () => {
     const { s3, repos, engines } = await devices(1);
     for (let index = 0; index < 8; index++) repos[0].snapshots.set(`snap-${index}`, snapshot(`snap-${index}`));
@@ -668,6 +679,8 @@ describe("SyncEngine", () => {
     await engines[0].syncOnce();
     await engines[1].syncOnce();
     await engines[1].resolveConfigConflict("7", "local");
+    expect(repos[1].state.configResolutions?.["7"]).toMatchObject({ choice: "local" });
+    expect(repos[1].state.known).not.toContain(repos[1].state.configResolutions?.["7"].token);
     const resolved = await engines[1].syncOnce();
     expect(resolved.conflicts).not.toContain("7");
     await engines[0].syncOnce();
