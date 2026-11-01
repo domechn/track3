@@ -10,7 +10,7 @@ vi.mock("./database", () => ({
   selectFromDatabase: dbSelect,
 }));
 
-import { queryHistoricalPage, queryHistoricalDetail } from "./charts-history";
+import { queryHistoricalPage, queryHistoricalDetail, queryEditLog } from "./charts-history";
 
 const range = {
   start: new Date("2021-01-01T00:00:00.000Z"),
@@ -51,6 +51,11 @@ describe("paged historical queries", () => {
       VALUES ('snapshot-000042', 1, 'crypto', 'wallet', 'ASSET0', 1, 43, 'buy',
         '2022-01-02T18:00:00.000Z', '2022-01-02T18:00:00.000Z', '2022-01-02T18:00:00.000Z')`);
     db.run(readFileSync("src-tauri/migrations/v08t09/history_snapshots_up.sql", "utf8"));
+    db.run(`CREATE TABLE snapshot_edit_log (
+      id INTEGER PRIMARY KEY, snapshot_uuid TEXT, edited_at TEXT, origin TEXT,
+      target TEXT, action TEXT, asset_type TEXT, symbol TEXT, wallet TEXT,
+      old_value TEXT, new_value TEXT
+    )`);
     addRows = (sql) => db.run(sql);
     queryPlan = (sql, values) => {
       const statement = db.prepare(`EXPLAIN QUERY PLAN ${sql}`);
@@ -90,6 +95,33 @@ describe("paged historical queries", () => {
     expect(result.rows[19].change).toBe(200);
     expect(result.latest).toMatchObject({ id: "snapshot-000042", total: 28500 });
     expect(sqlSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("filters edited snapshots and marks rows with retained edits", async () => {
+    addRows(`INSERT INTO snapshot_edit_log
+      (snapshot_uuid, edited_at, origin, target, action)
+      VALUES ('snapshot-000042', '2026-01-01', 'local', 'transaction', 'price'),
+             ('snapshot-000040', '2026-01-01', 'local', 'asset', 'delete')`);
+    const all = await queryHistoricalPage(range, 20, 0);
+    expect(all.rows[0]).toMatchObject({ id: "snapshot-000042", edited: true });
+    expect(all.rows[1]).toMatchObject({ id: "snapshot-000041", edited: false });
+    const edited = await queryHistoricalPage(range, 20, 0, "edited");
+    expect(edited.totalCount).toBe(2);
+    expect(edited.rows.map((row) => row.id)).toEqual(["snapshot-000042", "snapshot-000040"]);
+    expect(edited.rows[0].change).toBe(200);
+    expect(edited.rows[1].change).toBe(200);
+    expect(edited.latest?.id).toBe("snapshot-000042");
+    expect(sqlSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it("loads one snapshot's retained edits newest first", async () => {
+    addRows(`INSERT INTO snapshot_edit_log
+      (snapshot_uuid, edited_at, origin, target, action, symbol, old_value, new_value)
+      VALUES ('snapshot-000042', '2026-11-01T10:00:00Z', 'local', 'transaction', 'price', 'ETH', '2310', '2295'),
+             ('snapshot-000042', '2026-11-01T11:00:00Z', 'local', 'asset', 'delete', 'BTC', '{"amount":1}', NULL),
+             ('snapshot-000041', '2026-11-01T12:00:00Z', 'local', 'asset', 'delete', 'SOL', '{"amount":1}', NULL)`);
+    expect((await queryEditLog("snapshot-000042")).map((row) => [row.symbol, row.old_value, row.new_value]))
+      .toEqual([["BTC", '{"amount":1}', null], ["ETH", "2310", "2295"]]);
   });
 
   it("loads one snapshot's assets and transactions only on detail request", async () => {

@@ -5,10 +5,11 @@ import {
   deleteHistoricalDataDetailById,
   queryHistoricalDetail,
   queryHistoricalPage,
+  queryEditLog,
   queryRestoreHistoricalData,
   restoreHistoricalData,
 } from "@/middlelayers/charts";
-import type { HistoricalLatest, HistoricalPageRow } from "@/middlelayers/charts-history";
+import type { HistoricalLatest, HistoricalPageRow, SnapshotEdit } from "@/middlelayers/charts-history";
 import { addToBlacklist } from "@/middlelayers/configuration";
 import {
   CurrencyRateDetail,
@@ -66,6 +67,7 @@ import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
 import { useTranslation } from "@/i18n";
 import { ScrollArea } from "./ui/scroll-area";
+import HistoryEditLog from "./history-edit-log";
 
 type RankData = {
   id: number;
@@ -108,6 +110,9 @@ const App = ({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [selectedDataId, setSelectedDataId] = useState<string | null>(null);
+  const [editLog, setEditLog] = useState<SnapshotEdit[] | null>(null);
+  const [editLogError, setEditLogError] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<"all" | "edited">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
   const [detailSearch, setDetailSearch] = useState("");
@@ -144,7 +149,7 @@ const App = ({
       return;
     }
     setPageLoading(true);
-  }, [rangeKey, dataChangedVersion, dataPage, pageSize]);
+  }, [rangeKey, dataChangedVersion, dataPage, pageSize, historyFilter]);
 
   const symbolPricePairs = useMemo(() => {
     const latestBySymbol = new Map<string, number>();
@@ -212,7 +217,7 @@ const App = ({
     const currentGen = ++loadGenRef.current;
 
     try {
-      const result = await queryHistoricalPage(dateRange, pageSize, dataPage);
+      const result = await queryHistoricalPage(dateRange, pageSize, dataPage, historyFilter);
       if (currentGen !== loadGenRef.current) {
         return;
       }
@@ -230,7 +235,7 @@ const App = ({
         setPageLoading(false);
       }
     }
-  }, [rangeKey, dateRange, dataChangedVersion, dataPage, pageSize]);
+  }, [rangeKey, dateRange, dataChangedVersion, dataPage, pageSize, historyFilter]);
 
   useEffect(() => {
     loadPage();
@@ -256,6 +261,19 @@ const App = ({
         setDetailError(true);
         setDetailLoading(false);
       }
+    });
+    return () => { active = false; };
+  }, [isModalOpen, selectedDataId, dataChangedVersion]);
+
+  useEffect(() => {
+    if (!isModalOpen || !selectedDataId) return;
+    let active = true;
+    setEditLog(null);
+    setEditLogError(false);
+    void queryEditLog(selectedDataId).then((rows) => {
+      if (active) setEditLog(rows);
+    }).catch(() => {
+      if (active) setEditLogError(true);
     });
     return () => { active = false; };
   }, [isModalOpen, selectedDataId, dataChangedVersion]);
@@ -623,6 +641,7 @@ const App = ({
                 />
               </div>
             </div>
+            <HistoryEditLog edits={editLog} error={editLogError} />
             <div
               ref={detailRegionRef}
               className="w-full max-h-[70vh] overflow-auto"
@@ -845,6 +864,18 @@ const App = ({
                     : ""}
                 </div>
                 <div className="flex items-center gap-2 touch:min-w-0 touch:flex-wrap">
+                  <Select value={historyFilter} onValueChange={(value: "all" | "edited") => {
+                    setHistoryFilter(value);
+                    setDataPage(0);
+                  }}>
+                    <SelectTrigger aria-label={t("history.editLog.filter")} className="h-8 w-[130px] text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("history.editLog.all")}</SelectItem>
+                      <SelectItem value="edited">{t("history.editLog.edited")}</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <span className="text-xs text-muted-foreground">{t("history.rowsLabel")}</span>
                   <Select
                     value={String(pageSize)}
@@ -947,8 +978,8 @@ const App = ({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.map((row, idx) => {
-                        const isLatest = dataPage === 0 && idx === 0;
+                      {data.map((row) => {
+                        const isLatest = latestRow?.id === row.id;
                         const topAssets = row.topAssets;
                         const displayDate = snapshotDateFormatter.format(new Date(row.createdAt));
 
@@ -964,6 +995,9 @@ const App = ({
                                 aria-label={t("history.viewSnapshot").replace("{date}", `${timeToDateStr(new Date(row.createdAt).getTime(), true)} · ${displayDate}`)}
                                 className="t3-history-date-button flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <span>{displayDate}</span>
+                                {row.edited ? <span className="mt-1 w-fit rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                  {t("history.editLog.edited")}
+                                </span> : null}
                               </button>
                               <span className="block text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
                             </TableCell>

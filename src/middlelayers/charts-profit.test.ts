@@ -26,9 +26,10 @@ vi.mock("./datafetch/utils/cache", () => ({
 }));
 
 vi.mock("./database", () => ({
-  executeWrite: vi.fn(),
+  executeWriteWork: vi.fn((operation: () => Promise<unknown>) => operation()),
   selectFromDatabaseWithSql: vi.fn(),
 }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 vi.mock("./entities/assets", () => ({
   ASSET_HANDLER: {
@@ -52,7 +53,8 @@ import {
   updateTransactionPrice,
   updateTransactionTxnType,
 } from "./charts-profit";
-import { executeWrite, selectFromDatabaseWithSql } from "./database";
+import { selectFromDatabaseWithSql } from "./database";
+import { invoke } from "@tauri-apps/api/core";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 
@@ -112,7 +114,7 @@ beforeEach(() => {
     transaction,
   );
   vi.mocked(TRANSACTION_HANDLER.createOrUpdate).mockResolvedValue(undefined);
-  vi.mocked(executeWrite).mockResolvedValue({ rowsAffected: 1 });
+  vi.mocked(invoke).mockResolvedValue(undefined);
 });
 
 it("finds the opening baseline, skipping a prior snapshot when one exists at month start", async () => {
@@ -140,86 +142,11 @@ async function warmProfitCache() {
 
 describe("transaction mutations invalidate the total-profit cache", () => {
   it.each([
-    {
-      label: "price",
-      update: () => updateTransactionPrice(42, 110),
-      sql: "UPDATE transactions SET price = ?, updatedAt = ? WHERE id = ?",
-      values: [110, "2026-07-15T04:05:06.789Z", 42],
-    },
-    {
-      label: "type",
-      update: () => updateTransactionTxnType(42, "sell"),
-      sql: "UPDATE transactions SET txnType = ?, updatedAt = ? WHERE id = ?",
-      values: ["sell", "2026-07-15T04:05:06.789Z", 42],
-    },
-  ])("updates updatedAt with the $label field", async ({ update, sql, values }) => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-15T04:05:06.789Z"));
-    try {
-      await update();
-
-      expect(executeWrite).toHaveBeenCalledWith(sql, values);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("uses queued field updates so concurrent price and type changes are both preserved", async () => {
-    const persisted = { price: transaction.price, txnType: transaction.txnType };
-    let releasePriceWrite: (() => void) | undefined;
-    const priceWriteBlocked = new Promise<void>((resolve) => {
-      releasePriceWrite = resolve;
-    });
-
-    vi.mocked(executeWrite).mockImplementation(async (sql, values) => {
-      if (
-        sql ===
-        "UPDATE transactions SET price = ?, updatedAt = ? WHERE id = ?"
-      ) {
-        await priceWriteBlocked;
-        persisted.price = values?.[0] as number;
-      } else if (
-        sql ===
-        "UPDATE transactions SET txnType = ?, updatedAt = ? WHERE id = ?"
-      ) {
-        persisted.txnType = values?.[0] as TransactionModel["txnType"];
-      }
-      return { rowsAffected: 1 };
-    });
-
-    const priceUpdate = updateTransactionPrice(42, 110);
-    const typeUpdate = updateTransactionTxnType(42, "sell");
-
-    await vi.waitFor(() => {
-      expect(executeWrite).toHaveBeenCalledTimes(2);
-    });
-    releasePriceWrite?.();
-    await Promise.all([priceUpdate, typeUpdate]);
-
-    expect(executeWrite).toHaveBeenNthCalledWith(
-      1,
-      "UPDATE transactions SET price = ?, updatedAt = ? WHERE id = ?",
-      [110, expect.any(String), 42],
-    );
-    expect(executeWrite).toHaveBeenNthCalledWith(
-      2,
-      "UPDATE transactions SET txnType = ?, updatedAt = ? WHERE id = ?",
-      ["sell", expect.any(String), 42],
-    );
-    expect(persisted).toEqual({ price: 110, txnType: "sell" });
-    expect(TRANSACTION_HANDLER.getTransactionByID).not.toHaveBeenCalled();
-    expect(TRANSACTION_HANDLER.createOrUpdate).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["price", () => updateTransactionPrice(404, 110)],
-    ["type", () => updateTransactionTxnType(404, "sell")],
-  ])("rejects a %s update when the transaction does not exist", async (_label, update) => {
-    vi.mocked(executeWrite).mockResolvedValueOnce({ rowsAffected: 0 });
-
-    await expect(update()).rejects.toThrow("Transaction with id 404 not found");
-
-    expect(cache.clearCache).not.toHaveBeenCalled();
+    ["price", () => updateTransactionPrice(42, 110), "update_local_transaction_price", { id: 42, price: 110 }],
+    ["type", () => updateTransactionTxnType(42, "sell"), "update_local_transaction_type", { id: 42, txnType: "sell" }],
+  ] as const)("sends a %s edit through the transactional backend", async (_label, update, command, values) => {
+    await update();
+    expect(invoke).toHaveBeenCalledWith(command, values);
   });
 
   it("requeries profit handlers after a successful price update", async () => {
@@ -253,7 +180,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
     ["type", () => updateTransactionTxnType(42, "sell")],
   ])("keeps the warm cache when a %s update fails", async (_label, update) => {
     await warmProfitCache();
-    vi.mocked(executeWrite).mockRejectedValueOnce(
+    vi.mocked(invoke).mockRejectedValueOnce(
       new Error("write failed"),
     );
 

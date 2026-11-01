@@ -41,6 +41,7 @@ export {
   queryHistoricalData,
   queryHistoricalPage,
   queryHistoricalDetail,
+  queryEditLog,
   queryTotalValues,
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,

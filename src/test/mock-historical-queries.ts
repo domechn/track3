@@ -30,5 +30,5 @@ export function mockHistoricalQueries() {
       id, createdAt: "", total: 0, assets: [], transactions: [],
     },
   );
-  return { queryHistoricalData, queryHistoricalPage, queryHistoricalDetail };
+  return { queryHistoricalData, queryHistoricalPage, queryHistoricalDetail, queryEditLog: vi.fn(async () => []) };
 }
