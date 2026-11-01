@@ -832,9 +832,14 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-goals-editor input { min-height: 36px; border-color: hsl(var(--control)); background: hsl(var(--sunken)); }
   .t3-goals-editor button { border-radius: var(--radius-pill); }
   .t3-goals-drawer { z-index: 80; inset: 0 0 0 auto; display: flex; flex-direction: column; width: min(440px, 100vw); max-width: none; height: 100dvh; overflow-y: auto; border-radius: 0; padding: 0; transform: none; background: hsl(var(--card)); box-shadow: var(--shadow-overlay); }
+  div.t3-goals-drawer[data-state="open"] { animation: t3-goals-drawer-in 200ms ease-out; }
+  div.t3-goals-drawer[data-state="closed"] { animation: t3-goals-drawer-out 200ms ease-in; }
   .t3-goals-drawer > [data-ui-card] { flex: 1; background: hsl(var(--card)); }
   .t3-goals-drawer > [data-ui-card] > div:first-child { padding-right: 56px; border-bottom: 1px solid hsl(var(--border)); }
   .t3-goals-drawer #goal-rule-editor .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@keyframes t3-goals-drawer-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes t3-goals-drawer-out { from { transform: translateX(0); } to { transform: translateX(100%); } }
 
   .t3-manage-assistant { border-color: hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); box-shadow: var(--shadow-card); }
   .t3-manage-assistant [data-testid="session-sidebar"] { background: hsl(var(--card)); border-color: hsl(var(--border)); }

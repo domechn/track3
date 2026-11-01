@@ -267,7 +267,7 @@ export default function GoalsAlerts() {
           {editor}
         </details>
         : <Dialog open={manualOpen} onOpenChange={setManualOpen}>
-          <DialogContent className="t3-goals-drawer" onCloseAutoFocus={(event) => {
+          <DialogContent className="t3-goals-drawer md:w-[min(440px,100vw)]" onCloseAutoFocus={(event) => {
             event.preventDefault();
             (editorTrigger.current ?? newRuleButton.current)?.focus();
           }}>
