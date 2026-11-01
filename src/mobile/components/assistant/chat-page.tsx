@@ -678,7 +678,7 @@ function NotConfiguredCard() {
               <RocketIcon className="h-4 w-4" />
             </span>
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              {t("assistant.empty.localBadge")}
+              {t("assistant.phase6.syncBadge")}
             </span>
           </div>
           <CardTitle className="text-lg font-semibold tracking-tight">
@@ -707,7 +707,7 @@ function NotConfiguredCard() {
           </div>
           <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              {t("assistant.chat.privacy")}
+              {t("assistant.phase6.privacy")}
             </p>
             <Button asChild className="gap-1.5">
               <Link to="/settings/assistant" data-testid="assistant-empty-cta">
@@ -768,7 +768,7 @@ function UpgradeCard() {
     "assistant.upgrade.bullet.endpoint",
     "assistant.upgrade.bullet.skills",
     "assistant.upgrade.bullet.charts",
-    "assistant.upgrade.bullet.privacy",
+    "assistant.phase6.upgradePrivacy",
   ];
   return (
     <Card className="overflow-hidden" data-testid="assistant-upgrade">
@@ -793,7 +793,7 @@ function UpgradeCard() {
             {t("assistant.upgrade.title")}
           </CardTitle>
           <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-            {t("assistant.upgrade.description")}
+            {t("assistant.phase6.upgradeDescription")}
           </p>
         </CardHeader>
         <CardContent className="space-y-5">

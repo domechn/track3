@@ -143,13 +143,13 @@ const App = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="t3-assistant-settings">
       <div>
         <h3 className="text-lg font-medium tracking-tight">
           {t("settings.assistant.title")}
         </h3>
         <p className="text-sm text-muted-foreground">
-          {t("settings.assistant.description")}
+          {t("settings.phase6.assistantDescription")}
         </p>
       </div>
 

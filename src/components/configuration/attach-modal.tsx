@@ -32,7 +32,7 @@ const AttachModal = memo(function AttachModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[380px]">
+      <DialogContent className="t3-source-attach sm:max-w-[380px]">
         <DialogHeader>
           <DialogTitle>{t("config.others.attachTo")}</DialogTitle>
           <DialogDescription>

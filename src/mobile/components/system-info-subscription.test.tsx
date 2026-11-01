@@ -129,6 +129,19 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("does not show a stale app version while the native version is loading", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    window.location.hash = "#/settings/systemInfo?section=about";
+    mocks.getVersion.mockReturnValue(new Promise(() => {}));
+    try {
+      render(<SystemInfo onProStatusChange={vi.fn()} />);
+      expect(screen.queryByText("0.1.0")).not.toBeInTheDocument();
+      expect(screen.getByText("App Version").parentElement).toHaveTextContent("Loading...");
+    } finally {
+      window.location.hash = "";
+    }
+  });
+
   it("keeps the iPhone loading card directly beneath the page heading", () => {
     vi.mocked(isIOS).mockReturnValue(true);
     window.location.hash = "#/settings/systemInfo?section=pro";
@@ -146,7 +159,7 @@ describe("System Info subscription management", () => {
     let resolveLicense!: (license: string) => void;
     mocks.getLicenseIfIsPro.mockReturnValue(new Promise((resolve) => { resolveLicense = resolve; }));
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.getAllByText("Loading...").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("monthly-plan-card")).not.toBeInTheDocument();
     resolveLicense("stored-license");
     expect(await screen.findByRole("heading", { name: "Track3 Pro" })).toBeInTheDocument();

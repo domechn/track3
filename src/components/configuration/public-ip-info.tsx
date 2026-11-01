@@ -61,8 +61,8 @@ export function PublicIpInfo({ t, mobile = false }: { t: (key: string) => string
 
   return (
     <div role="group" aria-label={t("config.publicIpLabel")} aria-busy={status === "loading"} className={mobile
-      ? "min-w-0 rounded-xl border border-border bg-card px-4 py-3 text-sm"
-      : "min-w-0 rounded-md border border-border bg-muted/30 px-3 py-3 text-sm"}>
+      ? "t3-public-ip-info min-w-0 rounded-xl border border-border bg-card px-4 py-3 text-sm"
+      : "t3-public-ip-info min-w-0 rounded-md border border-border bg-muted/30 px-3 py-3 text-sm"}>
       <p className="mb-2 text-xs font-medium text-muted-foreground">{t("config.publicIpLabel")}</p>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {status === "value" && ip && <span className="min-w-0 select-text break-all rounded-md bg-secondary px-2.5 py-1.5 font-mono text-base font-semibold text-secondary-foreground">{ip.address}</span>}

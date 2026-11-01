@@ -95,7 +95,7 @@ const WalletSection = memo(function WalletSection({
                 {t("config.addWallet")}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="t3-source-editor sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>{t("config.addWallet")}</DialogTitle>
                 <DialogDescription>

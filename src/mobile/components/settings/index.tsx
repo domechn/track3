@@ -26,10 +26,11 @@ import {
 } from "@radix-ui/react-icons";
 import { LOCALE_LABELS, useTranslation } from "@/mobile/i18n";
 import { isIOS } from "@/utils/platform";
-import { InsetGroup, ListRow, SplitView, useHaptics, useSizeClass } from "@/mobile/components/mobile";
+import { SplitView, useHaptics, useSizeClass } from "@/mobile/components/mobile";
 import { getCachedPreferCurrency } from "@/middlelayers/configuration";
 import { useTheme } from "@/mobile/components/common/theme";
 import AssistantSettings from "@/mobile/components/settings/assistant";
+import { SettingsMenu } from "@/components/settings/settings-menu";
 
 const settingsTabs = [
   {
@@ -130,54 +131,36 @@ const App = () => {
           detailLabel={t(title ?? "settings.title")}
           master={isHub || isWide ? <>
             <h1 className="ios-large-title mb-5 pt-2">{t("settings.title")}</h1>
-            <nav aria-label={t("settings.sectionsAriaLabel")} onClickCapture={() => haptic("selection")}>
-              {(["portfolio", "preferences", "privacy"] as const).map((group) => <InsetGroup key={group} title={t(`settings.mobile.group.${group}`)}>
-                {mobileSettings.filter((item) => item.group === group).map((item) => {
-                  const Icon = item.icon;
-                  const value = item.key === "settings.mobile.currency" ? getCachedPreferCurrency() ?? "USD"
-                    : item.key === "settings.mobile.language" ? LOCALE_LABELS[locale]
-                      : item.key === "settings.tab.appearance" ? theme === "system" ? t("settings.mobile.system") : t(`appearance.theme.${theme}`)
-                        : undefined;
-                  return <ListRow key={item.href} href={`#${item.href}`} value={value}
-                    ariaCurrent={!isHub && selectedHref === item.href ? "page" : undefined}>
-                    <span aria-hidden="true" className="ios-d3-settings-icon"><Icon /></span>
-                    {t(item.key)}
-                  </ListRow>;
-                })}
-              </InsetGroup>)}
-            </nav>
+            <div onClickCapture={() => haptic("selection")}>
+              <SettingsMenu pathname={lo.pathname} search={lo.search} values={{
+                currency: getCachedPreferCurrency() ?? "USD",
+                language: LOCALE_LABELS[locale],
+                appearance: theme === "system" ? t("settings.mobile.system") : t(`appearance.theme.${theme}`),
+              }} />
+            </div>
           </> : null}
           detail={isHub ? <p className="analytics-empty">{t("settings.selectDetail")}</p> : <>
             <header className="space-y-3 pt-1">
               <h1 className="ios-large-title mb-5">{t(title ?? "settings.title")}</h1>
             </header>
-            <div className="ios-d3-settings-page"><Outlet /></div>
+            <div className="ios-d3-settings-page"><Outlet context={new URLSearchParams(lo.search).get("section")} /></div>
           </>} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="t3-settings">
       <h1 className="sr-only">{t("settings.title")}</h1>
-      <nav
-        aria-label={t("settings.sectionsAriaLabel")}
-        className="flex flex-wrap items-center gap-1 glass rounded-xl px-2 py-1.5"
-      >
-        {settingsTabs.map((tab) => (
-          <TabLink
-            key={tab.href}
-            to={tab.href}
-            title={t(tab.titleKey)}
-            icon={tab.icon}
-          />
-        ))}
-      </nav>
-      <div className="w-full">
-        <Outlet />
+      <p className="t3-settings-crumb">{t("settings.title")}</p>
+      <div className="t3-settings-layout" data-active-tab={settingsTabs.find((tab) => tab.href === lo.pathname)?.titleKey}>
+        <SettingsMenu pathname={lo.pathname} search={lo.search} />
+        <div className="t3-settings-content">
+        <Outlet context={new URLSearchParams(lo.search).get("section")} />
         {lo.pathname === "/settings" && (
           <Navigate to="/settings/configuration" />
         )}
+        </div>
       </div>
     </div>
   );

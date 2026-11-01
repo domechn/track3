@@ -31,6 +31,16 @@ test("iPhone bridge rejects desktop-only plugins", async ({ page }) => {
   expect(results.map((result) => result.status)).toEqual(["rejected", "rejected", "rejected"]);
 });
 
+test("iPhone Backup export row keeps its detail below the category name", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { richPortfolio: true });
+  await page.goto("/#/settings/data?section=backup");
+  const labels = page.locator(".ios-d3-backup-actions .ios-d3-setting-switch-row").first().locator("label span");
+  const title = (await labels.nth(0).boundingBox())!;
+  const detail = (await labels.nth(1).boundingBox())!;
+  expect(detail.y).toBeGreaterThanOrEqual(title.y + title.height);
+});
+
 test("More opens every iPhone settings section through the Settings hub", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page);
@@ -43,8 +53,8 @@ test("More opens every iPhone settings section through the Settings hub", async 
     has: page.locator(".mobile-list-label", { hasText: new RegExp(`^${title}$`) }),
   });
   for (const title of [
-    "Data sources", "Currency", "Appearance", "Language", "Blacklist",
-    "Pro and license", "AI assistant", "Security", "Backup", "Backup and sync", "About",
+    "Data sources", "Currency & display", "Appearance", "Language", "Blacklist",
+    "Pro & license", "AI assistant", "Security", "Backup & data", "Backup & sync", "About",
   ]) {
     const link = sectionLink(title);
     await expect(link).toBeVisible();
@@ -60,6 +70,52 @@ test("More opens every iPhone settings section through the Settings hub", async 
   await expect(page).toHaveURL(/#\/settings$/);
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect(page).toHaveURL(/#\/more$/);
+});
+
+test("iPhone settings hub shows saved preference values", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    localStorage.setItem("track3-ui-theme", "dark");
+    localStorage.setItem("track3-ui-locale", "en");
+  });
+  await installTauriBridge(page);
+  await page.goto("/#/settings");
+  const menu = page.getByRole("navigation", { name: "Settings sections" });
+  await expect(menu.getByRole("link", { name: "Currency & display" })).toContainText("USD");
+  await expect(menu.getByRole("link", { name: "Language" })).toContainText("English");
+  await expect(menu.getByRole("link", { name: "Appearance" })).toContainText("Dark");
+});
+
+test("iPhone can add a custom asset from an empty sources page", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { emptyPortfolio: true });
+  await page.goto("/#/settings/configuration?section=sources");
+  await page.getByRole("button", { name: "Add source" }).click();
+  await page.getByRole("button", { name: "Add custom asset" }).click();
+  await expect(page.getByRole("dialog", { name: "Add custom asset" })).toBeVisible();
+});
+
+test("iPhone custom asset editor stays closed after switching source tabs", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { emptyPortfolio: true });
+  await page.goto("/#/settings/configuration?section=sources");
+  await page.getByRole("button", { name: "Add source" }).click();
+  await page.getByRole("button", { name: "Add custom asset" }).click();
+  const editor = page.getByRole("dialog", { name: "Add custom asset" });
+  await editor.getByRole("textbox", { name: "Symbol" }).fill("GOLD");
+  await editor.getByRole("textbox", { name: "Amount" }).fill("2");
+  await editor.getByRole("button", { name: "Save" }).click();
+  await expect(editor).toHaveCount(0);
+  await page.getByRole("tab", { name: "Exchanges" }).click();
+  await page.getByRole("tab", { name: "Custom assets" }).click();
+  await page.waitForTimeout(300);
+  await expect(editor).toHaveCount(0);
+  await page.evaluate(() => { location.hash = "#/settings/configuration?section=currency"; });
+  await expect(page.getByRole("heading", { name: "Currency", exact: true }).first()).toBeVisible();
+  await page.evaluate(() => { location.hash = "#/settings/configuration?section=sources"; });
+  await expect(page.getByRole("tab", { name: "Custom assets" })).toBeVisible();
+  await page.waitForTimeout(300);
+  await expect(editor).toHaveCount(0);
 });
 
 test("an edge swipe returns from a settings page to the Settings hub", async ({ page, context }) => {
@@ -111,6 +167,18 @@ test("an edge swipe inside a source editor leaves the form open", async ({ page,
   });
   await expect(editor).toBeVisible();
   await expect(page).toHaveURL(/#\/settings\/configuration\?section=sources$/);
+});
+
+test("iPhone source tabs show one saved category at a time", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { richPortfolio: true });
+  await page.goto("/#/settings/configuration?section=sources");
+  const tabs = page.getByRole("tablist", { name: "Data sources" });
+  await expect(tabs).toBeVisible();
+  await expect(page.getByRole("region", { name: "Exchanges" })).toBeVisible();
+  await tabs.getByRole("tab", { name: "Wallets" }).click();
+  await expect(page.getByRole("region", { name: "Wallets" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Exchanges" })).toHaveCount(0);
 });
 
 test("locked sync status stays clear of the More tab and tab bar", async ({ page }) => {
@@ -235,6 +303,7 @@ test("custom asset source picker opens from the bottom of the iPhone screen", as
   await page.setViewportSize({ width: 390, height: 812 });
   await installTauriBridge(page);
   await page.goto("/#/settings/configuration?section=sources");
+  await page.getByRole("tab", { name: "Custom assets" }).click();
   await page.getByRole("button", { name: "More actions for BTC" }).click();
   await page.getByRole("button", { name: "Attach to" }).click();
   const picker = page.getByRole("dialog", { name: "Attach to" });

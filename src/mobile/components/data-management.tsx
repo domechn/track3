@@ -61,6 +61,7 @@ import { appLockEnabled, setAppLockEnabled } from "@/utils/ios-native";
 import { ConfirmSheet } from "@/mobile/components/mobile/overlays";
 import { InsetGroup } from "@/mobile/components/mobile";
 import { useSearchParams } from "react-router-dom";
+import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-summary";
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();
@@ -72,6 +73,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [exportData, setExportData] = useState<ExportData | undefined>(
     undefined,
   );
+  const [backupSummary, setBackupSummary] = useState<BackupSummary>();
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
   const [backupFolderFailure, setBackupFolderFailure] = useState<string | null>(null);
@@ -274,6 +276,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         if (onDataImported) {
           onDataImported();
         }
+        void queryBackupSummary().then(setBackupSummary).catch(() => undefined);
       })
       .catch((err) => {
         toast({
@@ -398,6 +401,10 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const showSecurity = !section || section === "security";
   const autoBackupFolderName = autoBackupDirectory?.split("/").filter(Boolean).at(-1) ?? autoBackupDirectory;
 
+  useEffect(() => {
+    if (showBackup) void queryBackupSummary().then(setBackupSummary).catch(() => undefined);
+  }, [showBackup]);
+
   return (
     <div className="ios-d3-settings-content ios-d3-data-settings space-y-6">
       {showBackup && showImportConfirm && <ConfirmSheet title={t("data.restoreConfirm.title")} onDismiss={() => {
@@ -443,6 +450,16 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         </p>
       </div>}
 
+      {showBackup && <section role="region" aria-label={t("data.phase6.onDevice")} className="rounded-lg border border-border bg-card p-4">
+        <h4 className="mb-3 text-sm font-semibold">{t("data.phase6.onDevice")}</h4>
+        <div className="grid grid-cols-3 gap-2">
+          {(["snapshots", "assets", "transactions"] as const).map((field) => <div key={field} className="rounded-md border border-border/50 bg-background/40 p-2">
+            <p className="text-lg font-semibold tabular-nums">{backupSummary?.[field].toLocaleString() ?? t("data.na")}</p>
+            <p className="text-xs text-muted-foreground">{t(`data.phase6.${field}`)}</p>
+          </div>)}
+        </div>
+      </section>}
+
       {showBackup && isIOS() && <div className="ios-d3-backup-actions">
         <div className="ios-d3-backup-import-section">
         <InsetGroup title={t("data.import")}>
@@ -473,11 +490,17 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         </div>
         <InsetGroup title={t("data.export")}>
           <div className="ios-d3-setting-switch-row">
-            <Label htmlFor="exportConfigurationCheckbox">{t("data.includeConfig")}</Label>
+            <Label htmlFor="exportConfigurationCheckbox">
+              <span className="block">{t("data.phase6.configuration")}</span>
+              <span className="block text-xs font-normal text-muted-foreground">{t("data.phase6.configDetail")}</span>
+            </Label>
             <Switch id="exportConfigurationCheckbox" checked={exportConfiguration} onCheckedChange={setExportConfiguration} aria-label={t("data.includeConfig")} />
           </div>
           <div className="ios-d3-setting-switch-row">
-            <Label htmlFor="exportDataCheckbox">{t("data.includeHistory")}</Label>
+            <Label htmlFor="exportDataCheckbox">
+              <span className="block">{t("data.phase6.portfolioHistory")}</span>
+              <span className="block text-xs font-normal text-muted-foreground">{t("data.phase6.historyDetail").replace("{snapshots}", backupSummary?.snapshots.toLocaleString() ?? t("data.na")).replace("{transactions}", backupSummary?.transactions.toLocaleString() ?? t("data.na"))}</span>
+            </Label>
             <Switch id="exportDataCheckbox" checked disabled aria-label={t("data.includeHistory")} />
           </div>
           <button type="button" className="ios-d3-data-action-row" onClick={onExportDataClick}><span>{t("data.exportButton")}</span><ChevronRightIcon aria-hidden="true" /></button>
@@ -485,17 +508,17 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         </InsetGroup>
       </div>}
       {showBackup && !isIOS() && <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium">
               {t("data.import")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-1 flex-col gap-4">
             <p className="text-sm text-muted-foreground">
               {t("data.importDesc")}
             </p>
-            <Button onClick={onImportDataClick} size="sm">
+            <Button onClick={onImportDataClick} size="sm" className="mt-auto w-fit">
               {t("data.importButton")}
             </Button>
           </CardContent>
@@ -503,25 +526,28 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium">
               {t("data.export")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center space-x-2">
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3 rounded-md border border-border/50 bg-background/40 p-3">
               <Checkbox
                 id="exportConfigurationCheckbox"
                 checked={exportConfiguration}
                 onCheckedChange={(v) => setExportConfiguration(!!v)}
+                aria-label={t("data.includeConfig")}
               />
-              <Label htmlFor="exportConfigurationCheckbox" className="text-sm touch:flex touch:min-h-11 touch:items-center">
-                {t("data.includeConfig")}
+              <Label htmlFor="exportConfigurationCheckbox" className="min-w-0 flex-1 cursor-pointer text-sm">
+                <span className="block">{t("data.phase6.configuration")}</span>
+                <span className="block text-xs font-normal text-muted-foreground">{t("data.phase6.configDetail")}</span>
               </Label>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="exportDataCheckbox" checked={true} disabled />
-              <Label htmlFor="exportDataCheckbox" className="text-sm touch:flex touch:min-h-11 touch:items-center">
-                {t("data.includeHistory")}
+            <div className="flex items-center gap-3 rounded-md border border-border/50 bg-background/40 p-3">
+              <Checkbox id="exportDataCheckbox" checked={true} disabled aria-label={t("data.includeHistory")} />
+              <Label htmlFor="exportDataCheckbox" className="min-w-0 flex-1 text-sm">
+                <span className="block">{t("data.phase6.portfolioHistory")}</span>
+                <span className="block text-xs font-normal text-muted-foreground">{t("data.phase6.historyDetail").replace("{snapshots}", backupSummary?.snapshots.toLocaleString() ?? t("data.na")).replace("{transactions}", backupSummary?.transactions.toLocaleString() ?? t("data.na"))}</span>
               </Label>
             </div>
             <Button onClick={onExportDataClick} size="sm">

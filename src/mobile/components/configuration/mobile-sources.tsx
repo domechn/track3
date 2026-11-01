@@ -15,6 +15,7 @@ import type { ExchangeRow, StockBrokerRow, WalletRow, SelectOption } from "@/com
 import { PublicIpInfo } from "@/components/configuration/public-ip-info";
 
 export type MobileSourcesProps = {
+  selectedKind?: "exchange" | "wallet" | "broker";
   exchanges: ExchangeRow[];
   wallets: WalletRow[];
   brokers: StockBrokerRow[];
@@ -164,7 +165,7 @@ export function MobileSources(props: MobileSourcesProps) {
         </ol>
         <Button className="ios-d3-editor-primary mt-5 min-h-12 w-full" onClick={() => setKindPickerOpen(true)}>{t("mobile.sources.addSource")}</Button>
       </div>}
-      {hasSources && sections.map(({ kind, label, add, rows, options }) => (
+      {hasSources && sections.filter(({ kind }) => !props.selectedKind || kind === props.selectedKind).map(({ kind, label, add, rows, options }) => (
         <section key={kind} aria-label={label} className="ios-d3-source-section space-y-2">
           <div className="flex items-center justify-between gap-2">
             <h2 className="ios-d3-section-heading">{label}</h2>

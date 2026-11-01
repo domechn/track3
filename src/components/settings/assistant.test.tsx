@@ -47,6 +47,16 @@ beforeEach(() => {
 });
 
 describe("AssistantSettings", () => {
+  it("explains that encrypted assistant data can sync to the user's bucket", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,
+    });
+    render(<AssistantSettings />);
+    await screen.findByLabelText(/endpoint/i);
+    expect(screen.getByText(/assistant settings and chats are encrypted and uploaded to your bucket/i)).toBeInTheDocument();
+    expect(screen.queryByText(/nothing leaves your machine except/i)).not.toBeInTheDocument();
+  });
+
   it("announces saving while settings are being persisted", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue({
       endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,

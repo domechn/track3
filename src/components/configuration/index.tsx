@@ -65,6 +65,7 @@ import type {
   WalletDraft,
   SelectOption,
 } from "./types";
+import { useOutletContext } from "react-router-dom";
 
 // ============================================================================
 // Constants (unchanged from original)
@@ -109,6 +110,8 @@ const App = ({
 }) => {
   const { toast } = useToast();
   const { t } = useTranslation();
+  const section = useOutletContext<string | null>();
+  const [sourceTab, setSourceTab] = useState<"exchanges" | "wallets" | "brokers" | "custom">("exchanges");
   const warmStartPreferCurrency =
     initialPreferCurrency || getCachedPreferCurrency();
 
@@ -1032,6 +1035,8 @@ const App = ({
     attachModalTargetIdx >= 0
       ? others[attachModalTargetIdx]?.attachTo
       : undefined;
+  const showCurrency = !section || section === "currency";
+  const showSources = !section || section === "sources";
 
   // ==========================================================================
   // Render
@@ -1057,11 +1062,11 @@ const App = ({
       />
 
       <div>
-        <h3 className="text-lg font-medium tracking-tight">{t("config.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t(section === "sources" ? "settings.phase6.sources" : section === "currency" ? "settings.phase6.currency" : "config.title")}</h3>
         <p className="text-sm text-muted-foreground">{t("config.subtitle")}</p>
       </div>
 
-      <SummaryCards
+      {!section && <SummaryCards
         exchangeCount={exchanges.length}
         activeExchangeCount={activeExchangeCount}
         stockBrokerCount={stockBrokers.length}
@@ -1071,9 +1076,9 @@ const App = ({
         othersCount={others.length}
         preferCurrency={preferCurrency}
         preferCurrencyLoading={preferCurrencyLoading}
-      />
+      />}
 
-      <GeneralSettings
+      {showCurrency && <GeneralSettings
         groupUSD={groupUSD}
         onGroupUSDChange={onGroupUSDSelectChange}
         hideInactive={hideInactive}
@@ -1087,9 +1092,19 @@ const App = ({
         onPreferCurrencyChange={onPreferCurrencyChanged}
         refreshCurrencyLoading={refreshCurrencyLoading}
         onUpdateCurrencyRatesClick={onUpdateCurrencyRatesClick}
-      />
+      />}
 
-      <StockBrokerSection
+      {section === "sources" && <>
+      <p className="text-sm text-muted-foreground">{t("settings.phase6.sourceSummary").replace("{count}", String(exchanges.length + wallets.length + stockBrokers.length + others.length))}</p>
+      <div role="group" aria-label={t("settings.phase6.sources")} className="t3-settings-source-tabs">
+        {(["exchanges", "wallets", "brokers", "custom"] as const).map((tab) =>
+          <button key={tab} type="button" aria-pressed={sourceTab === tab}
+            onClick={() => setSourceTab(tab)}>{t(`settings.phase6.sourceTab.${tab}`)}{" "}
+            <span className="ml-1 text-muted-foreground">{({ exchanges: exchanges.length, wallets: wallets.length, brokers: stockBrokers.length, custom: others.length })[tab]}</span>
+          </button>)}
+      </div></>}
+
+      {showSources && (!section || sourceTab === "brokers") && <StockBrokerSection
         stockBrokers={stockBrokers}
         visibleStockBrokers={visibleStockBrokers}
         stockBrokerPage={stockBrokerPage}
@@ -1106,9 +1121,9 @@ const App = ({
         onToggleActive={handleActiveStockBroker}
         onRemove={handleRemoveStockBroker}
         onQuickLook={handleQuickLookStockBroker}
-      />
+      />}
 
-      <ExchangeSection
+      {showSources && (!section || sourceTab === "exchanges") && <ExchangeSection
         exchanges={exchanges}
         visibleExchanges={visibleExchanges}
         exchangePage={exchangePage}
@@ -1125,9 +1140,9 @@ const App = ({
         onToggleActive={handleActiveExchange}
         onRemove={handleRemoveExchange}
         onQuickLook={handleQuickLookExchange}
-      />
+      />}
 
-      <WalletSection
+      {showSources && (!section || sourceTab === "wallets") && <WalletSection
         wallets={wallets}
         visibleWallets={visibleWallets}
         walletPage={walletPage}
@@ -1144,9 +1159,9 @@ const App = ({
         onToggleActive={handleActiveWallet}
         onRemove={handleRemoveWallet}
         onQuickLook={handleQuickLookWallet}
-      />
+      />}
 
-      <OthersSection
+      {showSources && (!section || sourceTab === "custom") && <OthersSection
         others={others}
         othersPage={othersPage}
         othersPageCount={othersPageCount}
@@ -1164,7 +1179,7 @@ const App = ({
           setAttachModalOpen(true);
         }}
         getAttachDisplayLabel={getAttachDisplayLabel}
-      />
+      />}
     </div>
   );
 };

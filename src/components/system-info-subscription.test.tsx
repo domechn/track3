@@ -123,11 +123,17 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("shows a loading value until the native version resolves", async () => {
+    mocks.getVersion.mockReturnValue(new Promise(() => {}));
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    await screen.findByText("App Version");
+    expect(screen.getByText("Track3 Loading...")).toBeInTheDocument();
+  });
   it("waits for the stored license before showing free purchase controls", async () => {
     let resolveLicense!: (license: string) => void;
     mocks.getLicenseIfIsPro.mockReturnValue(new Promise((resolve) => { resolveLicense = resolve; }));
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.getAllByText("Loading...").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("monthly-plan-card")).not.toBeInTheDocument();
     await act(async () => resolveLicense("stored-license"));
     expect(await screen.findByRole("heading", { name: "Track3 Pro" })).toBeInTheDocument();

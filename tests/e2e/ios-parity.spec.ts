@@ -203,8 +203,10 @@ for (const phone of phones) {
     await wallet.getByRole("textbox", { name: "Address" }).fill("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
     await wallet.getByRole("button", { name: "Add" }).click();
     await expect(wallet).not.toBeVisible();
+    await page.getByRole("tab", { name: "Wallets" }).click();
     await expect(page.getByRole("region", { name: "Wallet" }).getByRole("button", { name: /^Long-term BTC / })).toBeVisible();
 
+    await page.getByRole("tab", { name: "Exchanges" }).click();
     await page.getByRole("button", { name: "Add exchange" }).click();
     const exchange = page.getByRole("dialog", { name: "Edit data source" });
     await exchange.getByRole("button", { name: "Binance" }).click();
@@ -215,7 +217,9 @@ for (const phone of phones) {
     await expect(exchange).not.toBeVisible();
     await expect(page.getByRole("region", { name: "Exchanges" }).getByRole("button", { name: /^Portfolio Binance / })).toBeVisible();
     await page.reload();
+    await page.getByRole("tab", { name: "Wallets" }).click();
     await expect(page.getByRole("region", { name: "Wallet" }).getByRole("button", { name: /^Long-term BTC / })).toBeVisible();
+    await page.getByRole("tab", { name: "Exchanges" }).click();
     await expect(page.getByRole("region", { name: "Exchanges" }).getByRole("button", { name: /^Portfolio Binance / })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phone.width);
     await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-added-sources.png` });

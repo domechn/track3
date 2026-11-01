@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   importHistoricalData: vi.fn(),
   invoke: vi.fn(),
   readHistoricalDataFromFile: vi.fn(),
+  queryBackupSummary: vi.fn(),
   removeFromBlacklist: vi.fn(),
   saveAutoBackupDirectory: vi.fn(),
 }));
@@ -62,6 +63,9 @@ vi.mock("@/middlelayers/data", () => ({
   importHistoricalData: mocks.importHistoricalData,
   readHistoricalDataFromFile: mocks.readHistoricalDataFromFile,
 }));
+vi.mock("@/middlelayers/backup-summary", () => ({
+  queryBackupSummary: mocks.queryBackupSummary,
+}));
 
 vi.mock("@/middlelayers/configuration", () => ({
   addToBlacklist: mocks.addToBlacklist,
@@ -77,6 +81,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 beforeEach(() => {
   resetEncryptionWriteGateForTests();
   vi.clearAllMocks();
+  vi.mocked(isIOS).mockReturnValue(false);
   localStorage.removeItem(localeLocalStorageKey);
   mocks.getAutoBackupDirectory.mockResolvedValue(undefined);
   mocks.getLastAutoBackupAt.mockResolvedValue(
@@ -86,6 +91,7 @@ beforeEach(() => {
     new Date("2024-04-15T00:00:00.000Z"),
   );
   mocks.getBlacklistCoins.mockResolvedValue(["BTC"]);
+  mocks.queryBackupSummary.mockResolvedValue({ snapshots: 12, assets: 3, transactions: 9 });
   mocks.invoke.mockImplementation(async (command: string) =>
     command === "ios_backup_folder_status" ? { path: null, failure: null } : undefined);
   mocks.removeFromBlacklist.mockResolvedValue(undefined);
@@ -95,6 +101,24 @@ beforeEach(() => {
 });
 
 describe("Data Management", () => {
+  it("shows the device summary and export categories on iPhone", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    window.location.hash = "#/settings/data?section=backup";
+    render(<DataManagement />);
+    const summary = await screen.findByRole("region", { name: "On this device" });
+    expect(within(summary).getByText("12")).toBeInTheDocument();
+    expect(within(summary).getByText("3")).toBeInTheDocument();
+    expect(within(summary).getByText("9")).toBeInTheDocument();
+    expect(screen.getByText("Portfolio history")).toBeInTheDocument();
+    expect(screen.getByText("Configuration")).toBeInTheDocument();
+  });
+  it("keeps the blacklist setting limited to existing removal actions", async () => {
+    render(<DataManagement />);
+    await screen.findByText("BTC");
+    expect(screen.queryByRole("textbox", { name: "Token symbol" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide token" })).not.toBeInTheDocument();
+  });
+
   it("confirms a Files restore before importing on iPhone", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     window.location.hash = "#/settings/data?section=backup";

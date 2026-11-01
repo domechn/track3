@@ -70,7 +70,7 @@ test("a second device pulls history from the first device", async ({ browser }) 
 test("sync settings are reachable and explain passphrase recovery", async ({ page }) => {
   await installTauriBridge(page);
   await page.goto("/#/settings/sync");
-  await expect(page.getByRole("heading", { name: "Sync", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Backup & sync", exact: true })).toBeVisible();
   await expect(page.getByText(/never be recovered/i)).toBeVisible();
   await expect(page.getByLabel("Secret access key")).toHaveAttribute("type", "password");
 });

@@ -30,7 +30,7 @@ describe("Settings shell", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("link", { name: /configuration/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Data sources" })).toHaveAttribute(
       "aria-current",
       "page"
     );

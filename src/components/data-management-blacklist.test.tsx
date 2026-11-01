@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   importHistoricalData: vi.fn(),
   invoke: vi.fn(),
   readHistoricalDataFromFile: vi.fn(),
+  queryBackupSummary: vi.fn(),
   removeFromBlacklist: vi.fn(),
   saveAutoBackupDirectory: vi.fn(),
 }));
@@ -46,6 +47,10 @@ vi.mock("@/middlelayers/data", () => ({
   exportHistoricalData: mocks.exportHistoricalData,
   importHistoricalData: mocks.importHistoricalData,
   readHistoricalDataFromFile: mocks.readHistoricalDataFromFile,
+}));
+
+vi.mock("@/middlelayers/backup-summary", () => ({
+  queryBackupSummary: mocks.queryBackupSummary,
 }));
 
 vi.mock("@/middlelayers/configuration", () => ({
@@ -71,6 +76,7 @@ beforeEach(() => {
     new Date("2024-04-15T00:00:00.000Z"),
   );
   mocks.getBlacklistCoins.mockResolvedValue(["BTC"]);
+  mocks.queryBackupSummary.mockResolvedValue({ snapshots: 12, assets: 3, transactions: 9 });
   mocks.invoke.mockResolvedValue(undefined);
   mocks.removeFromBlacklist.mockResolvedValue(undefined);
   mocks.addToBlacklist.mockResolvedValue(undefined);
@@ -79,6 +85,22 @@ beforeEach(() => {
 });
 
 describe("Data Management", () => {
+  it("shows local history counts and names the two export categories", async () => {
+    render(<DataManagement />);
+    const summary = await screen.findByRole("region", { name: "On this device" });
+    expect(within(summary).getByText("12")).toBeInTheDocument();
+    expect(within(summary).getByText("3")).toBeInTheDocument();
+    expect(within(summary).getByText("9")).toBeInTheDocument();
+    expect(screen.getByText("Portfolio history")).toBeInTheDocument();
+    expect(screen.getByText("Configuration")).toBeInTheDocument();
+  });
+  it("keeps the blacklist setting limited to existing removal actions", async () => {
+    render(<DataManagement />);
+    await screen.findByText("BTC");
+    expect(screen.queryByRole("textbox", { name: "Token symbol" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide token" })).not.toBeInTheDocument();
+  });
+
   it("loads blacklisted tokens and removes one from the list", async () => {
     render(<DataManagement />);
 

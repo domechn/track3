@@ -28,3 +28,5 @@ This update supersedes the font, chart color, and card surface guidance in the e
 - The Wallets source list shows distinct sources. The retained treemap tests continue to check per-tile colors until its frozen golden can be regenerated in phase 7.
 - Summary dialog accessibility checks request reduced motion so the animated entry settles before axe measures the dialog.
 - ATH shows the current peak, distance, gain needed, and current value; Previous high and Lowest since ATH remain deferred. On phone, the Analytics destination tiles follow the Summary sections to keep the summary results together.
+- Backup shows counts of local history snapshots, current assets, and transactions, plus rows for the existing portfolio history and optional configuration export categories. The restore list and monthly schedule require new behavior and remain deferred.
+- Choosing “Later” after an update closes the restart dialog and leaves a restart button available for the session.

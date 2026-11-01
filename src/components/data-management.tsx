@@ -52,10 +52,16 @@ import {
   runEncryptionKeyRotation,
 } from "@/middlelayers/encryption-write-gate";
 import { redactSecrets } from "@/middlelayers/security/redact";
+import { useOutletContext } from "react-router-dom";
+import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-summary";
 
 const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { toast } = useToast();
   const { t } = useTranslation();
+  const section = useOutletContext<string | null>();
+  const showBackup = !section || section === "backup";
+  const showBlacklist = !section || section === "blacklist";
+  const showSecurity = !section || section === "security";
   const [exportConfiguration, setExportConfiguration] = useState(false);
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
     useState(false);
@@ -66,6 +72,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const { run: runBackupFolderDelete } = useOptimisticDelete(setAutoBackupDirectory);
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
   const [lastImportAt, setLastImportAt] = useState<Date>();
+  const [backupSummary, setBackupSummary] = useState<BackupSummary>();
   const [blacklist, setBlacklist] = useState<string[]>([]);
   const { run: runBlacklistDelete } = useOptimisticDelete(setBlacklist);
   const [encKeyInput, setEncKeyInput] = useState("");
@@ -123,6 +130,10 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     getBlacklistCoins().then(setBlacklist);
   }, []);
 
+  useEffect(() => {
+    if (showBackup) void queryBackupSummary().then(setBackupSummary).catch(() => undefined);
+  }, [showBackup]);
+
   async function loadAutoBackupDirectory() {
     const d = await getAutoBackupDirectory();
     setAutoBackupDirectory(d);
@@ -174,6 +185,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         if (onDataImported) {
           onDataImported();
         }
+        void queryBackupSummary().then(setBackupSummary).catch(() => undefined);
       })
       .catch((err) => {
         toast({
@@ -261,24 +273,36 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       </Dialog>
 
       <div>
-        <h3 className="text-lg font-medium tracking-tight">{t("data.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t(section === "backup" ? "settings.phase6.backup" : section === "blacklist" ? "settings.phase6.blacklist" : section === "security" ? "settings.phase6.security" : "data.title")}</h3>
         <p className="text-sm text-muted-foreground">
           {t("data.subtitle")}
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
+      {showBackup && <Card role="region" aria-label={t("data.phase6.onDevice")}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">{t("data.phase6.onDevice")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-3 gap-3">
+          {(["snapshots", "assets", "transactions"] as const).map((field) => <div key={field} className="rounded-md border border-border/50 bg-background/40 p-3">
+            <p className="text-xl font-semibold tabular-nums">{backupSummary?.[field].toLocaleString() ?? t("data.na")}</p>
+            <p className="text-xs text-muted-foreground">{t(`data.phase6.${field}`)}</p>
+          </div>)}
+        </CardContent>
+      </Card>}
+
+      {showBackup && <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium">
               {t("data.import")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-1 flex-col gap-4">
             <p className="text-sm text-muted-foreground">
               {t("data.importDesc")}
             </p>
-            <Button onClick={onImportDataClick} size="sm">
+            <Button onClick={onImportDataClick} size="sm" className="mt-auto w-fit">
               {t("data.importButton")}
             </Button>
           </CardContent>
@@ -286,25 +310,28 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium">
               {t("data.export")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center space-x-2">
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3 rounded-md border border-border/50 bg-background/40 p-3">
               <Checkbox
                 id="exportConfigurationCheckbox"
                 checked={exportConfiguration}
                 onCheckedChange={(v) => setExportConfiguration(!!v)}
+                aria-label={t("data.includeConfig")}
               />
-              <Label htmlFor="exportConfigurationCheckbox" className="text-sm touch:flex touch:min-h-11 touch:items-center">
-                {t("data.includeConfig")}
+              <Label htmlFor="exportConfigurationCheckbox" className="min-w-0 flex-1 cursor-pointer text-sm">
+                <span className="block">{t("data.phase6.configuration")}</span>
+                <span className="block text-xs font-normal text-muted-foreground">{t("data.phase6.configDetail")}</span>
               </Label>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="exportDataCheckbox" checked={true} disabled />
-              <Label htmlFor="exportDataCheckbox" className="text-sm touch:flex touch:min-h-11 touch:items-center">
-                {t("data.includeHistory")}
+            <div className="flex items-center gap-3 rounded-md border border-border/50 bg-background/40 p-3">
+              <Checkbox id="exportDataCheckbox" checked={true} disabled aria-label={t("data.includeHistory")} />
+              <Label htmlFor="exportDataCheckbox" className="min-w-0 flex-1 text-sm">
+                <span className="block">{t("data.phase6.portfolioHistory")}</span>
+                <span className="block text-xs font-normal text-muted-foreground">{t("data.phase6.historyDetail").replace("{snapshots}", backupSummary?.snapshots.toLocaleString() ?? t("data.na")).replace("{transactions}", backupSummary?.transactions.toLocaleString() ?? t("data.na"))}</span>
               </Label>
             </div>
             <Button onClick={onExportDataClick} size="sm">
@@ -312,9 +339,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
-      <Card>
+      {showBackup && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("data.autoBackup")}
@@ -372,9 +399,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card>
+      {showBlacklist && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("data.blacklist")}
@@ -414,9 +441,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card>
+      {showSecurity && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("data.encryption.key.title")}
@@ -446,7 +473,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
               : t("data.encryption.key.update")}
           </Button>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 };

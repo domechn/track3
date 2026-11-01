@@ -269,6 +269,8 @@ describe("ChatPage", () => {
     expect(
       screen.getAllByText(/your own OpenAI-compatible endpoint/i).length,
     ).toBeGreaterThan(0);
+    expect(screen.getByText("Optional encrypted sync to your bucket")).toBeTruthy();
+    expect(screen.queryAllByText(/Conversations stay on your machine/i)).toHaveLength(0);
     expect(screen.getByTestId("assistant-upgrade-cta")).toBeTruthy();
   });
 
@@ -284,6 +286,8 @@ describe("ChatPage", () => {
     expect(screen.getByText(/Set up the Assistant/i)).toBeTruthy();
     expect(screen.getByText(/Portfolio summary/i)).toBeTruthy();
     expect(screen.getByText(/Health score/i)).toBeTruthy();
+    expect(screen.getByText("Sync optional")).toBeTruthy();
+    expect(screen.getByText(/If you enable sync, encrypted chats can also be uploaded to your bucket/i)).toBeTruthy();
     expect(screen.getByTestId("assistant-empty-cta").getAttribute("href")).toBe(
       "/settings/assistant",
     );
