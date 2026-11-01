@@ -358,6 +358,23 @@ describe("DATA_MANAGER historical data import/export", () => {
     expect(TRANSACTION_HANDLER.importTransactions).not.toHaveBeenCalled();
   });
 
+  it("rejects a later invalid partial marker before writing any historical rows", async () => {
+    const first = makeHistoricalData();
+    const second = makeHistoricalData({
+      assets: [{ ...makeAsset(), id: 2, uuid: "snapshot-2" }],
+      transactions: [{ ...makeTransaction(), id: 11, assetID: 2, uuid: "snapshot-2" }],
+      partial: { sourcesTotal: 1, missing: [], fill: "last_known", createdAt },
+    });
+    const data = makeExportData({ historicalData: [first, second], configuration: undefined });
+
+    await expect(DATA_MANAGER.importHistoricalData("IGNORE", data))
+      .rejects.toThrow("Invalid partial snapshot");
+
+    expect(mocks.importAssets).not.toHaveBeenCalled();
+    expect(mocks.importTransactions).not.toHaveBeenCalled();
+    expect(mocks.writeDatabase.execute).not.toHaveBeenCalled();
+  });
+
   it("reads and parses exported data from a selected file", async () => {
     const data = makeExportData();
   mocks.stat.mockResolvedValue({ size: 1024 });

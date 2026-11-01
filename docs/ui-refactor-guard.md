@@ -51,9 +51,9 @@ Phase 0 itself changes guarded scripts, goldens, workflow files, and
 
 `golden:update` regenerates only the six static JSON files above. The
 behavioural fixtures use test-specific `UPDATE_GOLDEN=1` commands so that a
-static inventory refresh cannot silently rewrite released data formats. Run
-these commands only against the reviewed 0.9.4 baseline, then review each
-fixture diff:
+static inventory refresh cannot silently rewrite released data formats. Regenerate
+the frozen 0.9.4 fixtures only against the reviewed 0.9.4 baseline. Review each
+diff before accepting updates to the 0.9.5 addition fixtures:
 
 | Golden file | What it pins | Regeneration |
 | --- | --- | --- |
@@ -61,8 +61,10 @@ fixture diff:
 | `tests/golden/ui-sources-extra-0.9.4.json` | Inactive exchange, CEX-attached and unattached manual assets in Settings saves | `UPDATE_EXTRA_GOLDEN=1 corepack yarn vitest run src/test/golden/ui-shapes.test.tsx` |
 | `tests/golden/rebalance-desktop-en.csv`, `rebalance-desktop-zh.csv`, `rebalance-mobile-en.csv`, `rebalance-mobile-zh.csv` | Rebalance CSV bytes for both catalogs and shells | `UPDATE_GOLDEN=1 corepack yarn vitest run src/test/golden/rebalance-csv.test.ts` |
 | `tests/golden/export-0.9.4.json` | Complete historical export JSON and import round trip | `UPDATE_GOLDEN=1 corepack yarn vitest run src/middlelayers/golden-export.test.ts` |
+| `tests/golden/export-partial.json` | Export with an optional historical `partial` marker and import round trip | `UPDATE_GOLDEN=1 corepack yarn vitest run src/middlelayers/golden-export.test.ts`; keep the frozen 0.9.4 files byte-identical |
 | `tests/golden/backup-v2-0.9.4.json`, `backup-v2-part-0.9.4.json` | Backup metadata and exact part bytes for exported history | Same `golden-export.test.ts` command |
 | `tests/golden/sync-real-wire-0.9.4.json`, `sync-real-bucket-0.9.4.json` | Decrypted pushed sync objects and encrypted bucket bytes; the bucket is pulled back into a fresh repository | `UPDATE_GOLDEN=1 corepack yarn vitest run src/middlelayers/sync/golden-wire.test.ts` |
+| `tests/golden/sync-partial-wire.json` | Decrypted sync snapshot with an optional top-level `partial` marker | `UPDATE_GOLDEN=1 corepack yarn vitest run src/middlelayers/sync/golden-wire.test.ts`; keep the frozen 0.9.4 files byte-identical |
 | `tests/golden/sync-bucket-0.9.4.json`, `sync-snapshot.json`, `sync-session.json`, `sync-config.json` | Committed 0.9.4 bucket input and the snapshot, session, and config expected after pull | Kept from the released 0.9.4 fixture; `golden-wire.test.ts` reads these and does not regenerate them |
 | `tests/golden/sync-manifest.json` | Archived decrypted manifest for the committed 0.9.4 bucket; no current test reads this file | Kept from the released 0.9.4 fixture; no updater |
 | `src-tauri/tests/fixtures/schema-0.9.4.txt`, `migrations.sha256` | Frozen 0.9.4 SQLite schema and migration SQL hashes | Never regenerate from newer code |

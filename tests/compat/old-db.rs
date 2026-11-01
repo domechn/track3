@@ -50,6 +50,9 @@ fn released_094_opens_new_database_after_version_reset_without_dropping_data() {
         let edit_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM snapshot_edit_log WHERE snapshot_uuid='db-compat'")
             .fetch_one(&mut db).await.unwrap();
         assert_eq!(edit_rows, 1);
+        let partial_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM snapshot_partial WHERE uuid='db-compat'")
+            .fetch_one(&mut db).await.unwrap();
+        assert_eq!(partial_rows, 1);
         db.close().await.unwrap();
 
         let snapshot = serde_json::from_slice(&std::fs::read(directory.join("sync-snapshot.json")).unwrap()).unwrap();

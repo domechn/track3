@@ -21,7 +21,7 @@ const header: SyncHeader = {
 const snapshotId = "10000000-0000-4000-8000-000000000001";
 const oldSnapshotId = "10000000-0000-4000-8000-000000000002";
 const now = Date.parse("2024-04-16T13:00:00.000Z");
-const snapshot: Snapshot & { compatOptional: { note: string } } = {
+const snapshot: Snapshot = {
   uuid: snapshotId,
   assets: [{
     id: 1, uuid: snapshotId, createdAt: "2024-04-16T13:00:00.000Z", wallet: "wallet-compat",
@@ -29,7 +29,9 @@ const snapshot: Snapshot & { compatOptional: { note: string } } = {
   }],
   prices: [],
   transactions: [],
-  compatOptional: { note: "0.9.4 ignores this snapshot field" },
+  partial: { sourcesTotal: 2, missing: [{
+    wallet: "ddf7fe606e048ac89f8a8c62bf23c4be", kind: "exchange", provider: "OKX", category: "network",
+  }], fill: "last_known", createdAt: "2024-04-16T13:00:00.000Z" },
 };
 
 class Repository implements SyncRepository {

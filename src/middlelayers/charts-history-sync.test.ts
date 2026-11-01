@@ -22,7 +22,8 @@ it("captures prices and restores a whole deleted snapshot through the atomic imp
   const price = { id: 8, uuid: "snapshot-1", assetID: 7, symbol: "BTC", price: 1 };
   const transaction = { id: 9, uuid: "snapshot-1", assetID: 7, symbol: "BTC" };
   vi.mocked(getDatabase).mockResolvedValue({
-    select: async (sql: string) => sql.includes("assets_v2") ? [asset] :
+    select: async (sql: string) => sql.includes("snapshot_partial") ? [] :
+      sql.includes("assets_v2") ? [asset] :
       sql.includes("asset_prices") ? [price] : [transaction],
   } as never);
   vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([asset] as never);
@@ -43,7 +44,8 @@ it("restores transactions whose asset is missing from a deleted snapshot", async
   const valid = { id: 9, uuid: "snapshot-1", assetID: 7, symbol: "BTC" };
   const orphan = { id: 10, uuid: "snapshot-1", assetID: 99, symbol: "ETH" };
   vi.mocked(getDatabase).mockResolvedValue({
-    select: async (sql: string) => sql.includes("assets_v2") ? [asset] :
+    select: async (sql: string) => sql.includes("snapshot_partial") ? [] :
+      sql.includes("assets_v2") ? [asset] :
       sql.includes("asset_prices") ? [] : [valid, orphan],
   } as never);
   vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([asset] as never);

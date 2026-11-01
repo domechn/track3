@@ -261,6 +261,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/alerts_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/sync_state_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/init/snapshot_edit_log_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/init/snapshot_partial_up.sql"), "utf8"));
   if (seedEditLog) {
     const uuid = richPortfolio ? "demo-59" : "snapshot-new";
     db.run(`INSERT INTO snapshot_edit_log

@@ -2030,12 +2030,15 @@ describe("partial source snapshots", () => {
       price: { base: "usd" as const, value: 100 } };
     vi.mocked(fetchPortfolios).mockResolvedValue({
       coins: [partialCoin],
-      sourceResults: [{ sourceId: "cex:0", label: "Gate", walletIdentities: ["wallet-a"], status: "partial",
+      sourceResults: [{ sourceId: "cex:0", label: "Gate", kind: "exchange", provider: "Gate",
+        walletIdentities: ["wallet-a"], status: "partial",
         partial: { category: "network", endpoints: ["Dual investment"] }, coins: [partialCoin] }],
       failedSources: [],
     } as never);
     const result = await refreshAllData(vi.fn(), {}, operation);
-    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; amount: number; value: number }> };
+    const payload = vi.mocked(invoke).mock.calls[0][1] as {
+      assets: Array<{ symbol: string; amount: number; value: number }>; partial?: unknown;
+    };
     expect(result.persisted).toBe(true);
     expect(result.usedLastKnownData).toBe(false);
     expect(result.sourceStatuses).toEqual([expect.objectContaining({
@@ -2044,6 +2047,7 @@ describe("partial source snapshots", () => {
     expect(payload.assets).toEqual(expect.arrayContaining([
       expect.objectContaining({ symbol: "BTC", amount: 2, value: 200 }),
     ]));
+    expect(payload.partial).toBeUndefined();
   });
 
   it("omits the source value comparison when a manual entry shares its wallet", async () => {
@@ -2126,13 +2130,15 @@ describe("partial source snapshots", () => {
     vi.mocked(fetchPortfolios).mockResolvedValue({
       coins: [{ symbol: "ETH", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 25 } }],
       sourceResults: [
-        { sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-a"], status: "stale", coins: [], category: "network" },
-        { sourceId: "btc:1", label: "BTC wallet 2", walletIdentities: ["wallet-b"], status: "ok", coins: [{ symbol: "ETH", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 25 } }] },
+        { sourceId: "btc:0", label: "BTC wallet 1", kind: "wallet", provider: "BTC", walletIdentities: ["wallet-a"], status: "stale", coins: [], category: "network" },
+        { sourceId: "btc:1", label: "BTC wallet 2", kind: "wallet", provider: "BTC", walletIdentities: ["wallet-b"], status: "ok", coins: [{ symbol: "ETH", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 25 } }] },
       ],
       failedSources: [{ sourceId: "btc:0", analyzerName: "BTC wallet 1", walletIdentities: ["wallet-a"], error: "network", category: "network" }],
     } as never);
     await refreshAllData(vi.fn(), {}, operation);
-    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; amount: number; price: number; value: number }> };
+    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; amount: number; price: number; value: number }>; partial?: { missing: Array<{ wallet: string }> } };
+    expect(payload.partial?.missing).toEqual([{ wallet: md5("wallet-a"), kind: "wallet", provider: "BTC",
+      category: "network", lastSuccessAt: "2026-07-13T01:02:03.000Z" }]);
     expect(payload.assets).toEqual(expect.arrayContaining([
       expect.objectContaining({ symbol: "ETH", amount: 3, price: 25, value: 75 }),
       expect.objectContaining({ symbol: "ETH", amount: 2, price: 25, value: 50 }),
@@ -2219,7 +2225,8 @@ describe("partial source snapshots", () => {
     vi.mocked(fetchPortfolios).mockResolvedValue({
       coins: [{ symbol: "BTC", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 100 } }],
       sourceResults: [
-        { sourceId: "stock:0", label: "IBKR 1", walletIdentities: ["ibkr:one"], status: "stale", coins: [], category: "network" },
+        { sourceId: "stock:0", label: "IBKR 1", kind: "broker", provider: "IBKR",
+          walletIdentities: ["ibkr:one"], status: "stale", coins: [], category: "network" },
         { sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-b"], status: "ok", coins: [{ symbol: "BTC", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 100 } }] },
       ],
       failedSources: [{ sourceId: "stock:0", analyzerName: "IBKR 1", walletIdentities: ["ibkr:one"], error: "network", category: "network" }],
@@ -2231,8 +2238,11 @@ describe("partial source snapshots", () => {
     expect(result.sourceStatuses?.find((source) => source.sourceId === "stock:0")).toMatchObject({
       status: "failed", lastSuccessAt: "2026-07-12T12:30:00Z",
     });
-    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string }> };
+    const payload = vi.mocked(invoke).mock.calls[0][1] as {
+      assets: Array<{ symbol: string }>; partial?: unknown;
+    };
     expect(payload.assets.some((asset) => asset.symbol === "AAPL")).toBe(false);
+    expect(payload.partial).toBeUndefined();
   });
 
   it("includes the BTC placeholder when a non-BTC source fails", async () => {

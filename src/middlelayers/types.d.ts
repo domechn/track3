@@ -198,6 +198,7 @@ export type HistoricalData = {
   createdAt: string;
   assets: AssetModel[];
   transactions: TransactionModel[];
+  partial?: import("./snapshot-partial").PartialSnapshot;
 
   total: number;
 };
