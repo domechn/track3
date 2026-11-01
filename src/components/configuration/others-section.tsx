@@ -36,17 +36,22 @@ import {
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import type { OthersSectionProps, OtherDraft } from "./types";
+import { CustomPriceFields, parsePriceDraft, priceDraft } from "./custom-price-fields";
+import type { PriceDraft } from "./custom-price-fields";
+import { validateCustomPrice } from "@/middlelayers/custom-price";
 
 const CONFIG_LIST_PAGE_SIZE = 30;
 
 const OthersSection = memo(function OthersSection({
   others,
+  baseCurrency,
   othersPage,
   othersPageCount,
   pagedOthers,
   pagedOthersStartIndex,
   otherAmountDraftMap,
   onAdd,
+  onPriceChange,
   onOthersChange,
   onOtherAmountInputChange,
   onCommitOtherAmountInput,
@@ -56,6 +61,19 @@ const OthersSection = memo(function OthersSection({
   getAttachDisplayLabel,
 }: OthersSectionProps) {
   const { t } = useTranslation();
+  const [priceEditor, setPriceEditor] = useState<number | null>(null);
+  const [priceValue, setPriceValue] = useState<PriceDraft>(priceDraft());
+  const [priceError, setPriceError] = useState(false);
+  const editedOther = priceEditor === null ? undefined : others[priceEditor];
+  const customSymbols = others.map((row) => row.symbol);
+
+  function commitPrice() {
+    if (!editedOther || priceEditor === null) return;
+    const parsed = parsePriceDraft(priceValue, others, editedOther.symbol, editedOther.price, baseCurrency?.rate);
+    if (!parsed.valid) { setPriceError(true); return; }
+    onPriceChange(priceEditor, parsed.price);
+    setPriceEditor(null);
+  }
 
   return (
     <TooltipProvider>
@@ -74,6 +92,8 @@ const OthersSection = memo(function OthersSection({
             <AddOtherDialog
               t={t}
               onAdd={onAdd}
+              others={others}
+              baseCurrency={baseCurrency}
             />
           </div>
         </CardHeader>
@@ -98,6 +118,9 @@ const OthersSection = memo(function OthersSection({
                 <TableBody>
                   {pagedOthers.map((o, idx) => {
                     const globalIdx = pagedOthersStartIndex + idx;
+                    const priceLabel = t(!o.price ? "config.customPrice.market" :
+                      validateCustomPrice(o.price, customSymbols, o.symbol)
+                        ? `config.customPrice.${o.price.kind}` : "config.customPrice.invalidRule");
                     return (
                       <TableRow
                         key={"other" + globalIdx}
@@ -188,6 +211,11 @@ const OthersSection = memo(function OthersSection({
                                 <Link2Icon className="h-4 w-4 text-muted-foreground/50 hover:text-muted-foreground" />
                               </Button>
                             )}
+                            {!o.attachTo && <Button size="sm" variant="ghost" className="min-h-11"
+                              aria-label={`${t("config.customPrice.editFor").replace("{symbol}", o.symbol)}, ${priceLabel}`}
+                              onClick={() => { setPriceEditor(globalIdx); setPriceValue(priceDraft(o.price, baseCurrency?.rate)); setPriceError(false); }}>
+                              {priceLabel}
+                            </Button>}
                             <ConfirmDeleteDialog
                               trigger={<Button size="icon" variant="ghost" className="h-7 w-7" title={t("common.delete")}>
                                 <TrashIcon className="h-4 w-4 text-muted-foreground" />
@@ -237,6 +265,18 @@ const OthersSection = memo(function OthersSection({
           )}
         </CardContent>
       </Card>
+      <Dialog open={priceEditor !== null} onOpenChange={(open) => { if (!open) setPriceEditor(null); }}>
+        <DialogContent className="t3-source-editor sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{t("config.customPrice.title")}</DialogTitle>
+            <DialogDescription>{t("config.customPrice.description")}</DialogDescription>
+          </DialogHeader>
+          <CustomPriceFields draft={priceValue} onChange={setPriceValue} t={t}
+            currency={baseCurrency?.currency} rate={baseCurrency?.rate} />
+          {priceError && <p role="alert" className="text-sm text-destructive">{t("config.customPrice.invalid")}</p>}
+          <DialogFooter><Button onClick={commitPrice}>{t("common.save")}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 });
@@ -245,9 +285,13 @@ const OthersSection = memo(function OthersSection({
 function AddOtherDialog({
   t,
   onAdd,
+  others,
+  baseCurrency,
 }: {
   t: (key: string) => string;
-  onAdd: (val: { symbol: string; amount: number; alias?: string }) => void;
+  onAdd: (val: OtherDraft) => void;
+  others: OthersSectionProps["others"];
+  baseCurrency?: OthersSectionProps["baseCurrency"];
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<OtherDraft>({
@@ -255,17 +299,24 @@ function AddOtherDialog({
     amount: 0,
   });
   const [amountDraft, setAmountDraft] = useState("");
+  const [priceValue, setPriceValue] = useState<PriceDraft>(priceDraft());
+  const [priceError, setPriceError] = useState(false);
 
   function handleSubmit() {
     if (!draft.symbol) {
       return;
     }
+    const parsed = parsePriceDraft(priceValue, others, draft.symbol, undefined, baseCurrency?.rate);
+    if (!parsed.valid) { setPriceError(true); return; }
     onAdd({
       ...draft,
       amount: parseAmountInput(amountDraft),
+      ...(parsed.price ? { price: parsed.price } : {}),
     });
     setDraft({ symbol: "", amount: 0 });
     setAmountDraft("");
+    setPriceValue(priceDraft());
+    setPriceError(false);
     setOpen(false);
   }
 
@@ -328,6 +379,9 @@ function AddOtherDialog({
               className="col-span-3"
             />
           </div>
+          <CustomPriceFields draft={priceValue} onChange={setPriceValue} t={t}
+            currency={baseCurrency?.currency} rate={baseCurrency?.rate} />
+          {priceError && <p role="alert" className="text-sm text-destructive">{t("config.customPrice.invalid")}</p>}
         </div>
         <DialogFooter>
           <Button type="submit" onClick={handleSubmit}>

@@ -55,6 +55,7 @@ import {
 } from "./database";
 import { FullRefreshRequiredError } from "./refresh-error";
 import { partialFromSourceStatuses, type PartialSnapshot } from "./snapshot-partial";
+import { customFollowTargets, resolveCustomPrices } from "./custom-price";
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
   ASSET_HANDLER.listAssets(size),
@@ -694,11 +695,13 @@ async function queryWalletCoinValueContext(
   addProgress?: AddProgressFunc,
 ): Promise<WalletCoinValueContext> {
   const needPriceAssets = assets.filter((a) => !a.price);
+  const followTargets = customFollowTargets(assets);
   const cryptoPriceSymbols = Array.from(
     new Set(
       needPriceAssets
         .filter((a) => getAssetType(a) === "crypto")
         .map((a) => a.symbol)
+        .concat(followTargets.filter((target) => target.assetType === "crypto").map((target) => target.symbol))
         .concat(["USDT", "BTC"]),
     ),
   ).filter((x): x is string => !!x);
@@ -706,7 +709,8 @@ async function queryWalletCoinValueContext(
     new Set(
       needPriceAssets
         .filter((a) => getAssetType(a) === "stock")
-        .map((a) => a.symbol),
+        .map((a) => a.symbol)
+        .concat(followTargets.filter((target) => target.assetType === "stock").map((target) => target.symbol)),
     ),
   ).filter((x): x is string => !!x);
   const [cryptoPriceMap, stockPriceMap] = await Promise.all([
@@ -811,7 +815,9 @@ function resolveWalletCoins(
   staleWalletIdentities: string[] = [],
 ): WalletCoinUSD[] {
   const { priceMap } = valueContext;
-  const latestAssets = canonicalizePortfolioCoins(assets, canonicalization);
+  const latestAssets = canonicalizePortfolioCoins(
+    resolveCustomPrices(assets, priceMap, lastAssets), canonicalization,
+  );
 
   // add btc value if not exist
   const btcData = latestAssets.find(

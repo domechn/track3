@@ -8,6 +8,7 @@ export type WalletCoin = {
     value: number;
     base: "usd" | "usdt";
   };
+  customPrice?: OtherPrice;
   amount: number;
   wallet: string;
 };
@@ -78,6 +79,10 @@ export type OtherAttachment =
   | { kind: "cex"; type: string; identity: string }
   | { kind: "wallet"; type: string; identity: string };
 
+export type OtherPrice =
+  | { kind: "manual"; usd: number; setAt: string; note?: string }
+  | { kind: "follow"; assetType: AssetType; symbol: string; ratio: number };
+
 export type TokenConfig = {
   // evm address
   erc20: Addresses;
@@ -95,6 +100,7 @@ export type TokenConfig = {
     amount: number;
     // when set, the asset is merged into the matching CEX/wallet
     attachTo?: OtherAttachment;
+    price?: OtherPrice;
   }[];
 };
 

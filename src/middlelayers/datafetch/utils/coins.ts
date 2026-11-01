@@ -29,6 +29,7 @@ export function combineCoinLists(coinLists: WalletCoin[][]): WalletCoin[] {
         }
         symbols[key].amount += coin.amount;
         if (coin.price) symbols[key].price = coin.price;
+        if (coin.customPrice && !symbols[key].customPrice) symbols[key].customPrice = coin.customPrice;
         return symbols;
       }, {} as Record<string, WalletCoin>)
     )

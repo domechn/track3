@@ -1,5 +1,5 @@
 import { CurrencyRateDetail } from "@/middlelayers/types";
-import { OtherAttachment } from "@/middlelayers/datafetch/types";
+import { OtherAttachment, OtherPrice } from "@/middlelayers/datafetch/types";
 
 // --- Row data types for each config section ---
 
@@ -33,6 +33,7 @@ export interface OtherRow {
   symbol: string;
   amount: number;
   attachTo?: OtherAttachment;
+  price?: OtherPrice;
 }
 
 // --- Draft config types for add dialogs ---
@@ -67,6 +68,7 @@ export interface OtherDraft {
   symbol: string;
   amount: number;
   attachTo?: OtherAttachment;
+  price?: OtherPrice;
 }
 
 // --- Option types for selects ---
@@ -183,12 +185,14 @@ export interface WalletSectionProps {
 
 export interface OthersSectionProps {
   others: OtherRow[];
+  baseCurrency?: Pick<CurrencyRateDetail, "currency" | "rate">;
   othersPage: number;
   othersPageCount: number;
   pagedOthers: OtherRow[];
   pagedOthersStartIndex: number;
   otherAmountDraftMap: Record<number, string>;
-  onAdd: (val: { symbol: string; amount: number; alias?: string }) => void;
+  onAdd: (val: OtherRow) => void;
+  onPriceChange: (idx: number, price?: OtherPrice) => void;
   onOthersChange: (
     idx: number,
     key: "alias" | "symbol" | "amount" | "attachTo",

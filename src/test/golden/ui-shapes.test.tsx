@@ -138,6 +138,18 @@ const additionalSources: GlobalConfig = {
     { symbol: "FREEOTHER", alias: "Unattached manual", amount: 4 },
   ],
 };
+const pricedSources: GlobalConfig = {
+  ...additionalSources,
+  others: [
+    ...additionalSources.others,
+    { symbol: "NOVA", amount: 1200, price: {
+      kind: "manual", usd: 0.42, setAt: "2026-11-01T10:00:00.000Z", note: "OTC",
+    } },
+    { symbol: "STBTC", amount: 0.5, price: {
+      kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 1,
+    } },
+  ],
+};
 const shapePath = resolve("tests/golden/ui-shapes-0.9.4.json");
 const observedShapes: Record<string, unknown> = {};
 const expectedShapes = process.env.UPDATE_GOLDEN === "1"
@@ -239,6 +251,28 @@ describe("0.9.4 UI persistence shapes", () => {
         inactiveExchange: saved?.exchanges.at(-1),
         others: saved?.others,
       })));
+    });
+  }
+
+  for (const tree of ["desktop", "mobile"] as const) {
+    it(`${tree} Settings preserves optional custom price rules`, async () => {
+      vi.mocked(getConfiguration).mockResolvedValue(pricedSources);
+      if (tree === "mobile") {
+        vi.mocked(isIOS).mockReturnValue(true);
+        window.location.hash = "#/settings/configuration?section=sources";
+        render(<HashRouter><MobileConfiguration /></HashRouter>);
+      } else {
+        render(<DesktopConfiguration />);
+      }
+      const toggle = await screen.findByRole(tree === "mobile" ? "switch" : "checkbox",
+        { name: tree === "mobile" ? "Toggle Alias binance" : /group stable coins/i });
+      fireEvent.click(toggle);
+      await waitFor(() => expect(saveConfiguration).toHaveBeenCalledTimes(1));
+      fireEvent.click(toggle);
+      await waitFor(() => expect(saveConfiguration).toHaveBeenCalledTimes(2));
+      const prices = vi.mocked(saveConfiguration).mock.lastCall?.[0].others.slice(-2);
+      expect(prices).toStrictEqual(pricedSources.others.slice(-2));
+      pinAdditionalShape(`${tree}.customPrice`, prices);
     });
   }
 
