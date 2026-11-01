@@ -6,7 +6,7 @@ import { Toast, ToastProvider, ToastViewport } from "@/mobile/components/ui/toas
 
 const m = vi.hoisted(() => ({
   invoke: vi.fn(), choose: vi.fn(), find: vi.fn(), list: vi.fn(), read: vi.fn(), save: vi.fn(),
-  getFolder: vi.fn(), getBlacklist: vi.fn(), getTime: vi.fn(), duplicate: vi.fn(), importData: vi.fn(), toast: vi.fn(), clean: vi.fn(), documents: vi.fn(),
+  getFolder: vi.fn(), getBlacklist: vi.fn(), getTime: vi.fn(), duplicate: vi.fn(), importData: vi.fn(), previewImport: vi.fn(), importSelected: vi.fn(), toast: vi.fn(), clean: vi.fn(), documents: vi.fn(),
 }));
 vi.mock("@/utils/platform", () => ({ isIOS: () => true }));
 vi.mock("@/utils/backup-location", () => ({ chooseBackupLocation: m.choose, documentsBackupLocation: m.documents }));
@@ -23,7 +23,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 }));
 vi.mock("@/middlelayers/data", () => ({
   checkIfDuplicatedHistoricalData: m.duplicate, importHistoricalData: m.importData,
-  readHistoricalDataFromPath: vi.fn(),
+  readHistoricalDataFromPath: vi.fn(), previewImport: m.previewImport, importSelected: m.importSelected,
 }));
 
 beforeEach(() => {
@@ -33,7 +33,7 @@ beforeEach(() => {
     command === "ios_backup_folder_status" ? { path: null, failure: null } : null);
   m.choose.mockResolvedValue("/cloud/track3-backup");
   m.find.mockResolvedValue({ directory: "/cloud", normalized: true, legacy: false });
-  m.list.mockResolvedValue([{ client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 2 }]);
+  m.list.mockResolvedValue([{ client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 2, snapshots: 2 }]);
   m.read.mockResolvedValue({ client: "device-a", exportAt: "2024-03-01T00:00:00Z", historicalData: [], md5V2: "" });
   m.getFolder.mockResolvedValue("/app/Documents");
   m.documents.mockResolvedValue("/app/Documents");
@@ -41,6 +41,8 @@ beforeEach(() => {
   m.getTime.mockResolvedValue(new Date(0));
   m.duplicate.mockResolvedValue(false);
   m.importData.mockResolvedValue(true);
+  m.previewImport.mockResolvedValue({ rows: [{ uuid: "snapshot-one", createdAt: "2024-02-01T00:00:00Z", total: 42, assetCount: 1, status: "new", choice: "import", transactionIdCollisions: 0 }] });
+  m.importSelected.mockResolvedValue({ imported: 1, replaced: 0, skipped: 0, failures: [] });
   m.clean.mockResolvedValue(undefined);
   m.save.mockResolvedValue(undefined);
 });
@@ -57,6 +59,20 @@ it("reviews a selected folder and imports without changing auto backup", async (
   fireEvent.click(within(confirm).getByRole("button", { name: "Restore" }));
   await waitFor(() => expect(m.importData).toHaveBeenCalled());
   expect(m.save).not.toHaveBeenCalledWith("/cloud");
+});
+
+it("reviews the configured automatic copy through iOS preparation and merges selected snapshots", async () => {
+  m.getFolder.mockResolvedValue("/cloud");
+  m.invoke.mockImplementation(async (command: string) =>
+    command === "ios_backup_folder_status" ? { path: "/cloud", failure: null } : null);
+  m.list.mockResolvedValue([{ client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 1, snapshots: 1 }]);
+  render(<HashRouter><DataManagement /></HashRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "Review backup from device-a" }));
+  expect(await screen.findByText("2024-02: 1 snapshot")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Apply selected choices" }));
+  await waitFor(() => expect(m.importSelected).toHaveBeenCalledWith(expect.objectContaining({ client: "device-a" }), { "snapshot-one": "import" }));
+  expect(m.invoke).toHaveBeenCalledWith("ios_prepare_backup_folder", { path: "/cloud", kind: "auto" });
+  expect(m.importData).not.toHaveBeenCalled();
 });
 
 it("shows a saved Documents choice in the current app container", async () => {

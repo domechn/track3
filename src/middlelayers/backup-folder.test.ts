@@ -60,7 +60,7 @@ it("lists only a selected client when the parent is outside its security scope",
   disk.files.add("/cloud/track3-backup/device-a/metadata.json");
   const { listBackupClients } = await import("./backup-folder");
   expect(await listBackupClients("/cloud", "/cloud/track3-backup/device-a")).toEqual([
-    { client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 0 },
+    { client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 0, snapshots: 0 },
   ]);
 });
 
@@ -76,7 +76,27 @@ it("skips a client whose metadata has not downloaded yet", async () => {
   });
   const { listBackupClients } = await import("./backup-folder");
   expect(await listBackupClients("/cloud")).toEqual([
-    { client: "device-b", exportAt: "2024-03-01T00:00:00Z", months: 0 },
+    { client: "device-b", exportAt: "2024-03-01T00:00:00Z", months: 0, snapshots: 0 },
+  ]);
+});
+
+it("lists the current generation of each valid device with its snapshot count", async () => {
+  const { buildMetadata } = await import("./backup-v2");
+  disk.dirs.add("/cloud/track3-backup");
+  disk.dirs.add("/cloud/track3-backup/device-a");
+  disk.dirs.add("/cloud/track3-backup/device-b");
+  disk.dirs.add("/cloud/track3-backup/broken");
+  vi.mocked(readTextFile).mockImplementation(async (path) => {
+    if (String(path).includes("/broken/")) return "broken";
+    const client = String(path).includes("/device-a/") ? "device-a" : "device-b";
+    const counts = client === "device-a" ? [2, 3] : [1];
+    return JSON.stringify(buildMetadata(client, "0.9.4", client === "device-a" ? "2024-03-01T00:00:00Z" : "2024-04-01T00:00:00Z",
+      counts.map((records, index) => ({ month: `2024-0${index + 1}`, records, bytes: 10, sha256: "a".repeat(64), file: `2024-0${index + 1}.${"a".repeat(8)}.json` }))));
+  });
+  const { listBackupClients } = await import("./backup-folder");
+  expect(await listBackupClients("/cloud")).toEqual([
+    { client: "device-b", exportAt: "2024-04-01T00:00:00Z", months: 1, snapshots: 1 },
+    { client: "device-a", exportAt: "2024-03-01T00:00:00Z", months: 2, snapshots: 5 },
   ]);
 });
 

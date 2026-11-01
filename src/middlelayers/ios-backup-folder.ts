@@ -88,3 +88,7 @@ export async function prepareAutoBackupPath(path: string): Promise<void> {
     window.dispatchEvent(new Event(backupFolderStatusEvent));
   }
 }
+
+export async function prepareRestoreBackupPath(path: string): Promise<void> {
+  if (isIOS()) await invoke("ios_prepare_backup_folder", { path, kind: "auto" });
+}
