@@ -4,6 +4,7 @@ import { executeWrite, getDatabase } from "./database";
 import type { AssetType } from "./datafetch/types";
 import type { CurrencyRateDetail } from "./types";
 import { redactSecrets } from "./security/redact";
+import { isLatestSnapshotPartial } from "./snapshot-partial";
 
 export type RebalanceTarget =
   | { kind: "asset"; assetType: AssetType; symbol: string; percent: number }
@@ -24,6 +25,7 @@ export type RebalanceHolding = {
 };
 
 export type RebalanceOptions = {
+  partialSnapshot?: boolean;
   mode?: "full" | "buys";
   injectedCash?: number;
   minimumTradeValue?: number;
@@ -52,7 +54,7 @@ export type RebalanceResult = {
   rows: RebalanceRow[];
   currentTotal: number;
   projectedTotal: number;
-  warnings: ({ kind: "empty-type"; assetType: AssetType } | { kind: "missing-price-target" })[];
+  warnings: ({ kind: "empty-type"; assetType: AssetType } | { kind: "missing-price-target" } | { kind: "partial-snapshot" })[];
 };
 
 const DEFAULT_STABLECOINS = [
@@ -145,9 +147,10 @@ export async function deleteRebalanceProfile(): Promise<void> {
 export async function loadRebalanceHoldings(currency: CurrencyRateDetail): Promise<{
   holdings: RebalanceHolding[];
   stablecoinSymbols: string[];
+  partialSnapshot?: boolean;
 }> {
-  const [assets, stablecoinSymbols] = await Promise.all([
-    queryLatestAssets(), getStableCoins(),
+  const [assets, stablecoinSymbols, partialSnapshot] = await Promise.all([
+    queryLatestAssets(), getStableCoins(), isLatestSnapshotPartial(),
   ]);
   const rate = currency.rate || 1;
   return {
@@ -159,6 +162,7 @@ export async function loadRebalanceHoldings(currency: CurrencyRateDetail): Promi
       price: asset.price * rate,
     })),
     stablecoinSymbols: stablecoinSymbols.length ? stablecoinSymbols : DEFAULT_STABLECOINS,
+    partialSnapshot,
   };
 }
 
@@ -178,6 +182,11 @@ export function calculateRebalance(
   const ignoreBelowValue = options.ignoreBelowValue ?? 0;
   if ([injectedCash, minimumTradeValue, ignoreBelowValue].some((value) => !Number.isFinite(value) || value < 0)) {
     throw new Error("Cash and thresholds must be non-negative");
+  }
+  if (options.partialSnapshot) {
+    const currentTotal = holdings.reduce((sum, holding) => sum + holding.value, 0);
+    return { rows: [], currentTotal, projectedTotal: currentTotal + injectedCash,
+      warnings: [{ kind: "partial-snapshot" }] };
   }
   const stablecoins = new Set((options.stablecoinSymbols ?? DEFAULT_STABLECOINS).map((symbol) => symbol.toUpperCase()));
   const cashTarget = targets.find((target) => target.kind === "cash");

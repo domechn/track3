@@ -7,6 +7,7 @@ import { getAssetType } from "../../../datafetch/utils/coins";
 import type { AssetModel } from "../../../types";
 import type { AssetType } from "../../../datafetch/types";
 import { trace } from "./trace";
+import { partialSnapshotIds } from "../../../snapshot-partial";
 
 // ── Types ──
 
@@ -27,6 +28,7 @@ export interface GroupedAsset {
 export interface ValuePoint {
   timestamp: number;
   value: number;
+  partial?: boolean;
 }
 
 export interface AssetHistoryPoint {
@@ -116,10 +118,12 @@ export async function getPortfolioValueSeries(
   trace("getPortfolioValueSeries", "raw records:", records.length);
   if (records.length === 0) return [];
   const downsampled = downsample(records, maxPoints);
+  const partial = await partialSnapshotIds(downsampled.map((record) => record.uuid));
   trace("getPortfolioValueSeries", "downsampled:", downsampled.length, "points");
   return downsampled.map((r) => ({
     timestamp: new Date(r.createdAt).getTime(),
     value: r.totalValue,
+    ...(partial.has(r.uuid) ? { partial: true } : {}),
   }));
 }
 

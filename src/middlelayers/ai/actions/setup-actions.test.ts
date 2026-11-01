@@ -138,6 +138,20 @@ it("exports rebalance suggestions using the session's cash option", async () => 
   await executePreparedAction(action);
   expect(writeTextFile).toHaveBeenCalledWith("/tmp/rebalance.csv", expect.stringContaining('"BTC","100.00","100.00","0.00","Buy","1000.00"'));
 });
+it("does not export rebalance trades from a partial snapshot", async () => {
+  vi.mocked(getRebalanceProfile).mockResolvedValue({
+    targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }], tolerancePercent: 0,
+  });
+  vi.mocked(loadRebalanceHoldings).mockResolvedValue({
+    holdings: [{ assetType: "crypto", symbol: "BTC", amount: 1, price: 100, value: 100 }],
+    stablecoinSymbols: [], partialSnapshot: true,
+  });
+  vi.mocked(save).mockResolvedValue("/tmp/rebalance.csv");
+  await expect(executePreparedAction(await prepareAction("export_rebalance", {}, "call-partial-export")))
+    .rejects.toThrow(/snapshot is partial/);
+  expect(save).not.toHaveBeenCalled();
+  expect(writeTextFile).not.toHaveBeenCalled();
+});
 it("exports stablecoins as ordinary holdings when the page switch is off", async () => {
   vi.mocked(getRebalanceProfile).mockResolvedValue({
     targets: [

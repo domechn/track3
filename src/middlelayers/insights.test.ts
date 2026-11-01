@@ -75,6 +75,18 @@ describe("computeInsights", () => {
     expect(JSON.stringify(result)).not.toContain("private");
   });
 
+  it("omits rebalance drift from a partial latest snapshot", () => {
+    const latest = { ...snapshot("latest", at, { BTC: 800, ETH: 200 }), partialSnapshot: true };
+    const result = computeInsights({
+      snapshots: [latest],
+      rebalanceProfile: { targets: [
+        { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+        { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 50 },
+      ], tolerancePercent: 0 },
+    });
+    expect(result.some((item) => item.id === "drift")).toBe(false);
+  });
+
   it("detects a new holding on the next same-day refresh", () => {
     const latest = snapshot("latest", at, { BTC: 900, SOL: 100 });
     const prior = snapshot("prior", "2024-02-01T11:00:00.000Z", { BTC: 1000 });

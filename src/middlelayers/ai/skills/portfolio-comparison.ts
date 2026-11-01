@@ -1,6 +1,7 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
 import { trace } from "./functions/trace";
+import { isSnapshotPartial } from "../../snapshot-partial";
 import {
   getSnapshotSummaries,
   getAssetsBySnapshot,
@@ -106,9 +107,11 @@ async function runCompare(
   right: { uuid: string; createdAt: Date; totalValue: number },
   ctx: { baseCurrency: { rate: number; currency: string } },
 ): Promise<ToolResult> {
-  const [leftAssets, rightAssets] = await Promise.all([
+  const [leftAssets, rightAssets, leftPartial, rightPartial] = await Promise.all([
     getAssetsBySnapshot(left.uuid),
     getAssetsBySnapshot(right.uuid),
+    isSnapshotPartial(left.uuid),
+    isSnapshotPartial(right.uuid),
   ]);
 
   const leftGrouped = groupAssets(leftAssets);
@@ -191,11 +194,13 @@ async function runCompare(
         uuid: left.uuid,
         createdAt: left.createdAt.toISOString(),
         valueUsd: left.totalValue,
+        ...(leftPartial ? { partial: true } : {}),
       },
       right: {
         uuid: right.uuid,
         createdAt: right.createdAt.toISOString(),
         valueUsd: right.totalValue,
+        ...(rightPartial ? { partial: true } : {}),
       },
       baseCurrency: ctx.baseCurrency.currency,
       totalDeltaUsd,
@@ -205,7 +210,7 @@ async function runCompare(
       newPositions,
       removedPositions,
     },
-    text: `From ${left.createdAt.toISOString()} to ${right.createdAt.toISOString()}: total change ${totalDeltaPct >= 0 ? "+" : ""}${totalDeltaPct.toFixed(2)}% (${(totalDeltaUsd * rate).toFixed(2)} ${ctx.baseCurrency.currency}).`,
+    text: `From ${left.createdAt.toISOString()} to ${right.createdAt.toISOString()}: total change ${totalDeltaPct >= 0 ? "+" : ""}${totalDeltaPct.toFixed(2)}% (${(totalDeltaUsd * rate).toFixed(2)} ${ctx.baseCurrency.currency}).${leftPartial || rightPartial ? " This comparison includes a partial total with last known values for unavailable sources." : ""}`,
   };
 }
 

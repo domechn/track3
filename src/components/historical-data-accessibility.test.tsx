@@ -66,6 +66,8 @@ import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
   queryHistoricalData,
+  queryHistoricalPage,
+  queryHistoricalDetail,
   queryRestoreHistoricalData,
 } from "@/middlelayers/charts";
 import { addToBlacklist } from "@/middlelayers/configuration";
@@ -86,6 +88,32 @@ beforeEach(() => {
 });
 
 describe("Historical Data page", () => {
+  it.each([HistoricalData, MobileHistoricalData])("marks a carried snapshot in the list and explains its missing source in detail", async (Page) => {
+    const createdAt = "2024-04-16T12:00:00.000Z";
+    const partial = {
+      sourcesTotal: 5, fill: "last_known" as const, createdAt,
+      missing: [{ wallet: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", kind: "wallet" as const,
+        provider: "BTC", category: "network" as const, lastSuccessAt: "2024-04-15T12:00:00.000Z" }],
+    };
+    vi.mocked(queryHistoricalPage).mockResolvedValueOnce({
+      totalCount: 1, latest: { id: "snapshot-1", createdAt, total: 1200 },
+      rows: [{ id: "snapshot-1", createdAt, total: 1200, change: null,
+        assetCount: 1, topAssets: [], sourcesTotal: 5, missingCount: 1 }],
+    });
+    vi.mocked(queryHistoricalDetail).mockResolvedValueOnce({
+      id: "snapshot-1", createdAt, total: 1200, assets: [
+        { id: 7, uuid: "snapshot-1", createdAt, assetType: "crypto", symbol: "BTC",
+          amount: 1, value: 1200, price: 1200 },
+      ], transactions: [], partial,
+    });
+    render(<Page currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    const row = await screen.findByTestId("history-snapshot-row");
+    expect(within(row).getByText("Partial")).toBeInTheDocument();
+    expect(within(row).getByText("4 of 5 sources")).toBeInTheDocument();
+    fireEvent.click(row);
+    expect(await screen.findByText("This total includes last known values for unavailable sources.")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Partial" })).getByText(/BTC/)).toBeInTheDocument();
+  });
   it("groups snapshot totals in a readable summary strip", async () => {
     vi.mocked(queryHistoricalData).mockResolvedValue([]);
     render(<HistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);

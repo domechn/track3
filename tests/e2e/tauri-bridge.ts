@@ -37,6 +37,7 @@ type BridgeOptions = {
   checkoutFixture?: boolean;
   goldenHistory?: boolean;
   seedEditLog?: boolean;
+  seedPartialSnapshot?: boolean;
   appVersion?: string;
 };
 
@@ -69,6 +70,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     checkoutFixture = false,
     goldenHistory = false,
     seedEditLog = false,
+    seedPartialSnapshot = false,
     appVersion = "0.8.2",
   } = options;
   if (!options.onboarding) {
@@ -262,6 +264,19 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/sync_state_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/init/snapshot_edit_log_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/init/snapshot_partial_up.sql"), "utf8"));
+  if (seedPartialSnapshot) {
+    if (!richPortfolio) throw new Error("Partial snapshot fixture needs the rich portfolio");
+    for (const uuid of ["demo-30", "demo-59"]) {
+      const row = db.exec("SELECT createdAt, wallet FROM assets_v2 WHERE uuid = ? LIMIT 1", [uuid])[0]?.values[0];
+      if (!row) throw new Error("Partial snapshot fixture is missing");
+      const createdAt = String(row[0]);
+      db.run(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
+        VALUES (?, 5, ?, 'last_known', ?)`, [uuid, JSON.stringify([{
+        wallet: row[1], kind: "wallet", provider: "BTC", category: "network",
+        lastSuccessAt: new Date(Date.parse(createdAt) - 86400000).toISOString(),
+      }]), createdAt]);
+    }
+  }
   if (seedEditLog) {
     const uuid = richPortfolio ? "demo-59" : "snapshot-new";
     db.run(`INSERT INTO snapshot_edit_log
@@ -557,6 +572,16 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       }
       execute("INSERT INTO refresh_operations (operation_uuid, created_at) VALUES (?, ?)",
         [args.operationUuid, args.createdAt]);
+      if (args.partial) {
+        const partial = args.partial as {
+          sourcesTotal: number; missing: unknown[]; fill: string; createdAt: string;
+        };
+        execute(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
+          VALUES (?, ?, ?, ?, ?)`, [
+          args.operationUuid, partial.sourcesTotal, JSON.stringify(partial.missing),
+          partial.fill, partial.createdAt,
+        ]);
+      }
       return null;
     }
     if (cmd === "plugin:fs|exists") return files.has(args.path) || directories.has(args.path) ||

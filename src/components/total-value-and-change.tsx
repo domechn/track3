@@ -14,6 +14,7 @@ import {
 } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Line } from "react-chartjs-2";
 import {
   queryAssetChange,
@@ -34,6 +35,7 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
+import { hasPartialGap } from "@/middlelayers/chart-gap";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -195,6 +197,7 @@ const App = ({
   });
 
   const [btcAsBase, setBtcAsBase] = useState(false);
+  const [excludedProvider, setExcludedProvider] = useState("");
 
   const [showPercentageInChart, setShowPercentageInChart] = useState(false);
 
@@ -208,6 +211,8 @@ const App = ({
   const dataChangedVersion = useDataChangedVersion();
 
   const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
+  const excludedSource = totalValueData.excludedSources?.find((source) => source.provider === excludedProvider);
+  const shownTotalValue = totalValue - (excludedSource?.value ?? 0);
   const firstTotalValue = useMemo(
     () => assetChangeData.data[0]?.usdValue ?? 0,
     [assetChangeData],
@@ -222,10 +227,10 @@ const App = ({
       getTotalValueShower(
         btcAsBase,
         firstTotalValue,
-        totalValue,
+        shownTotalValue,
         assetChangeData,
       ),
-    [assetChangeData, firstTotalValue, totalValue, btcAsBase],
+    [assetChangeData, firstTotalValue, shownTotalValue, btcAsBase],
   );
 
   const changedValueOrPercentage = useMemo(() => {
@@ -234,7 +239,7 @@ const App = ({
     }
     let val = getPercentageChange(
       totalValueShower,
-      totalValue,
+      shownTotalValue,
       firstTotalValue,
     );
     const p = getUpOrDown(val);
@@ -242,7 +247,7 @@ const App = ({
       val = -val;
     }
     return `${p}${prettyNumberToLocaleString(val)}%`;
-  }, [showValue, firstTotalValue, totalValue, totalValueShower]);
+  }, [showValue, firstTotalValue, shownTotalValue, totalValueShower]);
 
   useEffect(() => {
     const gen = ++loadGenRef.current;
@@ -486,6 +491,11 @@ const App = ({
           tension: 0,
           pointRadius: 0,
           pointStyle: "rotRect",
+          segment: {
+            borderDash: (segment: { p0DataIndex: number; p1DataIndex: number }) =>
+              hasPartialGap(plottedTimestamps[segment.p0DataIndex], plottedTimestamps[segment.p1DataIndex],
+                assetChangeData.gaps ?? []) ? [3, 3] : undefined,
+          },
           fill: false,
         },
         ...(high === undefined ? [] : [{
@@ -499,7 +509,7 @@ const App = ({
         }]),
       ],
     };
-  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t]);
+  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t, assetChangeData.gaps]);
 
   return (
     <div className={metrics ? "h-full t3-total-overview" : "h-full"}>
@@ -568,13 +578,28 @@ const App = ({
         </CardHeader>
         <CardContent className="flex flex-1 flex-col t3-hero-content">
           <div className="text-2xl font-semibold font-mono tabular-nums tracking-tight t3-hero-value">
-            {totalValueShower.formatTotalValue()}
+            {getTotalValueShower(btcAsBase, firstTotalValue, shownTotalValue, assetChangeData).formatTotalValue()}
+            {totalValueData.partial && <span className="ml-2 inline-flex align-middle rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-sans text-xs font-medium tracking-normal text-foreground">
+              {t("history.partial.label")}
+            </span>}
           </div>
+          {!!totalValueData.excludedSources?.length && <Select value={excludedSource?.provider ?? "__all__"}
+            onValueChange={(value) => setExcludedProvider(value === "__all__" ? "" : value)}>
+            <SelectTrigger aria-label={t("totalValue.view")} className="mt-2 w-auto max-w-full font-sans text-xs font-normal">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{t("totalValue.withLastKnown")}</SelectItem>
+              {totalValueData.excludedSources.map((source) => <SelectItem key={source.provider} value={source.provider}>
+                {t("totalValue.excluding").replace("{provider}", source.provider)}
+              </SelectItem>)}
+            </SelectContent>
+          </Select>}
           <p className="text-xs text-muted-foreground mb-2 t3-hero-change">
             <span
               className={`tabular-nums ${changePercentageColorClass(
                 totalValueShower,
-                totalValue,
+                shownTotalValue,
                 firstTotalValue,
               )}`}
             >
@@ -593,6 +618,9 @@ const App = ({
               .replace("{date}", firstDate)}
               options={options as any} data={lineDataMemo} />
           </div>
+          {!!assetChangeData.gaps?.length && <p className="mt-1 border-t border-dotted border-muted-foreground/50 pt-1 text-xs text-muted-foreground">
+            {t("totalValue.partialGap")}
+          </p>}
           {ath && <div className="t3-ath-note">
             <span>{t("overview.design.ath")}</span>
             <strong>{currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(ath.value))}</strong>

@@ -119,6 +119,8 @@ export type TopCoinsPercentageChangeData = {
 
 export type TotalValueData = {
   totalValue: number;
+  partial?: boolean;
+  excludedSources?: { provider: string; value: number }[];
 };
 
 export type MaxTotalValueData = {
@@ -152,6 +154,7 @@ export type PNLTableDate = {
 
 export type AssetChangeData = {
   timestamps: number[];
+  gaps?: number[];
   data: {
     usdValue: number;
     btcPrice?: number;

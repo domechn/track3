@@ -103,6 +103,7 @@ class AssetHandler implements AssetHandlerImpl {
   async listMaxTotalValueRecord(
     start?: Date,
     end?: Date,
+    skipPartial = false,
   ): Promise<
     | {
         uuid: string;
@@ -113,7 +114,9 @@ class AssetHandler implements AssetHandlerImpl {
   > {
     const sql = `SELECT SUM(value) as totalValue, uuid, createdAt FROM ${this.assetTableName} WHERE 1=1 ${
       start ? " AND createdAt >= ?" : ""
-    } ${end ? " AND createdAt <= ?" : ""} GROUP BY uuid ORDER BY totalValue DESC LIMIT 1`;
+    } ${end ? " AND createdAt <= ?" : ""}${
+      skipPartial ? " AND uuid NOT IN (SELECT uuid FROM snapshot_partial)" : ""
+    } GROUP BY uuid ORDER BY totalValue DESC LIMIT 1`;
     const results = await selectFromDatabaseWithSql<{
       uuid: string;
       createdAt: Date;
@@ -131,6 +134,8 @@ class AssetHandler implements AssetHandlerImpl {
     start?: Date,
     end?: Date,
     excludedSymbols: string[] = [],
+    skipPartial = false,
+    latestCount?: number,
   ): Promise<
     {
       uuid: string;
@@ -143,7 +148,9 @@ class AssetHandler implements AssetHandlerImpl {
       : "SUM(value)";
     const sql = `SELECT ${value} as totalValue, uuid, createdAt FROM ${this.assetTableName} WHERE 1=1 ${
       start ? " AND createdAt >= ?" : ""
-    } ${end ? " AND createdAt <= ?" : ""} GROUP BY uuid ORDER BY createdAt ASC`;
+    } ${end ? " AND createdAt <= ?" : ""}${
+      skipPartial ? " AND uuid NOT IN (SELECT uuid FROM snapshot_partial)" : ""
+    } GROUP BY uuid ORDER BY createdAt ${latestCount ? "DESC LIMIT ?" : "ASC"}`;
     const results = await selectFromDatabaseWithSql<{
       uuid: string;
       createdAt: Date;
@@ -151,7 +158,8 @@ class AssetHandler implements AssetHandlerImpl {
     }>(
       sql,
       [...excludedSymbols.map((symbol) => symbol.toUpperCase()),
-        ...[start, end].filter((d): d is Date => d != null).map((d) => d.toISOString())],
+        ...[start, end].filter((d): d is Date => d != null).map((d) => d.toISOString()),
+        ...(latestCount ? [latestCount] : [])],
     );
 
     return results || [];

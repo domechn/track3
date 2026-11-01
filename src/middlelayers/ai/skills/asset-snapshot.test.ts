@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import skill from "./asset-snapshot";
 import { ASSET_HANDLER } from "../../entities/assets";
+import { isSnapshotPartial } from "../../snapshot-partial";
 
 vi.mock("../../entities/assets", () => ({
   ASSET_HANDLER: {
@@ -8,6 +9,7 @@ vi.mock("../../entities/assets", () => ({
     listAssetsByUUIDs: vi.fn(),
   },
 }));
+vi.mock("../../snapshot-partial", () => ({ isSnapshotPartial: vi.fn().mockResolvedValue(false) }));
 
 const baseCurrency = { currency: "USD", rate: 1, alias: "USD", symbol: "$" };
 
@@ -16,6 +18,18 @@ beforeEach(() => {
 });
 
 describe("asset_snapshot skill", () => {
+  it("labels a carried snapshot total as partial", async () => {
+    vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([
+      { uuid: "s", createdAt: "2026-07-20T00:00:00.000Z", totalValue: 1000 },
+    ] as never);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([
+      { uuid: "s", assetType: "crypto", symbol: "BTC", amount: 1, value: 1000, price: 1000 },
+    ] as never);
+    vi.mocked(isSnapshotPartial).mockResolvedValue(true);
+    const result = await skill.run({}, { baseCurrency });
+    expect(result.data).toMatchObject({ totalValueUsd: 1000, partial: true });
+    expect(result.text).toContain("partial");
+  });
   it("lists assets largest-first regardless of DB insertion order", async () => {
     vi.mocked(ASSET_HANDLER.listTotalValueRecords).mockResolvedValue([
       { uuid: "s", createdAt: "2026-07-20T00:00:00.000Z", totalValue: 1 },

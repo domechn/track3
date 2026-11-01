@@ -12,6 +12,7 @@ import { getBlacklistCoins } from "./configuration";
 import { getAssetType } from "./datafetch/utils/coins";
 import { timeToDateStr } from "../utils/date";
 import { ASSET_HANDLER } from "./entities/assets";
+import { isSnapshotPartial, snapshotExclusionOptions } from "./snapshot-partial";
 import { AssetType } from "./datafetch/types";
 import { filterByAssetType, toAssetReference } from "./charts-shared";
 import { selectFromDatabaseWithSql } from "./database";
@@ -114,8 +115,11 @@ export async function queryTotalValue(
       dateRange.end,
     );
     const latest = results[results.length - 1];
+    const partial = latest ? await isSnapshotPartial(latest.uuid) : false;
     return {
       totalValue: latest?.totalValue || 0,
+      ...(partial ? { partial: true } : {}),
+      ...(partial ? { excludedSources: await snapshotExclusionOptions(latest.uuid) } : {}),
     };
   }
 
@@ -130,9 +134,12 @@ export async function queryTotalValue(
   const latest = results[0];
 
   const latestTotal = latest.reduce((s, a) => s + a.value, 0) || 0;
+  const partial = latest[0]?.uuid ? await isSnapshotPartial(latest[0].uuid) : false;
 
   return {
     totalValue: latestTotal,
+    ...(partial ? { partial: true } : {}),
+    ...(partial ? { excludedSources: await snapshotExclusionOptions(latest[0].uuid) } : {}),
   };
 }
 
@@ -142,6 +149,7 @@ export async function queryMaxTotalValue(
   const record = await ASSET_HANDLER.listMaxTotalValueRecord(
     dateRange.start,
     dateRange.end,
+    true,
   );
   if (!record) {
     return {

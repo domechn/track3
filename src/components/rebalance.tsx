@@ -49,6 +49,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
     target.kind === "type" ? t(`rebalance.${target.assetType}`) : t(stablecoinsAsCash ? "rebalance.targetCash" : "rebalance.targetCashOnly");
   const dataChangedVersion = useDataChangedVersion();
   const [holdings, setHoldings] = useState<RebalanceHolding[]>([]);
+  const [partialSnapshot, setPartialSnapshot] = useState(false);
   const [stablecoinSymbols, setStablecoinSymbols] = useState<string[]>([]);
   const [targets, setTargets] = useState<TargetDraft[]>([]);
   const [tolerance, setTolerance] = useState(0);
@@ -118,6 +119,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
           setProfileReady(true);
         }
         setHoldings(latest.holdings);
+        setPartialSnapshot(!!latest.partialSnapshot);
         setStablecoinSymbols(latest.stablecoinSymbols);
         setLoadError(false);
       })
@@ -147,14 +149,14 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
     if (!targets.length || validation || !optionsValid) return undefined;
     try {
       const options: RebalanceOptions = {
-        mode, injectedCash, minimumTradeValue, ignoreBelowValue,
+        mode, injectedCash, minimumTradeValue, ignoreBelowValue, partialSnapshot,
         tolerancePercent: tolerance, stablecoinSymbols: stablecoinsAsCash ? stablecoinSymbols : [],
       };
       return calculateRebalance(holdings, targets, options);
     } catch {
       return undefined;
     }
-  }, [targets, validation, optionsValid, holdings, mode, injectedCash, minimumTradeValue, ignoreBelowValue, tolerance, stablecoinSymbols, stablecoinsAsCash]);
+  }, [targets, validation, optionsValid, holdings, mode, injectedCash, minimumTradeValue, ignoreBelowValue, tolerance, stablecoinSymbols, stablecoinsAsCash, partialSnapshot]);
   const visual = useMemo(() => result ? rebalanceVisuals(result) : undefined, [result]);
 
   function updateTarget(index: number, next: RebalanceTarget & { previousAsset?: { assetType: AssetType; symbol: string } }) {
@@ -237,6 +239,9 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
       {loading && !profileReady && <FinanceChartSkeleton />}
       {loadError && <p role="alert" className="text-sm text-destructive">{t("rebalance.loadError")}</p>}
       {profileLoadError && !loading && <p role="alert" className="text-sm text-destructive">{t("rebalance.profileLoadError")}</p>}
+      {partialSnapshot && <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+        {t("rebalance.partialPause")}
+      </p>}
       {profileReady && (
         <>
           <RebalanceSummary result={result} portfolioValue={holdings.reduce((sum, holding) => sum + holding.value, 0)}
@@ -381,7 +386,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 py-3">
                   <CardTitle className="text-base">{t("rebalance.suggestions")}</CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => void exportCsv()}>{t("rebalance.export")}</Button>
+                  <Button size="sm" variant="outline" disabled={partialSnapshot} onClick={() => void exportCsv()}>{t("rebalance.export")}</Button>
                 </CardHeader>
                 <CardContent className="space-y-2 px-4 pb-4">
                   {visual?.trades.length ? visual.trades.map((row) => (
@@ -402,7 +407,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
                 </CardContent>
               </Card>
               <p className="text-xs text-muted-foreground">{t(stablecoinsAsCash ? "rebalance.groupRule" : "rebalance.groupRuleCashOnly")}</p>
-              {result.warnings.map((warning) => (
+              {result.warnings.filter((warning) => warning.kind !== "partial-snapshot").map((warning) => (
                 <p key={warning.kind === "empty-type" ? warning.assetType : warning.kind} className="text-xs text-amber-600">
                   {warning.kind === "empty-type"
                     ? t("rebalance.groupEmpty").replace("{group}", t(`rebalance.${warning.assetType}`))

@@ -70,6 +70,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { BottomSheet, SplitView, SwipeableRow, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 import { groupHistoryMonths } from "@/mobile/components/history-months";
 import HistoryEditLog from "@/components/history-edit-log";
+import { HistoryPartialDetails, HistoryPartialPill } from "@/components/history-partial";
 
 function DesktopDetailPassthrough({ children }: React.ComponentProps<typeof BottomSheet>) {
   return <>{children}</>;
@@ -120,7 +121,7 @@ const App = ({
   const [selectedDataId, setSelectedDataId] = useState<string | null>(null);
   const [editLog, setEditLog] = useState<SnapshotEdit[] | null>(null);
   const [editLogError, setEditLogError] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState<"all" | "edited">("all");
+  const [historyFilter, setHistoryFilter] = useState<"all" | "edited" | "complete" | "partial">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
   const [detailSearch, setDetailSearch] = useState("");
@@ -655,6 +656,7 @@ const App = ({
                 />
               </div>
             </div>
+            <HistoryPartialDetails partial={selectedData?.partial} t={t} locale={locale} />
             <HistoryEditLog edits={editLog} error={editLogError} />
             {isMobile && <div className="history-mobile-detail-list">
               {visibleRankData.map((item) => <SwipeableRow key={item.assetId} className="history-mobile-asset" allowImmediateAction
@@ -862,7 +864,7 @@ const App = ({
               <p className="text-xs text-muted-foreground">
                 {t("history.recordsCardSubtitle")}
               </p>
-              <Select value={historyFilter} onValueChange={(value: "all" | "edited") => {
+              <Select value={historyFilter} onValueChange={(value: "all" | "edited" | "complete" | "partial") => {
                 setHistoryFilter(value);
                 setDataPage(0);
               }}>
@@ -872,6 +874,8 @@ const App = ({
                 <SelectContent>
                   <SelectItem value="all">{t("history.editLog.all")}</SelectItem>
                   <SelectItem value="edited">{t("history.editLog.edited")}</SelectItem>
+                  <SelectItem value="complete">{t("history.partial.complete")}</SelectItem>
+                  <SelectItem value="partial">{t("history.partial.label")}</SelectItem>
                 </SelectContent>
               </Select>
             </CardHeader>
@@ -1001,6 +1005,7 @@ const App = ({
                           {row.edited ? <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
                             {t("history.editLog.edited")}
                           </span> : null}
+                          <HistoryPartialPill row={row} t={t} />
                           <span className="history-mobile-snapshot-total ios-money">{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(row.total))}</span>
                         </span>
                         <span className="history-mobile-snapshot-secondary">
@@ -1056,6 +1061,7 @@ const App = ({
                                 {row.edited ? <span className="mt-1 w-fit rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
                                   {t("history.editLog.edited")}
                                 </span> : null}
+                                <HistoryPartialPill row={row} t={t} />
                               </button>
                               <span className="block text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
                             </TableCell>

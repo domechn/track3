@@ -395,6 +395,17 @@ describe("RefreshData — currency rates refresh ordering", () => {
     snapshotId: "previous",
     snapshotKey: "snapshot-key",
   };
+  it("shows the saved last-known choice once for each manual partial refresh", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("button", { name: "Use last known values" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Use last known values" }));
+    expect(screen.queryByRole("button", { name: "Use last known values" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Source status" }));
+    expect(screen.queryByRole("button", { name: "Use last known values" })).not.toBeInTheDocument();
+  });
 
   it("shows the next try in the refresh sheet and retries the failed source", async () => {
     vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
@@ -409,6 +420,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
       expect(refreshAllData).toHaveBeenCalledTimes(2);
       expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({ retrySourceId: "btc:0" });
+      expect(screen.getByRole("button", { name: "Use last known values" })).toBeInTheDocument();
     } finally { vi.useRealTimers(); }
   });
 

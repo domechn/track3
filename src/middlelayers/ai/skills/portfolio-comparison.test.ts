@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import skill from "./portfolio-comparison";
 import { ASSET_HANDLER } from "../../entities/assets";
+import { isSnapshotPartial } from "../../snapshot-partial";
 
 vi.mock("../../entities/assets", () => ({
   ASSET_HANDLER: {
@@ -8,6 +9,7 @@ vi.mock("../../entities/assets", () => ({
     listAssetsByUUIDs: vi.fn(),
   },
 }));
+vi.mock("../../snapshot-partial", () => ({ isSnapshotPartial: vi.fn().mockResolvedValue(false) }));
 
 const baseCurrency = { currency: "USD", rate: 1, alias: "USD", symbol: "$" };
 
@@ -31,6 +33,12 @@ beforeEach(() => {
 });
 
 describe("portfolio_comparison skill", () => {
+  it("warns when either compared total includes carried values", async () => {
+    vi.mocked(isSnapshotPartial).mockImplementation(async (uuid) => uuid === "s3");
+    const result = await skill.run({ left: "s1", right: "s3" }, { baseCurrency });
+    expect(result.data).toMatchObject({ right: { partial: true } });
+    expect(result.text).toContain("partial");
+  });
   it("accepts plain ISO strings for both sides", async () => {
     const result = await skill.run(
       { left: "2026-06-20", right: "2026-07-20" },

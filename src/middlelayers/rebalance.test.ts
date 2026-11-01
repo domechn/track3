@@ -19,6 +19,11 @@ const half: RebalanceTarget[] = [
 ];
 
 describe("rebalance calculator", () => {
+  it("pauses trades when the latest snapshot is partial", () => {
+    const result = calculateRebalance(holdings, half, { partialSnapshot: true });
+    expect(result.rows).toEqual([]);
+    expect(result.warnings).toContainEqual({ kind: "partial-snapshot" });
+  });
   it("matches a target with draft whitespace to its existing holding", () => {
     const result = calculateRebalance([
       { symbol: "BTC", assetType: "crypto", amount: 1, value: 60, price: 60 },

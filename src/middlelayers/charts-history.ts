@@ -17,6 +17,8 @@ export type HistoricalPageRow = {
   id: string;
   createdAt: string;
   edited?: boolean;
+  sourcesTotal?: number;
+  missingCount?: number;
   total: number;
   change: number | null;
   assetCount: number;
@@ -73,16 +75,20 @@ export async function queryHistoricalPage(
   dateRange: TDateRange,
   pageSize: number,
   page: number,
-  filter: "all" | "edited" = "all",
+  filter: "all" | "edited" | "complete" | "partial" = "all",
 ): Promise<{ totalCount: number; rows: HistoricalPageRow[]; latest: HistoricalLatest | null }> {
   if (!Number.isInteger(pageSize) || pageSize < 1 || !Number.isInteger(page) || page < 0) {
     throw new Error("Invalid history page");
   }
   const bounds = [dateRange.start.toISOString(), dateRange.end.toISOString()];
-  const editedWhere = filter === "edited"
+  const filteredWhere = filter === "edited"
     ? " AND EXISTS (SELECT 1 FROM snapshot_edit_log WHERE snapshot_uuid = history_snapshots.uuid)"
-    : "";
-  const previousTotal = filter === "edited"
+    : filter === "partial"
+      ? " AND EXISTS (SELECT 1 FROM snapshot_partial WHERE uuid = history_snapshots.uuid)"
+      : filter === "complete"
+        ? " AND NOT EXISTS (SELECT 1 FROM snapshot_partial WHERE uuid = history_snapshots.uuid)"
+        : "";
+  const previousTotal = filter !== "all"
     ? `(SELECT SUM(value) FROM assets_v2 WHERE uuid = (
          SELECT uuid FROM history_snapshots
          WHERE createdAt < page.createdAt OR (createdAt = page.createdAt AND uuid < page.id)
@@ -98,21 +104,25 @@ export async function queryHistoricalPage(
     latest: string | null;
     totalCount: number;
     edited: number;
+    sourcesTotal: number | null;
+    missingCount: number | null;
     previousTotal: number | null;
   }>(
     `WITH page AS (
        SELECT uuid AS id, createdAt FROM history_snapshots
-       WHERE createdAt >= ? AND createdAt <= ?${editedWhere}
+       WHERE createdAt >= ? AND createdAt <= ?${filteredWhere}
        ORDER BY createdAt DESC, uuid DESC LIMIT ? OFFSET ?
      )
      SELECT page.*,
        EXISTS (SELECT 1 FROM snapshot_edit_log WHERE snapshot_uuid = page.id) AS edited,
+       (SELECT sources_total FROM snapshot_partial WHERE uuid = page.id) AS sourcesTotal,
+       (SELECT json_array_length(missing) FROM snapshot_partial WHERE uuid = page.id) AS missingCount,
        ${previousTotal} AS previousTotal,
        (SELECT SUM(value) FROM assets_v2 WHERE uuid = page.id) AS total,
        (SELECT COUNT(DISTINCT asset_type || ':' || symbol)
         FROM assets_v2 WHERE uuid = page.id) AS assetCount,
        (SELECT COUNT(*) FROM history_snapshots
-        WHERE createdAt >= ? AND createdAt <= ?${editedWhere}) AS totalCount,
+        WHERE createdAt >= ? AND createdAt <= ?${filteredWhere}) AS totalCount,
        (SELECT json_object('id', uuid, 'createdAt', createdAt,
          'total', (SELECT SUM(value) FROM assets_v2 WHERE uuid = newest.uuid))
         FROM history_snapshots newest WHERE createdAt >= ? AND createdAt <= ?
@@ -135,8 +145,11 @@ export async function queryHistoricalPage(
     id: record.id,
     createdAt: record.createdAt,
     edited: !!record.edited,
+    ...(record.sourcesTotal !== null ? {
+      sourcesTotal: record.sourcesTotal, missingCount: record.missingCount ?? 0,
+    } : {}),
     total: record.total,
-    change: filter === "edited"
+    change: filter !== "all"
       ? record.previousTotal === null ? null : record.total - record.previousTotal
       : pageRecords[index + 1] ? record.total - pageRecords[index + 1].total : null,
     assetCount: record.assetCount,
@@ -150,7 +163,12 @@ export async function queryHistoricalPage(
 }
 
 export async function queryHistoricalDetail(uuid: string, includeTransactions = false): Promise<HistoricalData> {
-  const assets = await ASSET_HANDLER.listSymbolGroupedAssetsByUUID(uuid);
+  const [assets, partialRows] = await Promise.all([
+    ASSET_HANDLER.listSymbolGroupedAssetsByUUID(uuid),
+    selectFromDatabaseWithSql<PartialRow>(
+      "SELECT uuid, sources_total, missing, fill, created_at FROM snapshot_partial WHERE uuid = ?", [uuid],
+    ),
+  ]);
   const transactions = includeTransactions
     ? await TRANSACTION_HANDLER.listTransactionsByUUIDs([uuid])
     : [];
@@ -160,6 +178,7 @@ export async function queryHistoricalDetail(uuid: string, includeTransactions = 
     assets,
     transactions,
     total: assets.reduce((sum, asset) => sum + asset.value, 0),
+    ...(partialRows[0] ? { partial: partialFromRow(partialRows[0]) } : {}),
   };
 }
 
@@ -240,6 +259,8 @@ export async function queryTotalValues(
   const data = await ASSET_HANDLER.listTotalValueRecords(
     dateRange.start,
     dateRange.end,
+    [],
+    true,
   );
 
   return data.map((rs) => ({

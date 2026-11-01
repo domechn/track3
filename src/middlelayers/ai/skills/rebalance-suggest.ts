@@ -26,7 +26,7 @@ const skill: Skill = {
       || numbers.some((value) => value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value < 0))) {
       return { data: { error: "invalid-options" }, text: "Use a valid mode and non-negative cash amounts." };
     }
-    const { holdings, stablecoinSymbols } = await loadRebalanceHoldings(ctx.baseCurrency);
+    const { holdings, stablecoinSymbols, partialSnapshot } = await loadRebalanceHoldings(ctx.baseCurrency);
     const result = calculateRebalance(holdings, profile.targets, {
       mode: args.mode as "full" | "buys" | undefined,
       injectedCash: args.injectedCash as number | undefined,
@@ -34,6 +34,7 @@ const skill: Skill = {
       ignoreBelowValue: args.ignoreBelowValue as number | undefined,
       tolerancePercent: profile.tolerancePercent,
       stablecoinSymbols,
+      partialSnapshot,
     });
     return {
       data: {
@@ -43,7 +44,9 @@ const skill: Skill = {
         warnings: result.warnings,
         rounding: "Trade values use 0.01 base-currency units; quantities are rounded to 8 decimals.",
       },
-      text: `Indicative rebalance for ${result.rows.length} allocations in ${ctx.baseCurrency.currency}; no trades were executed.`,
+      text: partialSnapshot
+        ? "Rebalance suggestions are paused because the latest snapshot is partial. Refresh all sources successfully."
+        : `Indicative rebalance for ${result.rows.length} allocations in ${ctx.baseCurrency.currency}; no trades were executed.`,
     };
   },
 };
