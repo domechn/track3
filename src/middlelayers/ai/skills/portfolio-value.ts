@@ -1,6 +1,7 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
 import { trace } from "./functions/trace";
+import { isSnapshotPartial } from "../../snapshot-partial";
 import {
   getSnapshotSummaries,
   getAssetsBySnapshot,
@@ -45,14 +46,16 @@ const skill: Skill = {
       }
       const assets = await getAssetsBySnapshot(latest.uuid);
       const usdTotal = totalValue(assets);
+      const partial = await isSnapshotPartial(latest.uuid);
       return {
         data: {
           baseCurrency: ctx.baseCurrency.currency,
           asOf: latest.createdAt.toISOString(),
           value: usdTotal * rate,
           valueUsd: usdTotal,
+          ...(partial ? { partial: true } : {}),
         },
-        text: `Current portfolio value: ${(usdTotal * rate).toFixed(2)} ${ctx.baseCurrency.currency} as of ${latest.createdAt.toISOString()}.`,
+        text: `Current portfolio value: ${(usdTotal * rate).toFixed(2)} ${ctx.baseCurrency.currency} as of ${latest.createdAt.toISOString()}.${partial ? " This total is partial and includes last known values for unavailable sources." : ""}`,
       };
     }
 
@@ -69,7 +72,9 @@ const skill: Skill = {
       timestamp: p.timestamp,
       valueUsd: p.value,
       value: p.value * rate,
+      ...(p.partial ? { partial: true } : {}),
     }));
+    const hasPartial = series.some((point) => point.partial);
 
     return {
       data: {
@@ -78,6 +83,7 @@ const skill: Skill = {
         to: new Date(points[points.length - 1]!.timestamp).toISOString(),
         points,
         summary: {
+          ...(hasPartial ? { partial: true } : {}),
           startValue: points[0]!.value,
           endValue: points[points.length - 1]!.value,
           change: points[points.length - 1]!.value - points[0]!.value,
@@ -89,7 +95,7 @@ const skill: Skill = {
               : 0,
         },
       },
-      text: `Portfolio value covers ${points.length} sampled points from ${new Date(points[0]!.timestamp).toISOString()} to ${new Date(points[points.length - 1]!.timestamp).toISOString()}.`,
+      text: `Portfolio value covers ${points.length} sampled points from ${new Date(points[0]!.timestamp).toISOString()} to ${new Date(points[points.length - 1]!.timestamp).toISOString()}.${hasPartial ? " Some totals are partial and include last known values for unavailable sources." : ""}`,
     };
   },
 };

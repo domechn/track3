@@ -28,6 +28,7 @@ export async function queryPNLChartValue(
     dateRange.start,
     dateRange.end,
     excludedSymbols,
+    true,
   );
   return downsampleIndices([data.map((record) => record.totalValue)], maxSize)
     .map((index) => ({
@@ -37,12 +38,9 @@ export async function queryPNLChartValue(
 }
 
 export async function queryPNLTableValue(): Promise<PNLTableDate> {
-  const pnlData = (await ASSET_HANDLER.listSymbolGroupedAssets(35))
-    .slice()
-    .reverse()
-    .map((rs) => ({
-      totalValue: rs.reduce((s, r) => s + r.value, 0),
-      timestamp: new Date(rs[0]?.createdAt).getTime(),
+  const pnlData = (await ASSET_HANDLER.listTotalValueRecords(undefined, undefined, [], true, 35))
+    .reverse().map((record) => ({
+      totalValue: record.totalValue, timestamp: new Date(record.createdAt).getTime(),
     }));
 
   const getPNL = (days: number) => {
@@ -74,6 +72,7 @@ export async function queryTopNAssets(
   const rows = await selectFromDatabaseWithSql<{ symbol: string; asset_type: AssetType }>(
     `SELECT MIN(TRIM(symbol)) AS symbol, asset_type FROM assets_v2
      WHERE createdAt >= ? AND createdAt <= ?
+       AND assets_v2.uuid NOT IN (SELECT uuid FROM snapshot_partial)
      GROUP BY asset_type, UPPER(TRIM(symbol))
      ORDER BY SUM(value) DESC, symbol ASC, asset_type ASC LIMIT ?`,
     [dateRange.start.toISOString(), dateRange.end.toISOString(), n],
@@ -94,11 +93,13 @@ export async function queryAssetsPercentageChange(
     `WITH top AS (
        SELECT UPPER(TRIM(symbol)) AS symbolKey, MIN(TRIM(symbol)) AS symbol, asset_type FROM assets_v2
        WHERE createdAt >= ? AND createdAt <= ?
+         AND assets_v2.uuid NOT IN (SELECT uuid FROM snapshot_partial)
        GROUP BY asset_type, UPPER(TRIM(symbol))
        ORDER BY SUM(value) DESC, symbol ASC, asset_type ASC LIMIT ?
      ), snapshots AS (
        SELECT uuid, MAX(createdAt) AS createdAt, SUM(value) AS total
-       FROM assets_v2 WHERE createdAt >= ? AND createdAt <= ? GROUP BY uuid
+       FROM assets_v2 WHERE createdAt >= ? AND createdAt <= ?
+         AND assets_v2.uuid NOT IN (SELECT uuid FROM snapshot_partial) GROUP BY uuid
      ), top_values AS (
        SELECT a.uuid, top.symbol, top.asset_type, SUM(a.value) AS value
        FROM assets_v2 a JOIN top
@@ -233,6 +234,7 @@ async function querySampledTopAssets(dateRange: TDateRange, maxSize: number, inc
   }>(
     `SELECT uuid, MAX(createdAt) AS createdAt, SUM(value) AS total FROM assets_v2
      WHERE createdAt >= ? AND createdAt <= ?
+       AND assets_v2.uuid NOT IN (SELECT uuid FROM snapshot_partial)
      GROUP BY uuid ORDER BY createdAt ASC, uuid ASC`,
     [dateRange.start.toISOString(), dateRange.end.toISOString()],
   );
@@ -266,9 +268,10 @@ export async function queryAssetChange(
   maxSize = Infinity,
 ): Promise<AssetChangeData> {
   const records = await selectFromDatabaseWithSql<{
-    uuid: string; createdAt: string; usdValue: number; btcPrice: number | null;
+    uuid: string; createdAt: string; usdValue: number; btcPrice: number | null; partial: number;
   }>(
     `SELECT a.uuid, MAX(a.createdAt) AS createdAt, SUM(a.value) AS usdValue,
+       EXISTS (SELECT 1 FROM snapshot_partial WHERE uuid = a.uuid) AS partial,
        (SELECT btc.price FROM assets_v2 btc
         WHERE btc.uuid = a.uuid AND btc.symbol = 'BTC'
         ORDER BY btc.id LIMIT 1) AS btcPrice
@@ -276,10 +279,13 @@ export async function queryAssetChange(
      GROUP BY a.uuid ORDER BY createdAt ASC, a.uuid ASC`,
     [dateRange.start.toISOString(), dateRange.end.toISOString()],
   );
-  const sampled = downsampleIndices([records.map((record) => record.usdValue)], maxSize)
-    .map((index) => records[index]);
+  const gaps = records.filter((record) => record.partial).map((record) => new Date(record.createdAt).getTime());
+  const complete = records.filter((record) => !record.partial);
+  const sampled = downsampleIndices([complete.map((record) => record.usdValue)], maxSize)
+    .map((index) => complete[index]);
 
   return {
+    gaps,
     timestamps: sampled.map((record) => new Date(record.createdAt).getTime()),
     data: sampled.map((record) => ({
       usdValue: record.usdValue,
@@ -301,6 +307,7 @@ export async function queryCoinsAmountChange(
             SUM(amount) AS amount, SUM(value) AS value
      FROM assets_v2
      WHERE symbol = ? AND createdAt >= ? AND createdAt <= ?
+       AND assets_v2.uuid NOT IN (SELECT uuid FROM snapshot_partial)
        ${assetType ? "AND asset_type = ?" : ""}
      GROUP BY uuid ORDER BY createdAt ASC, uuid ASC`,
     [symbol, dateRange.start.toISOString(), dateRange.end.toISOString(), ...(assetType ? [assetType] : [])],

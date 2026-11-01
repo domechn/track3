@@ -34,6 +34,10 @@ vi.mock("@/middlelayers/entities/assets", () => ({
     listAssetsAfterCreatedAt: vi.fn(),
   },
 }));
+vi.mock("@/middlelayers/snapshot-partial", () => ({
+  isSnapshotPartial: vi.fn().mockResolvedValue(false),
+  partialSnapshotIds: vi.fn().mockResolvedValue(new Set()),
+}));
 vi.mock("@/middlelayers/entities/transactions", () => ({
   TRANSACTION_HANDLER: {
     listTransactions: vi.fn(),

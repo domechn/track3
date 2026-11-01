@@ -130,8 +130,8 @@ function saveInsightCard(card: InsightCard, signal?: AbortSignal): Promise<void>
 
 export async function loadInsightSnapshots(): Promise<InsightSnapshot[]> {
   const db = await getDatabase();
-  const latest = await db.select<Array<{ uuid: string; at: string }>>(
-    "SELECT uuid, createdAt AS at FROM assets_v2 ORDER BY createdAt DESC, id DESC LIMIT 1",
+  const latest = await db.select<Array<{ uuid: string; at: string; partialSnapshot: number }>>(
+    "SELECT uuid, createdAt AS at, EXISTS (SELECT 1 FROM snapshot_partial WHERE uuid = assets_v2.uuid) AS partialSnapshot FROM assets_v2 ORDER BY createdAt DESC, id DESC LIMIT 1",
   );
   if (!latest[0]) return [];
   const preceding = await db.select<Array<{ uuid: string; at: string }>>(
@@ -156,7 +156,8 @@ export async function loadInsightSnapshots(): Promise<InsightSnapshot[]> {
     ids.map((row) => row.uuid),
   );
   return ids.map(({ uuid, at }) => ({
-    uuid, at, assets: rows.filter((row) => row.uuid === uuid).map(({ uuid: _uuid, ...asset }) => asset),
+    uuid, at, partialSnapshot: uuid === latest[0].uuid && !!latest[0].partialSnapshot,
+    assets: rows.filter((row) => row.uuid === uuid).map(({ uuid: _uuid, ...asset }) => asset),
   }));
 }
 

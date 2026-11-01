@@ -284,9 +284,9 @@ export async function loadAlertEvaluationData(
   pnlWindows: AlertWindow[] = [],
 ): Promise<{ snapshots: AlertSnapshot[]; prices: AlertPrices; targets?: RebalanceProfile; excludedSymbols: string[] }> {
   const db = await getDatabase();
-  const selectAssets = "SELECT asset_type AS assetType, symbol, wallet, amount, value, price, createdAt AS at FROM assets_v2 WHERE uuid = ";
+  const selectAssets = "SELECT uuid, asset_type AS assetType, symbol, wallet, amount, value, price, createdAt AS at FROM assets_v2 WHERE uuid = ";
   const [rawLatestRows, blacklist, stablecoinSymbols] = await Promise.all([
-    db.select<Array<AlertAsset & { at: string }>>(
+    db.select<Array<AlertAsset & { uuid?: string; at: string }>>(
       selectAssets + "(SELECT uuid FROM assets_v2 ORDER BY createdAt DESC, id DESC LIMIT 1)",
     ),
     getBlacklistCoins(),
@@ -300,7 +300,11 @@ export async function loadAlertEvaluationData(
   const statuses = sourceStatuses ?? readStoredSourceStatuses();
   if (snapshots[0]) {
     const oldSnapshot = now.getTime() - Date.parse(snapshots[0].at) > 86400000;
-    snapshots[0].hasStaleSources = oldSnapshot || statuses.some((source) => source.status === "stale" || source.status === "failed");
+    const marker = rawLatestRows[0].uuid
+      ? await db.select<Array<{ uuid: string }>>("SELECT uuid FROM snapshot_partial WHERE uuid = ? LIMIT 1", [rawLatestRows[0].uuid])
+      : [];
+    snapshots[0].hasStaleSources = !!marker.length || oldSnapshot ||
+      statuses.some((source) => source.status === "stale" || source.status === "failed");
     snapshots[0].staleAssetKeys = oldSnapshot || (!sourceResults?.length && snapshots[0].hasStaleSources)
       ? latestRows.map(keyOf)
       : sourceResults
@@ -314,7 +318,7 @@ export async function loadAlertEvaluationData(
   for (const window of windows) {
     const cutoffMs = now.getTime() - windowMs[window];
     const rows = await db.select<Array<AlertAsset & { at: string }>>(
-      selectAssets + "(SELECT uuid FROM assets_v2 WHERE createdAt <= ? ORDER BY createdAt DESC, id DESC LIMIT 1)",
+      selectAssets + "(SELECT uuid FROM assets_v2 WHERE createdAt <= ? AND uuid NOT IN (SELECT uuid FROM snapshot_partial) ORDER BY createdAt DESC, id DESC LIMIT 1)",
       [new Date(cutoffMs).toISOString()],
     );
     if (!rows.length || Date.parse(rows[0].at) < cutoffMs - windowMs[window] / 4) continue;

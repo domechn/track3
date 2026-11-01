@@ -68,6 +68,7 @@ import PageLoadingOverlay from "./page-loading-overlay";
 import { useTranslation } from "@/i18n";
 import { ScrollArea } from "./ui/scroll-area";
 import HistoryEditLog from "./history-edit-log";
+import { HistoryPartialDetails, HistoryPartialPill } from "./history-partial";
 
 type RankData = {
   id: number;
@@ -112,7 +113,7 @@ const App = ({
   const [selectedDataId, setSelectedDataId] = useState<string | null>(null);
   const [editLog, setEditLog] = useState<SnapshotEdit[] | null>(null);
   const [editLogError, setEditLogError] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState<"all" | "edited">("all");
+  const [historyFilter, setHistoryFilter] = useState<"all" | "edited" | "complete" | "partial">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
   const [detailSearch, setDetailSearch] = useState("");
@@ -641,6 +642,7 @@ const App = ({
                 />
               </div>
             </div>
+            <HistoryPartialDetails partial={selectedData?.partial} t={t} locale={locale} />
             <HistoryEditLog edits={editLog} error={editLogError} />
             <div
               ref={detailRegionRef}
@@ -864,7 +866,7 @@ const App = ({
                     : ""}
                 </div>
                 <div className="flex items-center gap-2 touch:min-w-0 touch:flex-wrap">
-                  <Select value={historyFilter} onValueChange={(value: "all" | "edited") => {
+                  <Select value={historyFilter} onValueChange={(value: "all" | "edited" | "complete" | "partial") => {
                     setHistoryFilter(value);
                     setDataPage(0);
                   }}>
@@ -874,6 +876,8 @@ const App = ({
                     <SelectContent>
                       <SelectItem value="all">{t("history.editLog.all")}</SelectItem>
                       <SelectItem value="edited">{t("history.editLog.edited")}</SelectItem>
+                      <SelectItem value="complete">{t("history.partial.complete")}</SelectItem>
+                      <SelectItem value="partial">{t("history.partial.label")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <span className="text-xs text-muted-foreground">{t("history.rowsLabel")}</span>
@@ -998,6 +1002,7 @@ const App = ({
                                 {row.edited ? <span className="mt-1 w-fit rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
                                   {t("history.editLog.edited")}
                                 </span> : null}
+                                <HistoryPartialPill row={row} t={t} />
                               </button>
                               <span className="block text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
                             </TableCell>

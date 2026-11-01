@@ -1,3 +1,4 @@
+import initSqlJs from "sql.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   evaluate,
@@ -183,6 +184,30 @@ describe("alert storage", () => {
       kind: "portfolio_value_change", window: "7d", comparator: "lte", threshold: -10,
     }), data.snapshots, {}, undefined).value).toBe(-10);
   });
+  it("does not compare portfolio value against a partial historical snapshot", async () => {
+    const SQL = await initSqlJs();
+    const db = new SQL.Database();
+    db.run("CREATE TABLE assets_v2 (id INTEGER PRIMARY KEY, uuid TEXT, createdAt TEXT, asset_type TEXT, symbol TEXT, wallet TEXT, amount REAL, value REAL, price REAL)");
+    db.run("CREATE TABLE snapshot_partial (uuid TEXT PRIMARY KEY)");
+    db.run("CREATE TABLE rebalance_profiles (id INTEGER PRIMARY KEY, targets TEXT, tolerance_percent REAL)");
+    db.run("INSERT INTO assets_v2 (uuid, createdAt, asset_type, symbol, wallet, amount, value, price) VALUES ('prior', '2026-10-10T12:00:00.000Z', 'crypto', 'BTC', 'a', 1, 1000, 1000), ('latest', '2026-10-17T12:00:00.000Z', 'crypto', 'BTC', 'a', 1, 900, 900)");
+    db.run("INSERT INTO snapshot_partial (uuid) VALUES ('prior')");
+    vi.mocked(getDatabase).mockResolvedValue({
+      select: async (sql: string, values: unknown[] = []) => {
+        const stmt = db.prepare(sql);
+        stmt.bind(values as (string | number)[]);
+        const rows: object[] = [];
+        while (stmt.step()) rows.push(stmt.getAsObject());
+        stmt.free();
+        return rows;
+      },
+    } as never);
+    const data = await loadAlertEvaluationData(undefined, [], now);
+    expect(measureRule(rule({
+      kind: "portfolio_value_change", window: "7d", comparator: "lte", threshold: -10,
+    }), data.snapshots, {}, undefined).status).toBe("unavailable");
+    db.close();
+  });
   it("treats unmapped stale sources conservatively after refresh", async () => {
     vi.mocked(getDatabase).mockResolvedValue({
       select: async (sql: string) => sql.includes("FROM assets_v2")
@@ -207,6 +232,17 @@ describe("alert storage", () => {
     );
     expect(data.snapshots[0].hasStaleSources).toBe(false);
     expect(evaluate([rule({ threshold: 600 })], data.snapshots, {}, undefined, now)).toHaveLength(1);
+  });
+  it("keeps total alerts from firing when the latest stored snapshot is partial", async () => {
+    vi.mocked(getDatabase).mockResolvedValue({
+      select: async (sql: string) => sql.includes("FROM assets_v2")
+        ? [{ uuid: "partial-1", assetType: "crypto", symbol: "BTC", wallet: "wallet-a",
+          value: 1000, amount: 10, price: 100, at: now.toISOString() }]
+        : sql.includes("FROM snapshot_partial") ? [{ uuid: "partial-1" }] : [],
+    } as never);
+    const data = await loadAlertEvaluationData(undefined, [], now);
+    expect(data.snapshots[0].hasStaleSources).toBe(true);
+    expect(evaluate([rule()], data.snapshots, {}, undefined, now)).toEqual([]);
   });
 
   it("marks an old startup snapshot as stale before evaluating goals", async () => {

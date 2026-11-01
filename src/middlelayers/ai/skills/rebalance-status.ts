@@ -13,9 +13,9 @@ const skill: Skill = {
   async run(_args, ctx): Promise<ToolResult> {
     const profile = await getRebalanceProfile();
     if (!profile) return { data: { empty: true, reason: "no-targets" }, text: "No rebalance targets saved." };
-    const { holdings, stablecoinSymbols } = await loadRebalanceHoldings(ctx.baseCurrency);
+    const { holdings, stablecoinSymbols, partialSnapshot } = await loadRebalanceHoldings(ctx.baseCurrency);
     const result = calculateRebalance(holdings, profile.targets, {
-      tolerancePercent: profile.tolerancePercent, stablecoinSymbols,
+      tolerancePercent: profile.tolerancePercent, stablecoinSymbols, partialSnapshot,
     });
     return {
       data: {
@@ -26,7 +26,9 @@ const skill: Skill = {
           ({ symbol, assetType, kind, currentPercent, targetPercent, deviationPercent, note })),
         warnings: result.warnings,
       },
-      text: `Rebalance status for ${result.rows.length} allocations in ${ctx.baseCurrency.currency}.`,
+      text: partialSnapshot
+        ? "Rebalance suggestions are paused because the latest snapshot is partial. Refresh all sources successfully."
+        : `Rebalance status for ${result.rows.length} allocations in ${ctx.baseCurrency.currency}.`,
     };
   },
 };

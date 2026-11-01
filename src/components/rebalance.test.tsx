@@ -246,6 +246,20 @@ describe("Rebalance page", () => {
     expect(await screen.findByRole("row", { name: /BTC/ })).toHaveTextContent("Price unavailable");
   });
 
+  it("shows only the partial snapshot reason while trades are paused", async () => {
+    vi.mocked(loadRebalanceHoldings).mockResolvedValue({
+      holdings: assets, stablecoinSymbols: [], partialSnapshot: true,
+    });
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }],
+      tolerancePercent: 0,
+    });
+    render(<Rebalance currency={currency} />);
+    expect(await screen.findByText(/Trades are paused because the latest snapshot is partial/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sales are paused because a held target has no price/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export CSV" })).toBeDisabled();
+  });
+
   it("explains invalid trade options instead of silently hiding suggestions", async () => {
     vi.mocked(getRebalanceProfile).mockResolvedValue({
       targets: [

@@ -36,6 +36,7 @@ describe("refreshInsights", () => {
     const SQL = await initSqlJs();
     const db = new SQL.Database();
     db.run("CREATE TABLE assets_v2 (id INTEGER PRIMARY KEY, uuid TEXT, createdAt TEXT, asset_type TEXT, symbol TEXT, value REAL, amount REAL, price REAL)");
+    db.run("CREATE TABLE snapshot_partial (uuid TEXT PRIMARY KEY)");
     const insert = db.prepare("INSERT INTO assets_v2 (uuid, createdAt, asset_type, symbol, value, amount, price) VALUES (?, ?, 'crypto', ?, ?, 1, 1)");
     const add = (uuid: string, at: string, btc: number) => {
       insert.run([uuid, at, "BTC", btc]);

@@ -52,6 +52,7 @@ const App = ({
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [showLastKnownOffer, setShowLastKnownOffer] = useState(false);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult | undefined>(() => lastRetryResult);
   const [preflight, setPreflight] = useState<{ sourceId?: string; warnings: UsageWarning[] } | null>(null);
@@ -102,6 +103,10 @@ const App = ({
         (attempt) => automatic ? attempt() : retry(attempt, retries, retryInterval),
       );
       succeeded = result.persisted !== false && !result.requiresDataSourceAction;
+      const freshAutomaticTotal = automatic && succeeded && !result.usedLastKnownData;
+      if (!automatic || freshAutomaticTotal) {
+        setShowLastKnownOffer(!automatic && succeeded && !!result.usedLastKnownData);
+      }
       if (succeeded) {
         alertResult = result;
         getMemoryCacheInstance("data-fetch").clearCache();
@@ -319,7 +324,10 @@ const App = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+      <AlertDialog open={statusDialogOpen} onOpenChange={(open) => {
+        setStatusDialogOpen(open);
+        if (!open) setShowLastKnownOffer(false);
+      }}>
         <AlertDialogContent overlayProps={{ className: "t3-refresh-overlay" }} className="t3-refresh-popover sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>{t("refresh.sourceStatus")}</AlertDialogTitle>
@@ -395,6 +403,13 @@ const App = ({
               </div>
             ); })}
           </div>
+          {showLastKnownOffer && <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+            <p>{t("refresh.lastKnownSaved")}</p>
+            <Button className="mt-2" variant="outline" size="sm" onClick={() => {
+              setShowLastKnownOffer(false);
+              setStatusDialogOpen(false);
+            }}>{t("refresh.useLastKnown")}</Button>
+          </div>}
           <AlertDialogFooter>
             {retrySchedule.stopped && hasFailure && <Button variant="outline"
               disabled={refreshLoading || preflightPending} onClick={() => requestRefresh()}>{t("refresh.autoRetry.fullRefresh")}</Button>}

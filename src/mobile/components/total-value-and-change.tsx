@@ -14,6 +14,7 @@ import {
 } from "@/utils/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Line } from "react-chartjs-2";
 import {
   queryAssetChange,
@@ -35,6 +36,7 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/mobile/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
+import { hasPartialGap } from "@/middlelayers/chart-gap";
 import { AnimatedAmount, DeltaPill, SegmentedControl, Switch, useHaptics, useIsMobile } from "@/mobile/components/mobile";
 import { visibleHistoryIndices } from "@/mobile/components/mobile/chart-range";
 import { useTheme } from "@/mobile/components/common/theme";
@@ -203,6 +205,7 @@ const App = ({
   });
 
   const [btcAsBase, setBtcAsBase] = useState(false);
+  const [excludedProvider, setExcludedProvider] = useState("");
 
   const [showPercentageInChart, setShowPercentageInChart] = useState(false);
 
@@ -225,6 +228,8 @@ const App = ({
   const dataChangedVersion = useDataChangedVersion();
 
   const totalValue = useMemo(() => totalValueData.totalValue, [totalValueData]);
+  const excludedSource = totalValueData.excludedSources?.find((source) => source.provider === excludedProvider);
+  const shownTotalValue = totalValue - (excludedSource?.value ?? 0);
   const rangeDays = { "1W": 7, "1M": 30, "3M": 90, "1Y": 365, ALL: null }[chartRange];
   const visibleIndices = useMemo(() => isMobile
     ? visibleHistoryIndices(assetChangeData.timestamps, rangeDays)
@@ -248,10 +253,10 @@ const App = ({
       getTotalValueShower(
         btcAsBase,
         firstTotalValue,
-        totalValue,
+        shownTotalValue,
         assetChangeData,
       ),
-    [assetChangeData, firstTotalValue, totalValue, btcAsBase],
+    [assetChangeData, firstTotalValue, shownTotalValue, btcAsBase],
   );
 
   const changedValueOrPercentage = useMemo(() => {
@@ -260,7 +265,7 @@ const App = ({
     }
     let val = getPercentageChange(
       totalValueShower,
-      totalValue,
+      shownTotalValue,
       firstTotalValue,
     );
     const p = getUpOrDown(val);
@@ -268,7 +273,7 @@ const App = ({
       val = -val;
     }
     return `${p}${prettyNumberToLocaleString(val)}%`;
-  }, [showValue, firstTotalValue, totalValue, totalValueShower]);
+  }, [showValue, firstTotalValue, shownTotalValue, totalValueShower]);
 
   useEffect(() => {
     const gen = ++loadGenRef.current;
@@ -537,6 +542,11 @@ const App = ({
           tension: 0,
           pointRadius: 0,
           pointStyle: "rotRect",
+          segment: {
+            borderDash: (segment: { p0DataIndex: number; p1DataIndex: number }) =>
+              hasPartialGap(plottedTimestamps[segment.p0DataIndex], plottedTimestamps[segment.p1DataIndex],
+                assetChangeData.gaps ?? []) ? [3, 3] : undefined,
+          },
           fill: false,
         },
         ...(high === undefined ? [] : [{
@@ -550,7 +560,7 @@ const App = ({
         }]),
       ],
     };
-  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, palette, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t]);
+  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, palette, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t, assetChangeData.gaps]);
 
   return (
     <div className={metrics ? "h-full overview-total t3-total-overview" : "h-full overview-total"}>
@@ -632,20 +642,35 @@ const App = ({
         <CardContent className="flex flex-1 flex-col t3-hero-content mobile-hero-content">
           <div className={`${isMobile ? "" : "text-2xl"} font-semibold tabular-nums tracking-tight mobile-hero-value t3-hero-value`}>
             {isMobile && !btcAsBase
-              ? <AnimatedAmount value={currencyWrapper(currency)(totalValue)}
+              ? <AnimatedAmount value={currencyWrapper(currency)(shownTotalValue)}
                   format={(value) => currency.symbol + prettyNumberToLocaleString(value)} />
-              : totalValueShower.formatTotalValue()}
+              : getTotalValueShower(btcAsBase, firstTotalValue, shownTotalValue, assetChangeData).formatTotalValue()}
+            {totalValueData.partial && <span className="ml-2 inline-flex align-middle rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-sans text-xs font-medium tracking-normal text-foreground">
+              {t("history.partial.label")}
+            </span>}
           </div>
+          {!!totalValueData.excludedSources?.length && <Select value={excludedSource?.provider ?? "__all__"}
+            onValueChange={(value) => setExcludedProvider(value === "__all__" ? "" : value)}>
+            <SelectTrigger aria-label={t("totalValue.view")} className="mt-2 w-auto max-w-full font-sans text-xs font-normal">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{t("totalValue.withLastKnown")}</SelectItem>
+              {totalValueData.excludedSources.map((source) => <SelectItem key={source.provider} value={source.provider}>
+                {t("totalValue.excluding").replace("{provider}", source.provider)}
+              </SelectItem>)}
+            </SelectContent>
+          </Select>}
           <p className="text-xs text-muted-foreground mb-2 mobile-hero-change t3-hero-change">
             <button type="button" aria-label={`${changedValueOrPercentage}, ${t("totalValue.toggleChange")}`}
               onClick={() => setShowValue((value) => !value)}
               className={`tabular-nums touch:min-h-11 touch:px-2 ${changePercentageColorClass(
                 totalValueShower,
-                totalValue,
+                shownTotalValue,
                 firstTotalValue,
               )}`}
             >
-              {isMobile ? <DeltaPill value={totalValue - firstTotalValue} quoteColor={quoteColor}>{changedValueOrPercentage}</DeltaPill> : changedValueOrPercentage}
+              {isMobile ? <DeltaPill value={shownTotalValue - firstTotalValue} quoteColor={quoteColor}>{changedValueOrPercentage}</DeltaPill> : changedValueOrPercentage}
             </button>{" "}
             {t("totalValue.from").replace("{date}", displayedFirstDate)}
           </p>
@@ -678,6 +703,10 @@ const App = ({
             <span>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })
               .format(new Date(plottedTimestamps[plottedTimestamps.length - 1]))}</span>
           </div>}
+          {assetChangeData.gaps?.some((gap) => !isMobile || rangeDays === null ||
+            gap >= (assetChangeData.timestamps.at(-1) ?? 0) - rangeDays * 86_400_000) && <p className="mt-1 border-t border-dotted border-muted-foreground/50 pt-1 text-xs text-muted-foreground">
+            {t("totalValue.partialGap")}
+          </p>}
           {isMobile && <SegmentedControl label={t("overview.chartRange")} value={chartRange} onChange={(value) => setChartRange(value)}
             options={([
               ["1W", "overview.rangeWeek"], ["1M", "overview.rangeMonth"],

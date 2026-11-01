@@ -10,6 +10,7 @@ describe("loadInsightSnapshots", () => {
     const SQL = await initSqlJs();
     const db = new SQL.Database();
     db.run("CREATE TABLE assets_v2 (id INTEGER PRIMARY KEY, uuid TEXT, createdAt TEXT, asset_type TEXT, symbol TEXT, value REAL, amount REAL, price REAL)");
+    db.run("CREATE TABLE snapshot_partial (uuid TEXT PRIMARY KEY)");
     const insert = db.prepare("INSERT INTO assets_v2 (uuid, createdAt, asset_type, symbol, value, amount, price) VALUES (?, ?, 'crypto', 'BTC', ?, 1, 1)");
     for (const [uuid, at, value] of [
       ["exact-day", "2024-01-31T12:00:00.000Z", 100],
@@ -40,6 +41,7 @@ describe("loadInsightSnapshots", () => {
       const SQL = await initSqlJs();
       const db = new SQL.Database();
       db.run("CREATE TABLE assets_v2 (id INTEGER PRIMARY KEY, uuid TEXT, createdAt TEXT, asset_type TEXT, symbol TEXT, value REAL, amount REAL, price REAL)");
+      db.run("CREATE TABLE snapshot_partial (uuid TEXT PRIMARY KEY)");
       const insert = db.prepare("INSERT INTO assets_v2 (uuid, createdAt, asset_type, symbol, value, amount, price) VALUES (?, ?, 'crypto', 'BTC', 100, 1, 1)");
       for (const [uuid, at] of [
         ["month", "2024-01-11T00:30:00.000Z"],
@@ -66,5 +68,26 @@ describe("loadInsightSnapshots", () => {
     } finally {
       process.env.TZ = originalTimezone;
     }
+  });
+
+  it("marks a partial latest snapshot for insight decisions", async () => {
+    const SQL = await initSqlJs();
+    const db = new SQL.Database();
+    db.run("CREATE TABLE assets_v2 (id INTEGER PRIMARY KEY, uuid TEXT, createdAt TEXT, asset_type TEXT, symbol TEXT, value REAL, amount REAL, price REAL)");
+    db.run("CREATE TABLE snapshot_partial (uuid TEXT PRIMARY KEY)");
+    db.run("INSERT INTO assets_v2 (uuid, createdAt, asset_type, symbol, value, amount, price) VALUES ('latest', '2024-02-01T12:00:00.000Z', 'crypto', 'BTC', 100, 1, 100)");
+    db.run("INSERT INTO snapshot_partial (uuid) VALUES ('latest')");
+    vi.mocked(getDatabase).mockResolvedValue({
+      select: async (sql: string, values: unknown[] = []) => {
+        const stmt = db.prepare(sql);
+        stmt.bind(values as (string | number)[]);
+        const rows: object[] = [];
+        while (stmt.step()) rows.push(stmt.getAsObject());
+        stmt.free();
+        return rows;
+      },
+    } as never);
+    expect((await loadInsightSnapshots())[0].partialSnapshot).toBe(true);
+    db.close();
   });
 });

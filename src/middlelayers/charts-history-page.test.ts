@@ -56,6 +56,7 @@ describe("paged historical queries", () => {
       target TEXT, action TEXT, asset_type TEXT, symbol TEXT, wallet TEXT,
       old_value TEXT, new_value TEXT
     )`);
+    db.run(readFileSync("src-tauri/migrations/v094t095/snapshot_partial_up.sql", "utf8"));
     addRows = (sql) => db.run(sql);
     queryPlan = (sql, values) => {
       const statement = db.prepare(`EXPLAIN QUERY PLAN ${sql}`);
@@ -114,6 +115,22 @@ describe("paged historical queries", () => {
     expect(sqlSelect).toHaveBeenCalledTimes(2);
   });
 
+  it("filters complete and partial snapshots while keeping the actual latest total", async () => {
+    addRows(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
+      VALUES ('snapshot-000042', 5, '[{"wallet":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","kind":"wallet","provider":"BTC","category":"network"}]',
+        'last_known', '2022-01-02T18:00:00.000Z')`);
+    const all = await queryHistoricalPage(range, 20, 0);
+    expect(all.rows[0]).toMatchObject({ id: "snapshot-000042", sourcesTotal: 5, missingCount: 1 });
+    const partial = await queryHistoricalPage(range, 20, 0, "partial");
+    expect(partial.totalCount).toBe(1);
+    expect(partial.rows.map((row) => row.id)).toEqual(["snapshot-000042"]);
+    const complete = await queryHistoricalPage(range, 20, 0, "complete");
+    expect(complete.totalCount).toBe(42);
+    expect(complete.rows[0].id).toBe("snapshot-000041");
+    expect(complete.latest?.id).toBe("snapshot-000042");
+    expect(sqlSelect).toHaveBeenCalledTimes(3);
+  });
+
   it("loads one snapshot's retained edits newest first", async () => {
     addRows(`INSERT INTO snapshot_edit_log
       (snapshot_uuid, edited_at, origin, target, action, symbol, old_value, new_value)
@@ -130,7 +147,7 @@ describe("paged historical queries", () => {
     const detail = await queryHistoricalDetail("snapshot-000042");
     expect(detail.assets).toHaveLength(200);
     expect(detail.transactions).toHaveLength(0);
-    expect(sqlSelect).toHaveBeenCalledTimes(2);
+    expect(sqlSelect).toHaveBeenCalledTimes(3);
     const withTransactions = await queryHistoricalDetail("snapshot-000042", true);
     expect(withTransactions.transactions).toHaveLength(1);
     expect(withTransactions.transactions[0].assetType).toBe("crypto");

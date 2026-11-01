@@ -18,7 +18,7 @@ export type InsightAsset = {
   amount: number;
   price: number;
 };
-export type InsightSnapshot = { uuid: string; at: string; assets: InsightAsset[] };
+export type InsightSnapshot = { uuid: string; at: string; assets: InsightAsset[]; partialSnapshot?: boolean };
 export type InsightInput = {
   snapshots: InsightSnapshot[];
   stablecoinSymbols?: string[];
@@ -189,7 +189,7 @@ export function computeInsights(input: InsightInput): Insight[] {
     if (alert.acknowledgedAt || !Number.isFinite(at) || Math.abs(at - Date.parse(alert.triggeredAt)) > dayMs) continue;
     add(`alert:${alert.id}`, "warning", "insights.alert", { kind: alert.kind, value: round(alert.value) });
   }
-  if (input.rebalanceProfile && total > 0 && !unreliableCount) {
+  if (input.rebalanceProfile && total > 0 && !unreliableCount && !latest.partialSnapshot) {
     const calculation = calculateRebalance(latest.assets.map((asset) => ({ ...asset })), input.rebalanceProfile.targets,
       { tolerancePercent: input.rebalanceProfile.tolerancePercent });
     const drift = calculation.rows.filter((row) => row.kind === "asset")

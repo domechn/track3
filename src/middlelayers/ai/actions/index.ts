@@ -382,12 +382,16 @@ export async function executeAction(name: string, raw: unknown): Promise<string>
       const profile = await getRebalanceProfile();
       if (!profile) throw new Error("No rebalance targets to export");
       const currency = await queryPreferCurrency();
-      const { holdings, stablecoinSymbols } = await loadRebalanceHoldings(currency);
+      const { holdings, stablecoinSymbols, partialSnapshot } = await loadRebalanceHoldings(currency);
       const options = readRebalanceOptions();
       const result = calculateRebalance(holdings, profile.targets, {
         ...options, tolerancePercent: profile.tolerancePercent,
         stablecoinSymbols: options.stablecoinsAsCash === false ? [] : stablecoinSymbols,
+        partialSnapshot,
       });
+      if (result.warnings.some((warning) => warning.kind === "partial-snapshot")) {
+        throw new Error("Rebalance export is paused because the latest snapshot is partial");
+      }
       const dictionary: Record<string, string> = localStorage.getItem(localeLocalStorageKey) === "zh" ? zh : en;
       return await exportFile(rebalanceCsvFilename, ["csv"], (path) =>
         writeTextFile(path, suggestionsToCsv(result, currency.currency, (key) => dictionary[key] ?? en[key as keyof typeof en] ?? key)))

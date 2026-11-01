@@ -59,4 +59,20 @@ describe("rebalance assistant skills", () => {
     vi.mocked(getRebalanceProfile).mockResolvedValue(undefined);
     expect((await suggestSkill.run({}, { baseCurrency })).data).toEqual({ empty: true, reason: "no-targets" });
   });
+
+  it.each([statusSkill, suggestSkill])("%s pauses suggestions on a partial snapshot", async (skill) => {
+    vi.mocked(loadRebalanceHoldings).mockResolvedValue({
+      holdings: [
+        { symbol: "BTC", assetType: "crypto", amount: 2, value: 60, price: 30 },
+        { symbol: "ETH", assetType: "crypto", amount: 1, value: 20, price: 20 },
+      ],
+      stablecoinSymbols: [],
+      partialSnapshot: true,
+    });
+    const result = await skill.run({}, { baseCurrency });
+    expect(result.data).toMatchObject({
+      rows: [],
+      warnings: [{ kind: "partial-snapshot" }],
+    });
+  });
 });

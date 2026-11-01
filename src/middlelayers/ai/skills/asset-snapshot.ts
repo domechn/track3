@@ -1,6 +1,7 @@
 import { registerSkill } from "../tools";
 import type { Skill, ToolResult } from "./types";
 import { trace } from "./functions/trace";
+import { isSnapshotPartial } from "../../snapshot-partial";
 import {
   getLatestSnapshot,
   getAssetsBySnapshot,
@@ -44,6 +45,7 @@ const skill: Skill = {
     const grouped = groupAssets(assets);
     const usdTotal = totalValue(assets);
     const rate = ctx.baseCurrency.rate || 1;
+    const partial = await isSnapshotPartial(snapshot.uuid);
 
     return {
       data: {
@@ -51,6 +53,7 @@ const skill: Skill = {
         baseCurrency: ctx.baseCurrency.currency,
         totalValue: usdTotal * rate,
         totalValueUsd: usdTotal,
+        ...(partial ? { partial: true } : {}),
         assetCount: grouped.length,
         assets: grouped.map((g) => ({
           symbol: g.symbol,
@@ -61,7 +64,7 @@ const skill: Skill = {
           priceUsd: g.price,
         })),
       },
-      text: `Snapshot at ${snapshot.createdAt.toISOString()}: ${(usdTotal * rate).toFixed(2)} ${ctx.baseCurrency.currency} across ${grouped.length} assets.`,
+      text: `Snapshot at ${snapshot.createdAt.toISOString()}: ${(usdTotal * rate).toFixed(2)} ${ctx.baseCurrency.currency} across ${grouped.length} assets.${partial ? " This total is partial and includes last known values for unavailable sources." : ""}`,
     };
   },
 };

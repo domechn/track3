@@ -16,7 +16,7 @@ import {
   queryTopCoinsPercentageChangeData,
   queryTopNAssets,
 } from "./charts-timeseries";
-import { queryLatestAssetsPercentage } from "./charts-assets";
+import { queryLatestAssetsPercentage, queryMaxTotalValue } from "./charts-assets";
 
 const range = {
   start: new Date("2022-01-01T00:00:00.000Z"),
@@ -44,6 +44,8 @@ describe("large time-series queries", () => {
       }
     }
     insert.free();
+    db.run(`CREATE TABLE snapshot_partial (uuid TEXT PRIMARY KEY, sources_total INTEGER,
+      missing TEXT, fill TEXT, created_at TEXT)`);
     addRows = (sql) => db.run(sql);
     sqlSelect.mockReset();
     readCount.rows = 0;
@@ -68,6 +70,22 @@ describe("large time-series queries", () => {
     expect(change.data.at(-1)?.usdValue).toBe(28500);
     expect(sqlSelect).toHaveBeenCalledTimes(2);
     expect(readCount.rows).toBeLessThanOrEqual(86);
+  });
+  it("leaves a gap instead of plotting a partial snapshot's carried total", async () => {
+    addRows(`INSERT INTO snapshot_partial (uuid) VALUES ('snapshot-000021')`);
+    const change = await queryAssetChange(range);
+    expect(change.timestamps).toHaveLength(42);
+    expect(change.gaps).toEqual([new Date("2022-01-01T21:00:00.000Z").getTime()]);
+    const pnl = await queryPNLChartValue(range);
+    expect(pnl).toHaveLength(42);
+    expect(pnl.some((point) => point.timestamp === change.gaps?.[0])).toBe(false);
+  });
+  it("does not call a partial snapshot's carried total the all-time high", async () => {
+    addRows(`UPDATE assets_v2 SET value = 1000000 WHERE id = 1;
+      INSERT INTO snapshot_partial (uuid) VALUES ('snapshot-000000')`);
+    const high = await queryMaxTotalValue(range);
+    expect(high.uuid).toBe("snapshot-000042");
+    expect(high.totalValue).toBe(28500);
   });
   it("excludes blacklisted symbols from every goal portfolio value", async () => {
     const values = await queryPNLChartValue(range, 80, ["asset0"]);
