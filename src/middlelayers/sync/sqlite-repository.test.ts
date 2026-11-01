@@ -23,6 +23,18 @@ it("reports the UTF-8 size of the JSON saved in sync_state", async () => {
   expect(bytes).toBe(new TextEncoder().encode(saved).length);
 });
 
+it("stores decrypted manifests by owner, header salt, and ETag in the local cache", async () => {
+  vi.mocked(getDatabase).mockResolvedValue({
+    select: async () => [{ etag: '"v1"', body: '{"version":1,"entries":[]}', last_modified: "2026-01-01" }],
+  } as never);
+  const repo = new SqliteSyncRepository();
+  await repo.saveManifestCache("owner", "salt", '"v1"', { version: 1, entries: [] }, "2026-01-01");
+  expect(vi.mocked(executeWrite).mock.calls.at(-1)?.[1]).toContain("salt");
+  expect(await repo.loadManifestCache("owner", "salt")).toEqual({
+    etag: '"v1"', manifest: { version: 1, entries: [] }, lastModified: "2026-01-01",
+  });
+});
+
 it("decrypts local secrets for the sync payload and reencrypts pulled secrets", async () => {
   vi.mocked(getDatabase).mockResolvedValue({
     select: async () => [{ id: 10, data: "!ent:local-ciphertext" }, { id: 7, data: "USD" }],

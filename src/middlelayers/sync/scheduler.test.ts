@@ -226,7 +226,7 @@ describe("SyncScheduler", () => {
     vi.useFakeTimers();
     const store = new FakeS3();
     let finishStale!: () => void;
-    store.getObject = () => new Promise((resolve) => { finishStale = () => resolve(null); });
+    store.getObject = (_key, _signal) => new Promise<null>((resolve) => { finishStale = () => resolve(null); });
     const run = vi.fn()
       .mockImplementationOnce(async (signal: AbortSignal) => {
         await store.getObject("sync-header", signal);

@@ -19,10 +19,11 @@ export function isS3Conflict(error: unknown): boolean {
 }
 
 export type WriteConditions = { ifMatch?: string; ifNoneMatch?: "*" };
-export type StoredObject = { body: Uint8Array; etag: string };
+export type StoredObject = { body: Uint8Array; etag: string; lastModified?: string };
+export type NotModifiedObject = { notModified: true; etag: string; lastModified?: string };
 export type ListedObject = { key: string; etag: string; size: number; lastModified?: string };
-export type ListOptions = { prefix?: string; continuationToken?: string; signal?: AbortSignal };
-export type ListPage = { objects: ListedObject[]; nextContinuationToken?: string };
+export type ListOptions = { prefix?: string; delimiter?: string; continuationToken?: string; signal?: AbortSignal };
+export type ListPage = { objects: ListedObject[]; commonPrefixes?: string[]; nextContinuationToken?: string };
 export const listResponseBytes: unique symbol = Symbol("listResponseBytes");
 export type StoreRetry = {
   verb: "GET" | "PUT" | "LIST" | "DELETE" | "HEAD";
@@ -36,6 +37,7 @@ export type StoreRetry = {
 export interface S3Store {
   putObject(key: string, body: Uint8Array, conditions?: WriteConditions, signal?: AbortSignal): Promise<{ etag: string }>;
   getObject(key: string, signal?: AbortSignal): Promise<StoredObject | null>;
+  getObject(key: string, signal: AbortSignal | undefined, ifNoneMatch: string): Promise<StoredObject | NotModifiedObject | null>;
   headObject(key: string, signal?: AbortSignal): Promise<{ etag: string; size: number } | null>;
   deleteObject(key: string, signal?: AbortSignal): Promise<void>;
   listObjectsV2(options?: ListOptions): Promise<ListPage>;
@@ -48,7 +50,7 @@ export async function writeSyncHeader(store: S3Store, header: SyncHeader): Promi
 
 export async function readSyncHeader(store: S3Store): Promise<SyncHeader | null> {
   const object = await store.getObject("sync-header");
-  if (!object) return null;
+  if (!object || !("body" in object)) return null;
   if (object.body.length > 4096) throw new Error("Invalid sync header");
   const header: unknown = JSON.parse(new TextDecoder().decode(object.body));
   if (!header || typeof header !== "object" || !("kdf" in header) || !("keyCheck" in header)) {
@@ -77,10 +79,14 @@ export class FakeS3 implements S3Store {
     return { etag };
   }
 
-  async getObject(key: string, signal?: AbortSignal): Promise<StoredObject | null> {
+  getObject(key: string, signal?: AbortSignal): Promise<StoredObject | null>;
+  getObject(key: string, signal: AbortSignal | undefined, ifNoneMatch: string): Promise<StoredObject | NotModifiedObject | null>;
+  async getObject(key: string, signal?: AbortSignal, ifNoneMatch?: string): Promise<StoredObject | NotModifiedObject | null> {
     if (signal?.aborted) throw new Error("S3 request aborted");
     const object = this.objects.get(key);
-    return object ? { body: object.body.slice(), etag: object.etag } : null;
+    if (!object) return null;
+    if (ifNoneMatch === object.etag) return { notModified: true, etag: object.etag, lastModified: this.modified.get(key) };
+    return { body: object.body.slice(), etag: object.etag, lastModified: this.modified.get(key) };
   }
 
   async headObject(key: string, signal?: AbortSignal): Promise<{ etag: string; size: number } | null> {
@@ -98,16 +104,22 @@ export class FakeS3 implements S3Store {
   async listObjectsV2(options: ListOptions = {}): Promise<ListPage> {
     if (options.signal?.aborted) throw new Error("S3 request aborted");
     const keys = [...this.objects.keys()].filter((key) => key.startsWith(options.prefix ?? "")).sort();
+    const entries = options.delimiter ? [...new Set(keys.map((key) => {
+      const suffix = key.slice((options.prefix ?? "").length);
+      const slash = suffix.indexOf(options.delimiter!);
+      return slash < 0 ? key : (options.prefix ?? "") + suffix.slice(0, slash + options.delimiter!.length);
+    }))] : keys;
     const start = options.continuationToken
-      ? keys.findIndex((key) => key > options.continuationToken!)
+      ? entries.findIndex((key) => key > options.continuationToken!)
       : 0;
-    const page = keys.slice(start < 0 ? keys.length : start, (start < 0 ? keys.length : start) + this.pageSize);
+    const page = entries.slice(start < 0 ? entries.length : start, (start < 0 ? entries.length : start) + this.pageSize);
     return {
-      objects: page.map((key) => ({
+      objects: page.filter((key) => this.objects.has(key)).map((key) => ({
         key, etag: this.objects.get(key)!.etag, size: this.objects.get(key)!.body.length,
         lastModified: this.modified.get(key),
       })),
-      nextContinuationToken: page.length && keys.indexOf(page[page.length - 1]) < keys.length - 1
+      ...(options.delimiter ? { commonPrefixes: page.filter((key) => !this.objects.has(key)) } : {}),
+      nextContinuationToken: page.length && entries.indexOf(page[page.length - 1]) < entries.length - 1
         ? page[page.length - 1]
         : undefined,
     };
@@ -135,7 +147,7 @@ export class EncryptedStore {
     if (signal?.aborted) throw new Error("S3 request aborted");
     const name = await objectName(this.key, path);
     const object = await this.store.getObject(name, signal);
-    if (!object) return null;
+    if (!object || !("body" in object)) return null;
     const record = await this.readRecord<T>(name, object.body);
     if (record.path !== path) throw new Error("Sync object path mismatch");
     return { value: record.value, etag: object.etag };
@@ -151,7 +163,7 @@ export class EncryptedStore {
       const page = await this.store.listObjectsV2({ prefix: `${kind}/`, continuationToken, signal });
       for (const item of page.objects) {
         const object = await this.store.getObject(item.key, signal);
-        if (!object) continue;
+        if (!object || !("body" in object)) continue;
         const record = await this.readRecord<T>(item.key, object.body);
         if (await objectName(this.key, record.path) !== item.key) throw new Error("Sync object path mismatch");
         if (record.path.startsWith(prefix)) found.push({ path: record.path, value: record.value, etag: object.etag });

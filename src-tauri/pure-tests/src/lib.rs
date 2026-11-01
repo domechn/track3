@@ -280,11 +280,44 @@ mod init_schema_tests {
             run_migrations(&db_path, &resource_dir, "0.9.0").await.unwrap();
             run_migrations(&db_path, &resource_dir, "0.9.0").await.unwrap();
             let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
-            for table in ["rebalance_profiles", "alert_rules", "alert_history", "history_snapshots", "sync_state", "sync_applied_objects", "sync_snapshot_revisions"] {
+            for table in ["rebalance_profiles", "alert_rules", "alert_history", "history_snapshots", "sync_state", "sync_applied_objects", "sync_snapshot_revisions", "sync_manifest_cache"] {
                 let found: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?")
                     .bind(table).fetch_one(&mut db).await.unwrap();
                 assert_eq!(found, 1, "{table} missing after a fresh install");
             }
+            db.close().await.unwrap();
+        });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn existing_0_9_4_database_gains_manifest_cache_before_version_bump() {
+        let root = std::env::temp_dir().join(format!("track3-sync-cache-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let db_path = root.join("existing.db");
+        let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            for name in initialization_scripts().into_iter().filter(|name| *name != "sync_manifest_cache_up.sql") {
+                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap();
+                db.execute(sql.as_str()).await.unwrap();
+            }
+            db.execute("INSERT INTO configuration (id, data) VALUES (999, '0.9.4')").await.unwrap();
+            let before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sync_manifest_cache'")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(before, 0);
+            db.close().await.unwrap();
+
+            run_migrations(&db_path, &resource_dir, "0.9.4").await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.4").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            let version: String = sqlx::query_scalar("SELECT data FROM configuration WHERE id = 999")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(version, "0.9.4");
+            let after: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sync_manifest_cache'")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(after, 1);
             db.close().await.unwrap();
         });
         std::fs::remove_dir_all(root).unwrap();

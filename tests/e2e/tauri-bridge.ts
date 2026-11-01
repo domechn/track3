@@ -9,7 +9,7 @@ import { hourlyHistory } from "../../src/test/history-fixtures";
 
 const schemaFiles = [
   "assets_v2", "asset_prices", "transactions", "chat_sessions",
-  "currency_rates", "configuration",
+  "currency_rates", "configuration", "sync_manifest_cache",
 ];
 
 type BridgeOptions = {
@@ -499,10 +499,12 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
           if (url.searchParams.get("list-type") === "2") {
             const page = await s3.listObjectsV2({
               prefix: url.searchParams.get("prefix") ?? undefined,
+              delimiter: url.searchParams.get("delimiter") ?? undefined,
               continuationToken: url.searchParams.get("continuation-token") ?? undefined,
             });
             const xml = `<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>${!!page.nextContinuationToken}</IsTruncated>${page.objects.map((object) =>
-              `<Contents><Key>${encodeURIComponent(object.key)}</Key><ETag>${object.etag.replaceAll("&", "&amp;").replaceAll('"', "&quot;")}</ETag><Size>${object.size}</Size><LastModified>${object.lastModified}</LastModified></Contents>`).join("")}${page.nextContinuationToken ? `<NextContinuationToken>${page.nextContinuationToken}</NextContinuationToken>` : ""}</ListBucketResult>`;
+              `<Contents><Key>${encodeURIComponent(object.key)}</Key><ETag>${object.etag.replaceAll("&", "&amp;").replaceAll('"', "&quot;")}</ETag><Size>${object.size}</Size><LastModified>${object.lastModified}</LastModified></Contents>`).join("")}${(page.commonPrefixes ?? []).map((prefix) =>
+              `<CommonPrefixes><Prefix>${encodeURIComponent(prefix)}</Prefix></CommonPrefixes>`).join("")}${page.nextContinuationToken ? `<NextContinuationToken>${page.nextContinuationToken}</NextContinuationToken>` : ""}</ListBucketResult>`;
             bytes = new TextEncoder().encode(xml);
             responseHeaders = { "content-type": "application/xml" };
           } else if (method === "PUT") {
@@ -512,11 +514,14 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
             });
             responseHeaders = { etag: result.etag };
           } else if (method === "GET") {
-            const result = await s3.getObject(key);
+            const result = headers["if-none-match"]
+              ? await s3.getObject(key, undefined, headers["if-none-match"])
+              : await s3.getObject(key);
             if (!result) status = 404;
             else {
-              bytes = result.body;
-              responseHeaders = { etag: result.etag };
+              if ("notModified" in result) status = 304;
+              else bytes = result.body;
+              responseHeaders = { etag: result.etag, ...(result.lastModified ? { "last-modified": result.lastModified } : {}) };
             }
           } else if (method === "HEAD") {
             const result = await s3.headObject(key);

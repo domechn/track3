@@ -25,7 +25,7 @@ const SQLITE_PATH_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b'`')
     .add(b'{')
     .add(b'}');
-const INITIALIZATION_SCRIPTS: [&str; 11] = [
+const INITIALIZATION_SCRIPTS: [&str; 12] = [
     "configuration_up.sql",
     "assets_v2_up.sql",
     "currency_rates_up.sql",
@@ -37,6 +37,7 @@ const INITIALIZATION_SCRIPTS: [&str; 11] = [
     "alerts_up.sql",
     "history_snapshots_up.sql",
     "sync_state_up.sql",
+    "sync_manifest_cache_up.sql",
 ];
 
 #[derive(Clone, Debug)]
