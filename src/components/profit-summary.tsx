@@ -409,7 +409,7 @@ const App = ({
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+      <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
         {monthCards.map((item) => (
           <button
             key={item.key}
@@ -445,7 +445,7 @@ const App = ({
 
   function renderYearSummary() {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+      <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
         {yearCards.map((item) => (
           <div
             key={`y-profit-summary-${item.year}`}
@@ -470,7 +470,7 @@ const App = ({
   }
 
   return (
-    <Card className="min-h-[280px]">
+    <Card className="analyze-profit-summary min-h-[280px]">
       <CardHeader className="space-y-2 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">

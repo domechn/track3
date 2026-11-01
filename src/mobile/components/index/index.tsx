@@ -671,12 +671,12 @@ function AppRoutes({
           element={
             <AnimatedPage>
               <PageWrapper dateRange={maxDateRange} hasData={hasData}>
-                <AnalyticsHub currency={currentCurrency} dateRange={maxDateRange} quoteColor={quoteColor} />
                 <Summary
                   currency={currentCurrency}
                   dateRange={maxDateRange}
                   quoteColor={quoteColor}
                 />
+                <AnalyticsHub currency={currentCurrency} dateRange={maxDateRange} quoteColor={quoteColor} />
               </PageWrapper>
             </AnimatedPage>
           }

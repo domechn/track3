@@ -9,6 +9,7 @@ import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,7 +17,8 @@ import { toast } from "@/mobile/components/ui/use-toast";
 import AISetupCard from "@/mobile/components/common/ai-setup-card";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions/page-settings";
 import { readCostBasisSettings, setCostBasisSettingsFromPage } from "@/middlelayers/ui-state/page-prefs";
-import { CostCharts, FinanceChartSkeleton } from "@/mobile/components/finance-charts";
+import { FinanceChartSkeleton } from "@/mobile/components/finance-charts";
+import { CostBasisPanels } from "@/components/cost-basis-panels";
 import type { QuoteColor } from "@/middlelayers/types";
 import { MobileRecordList, useIsMobile, type MobileRecord } from "@/mobile/components/mobile";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
@@ -200,17 +202,16 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
         <p className="text-sm text-muted-foreground">{t("cost.subtitle")}</p>
       </div>
       {!isMobile && aiSetup}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {report && <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-          <span>{t("cost.proceeds")}: <strong className="font-medium text-foreground">{money(report.totals.proceeds)}{isMobile ? "" : " USD"}</strong></span>
-          <span>{t("cost.costBasis")}: <strong className="font-medium text-foreground">{money(report.totals.costBasis)}{isMobile ? "" : " USD"}</strong></span>
-        </div>}
-        <div className="flex gap-2">
-        <Button variant="outline" disabled={!report || loading || !filtersCurrent} onClick={() => void exportReport("csv")}>{t("cost.exportCsv")}</Button>
-        <Button variant="outline" disabled={!report || loading || !filtersCurrent} onClick={() => void exportReport("json")}>{t("cost.exportJson")}</Button>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Popover>
+          <PopoverTrigger asChild><Button variant="outline" disabled={!report || loading || !filtersCurrent}>{t("cost.design.export")}</Button></PopoverTrigger>
+          <PopoverContent align="end" className="w-48 p-2">
+            <Button className="w-full justify-start" variant="ghost" onClick={() => void exportReport("csv")}>{t("cost.exportCsv")}</Button>
+            <Button className="w-full justify-start" variant="ghost" onClick={() => void exportReport("json")}>{t("cost.exportJson")}</Button>
+          </PopoverContent>
+        </Popover>
       </div>
-      <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)} className="order-last rounded-lg border bg-card">
+      <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)} className="rounded-lg border bg-card">
         <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
       <Card>
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -258,7 +259,7 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
       {!validRange && <p id="cost-range-error" role="alert" className="text-sm text-destructive">{t("cost.invalidRange")}</p>}
       {loading && (report ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p> : <FinanceChartSkeleton />)}
       {report && validRange && <>
-        <CostCharts report={report} quoteColor={quoteColor} />
+        <CostBasisPanels report={report} quoteColor={quoteColor} t={t} />
         {report.warnings.length > 0 && <Card className="border-amber-500/50"><CardHeader className="px-4 pb-1 pt-3"><CardTitle className="text-sm">{t("cost.warnings")}</CardTitle></CardHeader><CardContent className="px-4 pb-3"><ul className="list-disc space-y-1 pl-5 text-xs">{report.warnings.slice(pages.warnings * pageSize, (pages.warnings + 1) * pageSize).map((warning, index) => (
           <li key={`${warning.eventId}-${index}`}>{t(`cost.warning.${warning.code}`).replace("{asset}", warning.symbol).replace("{amount}", qty(warning.amount))}</li>
         ))}</ul>

@@ -147,6 +147,7 @@ describe("Comparison page", () => {
     await waitFor(() => {
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
+    expect(screen.getByRole("table", { name: "Per asset" })).toHaveTextContent("BTC");
 
     const toggle = screen.getByRole("button", { name: /hide values/i });
     expect(toggle).toHaveAttribute("aria-pressed", "false");

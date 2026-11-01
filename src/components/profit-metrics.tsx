@@ -381,7 +381,7 @@ const App = ({
   });
 
   return (
-    <Card>
+    <Card className="analyze-profit-metrics">
       <CardHeader className="space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {t("profitMetrics.title")}

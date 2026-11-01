@@ -38,6 +38,7 @@ import { Button } from "./ui/button";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
+import { sourceRows } from "./analyze-values";
 
 type SortMode = "changeValue" | "changePercentage" | "absChange";
 type PageSize = "20" | "50" | "100";
@@ -74,10 +75,12 @@ const App = ({
   currency,
   dateRange,
   quoteColor,
+  selectedSource,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  selectedSource?: string | null;
 }) => {
   const loadGenRef = useRef(0);
   const { t } = useTranslation();
@@ -146,15 +149,15 @@ const App = ({
 
   const filteredRows = useMemo(() => {
     if (!deferredSearch) {
-      return rows;
+      return sourceRows(rows, selectedSource ?? null);
     }
 
-    return rows.filter((row) => {
+    return sourceRows(rows, selectedSource ?? null).filter((row) => {
       const haystack =
         `${row.walletTypeText} ${row.walletAliasText} ${row.wallet}`.toLowerCase();
       return haystack.includes(deferredSearch);
     });
-  }, [deferredSearch, rows]);
+  }, [deferredSearch, rows, selectedSource]);
 
   const sortedRows = useMemo(() => {
     const next = [...filteredRows];

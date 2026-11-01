@@ -277,7 +277,7 @@ it("shows unknown profit after switching from a priced coin to an unmatched with
   mocks.queryLastAssetsBySymbol.mockImplementation(async (symbol: string) =>
     ({ symbol, assetType: "crypto", amount: 2, price: 300, value: 600 }));
   renderCoinAnalysis();
-  await screen.findByText("$50.00");
+  await screen.findAllByText("$50.00");
   fireEvent.click(screen.getByText("Next coin"));
   await waitFor(() => expect(screen.getByText("Avg. buy price (selected range)").closest("[data-ui-card]")).toHaveTextContent("$300.00"));
   expect(screen.getByText("Breakeven Price").closest("[data-ui-card]")).toHaveTextContent("—");
@@ -352,6 +352,10 @@ afterEach(() => {
 });
 
 describe("CoinAnalysis allowSymbols population", () => {
+  it("links to the existing cost basis route", () => {
+    renderCoinAnalysis();
+    expect(screen.getByRole("button", { name: "Open cost basis" })).toBeInTheDocument();
+  });
   it("populates allowSymbols on first mount so the rank is computed", async () => {
     renderCoinAnalysis();
 
