@@ -73,7 +73,6 @@
     --shadow-card: 0 12px 28px rgb(13 13 14 / .08);
     --shadow-overlay: 0 18px 44px rgb(13 13 14 / .18);
     --focus-ring: 0 0 0 3px hsl(var(--ring) / .18);
-    --rail: 56px;
     --glass-blur: 0px;
     --glass-bg: hsl(var(--card));
     --glass-border: hsl(var(--border));
@@ -120,7 +119,6 @@
     --radius: 6px;
     --radius-pill: 999px;
     --radius-overlay: 10px;
-    --rail: 56px;
     --shadow-card: 0 12px 28px rgb(0 0 0 / .2);
     --shadow-overlay: 0 18px 44px rgb(0 0 0 / .5);
     --focus-ring: 0 0 0 3px hsl(var(--ring) / .22);
@@ -163,15 +161,10 @@
 }
 @layer utilities {
   .ios-large-title { font-size: 34px; line-height: 1.12; font-weight: 700; letter-spacing: -.035em; }
-  .ios-title { font-size: 22px; line-height: 1.25; font-weight: 700; letter-spacing: -.025em; }
-  .ios-headline { font-size: 17px; line-height: 1.3; font-weight: 600; }
-  .ios-body { font-size: 17px; line-height: 1.4; }
-  .ios-subhead { font-size: 15px; line-height: 1.35; }
   .ios-footnote { font-size: 13px; line-height: 1.3; }
-  .ios-caption { font-size: 12px; line-height: 1.25; }
   .ios-money { font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
-  .text-emerald-500, .text-emerald-600, .text-emerald-700, .text-emerald-500\/70 { color: hsl(var(--positive)); }
-  .text-rose-500, .text-rose-600, .text-rose-700, .text-rose-500\/70 { color: hsl(var(--negative)); }
+  .text-emerald-500, .text-emerald-600, .text-emerald-500\/70 { color: hsl(var(--positive)); }
+  .text-rose-500, .text-rose-500\/70 { color: hsl(var(--negative)); }
 }
 
 @layer base {
@@ -199,13 +192,6 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
   }
 
-  .glass-intense {
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-  }
 }
 html {
   -webkit-text-size-adjust: 100%;

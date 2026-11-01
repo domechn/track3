@@ -15,8 +15,6 @@ const buttonVariants = cva(
           "border border-accent-data bg-accent-data text-background hover:bg-accent-data/90",
         destructive:
           "border border-negative bg-negative text-background hover:bg-negative/90",
-        danger:
-          "border border-negative text-negative hover:bg-negative/10",
         outline:
           "border border-control bg-transparent hover:bg-raised",
         secondary:
@@ -27,7 +25,6 @@ const buttonVariants = cva(
       size: {
         default: "h-[34px] px-[14px]",
         sm: "h-7 px-[11px] text-xs",
-        lg: "h-10 px-8",
         icon: "h-[34px] w-[34px]",
       },
     },
