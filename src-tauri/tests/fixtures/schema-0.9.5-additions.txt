@@ -1,0 +1,2 @@
+["index","sqlite_autoindex_sync_manifest_cache_1","sync_manifest_cache",null]
+["table","sync_manifest_cache","sync_manifest_cache","CREATE TABLE sync_manifest_cache (\n  owner TEXT NOT NULL,\n  header_salt TEXT NOT NULL,\n  etag TEXT NOT NULL,\n  body TEXT NOT NULL CHECK (json_valid(body)),\n  last_modified TEXT,\n  PRIMARY KEY (owner, etag)\n)"]

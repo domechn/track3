@@ -4,6 +4,9 @@ import { S3Error, SyncTimeoutError, listResponseBytes, type ListOptions, type Li
 // Metadata requests are small; encrypted object transfers can be much larger.
 export const S3_METADATA_TIMEOUT_MS = 30_000;
 export const S3_OBJECT_TIMEOUT_MS = 120_000;
+export function bodyTimeoutMs(bytes: number): number {
+  return Math.min(30 * 60_000, 30_000 + Math.ceil(Math.max(0, Number.isFinite(bytes) ? bytes : 0) / 100_000) * 1000);
+}
 
 type S3Config = {
   endpoint: string;
@@ -138,12 +141,19 @@ export function parseListObjectsV2(xml: string): ListPage {
         ...(xmlText(item, "LastModified") ? { lastModified: xmlText(item, "LastModified") } : {}),
       };
     });
+  const commonPrefixes = Array.from(root.children)
+    .filter((child) => child.localName === "CommonPrefixes")
+    .map((item) => {
+      const prefix = xmlText(item, "Prefix");
+      if (prefix === undefined) throw new Error("Invalid S3 list response");
+      return encoded ? decodeURIComponent(prefix.replace(/\+/g, " ")) : prefix;
+    });
   const truncation = xmlText(root, "IsTruncated");
   if (truncation !== "true" && truncation !== "false") throw new Error("Invalid S3 list response");
   const truncated = truncation === "true";
   const nextContinuationToken = xmlText(root, "NextContinuationToken");
   if (truncated && !nextContinuationToken) throw new Error("Invalid S3 list response");
-  return { objects, nextContinuationToken: truncated ? nextContinuationToken : undefined };
+  return { objects, ...(commonPrefixes.length ? { commonPrefixes } : {}), nextContinuationToken: truncated ? nextContinuationToken : undefined };
 }
 
 async function discardResponse(response: Response): Promise<void> {
@@ -221,13 +231,14 @@ export class S3Client implements S3Store {
     return url;
   }
 
-  private async request(method: string, url: URL, body = new Uint8Array(), conditions?: WriteConditions, signal?: AbortSignal, defaultTimeoutMs = S3_METADATA_TIMEOUT_MS, diagnosticVerb: StoreRetry["verb"] = method as StoreRetry["verb"]): Promise<Response> {
+  private async request(method: string, url: URL, body = new Uint8Array(), conditions?: WriteConditions, signal?: AbortSignal, defaultTimeoutMs = S3_METADATA_TIMEOUT_MS, diagnosticVerb: StoreRetry["verb"] = method as StoreRetry["verb"], readEtag?: string): Promise<Response> {
     url.search = canonicalQuery(url);
     const headers: Record<string, string> = {};
     if (conditions?.ifMatch !== undefined) headers["if-match"] = conditions.ifMatch;
     if (conditions?.ifNoneMatch !== undefined) headers["if-none-match"] = conditions.ifNoneMatch;
+    if (readEtag !== undefined) headers["if-none-match"] = readEtag;
     if (this.config.sessionToken) headers["x-amz-security-token"] = this.config.sessionToken;
-    const timeoutMs = this.config.timeoutMs ?? defaultTimeoutMs;
+    const timeoutMs = this.config.timeoutMs ?? (method === "PUT" ? Math.max(defaultTimeoutMs, bodyTimeoutMs(body.length)) : defaultTimeoutMs);
     const retryBaseMs = this.config.retryBaseMs ?? 250;
     for (let attempt = 0; ; attempt++) {
       if (signal?.aborted) throw new Error("S3 request aborted");
@@ -301,7 +312,7 @@ export class S3Client implements S3Store {
         }
         continue;
       }
-      if (!response.ok) {
+      if (!response.ok && !(response.status === 304 && readEtag !== undefined)) {
         await discardResponse(response);
         throw new S3Error(`S3 request failed (status ${response.status})`, response.status);
       }
@@ -317,16 +328,25 @@ export class S3Client implements S3Store {
     return { etag };
   }
 
-  async getObject(key: string, signal?: AbortSignal): Promise<{ body: Uint8Array; etag: string } | null> {
+  getObject(key: string, signal?: AbortSignal): Promise<{ body: Uint8Array; etag: string; lastModified?: string } | null>;
+  getObject(key: string, signal: AbortSignal | undefined, ifNoneMatch: string): Promise<{ body: Uint8Array; etag: string; lastModified?: string } | { notModified: true; etag: string; lastModified?: string } | null>;
+  async getObject(key: string, signal?: AbortSignal, ifNoneMatch?: string): Promise<{ body: Uint8Array; etag: string; lastModified?: string } | { notModified: true; etag: string; lastModified?: string } | null> {
     try {
-      const response = await this.request("GET", this.url(key), undefined, undefined, signal, S3_OBJECT_TIMEOUT_MS);
+      const response = await this.request("GET", this.url(key), undefined, undefined, signal, S3_OBJECT_TIMEOUT_MS, "GET", ifNoneMatch);
       const etag = response.headers.get("etag");
+      const lastModified = response.headers.get("last-modified") ?? undefined;
+      if (response.status === 304) {
+        await discardResponse(response);
+        return { notModified: true, etag: etag ?? ifNoneMatch!, ...(lastModified ? { lastModified } : {}) };
+      }
       if (!etag) {
         await discardResponse(response);
         throw new Error("S3 response missing ETag");
       }
-      const body = new Uint8Array(await readResponse(response, () => response.arrayBuffer(), this.config.timeoutMs ?? S3_OBJECT_TIMEOUT_MS, signal));
-      return { body, etag };
+      const length = response.headers.get("content-length");
+      const body = new Uint8Array(await readResponse(response, () => response.arrayBuffer(),
+        this.config.timeoutMs ?? (length === null ? S3_OBJECT_TIMEOUT_MS : bodyTimeoutMs(Number(length))), signal));
+      return { body, etag, ...(lastModified ? { lastModified } : {}) };
     } catch (error) {
       if (error instanceof S3Error && error.status === 404) return null;
       throw error;
@@ -357,14 +377,17 @@ export class S3Client implements S3Store {
     const prefix = this.config.prefix ? `${this.config.prefix}/${options.prefix ?? ""}` : options.prefix;
     if (prefix !== undefined) url.searchParams.set("prefix", prefix);
     if (options.continuationToken !== undefined) url.searchParams.set("continuation-token", options.continuationToken);
+    if (options.delimiter !== undefined) url.searchParams.set("delimiter", options.delimiter);
     const response = await this.request("GET", url, undefined, undefined, options.signal, S3_METADATA_TIMEOUT_MS, "LIST");
-    const xml = await readResponse(response, () => response.text(), this.config.timeoutMs ?? S3_METADATA_TIMEOUT_MS, options.signal);
+    const xml = await readResponse(response, () => response.text(), this.config.timeoutMs ?? bodyTimeoutMs(Number(response.headers.get("content-length") ?? 0)), options.signal);
     const page = parseListObjectsV2(xml);
     Object.defineProperty(page, listResponseBytes, { value: new TextEncoder().encode(xml).length });
     if (this.config.prefix) {
       const base = `${this.config.prefix}/`;
       page.objects = page.objects.filter((item) => item.key.startsWith(base))
         .map((item) => ({ ...item, key: item.key.slice(base.length) }));
+      page.commonPrefixes = page.commonPrefixes?.filter((prefix) => prefix.startsWith(base))
+        .map((prefix) => prefix.slice(base.length));
     }
     return page;
   }

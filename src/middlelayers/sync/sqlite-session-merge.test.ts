@@ -84,6 +84,7 @@ it("converges SQLite backed session merges on two devices without ping pong", as
       messageCount INTEGER, preview TEXT
     );
     CREATE TABLE sync_state (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
+    CREATE TABLE sync_manifest_cache (owner TEXT, header_salt TEXT, etag TEXT, body TEXT, last_modified TEXT, PRIMARY KEY (owner, etag));
     CREATE TABLE assets_v2 (uuid TEXT);
     CREATE TABLE transactions (uuid TEXT);
     CREATE TABLE configuration (id INTEGER PRIMARY KEY, data TEXT);
@@ -115,13 +116,13 @@ it("converges SQLite backed session merges on two devices without ping pong", as
     }
     for (const device of ["a", "b", "a", "b", "a", "b"] as const) {
       storage.active = device;
-      const report = await engines[device].syncOnce({ categories: { history: false } });
+      const report = await engines[device].syncOnce({ categories: { history: false }, manual: true });
       expect(report.errors).toEqual([]);
     }
     for (const device of ["a", "b"] as const) {
       storage.active = device;
       expect((await repositories[device].listSessions())[0].messages.map((message) => message.id)).toEqual(["a", "b"]);
-      expect(await engines[device].syncOnce({ categories: { history: false } }))
+      expect(await engines[device].syncOnce({ categories: { history: false }, manual: true }))
         .toMatchObject({ pulled: 0, pushed: 0, errors: [] });
     }
   } finally {
@@ -139,6 +140,7 @@ it("does not execute an action again on another device after its approval syncs"
       messageCount INTEGER, preview TEXT
     );
     CREATE TABLE sync_state (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
+    CREATE TABLE sync_manifest_cache (owner TEXT, header_salt TEXT, etag TEXT, body TEXT, last_modified TEXT, PRIMARY KEY (owner, etag));
     CREATE TABLE assets_v2 (uuid TEXT);
     CREATE TABLE transactions (uuid TEXT);
     CREATE TABLE configuration (id INTEGER PRIMARY KEY, data TEXT);
@@ -167,16 +169,16 @@ it("does not execute an action again on another device after its approval syncs"
         createdAt: "2026-01-01T00:00:00Z", expiresAt: "2099-01-01T00:00:00Z",
       }] }],
     });
-    await engines.a.syncOnce({ categories: { history: false } });
+    await engines.a.syncOnce({ categories: { history: false }, manual: true });
     storage.active = "b";
-    await engines.b.syncOnce({ categories: { history: false } });
+    await engines.b.syncOnce({ categories: { history: false }, manual: true });
     await repositories.b.listSessions();
     storage.active = "a";
     expect(await claimSessionAction("chat", "action", "executing")).toBe(true);
     await finishSessionAction("chat", "action", "approved", "Added BTC");
-    await engines.a.syncOnce({ categories: { history: false } });
+    await engines.a.syncOnce({ categories: { history: false }, manual: true });
     storage.active = "b";
-    await engines.b.syncOnce({ categories: { history: false } });
+    await engines.b.syncOnce({ categories: { history: false }, manual: true });
     expect((await repositories.b.listSessions())[0].messages[0].blocks).toMatchObject([
       { status: "approved", result: "Added BTC" },
     ]);

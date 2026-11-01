@@ -1,4 +1,4 @@
-import { S3Error, SyncTimeoutError, listResponseBytes, type S3Store, type StoreRetry } from "./object-store";
+import { S3Error, SyncTimeoutError, listResponseBytes, type NotModifiedObject, type S3Store, type StoredObject, type StoreRetry } from "./object-store";
 
 export const syncPhases = [
   "headerRead", "keyDerivation", "discover", "manifestsDownload", "pull",
@@ -89,6 +89,7 @@ export function createSyncDiagnostics(inner: S3Store) {
     try {
       const result = await work();
       if (result === null) outcome = "notFound";
+      else if (result && typeof result === "object" && "notModified" in result) outcome = "notModified";
       receivedBytes = received(result);
       counts.bytesReceived += receivedBytes;
       return result;
@@ -112,11 +113,16 @@ export function createSyncDiagnostics(inner: S3Store) {
       diagnostics.slowest.length = Math.min(diagnostics.slowest.length, 5);
     }
   };
+  function getObject(key: string, signal?: AbortSignal): Promise<StoredObject | null>;
+  function getObject(key: string, signal: AbortSignal | undefined, ifNoneMatch: string): Promise<StoredObject | NotModifiedObject | null>;
+  function getObject(key: string, signal?: AbortSignal, ifNoneMatch?: string): Promise<StoredObject | NotModifiedObject | null> {
+    return record("GET", () => ifNoneMatch === undefined ? inner.getObject(key, signal) : inner.getObject(key, signal, ifNoneMatch), 0,
+      (result) => result && "body" in result ? result.body.length : 0);
+  }
   const store: S3Store = {
     putObject: (key, body, conditions, signal) =>
       record("PUT", () => inner.putObject(key, body, conditions, signal), body.length),
-    getObject: (key, signal) =>
-      record("GET", () => inner.getObject(key, signal), 0, (result) => result?.body.length ?? 0),
+    getObject,
     headObject: (key, signal) =>
       record("HEAD", () => inner.headObject(key, signal)),
     deleteObject: (key, signal) =>

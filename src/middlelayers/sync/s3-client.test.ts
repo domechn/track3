@@ -199,6 +199,23 @@ describe("S3Client", () => {
     const page = parseListObjectsV2("<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>devices/a/manifest</Key><ETag>\"a\"</ETag><Size>1</Size><LastModified>2026-01-02T03:04:05.000Z</LastModified></Contents></ListBucketResult>");
     expect(page.objects[0].lastModified).toBe("2026-01-02T03:04:05.000Z");
   });
+  it("parses delimiter common prefixes and returns a bodyless 304 for conditional GET", async () => {
+    const page = parseListObjectsV2("<ListBucketResult><IsTruncated>false</IsTruncated><CommonPrefixes><Prefix>devices/a/</Prefix></CommonPrefixes></ListBucketResult>");
+    expect(page.commonPrefixes).toEqual(["devices/a/"]);
+    http.mockResolvedValueOnce(new Response(null, { status: 304, headers: { ETag: '"a"' } }));
+    const result = await new S3Client(config).getObject("devices/a/manifest", undefined, '"a"');
+    expect(result).toEqual({ notModified: true, etag: '"a"' });
+    expect(http.mock.calls[0][1]?.headers).toMatchObject({ "if-none-match": '"a"' });
+  });
+  it("scales body deadlines with transfer size and caps them", async () => {
+    const { bodyTimeoutMs } = await import("./s3-client");
+    expect(bodyTimeoutMs(0)).toBe(30_000);
+    expect(bodyTimeoutMs(10_000_000)).toBe(130_000);
+    expect(bodyTimeoutMs(1_000_000_000)).toBe(1_800_000);
+    http.mockResolvedValueOnce(new Response(null, { status: 200, headers: { ETag: '"large"' } }));
+    await new S3Client(config).putObject("large", new Uint8Array(10_000_000));
+    expect(http.mock.calls[0][1]?.connectTimeout).toBe(130_000);
+  });
 
   it("keeps an optional remote prefix outside logical object keys", async () => {
     http.mockResolvedValueOnce(new Response(null, { status: 200, headers: { ETag: '"a"' } }))

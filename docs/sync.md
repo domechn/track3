@@ -158,9 +158,14 @@ older tombstones and masked snapshot objects be removed.
 ## Sync round
 
 1. Validate `sync-header` with the passphrase.
-2. List all device manifests, using S3 pagination. The per-device manifest is
-   the only publication point for its objects.
-3. Download unknown referenced objects. Enforce the 32 MiB encrypted object
+2. List device prefixes with `delimiter=/` at unlock, on **Sync now**, and at
+   most every six hours while unlocked. Reuse the local device list between
+   listings. Providers that ignore or reject the delimiter use a full listing
+   for the rest of the session. Fetch each known device's manifest with
+   `If-None-Match` and reuse its locally cached decrypted manifest on 304.
+   The per-device manifest is the only publication point for its objects.
+3. Download unknown referenced objects with up to four requests in flight,
+   then apply them in manifest order. Enforce the 32 MiB encrypted object
    size limit and the 256 MiB multipart payload limit,
    verify SHA-256 of the encrypted bytes, authenticate and decrypt, then import
    snapshots by UUID. Merge configuration with HLC ordering (physical
@@ -168,7 +173,7 @@ older tombstones and masked snapshot objects be removed.
    Remote clocks more than 24 hours ahead of the local clock are rejected
    and retried on a later round.
 4. Write new local objects with `If-None-Match: *`. Rewrite the encrypted
-   local manifest after each batch of 250 successful object writes and after
+   local manifest after each batch of 1,000 successful object writes and after
    the final batch. Each rewrite uses `If-Match` against the ETag returned by
    the previous manifest write (`If-None-Match: *` on creation). A failed
    object write leaves an unreferenced object; the next round verifies and
@@ -205,7 +210,9 @@ successful portfolio refresh starts a new attempt sequence; focus alone does
 not. It never blocks a portfolio refresh.
 
 S3 metadata requests have a 30-second deadline; encrypted object transfers
-have a 120-second deadline. The scheduler times out a round after three minutes
+have a base 120-second request deadline. PUTs and GET/LIST response bodies
+scale with transfer size at one second per 100 KB, capped at 30 minutes.
+The scheduler times out a round after three minutes
 without progress or a completed S3 request, and caps every round at six hours.
 The idle limit also covers local work before the first request. The scheduler
 waits for a timed-out round to settle before starting another one. Stopping
@@ -213,8 +220,9 @@ sync waits up to five seconds for an aborted round; **Forget remote data**
 leaves remote objects untouched if the round is still running and can be
 retried after it finishes.
 
-Malformed individual objects are reported. Partial rounds retry with exponential
-backoff; permanently damaged remote data needs repair before a retry can succeed.
+Malformed individual objects are reported once and retried after 24 hours.
+Partial rounds retry transient failures with exponential backoff; permanently
+damaged remote data needs repair before a retry can succeed.
 A missing remote header, invalid passphrase, access error, or invalid configuration
 stops automatic retries and shows the reason. The first
 round downloads existing manifests and merges without deleting local-only
@@ -248,8 +256,8 @@ Choose a unique passphrase of at least 16 characters. When creating a new sync
 bucket, confirm it before enabling. A device joining an existing bucket only
 needs the existing passphrase. **The sync passphrase can NEVER be recovered.** Losing it makes all
 remote data permanently unreadable, even with valid S3 credentials. Store it
-in a safe place before enabling. Track3 keeps the passphrase in memory only
-for the current app session. After a restart, unlock sync from the status
+in a safe place before enabling. Track3 keeps the passphrase and derived key in
+memory only for the current unlocked session. After a restart, unlock sync from the status
 indicator or Sync settings; automatic sync starts after unlock. There is no
 OS keychain option because Track3 has no existing keychain integration.
 

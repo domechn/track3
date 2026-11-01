@@ -996,6 +996,7 @@ async fn repair_required_schema(
     let sync_state = read_migration_sql(resource_dir, "v08t09/sync_state_up.sql")?;
     let history_snapshots = read_migration_sql(resource_dir, "v08t09/history_snapshots_up.sql")?;
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
+    let sync_manifest_cache = read_migration_sql(resource_dir, "init/sync_manifest_cache_up.sql")?;
     let additive_schema = if version_is_less(app_version, "0.9.5")? {
         Vec::new()
     } else {
@@ -1153,6 +1154,10 @@ async fn repair_required_schema(
             .execute(&mut *transaction)
             .await
             .map_err(|error| format!("failed to ensure sync state tables: {error}"))?;
+        sqlx::raw_sql(&sync_manifest_cache)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to ensure sync manifest cache: {error}"))?;
         // If the table exists but any of its triggers is gone, the index may have drifted
         // (rows added or deleted while untracked): rebuild it fully before re-creating them.
         if migration_table_exists(&mut transaction, "history_snapshots").await? {

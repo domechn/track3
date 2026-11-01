@@ -12,6 +12,43 @@ const configured: SyncSettings = {
 afterEach(() => vi.useRealTimers());
 
 describe("SyncRuntime", () => {
+  it("hands the unlocked key to the engine and clears its session on disable", async () => {
+    let primed = false;
+    let unregistered = false;
+    const runtime = new SyncRuntime({
+      load: async () => configured, save: async () => {}, store: () => new FakeS3(),
+      engine: () => ({ engine: {
+        primeKey: () => { primed = true; },
+        syncOnce: async () => ({ pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] }),
+      }, unregister: () => { unregistered = true; } }),
+    });
+    await runtime.initialize();
+    expect(await runtime.configure(configured, "correct horse battery staple")).toBe("ok");
+    expect(primed).toBe(true);
+    await runtime.disable();
+    expect(unregistered).toBe(true);
+    expect(runtime.status().mode).toBe("disabled");
+  });
+  it("passes manual discovery to the next round when Sync now is pressed during an active round", async () => {
+    const manual: Array<boolean | undefined> = [];
+    let finish!: () => void;
+    const runtime = new SyncRuntime({
+      load: async () => configured, save: async () => {}, store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: async (options) => {
+        manual.push(options?.manual);
+        if (manual.length === 1) await new Promise<void>((resolve) => { finish = resolve; });
+        return { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] };
+      } }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.configure(configured, "correct horse battery staple");
+    await vi.waitFor(() => expect(manual).toHaveLength(1));
+    const requested = runtime.syncNow();
+    finish();
+    await requested;
+    expect(manual).toEqual([false, true]);
+    runtime.stop();
+  });
   it("publishes the last round diagnostics through runtime status", async () => {
     const runtime = new SyncRuntime({
       load: async () => configured, save: async () => {}, store: () => new FakeS3(),
@@ -191,6 +228,20 @@ describe("SyncRuntime", () => {
     runtime.stop();
   });
 
+  it("clears decrypted manifest cache when sync is disabled", async () => {
+    const cached = new Map([["old bucket", '{"entries":[]}']]);
+    const runtime = new SyncRuntime({
+      load: async () => ({ ...configured, enabled: true }),
+      save: async () => {},
+      store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: vi.fn() }, unregister: () => {} }),
+      clearCache: async () => { cached.clear(); },
+    });
+    await runtime.initialize();
+    await runtime.disable();
+    expect(cached.size).toBe(0);
+  });
+
   it("clears local sync settings only when explicitly requested", async () => {
     let saved = { ...configured, enabled: true };
     const runtime = new SyncRuntime({
@@ -281,12 +332,13 @@ describe("SyncRuntime", () => {
     await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
     await s3.putObject("devices/a/manifest", new Uint8Array([1]));
     let saved = { ...configured, enabled: true };
+    let unregistered = 0;
     let finish!: (report: { pulled: number; pushed: number; tombstonesApplied: number; configChanges: number; conflicts: string[]; errors: string[] }) => void;
     const runtime = new SyncRuntime({
       load: async () => saved,
       save: async (next) => { saved = next; },
       store: () => s3,
-      engine: () => ({ engine: { syncOnce: async () => new Promise((resolve) => { finish = resolve; }) }, unregister: () => {} }),
+      engine: () => ({ engine: { syncOnce: async () => new Promise((resolve) => { finish = resolve; }) }, unregister: () => { unregistered++; } }),
     });
     await runtime.initialize();
     await runtime.unlock("correct horse battery staple");
@@ -297,9 +349,15 @@ describe("SyncRuntime", () => {
     await forgetting;
     expect((await s3.listObjectsV2({ prefix: "devices/" })).objects).toHaveLength(1);
     expect(saved.enabled).toBe(false);
+    const retry = expect(runtime.forgetRemote()).rejects.toThrow("Sync round has not stopped");
+    await vi.advanceTimersByTimeAsync(5_000);
+    await retry;
+    expect((await s3.listObjectsV2({ prefix: "devices/" })).objects).toHaveLength(1);
+    expect(unregistered).toBe(0);
     finish({ pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] });
     await running;
     await runtime.forgetRemote();
+    expect(unregistered).toBe(1);
     expect((await s3.listObjectsV2({ prefix: "devices/" })).objects).toHaveLength(0);
   });
 

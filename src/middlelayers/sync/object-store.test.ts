@@ -3,6 +3,21 @@ import { createSyncHeader } from "./crypto";
 import { EncryptedStore, FakeS3, S3Error, readSyncHeader, writeSyncHeader } from "./object-store";
 
 describe("FakeS3", () => {
+  it("models R2 delimiter discovery and conditional manifest reads and writes", async () => {
+    const s3 = new FakeS3(1);
+    const first = await s3.putObject("devices/a/manifest", new Uint8Array([1]), { ifNoneMatch: "*" });
+    await s3.putObject("devices/a/snapshot/one", new Uint8Array([2]), { ifNoneMatch: "*" });
+    await s3.putObject("devices/b/manifest", new Uint8Array([3]), { ifNoneMatch: "*" });
+    const firstPage = await s3.listObjectsV2({ prefix: "devices/", delimiter: "/" });
+    expect(firstPage.objects).toEqual([]);
+    expect(firstPage.commonPrefixes).toEqual(["devices/a/"]);
+    const secondPage = await s3.listObjectsV2({ prefix: "devices/", delimiter: "/", continuationToken: firstPage.nextContinuationToken });
+    expect(secondPage.commonPrefixes).toEqual(["devices/b/"]);
+    expect(await s3.getObject("devices/a/manifest", undefined, first.etag)).toEqual(expect.objectContaining({ notModified: true, etag: first.etag }));
+    await expect(s3.putObject("devices/a/manifest", new Uint8Array([4]), { ifMatch: '"stale"' })).rejects.toMatchObject({ status: 412 });
+    const second = await s3.putObject("devices/a/manifest", new Uint8Array([4]), { ifMatch: first.etag });
+    expect((await s3.getObject("devices/a/manifest", undefined, first.etag))).toMatchObject({ body: new Uint8Array([4]), etag: second.etag });
+  });
   it("can model a concurrent conditional request conflict", async () => {
     const s3 = new FakeS3(1000, 409);
     await s3.putObject("manifest", new Uint8Array([1]), { ifNoneMatch: "*" });
