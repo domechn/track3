@@ -278,9 +278,12 @@ describe("Sync settings page", () => {
     let finish!: () => void;
     vi.mocked(syncRuntime.resolveConfigConflict).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     render(<SyncSettingsPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Keep local" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use this device's value" }));
+    expect(syncRuntime.resolveConfigConflict).not.toHaveBeenCalled();
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(/overwrite the other side/i);
+    fireEvent.click(screen.getByRole("button", { name: "Use this device's value" }));
+    expect(screen.getByRole("button", { name: "Use the other device's value" })).toBeDisabled();
     expect(screen.getAllByRole("button", { name: "Resolving…" })).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Use remote" })).toBeDisabled();
     expect(syncRuntime.resolveConfigConflict).toHaveBeenCalledTimes(1);
     finish();
     await waitFor(() => expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -293,7 +296,8 @@ describe("Sync settings page", () => {
     vi.mocked(syncRuntime.configConflicts).mockResolvedValue([{ id: "10" }]);
     vi.mocked(syncRuntime.resolveConfigConflict).mockRejectedValueOnce(new Error("secret credential"));
     render(<SyncSettingsPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Use remote" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use the other device's value" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use the other device's value" }));
     await waitFor(() => expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
       variant: "destructive", title: "Conflict resolution failed",
       description: "Could not resolve the config conflict. Try again.",
@@ -465,7 +469,8 @@ describe("Sync settings page", () => {
     render(<SyncSettingsPage />);
     expect(await screen.findByText(/local value.*safe/i)).toBeInTheDocument();
     expect(screen.getByText(/exchanges/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Keep local" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use this device's value" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use this device's value" }));
     await waitFor(() => expect(syncRuntime.resolveConfigConflict).toHaveBeenCalledWith("10", "local"));
   });
   it("names wallet and assistant key conflicts without displaying their values", async () => {

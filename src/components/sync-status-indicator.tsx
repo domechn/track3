@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
+import { SyncDetails } from "@/components/sync-details";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 
@@ -109,7 +110,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
           onInteractOutside={(event) => {
             if (document.querySelector('[role="alertdialog"]')) event.preventDefault();
           }}
-          className={`t3-sync-popover w-[calc(100vw-2rem)] max-w-[520px] space-y-3 text-sm ${mobile ? "ios-d3-sync-popover" : ""}`}>
+          className={`t3-sync-popover max-h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${mobile ? "ios-d3-sync-popover" : ""}`}>
           <h2 className="text-base font-semibold">{t("sync.status.details")}</h2>
           {status.mode === "unreadable" ? <>
             <p role="alert" className="text-destructive">{t("sync.unreadable")}</p>
@@ -175,6 +176,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
             </>}
             <Button size="sm" variant="outline" disabled={status.sync.phase === "syncing"}
               onClick={() => void syncRuntime.syncNow()}>{t("sync.now")}</Button>
+            <SyncDetails report={report} diagnostics={status.sync.diagnostics} t={t} ConfirmDialog={ConfirmDialog} />
           </>}
         </PopoverContent>
       </Popover>

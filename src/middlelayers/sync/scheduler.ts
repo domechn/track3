@@ -1,6 +1,7 @@
 import type { SyncProgress, SyncReport } from "./engine";
 import { classifySyncError, type SyncConnectionResult } from "./settings";
 import { SyncTimeoutError } from "./object-store";
+import type { SyncDiagnostics } from "./diagnostics";
 
 export const SYNC_IDLE_TIMEOUT_MS = 3 * 60_000;
 export const SYNC_RUN_TIMEOUT_MS = 6 * 60 * 60_000;
@@ -14,6 +15,7 @@ export type SyncStatus = {
   progress?: SyncProgress;
   error?: Exclude<SyncConnectionResult, "ok"> | "sync";
   retryStopped?: boolean;
+  diagnostics?: SyncDiagnostics;
 };
 
 export class SyncScheduler {
@@ -30,7 +32,7 @@ export class SyncScheduler {
   private state: SyncStatus = { phase: "idle" };
 
   constructor(
-    private readonly run: (signal: AbortSignal, activity: (progress?: SyncProgress) => void) => Promise<SyncReport>,
+    private readonly run: (signal: AbortSignal, activity: (progress?: SyncProgress) => void, onDiagnostics: (diagnostics: SyncDiagnostics) => void) => Promise<SyncReport>,
     private readonly options: { debounceMs?: number; focusThrottleMs?: number; retryBaseMs?: number } = {},
   ) {}
 
@@ -140,7 +142,11 @@ export class SyncScheduler {
           controller.signal.addEventListener("abort", onAbort, { once: true });
         });
         try {
-          run = this.run(controller.signal, reportActivity);
+          run = this.run(controller.signal, reportActivity, (diagnostics) => {
+            if (!this.stopped && runId === this.runId) {
+              this.setStatus({ ...this.state, diagnostics });
+            }
+          });
         } catch (error) {
           run = Promise.reject(error);
         }
@@ -152,7 +158,7 @@ export class SyncScheduler {
           this.fail("sync", report);
         } else {
           this.failures = 0;
-          this.setStatus({ phase: "idle", report, lastSync: Date.now() });
+          this.setStatus({ phase: "idle", report, diagnostics: report.diagnostics ?? this.state.diagnostics, lastSync: Date.now() });
         }
       } catch (error) {
         if (!this.stopped && runId === this.runId) this.fail(

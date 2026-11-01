@@ -66,6 +66,31 @@ describe("SigV4", () => {
 });
 
 describe("S3Client", () => {
+  it("reports every 5xx retry and its wait to the counting store", async () => {
+    const { createSyncDiagnostics } = await import("./diagnostics");
+    http.mockResolvedValueOnce(new Response("busy", { status: 503 }));
+    http.mockResolvedValueOnce(new Response("ok", { status: 200, headers: { etag: '"e"' } }));
+    const { store, diagnostics } = createSyncDiagnostics(new S3Client({ ...config, retryBaseMs: 1 }));
+    await store.getObject("test-object");
+    expect(diagnostics.requests.GET.count).toBe(2);
+    expect(diagnostics.requests.GET.outcomes.serverError.count).toBe(1);
+    expect(diagnostics.requests.GET.outcomes.ok.count).toBe(1);
+    expect(diagnostics.retries).toBe(1);
+    expect(diagnostics.retryWaitMs).toBeGreaterThanOrEqual(1);
+  });
+  it("counts all attempts when S3 exhausts its hidden retries", async () => {
+    const { createSyncDiagnostics } = await import("./diagnostics");
+    for (let index = 0; index < 4; index++) {
+      http.mockResolvedValueOnce(new Response(null, { status: index === 0 ? 429 : 503 }));
+    }
+    const { store, diagnostics } = createSyncDiagnostics(new S3Client({ ...config, retryBaseMs: 1 }));
+    await expect(store.getObject("test-object")).rejects.toMatchObject({ status: 503 });
+    expect(diagnostics.requests.GET.count).toBe(4);
+    expect(diagnostics.requests.GET.outcomes.rateLimited.count).toBe(1);
+    expect(diagnostics.requests.GET.outcomes.serverError.count).toBe(3);
+    expect(diagnostics.retries).toBe(3);
+    expect(diagnostics.retryWaitMs).toBeGreaterThanOrEqual(3);
+  });
   it.each([
     ["HEAD", 30_000, (client: S3Client, signal: AbortSignal) => client.headObject("snap/a", signal)],
     ["LIST", 30_000, (client: S3Client, signal: AbortSignal) => client.listObjectsV2({ signal })],

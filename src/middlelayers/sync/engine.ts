@@ -2,6 +2,7 @@ import { decryptObject, encryptObject, objectName, unlockSyncHeader } from "./cr
 import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-store";
 import { compareClock, nextClock, validRemoteClock, type Hlc } from "./clock";
 import { syncCategory, type SyncCategory } from "./config-keys";
+import { createSyncDiagnostics, type SyncDiagnostics } from "./diagnostics";
 
 export type Snapshot = {
   uuid: string;
@@ -71,7 +72,7 @@ export function resetSyncState(state: SyncState): SyncState {
 
 export interface SyncRepository {
   loadState(): Promise<SyncState>;
-  saveState(state: SyncState): Promise<void>;
+  saveState(state: SyncState): Promise<void | number>;
   listSnapshotIds(): Promise<string[]>;
   listChangedSnapshotIds?(since?: number): Promise<{ ids: string[]; revision: number }>;
   readSnapshot(uuid: string): Promise<Snapshot>;
@@ -92,6 +93,7 @@ export type SyncReport = {
   pulled: number; pushed: number; tombstonesApplied: number; configChanges: number;
   conflicts: string[]; errors: string[]; pulledFrom?: string[];
   devices?: Array<{ id: string; name?: string; lastUpload?: string }>;
+  diagnostics?: SyncDiagnostics;
 };
 export type SyncProgress = { phase: "pull" | "push"; completed: number; total: number };
 export type SyncOptions = {
@@ -100,6 +102,7 @@ export type SyncOptions = {
   categories?: Partial<Record<SyncCategory | "chat" | "history", boolean>>;
   dryRun?: boolean;
   deviceName?: string;
+  onDiagnostics?: (diagnostics: SyncDiagnostics) => void;
 };
 
 const encoder = new TextEncoder();
@@ -264,9 +267,10 @@ export class SyncEngine {
   private stateWrites: Promise<void> = Promise.resolve();
   private tombstoneQueue: Promise<void> = Promise.resolve();
   private activeState?: SyncState;
+  private roundDiagnostics?: ReturnType<typeof createSyncDiagnostics>;
 
   constructor(
-    private readonly store: S3Store,
+    private store: S3Store,
     private readonly repo: SyncRepository,
     private readonly passphrase: string,
     private readonly environment: { now?: () => number } = {},
@@ -281,7 +285,12 @@ export class SyncEngine {
   }
 
   private saveState(state: SyncState): Promise<void> {
-    const result = this.stateWrites.then(() => this.repo.saveState(state));
+    const result = this.stateWrites.then(async () => {
+      const metrics = this.roundDiagnostics;
+      if (!metrics) { await this.repo.saveState(state); return; }
+      const bytes = await metrics.measureSave(() => this.repo.saveState(state));
+      metrics.diagnostics.syncStateBytes = bytes ?? encoder.encode(JSON.stringify(state)).length;
+    });
     this.stateWrites = result.then(() => undefined, () => undefined);
     return result;
   }
@@ -341,8 +350,25 @@ export class SyncEngine {
 
   syncOnce(options: SyncOptions = {}): Promise<SyncReport> {
     return this.exclusive(async () => {
-      try { return await this.syncRound(options); }
-      finally { this.activeState = undefined; }
+      const original = this.store;
+      const metrics = createSyncDiagnostics(original);
+      this.roundDiagnostics = metrics;
+      this.store = metrics.store;
+      try {
+        const report = await this.syncRound(options);
+        return { ...report, diagnostics: metrics.diagnostics };
+      } finally {
+        const state = this.activeState;
+        if (state) {
+          metrics.diagnostics.snapshots = Object.keys(state.snapshotHashes ?? {}).length;
+          metrics.diagnostics.knownTokens = state.known?.length ?? 0;
+        }
+        metrics.finish();
+        try { options.onDiagnostics?.(metrics.diagnostics); } catch { /* Diagnostics must not change sync results. */ }
+        this.store = original;
+        this.roundDiagnostics = undefined;
+        this.activeState = undefined;
+      }
     });
   }
 
@@ -351,6 +377,7 @@ export class SyncEngine {
     if (options.signal?.aborted) throw new Error("Sync aborted");
     const header = await readSyncHeader(this.store);
     if (!header) throw new Error("Sync has not been initialized");
+    this.roundDiagnostics?.phase("keyDerivation");
     const key = await unlockSyncHeader(header, this.passphrase);
     if (options.signal?.aborted) throw new Error("Sync aborted");
     const stateReady = this.tombstoneQueue.then(async () => {
@@ -373,6 +400,7 @@ export class SyncEngine {
         (byte) => byte.toString(16).padStart(2, "0")).join("");
     };
     const validClock = (value: Hlc, owner: string) => validRemoteClock(value, owner, this.now());
+    this.roundDiagnostics?.phase("localScan");
     await this.device(state, !options.dryRun);
     state.known ??= [];
     state.published ??= [];
@@ -454,6 +482,7 @@ export class SyncEngine {
     report.devices = [];
     let manifestReadFailed = false;
     let continuationToken: string | undefined;
+    this.roundDiagnostics?.phase("discover");
     do {
       aborted();
       const page = await this.store.listObjectsV2({ prefix: "devices/", continuationToken, signal: options.signal });
@@ -462,6 +491,7 @@ export class SyncEngine {
         const match = /^devices\/([0-9a-f-]{36})\/manifest$/.exec(item.key);
         if (!match) continue;
         try {
+          this.roundDiagnostics?.phase("manifestsDownload");
           if (item.size > MAX_MANIFEST_BYTES) throw new Error("Invalid sync manifest");
           const object = await this.store.getObject(item.key, options.signal);
           if (!object || object.body.length > MAX_MANIFEST_BYTES) throw new Error("Invalid sync manifest");
@@ -476,12 +506,16 @@ export class SyncEngine {
         } catch {
           manifestReadFailed = true;
           report.errors.push("Failed to read sync manifest");
+        } finally {
+          this.roundDiagnostics?.phase("discover");
         }
       }
       continuationToken = page.nextContinuationToken;
     } while (continuationToken);
     const own = manifests.find((item) => item.owner === state.deviceId);
     const entries = manifests.flatMap(({ owner, manifest }) => manifest.entries.map((entry) => ({ owner, entry })));
+    this.roundDiagnostics!.diagnostics.entries = entries.length;
+    this.roundDiagnostics?.phase("localScan");
     if (!manifestReadFailed) {
       const visible = new Set(entries.map(({ owner, entry }) => entryToken(owner, entry)));
       for (const token of known) if (!visible.has(token)) known.delete(token);
@@ -516,6 +550,7 @@ export class SyncEngine {
     const remoteEdits = new Map<string, SnapshotEdit>();
     const remoteRowEvents = new Map<string, Record<string, Tombstone>>();
     const remoteTransactionEvents = new Map<string, TransactionEvents>();
+    this.roundDiagnostics?.phase("pull");
     for (const { owner, entry } of entries.slice().sort((a, b) =>
       Number(b.entry.kind === "tombstone") - Number(a.entry.kind === "tombstone"))) {
       aborted();
@@ -610,6 +645,7 @@ export class SyncEngine {
       }
     }
     aborted();
+    this.roundDiagnostics?.phase("localScan");
     const resolvedLocalConfig = new Set<string>();
     for (const id of new Set([...Object.keys(localConfig), ...Object.keys(state.config), ...Object.keys(state.configConflicts)])) {
       const category = syncCategory(id);
@@ -1043,6 +1079,7 @@ export class SyncEngine {
       report.pushed = writes.length;
       return report;
     }
+    this.roundDiagnostics?.phase("push");
     if (writes.length) {
       const probe = `devices/${state.deviceId}/probe/${crypto.randomUUID()}`;
       const content = encoder.encode("conditional-write-probe");
@@ -1157,6 +1194,7 @@ export class SyncEngine {
     };
     const checkpoint = async (published: Array<{ entry: Entry; write: typeof writes[number] }>): Promise<boolean> => {
       if (!published.length && (deviceName === undefined || own?.manifest.name === deviceName)) return true;
+      this.roundDiagnostics?.phase("manifestWrite");
       const entriesToPublish = published.map(({ entry }) => entry);
       const candidateEntries = [...ownEntries, ...entriesToPublish];
       const replacedSessions = new Set(entriesToPublish
@@ -1181,11 +1219,13 @@ export class SyncEngine {
       } satisfies Manifest)))));
       if (manifestEntries.length > 100_000 || body.length > MAX_MANIFEST_BYTES) {
         report.errors.push("Sync manifest is too large");
+        this.roundDiagnostics?.phase("push");
         return false;
       }
       try {
         const result = await this.store.putObject(path, body,
           manifestEtag ? { ifMatch: manifestEtag } : { ifNoneMatch: "*" }, options.signal);
+        this.roundDiagnostics?.phase("push");
         manifestEtag = result.etag;
         ownEntries = manifestEntries;
         const currentDevice = report.devices!.find((device) => device.id === state.deviceId);
@@ -1218,6 +1258,7 @@ export class SyncEngine {
         }
         state.known = [...known];
         await this.saveState(state);
+        this.roundDiagnostics?.phase("prune");
         for (const entry of obsolete) {
           if (entry.kind === "config" || entry.kind === "tombstone") continue;
           try {
@@ -1236,8 +1277,10 @@ export class SyncEngine {
             report.errors.push("Failed to prune old sync object");
           }
         }
+        this.roundDiagnostics?.phase("push");
         return true;
       } catch {
+        this.roundDiagnostics?.phase("push");
         report.errors.push("Failed to write sync manifest");
         return false;
       }

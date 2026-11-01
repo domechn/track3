@@ -57,8 +57,8 @@ test("mobile locked prompt dismisses and turn-off requires confirmation", async 
   await pill.click();
   await expect(page.getByLabel("Sync passphrase")).toBeVisible();
   const popover = (await page.locator(".t3-sync-popover").boundingBox())!;
-  expect(popover.x).toBeGreaterThan(0);
-  await page.touchscreen.tap(popover.x / 2, popover.y + 24);
+  expect(popover.y).toBeGreaterThan(0);
+  await page.touchscreen.tap(popover.x + popover.width / 2, popover.y / 2);
   await expect(page.getByLabel("Sync passphrase")).toHaveCount(0);
   await pill.click();
   await expect(page.getByRole("button", { name: "Turn off sync on this device" })).toBeVisible();
