@@ -102,11 +102,15 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" side="bottom" collisionPadding={16}
+          // Radix Escape was intermittent with focused content in the widened card; nested confirmations handle their own Escape.
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !document.querySelector('[role="alertdialog"]')) setOpen(false);
+          }}
           onInteractOutside={(event) => {
             if (document.querySelector('[role="alertdialog"]')) event.preventDefault();
           }}
-          className={`t3-sync-popover w-[calc(100vw-2rem)] max-w-80 space-y-3 text-sm ${mobile ? "ios-d3-sync-popover" : ""}`}>
-          <h2 className="font-semibold">{t("sync.status.details")}</h2>
+          className={`t3-sync-popover w-[calc(100vw-2rem)] max-w-[520px] space-y-3 text-sm ${mobile ? "ios-d3-sync-popover" : ""}`}>
+          <h2 className="text-base font-semibold">{t("sync.status.details")}</h2>
           {status.mode === "unreadable" ? <>
             <p role="alert" className="text-destructive">{t("sync.unreadable")}</p>
             <a href="#/settings/sync" className="text-primary underline">{t("sync.reenter")}</a>

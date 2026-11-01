@@ -52,6 +52,7 @@ it("shows the monthly quota message for iOS wallet quick look", async () => {
   vi.mocked(isIOS).mockReturnValue(true);
   window.location.hash = "#/settings/configuration?section=sources";
   render(<HashRouter><MobileConfiguration initialPreferCurrency="EUR" /></HashRouter>);
+  fireEvent.click(await screen.findByRole("tab", { name: "Wallets" }));
   fireEvent.click(await screen.findByRole("button", { name: /More actions for ERC20 vault/i }));
   fireEvent.click(await screen.findByRole("button", { name: "Quick look" }));
   await waitFor(() => expect(toast).toHaveBeenCalledWith({
@@ -71,6 +72,7 @@ it("invalidates Pro usage after iOS wallet quick look", async () => {
   loadPortfolio.mockResolvedValueOnce([]);
   window.location.hash = "#/settings/configuration?section=sources";
   render(<HashRouter><MobileConfiguration initialPreferCurrency="EUR" /></HashRouter>);
+  fireEvent.click(await screen.findByRole("tab", { name: "Wallets" }));
   fireEvent.click(await screen.findByRole("button", { name: /More actions for ERC20 vault/i }));
   fireEvent.click(await screen.findByRole("button", { name: "Quick look" }));
   await waitFor(() => expect(invalidateUsageCache).toHaveBeenCalledOnce());

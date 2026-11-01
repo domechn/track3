@@ -80,13 +80,24 @@ const App = ({
   if (isIOS()) return <div className="ios-d3-mobile-appearance">
     {showTheme && <>
       <InsetGroup title={t("appearance.theme")}>
-        {[...THEME_VALUES].reverse().map((value) => <ListRow key={value} className="ios-d3-choice-row" onClick={() => {
+        {(["light", "dark", "system"] as const satisfies readonly Theme[]).map((value) => <button key={value} type="button"
+          aria-label={t(`appearance.theme.${value}`)}
+          aria-pressed={selectedTheme === value}
+          className="t3-mobile-theme-choice" onClick={() => {
           setSelectedTheme(value);
           currentTheme.setTheme(value);
           void saveTheme(value);
-        }} trailing={<span className="ios-d3-choice-check" aria-hidden="true">{selectedTheme === value ? "✓" : ""}</span>}>
-          {t(`appearance.theme.${value}`)}
-        </ListRow>)}
+        }}>
+          <span data-testid="theme-preview" aria-hidden="true" className={`t3-theme-preview t3-theme-preview-${value}`}>
+            <span className="t3-theme-preview-rail" />
+            <span className="t3-theme-preview-content"><i /><b /><i /><em /></span>
+          </span>
+          <span className="t3-mobile-theme-choice-label">
+            <span>{t(`appearance.theme.${value}`)}</span>
+            <small>{t(`settings.phase6.themeHint.${value}`)}</small>
+          </span>
+          <span className="t3-mobile-theme-choice-radio" aria-hidden="true" />
+        </button>)}
       </InsetGroup>
       <InsetGroup title={t("appearance.quoteColor")}>
         {QUOTE_COLOR_VALUES.map((value) => <ListRow key={value} className="ios-d3-choice-row" onClick={() => void handleQuoteColorValueChange(value)} trailing={<span className="ios-d3-choice-check" aria-hidden="true">{quoteColor === value ? "✓" : ""}</span>}>
@@ -191,14 +202,14 @@ const App = ({
                   selectedTheme === "dark" ? "border-foreground/60" : "border-muted"
                 }`}
               >
-                <div className="space-y-2 rounded-sm bg-slate-950/95 p-2">
-                  <div className="space-y-2 rounded-md bg-slate-800/90 p-2 shadow-sm border border-white/10">
-                    <div className="h-2 w-[80px] rounded-lg bg-slate-400/80" />
-                    <div className="h-2 w-[100px] rounded-lg bg-slate-400/80" />
+                <div className="dark space-y-2 rounded-sm bg-background p-2">
+                  <div className="space-y-2 rounded-md bg-card p-2 shadow-sm border border-border/40">
+                    <div className="h-2 w-[80px] rounded-lg bg-muted" />
+                    <div className="h-2 w-[100px] rounded-lg bg-muted" />
                   </div>
-                  <div className="flex items-center space-x-2 rounded-md bg-slate-800/90 p-2 shadow-sm border border-white/10">
-                    <div className="h-4 w-4 rounded-full bg-slate-400/80" />
-                    <div className="h-2 w-[100px] rounded-lg bg-slate-400/80" />
+                  <div className="flex items-center space-x-2 rounded-md bg-card p-2 shadow-sm border border-border/40">
+                    <div className="h-4 w-4 rounded-full bg-muted" />
+                    <div className="h-2 w-[100px] rounded-lg bg-muted" />
                   </div>
                 </div>
               </div>

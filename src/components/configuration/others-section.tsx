@@ -277,7 +277,7 @@ function AddOtherDialog({
           {t("config.addSymbol")}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="t3-source-editor sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{t("config.addOther")}</DialogTitle>
           <DialogDescription>

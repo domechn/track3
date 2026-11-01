@@ -159,11 +159,14 @@ export default function SyncSettingsPage() {
 
   return (
     <div className="sync-settings-page space-y-5">
+      <div className="t3-settings-page-head">
+        <h3>{t("settings.phase6.sync")}</h3>
+        <p>{t("sync.intro")}</p>
+      </div>
       {status.mode === "unreadable" && <p role="alert" className="text-sm text-muted-foreground">{t("sync.unreadable")}</p>}
-      <Card>
+      <Card className="t3-sync-connection">
         <CardHeader>
-          <CardTitle>{t("sync.title")}</CardTitle>
-          <p className="text-sm text-muted-foreground">{t("sync.intro")}</p>
+          <CardTitle>{t("settings.phase6.connection")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -202,7 +205,7 @@ export default function SyncSettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="t3-sync-passphrase">
         <CardHeader><CardTitle>{t("sync.passphrase.title")}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div role="note" className="rounded-lg border-2 border-destructive bg-destructive/10 p-4 font-semibold text-destructive dark:border-red-400 dark:text-red-300">
@@ -241,7 +244,7 @@ export default function SyncSettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="t3-sync-categories">
         <CardHeader>
           <CardTitle>{t("sync.categories.title")}</CardTitle>
           <p className="text-sm text-muted-foreground">{t("sync.categories.deviceLocal")}</p>
@@ -268,7 +271,7 @@ export default function SyncSettingsPage() {
       </Card>
 
       {status.mode === "ready" && configConflicts.length > 0 && (
-        <Card>
+        <Card className="t3-sync-conflicts">
           <CardHeader>
             <CardTitle>{t("sync.configConflict.title")}</CardTitle>
             <p className="text-sm text-muted-foreground">{t("sync.configConflict.description")}</p>
@@ -294,7 +297,7 @@ export default function SyncSettingsPage() {
       )}
 
       {(status.mode !== "disabled" || !!syncRuntime.getSettings().endpoint) && (
-        <Card>
+        <Card className="t3-sync-devices">
           <CardHeader>
             <CardTitle>{t("sync.devices.title")}</CardTitle>
             <p className="text-sm text-muted-foreground">{t("sync.devices.localNames")}</p>

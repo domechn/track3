@@ -70,6 +70,14 @@ describe("iPhone appearance settings", () => {
     }
   });
 
+  it("shows the three theme choices with visual previews", () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    window.location.hash = "#/settings/appearance?section=theme";
+    render(<HashRouter><Appearance /></HashRouter>);
+    expect(screen.getAllByTestId("theme-preview")).toHaveLength(3);
+    expect(screen.getAllByTestId("theme-preview")[0]).toHaveClass("t3-theme-preview-light");
+  });
+
   it("applies a theme without invoking the desktop process plugin", async () => {
     vi.mocked(isIOS).mockReturnValue(false);
     vi.mocked(reloadApp).mockClear();

@@ -1,15 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
-import { useToast } from "@/components/ui/use-toast";
-import { ToastAction } from "@/components/ui/toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { reloadApp } from "@/utils/app";
 import { useTranslation } from "@/i18n";
 
-const maxInt = 2147483647;
-
 const App = () => {
-  const { toast } = useToast();
   const { t } = useTranslation();
+  const [readyVersion, setReadyVersion] = useState<string | null>(null);
+  const [deferred, setDeferred] = useState(false);
   useEffect(() => {
     void autoInstallLatestVersion().catch(() => {
       console.warn("Automatic update check failed");
@@ -22,22 +21,27 @@ const App = () => {
       return false;
     }
     await update.downloadAndInstall();
-    toast({
-      title: t("autoUpdater.title"),
-      duration: maxInt,
-      action: (
-        <ToastAction
-          altText={t("autoUpdater.reload")}
-          onClick={reloadApp}
-          className="bg-primary text-primary-foreground shadow hover:bg-primary/90"
-        >
-          {t("autoUpdater.reload")}
-        </ToastAction>
-      ),
-    });
+    setReadyVersion(update.version ?? "");
   }
 
-  return <></>;
+  return <><Dialog open={readyVersion !== null && !deferred} onOpenChange={(open) => { if (!open) setDeferred(true); }}>
+    <DialogContent className="sm:max-w-[520px]">
+      <DialogHeader>
+        <DialogTitle>{t("settings.phase6.updateReadyTitle")}</DialogTitle>
+        <DialogDescription>
+          {t("settings.phase6.updateReadyDescription").replace("{version}", readyVersion || t("settings.phase6.updateReadyVersion"))}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setDeferred(true)}>{t("settings.phase6.updateLater")}</Button>
+        <Button onClick={reloadApp}>{t("settings.phase6.updateRestart")}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+    {readyVersion !== null && deferred && <Button className="fixed bottom-4 right-4 z-50 shadow-overlay" onClick={reloadApp}>
+      {t("settings.phase6.updateRestart")}
+    </Button>}
+  </>;
 };
 
 export default App;

@@ -26,8 +26,21 @@ test("locked sync popover and controls fit at 320px", async ({ page }) => {
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(320);
   for (const name of ["Unlock sync", "Skip for now", "Turn off sync on this device"]) {
-    expect((await page.getByRole("button", { name }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect.poll(async () => (await page.getByRole("button", { name }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
+});
+
+test("sync details open as a bottom sheet above the iPhone tab bar", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { seedLockedSync: true });
+  await page.goto("/#/overview");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect.poll(async () => {
+    const box = (await dialog.boundingBox())!;
+    const tabs = (await page.locator(".mobile-tab-bar").boundingBox())!;
+    return box.x <= 1 && box.x + box.width >= 389 && Math.abs(box.y + box.height - tabs.y) <= 1;
+  }).toBe(true);
 });
 
 test("mobile locked prompt dismisses and turn-off requires confirmation", async ({ page }) => {

@@ -1063,6 +1063,7 @@ const App = ({
   }
 
   const mobileSection = searchParams.get("section");
+  const [sourceTab, setSourceTab] = useState<"exchanges" | "wallets" | "brokers" | "custom">("exchanges");
   if (isIOS()) {
     return mobileSection === "currency" ? (
       <GeneralSettings
@@ -1082,7 +1083,19 @@ const App = ({
       />
     ) : (
       <div className="space-y-6">
-      <MobileSources
+      {mobileSection === "sources" && exchanges.length + wallets.length + stockBrokers.length + others.length > 0 && <>
+        <p className="t3-mobile-source-summary">{t("settings.phase6.sourceSummary").replace("{count}", String(exchanges.length + wallets.length + stockBrokers.length + others.length))}</p>
+        <div role="tablist" aria-label={t("settings.phase6.sources")} className="t3-mobile-source-tabs">
+          {(["exchanges", "wallets", "brokers", "custom"] as const).map((tab) =>
+            <button key={tab} type="button" role="tab" aria-label={t(`settings.phase6.sourceTab.${tab}`)}
+              aria-selected={sourceTab === tab} onClick={() => setSourceTab(tab)}>
+              {t(`settings.phase6.sourceTab.${tab}`)}
+              <span aria-hidden="true">{({ exchanges: exchanges.length, wallets: wallets.length, brokers: stockBrokers.length, custom: others.length })[tab]}</span>
+            </button>)}
+        </div>
+      </>}
+      {(mobileSection !== "sources" || sourceTab !== "custom") && <MobileSources
+        selectedKind={mobileSection === "sources" ? sourceTab === "exchanges" ? "exchange" : sourceTab === "wallets" ? "wallet" : "broker" : undefined}
         formatError={safeError}
         exchanges={exchanges}
         wallets={wallets}
@@ -1103,11 +1116,12 @@ const App = ({
         onQuickLookExchange={handleQuickLookExchange}
         onQuickLookWallet={handleQuickLookWallet}
         onQuickLookBroker={handleQuickLookStockBroker}
-        onAddCustomAsset={() => setAddOtherRequest((request) => request + 1)}
-      />
-      <MobileOthers
+        onAddCustomAsset={() => { setSourceTab("custom"); setAddOtherRequest((request) => request + 1); }}
+      />}
+      {(mobileSection !== "sources" || sourceTab === "custom" || exchanges.length + wallets.length + stockBrokers.length + others.length === 0) && <MobileOthers
         others={others}
         addRequest={addOtherRequest}
+        onAddRequestHandled={() => setAddOtherRequest(0)}
         hideEmpty={exchanges.length + wallets.length + stockBrokers.length + others.length === 0}
         onSave={(index, value) => {
           if (index === null) handleAddOther(value);
@@ -1118,7 +1132,7 @@ const App = ({
         }}
         onRemove={handleRemoveOther}
         onAttach={(index) => { setAttachModalTargetIdx(index); setAttachModalOpen(true); }}
-      />
+      />}
       <AttachModal
         open={attachModalOpen}
         onOpenChange={handleAttachModalOpenChange}

@@ -1,4 +1,4 @@
-import { render as testingRender, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as testingRender, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { HashRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -126,7 +126,28 @@ describe("Configuration base currency initialization", () => {
       others: [],
     } as never);
     render(<Configuration />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Custom assets" }));
     expect(await screen.findByRole("button", { name: "Add symbol" })).toBeInTheDocument();
+    vi.mocked(isIOS).mockReturnValue(false);
+    window.location.hash = "";
+  });
+
+  it.each([
+    ["an empty portfolio", []],
+    ["only custom assets", [{ symbol: "SOL", amount: 2 }]],
+  ])("opens Add custom asset from the source picker with %s", async (_name, others) => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    window.location.hash = "#/settings/configuration?section=sources";
+    vi.mocked(getConfiguration).mockResolvedValue({
+      configs: { groupUSD: false, hideInactive: false },
+      exchanges: [],
+      stockConfig: { brokers: [] },
+      others,
+    } as never);
+    render(<Configuration />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add source" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add custom asset" }));
+    expect(await screen.findByRole("dialog", { name: "Add custom asset" })).toBeInTheDocument();
     vi.mocked(isIOS).mockReturnValue(false);
     window.location.hash = "";
   });

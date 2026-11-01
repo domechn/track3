@@ -21,7 +21,7 @@ test("desktop locked prompt dismisses and turn-off requires confirmation", async
   await expect(page.getByLabel("Sync passphrase")).toHaveCount(0);
   await expect(pill).toBeFocused();
   await pill.click();
-  await page.mouse.click(500, 100);
+  await page.mouse.click(100, 700);
   await expect(page.getByLabel("Sync passphrase")).toHaveCount(0);
   await pill.click();
   await page.getByRole("button", { name: "Turn off sync on this device" }).click();

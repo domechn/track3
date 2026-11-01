@@ -17,6 +17,7 @@ export function MobileOthers(props: {
   onAttach: (index: number) => void;
   hideEmpty?: boolean;
   addRequest?: number;
+  onAddRequestHandled?: () => void;
 }) {
   const { t } = useTranslation();
   const [editor, setEditor] = useState<{ index: number | null; value: OtherRow; amount: string }>();
@@ -28,7 +29,12 @@ export function MobileOthers(props: {
     setEditor({ index, value: { ...value, alias: value.alias ?? "" }, amount: String(value.amount) });
     setError("");
   };
-  useEffect(() => { if (props.addRequest) open(null); }, [props.addRequest]);
+  useEffect(() => {
+    if (props.addRequest) {
+      open(null);
+      props.onAddRequestHandled?.();
+    }
+  }, [props.addRequest]);
   const save = () => {
     if (!editor) return;
     const amount = Number(editor.amount);

@@ -6,6 +6,7 @@ import { isIOS } from "@/utils/platform";
 import { vi } from "vitest";
 
 vi.mock("@/utils/platform", () => ({ isIOS: vi.fn(() => false) }));
+vi.mock("@/utils/app", () => ({ getVersion: vi.fn().mockResolvedValue("0.9.4") }));
 
 describe("Settings shell", () => {
   it("provides a page heading and labeled navigation", () => {
@@ -34,13 +35,13 @@ describe("Settings shell", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("link", { name: /configuration/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Data sources" })).toHaveAttribute(
       "aria-current",
       "page"
     );
   });
 
-  it("opens an iPhone settings hub with reachable feature pages", () => {
+  it("opens an iPhone settings hub with reachable feature pages", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     render(
       <MemoryRouter initialEntries={["/settings"]}>
@@ -52,11 +53,11 @@ describe("Settings shell", () => {
       </MemoryRouter>
     );
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Data sources" })).toHaveAttribute("href", "#/settings/configuration?section=sources");
-    expect(screen.getByRole("link", { name: "Security" })).toHaveAttribute("href", "#/settings/data?section=security");
-    expect(screen.getByRole("link", { name: "Backup" })).toHaveAttribute("href", "#/settings/data?section=backup");
-    expect(screen.getByRole("link", { name: "Data sources" }).querySelector(".ios-d3-settings-icon")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "About" }).querySelector(".ios-d3-settings-icon")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Data sources" })).toHaveAttribute("href", "/settings/configuration?section=sources");
+    expect(screen.getByRole("link", { name: "Security" })).toHaveAttribute("href", "/settings/data?section=security");
+    expect(screen.getByRole("link", { name: "Backup & data" })).toHaveAttribute("href", "/settings/data?section=backup");
+    expect(screen.getByRole("link", { name: "Data sources" }).querySelector(".t3-settings-menu-icon")).toBeInTheDocument();
+    expect((await screen.findByRole("link", { name: "About 0.9.4" })).querySelector(".t3-settings-menu-icon")).toBeInTheDocument();
     vi.mocked(isIOS).mockReturnValue(false);
   });
 });
