@@ -179,6 +179,22 @@ older tombstones and masked snapshot objects be removed.
 conflicts, and sanitized errors. `dryRun()` estimates changes without writing
 the database or object store. `status()` exposes the local device ID, clock,
 and last successful sync time.
+Each round also reports in-memory diagnostics: total and phase milliseconds
+(header read, key derivation, discover/list, manifest downloads, pull, local
+scan, state saves, push, manifest writes, prune); request counts and sent and
+received bytes by GET, PUT, LIST, DELETE, and HEAD and by outcome; retry count,
+total retry wait, timeouts; the last saved `sync_state` JSON byte size; cached
+snapshot hashes, manifest entries, and known token counts; and the five slowest
+store calls as method, phase, and milliseconds. A retried S3 call counts every
+network attempt, including its 429 or 5xx response. Retry outcomes also appear
+in their failure category. LIST received bytes are the XML response size;
+failed response bodies count only when the provider reports Content-Length.
+State-save time is also included in the active phase, so phase times overlap
+and may add up to more than the total.
+The status indicator's Details section shows the last round and can copy only
+this numeric diagnostic object. It never includes object paths, endpoints,
+bucket names, device names, config values, or credentials. Diagnostics are
+not written to the database or bucket.
 To use the desktop adapter, construct it with `createSqliteSyncEngine`; call
 the returned `unregister` when sync is disabled. `SyncRuntime` owns the
 desktop adapter, session passphrase, and `SyncScheduler`. The scheduler

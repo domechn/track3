@@ -23,6 +23,15 @@ export type StoredObject = { body: Uint8Array; etag: string };
 export type ListedObject = { key: string; etag: string; size: number; lastModified?: string };
 export type ListOptions = { prefix?: string; continuationToken?: string; signal?: AbortSignal };
 export type ListPage = { objects: ListedObject[]; nextContinuationToken?: string };
+export const listResponseBytes: unique symbol = Symbol("listResponseBytes");
+export type StoreRetry = {
+  verb: "GET" | "PUT" | "LIST" | "DELETE" | "HEAD";
+  status: number;
+  bytesSent: number;
+  bytesReceived: number;
+  waitMs: number;
+  resumed: boolean;
+};
 
 export interface S3Store {
   putObject(key: string, body: Uint8Array, conditions?: WriteConditions, signal?: AbortSignal): Promise<{ etag: string }>;
@@ -30,6 +39,7 @@ export interface S3Store {
   headObject(key: string, signal?: AbortSignal): Promise<{ etag: string; size: number } | null>;
   deleteObject(key: string, signal?: AbortSignal): Promise<void>;
   listObjectsV2(options?: ListOptions): Promise<ListPage>;
+  observeRetries?(listener: (retry: StoreRetry) => void): () => void;
 }
 
 export async function writeSyncHeader(store: S3Store, header: SyncHeader): Promise<{ etag: string }> {

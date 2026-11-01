@@ -24,6 +24,9 @@ it("keeps the sync status copy present in both English and Chinese desktop and m
     for (const key of keys) {
       expect((catalog as Record<string, string>)[key], key).toBeTruthy();
     }
+    for (const key of Object.keys(desktopEn).filter((key) => key.startsWith("sync.details."))) {
+      expect((catalog as Record<string, string>)[key], key).toBeTruthy();
+    }
   }
   expect(Object.keys(desktopEn).sort()).toEqual(Object.keys(desktopZh).sort());
   expect(Object.keys(mobileEn).sort()).toEqual(Object.keys(mobileZh).sort());

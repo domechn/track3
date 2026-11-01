@@ -176,13 +176,14 @@ export class SyncRuntime {
       headObject: (key, signal) => completed(store.headObject(key, signal)),
       deleteObject: (key, signal) => completed(store.deleteObject(key, signal)),
       listObjectsV2: (options) => completed(store.listObjectsV2(options)),
+      observeRetries: (listener) => store.observeRetries?.(listener) ?? (() => {}),
     };
     this.handle = this.deps.engine(trackedStore, passphrase);
-    this.scheduler = new SyncScheduler(async (signal, reportActivity) => {
+    this.scheduler = new SyncScheduler(async (signal, reportActivity, onDiagnostics) => {
       activity = reportActivity;
       const currentId = await this.deps.deviceId?.();
       return this.handle!.engine.syncOnce({
-        signal, onProgress: reportActivity, categories: this.settings.categories,
+        signal, onProgress: reportActivity, onDiagnostics, categories: this.settings.categories,
         deviceName: this.settings.deviceNames[currentId ?? ""],
       });
     });

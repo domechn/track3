@@ -64,12 +64,6 @@ export function configurationFromForm({ exchanges, stockBrokers, wallets, groupU
 export const syncCategories: SyncCategoryName[] = ["history", "settings", "secrets", "rebalance", "chat"];
 export const syncFields = ["endpoint", "region", "bucket", "prefix", "accessKeyId", "secretAccessKey"] as const;
 export type SyncField = typeof syncFields[number];
-export const configConflictNames: Record<string, string> = {
-  "6": "querySize", "7": "currency", "8": "quoteColor", "10": "exchanges",
-  "11": "wallets", "12": "general", "20": "stockBroker", "993": "costBasis",
-  "994": "assistant", "995": "blacklist", rebalance: "rebalance",
-};
-
 export const syncFormWithField = (current: SyncSettings, name: SyncField, value: string): SyncSettings => ({ ...current, [name]: value });
 export const syncFormWithPathStyle = (current: SyncSettings, checked: boolean): SyncSettings => ({ ...current, pathStyle: checked });
 export const syncFormWithCategory = (current: SyncSettings, category: SyncCategoryName, checked: boolean): SyncSettings => ({
