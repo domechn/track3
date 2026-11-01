@@ -70,14 +70,23 @@ pub async fn import_sync_snapshot(
     database_path: &Path,
     value: serde_json::Value,
 ) -> Result<bool, String> {
-    persist_sync_snapshot(database_path, value, false).await
+    persist_sync_snapshot(database_path, value, false, false).await
 }
 
 pub async fn replace_sync_snapshot(
     database_path: &Path,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    persist_sync_snapshot(database_path, value, true)
+    persist_sync_snapshot(database_path, value, true, false)
+        .await
+        .map(|_| ())
+}
+
+pub async fn replace_import_snapshot(
+    database_path: &Path,
+    value: serde_json::Value,
+) -> Result<(), String> {
+    persist_sync_snapshot(database_path, value, true, true)
         .await
         .map(|_| ())
 }
@@ -86,8 +95,9 @@ async fn persist_sync_snapshot(
     database_path: &Path,
     value: serde_json::Value,
     replace: bool,
+    preserve_local_prices: bool,
 ) -> Result<bool, String> {
-    let snapshot: Snapshot =
+    let mut snapshot: Snapshot =
         serde_json::from_value(value).map_err(|_| "Invalid sync snapshot".to_string())?;
     if snapshot.uuid.is_empty()
         || snapshot.assets.iter().any(|row| {
@@ -130,6 +140,42 @@ async fn persist_sync_snapshot(
     }
     if replace && exists == 0 {
         return Err("Cannot edit missing sync snapshot".to_string());
+    }
+    if preserve_local_prices {
+        if !snapshot.prices.is_empty() {
+            return Err("Import file cannot replace local cost prices".to_string());
+        }
+        let rows: Vec<(String, String, String, String, f64, String, String)> = sqlx::query_as(
+            "SELECT a.asset_type, a.wallet, a.symbol, p.symbol, p.price, p.assetCreatedAt, p.updatedAt
+             FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID AND a.uuid = p.uuid WHERE p.uuid = ?",
+        )
+        .bind(&snapshot.uuid)
+        .fetch_all(&mut connection)
+        .await
+        .map_err(|_| "Failed to read local cost prices".to_string())?;
+        let price_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM asset_prices WHERE uuid = ?")
+            .bind(&snapshot.uuid)
+            .fetch_one(&mut connection)
+            .await
+            .map_err(|_| "Failed to read local cost prices".to_string())?;
+        if price_count != rows.len() as i64 {
+            return Err("Cannot replace snapshot without losing local cost prices".to_string());
+        }
+        for (asset_type, wallet, symbol, price_symbol, price, asset_created_at, updated_at) in rows {
+            let asset = snapshot.assets.iter().find(|asset| {
+                asset.asset_type == asset_type
+                    && asset.wallet.as_deref().unwrap_or("") == wallet
+                    && asset.symbol == symbol
+            }).ok_or_else(|| "Cannot replace snapshot without losing local cost prices".to_string())?;
+            snapshot.prices.push(Price {
+                uuid: snapshot.uuid.clone(),
+                asset_id: asset.id,
+                symbol: price_symbol,
+                price,
+                asset_created_at,
+                updated_at,
+            });
+        }
     }
     if replace {
         for table in ["asset_prices", "transactions", "assets_v2"] {

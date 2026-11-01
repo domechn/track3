@@ -19,6 +19,28 @@ import {
   TransactionHandlerImpl,
 } from "./entities/transactions";
 import { executeWriteWork, WriteDatabase } from "./database";
+import { getDatabase } from "./database";
+import { invoke } from "@tauri-apps/api/core";
+import { readSnapshot } from "./snapshot";
+import { snapshotContent, type Snapshot } from "./sync/engine";
+
+export type ImportStatus = "new" | "same" | "different";
+export type ImportChoice = "import" | "skip" | "keep" | "replace";
+export type ImportPreviewRow = {
+  uuid: string;
+  createdAt: string;
+  total: number;
+  assetCount: number;
+  status: ImportStatus;
+  choice: ImportChoice;
+  transactionIdCollisions: number;
+};
+export type ImportResult = {
+  imported: number;
+  replaced: number;
+  skipped: number;
+  failures: Array<{ uuid: string; error: string }>;
+};
 
 export interface DataManager {
   readHistoricalData(filePath: string): Promise<ExportData>;
@@ -30,6 +52,8 @@ export interface DataManager {
     conflictResolver: "REPLACE" | "IGNORE",
     data: ExportData,
   ): Promise<void>;
+  previewImport(data: ExportData): Promise<{ rows: ImportPreviewRow[] }>;
+  importSelected(data: ExportData, choices: Record<string, ImportChoice>): Promise<ImportResult>;
 }
 
 export type ExportData = {
@@ -146,6 +170,135 @@ class DataManagement implements DataManager {
     }
   }
 
+  private validateExportData(data: ExportData): PartlyHistoricalData {
+    const { exportAt, md5V2: md5Str, configuration, historicalData, client, clientVersion } = data;
+    if (clientVersion === undefined) {
+      throw new Error("exported data is not compatible with current version");
+    }
+    if (md5Str) {
+      const md5Payload = {
+        data: JSON.stringify({ exportAt, client, clientVersion, historicalData, configuration }),
+      };
+      if (md5(JSON.stringify(md5Payload)) !== md5Str) {
+        throw new Error("invalid data, md5 check failed: errorCode 000");
+      }
+    }
+    if (!historicalData || !Array.isArray(historicalData) || historicalData.length === 0) {
+      throw new Error("invalid data: errorCode 001");
+    }
+    return historicalData;
+  }
+
+  private fileSnapshot(record: Pick<PartlyHistoricalData[number], "assets" | "transactions">): Snapshot {
+    const uuid = record.assets[0]?.uuid;
+    if (!uuid || record.assets.some((asset) => asset.uuid !== uuid || !Number.isSafeInteger(asset.id) || asset.id <= 0) ||
+      record.transactions.some((txn) => txn.uuid !== uuid || !Number.isSafeInteger(txn.assetID))) {
+      throw new Error("invalid snapshot in import file");
+    }
+    const assets = record.assets.map((asset) => {
+      const row = asset as AssetModel & { asset_type?: string };
+      return {
+        id: asset.id, uuid: asset.uuid, createdAt: asset.createdAt,
+        wallet: asset.wallet ?? "", asset_type: row.asset_type ?? asset.assetType,
+        symbol: asset.symbol, amount: asset.amount, value: asset.value, price: asset.price,
+      };
+    });
+    const transactions = record.transactions.map((txn) => {
+      const row = txn as TransactionModel & { asset_type?: string };
+      return {
+        uuid: txn.uuid, assetID: txn.assetID, asset_type: row.asset_type ?? txn.assetType,
+        wallet: txn.wallet, symbol: txn.symbol, amount: txn.amount, price: txn.price,
+        txnType: txn.txnType, txnCreatedAt: txn.txnCreatedAt,
+        createdAt: txn.createdAt, updatedAt: txn.updatedAt,
+      };
+    });
+    return { uuid, assets, prices: [], transactions };
+  }
+
+  async previewImport(data: ExportData): Promise<{ rows: ImportPreviewRow[] }> {
+    const records = this.validateExportData(data);
+    this.validateHistoricalData(records);
+    const uuids = new Set<string>();
+    const snapshots = records.map((record) => {
+      const snapshot = this.fileSnapshot(record);
+      if (uuids.has(snapshot.uuid)) throw new Error("duplicate snapshot in import file");
+      uuids.add(snapshot.uuid);
+      return snapshot;
+    });
+    const db = await getDatabase();
+    const existing = new Set((await db.select<Array<{ uuid: string }>>(
+      "SELECT uuid FROM assets_v2 UNION SELECT uuid FROM transactions",
+    )).map((row) => row.uuid));
+    const transactionIds = new Set(records.flatMap((record) => record.transactions.map((row) => row.id))
+      .filter((id) => Number.isSafeInteger(id) && id > 0));
+    const colliding = new Map<number, string>();
+    const ids = [...transactionIds];
+    for (let index = 0; index < ids.length; index += 500) {
+      const batch = ids.slice(index, index + 500);
+      const rows = await db.select<Array<{ id: number; uuid: string }>>(
+        `SELECT id, uuid FROM transactions WHERE id IN (${batch.map(() => "?").join(",")})`,
+        batch,
+      );
+      for (const row of rows) colliding.set(row.id, row.uuid);
+    }
+    const rows: ImportPreviewRow[] = [];
+    for (let index = 0; index < records.length; index++) {
+      const snapshot = snapshots[index];
+      let status: ImportStatus = "new";
+      if (existing.has(snapshot.uuid)) {
+        const local = await readSnapshot(snapshot.uuid);
+        status = local.assets.length > 0 &&
+          snapshotContent(this.fileSnapshot(local as unknown as PartlyHistoricalData[number])) === snapshotContent(snapshot)
+          ? "same" : "different";
+      }
+      rows.push({
+        uuid: snapshot.uuid,
+        createdAt: records[index].createdAt,
+        total: records[index].total,
+        assetCount: records[index].assets.length,
+        status,
+        choice: status === "new" ? "import" : status === "same" ? "skip" : "keep",
+        transactionIdCollisions: records[index].transactions.filter((txn) => {
+          const owner = colliding.get(txn.id);
+          return owner !== undefined && owner !== txn.uuid;
+        }).length,
+      });
+    }
+    return { rows };
+  }
+
+  async importSelected(data: ExportData, choices: Record<string, ImportChoice>): Promise<ImportResult> {
+    const preview = await this.previewImport(data);
+    const result: ImportResult = { imported: 0, replaced: 0, skipped: 0, failures: [] };
+    for (let index = 0; index < preview.rows.length; index++) {
+      const row = preview.rows[index];
+      const choice = choices[row.uuid] ?? row.choice;
+      if (choice === "skip" || choice === "keep") {
+        result.skipped++;
+        continue;
+      }
+      if ((choice !== "import" || row.status !== "new") &&
+        (choice !== "replace" || row.status !== "different")) {
+        result.failures.push({ uuid: row.uuid, error: "Import choice no longer matches this snapshot" });
+        continue;
+      }
+      const snapshot = this.fileSnapshot(data.historicalData[index]);
+      try {
+        if (choice === "import") {
+          const imported = await invoke<boolean>("import_sync_snapshot", { snapshot });
+          if (imported) result.imported++;
+          else result.failures.push({ uuid: row.uuid, error: "Snapshot already exists" });
+        } else {
+          await invoke("replace_import_snapshot", { snapshot });
+          result.replaced++;
+        }
+      } catch (error) {
+        result.failures.push({ uuid: row.uuid, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return result;
+  }
+
   // import historicalData from file
   private async saveHistoricalDataAssets(
     historicalData: PartlyHistoricalData,
@@ -172,48 +325,11 @@ class DataManagement implements DataManager {
     data: ExportData,
     dataFilter?: (origin: PartlyHistoricalData) => PartlyHistoricalData,
   ): Promise<void> {
-    const {
-      exportAt,
-      md5V2: md5Str,
-      configuration,
-      historicalData,
-      client,
-      clientVersion,
-    } = data;
-
-    if (clientVersion === undefined) {
-      throw new Error("exported data is not compatible with current version");
-    }
-
-    // !compatible with older versions logic ( before 0.3.3 )
-    if (md5Str) {
-      const md5Payload = {
-        data: JSON.stringify({
-          exportAt,
-          client,
-          clientVersion,
-          historicalData,
-          configuration,
-        }),
-      };
-      const currentMd5 = md5(JSON.stringify(md5Payload));
-      if (currentMd5 !== md5Str) {
-        throw new Error("invalid data, md5 check failed: errorCode 000");
-      }
-    }
-
-    if (
-      !historicalData ||
-      !Array.isArray(historicalData) ||
-      historicalData.length === 0
-    ) {
-      throw new Error("invalid data: errorCode 001");
-    }
-
+    const historicalData = this.validateExportData(data);
     const savedData = dataFilter ? dataFilter(historicalData) : historicalData;
     this.validateHistoricalData(savedData);
-    const importedConfiguration = configuration
-      ? await parseRawConfiguration(configuration)
+    const importedConfiguration = data.configuration
+      ? await parseRawConfiguration(data.configuration)
       : undefined;
 
     // start to import

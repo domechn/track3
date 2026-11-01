@@ -73,4 +73,4 @@ fixture diff:
 `total-profit/` cache namespace is constructed from `CACHE_GROUP_KEYS` at
 runtime, so the browser test recognizes it from that constant; the static
 literal scanner does not capture it. The recorded two-click import behavior
-is described in `docs/ui/golden-known-bugs.md`.
+is described in `docs/golden-known-bugs.md`.

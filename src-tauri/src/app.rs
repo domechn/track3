@@ -24,6 +24,7 @@ use crate::{
     sync_persistence::{
         delete_sync_snapshot as delete_sync_snapshot_atomically,
         import_sync_snapshot as import_sync_snapshot_atomically,
+        replace_import_snapshot as replace_import_snapshot_atomically,
         replace_sync_snapshot as replace_sync_snapshot_atomically,
     },
     types::{CoinWithPrice, RefreshAssetInput, RefreshTransactionInput},
@@ -120,6 +121,14 @@ async fn replace_sync_snapshot(
     snapshot: serde_json::Value,
 ) -> Result<(), String> {
     replace_sync_snapshot_atomically(&database_path.0, snapshot).await
+}
+
+#[tauri::command]
+async fn replace_import_snapshot(
+    database_path: tauri::State<'_, DatabasePath>,
+    snapshot: serde_json::Value,
+) -> Result<(), String> {
+    replace_import_snapshot_atomically(&database_path.0, snapshot).await
 }
 
 #[tauri::command]
@@ -657,6 +666,7 @@ pub fn run() {
         persist_refresh,
         import_sync_snapshot,
         replace_sync_snapshot,
+        replace_import_snapshot,
         delete_sync_snapshot,
         get_database_url,
         ios_key_recovery_needed,
@@ -689,6 +699,7 @@ pub fn run() {
         persist_refresh,
         import_sync_snapshot,
         replace_sync_snapshot,
+        replace_import_snapshot,
         delete_sync_snapshot,
         get_database_url,
         ios_key_recovery_needed,
@@ -719,6 +730,7 @@ pub fn run() {
         persist_refresh,
         import_sync_snapshot,
         replace_sync_snapshot,
+        replace_import_snapshot,
         delete_sync_snapshot,
         get_database_url,
         mark_frontend_ready,
@@ -735,6 +747,7 @@ pub fn run() {
         persist_refresh,
         import_sync_snapshot,
         replace_sync_snapshot,
+        replace_import_snapshot,
         delete_sync_snapshot,
         get_database_url,
     ]);

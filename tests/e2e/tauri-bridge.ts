@@ -343,22 +343,62 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       }
       return null;
     }
-    if (cmd === "import_sync_snapshot") {
-      // Mirrors the Rust command: insert the snapshot's rows verbatim (idempotent by uuid).
+    if (cmd === "import_sync_snapshot" || cmd === "replace_import_snapshot") {
       const snapshot = args.snapshot as { uuid: string; assets: any[]; prices: any[]; transactions: any[] };
       const existing = select("SELECT COUNT(*) AS n FROM assets_v2 WHERE uuid = ?", [snapshot.uuid])[0]?.n ?? 0;
-      if (Number(existing) > 0) return false;
-      const insert = (table: string, rows: Array<Record<string, unknown>>) => {
-        for (const row of rows) {
-          const columns = Object.keys(row);
-          db.run(`INSERT INTO ${table} (${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`,
-            columns.map((column) => row[column] as any));
+      if (cmd === "import_sync_snapshot" && Number(existing) > 0) return false;
+      if (cmd === "replace_import_snapshot" && Number(existing) === 0) throw new Error("Cannot edit missing sync snapshot");
+      if (cmd === "replace_import_snapshot" && snapshot.prices.length) throw new Error("Import file cannot replace local cost prices");
+      db.run("BEGIN");
+      try {
+        const localPrices = cmd === "replace_import_snapshot"
+          ? select("SELECT a.asset_type, a.wallet, a.symbol, p.symbol AS priceSymbol, p.price, p.assetCreatedAt, p.updatedAt FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID AND a.uuid = p.uuid WHERE p.uuid = ?", [snapshot.uuid])
+          : [];
+        if (cmd === "replace_import_snapshot" &&
+          Number(select("SELECT COUNT(*) AS n FROM asset_prices WHERE uuid = ?", [snapshot.uuid])[0]?.n) !== localPrices.length) {
+          throw new Error("Cannot replace snapshot without losing local cost prices");
         }
-      };
-      insert("assets_v2", snapshot.assets);
-      insert("asset_prices", snapshot.prices);
-      insert("transactions", snapshot.transactions);
-      return true;
+        for (const price of localPrices) {
+          if (!snapshot.assets.some((asset) => (asset.asset_type ?? asset.assetType) === price.asset_type &&
+            (asset.wallet ?? "") === price.wallet && asset.symbol === price.symbol)) {
+            throw new Error("Cannot replace snapshot without losing local cost prices");
+          }
+        }
+        if (cmd === "replace_import_snapshot") {
+          for (const table of ["asset_prices", "transactions", "assets_v2"]) db.run(`DELETE FROM ${table} WHERE uuid = ?`, [snapshot.uuid]);
+        }
+        const idMap = new Map<number, number>();
+        for (const asset of snapshot.assets) {
+          db.run("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [snapshot.uuid, asset.createdAt, asset.wallet ?? "", asset.asset_type ?? asset.assetType, asset.symbol, asset.amount, asset.value, asset.price]);
+          idMap.set(asset.id, Number(select("SELECT last_insert_rowid() AS id")[0].id));
+        }
+        for (const txn of snapshot.transactions) {
+          const assetID = idMap.get(txn.assetID);
+          if (!assetID) throw new Error("Invalid sync transaction asset");
+          db.run("INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [snapshot.uuid, assetID, txn.asset_type ?? txn.assetType, txn.wallet, txn.symbol, txn.amount, txn.price, txn.txnType, txn.txnCreatedAt, txn.createdAt, txn.updatedAt]);
+        }
+        if (cmd === "import_sync_snapshot") {
+          for (const price of snapshot.prices) {
+            const assetID = idMap.get(price.assetID);
+            if (!assetID) continue;
+            db.run("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
+              [price.uuid, assetID, price.symbol, price.price, price.assetCreatedAt, price.updatedAt]);
+          }
+        }
+        for (const price of localPrices) {
+          const asset = snapshot.assets.find((row) => (row.asset_type ?? row.assetType) === price.asset_type &&
+            (row.wallet ?? "") === price.wallet && row.symbol === price.symbol)!;
+          db.run("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
+            [snapshot.uuid, idMap.get(asset.id)!, price.priceSymbol, price.price, price.assetCreatedAt, price.updatedAt]);
+        }
+        db.run("COMMIT");
+      } catch (error) {
+        db.run("ROLLBACK");
+        throw error;
+      }
+      return cmd === "import_sync_snapshot" ? true : null;
     }
     if (cmd === "plugin:path|resolve_directory") {
       if (args.directory === 16) return "/e2e/cache";
@@ -399,39 +439,6 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       execute("INSERT INTO refresh_operations (operation_uuid, created_at) VALUES (?, ?)",
         [args.operationUuid, args.createdAt]);
       return null;
-    }
-    if (cmd === "delete_sync_snapshot") {
-      db.run("BEGIN");
-      try {
-        for (const table of ["asset_prices", "transactions", "assets_v2"]) {
-          execute(`DELETE FROM ${table} WHERE uuid = ?`, [args.uuid]);
-        }
-        db.run("COMMIT");
-      } catch (error) {
-        db.run("ROLLBACK");
-        throw error;
-      }
-      return null;
-    }
-    if (cmd === "import_sync_snapshot") {
-      const snapshot = args.snapshot;
-      if (select("SELECT 1 FROM assets_v2 WHERE uuid = ? LIMIT 1", [snapshot.uuid]).length) return false;
-      db.run("BEGIN");
-      try {
-        for (const [table, rows] of [
-          ["assets_v2", snapshot.assets], ["asset_prices", snapshot.prices], ["transactions", snapshot.transactions],
-        ] as const) {
-          for (const row of rows) {
-            const keys = Object.keys(row);
-            execute(`INSERT INTO ${table} (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`, keys.map((key) => row[key]));
-          }
-        }
-        db.run("COMMIT");
-      } catch (error) {
-        db.run("ROLLBACK");
-        throw error;
-      }
-      return true;
     }
     if (cmd === "plugin:fs|exists") return files.has(args.path) || directories.has(args.path) ||
       (richPortfolio && /\/assets\/coins\/(btc|eth|sol|usdc|avax|link)\.png$/.test(args.path));
@@ -742,6 +749,12 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   }, richPortfolio);
   return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, httpRequests: () => requests.size, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares,
     historyIds: () => select("SELECT DISTINCT uuid FROM assets_v2 ORDER BY uuid").map((row) => row.uuid),
+    transactionUuids: () => select("SELECT uuid FROM transactions ORDER BY id").map((row) => row.uuid),
+    seedTransactionIdCollision: () => db.run("INSERT INTO transactions (id, uuid, assetID, wallet, symbol, amount, price, txnType, txnCreatedAt) VALUES (1, 'snapshot-old', 1, 'wallet-1', 'BTC', 1, 40000, 'buy', '2024-01-01T00:00:00.000Z')"),
+    seedCostPrice: () => db.run("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) SELECT uuid, id, symbol, 123, createdAt, createdAt FROM assets_v2 WHERE uuid = 'snapshot-old'"),
+    costPrice: () => select("SELECT p.price FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID WHERE p.uuid = 'snapshot-old'")[0]?.price,
+    snapshotPrices: (uuid: string) => select("SELECT p.price FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID AND a.uuid = p.uuid WHERE p.uuid = ?", [uuid]).map((row) => row.price),
+    snapshotValue: () => select("SELECT value FROM assets_v2 WHERE uuid = 'snapshot-old'")[0]?.value,
     exportedFile: () => exportedPath === null ? null : files.get(exportedPath) ?? null,
     setImportFile: (text: string) => {
       exportedPath = "/e2e/documents/track3-import-golden.json";
