@@ -16,6 +16,7 @@ vi.mock("@/middlelayers/configuration", () => ({ addToBlacklist: vi.fn() }));
 vi.mock("@/middlelayers/charts", () => ({
   queryHistoricalPage: vi.fn(),
   queryHistoricalDetail: vi.fn(),
+  queryEditLog: vi.fn(async () => []),
   queryRestoreHistoricalData: vi.fn(),
   deleteHistoricalDataByUUID: vi.fn(),
   deleteHistoricalDataDetailById: vi.fn(),
@@ -61,7 +62,7 @@ it("renders one SQL page and windows a 200-asset detail table", async () => {
   expect(document.querySelectorAll("[role=option]").length).toBeLessThan(100);
   fireEvent.change(screen.getByRole("spinbutton", { name: /select page/i }), { target: { value: "2" } });
   fireEvent.keyDown(screen.getByRole("spinbutton", { name: /select page/i }), { key: "Enter" });
-  await waitFor(() => expect(queryHistoricalPage).toHaveBeenCalledWith(expect.anything(), 20, 1));
+  await waitFor(() => expect(queryHistoricalPage).toHaveBeenCalledWith(expect.anything(), 20, 1, "all"));
   fireEvent.click(screen.getAllByText("snapshot")[0]);
   const dialog = await screen.findByRole("dialog", { name: /historical data detail/i });
   await waitFor(() => expect(within(dialog).getAllByTestId("history-detail-row").length).toBeGreaterThan(0));

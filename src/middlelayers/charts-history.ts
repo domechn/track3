@@ -7,7 +7,7 @@ import {
   TransactionModel,
 } from "./types";
 import { ASSET_HANDLER } from "./entities/assets";
-import { selectFromDatabaseWithSql } from "./database";
+import { executeWriteWork, selectFromDatabaseWithSql } from "./database";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { invoke } from "@tauri-apps/api/core";
 import { readSnapshot } from "./snapshot";
@@ -15,22 +15,79 @@ import { readSnapshot } from "./snapshot";
 export type HistoricalPageRow = {
   id: string;
   createdAt: string;
+  edited?: boolean;
   total: number;
   change: number | null;
   assetCount: number;
   topAssets: Pick<AssetModel, "symbol" | "assetType" | "price" | "value">[];
 };
 export type HistoricalLatest = Pick<HistoricalPageRow, "id" | "createdAt" | "total">;
+export type SnapshotEdit = {
+  id: number;
+  edited_at: string;
+  origin: "local" | "import" | "sync";
+  target: "transaction" | "asset" | "snapshot";
+  action: "price" | "txnType" | "delete" | "restore" | "replace";
+  asset_type: string | null;
+  symbol: string | null;
+  old_value: string | null;
+  new_value: string | null;
+};
+
+export function displayEditValue(
+  value: string | null,
+  locale: string,
+  labels: { assets: string; amount: string; value: string },
+): string {
+  if (value === null) return "";
+  const number = (input: number) => new Intl.NumberFormat(locale, { maximumSignificantDigits: 15 }).format(input);
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (parsed && typeof parsed === "object") {
+      if ("assets" in parsed && typeof parsed.assets === "number" && "total" in parsed) {
+        return `${number(parsed.assets)} ${labels.assets}, ${labels.value} ${number(Number(parsed.total))}`;
+      }
+      if ("amount" in parsed && typeof parsed.amount === "number" &&
+          "value" in parsed && typeof parsed.value === "number") {
+        return `${labels.amount} ${number(parsed.amount)}, ${labels.value} ${number(parsed.value)}`;
+      }
+    }
+  } catch {
+    // Plain price and transaction type values are stored as text.
+  }
+  const numeric = Number(value);
+  return value.trim() && Number.isFinite(numeric) ? number(numeric) : value;
+}
+
+export function queryEditLog(uuid: string): Promise<SnapshotEdit[]> {
+  return selectFromDatabaseWithSql<SnapshotEdit>(
+    `SELECT id, edited_at, origin, target, action, asset_type, symbol, old_value, new_value
+     FROM snapshot_edit_log WHERE snapshot_uuid = ?
+     ORDER BY edited_at DESC, id DESC LIMIT 5000`,
+    [uuid],
+  );
+}
 
 export async function queryHistoricalPage(
   dateRange: TDateRange,
   pageSize: number,
   page: number,
+  filter: "all" | "edited" = "all",
 ): Promise<{ totalCount: number; rows: HistoricalPageRow[]; latest: HistoricalLatest | null }> {
   if (!Number.isInteger(pageSize) || pageSize < 1 || !Number.isInteger(page) || page < 0) {
     throw new Error("Invalid history page");
   }
   const bounds = [dateRange.start.toISOString(), dateRange.end.toISOString()];
+  const editedWhere = filter === "edited"
+    ? " AND EXISTS (SELECT 1 FROM snapshot_edit_log WHERE snapshot_uuid = history_snapshots.uuid)"
+    : "";
+  const previousTotal = filter === "edited"
+    ? `(SELECT SUM(value) FROM assets_v2 WHERE uuid = (
+         SELECT uuid FROM history_snapshots
+         WHERE createdAt < page.createdAt OR (createdAt = page.createdAt AND uuid < page.id)
+         ORDER BY createdAt DESC, uuid DESC LIMIT 1
+       ))`
+    : "NULL";
   const records = await selectFromDatabaseWithSql<{
     id: string | null;
     createdAt: string;
@@ -39,18 +96,22 @@ export async function queryHistoricalPage(
     topAssets: string;
     latest: string | null;
     totalCount: number;
+    edited: number;
+    previousTotal: number | null;
   }>(
     `WITH page AS (
        SELECT uuid AS id, createdAt FROM history_snapshots
-       WHERE createdAt >= ? AND createdAt <= ?
+       WHERE createdAt >= ? AND createdAt <= ?${editedWhere}
        ORDER BY createdAt DESC, uuid DESC LIMIT ? OFFSET ?
      )
      SELECT page.*,
+       EXISTS (SELECT 1 FROM snapshot_edit_log WHERE snapshot_uuid = page.id) AS edited,
+       ${previousTotal} AS previousTotal,
        (SELECT SUM(value) FROM assets_v2 WHERE uuid = page.id) AS total,
        (SELECT COUNT(DISTINCT asset_type || ':' || symbol)
         FROM assets_v2 WHERE uuid = page.id) AS assetCount,
        (SELECT COUNT(*) FROM history_snapshots
-        WHERE createdAt >= ? AND createdAt <= ?) AS totalCount,
+        WHERE createdAt >= ? AND createdAt <= ?${editedWhere}) AS totalCount,
        (SELECT json_object('id', uuid, 'createdAt', createdAt,
          'total', (SELECT SUM(value) FROM assets_v2 WHERE uuid = newest.uuid))
         FROM history_snapshots newest WHERE createdAt >= ? AND createdAt <= ?
@@ -72,8 +133,11 @@ export async function queryHistoricalPage(
   const rows = pageRecords.slice(0, pageSize).map((record, index) => ({
     id: record.id,
     createdAt: record.createdAt,
+    edited: !!record.edited,
     total: record.total,
-    change: pageRecords[index + 1] ? record.total - pageRecords[index + 1].total : null,
+    change: filter === "edited"
+      ? record.previousTotal === null ? null : record.total - record.previousTotal
+      : pageRecords[index + 1] ? record.total - pageRecords[index + 1].total : null,
     assetCount: record.assetCount,
     topAssets: JSON.parse(record.topAssets || "[]") as HistoricalPageRow["topAssets"],
   }));
@@ -175,16 +239,14 @@ export async function queryTotalValues(
 
 // delete batch records by uuid
 export async function deleteHistoricalDataByUUID(uuid: string): Promise<void> {
-  await invoke("delete_sync_snapshot", { uuid });
+  await executeWriteWork(() => invoke("delete_local_snapshot", { uuid }));
 }
 
 // delete single record by id
 export async function deleteHistoricalDataDetailById(
   id: number,
 ): Promise<void> {
-  await ASSET_HANDLER.deleteAssetByID(id);
-  // !also delete assets related transactions
-  await TRANSACTION_HANDLER.deleteTransactionsByAssetID(id);
+  await executeWriteWork(() => invoke("delete_local_asset", { id }));
 }
 
 export async function restoreHistoricalData(
@@ -193,15 +255,14 @@ export async function restoreHistoricalData(
   const { assets, transactions } = data;
 
   if (data.snapshot) {
-    await invoke("import_sync_snapshot", { snapshot: data.snapshot });
     const assetIds = new Set(data.snapshot.assets.map((asset) => asset.id));
     const orphanTransactions = transactions.filter((transaction) => !assetIds.has(transaction.assetID));
-    if (orphanTransactions.length) await TRANSACTION_HANDLER.saveTransactions(orphanTransactions);
+    await executeWriteWork(() => invoke("restore_local_snapshot", {
+      snapshot: data.snapshot, orphanTransactions,
+    }));
     return;
   }
-  await ASSET_HANDLER.saveAssets(assets);
-  // await ASSET_PRICE_HANDLER.savePrices(prices)
-  await TRANSACTION_HANDLER.saveTransactions(transactions);
+  await executeWriteWork(() => invoke("restore_local_asset", { backup: { assets, transactions } }));
 }
 
 export async function queryRestoreHistoricalData(

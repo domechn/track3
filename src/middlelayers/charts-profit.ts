@@ -17,7 +17,8 @@ import { CACHE_GROUP_KEYS } from "./consts";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { filterByAssetType } from "./charts-shared";
-import { executeWrite, selectFromDatabaseWithSql } from "./database";
+import { executeWriteWork, selectFromDatabaseWithSql } from "./database";
+import { invoke } from "@tauri-apps/api/core";
 import { fromStoredTransactions } from "./cost-basis";
 
 const TOTAL_PROFIT_CACHE_TTL_SECONDS = 15 * 60;
@@ -328,14 +329,7 @@ export function cleanTotalProfitCache() {
 }
 
 export async function updateTransactionPrice(id: number, price: number) {
-  const updatedAt = new Date().toISOString();
-  const result = await executeWrite(
-    "UPDATE transactions SET price = ?, updatedAt = ? WHERE id = ?",
-    [price, updatedAt, id],
-  );
-  if (result.rowsAffected === 0) {
-    throw new Error(`Transaction with id ${id} not found`);
-  }
+  await executeWriteWork(() => invoke("update_local_transaction_price", { id, price }));
   cleanTotalProfitCache();
 }
 
@@ -343,14 +337,7 @@ export async function updateTransactionTxnType(
   id: number,
   txnType: TransactionType,
 ) {
-  const updatedAt = new Date().toISOString();
-  const result = await executeWrite(
-    "UPDATE transactions SET txnType = ?, updatedAt = ? WHERE id = ?",
-    [txnType, updatedAt, id],
-  );
-  if (result.rowsAffected === 0) {
-    throw new Error(`Transaction with id ${id} not found`);
-  }
+  await executeWriteWork(() => invoke("update_local_transaction_type", { id, txnType }));
   cleanTotalProfitCache();
 }
 

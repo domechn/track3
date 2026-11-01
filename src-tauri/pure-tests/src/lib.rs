@@ -1,3 +1,5 @@
+#[path = "../../src/edit_log.rs"]
+pub mod edit_log;
 #[path = "../../src/ent.rs"]
 pub mod ent;
 #[path = "../../src/info.rs"]
@@ -16,6 +18,165 @@ pub mod startup_security;
 pub mod sync_persistence;
 #[path = "../../src/types.rs"]
 pub mod types;
+
+#[cfg(test)]
+mod edit_log_tests {
+    use super::edit_log::{
+        delete_local_asset, restore_local_asset, update_transaction_price, update_transaction_type,
+    };
+    use super::sync_persistence::{
+        delete_local_snapshot, replace_sync_snapshot, restore_local_snapshot,
+    };
+    use sqlx::{Connection, Executor, SqliteConnection};
+
+    #[test]
+    fn local_transaction_edits_record_values_and_rollback_with_the_log() {
+        let path = std::env::temp_dir().join(format!("track3-edit-{}.db", uuid::Uuid::new_v4()));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
+            db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/snapshot_edit_log_up.sql")).await.unwrap();
+            db.execute("INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType) VALUES ('one', 1, 'crypto', 'hashed-wallet', 'ETH', 2, 2310, 'buy')").await.unwrap();
+            db.close().await.unwrap();
+            update_transaction_price(&path, 1, 2295.0).await.unwrap();
+            update_transaction_type(&path, 1, "sell").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let rows: Vec<(String, String, String, String)> = sqlx::query_as(
+                "SELECT action, wallet, old_value, new_value FROM snapshot_edit_log ORDER BY id"
+            ).fetch_all(&mut db).await.unwrap();
+            assert_eq!(rows, vec![
+                ("price".into(), "hashed-wallet".into(), "2310".into(), "2295".into()),
+                ("txnType".into(), "hashed-wallet".into(), "buy".into(), "sell".into()),
+            ]);
+            db.execute("CREATE TRIGGER fail_log BEFORE INSERT ON snapshot_edit_log BEGIN SELECT RAISE(ABORT, 'injected'); END").await.unwrap();
+            db.close().await.unwrap();
+            assert!(update_transaction_price(&path, 1, 2200.0).await.is_err());
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let price: f64 = sqlx::query_scalar("SELECT price FROM transactions WHERE id=1").fetch_one(&mut db).await.unwrap();
+            assert_eq!(price, 2295.0);
+            db.close().await.unwrap();
+        });
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn asset_delete_and_undo_keep_related_transactions_and_write_two_rows() {
+        let path =
+            std::env::temp_dir().join(format!("track3-asset-edit-{}.db", uuid::Uuid::new_v4()));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
+            db.execute(include_str!("../../migrations/init/assets_v2_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/snapshot_edit_log_up.sql")).await.unwrap();
+            db.execute("INSERT INTO assets_v2 (uuid, wallet, asset_type, symbol, amount, value, price) VALUES ('one', 'hashed-wallet', 'crypto', 'ETH', 2, 4, 2)").await.unwrap();
+            db.execute("INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType) VALUES ('one', 1, 'crypto', 'hashed-wallet', 'ETH', 2, 2, 'buy')").await.unwrap();
+            db.close().await.unwrap();
+            let backup = delete_local_asset(&path, 1).await.unwrap();
+            restore_local_asset(&path, backup).await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let actions: Vec<String> = sqlx::query_scalar("SELECT action FROM snapshot_edit_log ORDER BY id")
+                .fetch_all(&mut db).await.unwrap();
+            assert_eq!(actions, vec!["delete", "restore"]);
+            let values: Vec<(Option<String>, Option<String>)> =
+                sqlx::query_as("SELECT old_value, new_value FROM snapshot_edit_log ORDER BY id")
+                    .fetch_all(&mut db).await.unwrap();
+            assert_eq!(serde_json::from_str::<serde_json::Value>(values[0].0.as_deref().unwrap()).unwrap(),
+                serde_json::json!({"amount": 2.0, "value": 4.0, "price": 2.0}));
+            assert_eq!(serde_json::from_str::<serde_json::Value>(values[1].1.as_deref().unwrap()).unwrap(),
+                serde_json::json!({"amount": 2.0, "value": 4.0, "price": 2.0}));
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM transactions WHERE assetID=1")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(count, 1);
+            db.execute("CREATE TRIGGER fail_log BEFORE INSERT ON snapshot_edit_log BEGIN SELECT RAISE(ABORT, 'injected'); END").await.unwrap();
+            db.close().await.unwrap();
+            assert!(delete_local_asset(&path, 1).await.is_err());
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assets_v2 WHERE id=1")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(rows, 1);
+            db.close().await.unwrap();
+        });
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn local_snapshot_delete_and_undo_log_but_remote_replace_does_not() {
+        let path =
+            std::env::temp_dir().join(format!("track3-snapshot-edit-{}.db", uuid::Uuid::new_v4()));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
+            for sql in [
+                include_str!("../../migrations/init/assets_v2_up.sql"),
+                include_str!("../../migrations/init/asset_prices_up.sql"),
+                include_str!("../../migrations/init/transactions_up.sql"),
+                include_str!("../../migrations/init/sync_state_up.sql"),
+                include_str!("../../migrations/init/snapshot_edit_log_up.sql"),
+            ] { db.execute(sql).await.unwrap(); }
+            db.execute("INSERT INTO assets_v2 (uuid, wallet, asset_type, symbol, amount, value, price) VALUES ('one', 'hash', 'crypto', 'ETH', 1, 2, 2)").await.unwrap();
+            db.execute("INSERT INTO transactions (id, uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt) VALUES (9, 'one', 99, 'crypto', 'hash', 'ETH', 1, 2, 'buy', '2026-11-01', '2026-11-01', '2026-11-01')").await.unwrap();
+            db.close().await.unwrap();
+            let snapshot = serde_json::json!({
+                "uuid": "one",
+                "assets": [{"id": 1, "uuid": "one", "createdAt": "2026-11-01", "wallet": "hash", "asset_type": "crypto", "symbol": "ETH", "amount": 1, "value": 2, "price": 2}],
+                "prices": [], "transactions": []
+            });
+            delete_local_snapshot(&path, "one").await.unwrap();
+            let orphan = serde_json::json!([{"id": 9, "uuid": "one", "assetID": 99, "assetType": "crypto",
+                "wallet": "hash", "symbol": "ETH", "amount": 1, "price": 2, "txnType": "buy",
+                "txnCreatedAt": "2026-11-01", "createdAt": "2026-11-01", "updatedAt": "2026-11-01"}]);
+            restore_local_snapshot(&path, snapshot.clone(), orphan).await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let restored_orphans: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM transactions WHERE id=9 AND assetID=99")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(restored_orphans, 1);
+            db.close().await.unwrap();
+            let mut changed = snapshot;
+            changed["assets"][0]["value"] = serde_json::json!(3);
+            replace_sync_snapshot(&path, changed).await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let actions: Vec<String> = sqlx::query_scalar("SELECT action FROM snapshot_edit_log ORDER BY id")
+                .fetch_all(&mut db).await.unwrap();
+            assert_eq!(actions, vec!["delete", "restore"]);
+            let values: Vec<(Option<String>, Option<String>)> =
+                sqlx::query_as("SELECT old_value, new_value FROM snapshot_edit_log ORDER BY id")
+                    .fetch_all(&mut db).await.unwrap();
+            assert_eq!(serde_json::from_str::<serde_json::Value>(values[0].0.as_deref().unwrap()).unwrap(),
+                serde_json::json!({"assets": 1, "transactions": 1, "total": 2.0}));
+            assert_eq!(serde_json::from_str::<serde_json::Value>(values[1].1.as_deref().unwrap()).unwrap(),
+                serde_json::json!({"assets": 1, "transactions": 1, "total": 2.0}));
+            db.execute("CREATE TRIGGER fail_log BEFORE INSERT ON snapshot_edit_log BEGIN SELECT RAISE(ABORT, 'injected'); END").await.unwrap();
+            db.close().await.unwrap();
+            assert!(delete_local_snapshot(&path, "one").await.is_err());
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assets_v2 WHERE uuid='one'")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(rows, 1);
+            db.close().await.unwrap();
+        });
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn edit_log_retains_the_newest_5000_entries() {
+        let path =
+            std::env::temp_dir().join(format!("track3-edit-cap-{}.db", uuid::Uuid::new_v4()));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
+            db.execute(include_str!("../../migrations/init/snapshot_edit_log_up.sql")).await.unwrap();
+            db.execute("WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<5000) INSERT INTO snapshot_edit_log (snapshot_uuid, edited_at, origin, target, action) SELECT 'one', '2026-11-01', 'local', 'asset', 'delete' FROM n").await.unwrap();
+            super::edit_log::record(&mut db, "one", "local", "asset", "restore", None, None, None, None, None).await.unwrap();
+            let (count, oldest, newest): (i64, i64, i64) = sqlx::query_as("SELECT COUNT(*), MIN(id), MAX(id) FROM snapshot_edit_log")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!((count, oldest, newest), (5000, 2, 5001));
+            db.close().await.unwrap();
+        });
+        std::fs::remove_file(path).unwrap();
+    }
+}
 
 #[cfg(test)]
 mod sync_tests {
@@ -62,16 +223,17 @@ mod sync_tests {
         std::fs::remove_file(path).unwrap();
     }
 
-
     #[test]
     fn import_replace_keeps_cost_prices_and_rejects_unmatched_prices() {
-        let path = std::env::temp_dir().join(format!("track3-import-prices-{}.db", uuid::Uuid::new_v4()));
+        let path =
+            std::env::temp_dir().join(format!("track3-import-prices-{}.db", uuid::Uuid::new_v4()));
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime.block_on(async {
             let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
             db.execute(include_str!("../../migrations/init/assets_v2_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/init/asset_prices_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/snapshot_edit_log_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/v08t09/sync_state_up.sql")).await.unwrap();
             db.execute("INSERT INTO assets_v2 (uuid, wallet, symbol, amount, value, price) VALUES ('one', 'wallet', 'BTC', 1, 3, 3)").await.unwrap();
             db.execute("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) SELECT 'one', id, 'BTC', 2, '2024-01-01', '2024-01-02' FROM assets_v2 WHERE uuid = 'one'").await.unwrap();
@@ -90,6 +252,29 @@ mod sync_tests {
             assert_eq!(row.1, row.2);
             let revision_after: i64 = sqlx::query_scalar("SELECT revision FROM sync_snapshot_revisions WHERE uuid = 'one'").fetch_one(&mut db).await.unwrap();
             assert!(revision_after > revision_before);
+            db.close().await.unwrap();
+            replace_import_snapshot(&path, replacement.clone()).await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let changes: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM snapshot_edit_log WHERE origin='import' AND action='replace'")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(changes, 1, "an unchanged replacement must not add another edit");
+            let values: (String, String) = sqlx::query_as(
+                "SELECT old_value, new_value FROM snapshot_edit_log WHERE origin='import' AND action='replace'"
+            ).fetch_one(&mut db).await.unwrap();
+            assert_eq!(serde_json::from_str::<serde_json::Value>(&values.0).unwrap(),
+                serde_json::json!({"assets": 1, "transactions": 0, "total": 3.0}));
+            assert_eq!(serde_json::from_str::<serde_json::Value>(&values.1).unwrap(),
+                serde_json::json!({"assets": 1, "transactions": 0, "total": 8.0}));
+            db.execute("CREATE TRIGGER fail_log BEFORE INSERT ON snapshot_edit_log BEGIN SELECT RAISE(ABORT, 'injected'); END").await.unwrap();
+            db.close().await.unwrap();
+            let mut changed = replacement.clone();
+            changed["assets"][0]["value"] = serde_json::json!(10);
+            assert!(replace_import_snapshot(&path, changed).await.is_err());
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let total: f64 = sqlx::query_scalar("SELECT value FROM assets_v2 WHERE uuid='one'")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(total, 8.0);
+            db.execute("DROP TRIGGER fail_log").await.unwrap();
             db.close().await.unwrap();
 
             let mut unmatched = replacement;
@@ -116,8 +301,51 @@ mod sync_tests {
     }
 
     #[test]
+    fn import_replace_ignores_transaction_order_when_values_are_unchanged() {
+        let path = std::env::temp_dir().join(format!(
+            "track3-import-edit-order-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
+            db.execute(include_str!("../../migrations/init/assets_v2_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/asset_prices_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/snapshot_edit_log_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/v08t09/sync_state_up.sql")).await.unwrap();
+            db.execute("INSERT INTO assets_v2 (uuid, wallet, symbol, amount, value, price) VALUES ('one', 'wallet', 'BTC', 1, 3, 3)").await.unwrap();
+            db.close().await.unwrap();
+
+            let transaction = |amount| serde_json::json!({
+                "uuid": "one", "assetID": 1, "assetType": "crypto", "wallet": "wallet",
+                "symbol": "BTC", "amount": amount, "price": 3, "txnType": "buy",
+                "txnCreatedAt": "2024-01-01", "createdAt": "2024-01-01", "updatedAt": "2024-01-01"
+            });
+            let snapshot = serde_json::json!({
+                "uuid": "one",
+                "assets": [{"id": 1, "uuid": "one", "createdAt": "2024-01-01", "wallet": "wallet",
+                    "asset_type": "crypto", "symbol": "BTC", "amount": 1, "value": 3, "price": 3}],
+                "prices": [],
+                "transactions": [transaction(1), transaction(2)]
+            });
+            replace_import_snapshot(&path, snapshot.clone()).await.unwrap();
+            let mut reversed = snapshot;
+            reversed["transactions"].as_array_mut().unwrap().reverse();
+            replace_import_snapshot(&path, reversed).await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let edits: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM snapshot_edit_log")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(edits, 1, "reordering equal transactions is not a new edit");
+            db.close().await.unwrap();
+        });
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn snapshot_revision_tracks_insert_update_and_delete() {
-        let path = std::env::temp_dir().join(format!("track3-sync-revisions-{}.db", uuid::Uuid::new_v4()));
+        let path =
+            std::env::temp_dir().join(format!("track3-sync-revisions-{}.db", uuid::Uuid::new_v4()));
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime.block_on(async {
             let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
@@ -267,10 +495,26 @@ mod init_schema_tests {
     use std::path::{Path, PathBuf};
 
     const NEW_TABLE_SCRIPTS: [(&str, &str, &str); 4] = [
-        ("rebalance_profiles_up.sql", include_str!("../../migrations/init/rebalance_profiles_up.sql"), include_str!("../../migrations/v08t09/rebalance_profiles_up.sql")),
-        ("alerts_up.sql", include_str!("../../migrations/init/alerts_up.sql"), include_str!("../../migrations/v08t09/alerts_up.sql")),
-        ("history_snapshots_up.sql", include_str!("../../migrations/init/history_snapshots_up.sql"), include_str!("../../migrations/v08t09/history_snapshots_up.sql")),
-        ("sync_state_up.sql", include_str!("../../migrations/init/sync_state_up.sql"), include_str!("../../migrations/v08t09/sync_state_up.sql")),
+        (
+            "rebalance_profiles_up.sql",
+            include_str!("../../migrations/init/rebalance_profiles_up.sql"),
+            include_str!("../../migrations/v08t09/rebalance_profiles_up.sql"),
+        ),
+        (
+            "alerts_up.sql",
+            include_str!("../../migrations/init/alerts_up.sql"),
+            include_str!("../../migrations/v08t09/alerts_up.sql"),
+        ),
+        (
+            "history_snapshots_up.sql",
+            include_str!("../../migrations/init/history_snapshots_up.sql"),
+            include_str!("../../migrations/v08t09/history_snapshots_up.sql"),
+        ),
+        (
+            "sync_state_up.sql",
+            include_str!("../../migrations/init/sync_state_up.sql"),
+            include_str!("../../migrations/v08t09/sync_state_up.sql"),
+        ),
     ];
 
     fn initialization_scripts() -> Vec<&'static str> {
@@ -290,16 +534,30 @@ mod init_schema_tests {
     fn init_and_versioned_copies_of_the_new_tables_are_identical_and_registered() {
         for (name, init, versioned) in NEW_TABLE_SCRIPTS {
             assert_eq!(init, versioned, "{name} differs between init and v08t09");
-            assert!(initialization_scripts().contains(&name), "{name} missing from INITIALIZATION_SCRIPTS");
+            assert!(
+                initialization_scripts().contains(&name),
+                "{name} missing from INITIALIZATION_SCRIPTS"
+            );
         }
         let additive = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../migrations/v094t095");
         for entry in std::fs::read_dir(additive).unwrap() {
             let entry = entry.unwrap();
             let name = entry.file_name().into_string().unwrap();
-            if !name.ends_with("_up.sql") { continue }
-            let init = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../migrations/init").join(&name);
-            assert_eq!(std::fs::read(entry.path()).unwrap(), std::fs::read(init).unwrap(), "{name} differs from init");
-            assert!(initialization_scripts().contains(&name.as_str()), "{name} missing from INITIALIZATION_SCRIPTS");
+            if !name.ends_with("_up.sql") {
+                continue;
+            }
+            let init = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../migrations/init")
+                .join(&name);
+            assert_eq!(
+                std::fs::read(entry.path()).unwrap(),
+                std::fs::read(init).unwrap(),
+                "{name} differs from init"
+            );
+            assert!(
+                initialization_scripts().contains(&name.as_str()),
+                "{name} missing from INITIALIZATION_SCRIPTS"
+            );
         }
     }
 
@@ -311,18 +569,42 @@ mod init_schema_tests {
         let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime.block_on(async {
-            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            let mut db =
+                SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display()))
+                    .await
+                    .unwrap();
             for name in initialization_scripts() {
-                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap();
+                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name))
+                    .unwrap();
                 db.execute(sql.as_str()).await.unwrap();
             }
             db.close().await.unwrap();
-            run_migrations(&db_path, &resource_dir, "0.9.0").await.unwrap();
-            run_migrations(&db_path, &resource_dir, "0.9.0").await.unwrap();
-            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
-            for table in ["rebalance_profiles", "alert_rules", "alert_history", "history_snapshots", "sync_state", "sync_applied_objects", "sync_snapshot_revisions", "sync_manifest_cache"] {
-                let found: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?")
-                    .bind(table).fetch_one(&mut db).await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.0")
+                .await
+                .unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.0")
+                .await
+                .unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display()))
+                .await
+                .unwrap();
+            for table in [
+                "rebalance_profiles",
+                "alert_rules",
+                "alert_history",
+                "history_snapshots",
+                "sync_state",
+                "sync_applied_objects",
+                "sync_snapshot_revisions",
+                "sync_manifest_cache",
+            ] {
+                let found: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?",
+                )
+                .bind(table)
+                .fetch_one(&mut db)
+                .await
+                .unwrap();
                 assert_eq!(found, 1, "{table} missing after a fresh install");
             }
             db.close().await.unwrap();
@@ -514,7 +796,10 @@ mod init_schema_tests {
     #[test]
     fn v094t095_repair_applies_registered_scripts_idempotently() {
         let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        let root = std::env::temp_dir().join(format!("track3-additive-migration-{}", uuid::Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!(
+            "track3-additive-migration-{}",
+            uuid::Uuid::new_v4()
+        ));
         let db_path = root.join("database.db");
         for directory in ["init", "v08t09"] {
             let destination = root.join("migrations").join(directory);
@@ -526,10 +811,17 @@ mod init_schema_tests {
         }
         let additive = root.join("migrations/v094t095");
         std::fs::create_dir_all(&additive).unwrap();
-        std::fs::write(additive.join("compat_probe_up.sql"), "CREATE TABLE IF NOT EXISTS compat_probe (id INTEGER PRIMARY KEY);").unwrap();
+        std::fs::write(
+            additive.join("compat_probe_up.sql"),
+            "CREATE TABLE IF NOT EXISTS compat_probe (id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime.block_on(async {
-            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            let mut db =
+                SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display()))
+                    .await
+                    .unwrap();
             for name in initialization_scripts() {
                 let sql = std::fs::read_to_string(root.join("migrations/init").join(name)).unwrap();
                 db.execute(sql.as_str()).await.unwrap();
@@ -538,9 +830,15 @@ mod init_schema_tests {
             run_migrations(&db_path, &root, "0.9.4").await.unwrap();
             run_migrations(&db_path, &root, "0.9.5").await.unwrap();
             run_migrations(&db_path, &root, "0.9.5").await.unwrap();
-            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
-            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='compat_probe'")
-                .fetch_one(&mut db).await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display()))
+                .await
+                .unwrap();
+            let count: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='compat_probe'",
+            )
+            .fetch_one(&mut db)
+            .await
+            .unwrap();
             assert_eq!(count, 1);
             db.close().await.unwrap();
         });
@@ -548,8 +846,47 @@ mod init_schema_tests {
     }
 
     #[test]
+    fn edit_log_repair_adds_only_its_table_and_preserves_rows_on_repeat() {
+        let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let root = std::env::temp_dir().join(format!(
+            "track3-edit-log-migration-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let db_path = root.join("database.db");
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            for name in initialization_scripts().into_iter().filter(|name| *name != "snapshot_edit_log_up.sql") {
+                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap();
+                db.execute(sql.as_str()).await.unwrap();
+            }
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.4").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            let created: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE name='snapshot_edit_log'")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(created, 1);
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.5").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            db.execute("INSERT INTO snapshot_edit_log (snapshot_uuid, edited_at, origin, target, action) VALUES ('one', '2026-11-01', 'local', 'asset', 'delete')").await.unwrap();
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.5").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM snapshot_edit_log WHERE snapshot_uuid='one'")
+                .fetch_one(&mut db).await.unwrap();
+            assert_eq!(rows, 1);
+            db.close().await.unwrap();
+        });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn write_forward_database_fixture() {
-        let Ok(directory) = std::env::var("TRACK3_COMPAT_FORWARD") else { return };
+        let Ok(directory) = std::env::var("TRACK3_COMPAT_FORWARD") else {
+            return;
+        };
         let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let db_path = PathBuf::from(directory).join("migrated.db");
         let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -566,6 +903,9 @@ mod init_schema_tests {
             db.execute("INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType) VALUES ('db-compat', 1, 'crypto', 'wallet-compat', 'BTC', 2, 2, 'buy')").await.unwrap();
             db.close().await.unwrap();
             run_migrations(&db_path, &resource_dir, "0.9.5").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            db.execute("INSERT INTO snapshot_edit_log (snapshot_uuid, edited_at, origin, target, action, old_value, new_value) VALUES ('db-compat', '2026-11-01T00:00:00Z', 'local', 'transaction', 'price', '2', '3')").await.unwrap();
+            db.close().await.unwrap();
         });
     }
 
@@ -580,9 +920,13 @@ mod init_schema_tests {
         let db_path = root.join("fresh.db");
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let schema = runtime.block_on(async {
-            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            let mut db =
+                SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display()))
+                    .await
+                    .unwrap();
             for name in initialization_scripts() {
-                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap();
+                let sql = std::fs::read_to_string(resource_dir.join("migrations/init").join(name))
+                    .unwrap();
                 db.execute(sql.as_str()).await.unwrap();
             }
             db.close().await.unwrap();
@@ -632,26 +976,56 @@ mod init_schema_tests {
             + "\n";
         let frozen_schema = std::fs::read_to_string(fixture_dir.join("schema-0.9.4.txt")).unwrap();
         let actual_lines = schema.lines().collect::<std::collections::BTreeSet<_>>();
-        let frozen_lines = frozen_schema.lines().collect::<std::collections::BTreeSet<_>>();
-        assert!(frozen_lines.is_subset(&actual_lines), "a 0.9.4 schema object changed or disappeared");
-        let additions = actual_lines.difference(&frozen_lines).copied().collect::<Vec<_>>().join("\n");
-        let additions = format!("{additions}{}", if additions.is_empty() { "" } else { "\n" });
+        let frozen_lines = frozen_schema
+            .lines()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            frozen_lines.is_subset(&actual_lines),
+            "a 0.9.4 schema object changed or disappeared"
+        );
+        let additions = actual_lines
+            .difference(&frozen_lines)
+            .copied()
+            .collect::<Vec<_>>()
+            .join("\n");
+        let additions = format!(
+            "{additions}{}",
+            if additions.is_empty() { "" } else { "\n" }
+        );
         if std::env::var("UPDATE_GOLDEN").as_deref() == Ok("1") {
             std::fs::write(fixture_dir.join("schema-0.9.5-additions.txt"), &additions).unwrap();
         }
-        let reviewed_schema = std::fs::read_to_string(fixture_dir.join("schema-0.9.5-additions.txt")).unwrap();
+        let reviewed_schema =
+            std::fs::read_to_string(fixture_dir.join("schema-0.9.5-additions.txt")).unwrap();
         assert_eq!(additions, reviewed_schema);
 
         let frozen_hashes = std::fs::read_to_string(fixture_dir.join("migrations.sha256")).unwrap();
         let actual_hashes = hashes.lines().collect::<std::collections::BTreeSet<_>>();
-        let frozen_hash_lines = frozen_hashes.lines().collect::<std::collections::BTreeSet<_>>();
-        assert!(frozen_hash_lines.is_subset(&actual_hashes), "a 0.9.4 migration SQL file changed or disappeared");
-        let new_hashes = actual_hashes.difference(&frozen_hash_lines).copied().collect::<Vec<_>>().join("\n");
-        let new_hashes = format!("{new_hashes}{}", if new_hashes.is_empty() { "" } else { "\n" });
+        let frozen_hash_lines = frozen_hashes
+            .lines()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            frozen_hash_lines.is_subset(&actual_hashes),
+            "a 0.9.4 migration SQL file changed or disappeared"
+        );
+        let new_hashes = actual_hashes
+            .difference(&frozen_hash_lines)
+            .copied()
+            .collect::<Vec<_>>()
+            .join("\n");
+        let new_hashes = format!(
+            "{new_hashes}{}",
+            if new_hashes.is_empty() { "" } else { "\n" }
+        );
         if std::env::var("UPDATE_GOLDEN").as_deref() == Ok("1") {
-            std::fs::write(fixture_dir.join("migrations-0.9.5-additions.sha256"), &new_hashes).unwrap();
+            std::fs::write(
+                fixture_dir.join("migrations-0.9.5-additions.sha256"),
+                &new_hashes,
+            )
+            .unwrap();
         }
-        let reviewed_hashes = std::fs::read_to_string(fixture_dir.join("migrations-0.9.5-additions.sha256")).unwrap();
+        let reviewed_hashes =
+            std::fs::read_to_string(fixture_dir.join("migrations-0.9.5-additions.sha256")).unwrap();
         assert_eq!(new_hashes, reviewed_hashes);
     }
 }
@@ -670,8 +1044,14 @@ mod backup_folder_path_tests {
 
     #[test]
     fn normalizes_child_backup_locations() {
-        assert_eq!(backup_parent(Path::new("/cloud/track3-backup")), Some(Path::new("/cloud").to_path_buf()));
-        assert_eq!(backup_parent(Path::new("/cloud/track3-backup/client-a")), Some(Path::new("/cloud").to_path_buf()));
+        assert_eq!(
+            backup_parent(Path::new("/cloud/track3-backup")),
+            Some(Path::new("/cloud").to_path_buf())
+        );
+        assert_eq!(
+            backup_parent(Path::new("/cloud/track3-backup/client-a")),
+            Some(Path::new("/cloud").to_path_buf())
+        );
         assert_eq!(backup_parent(Path::new("/cloud/other")), None);
     }
 

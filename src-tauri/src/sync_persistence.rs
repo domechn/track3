@@ -1,3 +1,4 @@
+use crate::edit_log;
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteConnectOptions, Connection, Executor, SqliteConnection};
 use std::{collections::HashMap, path::Path, time::Duration};
@@ -137,6 +138,7 @@ struct Price {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Transaction {
+    id: Option<i64>,
     uuid: String,
     #[serde(rename = "assetID")]
     asset_id: i64,
@@ -167,14 +169,14 @@ pub async fn import_sync_snapshot(
     database_path: &Path,
     value: serde_json::Value,
 ) -> Result<bool, String> {
-    persist_sync_snapshot(database_path, value, false, false).await
+    persist_sync_snapshot(database_path, value, false, false, None, Vec::new()).await
 }
 
 pub async fn replace_sync_snapshot(
     database_path: &Path,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    persist_sync_snapshot(database_path, value, true, false)
+    persist_sync_snapshot(database_path, value, true, false, None, Vec::new())
         .await
         .map(|_| ())
 }
@@ -183,9 +185,41 @@ pub async fn replace_import_snapshot(
     database_path: &Path,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    persist_sync_snapshot(database_path, value, true, true)
-        .await
-        .map(|_| ())
+    persist_sync_snapshot(
+        database_path,
+        value,
+        true,
+        true,
+        Some(("import", "replace")),
+        Vec::new(),
+    )
+    .await
+    .map(|_| ())
+}
+
+pub async fn restore_local_snapshot(
+    database_path: &Path,
+    value: serde_json::Value,
+    orphan_transactions: serde_json::Value,
+) -> Result<(), String> {
+    let orphans: Vec<Transaction> = serde_json::from_value(orphan_transactions)
+        .map_err(|_| "Invalid orphan transactions".to_string())?;
+    persist_sync_snapshot(
+        database_path,
+        value,
+        false,
+        false,
+        Some(("local", "restore")),
+        orphans,
+    )
+    .await
+    .and_then(|imported| {
+        if imported {
+            Ok(())
+        } else {
+            Err("Snapshot already exists".to_string())
+        }
+    })
 }
 
 async fn persist_sync_snapshot(
@@ -193,6 +227,8 @@ async fn persist_sync_snapshot(
     value: serde_json::Value,
     replace: bool,
     preserve_local_prices: bool,
+    log: Option<(&str, &str)>,
+    orphan_transactions: Vec<Transaction>,
 ) -> Result<bool, String> {
     let mut snapshot: Snapshot =
         serde_json::from_value(value).map_err(|_| "Invalid sync snapshot".to_string())?;
@@ -209,6 +245,9 @@ async fn persist_sync_snapshot(
             .iter()
             .any(|row| row.uuid != snapshot.uuid || !row.price.is_finite())
         || snapshot.transactions.iter().any(|row| {
+            row.uuid != snapshot.uuid || !row.amount.is_finite() || !row.price.is_finite()
+        })
+        || orphan_transactions.iter().any(|row| {
             row.uuid != snapshot.uuid || !row.amount.is_finite() || !row.price.is_finite()
         })
     {
@@ -238,6 +277,16 @@ async fn persist_sync_snapshot(
     if replace && exists == 0 {
         return Err("Cannot edit missing sync snapshot".to_string());
     }
+    let old_summary = if log.is_some() && replace {
+        Some(snapshot_summary_from_db(&mut connection, &snapshot.uuid).await?)
+    } else {
+        None
+    };
+    let replacement_changed = if log.is_some() && replace {
+        snapshot_differs(&mut connection, &snapshot).await?
+    } else {
+        false
+    };
     if preserve_local_prices {
         if !snapshot.prices.is_empty() {
             return Err("Import file cannot replace local cost prices".to_string());
@@ -356,6 +405,18 @@ async fn persist_sync_snapshot(
         .await
         .map_err(|_| "Failed to insert sync transaction".to_string())?;
     }
+    for row in &orphan_transactions {
+        sqlx::query(
+            "INSERT INTO transactions
+             (id, uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(row.id).bind(&row.uuid).bind(row.asset_id).bind(&row.asset_type)
+        .bind(&row.wallet).bind(&row.symbol).bind(row.amount).bind(row.price)
+        .bind(&row.txn_type).bind(&row.txn_created_at).bind(&row.created_at).bind(&row.updated_at)
+        .execute(&mut connection).await
+        .map_err(|_| "Failed to restore orphan transaction".to_string())?;
+    }
     sqlx::query(
         "INSERT INTO sync_applied_objects (object_key, applied_at) VALUES (?, CURRENT_TIMESTAMP)",
     )
@@ -363,6 +424,23 @@ async fn persist_sync_snapshot(
     .execute(&mut connection)
     .await
     .map_err(|_| "Failed to record sync snapshot".to_string())?;
+    if let Some((origin, action)) = log {
+        if !replace || replacement_changed {
+            let new_summary = if orphan_transactions.is_empty() {
+                snapshot_summary(&snapshot)
+            } else {
+                serde_json::json!({
+                    "assets": snapshot.assets.len(),
+                    "transactions": snapshot.transactions.len() + orphan_transactions.len(),
+                    "total": snapshot.assets.iter().map(|asset| asset.value).sum::<f64>(),
+                }).to_string()
+            };
+            edit_log::record(
+                &mut connection, &snapshot.uuid, origin, "snapshot", action,
+                None, None, None, old_summary.as_deref(), Some(&new_summary),
+            ).await?;
+        }
+    }
     Ok(true)
     }.await;
     let finished = if result.is_ok() {
@@ -385,7 +463,134 @@ async fn persist_sync_snapshot(
     result
 }
 
+fn snapshot_summary(snapshot: &Snapshot) -> String {
+    serde_json::json!({
+        "assets": snapshot.assets.len(),
+        "transactions": snapshot.transactions.len(),
+        "total": snapshot.assets.iter().map(|asset| asset.value).sum::<f64>(),
+    })
+    .to_string()
+}
+
+async fn snapshot_summary_from_db(db: &mut SqliteConnection, uuid: &str) -> Result<String, String> {
+    let (assets, total): (i64, f64) =
+        sqlx::query_as("SELECT COUNT(*), COALESCE(SUM(value), 0) FROM assets_v2 WHERE uuid = ?")
+            .bind(uuid)
+            .fetch_one(&mut *db)
+            .await
+            .map_err(|_| "Failed to read snapshot summary".to_string())?;
+    let transactions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM transactions WHERE uuid = ?")
+        .bind(uuid)
+        .fetch_one(db)
+        .await
+        .map_err(|_| "Failed to read snapshot summary".to_string())?;
+    Ok(
+        serde_json::json!({"assets": assets, "transactions": transactions, "total": total})
+            .to_string(),
+    )
+}
+
+async fn snapshot_differs(db: &mut SqliteConnection, snapshot: &Snapshot) -> Result<bool, String> {
+    let mut assets: Vec<(String, String, String, String, f64, f64, f64)> = sqlx::query_as(
+        "SELECT createdAt, asset_type, wallet, symbol, amount, value, price FROM assets_v2 WHERE uuid = ?",
+    ).bind(&snapshot.uuid).fetch_all(&mut *db).await.map_err(|_| "Failed to compare snapshot assets".to_string())?;
+    let mut incoming_assets = snapshot
+        .assets
+        .iter()
+        .map(|asset| {
+            (
+                asset.created_at.clone(),
+                asset.asset_type.clone(),
+                asset.wallet.clone().unwrap_or_default(),
+                asset.symbol.clone(),
+                asset.amount,
+                asset.value,
+                asset.price,
+            )
+        })
+        .collect::<Vec<_>>();
+    let asset_order = |a: &(String, String, String, String, f64, f64, f64),
+                       b: &(String, String, String, String, f64, f64, f64)| {
+        a.0.cmp(&b.0)
+            .then(a.1.cmp(&b.1))
+            .then(a.2.cmp(&b.2))
+            .then(a.3.cmp(&b.3))
+            .then(a.4.total_cmp(&b.4))
+            .then(a.5.total_cmp(&b.5))
+            .then(a.6.total_cmp(&b.6))
+    };
+    assets.sort_by(asset_order);
+    incoming_assets.sort_by(asset_order);
+    if assets != incoming_assets {
+        return Ok(true);
+    }
+    let mut transactions: Vec<(String, String, String, f64, f64, String, String, String, String)> = sqlx::query_as(
+        "SELECT asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt
+         FROM transactions WHERE uuid = ?",
+    ).bind(&snapshot.uuid).fetch_all(db).await.map_err(|_| "Failed to compare snapshot transactions".to_string())?;
+    let mut incoming_transactions = snapshot
+        .transactions
+        .iter()
+        .map(|row| {
+            (
+                row.asset_type.clone(),
+                row.wallet.clone(),
+                row.symbol.clone(),
+                row.amount,
+                row.price,
+                row.txn_type.clone(),
+                row.txn_created_at.clone(),
+                row.created_at.clone(),
+                row.updated_at.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let transaction_order = |a: &(
+        String,
+        String,
+        String,
+        f64,
+        f64,
+        String,
+        String,
+        String,
+        String,
+    ),
+                             b: &(
+        String,
+        String,
+        String,
+        f64,
+        f64,
+        String,
+        String,
+        String,
+        String,
+    )| {
+        a.0.cmp(&b.0)
+            .then(a.1.cmp(&b.1))
+            .then(a.2.cmp(&b.2))
+            .then(a.3.total_cmp(&b.3))
+            .then(a.4.total_cmp(&b.4))
+            .then(a.5.cmp(&b.5))
+            .then(a.6.cmp(&b.6))
+            .then(a.7.cmp(&b.7))
+            .then(a.8.cmp(&b.8))
+    };
+    transactions.sort_by(transaction_order);
+    incoming_transactions.sort_by(transaction_order);
+    Ok(transactions != incoming_transactions)
+}
+
 pub async fn delete_sync_snapshot(database_path: &Path, uuid: &str) -> Result<(), String> {
+    delete_snapshot(database_path, uuid, false).await
+}
+
+pub async fn delete_local_snapshot(database_path: &Path, uuid: &str) -> Result<(), String> {
+    delete_snapshot(database_path, uuid, true).await
+}
+
+async fn delete_snapshot(database_path: &Path, uuid: &str, local: bool) -> Result<(), String> {
     if uuid.is_empty() {
         return Err("Invalid sync snapshot id".to_string());
     }
@@ -395,6 +600,11 @@ pub async fn delete_sync_snapshot(database_path: &Path, uuid: &str) -> Result<()
         return Err("Failed to begin sync delete".to_string());
     }
     let result: Result<(), String> = async {
+        let old_summary = if local {
+            Some(snapshot_summary_from_db(&mut connection, uuid).await?)
+        } else {
+            None
+        };
         for table in ["asset_prices", "transactions", "assets_v2"] {
             sqlx::query(&format!("DELETE FROM {table} WHERE uuid = ?"))
                 .bind(uuid)
@@ -407,6 +617,21 @@ pub async fn delete_sync_snapshot(database_path: &Path, uuid: &str) -> Result<()
             .execute(&mut connection)
             .await
             .map_err(|_| "Failed to clear sync snapshot marker".to_string())?;
+        if let Some(summary) = old_summary {
+            edit_log::record(
+                &mut connection,
+                uuid,
+                "local",
+                "snapshot",
+                "delete",
+                None,
+                None,
+                None,
+                Some(&summary),
+                None,
+            )
+            .await?;
+        }
         Ok(())
     }
     .await;

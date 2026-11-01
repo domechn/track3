@@ -47,6 +47,9 @@ fn released_094_opens_new_database_after_version_reset_without_dropping_data() {
         let assets: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assets_v2 WHERE uuid='db-compat'").fetch_one(&mut db).await.unwrap();
         let transactions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM transactions WHERE uuid='db-compat'").fetch_one(&mut db).await.unwrap();
         assert_eq!((assets, transactions), (1, 1));
+        let edit_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM snapshot_edit_log WHERE snapshot_uuid='db-compat'")
+            .fetch_one(&mut db).await.unwrap();
+        assert_eq!(edit_rows, 1);
         db.close().await.unwrap();
 
         let snapshot = serde_json::from_slice(&std::fs::read(directory.join("sync-snapshot.json")).unwrap()).unwrap();

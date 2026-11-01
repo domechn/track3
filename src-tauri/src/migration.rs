@@ -1181,6 +1181,7 @@ async fn repair_required_schema(
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
     let sync_manifest_cache = read_migration_sql(resource_dir, "init/sync_manifest_cache_up.sql")?;
     let sync_snapshot_state = read_migration_sql(resource_dir, "init/sync_snapshot_state_up.sql")?;
+    let snapshot_edit_log = read_migration_sql(resource_dir, "init/snapshot_edit_log_up.sql")?;
     let additive_schema = if version_is_less(app_version, "0.9.5")? {
         Vec::new()
     } else {
@@ -1347,6 +1348,10 @@ async fn repair_required_schema(
             .await
             .map_err(|error| format!("failed to ensure sync snapshot state: {error}"))?;
         migrate_sync_snapshot_state(&mut transaction).await?;
+        sqlx::raw_sql(&snapshot_edit_log)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to ensure snapshot edit log: {error}"))?;
         // If the table exists but any of its triggers is gone, the index may have drifted
         // (rows added or deleted while untracked): rebuild it fully before re-creating them.
         if migration_table_exists(&mut transaction, "history_snapshots").await? {

@@ -5,10 +5,11 @@ import {
   deleteHistoricalDataDetailById,
   queryHistoricalDetail,
   queryHistoricalPage,
+  queryEditLog,
   queryRestoreHistoricalData,
   restoreHistoricalData,
 } from "@/middlelayers/charts";
-import type { HistoricalLatest, HistoricalPageRow } from "@/middlelayers/charts-history";
+import type { HistoricalLatest, HistoricalPageRow, SnapshotEdit } from "@/middlelayers/charts-history";
 import { addToBlacklist } from "@/middlelayers/configuration";
 import {
   CurrencyRateDetail,
@@ -68,6 +69,7 @@ import { useTranslation } from "@/mobile/i18n";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BottomSheet, SplitView, SwipeableRow, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 import { groupHistoryMonths } from "@/mobile/components/history-months";
+import HistoryEditLog from "@/components/history-edit-log";
 
 function DesktopDetailPassthrough({ children }: React.ComponentProps<typeof BottomSheet>) {
   return <>{children}</>;
@@ -116,6 +118,9 @@ const App = ({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [selectedDataId, setSelectedDataId] = useState<string | null>(null);
+  const [editLog, setEditLog] = useState<SnapshotEdit[] | null>(null);
+  const [editLogError, setEditLogError] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<"all" | "edited">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
   const [detailSearch, setDetailSearch] = useState("");
@@ -154,7 +159,7 @@ const App = ({
       return;
     }
     setPageLoading(true);
-  }, [rangeKey, dataChangedVersion, dataPage, pageSize]);
+  }, [rangeKey, dataChangedVersion, dataPage, pageSize, historyFilter]);
 
   const symbolPricePairs = useMemo(() => {
     const latestBySymbol = new Map<string, number>();
@@ -222,7 +227,7 @@ const App = ({
     const currentGen = ++loadGenRef.current;
 
     try {
-      const result = await queryHistoricalPage(dateRange, pageSize, dataPage);
+      const result = await queryHistoricalPage(dateRange, pageSize, dataPage, historyFilter);
       if (currentGen !== loadGenRef.current) {
         return;
       }
@@ -240,7 +245,7 @@ const App = ({
         setPageLoading(false);
       }
     }
-  }, [rangeKey, dateRange, dataChangedVersion, dataPage, pageSize]);
+  }, [rangeKey, dateRange, dataChangedVersion, dataPage, pageSize, historyFilter]);
 
   useEffect(() => {
     loadPage();
@@ -266,6 +271,19 @@ const App = ({
         setDetailError(true);
         setDetailLoading(false);
       }
+    });
+    return () => { active = false; };
+  }, [isModalOpen, selectedDataId, dataChangedVersion]);
+
+  useEffect(() => {
+    if (!isModalOpen || !selectedDataId) return;
+    let active = true;
+    setEditLog(null);
+    setEditLogError(false);
+    void queryEditLog(selectedDataId).then((rows) => {
+      if (active) setEditLog(rows);
+    }).catch(() => {
+      if (active) setEditLogError(true);
     });
     return () => { active = false; };
   }, [isModalOpen, selectedDataId, dataChangedVersion]);
@@ -637,6 +655,7 @@ const App = ({
                 />
               </div>
             </div>
+            <HistoryEditLog edits={editLog} error={editLogError} />
             {isMobile && <div className="history-mobile-detail-list">
               {visibleRankData.map((item) => <SwipeableRow key={item.assetId} className="history-mobile-asset" allowImmediateAction
                 actions={[{ label: t("common.delete"), destructive: true, disabled: deletingDetail,
@@ -843,6 +862,18 @@ const App = ({
               <p className="text-xs text-muted-foreground">
                 {t("history.recordsCardSubtitle")}
               </p>
+              <Select value={historyFilter} onValueChange={(value: "all" | "edited") => {
+                setHistoryFilter(value);
+                setDataPage(0);
+              }}>
+                <SelectTrigger aria-label={t("history.editLog.filter")} className="mt-2 h-9 w-[150px] text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("history.editLog.all")}</SelectItem>
+                  <SelectItem value="edited">{t("history.editLog.edited")}</SelectItem>
+                </SelectContent>
+              </Select>
             </CardHeader>
             <CardContent className="space-y-3 touch:min-w-0">
               <div className="history-page-controls flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
@@ -954,7 +985,7 @@ const App = ({
                     </h2>
                     <div className="history-month-rows">
                   {group.rows.map((row) => {
-                    const isLatest = dataPage === 0 && data[0]?.id === row.id;
+                    const isLatest = latestRow?.id === row.id;
                     return <SwipeableRow key={row.id} className="history-mobile-snapshot"
                       actions={isLatest ? [{ label: t("common.delete"), destructive: true, disabled: deleting,
                         onClick: () => setDeleteCandidate(row.id) }] : []}>
@@ -967,6 +998,9 @@ const App = ({
                             locale === "zh" ? "zh-CN" : "en-US",
                             { month: "short", day: "numeric" },
                           ).format(new Date(row.createdAt))}</span>
+                          {row.edited ? <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                            {t("history.editLog.edited")}
+                          </span> : null}
                           <span className="history-mobile-snapshot-total ios-money">{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(row.total))}</span>
                         </span>
                         <span className="history-mobile-snapshot-secondary">
@@ -1002,8 +1036,8 @@ const App = ({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.map((row, idx) => {
-                        const isLatest = dataPage === 0 && idx === 0;
+                      {data.map((row) => {
+                        const isLatest = latestRow?.id === row.id;
                         const topAssets = row.topAssets;
                         const displayDate = snapshotDateFormatter.format(new Date(row.createdAt));
 
@@ -1019,6 +1053,9 @@ const App = ({
                                 aria-label={t("history.viewSnapshot").replace("{date}", `${timeToDateStr(new Date(row.createdAt).getTime(), true)} · ${displayDate}`)}
                                 className="flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <span>{displayDate}</span>
+                                {row.edited ? <span className="mt-1 w-fit rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                  {t("history.editLog.edited")}
+                                </span> : null}
                               </button>
                               <span className="block text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
                             </TableCell>

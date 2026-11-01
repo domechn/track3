@@ -36,6 +36,7 @@ type BridgeOptions = {
   preflightExhaustedFixture?: boolean;
   checkoutFixture?: boolean;
   goldenHistory?: boolean;
+  seedEditLog?: boolean;
   appVersion?: string;
 };
 
@@ -67,6 +68,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     preflightExhaustedFixture = false,
     checkoutFixture = false,
     goldenHistory = false,
+    seedEditLog = false,
     appVersion = "0.8.2",
   } = options;
   if (!options.onboarding) {
@@ -258,6 +260,14 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   }
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/alerts_up.sql"), "utf8"));
   db.run(readFileSync(resolve("src-tauri/migrations/v08t09/sync_state_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/init/snapshot_edit_log_up.sql"), "utf8"));
+  if (seedEditLog) {
+    const uuid = richPortfolio ? "demo-59" : "snapshot-new";
+    db.run(`INSERT INTO snapshot_edit_log
+      (snapshot_uuid, edited_at, origin, target, action, asset_type, symbol, wallet, old_value, new_value)
+      VALUES (?, '2026-11-01T10:02:00.000Z', 'local', 'asset', 'restore', 'crypto', 'ETH', 'hashed-wallet', NULL, '{"amount":3.8,"value":12000,"price":3157.89}')`,
+    [uuid]);
+  }
   const config = JSON.stringify({
     endpoint: "https://assistant.test/v1",
     apiKey: "sk-e2e",
@@ -310,6 +320,17 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   const execute = (query: string, values: unknown[] = []) => {
     db.run(query, values as any[]);
     return [db.getRowsModified(), select("SELECT last_insert_rowid() AS id")[0]?.id ?? 0];
+  };
+  const logEdit = (
+    uuid: string, origin: string, target: string, action: string,
+    assetType: string | null, symbol: string | null, wallet: string | null,
+    oldValue: string | null, newValue: string | null,
+  ) => {
+    db.run(`INSERT INTO snapshot_edit_log
+      (snapshot_uuid, edited_at, origin, target, action, asset_type, symbol, wallet, old_value, new_value)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [uuid, new Date().toISOString(), origin, target, action, assetType, symbol, wallet, oldValue, newValue]);
+    db.run("DELETE FROM snapshot_edit_log WHERE id <= (SELECT id FROM snapshot_edit_log ORDER BY id DESC LIMIT 1 OFFSET 5000)");
   };
 
   await page.exposeBinding("__e2eInvoke", async (_source, cmd: string, args: any, options?: any) => {
@@ -367,17 +388,73 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       return null;
     }
     if (cmd === "plugin:opener|open_url") { openedUrls.push(args.url); return null; }
-    if (cmd === "delete_sync_snapshot") {
-      // Mirrors the Rust command: remove the snapshot's rows from every snapshot-scoped table.
-      for (const table of ["asset_prices", "transactions", "assets_v2", "history_snapshots"]) {
-        try { db.run(`DELETE FROM ${table} WHERE uuid = ?`, [args.uuid]); } catch { /* table absent in this fixture */ }
-      }
+    if (cmd === "update_local_transaction_price" || cmd === "update_local_transaction_type") {
+      const row = select("SELECT uuid, asset_type, symbol, wallet, price, txnType FROM transactions WHERE id = ?", [args.id])[0];
+      if (!row) throw new Error("Transaction not found");
+      const isPrice = cmd === "update_local_transaction_price";
+      const oldValue = String(isPrice ? row.price : row.txnType);
+      const newValue = String(isPrice ? args.price : args.txnType);
+      if (oldValue === newValue) return null;
+      db.run("BEGIN");
+      try {
+        db.run(`UPDATE transactions SET ${isPrice ? "price" : "txnType"} = ?, updatedAt = ? WHERE id = ?`,
+          [isPrice ? args.price : args.txnType, new Date().toISOString(), args.id]);
+        logEdit(String(row.uuid), "local", "transaction", isPrice ? "price" : "txnType",
+          String(row.asset_type), String(row.symbol), String(row.wallet), oldValue, newValue);
+        db.run("COMMIT");
+      } catch (error) { db.run("ROLLBACK"); throw error; }
       return null;
     }
-    if (cmd === "import_sync_snapshot" || cmd === "replace_import_snapshot") {
+    if (cmd === "delete_local_asset") {
+      const asset = select("SELECT * FROM assets_v2 WHERE id = ?", [args.id])[0];
+      if (!asset) throw new Error("Asset not found");
+      db.run("BEGIN");
+      try {
+        db.run("DELETE FROM transactions WHERE assetID = ?", [args.id]);
+        db.run("DELETE FROM assets_v2 WHERE id = ?", [args.id]);
+        logEdit(String(asset.uuid), "local", "asset", "delete", String(asset.asset_type),
+          String(asset.symbol), String(asset.wallet), JSON.stringify({ amount: asset.amount, value: asset.value, price: asset.price }), null);
+        db.run("COMMIT");
+      } catch (error) { db.run("ROLLBACK"); throw error; }
+      return null;
+    }
+    if (cmd === "restore_local_asset") {
+      const { assets, transactions } = args.backup as { assets: any[]; transactions: any[] };
+      const asset = assets[0];
+      if (!asset || assets.length !== 1) throw new Error("Invalid asset backup");
+      db.run("BEGIN");
+      try {
+        db.run("INSERT INTO assets_v2 (id, uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [asset.id, asset.uuid, asset.createdAt, asset.wallet ?? "", asset.assetType, asset.symbol, asset.amount, asset.value, asset.price]);
+        for (const txn of transactions) {
+          db.run("INSERT INTO transactions (id, uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [txn.id, txn.uuid, txn.assetID, txn.assetType, txn.wallet, txn.symbol, txn.amount, txn.price, txn.txnType, txn.txnCreatedAt, txn.createdAt, txn.updatedAt]);
+        }
+        logEdit(asset.uuid, "local", "asset", "restore", asset.assetType, asset.symbol, asset.wallet ?? "",
+          null, JSON.stringify({ amount: asset.amount, value: asset.value, price: asset.price }));
+        db.run("COMMIT");
+      } catch (error) { db.run("ROLLBACK"); throw error; }
+      return null;
+    }
+    if (cmd === "delete_sync_snapshot" || cmd === "delete_local_snapshot") {
+      // Mirrors the Rust command: remove the snapshot's rows from every snapshot-scoped table.
+      const assets = select("SELECT COUNT(*) AS n, COALESCE(SUM(value), 0) AS total FROM assets_v2 WHERE uuid = ?", [args.uuid])[0];
+      const transactions = select("SELECT COUNT(*) AS n FROM transactions WHERE uuid = ?", [args.uuid])[0];
+      db.run("BEGIN");
+      try {
+        for (const table of ["asset_prices", "transactions", "assets_v2", "history_snapshots"]) {
+          try { db.run(`DELETE FROM ${table} WHERE uuid = ?`, [args.uuid]); } catch { /* table absent in this fixture */ }
+        }
+        if (cmd === "delete_local_snapshot") logEdit(args.uuid, "local", "snapshot", "delete", null, null, null,
+          JSON.stringify({ assets: assets.n, transactions: transactions.n, total: assets.total }), null);
+        db.run("COMMIT");
+      } catch (error) { db.run("ROLLBACK"); throw error; }
+      return null;
+    }
+    if (cmd === "import_sync_snapshot" || cmd === "replace_import_snapshot" || cmd === "restore_local_snapshot") {
       const snapshot = args.snapshot as { uuid: string; assets: any[]; prices: any[]; transactions: any[] };
       const existing = select("SELECT COUNT(*) AS n FROM assets_v2 WHERE uuid = ?", [snapshot.uuid])[0]?.n ?? 0;
-      if (cmd === "import_sync_snapshot" && Number(existing) > 0) return false;
+      if (cmd !== "replace_import_snapshot" && Number(existing) > 0) return false;
       if (cmd === "replace_import_snapshot" && Number(existing) === 0) throw new Error("Cannot edit missing sync snapshot");
       if (cmd === "replace_import_snapshot" && snapshot.prices.length) throw new Error("Import file cannot replace local cost prices");
       db.run("BEGIN");
@@ -424,6 +501,16 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
           db.run("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
             [snapshot.uuid, idMap.get(asset.id)!, price.priceSymbol, price.price, price.assetCreatedAt, price.updatedAt]);
         }
+        if (cmd === "restore_local_snapshot") for (const txn of args.orphanTransactions as any[]) {
+          db.run("INSERT INTO transactions (id, uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [txn.id, txn.uuid, txn.assetID, txn.asset_type ?? txn.assetType, txn.wallet, txn.symbol, txn.amount, txn.price, txn.txnType, txn.txnCreatedAt, txn.createdAt, txn.updatedAt]);
+        }
+        if (cmd === "restore_local_snapshot") logEdit(snapshot.uuid, "local", "snapshot", "restore", null, null, null,
+          null, JSON.stringify({ assets: snapshot.assets.length, transactions: snapshot.transactions.length + (args.orphanTransactions?.length ?? 0),
+            total: snapshot.assets.reduce((sum, asset) => sum + asset.value, 0) }));
+        if (cmd === "replace_import_snapshot") logEdit(snapshot.uuid, "import", "snapshot", "replace", null, null, null,
+          null, JSON.stringify({ assets: snapshot.assets.length, transactions: snapshot.transactions.length,
+            total: snapshot.assets.reduce((sum, asset) => sum + asset.value, 0) }));
         db.run("COMMIT");
       } catch (error) {
         db.run("ROLLBACK");

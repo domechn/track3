@@ -6,7 +6,10 @@ import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { deleteHistoricalDataByUUID, queryRestoreHistoricalData, restoreHistoricalData } from "./charts-history";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("./database", () => ({ getDatabase: vi.fn() }));
+vi.mock("./database", () => ({
+  getDatabase: vi.fn(),
+  executeWriteWork: (operation: () => Promise<unknown>) => operation(),
+}));
 vi.mock("./entities/assets", () => ({ ASSET_HANDLER: {
   listAssetsByUUIDs: vi.fn(), listAssetsByIDs: vi.fn(), saveAssets: vi.fn(),
 } }));
@@ -28,10 +31,10 @@ it("captures prices and restores a whole deleted snapshot through the atomic imp
   await deleteHistoricalDataByUUID("snapshot-1");
   await restoreHistoricalData(undo);
   expect(vi.mocked(invoke).mock.calls).toEqual([
-    ["delete_sync_snapshot", { uuid: "snapshot-1" }],
-    ["import_sync_snapshot", { snapshot: {
+    ["delete_local_snapshot", { uuid: "snapshot-1" }],
+    ["restore_local_snapshot", { snapshot: {
       uuid: "snapshot-1", assets: [asset], prices: [price], transactions: [transaction],
-    } }],
+    }, orphanTransactions: [] }],
   ]);
 });
 
@@ -47,8 +50,8 @@ it("restores transactions whose asset is missing from a deleted snapshot", async
   vi.mocked(TRANSACTION_HANDLER.listTransactionsByUUIDs).mockResolvedValue([valid, orphan] as never);
   const undo = await queryRestoreHistoricalData("snapshot-1");
   await restoreHistoricalData(undo);
-  expect(vi.mocked(invoke)).toHaveBeenCalledWith("import_sync_snapshot", {
+  expect(vi.mocked(invoke)).toHaveBeenCalledWith("restore_local_snapshot", {
     snapshot: { uuid: "snapshot-1", assets: [asset], prices: [], transactions: [valid] },
+    orphanTransactions: [orphan],
   });
-  expect(vi.mocked(TRANSACTION_HANDLER.saveTransactions)).toHaveBeenCalledWith([orphan]);
 });

@@ -22,10 +22,12 @@ use crate::{
     refresh_persistence::persist_refresh as persist_refresh_atomically,
     startup_security::{acquire_app_instance_lock, LEGACY_ENCRYPTION_KEY},
     sync_persistence::{
+        delete_local_snapshot as delete_local_snapshot_atomically,
         delete_sync_snapshot as delete_sync_snapshot_atomically,
         import_sync_snapshot as import_sync_snapshot_atomically,
         replace_import_snapshot as replace_import_snapshot_atomically,
         replace_sync_snapshot as replace_sync_snapshot_atomically,
+        restore_local_snapshot as restore_local_snapshot_atomically,
         save_sync_state as save_sync_state_atomically, SnapshotStateRow,
     },
     types::{CoinWithPrice, RefreshAssetInput, RefreshTransactionInput},
@@ -138,6 +140,57 @@ async fn delete_sync_snapshot(
     uuid: String,
 ) -> Result<(), String> {
     delete_sync_snapshot_atomically(&database_path.0, &uuid).await
+}
+
+#[tauri::command]
+async fn update_local_transaction_price(
+    database_path: tauri::State<'_, DatabasePath>,
+    id: i64,
+    price: f64,
+) -> Result<(), String> {
+    crate::edit_log::update_transaction_price(&database_path.0, id, price).await
+}
+
+#[tauri::command]
+async fn update_local_transaction_type(
+    database_path: tauri::State<'_, DatabasePath>,
+    id: i64,
+    txn_type: String,
+) -> Result<(), String> {
+    crate::edit_log::update_transaction_type(&database_path.0, id, &txn_type).await
+}
+
+#[tauri::command]
+async fn delete_local_asset(
+    database_path: tauri::State<'_, DatabasePath>,
+    id: i64,
+) -> Result<serde_json::Value, String> {
+    crate::edit_log::delete_local_asset(&database_path.0, id).await
+}
+
+#[tauri::command]
+async fn restore_local_asset(
+    database_path: tauri::State<'_, DatabasePath>,
+    backup: serde_json::Value,
+) -> Result<(), String> {
+    crate::edit_log::restore_local_asset(&database_path.0, backup).await
+}
+
+#[tauri::command]
+async fn delete_local_snapshot(
+    database_path: tauri::State<'_, DatabasePath>,
+    uuid: String,
+) -> Result<(), String> {
+    delete_local_snapshot_atomically(&database_path.0, &uuid).await
+}
+
+#[tauri::command]
+async fn restore_local_snapshot(
+    database_path: tauri::State<'_, DatabasePath>,
+    snapshot: serde_json::Value,
+    orphan_transactions: serde_json::Value,
+) -> Result<(), String> {
+    restore_local_snapshot_atomically(&database_path.0, snapshot, orphan_transactions).await
 }
 
 #[tauri::command]
@@ -526,8 +579,11 @@ async fn ios_prepare_backup_folder(
 fn mark_frontend_ready(handle: tauri::AppHandle, width: u32, height: u32) -> Result<(), String> {
     let cache_dir = handle.path().app_cache_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
-    std::fs::write(cache_dir.join("track3-ready"), format!("track3:ready\n{width}x{height}\n"))
-        .map_err(|e| e.to_string())
+    std::fs::write(
+        cache_dir.join("track3-ready"),
+        format!("track3:ready\n{width}x{height}\n"),
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[cfg(debug_assertions)]
@@ -687,6 +743,12 @@ pub fn run() {
         replace_sync_snapshot,
         replace_import_snapshot,
         delete_sync_snapshot,
+        update_local_transaction_price,
+        update_local_transaction_type,
+        delete_local_asset,
+        restore_local_asset,
+        delete_local_snapshot,
+        restore_local_snapshot,
         save_sync_state,
         get_database_url,
         ios_key_recovery_needed,
@@ -721,6 +783,12 @@ pub fn run() {
         replace_sync_snapshot,
         replace_import_snapshot,
         delete_sync_snapshot,
+        update_local_transaction_price,
+        update_local_transaction_type,
+        delete_local_asset,
+        restore_local_asset,
+        delete_local_snapshot,
+        restore_local_snapshot,
         save_sync_state,
         get_database_url,
         ios_key_recovery_needed,
@@ -753,6 +821,12 @@ pub fn run() {
         replace_sync_snapshot,
         replace_import_snapshot,
         delete_sync_snapshot,
+        update_local_transaction_price,
+        update_local_transaction_type,
+        delete_local_asset,
+        restore_local_asset,
+        delete_local_snapshot,
+        restore_local_snapshot,
         save_sync_state,
         get_database_url,
         mark_frontend_ready,
@@ -771,6 +845,12 @@ pub fn run() {
         replace_sync_snapshot,
         replace_import_snapshot,
         delete_sync_snapshot,
+        update_local_transaction_price,
+        update_local_transaction_type,
+        delete_local_asset,
+        restore_local_asset,
+        delete_local_snapshot,
+        restore_local_snapshot,
         save_sync_state,
         get_database_url,
     ]);
