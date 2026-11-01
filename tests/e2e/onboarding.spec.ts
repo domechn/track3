@@ -107,11 +107,20 @@ test("reduced motion shows static art and remains accessible", async ({ page }) 
 test("desktop backdrop dismissal remembers Skip", async ({ page }) => {
   await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
   await page.goto("/#/overview")
-  await expect(page.getByTestId("onboarding-dialog")).toBeVisible()
+  const dialog = page.getByTestId("onboarding-dialog")
+  await expect(dialog).toBeVisible()
   const overlay = page.locator(".ob-overlay")
   await expect(overlay).toHaveCSS("opacity", "1")
-  await overlay.click({ position: { x: 24, y: 24 } })
-  await expect(page.getByTestId("onboarding-dialog")).toHaveCount(0)
+  await dialog.getByRole("heading", { name: "Welcome to Track3" }).click()
+  await expect(dialog).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBeNull()
+  expect(await page.evaluate(() => ({
+    dialog: getComputedStyle(document.querySelector(".ob-desktop")!).pointerEvents,
+    body: getComputedStyle(document.querySelector(".ob-desktop .ob-body")!).pointerEvents,
+    hit: document.elementFromPoint(8, 8)?.classList.contains("ob-overlay"),
+  }))).toMatchObject({ dialog: "auto", body: "auto", hit: true })
+  await overlay.click({ position: { x: 8, y: 8 } })
+  await expect(dialog).toHaveCount(0)
   expect(await page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBe("skipped")
 })
 

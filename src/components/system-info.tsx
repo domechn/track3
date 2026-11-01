@@ -29,6 +29,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { requestOnboardingReplay } from "@/middlelayers/onboarding";
+import { useOutletContext } from "react-router-dom";
 
 const App = ({
   onProStatusChange,
@@ -37,9 +38,12 @@ const App = ({
 }) => {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const section = useOutletContext<string | null>();
+  const showPro = !section || section === "pro";
+  const showAbout = !section || section === "about";
   const tRef = useRef(t);
   tRef.current = t;
-  const [version, setVersion] = useState<string>("0.1.0");
+  const [version, setVersion] = useState<string>(t("common.loading"));
   const [licenseLoaded, setLicenseLoaded] = useState(false);
   const [activeLicense, setActiveLicense] = useState<string | undefined>();
   const [inputLicense, setInputLicense] = useState<string | undefined>();
@@ -314,13 +318,13 @@ const App = ({
   </div>;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${section === "about" ? "t3-system-about" : ""}`}>
       <div>
-        <h3 className="text-lg font-medium tracking-tight">{t("system.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t(section === "about" ? "settings.phase6.about" : section === "pro" ? "settings.phase6.pro" : "system.title")}</h3>
         <p className="text-sm text-muted-foreground">{t("system.subtitle")}</p>
       </div>
 
-      {checkoutPhase !== "idle" && (
+      {showPro && checkoutPhase !== "idle" && (
         <Card className="overflow-hidden">
           <CardContent className="space-y-3 p-6 text-sm" role="status">
             <p className="font-medium">{t(`system.checkout.${checkoutPhase}`)}</p>
@@ -337,7 +341,7 @@ const App = ({
         </Card>
       )}
 
-      <SystemInfoCard
+      {showPro && <SystemInfoCard
         title={activeLicense ? t("system.track3Pro") : t("system.track3Free")}
         status={activeLicense && !subInfoLoading && subscriptionInfo
           ? { label: subscriptionStatusLabel(subscriptionInfo.status), value: subscriptionInfo.status }
@@ -428,8 +432,12 @@ const App = ({
             </div>}
           </div>
         </>}
-      </SystemInfoCard>
-      <Card>
+      </SystemInfoCard>}
+      {showAbout && <Card className="t3-about-version">
+        <CardHeader className="pb-2"><CardTitle>{t("system.appVersion")}</CardTitle></CardHeader>
+        <CardContent><p className="text-xl font-semibold tabular-nums">Track3 {version}</p></CardContent>
+      </Card>}
+      {showAbout && <Card className="t3-about-guide">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">{t("onboarding.replay.title")}</CardTitle>
         </CardHeader>
@@ -437,7 +445,7 @@ const App = ({
           <p className="text-xs text-muted-foreground">{t("onboarding.replay.description")}</p>
           <Button type="button" variant="outline" size="sm" data-testid="onboarding-replay" onClick={requestOnboardingReplay}>{t("onboarding.replay.action")}</Button>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 

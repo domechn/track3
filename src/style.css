@@ -421,6 +421,7 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
 .t3-topbar-sync-button { box-shadow: none; white-space: nowrap; }
 .t3-topbar-sync-button:hover { background: hsl(var(--hover)); }
 .t3-sync-popover { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--popover)); box-shadow: var(--shadow-overlay); }
+.t3-system-preview-light { --background: 240 7% 97%; --muted: 240 5% 93%; }
 .t3-live-trigger:hover, .t3-live-trigger[data-state="open"] { color: hsl(var(--accent-data)); }
 .t3-live-label { font-size: 12px; white-space: nowrap; }
 .t3-live-trigger strong { font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -808,10 +809,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-goals-summary > div + div { border-left: 1px solid hsl(var(--border)); }
   .t3-goals-summary span { color: hsl(var(--muted-foreground)); font-size: 12px; }
   .t3-goals-summary strong { overflow-wrap: anywhere; font-size: 22px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .t3-manage-goals > .t3-goals-rules { grid-column: 1; grid-row: auto; min-width: 0; }
-  .t3-manage-goals > .t3-goals-history { grid-column: 2; min-width: 0; }
-  .t3-manage-goals > .t3-goals-rules { order: 1; }
-  .t3-manage-goals > .t3-goals-history { order: 2; }
+  .t3-manage-goals > .t3-goals-rules { order: 1; grid-column: 1; grid-row: auto; min-width: 0; }
+  .t3-manage-goals > .t3-goals-history { order: 2; grid-column: 2; min-width: 0; }
   .t3-manage-goals > .t3-goals-notifications { order: 3; grid-column: 1 / -1; }
   .t3-manage-goals > .t3-goals-editor { order: 4; }
   .t3-manage-goals > :has(canvas) { order: 9; }
@@ -900,4 +899,75 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-goals-summary > div:nth-child(4) { border-top: 1px solid hsl(var(--border)); }
   .t3-goals-summary strong { font-size: 18px; }
   .t3-goals-drawer { inset: 0; width: 100vw; }
+}
+
+/* Settings: the route shell and both theme variants share the Terminal surface tokens. */
+.t3-settings { min-width: 0; }
+.t3-settings-crumb { margin: 0 0 8px; color: hsl(var(--muted-foreground)); font-size: 13px; }
+.t3-settings-layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 28px; }
+.t3-settings-menu { min-width: 0; padding-right: 16px; border-right: 1px solid hsl(var(--border)); }
+.t3-settings-menu-group + .t3-settings-menu-group { margin-top: 19px; }
+.t3-settings-menu-heading { margin: 0 10px 5px; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.t3-settings-menu-links { display: grid; gap: 2px; }
+.t3-settings-menu-link { position: relative; display: flex; min-height: 34px; align-items: center; gap: 10px; padding: 0 10px; border-radius: var(--radius); color: hsl(var(--muted-foreground)); font-size: 13px; text-decoration: none; }
+.t3-settings-menu-link:hover { color: hsl(var(--foreground)); background: hsl(var(--secondary)); }
+.t3-settings-menu-link[aria-current="page"] { color: hsl(var(--foreground)); background: hsl(var(--secondary)); }
+.t3-settings-menu-link[aria-current="page"]::before { position: absolute; top: 7px; bottom: 7px; left: 0; width: 2px; border-radius: 2px; background: hsl(var(--primary)); content: ""; }
+.t3-settings-menu-icon { flex: none; width: 16px; height: 16px; }
+.t3-settings-menu-value { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: 12px; font-variant-numeric: tabular-nums; }
+.t3-settings-menu-chevron { display: none; }
+.t3-settings-content { min-width: 0; }
+.t3-settings-content > div > div:first-child h3 { color: hsl(var(--foreground)); font-size: 26px; font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+.t3-settings-content > div > div:first-child p { margin-top: 4px; font-size: 13px; }
+.t3-settings-content [data-ui-card] { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); box-shadow: var(--shadow-card); }
+.t3-settings-content [data-ui-card] h3 { color: hsl(var(--foreground)); font-size: 15px; font-weight: 600; }
+.t3-settings-content :is(button, [role="button"]):focus-visible, .t3-settings-menu-link:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .t3-settings:not(.ios-d3-settings) .t3-settings-layout { display: block; }
+  .t3-settings:not(.ios-d3-settings) .t3-settings-menu { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 8px; border: 0; }
+  .t3-settings:not(.ios-d3-settings) .t3-settings-menu-group,
+  .t3-settings:not(.ios-d3-settings) .t3-settings-menu-links { display: contents; }
+  .t3-settings:not(.ios-d3-settings) .t3-settings-menu-heading { display: none; }
+  .t3-settings:not(.ios-d3-settings) .t3-settings-menu-link { flex: none; white-space: nowrap; }
+  .t3-settings:not(.ios-d3-settings) .t3-settings-content { margin-top: 12px; }
+}
+.t3-settings-source-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid hsl(var(--border)); }
+@media (pointer: coarse) {
+  .t3-settings-menu-link { min-height: 44px; }
+}
+.t3-settings-source-tabs button { position: relative; min-height: 42px; flex: none; padding: 0 12px; color: hsl(var(--muted-foreground)); font-size: 13px; }
+.t3-settings-source-tabs button[aria-pressed="true"] { color: hsl(var(--foreground)); }
+.t3-settings-source-tabs button[aria-pressed="true"]::after { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: hsl(var(--primary)); content: ""; }
+.sync-settings-page { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.sync-settings-page.space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
+.sync-settings-page > [role="alert"], .sync-settings-page > .t3-settings-page-head, .sync-settings-page > .t3-sync-categories, .sync-settings-page > .t3-sync-conflicts, .sync-settings-page > .t3-sync-devices { grid-column: 1 / -1; }
+.t3-settings-page-head h3 { color: hsl(var(--foreground)); font-size: 26px; font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+.t3-settings-page-head p { margin-top: 4px; color: hsl(var(--muted-foreground)); font-size: 13px; }
+body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-state="open"])) .sync-settings-page { margin-right: 0; padding-bottom: 0; }
+.t3-settings-content label[for="light"] > div { background: rgb(245 246 248); }
+.t3-settings-content label[for="light"] > div > div { background: rgb(234 237 241); }
+.t3-settings-content label[for="light"] > div > div > div { background: #fff; }
+.t3-settings-content label[for="light"] > div .bg-muted { background: rgb(194 201 210); }
+.t3-settings-content label[for="light"] > div .bg-muted\/60 { background: rgb(234 237 241); }
+.t3-settings-content .grid.max-w-2xl:has(label[for="light"]) { max-width: none; }
+.t3-system-about { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.t3-system-about.space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
+.t3-system-about > div:first-child { grid-column: 1 / -1; }
+@media (max-width: 900px) { .t3-system-about { grid-template-columns: minmax(0, 1fr); } }
+.t3-source-editor { width: min(560px, calc(100vw - 32px)) !important; max-width: 560px !important; max-height: min(90dvh, 900px); overflow-y: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--popover)); }
+.t3-source-editor .grid-cols-4 { grid-template-columns: minmax(0, 1fr); justify-items: stretch; gap: 6px; }
+.t3-source-editor .grid-cols-4 > label { text-align: left; }
+.t3-source-editor .grid-cols-4 > :is(input,button,[role="combobox"]) { grid-column: 1; width: 100%; max-width: none; }
+.t3-source-quicklook, .t3-source-attach { width: min(560px, calc(100vw - 32px)) !important; max-width: 560px !important; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--popover)); }
+.t3-public-ip-info { border-color: hsl(var(--accent-data) / .35); background: hsl(var(--accent-data) / .1); }
+@media (min-width: 761px) and (max-width: 1200px) {
+  .t3-settings-content:has(.t3-settings-source-tabs) table.table-fixed:has(thead th:nth-child(5)) tr > :nth-child(3),
+  .t3-settings-content:has(.t3-settings-source-tabs) table.table-fixed:has(thead th:nth-child(6)) tr > :nth-child(4) {
+    display: none;
+  }
+}
+.t3-assistant-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.t3-assistant-settings > div:first-child { grid-column: 1 / -1; }
+@media (max-width: 900px) {
+  .sync-settings-page, .t3-assistant-settings { grid-template-columns: minmax(0, 1fr); }
 }

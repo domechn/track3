@@ -19,6 +19,7 @@ import {
   useTranslation,
   type Locale,
 } from "@/i18n";
+import { useOutletContext } from "react-router-dom";
 
 const App = ({
   onQuoteColorChange,
@@ -26,6 +27,9 @@ const App = ({
   onQuoteColorChange?: (val: QuoteColor) => void;
 }) => {
   const { t, locale, setLocale } = useTranslation();
+  const section = useOutletContext<string | null>();
+  const showTheme = !section || section === "theme";
+  const showLanguage = !section || section === "language";
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
   const [selectedTheme, setSelectedTheme] = useState<Theme>("light");
   const [selectedLocale, setSelectedLocale] = useState<Locale>(locale);
@@ -73,13 +77,13 @@ const App = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium tracking-tight">{t("appearance.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t(section === "language" ? "settings.phase6.language" : "appearance.title")}</h3>
         <p className="text-sm text-muted-foreground">
           {t("appearance.subtitle")}
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -112,9 +116,20 @@ const App = ({
             </p>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("appearance.language")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-semibold">{LOCALE_LABELS[selectedLocale]}</div>
+            <p className="text-xs text-muted-foreground">{t("appearance.languageNote")}</p>
+          </CardContent>
+        </Card>
       </div>
 
-      <Card>
+      {showTheme && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("appearance.theme")}
@@ -124,7 +139,7 @@ const App = ({
           <RadioGroup
             onValueChange={(value) => setSelectedTheme(value as Theme)}
             value={selectedTheme}
-            className="grid max-w-2xl grid-cols-1 md:grid-cols-2 gap-6"
+            className="grid max-w-2xl grid-cols-1 md:grid-cols-3 gap-4"
           >
             <Label htmlFor="light" className="cursor-pointer">
               <RadioGroupItem value="light" className="sr-only" id="light" />
@@ -156,14 +171,14 @@ const App = ({
                   selectedTheme === "dark" ? "border-foreground/60" : "border-muted"
                 }`}
               >
-                <div className="space-y-2 rounded-sm bg-slate-950/95 p-2">
-                  <div className="space-y-2 rounded-md bg-slate-800/90 p-2 shadow-sm border border-white/10">
-                    <div className="h-2 w-[80px] rounded-lg bg-slate-400/80" />
-                    <div className="h-2 w-[100px] rounded-lg bg-slate-400/80" />
+                <div className="dark space-y-2 rounded-sm bg-background p-2">
+                  <div className="space-y-2 rounded-md bg-card p-2 shadow-sm border border-border/40">
+                    <div className="h-2 w-[80px] rounded-lg bg-muted" />
+                    <div className="h-2 w-[100px] rounded-lg bg-muted" />
                   </div>
-                  <div className="flex items-center space-x-2 rounded-md bg-slate-800/90 p-2 shadow-sm border border-white/10">
-                    <div className="h-4 w-4 rounded-full bg-slate-400/80" />
-                    <div className="h-2 w-[100px] rounded-lg bg-slate-400/80" />
+                  <div className="flex items-center space-x-2 rounded-md bg-card p-2 shadow-sm border border-border/40">
+                    <div className="h-4 w-4 rounded-full bg-muted" />
+                    <div className="h-2 w-[100px] rounded-lg bg-muted" />
                   </div>
                 </div>
               </div>
@@ -171,14 +186,24 @@ const App = ({
                 {t("appearance.theme.dark")}
               </span>
             </Label>
+            <Label htmlFor="system" className="cursor-pointer">
+              <RadioGroupItem value="system" className="sr-only" id="system" />
+              <div className={`rounded-md border-2 p-1 ${selectedTheme === "system" ? "border-primary" : "border-muted"}`}>
+                <div className="flex h-24 overflow-hidden rounded-sm border border-border">
+                  <div className="dark w-1/2 space-y-2 bg-background p-3"><div className="h-2 w-full rounded bg-muted" /><div className="h-2 w-3/4 rounded bg-muted" /></div>
+                  <div className="t3-system-preview-light w-1/2 space-y-2 bg-background p-3"><div className="h-2 w-full rounded bg-muted" /><div className="h-2 w-3/4 rounded bg-muted" /></div>
+                </div>
+              </div>
+              <span className="block w-full p-2 text-center text-sm">{t("settings.phase6.themeSystem")}</span>
+            </Label>
           </RadioGroup>
           <Button onClick={() => handleThemeValueChange(selectedTheme)}>
             {t("common.updatePreferences")}
           </Button>
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card>
+      {showTheme && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("appearance.quoteColor")}
@@ -208,9 +233,9 @@ const App = ({
             </div>
           </RadioGroup>
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card>
+      {showLanguage && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("appearance.language")}
@@ -234,7 +259,7 @@ const App = ({
             ))}
           </RadioGroup>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 };

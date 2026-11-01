@@ -24,7 +24,7 @@ const QuickLookDialog = memo(function QuickLookDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="t3-source-quicklook sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Quick Look - {title}</DialogTitle>
           <DialogDescription>

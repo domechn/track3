@@ -67,6 +67,7 @@ test("iOS asks before an exhausted Pro wallet refresh", async ({ page }) => {
 test("iOS wallet quick look explains a monthly quota failure", async ({ page }) => {
   await installTauriBridge(page, { quotaExhaustedFixture: true });
   await page.goto("/#/settings/configuration?section=sources");
+  await page.getByRole("tab", { name: "Wallets" }).click();
   await page.getByRole("button", { name: /More actions for ERC20/i }).click();
   await page.getByRole("button", { name: "Quick look" }).click();
   await expect(page.getByText("Monthly refresh limit reached", { exact: true })).toBeVisible();

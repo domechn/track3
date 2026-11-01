@@ -4,6 +4,7 @@
     "await saveQuoteColor(v);",
     "<RadioGroupItem value=\"light\" className=\"sr-only\" id=\"light\" />",
     "<RadioGroupItem value=\"dark\" className=\"sr-only\" id=\"dark\" />",
+    "<RadioGroupItem value=\"system\" className=\"sr-only\" id=\"system\" />",
     "<RadioGroupItem value=\"green-up-red-down\" id=\"green-up-red-down\" />",
     "<RadioGroupItem value=\"red-up-green-down\" id=\"red-up-green-down\" />",
     "<RadioGroupItem value={loc} id={`language-${loc}`} />"

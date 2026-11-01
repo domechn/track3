@@ -143,13 +143,13 @@ const App = () => {
   }
 
   return (
-    <div className="ios-d3-settings-content ios-d3-assistant-settings space-y-6">
+    <div className="ios-d3-settings-content ios-d3-assistant-settings t3-assistant-settings">
       <div>
         <h3 className="text-lg font-medium tracking-tight">
           {t("settings.assistant.title")}
         </h3>
         <p className="text-sm text-muted-foreground">
-          {t("settings.assistant.description")}
+          {t("settings.phase6.assistantDescription")}
         </p>
       </div>
 

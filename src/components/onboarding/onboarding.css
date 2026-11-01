@@ -74,3 +74,37 @@
 @media (prefers-reduced-motion: reduce) {
   .ob-dots span { transition: none; }
 }
+
+/* Leave a clickable backdrop around the guide. */
+.ob-desktop {
+  inset: 16px;
+  width: calc(100vw - 32px);
+  height: calc(100dvh - 32px);
+  max-height: none;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  translate: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.ob-desktop .ob-body {
+  grid-column: 1;
+  grid-row: 1;
+  justify-content: center;
+  padding: clamp(24px, 5vw, 84px);
+}
+.ob-desktop .ob-art {
+  grid-column: 2;
+  grid-row: 1;
+  border: 0;
+  border-left: 1px solid hsl(var(--border));
+}
+.ob-desktop .ob-text { flex: none; padding-block: 48px; }
+.ob-desktop .ob-title { font-size: clamp(28px, 3vw, 42px); }
+@media (max-width: 700px) {
+  .ob-desktop { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 35%) minmax(0, 65%); }
+  .ob-desktop .ob-art { grid-column: 1; grid-row: 1; border-left: 0; border-bottom: 1px solid hsl(var(--border)); }
+  .ob-desktop .ob-body { grid-column: 1; grid-row: 2; }
+  .ob-desktop .ob-text { flex: 1; padding-block: 12px; }
+}

@@ -7,7 +7,7 @@ test("mouse layout stays compact at narrow and wide desktop widths", async ({ pa
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/#/settings/sync");
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(false);
-    const settingsTab = page.getByRole("link", { name: "Sync", exact: true }).last();
+    const settingsTab = page.getByRole("link", { name: "Backup & sync", exact: true }).last();
     await expect(settingsTab).toBeVisible();
     expect((await settingsTab.boundingBox())!.height).toBeLessThanOrEqual(36.01);
     const track = page.getByRole("switch", { name: "Path style addressing" });
@@ -167,9 +167,9 @@ test.describe("coarse pointer", () => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto("/#/settings/sync");
       expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
-      await expect(page.getByRole("link", { name: "Sync", exact: true }).last()).toBeVisible();
+      await expect(page.getByRole("link", { name: "Backup & sync", exact: true }).last()).toBeVisible();
       for (const control of [
-        page.getByRole("link", { name: "Sync", exact: true }).last(),
+        page.getByRole("link", { name: "Backup & sync", exact: true }).last(),
         page.getByRole("switch", { name: "Path style addressing" }),
         page.locator("aside").getByRole("link", { name: "Overview" }),
       ]) {

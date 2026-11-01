@@ -5,6 +5,24 @@ import { installTauriBridge } from "./tauri-bridge";
 
 registerSyncFeedbackScenes("mobile");
 
+test("wide tablet Sync uses its detail width when no toast is open", async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 1133, height: 834 }, isMobile: true, hasTouch: true,
+    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+  });
+  try {
+    const page = await context.newPage();
+    await installTauriBridge(page);
+    await page.goto("/#/settings/sync");
+    await expect(page.locator(".sync-settings-page")).toBeVisible();
+    const detail = (await page.locator(".ios-d3-settings .mobile-split-detail:has(.sync-settings-page)").boundingBox())!;
+    const sync = (await page.locator(".sync-settings-page").boundingBox())!;
+    expect(sync.width).toBeGreaterThanOrEqual(detail.width * 0.8);
+  } finally {
+    await context.close();
+  }
+});
+
 // These dimensions match the device presets in ios-wide.spec.ts.
 const tabletViewports = [
   ["tablet-no-gutter-boundary", 1099, 800],

@@ -120,6 +120,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     expect(reveal!.x).toBeGreaterThan(paste!.x);
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-source-credentials.png` });
     await page.getByRole("dialog", { name: "Edit data source" }).getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("tab", { name: "Custom assets" }).click();
     await page.getByRole("button", { name: "Add symbol" }).click();
     const cancel = await page.getByRole("dialog", { name: "Add custom asset" }).getByRole("button", { name: "Cancel" }).boundingBox();
     expect(cancel!.x).toBeLessThan(60);

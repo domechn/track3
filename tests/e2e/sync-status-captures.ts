@@ -20,9 +20,13 @@ async function publish(page: Page, sync: Record<string, unknown>) {
   }, sync);
 }
 
-export async function captureSyncStates(page: Page, platform: Platform, theme: Theme, locale: Locale) {
-  mkdirSync(".local/sync-status", { recursive: true });
-  await page.setViewportSize({ width: platform === "mobile" ? 390 : 1280, height: platform === "mobile" ? 844 : 800 });
+export async function captureSyncStates(page: Page, platform: Platform, theme: Theme, locale: Locale,
+  options?: { size: string; width: number; height: number; output: string }) {
+  const output = options?.output ?? ".local/sync-status";
+  const size = options?.size ?? platform;
+  mkdirSync(output, { recursive: true });
+  await page.setViewportSize({ width: options?.width ?? (platform === "mobile" ? 390 : 1280),
+    height: options?.height ?? (platform === "mobile" ? 844 : 800) });
   await page.addInitScript(({ theme, locale }) => {
     localStorage.setItem("track3-ui-theme", theme);
     localStorage.setItem("track3-ui-locale", locale);
@@ -34,7 +38,7 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
   const button = (name: string) => page.getByRole("button", { name });
   const capture = async (state: string) => {
     await expect(page.getByRole("dialog")).toBeVisible();
-    await page.screenshot({ path: `.local/sync-status/${platform}-${theme}-${locale}-${state}.png`, animations: "disabled" });
+    await page.screenshot({ path: `${output}/${size}-${theme}-${locale}-${state}.png`, animations: "disabled" });
   };
   await expect(button(pill[locale].locked)).toBeVisible();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -42,7 +46,7 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
   await button(skip[locale]).click();
   await expect(button(pill[locale].skipped)).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.screenshot({ path: `.local/sync-status/${platform}-${theme}-${locale}-skipped.png`, animations: "disabled" });
+  await page.screenshot({ path: `${output}/${size}-${theme}-${locale}-skipped.png`, animations: "disabled" });
 
   const cases = [
     { name: "never", phase: "idle", pill: pill[locale].idle, sync: { phase: "idle" } },
@@ -71,7 +75,7 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
   }
-  if (platform === "mobile") {
+  if (platform === "mobile" && !options) {
     await page.setViewportSize({ width: 320, height: 700 });
     await publish(page, { phase: "syncing", startedAt: Date.now() - 5000,
       progress: { phase: "push", completed: 1240, total: 4567 } });

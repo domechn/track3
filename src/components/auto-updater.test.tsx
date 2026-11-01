@@ -96,7 +96,7 @@ describe("AutoUpdater", () => {
     consoleWarn.mockRestore();
   });
 
-  it("keeps the reload action after a successful update", async () => {
+  it("offers restart after a successful update", async () => {
     const downloadAndInstall = vi.fn().mockResolvedValueOnce(undefined);
     vi.mocked(check).mockResolvedValueOnce({
       available: true,
@@ -105,16 +105,28 @@ describe("AutoUpdater", () => {
 
     render(<AutoUpdater />);
 
-    await waitFor(() => {
-      expect(toast).toHaveBeenCalledOnce();
-    });
+    await screen.findByRole("dialog", { name: "Update ready to install" });
     expect(downloadAndInstall).toHaveBeenCalledOnce();
-
-    const { action, title } = toast.mock.calls[0][0];
-    expect(title).toBe("🔥 New version available!");
-    render(action);
-    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
-
+    fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
     expect(reloadApp).toHaveBeenCalledOnce();
+  });
+
+  it("shows a dismissible ready dialog after the existing download completes", async () => {
+    const downloadAndInstall = vi.fn().mockResolvedValueOnce(undefined);
+    vi.mocked(check).mockResolvedValueOnce({
+      available: true,
+      version: "0.9.5",
+      downloadAndInstall,
+    } as unknown as Awaited<ReturnType<typeof check>>);
+
+    render(<AutoUpdater />);
+
+    const dialog = await screen.findByRole("dialog", { name: "Update ready to install" });
+    expect(dialog).toHaveTextContent("0.9.5");
+    fireEvent.click(screen.getByRole("button", { name: "Later" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
+    expect(reloadApp).toHaveBeenCalledOnce();
+    expect(toast).not.toHaveBeenCalled();
   });
 });
