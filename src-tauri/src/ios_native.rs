@@ -5,6 +5,7 @@ use tauri::Manager;
 unsafe extern "C" {
     fn track3_ios_install_native();
     fn track3_ios_lock_enabled() -> bool;
+    fn track3_ios_auto_retry_allowed() -> bool;
     fn track3_ios_set_lock_enabled(enabled: bool);
     fn track3_ios_authenticate() -> bool;
     fn track3_ios_haptic(kind: u8);
@@ -57,6 +58,10 @@ pub fn install() {
 
 pub fn lock_enabled() -> bool {
     unsafe { track3_ios_lock_enabled() }
+}
+
+pub fn auto_retry_allowed() -> bool {
+    unsafe { track3_ios_auto_retry_allowed() }
 }
 
 pub fn set_lock_enabled(enabled: bool) {

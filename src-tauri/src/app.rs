@@ -313,6 +313,12 @@ fn ios_lock_enabled() -> bool {
 
 #[cfg(target_os = "ios")]
 #[tauri::command]
+fn ios_auto_retry_allowed() -> bool {
+    crate::ios_native::auto_retry_allowed()
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
 fn ios_set_lock_enabled(enabled: bool) -> Result<(), String> {
     crate::ios_native::set_lock_enabled(enabled);
     Ok(())
@@ -657,6 +663,7 @@ pub fn run() {
         ios_startup_failure,
         ios_retry_startup,
         ios_lock_enabled,
+        ios_auto_retry_allowed,
         ios_set_lock_enabled,
         ios_authenticate,
         ios_haptic,
@@ -688,6 +695,7 @@ pub fn run() {
         ios_startup_failure,
         ios_retry_startup,
         ios_lock_enabled,
+        ios_auto_retry_allowed,
         ios_set_lock_enabled,
         ios_authenticate,
         ios_haptic,

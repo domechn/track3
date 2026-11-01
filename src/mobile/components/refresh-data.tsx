@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   refreshAllData,
   type RefreshAllDataResult,
@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import { trackRefreshEvent } from "@/middlelayers/ui-state/telemetry";
 import { retries, retryInterval, readStoredStatuses, writeStoredStatuses, retryRefresh, mobileRefreshOptions } from "@/middlelayers/ui-state/source-status-store";
 import { publishSourceStatuses } from "@/components/source-status-event";
+import { bindRefreshRetry, refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,9 +37,12 @@ import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-s
 import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "@/middlelayers/source-status";
 import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failure";
 import { isIOS } from "@/utils/platform";
+import { invoke } from "@tauri-apps/api/core";
 import { listPortfolioSources } from "@/middlelayers/data";
 import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
+
+let lastRetryResult: RefreshAllDataResult | undefined;
 
 const App = ({
   loading: refreshLoading,
@@ -54,8 +58,11 @@ const App = ({
   const [preflightPending, setPreflightPending] = useState(false);
   const preflightPendingRef = useRef(false);
   const refreshInProgress = useRef(false);
+  const refreshLoadingRef = useRef(refreshLoading);
+  refreshLoadingRef.current = refreshLoading;
+  const retrySchedule = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
-  const [lastResult, setLastResult] = useState<RefreshAllDataResult>();
+  const [lastResult, setLastResult] = useState<RefreshAllDataResult | undefined>(() => lastRetryResult);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSources, setPendingSources] = useState<Array<{ sourceId: string; label: string }>>([]);
   const [liveSources, setLiveSources] = useState<PortfolioSourceResult[]>([]);
@@ -77,11 +84,12 @@ const App = ({
     setRefreshProgress(Math.min(Math.max(p, 0), 100));
   }
 
-  const runRefresh = async (sourceId?: string) => {
+  const runRefresh = async (sourceId?: string, automatic = false): Promise<PortfolioSourceStatus[] | null | undefined> => {
     if (refreshLoading || refreshInProgress.current) return;
-    if (sourceId && !lastResult?.sourceResults) return;
+    if (sourceId && !lastResult?.sourceResults) return null;
+    if (!automatic) refreshRetryScheduler.manualStart();
     refreshInProgress.current = true;
-    if (isIOS()) setStatusDialogOpen(true);
+    if (isIOS() && !automatic) setStatusDialogOpen(true);
     setRefreshing(true);
     setLiveSources([]);
     cancelInsightRefresh();
@@ -94,6 +102,7 @@ const App = ({
     }
     const operation: RefreshOperation = { operationUuid: uuidv4() };
     let succeeded = false;
+    let retryStatuses: PortfolioSourceStatus[] | undefined;
     let insightStatuses = sourceStatuses;
     let alertResult: RefreshAllDataResult | undefined;
     try {
@@ -106,7 +115,7 @@ const App = ({
         mobileRefreshOptions(sourceId, lastResult, sourceStatuses,
           (source) => setLiveSources((current) => [...current.filter((item) => item.sourceId !== source.sourceId), source])),
         operation,
-        (attempt) => retry(attempt, retries, retryInterval),
+        (attempt) => automatic ? attempt() : retry(attempt, retries, retryInterval),
       );
       succeeded = result.persisted !== false && !result.requiresDataSourceAction;
       if (succeeded) {
@@ -115,9 +124,12 @@ const App = ({
       }
       if (result.sourceStatuses) {
         const statuses = normalizeSourceStatuses(result.sourceStatuses);
+        retryStatuses = statuses;
+        if (!automatic) refreshRetryScheduler.complete(statuses);
         setSourceStatuses(statuses);
         insightStatuses = statuses;
-        setStatusDialogOpen(statuses.some((source) => source.status === "failed" || source.status === "stale"));
+        setStatusDialogOpen((open) => automatic ? open && !statuses.every((source) => source.status === "ok")
+          : statuses.some((source) => source.status === "failed" || source.status === "stale"));
         try {
           writeStoredStatuses(statuses);
         } catch {
@@ -125,8 +137,9 @@ const App = ({
         }
         publishSourceStatuses(statuses);
       }
+      lastRetryResult = result;
       setLastResult(result);
-      if (succeeded) {
+      if (succeeded && !automatic) {
         const unavailable = insightStatuses.filter((source) => source.status === "stale" || source.status === "failed").map((source) =>
           sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
         const incomplete = insightStatuses.some((source) => source.status === "failed");
@@ -142,7 +155,7 @@ const App = ({
             ? unavailable ? t("refresh.partial").replace("{sources}", unavailable) : t("refresh.partialGeneric")
             : "";
         toast({ description: [statusWarning, partialWarning].filter(Boolean).join(" ") || t("refresh.success") });
-      } else {
+      } else if (!succeeded && !automatic) {
         const unavailable = insightStatuses.filter((source) => source.status !== "ok" &&
           (!sourceId || source.sourceId === sourceId)).map((source) =>
           sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
@@ -157,16 +170,19 @@ const App = ({
           .map((source) => source.sourceId).join(",") ?? "",
       });
     } catch (error) {
+      if (error instanceof FullRefreshRequiredError) refreshRetryScheduler.stop();
       const messageKey = error instanceof FullRefreshRequiredError
         ? "refresh.runFullRefresh"
         : error instanceof Error && error.message.startsWith("no configuration found")
           ? "refresh.noConfiguration"
           : "refresh.unexpectedError";
-      toast({ description: t(messageKey), variant: "destructive" });
+      if (!automatic) toast({ description: t(messageKey), variant: "destructive" });
       trackRefreshEvent({ failed: "true" });
+      if (automatic) throw error;
     } finally {
       await invalidateUsageCache();
       refreshInProgress.current = false;
+      refreshRetryScheduler.poke();
       setRefreshing(false);
       setRefreshLoading(false);
       setProgress(0);
@@ -188,7 +204,17 @@ const App = ({
         });
       }
     }
+    return retryStatuses;
   };
+
+  const runRefreshRef = useRef(runRefresh);
+  runRefreshRef.current = runRefresh;
+  useEffect(() => bindRefreshRetry(
+    (sourceId) => isIOS()
+      ? invoke("ios_auto_retry_allowed").then((allowed) => allowed === true ? runRefreshRef.current(sourceId, true) : undefined)
+      : runRefreshRef.current(sourceId, true),
+    () => !refreshLoadingRef.current && !refreshInProgress.current && !preflightPendingRef.current,
+  ), []);
 
   const requestRefresh = async (sourceId?: string) => {
     if (refreshLoading || preflight || preflightPendingRef.current || refreshInProgress.current) return;
@@ -245,6 +271,11 @@ const App = ({
   const failedStatuses = sortedStatuses.filter((source) => source.status === "failed");
   const partialStatuses = sortedStatuses.filter((source) => source.status === "partial");
   const failedNames = failedStatuses.map(displayIdentity).join(", ");
+  const nextRetryAt = Math.min(...Object.values(retrySchedule.nextBySource));
+  const retryStatus = Number.isFinite(nextRetryAt)
+    ? t("refresh.autoRetry.next").replace("{time}", new Date(nextRetryAt).toLocaleTimeString(
+      locale === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false }))
+    : retrySchedule.stopped ? t("refresh.autoRetry.stopped") : "";
   const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
     ok: "t3-pill t3-refresh-status-pill",
@@ -341,6 +372,7 @@ const App = ({
                       sortedStatuses.filter((source) => source.status === "stale").map(displayIdentity).join(", "))
                   : t("refresh.allCurrent")}
             </AlertDialogDescription>
+            {retryStatus && <p className="text-xs text-muted-foreground">{retryStatus}</p>}
             {refreshing && <div role="progressbar" aria-label={t("refresh.inProgress")} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="h-2 overflow-hidden rounded-full bg-muted">
               <div className="h-full bg-primary transition-[width]" style={{ width: `${progress}%` }} />
             </div>}
@@ -423,7 +455,9 @@ const App = ({
             ); })}
           </div>
           <AlertDialogFooter>
-            {!refreshing && failedStatuses.some((source) => source.category !== "quota") && <Button variant="outline"
+            {!refreshing && retrySchedule.stopped && hasFailure && <Button variant="outline"
+              disabled={refreshLoading || preflightPending} onClick={() => requestRefresh()}>{t("refresh.autoRetry.fullRefresh")}</Button>}
+            {!refreshing && !retrySchedule.stopped && failedStatuses.some((source) => source.category !== "quota") && <Button variant="outline"
               disabled={refreshLoading || preflightPending} onClick={() => requestRefresh()}>{t("refresh.retryAllFailed")}</Button>}
             <AlertDialogCancel>{t("refresh.close")}</AlertDialogCancel>
           </AlertDialogFooter>

@@ -13,10 +13,13 @@ import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts } from "@/middlelayers/alert-notifications";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 import axe from "axe-core";
+import { refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
 import { isIOS } from "@/utils/platform";
 import { isProVersion } from "@/middlelayers/license";
 import { RefreshButtonLoadingContext } from "@/mobile/components/index";
 import { writeStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
+import { invoke } from "@tauri-apps/api/core";
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue(true) }));
 vi.mock("@/utils/platform", async (original) => ({
   ...await original<typeof import("@/utils/platform")>(), isIOS: vi.fn(() => false),
 }));
@@ -393,6 +396,59 @@ describe("RefreshData — currency rates refresh ordering", () => {
     snapshotKey: "snapshot-key",
   };
 
+  it("shows the next try in the refresh sheet and retries the failed source", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
+    await waitFor(() => expect(dialog).toHaveTextContent("Next automatic try at"));
+    vi.useFakeTimers();
+    try {
+      refreshRetryScheduler.poke();
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+      expect(refreshAllData).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({ retrySourceId: "btc:0" });
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("does not reopen the iOS status sheet or toast during an automatic retry", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    vi.mocked(invoke).mockResolvedValue(true);
+    vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await screen.findByRole("alertdialog", { name: "Source status" });
+    await waitFor(() => expect(refreshRetryScheduler.status().nextBySource["btc:0"]).toBeDefined());
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog", { name: "Source status" })).toBeNull());
+    mockToast.mockClear();
+    vi.useFakeTimers();
+    try {
+      refreshRetryScheduler.poke();
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+      expect(refreshAllData).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("alertdialog", { name: "Source status" })).toBeNull();
+      expect(mockToast).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("retries after the refresh control unmounts and remounts mid-schedule", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
+    const view = render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(refreshRetryScheduler.status().nextBySource["btc:0"]).toBeDefined());
+    view.unmount();
+    render(<RefreshData loading={false} />);
+    vi.useFakeTimers();
+    try {
+      refreshRetryScheduler.poke();
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+      expect(refreshAllData).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({ retrySourceId: "btc:0" });
+    } finally { vi.useRealTimers(); }
+  });
+
   it("shows a stale source and its reason after saving a partial refresh", async () => {
     vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
     const user = userEvent.setup();
@@ -452,6 +508,16 @@ describe("RefreshData — currency rates refresh ordering", () => {
       }),
       expect.any(Object), expect.any(Function),
     );
+  });
+
+  it("offers a full manual refresh when source retries must stop", async () => {
+    vi.mocked(refreshAllData).mockResolvedValueOnce(partialResult as never)
+      .mockRejectedValueOnce(new FullRefreshRequiredError("Source changed"));
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
+    expect(await screen.findByRole("button", { name: "Run full refresh" })).toBeVisible();
   });
 
   it("keeps a failed status visible when a single-source retry fails", async () => {

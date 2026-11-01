@@ -17,6 +17,11 @@ private final class Track3PrivacyLock: NSObject {
 
     var enabled: Bool { UserDefaults.standard.bool(forKey: setting) }
 
+    func autoRetryAllowed() -> Bool {
+        let check = { !self.needsUnlock && UIApplication.shared.applicationState == .active }
+        return Thread.isMainThread ? check() : DispatchQueue.main.sync(execute: check)
+    }
+
     func install() {
         guard !installed else { return }
         installed = true
@@ -267,6 +272,11 @@ public func track3IOSInstallNative() {
 @_cdecl("track3_ios_lock_enabled")
 public func track3IOSLockEnabled() -> Bool {
     Track3PrivacyLock.shared.enabled
+}
+
+@_cdecl("track3_ios_auto_retry_allowed")
+public func track3IOSAutoRetryAllowed() -> Bool {
+    Track3PrivacyLock.shared.autoRetryAllowed()
 }
 
 @_cdecl("track3_ios_set_lock_enabled")

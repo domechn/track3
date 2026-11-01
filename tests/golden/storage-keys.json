@@ -5,6 +5,7 @@
     "track3-assistant-comparison-dates",
     "track3-assistant-date-range",
     "track3-auto-backup.json",
+    "track3-auto-retry-failed-sources",
     "track3-backup",
     "track3-cache-epoch/",
     "track3-connection-probe",
@@ -45,6 +46,7 @@
     "src/middlelayers/configuration.ts:themeLocalStorageKey": "track3-ui-theme",
     "src/middlelayers/insights-service.ts:INSIGHT_QUESTION_STORAGE_KEY": "track3-insight-question",
     "src/middlelayers/onboarding-storage.ts:ONBOARDING_STORAGE_KEY": "track3-onboarding-v1",
+    "src/middlelayers/refresh-retry-scheduler.ts:RETRY_ENABLED_KEY": "track3-auto-retry-failed-sources",
     "src/utils/app.ts:APTABASE_APP_KEY": "A-EU-6972874637",
     "src/utils/wallet-treemap.ts:OTHERS_AGGREGATED_KEY": "__others_aggregated__"
   },

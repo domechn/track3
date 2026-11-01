@@ -6,11 +6,12 @@ import {
   TDateRange,
 } from "@/middlelayers/types";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
 import { useTranslation } from "@/i18n";
+import { refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
 import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 import { sourceStatusesChangedEvent } from "./source-status-event";
 import { WalletStatusBanner } from "./wallet-status-banner";
@@ -31,6 +32,7 @@ const App = ({
   const [pageLoading, setPageLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const retrySchedule = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
   useEffect(() => {
     const onChanged = (event: Event) => setStatuses((event as CustomEvent<PortfolioSourceStatus[]>).detail);
     window.addEventListener(sourceStatusesChangedEvent, onChanged);
@@ -59,7 +61,8 @@ const App = ({
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
       <div className="analyze-wallets relative min-h-[400px]" aria-busy={pageLoading}>
         <h1 className="analyze-page-title">{t("wallets.h1")}</h1>
-        <WalletStatusBanner statuses={statuses} locale={locale} t={t} />
+        <WalletStatusBanner statuses={statuses} locale={locale} t={t}
+          nextBySource={retrySchedule.nextBySource} stopped={retrySchedule.stopped} />
         <StaggerContainer className="space-y-3">
           <FadeUp>
             <WalletAssetsPercentage currency={currency} dateRange={dateRange}
