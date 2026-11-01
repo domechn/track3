@@ -484,9 +484,11 @@
   "desktop.comparison": "{\"base\":\"2024-04-15\",\"head\":\"2024-04-16\"}",
   "desktop.costBasis": "{\"from\":\"2024-01-01\",\"to\":\"2024-12-31\",\"holdingPeriodDays\":400}",
   "desktop.rebalance": "{\"mode\":\"buys\",\"injectedCash\":42.5,\"minimumTradeValue\":3,\"ignoreBelowValue\":2}",
+  "desktop.rebalanceStablecoinsOff": "{\"mode\":\"buys\",\"injectedCash\":42.5,\"minimumTradeValue\":3,\"ignoreBelowValue\":2,\"stablecoinsAsCash\":false}",
   "desktop.sourceStatuses": "[{\"sourceId\":\"wallet:btc\",\"label\":\"Bitcoin\",\"status\":\"stale\",\"category\":\"network\",\"kind\":\"wallet\",\"lastSuccessAt\":\"2024-04-15T00:00:00.000Z\"}]",
   "mobile.comparison": "{\"base\":\"2024-04-15\",\"head\":\"2024-04-16\"}",
   "mobile.costBasis": "{\"from\":\"2024-01-01\",\"to\":\"2024-12-31\",\"holdingPeriodDays\":400}",
   "mobile.rebalance": "{\"mode\":\"buys\",\"injectedCash\":42.5,\"minimumTradeValue\":3,\"ignoreBelowValue\":2}",
+  "mobile.rebalanceStablecoinsOff": "{\"mode\":\"buys\",\"injectedCash\":42.5,\"minimumTradeValue\":3,\"ignoreBelowValue\":2,\"stablecoinsAsCash\":false}",
   "mobile.sourceStatuses": "[{\"sourceId\":\"wallet:btc\",\"label\":\"Bitcoin\",\"status\":\"stale\",\"category\":\"network\",\"kind\":\"wallet\",\"lastSuccessAt\":\"2024-04-15T00:00:00.000Z\"}]"
 }

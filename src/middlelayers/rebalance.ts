@@ -30,6 +30,7 @@ export type RebalanceOptions = {
   ignoreBelowValue?: number;
   tolerancePercent?: number;
   stablecoinSymbols?: string[];
+  stablecoinsAsCash?: boolean;
 };
 
 export type RebalanceRow = {

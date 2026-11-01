@@ -38,6 +38,18 @@ it("keeps rebalance options in session storage with the current field order", ()
   expect(sessionStorage.getItem("track3-rebalance-options")).toBe('{"mode":"buys","injectedCash":1,"minimumTradeValue":2,"ignoreBelowValue":3}');
 });
 
+it("stores the stablecoin exception only while it is off", () => {
+  setRebalanceOptions({ mode: "buys", injectedCash: 1, minimumTradeValue: 2, ignoreBelowValue: 3, stablecoinsAsCash: false });
+  expect(readRebalanceOptions().stablecoinsAsCash).toBe(false);
+  expect(sessionStorage.getItem("track3-rebalance-options"))
+    .toBe('{"mode":"buys","injectedCash":1,"minimumTradeValue":2,"ignoreBelowValue":3,"stablecoinsAsCash":false}');
+  mergeRebalanceOptions({ injectedCash: 5 });
+  expect(readRebalanceOptions().stablecoinsAsCash).toBe(false);
+  setRebalanceOptions({ mode: "buys", injectedCash: 1, minimumTradeValue: 2, ignoreBelowValue: 3, stablecoinsAsCash: true });
+  expect(sessionStorage.getItem("track3-rebalance-options"))
+    .toBe('{"mode":"buys","injectedCash":1,"minimumTradeValue":2,"ignoreBelowValue":3}');
+});
+
 it("merges assistant rebalance changes into the saved page options", () => {
   sessionStorage.setItem("track3-rebalance-options", '{"mode":"buys","injectedCash":1,"minimumTradeValue":2,"ignoreBelowValue":3}');
   mergeRebalanceOptions({ injectedCash: 5 });

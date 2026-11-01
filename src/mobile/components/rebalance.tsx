@@ -32,6 +32,7 @@ import { RebalanceSummary } from "@/components/rebalance-summary";
 import type { QuoteColor } from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/mobile/components/ui/switch";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
@@ -47,10 +48,11 @@ const stepPercent = (percent: number, step: number) =>
   Math.max(0, Math.min(100, Math.round(((Number.isFinite(percent) ? percent : 0) + step) * 100) / 100));
 export default function Rebalance({ currency, quoteColor = "green-up-red-down" }: { currency: CurrencyRateDetail; quoteColor?: QuoteColor }) {
   const { t } = useTranslation();
+  const [stablecoinsAsCash, setStablecoinsAsCash] = useState(() => readRebalanceOptions().stablecoinsAsCash !== false);
   const mobile = useIsMobile();
   const labelFor = (target: RebalanceTarget) =>
     target.kind === "asset" ? target.symbol || t("rebalance.targetAsset") :
-    target.kind === "type" ? t(`rebalance.${target.assetType}`) : t("rebalance.targetCash");
+    target.kind === "type" ? t(`rebalance.${target.assetType}`) : t(stablecoinsAsCash ? "rebalance.targetCash" : "rebalance.targetCashOnly");
   const dataChangedVersion = useDataChangedVersion();
   const [holdings, setHoldings] = useState<RebalanceHolding[]>([]);
   const [stablecoinSymbols, setStablecoinSymbols] = useState<string[]>([]);
@@ -84,6 +86,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
       setInjectedCash(options.injectedCash ?? 0);
       setMinimumTradeValue(options.minimumTradeValue ?? 0);
       setIgnoreBelowValue(options.ignoreBelowValue ?? 0);
+      setStablecoinsAsCash(options.stablecoinsAsCash !== false);
       setActionVersion((version) => version + 1);
     };
     window.addEventListener(ASSISTANT_APP_ACTION_EVENT, changed);
@@ -91,8 +94,8 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   }, []);
 
   useEffect(() => {
-    if (optionsValid) setRebalanceOptions({ mode, injectedCash, minimumTradeValue, ignoreBelowValue });
-  }, [mode, injectedCash, minimumTradeValue, ignoreBelowValue]);
+    if (optionsValid) setRebalanceOptions({ mode, injectedCash, minimumTradeValue, ignoreBelowValue, stablecoinsAsCash });
+  }, [mode, injectedCash, minimumTradeValue, ignoreBelowValue, stablecoinsAsCash]);
 
   useEffect(() => {
     let active = true;
@@ -151,13 +154,13 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
     try {
       const options: RebalanceOptions = {
         mode, injectedCash, minimumTradeValue, ignoreBelowValue,
-        tolerancePercent: tolerance, stablecoinSymbols,
+        tolerancePercent: tolerance, stablecoinSymbols: stablecoinsAsCash ? stablecoinSymbols : [],
       };
       return calculateRebalance(holdings, targets, options);
     } catch {
       return undefined;
     }
-  }, [targets, validation, optionsValid, holdings, mode, injectedCash, minimumTradeValue, ignoreBelowValue, tolerance, stablecoinSymbols]);
+  }, [targets, validation, optionsValid, holdings, mode, injectedCash, minimumTradeValue, ignoreBelowValue, tolerance, stablecoinSymbols, stablecoinsAsCash]);
   const visual = useMemo(() => result ? rebalanceVisuals(result) : undefined, [result]);
 
   function updateTarget(index: number, next: RebalanceTarget & { previousAsset?: { assetType: AssetType; symbol: string } }) {
@@ -287,10 +290,10 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
                       }}>
                       <option value="asset">{t("rebalance.targetAsset")}</option>
                       <option value="type">{t("rebalance.targetType")}</option>
-                      <option value="cash">{t("rebalance.targetCash")}</option>
+                      <option value="cash">{t(stablecoinsAsCash ? "rebalance.targetCash" : "rebalance.targetCashOnly")}</option>
                     </select>
                   </label>
-                  {target.kind === "cash" ? <span className="pb-2 text-xs">{t("rebalance.targetCash")}</span> :
+                  {target.kind === "cash" ? <span className="pb-2 text-xs">{t(stablecoinsAsCash ? "rebalance.targetCash" : "rebalance.targetCashOnly")}</span> :
                     target.kind === "type" ? (
                       <label className="space-y-1 text-xs text-muted-foreground">
                         <span>{t("rebalance.targetType")}</span>
@@ -387,6 +390,10 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
               {numberField("rebalance-cash", t("rebalance.injectedCash").replace("{currency}", currency.currency), injectedCash, setInjectedCash)}
               {numberField("rebalance-minimum", t("rebalance.minimumTrade").replace("{currency}", currency.currency), minimumTradeValue, setMinimumTradeValue)}
               {numberField("rebalance-ignore", t("rebalance.ignoreBelow").replace("{currency}", currency.currency), ignoreBelowValue, setIgnoreBelowValue)}
+              <div className="col-span-2 flex items-center justify-between gap-3 border-t pt-3 md:col-span-4">
+                <label htmlFor="rebalance-stablecoins-as-cash" className="text-sm text-foreground">{t("rebalance.stablecoinsAsCash")}</label>
+                <Switch id="rebalance-stablecoins-as-cash" checked={stablecoinsAsCash} onCheckedChange={setStablecoinsAsCash} />
+              </div>
             </CardContent>
           </Card>
           </details>
@@ -422,7 +429,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
                   </div>
                 </CardContent>
               </Card>
-              <p className="text-xs text-muted-foreground">{t("rebalance.groupRule")}</p>
+              <p className="text-xs text-muted-foreground">{t(stablecoinsAsCash ? "rebalance.groupRule" : "rebalance.groupRuleCashOnly")}</p>
               {result.warnings.map((warning) => (
                 <p key={warning.kind === "empty-type" ? warning.assetType : warning.kind} className="text-xs text-amber-600">
                   {warning.kind === "empty-type"

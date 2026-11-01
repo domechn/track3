@@ -68,6 +68,7 @@ describe("assistant action registry", () => {
     expect(() => validateActionArgs("edit_alert", { id: 0, kind: "period_pnl", comparator: "lte", threshold: -10, window: "7d" })).toThrow();
     expect(validateActionArgs("set_rebalance_options", { mode: "buys", injectedCash: 1000, minimumTradeValue: 10 })).toHaveProperty("injectedCash", 1000);
     expect(() => validateActionArgs("set_rebalance_options", { mode: "buys", injectedCash: -1 })).toThrow();
+    expect(() => validateActionArgs("set_rebalance_options", { stablecoinsAsCash: false })).toThrow();
     expect(validateActionArgs("apply_rebalance_preset", { preset: "equal_weight" })).toHaveProperty("preset", "equal_weight");
   });
 });

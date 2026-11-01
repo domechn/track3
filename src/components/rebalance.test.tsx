@@ -80,6 +80,29 @@ describe("Rebalance page", () => {
     render(<Rebalance currency={currency} />);
     expect(await screen.findByText("Targets are included in encrypted sync when enabled.")).toBeInTheDocument();
   });
+  it("counts stablecoins toward cash by default and only cash reserve when switched off", async () => {
+    vi.mocked(loadRebalanceHoldings).mockResolvedValue({
+      holdings: [assets[0], { symbol: "USDC", assetType: "crypto", amount: 40, value: 40, price: 1 }],
+      stablecoinSymbols: ["USDC"],
+    });
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 }, { kind: "cash", percent: 50 }],
+      tolerancePercent: 0,
+    });
+    render(<Rebalance currency={currency} />);
+    const toggle = await screen.findByRole("switch", { name: "Treat USDT and USDC as cash" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("row", { name: /USDC/ })).toHaveTextContent("40.00%");
+    expect(screen.getByRole("row", { name: /CASH/ })).toHaveTextContent("10.00%");
+    fireEvent.click(toggle);
+    expect(screen.getByLabelText("Target percentage for Cash")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /USDC/ })).toHaveTextContent("0.00%");
+    expect(screen.getByRole("row", { name: /CASH/ })).toHaveTextContent("50.00%");
+    expect(screen.getByRole("row", { name: /USDC/ })).toHaveTextContent("Sell");
+    expect(screen.getByText("Type targets include stablecoins in the current mix of untargeted holdings. Only cash and the cash reserve meet a cash target.")).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.getByLabelText("Target percentage for Cash / stablecoins")).toBeInTheDocument();
+  });
   it("has no axe violations with a saved target profile", async () => {
     vi.mocked(getRebalanceProfile).mockResolvedValue({
       targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }],

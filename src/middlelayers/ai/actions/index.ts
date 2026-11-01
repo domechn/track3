@@ -384,7 +384,10 @@ export async function executeAction(name: string, raw: unknown): Promise<string>
       const currency = await queryPreferCurrency();
       const { holdings, stablecoinSymbols } = await loadRebalanceHoldings(currency);
       const options = readRebalanceOptions();
-      const result = calculateRebalance(holdings, profile.targets, { ...options, tolerancePercent: profile.tolerancePercent, stablecoinSymbols });
+      const result = calculateRebalance(holdings, profile.targets, {
+        ...options, tolerancePercent: profile.tolerancePercent,
+        stablecoinSymbols: options.stablecoinsAsCash === false ? [] : stablecoinSymbols,
+      });
       const dictionary: Record<string, string> = localStorage.getItem(localeLocalStorageKey) === "zh" ? zh : en;
       return await exportFile(rebalanceCsvFilename, ["csv"], (path) =>
         writeTextFile(path, suggestionsToCsv(result, currency.currency, (key) => dictionary[key] ?? en[key as keyof typeof en] ?? key)))

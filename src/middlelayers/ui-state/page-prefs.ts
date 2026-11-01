@@ -67,8 +67,8 @@ export function readRebalanceOptions(): Partial<RebalanceOptions> {
     return value && typeof value === "object" && !Array.isArray(value) ? value as Partial<RebalanceOptions> : {};
   } catch { return {}; }
 }
-export function setRebalanceOptions({ mode, injectedCash, minimumTradeValue, ignoreBelowValue }: Pick<RebalanceOptions, "mode" | "injectedCash" | "minimumTradeValue" | "ignoreBelowValue">): void {
-  sessionStorage.setItem(rebalanceKey, JSON.stringify({ mode, injectedCash, minimumTradeValue, ignoreBelowValue }));
+export function setRebalanceOptions({ mode, injectedCash, minimumTradeValue, ignoreBelowValue, stablecoinsAsCash }: Pick<RebalanceOptions, "mode" | "injectedCash" | "minimumTradeValue" | "ignoreBelowValue" | "stablecoinsAsCash">): void {
+  sessionStorage.setItem(rebalanceKey, JSON.stringify({ mode, injectedCash, minimumTradeValue, ignoreBelowValue, stablecoinsAsCash: stablecoinsAsCash === false ? false : undefined }));
 }
 export function mergeRebalanceOptions(args: Record<string, unknown>): void {
   sessionStorage.setItem(rebalanceKey, JSON.stringify({ ...readRebalanceOptions(), ...args }));
