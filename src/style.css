@@ -713,6 +713,7 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .wallet-asset-change-scroll { display: none; }
   .wallet-asset-change-mobile { display: grid; }
   .wallet-asset-change-mobile > div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid hsl(var(--border)); padding: 12px 0; font-size: 13px; }
+}
 
 /* Manage: compact records and plans share the existing light and dark tokens. */
   .t3-manage-history,
@@ -867,6 +868,11 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-rebalance-summary > div:nth-child(5) { grid-column: span 2; border-top: 1px solid hsl(var(--border)); }
   .t3-manage-goals > .t3-goals-rules,
   .t3-manage-goals > .t3-goals-history { grid-column: 1; }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  .t3-rebalance-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .t3-rebalance-summary > div:nth-child(4) { border-top: 1px solid hsl(var(--border)); border-left: 0; }
+  .t3-rebalance-summary > div:nth-child(5) { grid-column: span 2; border-top: 1px solid hsl(var(--border)); }
 }
 @media (max-width: 700px) {
   .t3-rebalance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }

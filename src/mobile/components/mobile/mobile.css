@@ -1613,6 +1613,10 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
 .ios-d3-rebalance.t3-manage-rebalance .ios-d3-trade { border: 0; border-top: 1px solid hsl(var(--rule)); border-radius: 0; background: transparent; }
 .ios-d3-rebalance.t3-manage-rebalance ul[aria-label] li { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
 .ios-d3-rebalance.t3-manage-rebalance .t3-rebalance-sync-note { margin-top: 10px; }
+.ios-d3-rebalance.t3-manage-rebalance .t3-rebalance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ios-d3-rebalance.t3-manage-rebalance .t3-rebalance-summary > div:nth-child(3) { border-top: 1px solid hsl(var(--border)); border-left: 0; }
+.ios-d3-rebalance.t3-manage-rebalance .t3-rebalance-summary > div:nth-child(4) { border-top: 1px solid hsl(var(--border)); border-left: 1px solid hsl(var(--border)); }
+.ios-d3-rebalance.t3-manage-rebalance .t3-rebalance-summary > div:nth-child(5) { grid-column: 1 / -1; border-top: 1px solid hsl(var(--border)); border-left: 0; }
 
 .ios-d3-goals.t3-manage-goals { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
 .ios-d3-goals.t3-manage-goals > .t3-goals-rules { order: 1; }
