@@ -38,12 +38,41 @@ export type SubscriptionPlansResponse = {
   plans: SubscriptionPlan[];
 };
 
+export type LicenseDevices = {
+  limit: number;
+  devices: {
+    id: string;
+    current: boolean;
+    platform: "macos" | "windows" | "linux" | "ios" | null;
+    appVersion: string | null;
+    activatedAt: string;
+    lastSeenAt: string | null;
+  }[];
+};
+
+function isLicenseDevices(value: unknown): value is LicenseDevices {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  if (!Number.isInteger(result.limit) || (result.limit as number) < 1 || !Array.isArray(result.devices)) return false;
+  return result.devices.every((entry: unknown) => {
+    if (!entry || typeof entry !== "object") return false;
+    const device = entry as Record<string, unknown>;
+    return typeof device.id === "string" && /^[a-f0-9]{16}$/.test(device.id)
+      && typeof device.current === "boolean"
+      && (device.platform === null || ["macos", "windows", "linux", "ios"].includes(device.platform as string))
+      && (device.appVersion === null || typeof device.appVersion === "string")
+      && typeof device.activatedAt === "string" && Number.isFinite(Date.parse(device.activatedAt))
+      && (device.lastSeenAt === null || typeof device.lastSeenAt === "string" && Number.isFinite(Date.parse(device.lastSeenAt)));
+  });
+}
+
 const LICENSE_CACHE_TTL_SECONDS = 5 * 60;
 const LICENSE_CACHE_KEY_PREFIXES = {
   proStatus: "pro-status",
   subscriptionInfo: "subscription-info",
   subscriptionPlans: "subscription-plans",
   usage: "usage",
+  devices: "devices",
 };
 
 const licenseCache = getMemoryCacheInstance(
@@ -305,6 +334,25 @@ export class LicenseCenter {
       );
       if (!resp?.usage?.erc20 || !resp.usage.tron) return;
       return setCachedLicenseValue(cacheKey, resp, 60);
+    } catch {
+      return;
+    }
+  }
+
+  public async getLicenseDevices(): Promise<LicenseDevices | undefined> {
+    try {
+      const license = await getLicenseIfIsPro();
+      if (!license) return;
+      const cacheKey = makeLicenseCacheKey(LICENSE_CACHE_KEY_PREFIXES.devices, license);
+      const cached = getCachedLicenseValue<LicenseDevices>(cacheKey);
+      if (cached) return cached;
+      const response = await sendHttpRequest<unknown>(
+        "POST", this.subscriptionInfoEndpoint, 3000,
+        { "x-track3-client-id": await getClientID(), "x-track3-api-key": license },
+        { action: "devices" },
+      );
+      if (!isLicenseDevices(response)) return;
+      return setCachedLicenseValue(cacheKey, response, 60);
     } catch {
       return;
     }

@@ -32,6 +32,40 @@ beforeEach(() => {
 });
 
 describe("LicenseCenter subscription APIs", () => {
+  it("hides devices when the server has no devices action and retries after an error", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+    vi.mocked(sendHttpRequest).mockRejectedValueOnce(new Error("Unknown license action"));
+    expect(await LicenseCenter.getInstance().getLicenseDevices()).toBeUndefined();
+    vi.mocked(sendHttpRequest).mockRejectedValueOnce(new Error("offline"));
+    expect(await LicenseCenter.getInstance().getLicenseDevices()).toBeUndefined();
+    expect(sendHttpRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("maps a supported devices response and caches it without extra request headers", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+    const response = { limit: 3, devices: [
+      { id: "0123456789abcdef", current: true, platform: "ios", appVersion: "0.9.5",
+        activatedAt: "2026-10-01T10:00:00.000Z", lastSeenAt: "2026-11-01T10:00:00.000Z" },
+      { id: "abcdef0123456789", current: false, platform: null, appVersion: null,
+        activatedAt: "2026-09-01T10:00:00.000Z", lastSeenAt: null },
+    ] };
+    vi.mocked(sendHttpRequest).mockResolvedValue(response);
+    expect(await LicenseCenter.getInstance().getLicenseDevices()).toEqual(response);
+    expect(await LicenseCenter.getInstance().getLicenseDevices()).toEqual(response);
+    expect(sendHttpRequest).toHaveBeenCalledTimes(1);
+    expect(sendHttpRequest).toHaveBeenCalledWith("POST", `${PRO_API_ENDPOINT}/api/license`, 3000,
+      { "x-track3-client-id": clientId, "x-track3-api-key": "stored-license" }, { action: "devices" });
+  });
+
+  it("does not show malformed device records or call the API without a license", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue(undefined);
+    expect(await LicenseCenter.getInstance().getLicenseDevices()).toBeUndefined();
+    expect(sendHttpRequest).not.toHaveBeenCalled();
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("stored-license");
+    vi.mocked(sendHttpRequest).mockResolvedValue({ limit: 3, devices: [{ id: "raw-client-id" }] });
+    expect(await LicenseCenter.getInstance().getLicenseDevices()).toBeUndefined();
+  });
+
   it("accepts an already bound checkout device and saves its license", async () => {
     vi.mocked(getLicenseIfIsPro).mockResolvedValue(undefined);
     vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {

@@ -17,9 +17,11 @@ import {
   type SubscriptionPlan,
   type SubscriptionPlansResponse,
   type SubscriptionInfo,
+  type LicenseDevices,
 } from "@/middlelayers/license";
 import { CheckoutFlow, type CheckoutPhase } from "@/middlelayers/checkout";
 import { ProUsageRows } from "@/components/pro-usage-rows";
+import { ProLicenseDevices } from "@/components/pro-license-devices";
 import { SystemInfoCard, subscriptionSummary } from "@/components/system-info-card";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
@@ -56,6 +58,7 @@ const App = ({
   const [subscriptionInfo, setSubscriptionInfo] =
     useState<SubscriptionInfo | null>(null);
   const [usageEnforced, setUsageEnforced] = useState(false);
+  const [licenseDevices, setLicenseDevices] = useState<LicenseDevices>();
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkoutPhase, setCheckoutPhase] = useState<CheckoutPhase>("idle");
@@ -80,11 +83,15 @@ const App = ({
   useEffect(() => {
     let current = true;
     setUsageEnforced(false);
+    setLicenseDevices(undefined);
     if (activeLicense) {
       loadSubscriptionInfo();
       void LicenseCenter.getInstance().getUsage().then((result) => {
         if (current) setUsageEnforced(result?.enforced === true);
       });
+      void LicenseCenter.getInstance().getLicenseDevices()
+        .then((result) => { if (current) setLicenseDevices(result); })
+        .catch(() => { if (current) setLicenseDevices(undefined); });
     } else {
       setSubscriptionInfo(null);
     }
@@ -385,6 +392,7 @@ const App = ({
           <Button className="w-full" onClick={onSaveLicenseClick} disabled={saveLicenseLoading || !inputLicense}>{t("system.activate")}</Button>
         </section>}
     </SystemInfoCard>
+    {activeLicense && licenseDevices && <ProLicenseDevices value={licenseDevices} locale={locale} t={t} />}
     <p className="ios-d3-settings-note">{t("system.checkout.iosNote")}</p>
   </div>;
 
@@ -505,6 +513,7 @@ const App = ({
           </div>
         </>}
       </SystemInfoCard>
+      {activeLicense && licenseDevices && <ProLicenseDevices value={licenseDevices} locale={locale} t={t} />}
     </div>
   );
 

@@ -40,6 +40,7 @@ type BridgeOptions = {
   seedPartialSnapshot?: boolean;
   customPriceFixture?: boolean;
   appVersion?: string;
+  licenseDevices?: "absent" | "present" | "error";
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
@@ -74,6 +75,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     seedPartialSnapshot = false,
     customPriceFixture = false,
     appVersion = "0.8.2",
+    licenseDevices = "absent",
   } = options;
   if (!options.onboarding) {
     await page.addInitScript(() => localStorage.setItem("track3-onboarding-v1", "completed"));
@@ -338,6 +340,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   const openedUrls: string[] = [];
   let publicIpMode: "loading" | "value" | "error" = "value";
   let publicIpRequests = 0;
+  let licenseDeviceRequests = 0;
 
   const select = (query: string, values: unknown[] = []) => {
     localQueries++;
@@ -766,7 +769,22 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
         body = '{"isPro":true}';
       } else if (proApi && requestPath === "/api/license") {
         const action = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? []))).action;
-        body = action === "subscription-plans"
+        if (action === "devices") {
+          licenseDeviceRequests++;
+          const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
+          if (headers["x-track3-platform"] || headers["x-track3-app-version"]) throw new Error("unexpected device metadata headers");
+          if (licenseDevices === "present") {
+            body = JSON.stringify({ limit: 3, devices: [
+              { id: "0123456789abcdef", current: true, platform: "ios", appVersion: "0.9.5",
+                activatedAt: "2026-10-01T10:00:00.000Z", lastSeenAt: "2026-11-01T10:00:00.000Z" },
+              { id: "abcdef0123456789", current: false, platform: null, appVersion: null,
+                activatedAt: "2026-09-01T10:00:00.000Z", lastSeenAt: null },
+            ] });
+          } else {
+            status = licenseDevices === "absent" ? 400 : 500;
+            body = JSON.stringify({ error: licenseDevices === "absent" ? "Unknown license action" : "Server error" });
+          }
+        } else body = action === "subscription-plans"
           ? '{"plans":[{"planType":"monthly","currency":"usd","unitAmountCents":1299,"interval":"month"},{"planType":"yearly","currency":"usd","unitAmountCents":9999,"interval":"year"}]}'
           : action === "usage"
             ? JSON.stringify({ enforced: true, usage })
@@ -926,6 +944,6 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       files.set(exportedPath, text);
     },
     authentications: () => authentications,
-    openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; },
+    openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, licenseDeviceRequests: () => licenseDeviceRequests, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; },
     setPublicIpMode: (mode: "loading" | "value" | "error") => { publicIpMode = mode; }, publicIpRequests: () => publicIpRequests };
 }

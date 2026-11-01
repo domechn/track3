@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   getCustomerPortalUrl: vi.fn(),
   getSubscriptionPlans: vi.fn(),
   getLicenseIfIsPro: vi.fn(),
+  getLicenseDevices: vi.fn(),
   getSubscriptionInfo: vi.fn(),
   getUsage: vi.fn(),
   getVersion: vi.fn(),
@@ -66,6 +67,7 @@ vi.mock("@/middlelayers/license", () => ({
       getCustomerPortalUrl: mocks.getCustomerPortalUrl,
       getSubscriptionPlans: mocks.getSubscriptionPlans,
       getSubscriptionInfo: mocks.getSubscriptionInfo,
+      getLicenseDevices: mocks.getLicenseDevices,
       getUsage: mocks.getUsage,
       inactiveLicense: mocks.inactiveLicense,
       validateLicense: mocks.validateLicense,
@@ -107,6 +109,7 @@ beforeEach(() => {
     isLegacy: false,
   });
   mocks.getUsage.mockResolvedValue(undefined);
+  mocks.getLicenseDevices.mockResolvedValue(undefined);
   mocks.getSubscriptionPlans.mockResolvedValue({
     plans: [
       {
@@ -129,6 +132,26 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("shows the license devices on iOS only for a supported response", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    window.location.hash = "#/settings/systemInfo?section=pro";
+    mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
+    mocks.getLicenseDevices.mockResolvedValue({ limit: 3, devices: [
+      { id: "0123456789abcdef", current: true, platform: "ios", appVersion: "0.9.5",
+        activatedAt: "2026-10-01T10:00:00.000Z", lastSeenAt: null },
+    ] });
+    try {
+      render(<SystemInfo onProStatusChange={vi.fn()} />);
+      const section = await screen.findByRole("region", { name: "Devices on this license" });
+      expect(section).toHaveTextContent("1 of 3 device slots");
+      expect(section).toHaveTextContent("iOS");
+      expect(section).toHaveTextContent("This device");
+      expect(section).toHaveTextContent("Never");
+    } finally {
+      window.location.hash = "";
+    }
+  });
+
   it("does not show a stale app version while the native version is loading", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     window.location.hash = "#/settings/systemInfo?section=about";
