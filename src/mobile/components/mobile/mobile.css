@@ -193,7 +193,6 @@
   .mobile-header-total { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: .05rem; }
   .mobile-compact-title { display: block; max-width: 28%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: .5rem; font-size: .875rem; font-weight: 600; }
   #app-top-bar.mobile-topbar-root .mobile-compact-title:not(.mobile-overview-compact-title) { position: absolute; left: 50%; max-width: calc(100% - 140px); transform: translateX(-50%); margin: 0; font-size: 17px; }
-  .mobile-nav-brand { margin-right: auto; color: hsl(var(--foreground)); font-size: 17px; font-weight: 700; letter-spacing: -.04em; }
   .mobile-header-back { flex: none; margin-right: .5rem; }
   .mobile-header-back + .mobile-compact-title { position: absolute; left: 50%; max-width: calc(100% - 160px); margin: 0; transform: translateX(-50%); font-size: 17px; text-align: center; }
   .mobile-analytics-hub { display: block; }
@@ -229,8 +228,6 @@
   .history-mobile-delete { min-height: 2.75rem; margin-top: .4rem; color: hsl(var(--destructive)); font-size: .875rem; }
   .overview-sections { display: grid; gap: 24px; }
   .overview-sections > * { margin-top: 0 !important; }
-  .overview-main-grid { display: flex; min-width: 0; flex-direction: column; gap: 24px; }
-  .overview-main-grid > * { width: 100%; }
   .overview-sections :is(.mobile-hero-card, .overview-pnl-card, .overview-allocation-card, .overview-movers-card, .overview-insights-card) { border: 0; box-shadow: none; }
   .mobile-hero-card { background: transparent !important; }
   .overview-total .mobile-hero-header { display: contents; }
@@ -273,7 +270,6 @@
   .overview-movers-card > :last-child { padding: 4px 18px 18px; }
   .overview-movers-card .profit-mobile-list { margin-top: 8px; }
   .overview-movers-card .profit-mobile-list .mobile-list-row { padding-left: 12px; padding-right: 12px; }
-  .overview-movers-card .mobile-stock-mark { width: 24px; height: 24px; font-size: 12px; }
   .overview-more-disclosure { padding: 0; overflow: hidden; }
   .overview-insights .mobile-section-header { min-height: 44px; margin-bottom: 4px; }
   .overview-insights-card > :last-child { padding: 18px 18px 20px; }
@@ -295,7 +291,6 @@
   .mobile-allocation-row:not(:last-child)::after { left: 88px; }
   .mobile-allocation-swatch { width: 7px; height: 28px; flex: none; border-radius: 4px; }
   .mobile-allocation-row img { width: 36px; height: 36px; flex: none; border-radius: 50%; }
-  .mobile-stock-mark { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border-radius: 50%; background: hsl(var(--primary) / .12); color: hsl(var(--primary)); font-size: 17px; font-weight: 700; }
   .mobile-allocation-name, .mobile-allocation-value { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
   .mobile-allocation-name { flex: 1; min-width: 3rem; }
   .mobile-allocation-name strong, .mobile-allocation-value strong { font-size: 15px; font-weight: 600; white-space: nowrap; }
@@ -339,8 +334,6 @@
   .ios-d3-settings .mobile-list-row { position: relative; min-height: 58px; gap: 12px; border-bottom: 0; font-size: 17px; }
   .ios-d3-settings nav .mobile-list-row:not(:last-child)::after { position: absolute; right: 0; bottom: 0; left: 64px; border-bottom: .5px solid var(--ios-separator); content: ""; }
   .ios-d3-settings .mobile-list-row > svg { width: 16px; height: 16px; color: hsl(var(--muted-foreground) / .65); }
-  .ios-d3-settings-icon { display: inline-grid; flex: none; width: 30px; height: 30px; place-items: center; border-radius: 8px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-  .ios-d3-settings-icon svg { width: 18px; height: 18px; stroke-width: 1.8; }
   .ios-d3-settings .mobile-list-label { display: flex; align-items: center; gap: 14px; }
   .ios-d3-more .mobile-inset-section { margin-bottom: 26px; }
   .ios-d3-more .mobile-inset-heading { margin-bottom: 8px; font-weight: 500; }
@@ -511,10 +504,8 @@
   .ios-d3-system-settings .mobile-list-row:not(:last-child) { position: relative; }
   .ios-d3-system-settings .mobile-list-row:not(:last-child)::after { position: absolute; right: 0; bottom: 0; left: 16px; border-bottom: .5px solid var(--ios-separator); content: ""; }
   .ios-d3-system-settings .mobile-list-value { text-align: right; font-variant-numeric: tabular-nums; }
-  .ios-d3-license-group { overflow: hidden; border-radius: 14px; }
   .ios-d3-settings-page .ios-d3-license-field input { min-width: 0; flex: 1; border: 0; background: transparent; box-shadow: none; }
   .ios-d3-license-field button { flex: none; color: hsl(var(--primary)); }
-  .ios-d3-license-deactivate { width: 100%; min-height: 56px; padding: 8px 16px; color: var(--ios-loss); text-align: left; font-size: 17px; }
   .ios-d3-system-settings > section > button { min-height: 50px; border-radius: 12px; }
   .ios-d3-assistant-settings > .glass.ios-d3-assistant-field { position: relative; margin-top: 0; border-radius: 0; }
   .ios-d3-assistant-settings > .glass.ios-d3-assistant-field + .glass.ios-d3-assistant-field { margin-block-start: 0; margin-top: 0; }
@@ -1121,7 +1112,6 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
 @container (min-width: 700px) {
   .analytics-tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .analytics-tile-grid > :last-child:nth-child(odd) { grid-column: auto; }
-  .overview-main-grid > * { grid-column: span 1; }
 }
 
 .history-month-section { container-type: inline-size; }
@@ -1154,8 +1144,6 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
   .ios-d3-chat .assistant-insights-card .flex:has(> [id^="insight-"]) { align-items: center; }
   .mobile-analytics-hub { margin-top: 24px; margin-bottom: 24px; }
   .analytics-empty { display: grid; min-height: 240px; place-items: center; color: hsl(var(--muted-foreground)); font-size: 15px; }
-  .overview-main-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
-  .overview-main-grid > * { min-width: 0; }
   .overview-sections .overview-allocation-card .mobile-allocation-layout {
     display: grid; grid-template-columns: minmax(190px, 30%) minmax(0, 1fr); align-items: center;
   }

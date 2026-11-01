@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
+  corePlugins: { container: false },
   content: [
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -8,13 +9,6 @@ module.exports = {
     "./src/**/*.{ts,tsx}",
   ],
   theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
     extend: {
       fontFamily: {
         sans: [
@@ -90,29 +84,10 @@ module.exports = {
         pill: "var(--radius-pill)",
         overlay: "var(--radius-overlay)",
       },
-      keyframes: {
-        "accordion-down": {
-          from: { height: 0 },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: 0 },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-      },
       boxShadow: {
-        glass: "0 8px 32px rgba(0, 0, 0, 0.06)",
         card: "var(--shadow-card)",
         overlay: "var(--shadow-overlay)",
         focus: "var(--focus-ring)",
-      },
-      width: {
-        sidebar: "var(--sidebar-width)",
-        "sidebar-collapsed": "var(--sidebar-collapsed-width)",
       },
     },
   },
