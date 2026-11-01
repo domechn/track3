@@ -27,6 +27,15 @@ describe("sync settings", () => {
     expect(await testSyncConnection(store, "")).toBe("passphrase");
   });
 
+  it("checks a recovered root key against the live header before probing writes", async () => {
+    const store = new FakeS3();
+    const { header, key } = await createSyncHeader("correct horse battery staple");
+    await writeSyncHeader(store, header);
+    expect(await testSyncConnection(store, "", key)).toBe("ok");
+    expect(await testSyncConnection(store, "", new Uint8Array(32))).toBe("passphrase");
+    expect(await testSyncConnection(new FakeS3(), "", key)).toBe("header");
+  });
+
   it("checks write access and conditional writes before reporting a working connection", async () => {
     const store = new FakeS3();
     store.putObject = async () => { throw new S3Error("secret", 403); };

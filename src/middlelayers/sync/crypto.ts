@@ -153,6 +153,12 @@ export async function unlockSyncHeader(header: SyncHeader, passphrase: string): 
   return key;
 }
 
+export async function unlockSyncHeaderWithKey(header: SyncHeader, key: Uint8Array): Promise<Uint8Array> {
+  validateSyncHeader(header);
+  await verifySyncHeaderKey(header, key);
+  return key.slice();
+}
+
 export async function objectName(key: Uint8Array, path: string): Promise<string> {
   aad(path);
   const slash = path.indexOf("/");

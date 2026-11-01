@@ -1,4 +1,4 @@
-import { decryptObject, encryptObject, objectName, unlockSyncHeader, validateSyncHeader, verifySyncHeaderKey, type SyncHeader } from "./crypto";
+import { decryptObject, encryptObject, objectName, unlockSyncHeader, unlockSyncHeaderWithKey, validateSyncHeader, verifySyncHeaderKey, type SyncHeader } from "./crypto";
 import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-store";
 import { compareClock, MAX_REMOTE_SKEW_MS, nextClock, validRemoteClock, type Hlc } from "./clock";
 import { syncCategory, type SyncCategory } from "./config-keys";
@@ -286,6 +286,7 @@ export class SyncEngine {
   private activeState?: SyncState;
   private roundDiagnostics?: ReturnType<typeof createSyncDiagnostics>;
   private cachedKey?: { header: string; key: Uint8Array };
+  private rootKey?: Uint8Array;
   private discovered = false;
   private delimiterUnsupported = false;
 
@@ -293,12 +294,16 @@ export class SyncEngine {
     private store: S3Store,
     private readonly repo: SyncRepository,
     private readonly passphrase: string,
-    private readonly environment: { now?: () => number; storeIdentity?: string } = {},
-  ) {}
+    private readonly environment: { now?: () => number; storeIdentity?: string; rootKey?: Uint8Array } = {},
+  ) {
+    this.rootKey = environment.rootKey?.slice();
+  }
 
   dispose(): void {
     this.cachedKey?.key.fill(0);
     this.cachedKey = undefined;
+    this.rootKey?.fill(0);
+    this.rootKey = undefined;
   }
 
   primeKey(header: SyncHeader, key: Uint8Array): void {
@@ -410,10 +415,16 @@ export class SyncEngine {
     this.roundDiagnostics?.phase("keyDerivation");
     validateSyncHeader(header);
     const keyId = JSON.stringify(header);
-    if (this.cachedKey?.header !== keyId) this.dispose();
+    if (this.cachedKey && this.cachedKey.header !== keyId) this.dispose();
     if (this.cachedKey) await verifySyncHeaderKey(header, this.cachedKey.key);
-    const key = this.cachedKey?.key ?? await unlockSyncHeader(header, this.passphrase);
-    this.cachedKey ??= { header: keyId, key };
+    const key = this.cachedKey?.key ?? (this.rootKey
+      ? await unlockSyncHeaderWithKey(header, this.rootKey)
+      : await unlockSyncHeader(header, this.passphrase));
+    if (!this.cachedKey) {
+      this.cachedKey = { header: keyId, key };
+      this.rootKey?.fill(0);
+      this.rootKey = undefined;
+    }
     if (options.signal?.aborted) throw new Error("Sync aborted");
     const stateReady = this.tombstoneQueue.then(async () => {
       let state = await this.repo.loadState();

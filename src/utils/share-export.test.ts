@@ -18,3 +18,11 @@ it("shares a staged JSON export and removes the private staging file", async () 
   expect(shareIOSFile).toHaveBeenCalledWith(written);
   expect(remove).toHaveBeenCalledWith(written.replace(/\/track3-export-data\.json$/, ""), { recursive: true });
 });
+
+it("shares a named encrypted recovery file and removes staging when sharing fails", async () => {
+  vi.mocked(shareIOSFile).mockRejectedValueOnce(new Error("cancelled"));
+  let written = "";
+  await expect(shareExport(async (path) => { written = path; }, "track3-sync-test.t3key")).rejects.toThrow("cancelled");
+  expect(written).toMatch(/^\/cache\/[^/]+\/track3-sync-test\.t3key$/);
+  expect(remove).toHaveBeenCalledWith(written.replace(/\/track3-sync-test\.t3key$/, ""), { recursive: true });
+});

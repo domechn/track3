@@ -1,4 +1,5 @@
-import { createSyncHeader, unlockSyncHeader, type SyncHeader } from "./crypto";
+import { createSyncHeader, unlockSyncHeader, unlockSyncHeaderWithKey, type SyncHeader } from "./crypto";
+import { createRecoveryFile, openRecoveryFile } from "./recovery-file";
 import { createSqliteSyncEngine } from "./index";
 import { isS3Conflict, readSyncHeader, writeSyncHeader, type NotModifiedObject, type S3Store, type StoredObject } from "./object-store";
 import { SyncScheduler, type SyncStatus } from "./scheduler";
@@ -25,7 +26,7 @@ type Dependencies = {
   load(): Promise<SyncSettings>;
   save(settings: SyncSettings): Promise<void>;
   store(settings: SyncSettings): S3Store;
-  engine(store: S3Store, passphrase: string, storeIdentity?: string): EngineHandle;
+  engine(store: S3Store, passphrase: string, storeIdentity?: string, rootKey?: Uint8Array): EngineHandle;
   resetState?(): Promise<void>;
   clearCache?(): Promise<void>;
   deviceId?(): Promise<string | undefined>;
@@ -54,6 +55,7 @@ export type RuntimeStatus = {
 export class SyncRuntime {
   private settings: SyncSettings = defaultSyncSettings;
   private passphrase?: string;
+  private rootKey?: Uint8Array;
   private scheduler?: SyncScheduler;
   private handle?: EngineHandle;
   private lockedPromptClaimed = false;
@@ -101,7 +103,8 @@ export class SyncRuntime {
 
   async test(settings: SyncSettings, passphrase: string): Promise<SyncConnectionResult> {
     if (validateSyncSettings(settings)) return "configuration";
-    return testSyncConnection(this.deps.store(settings), passphrase || this.passphrase || "");
+    return testSyncConnection(this.deps.store(settings), passphrase || this.passphrase || "",
+      passphrase ? undefined : this.rootKey);
   }
 
   async hasHeader(settings: SyncSettings): Promise<boolean> {
@@ -111,14 +114,17 @@ export class SyncRuntime {
   async configure(settings: SyncSettings, passphrase: string): Promise<SyncConnectionResult> {
     if (validateSyncSettings(settings)) return "configuration";
     const secret = passphrase || this.passphrase;
-    if (!secret || secret.length < 16) return "passphrase";
+    const recoveredKey = !secret ? this.rootKey?.slice() : undefined;
+    if (!recoveredKey && (!secret || secret.length < 16)) return "passphrase";
     const store = this.deps.store(settings);
-    const result = await testSyncConnection(store, secret);
-    if (result !== "ok") return result;
     let key: Uint8Array | undefined;
     try {
+      const result = await testSyncConnection(store, secret || "", recoveredKey);
+      if (result !== "ok") return result;
       let header = await readSyncHeader(store);
       if (!header) {
+        if (recoveredKey) return "header";
+        if (!secret) return "passphrase";
         const created = await createSyncHeader(secret);
         header = created.header;
         key = created.key;
@@ -136,7 +142,7 @@ export class SyncRuntime {
           }
           catch { return "passphrase"; }
         }
-      } else key = await unlockSyncHeader(header, secret);
+      } else key = recoveredKey ? await unlockSyncHeaderWithKey(header, recoveredKey) : await unlockSyncHeader(header, secret || "");
       const next = { ...settings, enabled: true };
       if (this.scheduler && !await this.scheduler.stop()) {
         this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
@@ -148,12 +154,13 @@ export class SyncRuntime {
         await this.deps.resetState?.();
       }
       this.settings = next;
-      this.activate(store, secret, header, key);
+      this.activate(store, secret || "", header, key, !!recoveredKey);
       return "ok";
     } catch (error) {
       return classifySyncError(error);
     } finally {
       key?.fill(0);
+      recoveredKey?.fill(0);
     }
   }
 
@@ -182,10 +189,54 @@ export class SyncRuntime {
     }
   }
 
-  private activate(store: S3Store, passphrase: string, header?: SyncHeader, key?: Uint8Array): void {
+  async exportRecoveryFile(syncPassphrase: string, filePassphrase: string): Promise<string> {
+    if (this.snapshot.mode !== "ready" || !this.settings.enabled) throw new Error("Sync is locked");
+    const header = await readSyncHeader(this.deps.store(this.settings));
+    if (!header) throw new Error("Sync header is missing");
+    let key: Uint8Array;
+    try {
+      key = await unlockSyncHeader(header, syncPassphrase);
+    } catch {
+      throw new Error("Incorrect sync passphrase");
+    }
+    try {
+      return await createRecoveryFile(header, key, syncPassphrase, filePassphrase);
+    } finally {
+      key.fill(0);
+    }
+  }
+
+  async unlockRecoveryFile(file: string, passphrase: string): Promise<SyncConnectionResult> {
+    if (!this.settings.enabled) return "configuration";
+    let key: Uint8Array | undefined;
+    try {
+      const store = this.deps.store(this.settings);
+      const header = await readSyncHeader(store);
+      if (!header) return "header";
+      try {
+        key = await openRecoveryFile(file, passphrase, header);
+      } catch {
+        return "passphrase";
+      }
+      if (this.scheduler && !await this.scheduler.stop()) {
+        this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
+        return "timeout";
+      }
+      this.activate(store, "", header, key, true);
+      return "ok";
+    } catch (error) {
+      return classifySyncError(error);
+    } finally {
+      key?.fill(0);
+    }
+  }
+
+  private activate(store: S3Store, passphrase: string, header?: SyncHeader, key?: Uint8Array, recovered = false): void {
     this.skipped = false;
     this.handle?.unregister();
-    this.passphrase = passphrase;
+    this.passphrase = passphrase || undefined;
+    this.rootKey?.fill(0);
+    this.rootKey = recovered ? key?.slice() : undefined;
     let activity: (progress?: SyncProgress) => void = () => {};
     const completed = <T,>(request: Promise<T>): Promise<T> => request.finally(() => activity());
     function getObject(key: string, signal?: AbortSignal): Promise<StoredObject | null>;
@@ -202,8 +253,9 @@ export class SyncRuntime {
       observeRetries: (listener) => store.observeRetries?.(listener) ?? (() => {}),
     };
     this.handle = this.deps.engine(trackedStore, passphrase,
-      JSON.stringify([this.settings.endpoint, this.settings.bucket, this.settings.region, this.settings.prefix, this.settings.pathStyle]));
-    if (header && key) this.handle.engine.primeKey?.(header, key);
+      JSON.stringify([this.settings.endpoint, this.settings.bucket, this.settings.region, this.settings.prefix, this.settings.pathStyle]),
+      recovered ? key : undefined);
+    if (header && key && !recovered) this.handle.engine.primeKey?.(header, key);
     this.scheduler = new SyncScheduler(async (signal, reportActivity, onDiagnostics) => {
       activity = reportActivity;
       const currentId = await this.deps.deviceId?.();
@@ -262,6 +314,8 @@ export class SyncRuntime {
       await this.deps.clearCache?.();
     }).catch(() => {});
     this.passphrase = undefined;
+    this.rootKey?.fill(0);
+    this.rootKey = undefined;
     this.skipped = false;
     this.publish("disabled", { phase: "idle" });
     if (settled) await this.deps.clearCache?.();
@@ -310,6 +364,8 @@ export class SyncRuntime {
     this.scheduler = undefined;
     this.handle = undefined;
     this.passphrase = undefined;
+    this.rootKey?.fill(0);
+    this.rootKey = undefined;
   }
 }
 

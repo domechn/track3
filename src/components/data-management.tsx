@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useToast } from "@/components/ui/use-toast";
@@ -59,6 +59,8 @@ import {
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { useOutletContext } from "react-router-dom";
 import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-summary";
+import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { SyncRecoveryExport } from "@/components/settings/sync-recovery";
 
 const App = ({ onDataImported, currency }: { onDataImported?: () => void; currency?: CurrencyRateDetail }) => {
   const { toast } = useToast();
@@ -67,6 +69,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const showBackup = !section || section === "backup";
   const showBlacklist = !section || section === "blacklist";
   const showSecurity = !section || section === "security";
+  const syncStatus = useSyncExternalStore(syncRuntime.subscribe, syncRuntime.status);
   const [exportConfiguration, setExportConfiguration] = useState(false);
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
     useState(false);
@@ -505,6 +508,11 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
             </div>
           )}
         </CardContent>
+      </Card>}
+
+      {showSecurity && syncStatus.mode === "ready" && <Card>
+        <CardHeader className="pb-2"><CardTitle>{t("sync.recovery.title")}</CardTitle></CardHeader>
+        <CardContent><SyncRecoveryExport t={t} /></CardContent>
       </Card>}
 
       {showSecurity && <Card>
