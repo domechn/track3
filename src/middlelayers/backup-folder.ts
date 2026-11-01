@@ -3,7 +3,7 @@ import { importBackupV2, parseMetadata, type BackupMetadata, type BackupRecords 
 import type { ExportData } from "./datamanager";
 
 export type BackupFolder = { directory: string; normalized: boolean; legacy: boolean };
-export type BackupClient = { client: string; exportAt: string; months: number };
+export type BackupClient = { client: string; exportAt: string; months: number; snapshots: number };
 
 export async function findBackupFolder(picked: string): Promise<BackupFolder | undefined> {
   const selected = picked.replace(/\/+$/, "");
@@ -35,7 +35,12 @@ export async function listBackupClients(directory: string, selected = directory)
     if (!entry.isDirectory || entry.isSymlink || !/^[A-Za-z0-9-]+$/.test(entry.name)) continue;
     try {
       const metadata = parseMetadata(await readTextFile(`${root}/${entry.name}/metadata.json`), entry.name);
-      if (metadata) clients.push({ client: entry.name, exportAt: metadata.exportAt, months: metadata.parts.length });
+      if (metadata) clients.push({
+        client: entry.name,
+        exportAt: metadata.exportAt,
+        months: metadata.parts.length,
+        snapshots: metadata.parts.reduce((count, part) => count + part.records, 0),
+      });
     } catch {
       // A client may be incomplete while its metadata is still syncing.
     }

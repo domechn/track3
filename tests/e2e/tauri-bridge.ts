@@ -28,6 +28,7 @@ type BridgeOptions = {
   slowAssistant?: boolean;
   failDataQueries?: boolean;
   backupFolderFixture?: boolean;
+  configuredBackupFixture?: boolean;
   backupFolderPick?: string;
   backupFolderFailure?: string;
   proUsageFixture?: boolean;
@@ -58,6 +59,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     slowAssistant = false,
     failDataQueries = false,
     backupFolderFixture = false,
+    configuredBackupFixture = false,
     backupFolderPick,
     backupFolderFailure,
     proUsageFixture = false,
@@ -117,6 +119,10 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   }
   if (backupFolderFailure) {
     db.run("INSERT INTO configuration (id, data) VALUES (3, '/e2e/cloud/old')");
+  }
+  if (configuredBackupFixture) {
+    db.run("INSERT INTO configuration (id, data) VALUES (3, '/e2e/cloud')");
+    db.run("UPDATE configuration SET data = 'device-a' WHERE id = 998");
   }
   if (seedLockedSync) {
     db.run("INSERT INTO configuration (id, data) VALUES (991, ?)", [

@@ -26,6 +26,7 @@ import {
 import { type ExportData, type ImportChoice, type ImportPreviewRow, type ImportResult } from "@/middlelayers/datamanager";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import ImportPreview from "@/components/import-preview";
+import BackupRestoreList, { BackupRestoreSummary } from "@/components/backup-restore-list";
 import { timeToDateStr } from "@/utils/date";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -61,7 +62,7 @@ import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-su
 
 const App = ({ onDataImported, currency }: { onDataImported?: () => void; currency?: CurrencyRateDetail }) => {
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const section = useOutletContext<string | null>();
   const showBackup = !section || section === "backup";
   const showBlacklist = !section || section === "blacklist";
@@ -72,7 +73,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const [exportData, setExportData] = useState<ExportData | undefined>(
     undefined,
   );
-  const [itemPreview, setItemPreview] = useState<{ data: ExportData; rows: ImportPreviewRow[] }>();
+  const [itemPreview, setItemPreview] = useState<{ data: ExportData; rows: ImportPreviewRow[]; backup?: boolean }>();
   const [itemResult, setItemResult] = useState<ImportResult>();
   const [itemBusy, setItemBusy] = useState(false);
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
@@ -199,7 +200,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       if (result.failures.length) {
         setItemResult(result);
         const { rows } = await previewImport(itemPreview.data);
-        setItemPreview({ data: itemPreview.data, rows });
+        setItemPreview({ ...itemPreview, rows });
       }
       else {
         setItemPreview(undefined);
@@ -297,6 +298,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[680px]">
           <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>
+          {itemPreview?.backup && <BackupRestoreSummary data={itemPreview.data} rows={itemPreview.rows} t={t} locale={locale} />}
           {itemPreview && <ImportPreview rows={itemPreview.rows} result={itemResult} busy={itemBusy} currency={currency}
             onImport={(choices) => void applyItemChoices(choices)} onCancel={() => setItemPreview(undefined)} />}
         </DialogContent>
@@ -452,6 +454,14 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
               />
             </div>
           </div>
+        </CardContent>
+      </Card>}
+
+      {showBackup && <Card role="region" aria-label={t("data.restore.title")}>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t("data.restore.title")}</CardTitle></CardHeader>
+        <CardContent>
+          <BackupRestoreList directory={autoBackupDirectory} t={t} locale={locale}
+            onPreview={(data, rows) => { setItemResult(undefined); setItemPreview({ data, rows, backup: true }); }} />
         </CardContent>
       </Card>}
 

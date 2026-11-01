@@ -26,6 +26,7 @@ import {
 import { type ExportData, type ImportChoice, type ImportPreviewRow, type ImportResult } from "@/middlelayers/datamanager";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import ImportPreview from "@/components/import-preview";
+import BackupRestoreList, { BackupRestoreSummary } from "@/components/backup-restore-list";
 import { timeToDateStr } from "@/utils/date";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/mobile/components/ui/switch";
@@ -59,7 +60,7 @@ import {
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { chooseBackupLocation, documentsBackupLocation } from "@/utils/backup-location";
 import { findBackupFolder, listBackupClients, readBackupClient, type BackupClient, type BackupFolder } from "@/middlelayers/backup-folder";
-import { backupFolderPreparationEvent, backupFolderStatusEvent, chooseAndSaveAutoBackupFolder, iosDocumentsBackupMarker, isICloudDrivePath, isIOSDocumentsBackupChoice, loadAutoBackupFolder } from "@/middlelayers/ios-backup-folder";
+import { backupFolderPreparationEvent, backupFolderStatusEvent, chooseAndSaveAutoBackupFolder, iosDocumentsBackupMarker, isICloudDrivePath, isIOSDocumentsBackupChoice, loadAutoBackupFolder, prepareRestoreBackupPath } from "@/middlelayers/ios-backup-folder";
 import { isIOS } from "@/utils/platform";
 import { appLockEnabled, setAppLockEnabled } from "@/utils/ios-native";
 import { ConfirmSheet } from "@/mobile/components/mobile/overlays";
@@ -77,7 +78,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const [exportData, setExportData] = useState<ExportData | undefined>(
     undefined,
   );
-  const [itemPreview, setItemPreview] = useState<{ data: ExportData; rows: ImportPreviewRow[] }>();
+  const [itemPreview, setItemPreview] = useState<{ data: ExportData; rows: ImportPreviewRow[]; backup?: boolean }>();
   const [itemResult, setItemResult] = useState<ImportResult>();
   const [itemBusy, setItemBusy] = useState(false);
   const [backupSummary, setBackupSummary] = useState<BackupSummary>();
@@ -269,7 +270,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       if (result.failures.length) {
         setItemResult(result);
         const { rows } = await previewImport(itemPreview.data);
-        setItemPreview({ data: itemPreview.data, rows });
+        setItemPreview({ ...itemPreview, rows });
       }
       else {
         setItemPreview(undefined);
@@ -454,6 +455,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       {showBackup && <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
         <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto sm:max-w-[680px]">
           <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>
+          {itemPreview?.backup && <BackupRestoreSummary data={itemPreview.data} rows={itemPreview.rows} t={t} locale={locale} />}
           {itemPreview && <ImportPreview rows={itemPreview.rows} result={itemResult} busy={itemBusy} currency={currency}
             onImport={(choices) => void applyItemChoices(choices)} onCancel={() => setItemPreview(undefined)} translate={t} locale={locale} />}
         </DialogContent>
@@ -693,6 +695,13 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
           </div>
         </CardContent>
       </Card>}
+
+      {showBackup && <InsetGroup title={t("data.restore.title")}>
+        <div className="p-4">
+          <BackupRestoreList directory={autoBackupDirectory} prepare={isIOS() ? prepareRestoreBackupPath : undefined} t={t} locale={locale}
+            onPreview={(data, rows) => { setItemResult(undefined); setItemPreview({ data, rows, backup: true }); }} />
+        </div>
+      </InsetGroup>}
 
       {showBlacklist && <Card className="ios-d3-blacklist-setting">
         <CardHeader className="ios-d3-data-panel-header pb-2">
