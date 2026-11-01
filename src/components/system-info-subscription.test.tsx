@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   getCustomerPortalUrl: vi.fn(),
   getSubscriptionPlans: vi.fn(),
   getLicenseIfIsPro: vi.fn(),
+  getLicenseDevices: vi.fn(),
   getSubscriptionInfo: vi.fn(),
   getUsage: vi.fn(),
   getVersion: vi.fn(),
@@ -61,6 +62,7 @@ vi.mock("@/middlelayers/license", () => ({
       getCustomerPortalUrl: mocks.getCustomerPortalUrl,
       getSubscriptionPlans: mocks.getSubscriptionPlans,
       getSubscriptionInfo: mocks.getSubscriptionInfo,
+      getLicenseDevices: mocks.getLicenseDevices,
       getUsage: mocks.getUsage,
       inactiveLicense: mocks.inactiveLicense,
       validateLicense: mocks.validateLicense,
@@ -101,6 +103,7 @@ beforeEach(() => {
     isLegacy: false,
   });
   mocks.getUsage.mockResolvedValue(undefined);
+  mocks.getLicenseDevices.mockResolvedValue(undefined);
   mocks.getSubscriptionPlans.mockResolvedValue({
     plans: [
       {
@@ -123,6 +126,36 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("shows license devices only when the server supports the devices action", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
+    mocks.getLicenseDevices.mockResolvedValue({ limit: 3, devices: [
+      { id: "0123456789abcdef", current: true, platform: "linux", appVersion: "0.9.5",
+        activatedAt: "2026-10-01T10:00:00.000Z", lastSeenAt: "2026-11-01T10:00:00.000Z" },
+    ] });
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    const section = await screen.findByRole("region", { name: "Devices on this license" });
+    expect(section).toHaveTextContent("1 of 3 device slots");
+    expect(section).toHaveTextContent("Linux");
+    expect(section).toHaveTextContent("0.9.5");
+    expect(section).toHaveTextContent("This device");
+    expect(section).toHaveTextContent("Activated");
+    expect(section).toHaveTextContent("Last seen");
+    expect(within(section).queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps the devices section hidden on an unsupported or failed lookup", async () => {
+    mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
+    mocks.getLicenseDevices.mockResolvedValueOnce(undefined);
+    const view = render(<SystemInfo onProStatusChange={vi.fn()} />);
+    await waitFor(() => expect(mocks.getLicenseDevices).toHaveBeenCalled());
+    expect(screen.queryByRole("region", { name: "Devices on this license" })).not.toBeInTheDocument();
+    view.unmount();
+    mocks.getLicenseDevices.mockRejectedValueOnce(new Error("offline"));
+    render(<SystemInfo onProStatusChange={vi.fn()} />);
+    await waitFor(() => expect(mocks.getLicenseDevices).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("region", { name: "Devices on this license" })).not.toBeInTheDocument();
+  });
+
   it("shows a loading value until the native version resolves", async () => {
     mocks.getVersion.mockReturnValue(new Promise(() => {}));
     render(<SystemInfo onProStatusChange={vi.fn()} />);

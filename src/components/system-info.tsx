@@ -17,9 +17,11 @@ import {
   type SubscriptionPlan,
   type SubscriptionPlansResponse,
   type SubscriptionInfo,
+  type LicenseDevices,
 } from "@/middlelayers/license";
 import { CheckoutFlow, type CheckoutPhase } from "@/middlelayers/checkout";
 import { ProUsageRows } from "./pro-usage-rows";
+import { ProLicenseDevices } from "./pro-license-devices";
 import { SystemInfoCard, subscriptionSummary } from "./system-info-card";
 import { useToast } from "@/components/ui/use-toast";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
@@ -56,6 +58,7 @@ const App = ({
   const [subscriptionInfo, setSubscriptionInfo] =
     useState<SubscriptionInfo | null>(null);
   const [usageEnforced, setUsageEnforced] = useState(false);
+  const [licenseDevices, setLicenseDevices] = useState<LicenseDevices>();
   const [subInfoLoading, setSubInfoLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkoutPhase, setCheckoutPhase] = useState<CheckoutPhase>("idle");
@@ -80,11 +83,15 @@ const App = ({
   useEffect(() => {
     let current = true;
     setUsageEnforced(false);
+    setLicenseDevices(undefined);
     if (activeLicense) {
       loadSubscriptionInfo();
       void LicenseCenter.getInstance().getUsage().then((result) => {
         if (current) setUsageEnforced(result?.enforced === true);
       });
+      void LicenseCenter.getInstance().getLicenseDevices()
+        .then((result) => { if (current) setLicenseDevices(result); })
+        .catch(() => { if (current) setLicenseDevices(undefined); });
     } else {
       setSubscriptionInfo(null);
     }
@@ -433,6 +440,7 @@ const App = ({
           </div>
         </>}
       </SystemInfoCard>}
+      {showPro && activeLicense && licenseDevices && <ProLicenseDevices value={licenseDevices} locale={locale} t={t} />}
       {showAbout && <Card className="t3-about-version">
         <CardHeader className="pb-2"><CardTitle>{t("system.appVersion")}</CardTitle></CardHeader>
         <CardContent><p className="text-xl font-semibold tabular-nums">Track3 {version}</p></CardContent>
