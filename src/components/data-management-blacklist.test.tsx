@@ -25,6 +25,10 @@ const mocks = vi.hoisted(() => ({
   importHistoricalData: vi.fn(),
   invoke: vi.fn(),
   readHistoricalDataFromFile: vi.fn(),
+  listBackupClients: vi.fn(),
+  readBackupClient: vi.fn(),
+  previewImport: vi.fn(),
+  importSelected: vi.fn(),
   queryBackupSummary: vi.fn(),
   removeFromBlacklist: vi.fn(),
   saveAutoBackupDirectory: vi.fn(),
@@ -47,6 +51,13 @@ vi.mock("@/middlelayers/data", () => ({
   exportHistoricalData: mocks.exportHistoricalData,
   importHistoricalData: mocks.importHistoricalData,
   readHistoricalDataFromFile: mocks.readHistoricalDataFromFile,
+  previewImport: mocks.previewImport,
+  importSelected: mocks.importSelected,
+}));
+
+vi.mock("@/middlelayers/backup-folder", () => ({
+  listBackupClients: mocks.listBackupClients,
+  readBackupClient: mocks.readBackupClient,
 }));
 
 vi.mock("@/middlelayers/backup-summary", () => ({
@@ -69,6 +80,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.removeItem(localeLocalStorageKey);
   mocks.getAutoBackupDirectory.mockResolvedValue(undefined);
+  mocks.listBackupClients.mockResolvedValue([]);
+  mocks.readBackupClient.mockResolvedValue({ client: "own-device", clientVersion: "0.9.4", exportAt: "2024-03-01T00:00:00Z", historicalData: [{ createdAt: "2024-02-01T00:00:00Z", total: 42, assets: [{ uuid: "snapshot-one" }], transactions: [] }], md5V2: "" });
+  mocks.previewImport.mockResolvedValue({ rows: [{ uuid: "snapshot-one", createdAt: "2024-02-01T00:00:00Z", total: 42, assetCount: 1, status: "new", choice: "import", transactionIdCollisions: 0 }] });
+  mocks.importSelected.mockResolvedValue({ imported: 1, replaced: 0, skipped: 0, failures: [] });
   mocks.getLastAutoBackupAt.mockResolvedValue(
     new Date("2024-04-16T00:00:00.000Z"),
   );
@@ -85,6 +100,24 @@ beforeEach(() => {
 });
 
 describe("Data Management", () => {
+  it("shows an empty restore list for a configured folder without backup copies", async () => {
+    mocks.getAutoBackupDirectory.mockResolvedValue("/cloud");
+    render(<DataManagement />);
+    expect(await screen.findByText("No backup copies found in this folder.")).toBeInTheDocument();
+  });
+
+  it("reviews its own device copy through the per-snapshot merge preview", async () => {
+    mocks.getAutoBackupDirectory.mockResolvedValue("/cloud");
+    mocks.listBackupClients.mockResolvedValue([{ client: "own-device", exportAt: "2024-03-01T00:00:00Z", months: 1, snapshots: 1 }]);
+    render(<DataManagement />);
+    fireEvent.click(await screen.findByRole("button", { name: "Review backup from own-device" }));
+    expect(await screen.findByText("2024-02: 1 snapshot")).toBeInTheDocument();
+    expect(screen.getByText("New: 1 · Same: 0 · Different: 0")).toBeInTheDocument();
+    expect(screen.getByText("Snapshot dates: Feb 1, 2024 – Feb 1, 2024")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Apply selected choices" }));
+    await waitFor(() => expect(mocks.importSelected).toHaveBeenCalledWith(expect.objectContaining({ client: "own-device" }), { "snapshot-one": "import" }));
+    expect(mocks.importHistoricalData).not.toHaveBeenCalled();
+  });
   it("shows local history counts and names the two export categories", async () => {
     render(<DataManagement />);
     const summary = await screen.findByRole("region", { name: "On this device" });
