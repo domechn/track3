@@ -176,6 +176,48 @@ afterEach(() => {
 });
 
 describe("WalletAssetsPercentage treemap", () => {
+  it("keeps distinct colours for onchain treemap tiles", async () => {
+    mocks.queryWalletAssetsPercentage.mockResolvedValue(MIXED_15);
+    renderComponent();
+    await waitFor(() => expect(screen.getAllByTestId("wallet-treemap-tile").length).toBe(14));
+    const onchainColors = screen.getAllByTestId("wallet-treemap-tile")
+      .filter((tile) => tile.getAttribute("data-tile-category") === "onchain")
+      .map((tile) => (tile as HTMLElement).style.background);
+    expect(onchainColors.length).toBeGreaterThan(1);
+    expect(new Set(onchainColors).size).toBeGreaterThan(1);
+  });
+
+  it("shows the remaining coin sources in an Others row", async () => {
+    mocks.queryWalletAssetsPercentage.mockResolvedValue(MIXED_15);
+    renderComponent({ symbol: "BTC", assetType: "crypto" });
+    const list = await screen.findByRole("list", { name: "Source allocation" });
+    expect(list.children).toHaveLength(9);
+    expect(list.lastElementChild).toHaveTextContent("Others (+8)");
+    expect(list.lastElementChild).toHaveTextContent("9.4%");
+  });
+
+  it("passes per-source coin quantity into the desktop allocation list", async () => {
+    mocks.queryWalletAssetsPercentage.mockResolvedValue([
+      { ...makeWallet("sol-wallet", 100, "SOL"), amount: 1.2345 },
+    ]);
+    renderComponent({ symbol: "SOL", assetType: "crypto" });
+    const list = await screen.findByRole("list", { name: "Source allocation" });
+    expect(list.children[0]).toHaveTextContent("1.2345");
+  });
+
+  it("shows source allocation rows and narrows the selected source", async () => {
+    mocks.queryWalletAssetsPercentage.mockResolvedValue(MIXED_15);
+    const { rerender } = renderComponent({ onSelectSource: vi.fn(), selectedSource: null });
+    await waitFor(() => expect(screen.getByRole("list", { name: "Source allocation" }).children).toHaveLength(9));
+    expect(screen.getByRole("list", { name: "Source allocation" }).lastElementChild).toHaveTextContent("Others (+8)");
+    rerender(<DataChangedContext.Provider value={0}><ChartResizeContext.Provider value={{ needResize: 0, setNeedResize: vi.fn() }}>
+      <OverviewLoadingContext.Provider value={{ reportLoaded: mocks.reportLoaded }}>
+        <WalletAssetsPercentage currency={currency} dateRange={dateRange} onSelectSource={vi.fn()} selectedSource="binance" />
+      </OverviewLoadingContext.Provider>
+    </ChartResizeContext.Provider></DataChangedContext.Provider>);
+    expect(screen.getByRole("list", { name: "Source allocation" }).children).toHaveLength(1);
+    expect(screen.getByTestId("stat-total-value")).toHaveTextContent("$32,400");
+  });
   it("renders 14 tiles: 13 wallets ≥1% + 1 Others tile for the 3 wallets <1%", async () => {
     mocks.queryWalletAssetsPercentage.mockResolvedValue(MIXED_15);
     renderComponent();

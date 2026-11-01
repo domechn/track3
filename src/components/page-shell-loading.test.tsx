@@ -83,11 +83,13 @@ describe("Summary page shell", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: /summary/i })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(/loading summary data/i);
+    expect(screen.getByText(/loading summary data/i).closest('[role="status"]'))
+      .toHaveTextContent(/loading summary data/i);
 
     vi.advanceTimersByTime(9000);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/loading summary data/i);
+    expect(screen.getByText(/loading summary data/i).closest('[role="status"]'))
+      .toHaveTextContent(/loading summary data/i);
   });
 
   it("clears the loading status after summary sections report loaded", async () => {

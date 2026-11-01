@@ -870,8 +870,24 @@ const App = ({
 
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
-      <div className="relative min-h-[400px]">
-        <h1 className="sr-only">{formatAssetLabel({ symbol, assetType })}</h1>
+      <div className="analyze-coin relative min-h-[400px]">
+        <div className="coin-page-heading">
+          <div className="coin-page-identity">
+            <img src={resolveAssetLogoSrc({ symbol, assetType }, logo)} alt="" />
+            <div>
+              <h1>{formatAssetLabel({ symbol, assetType })}</h1>
+              <span>{assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</span>
+            </div>
+          </div>
+          <Button variant="outline" onClick={() => navigate("/cost-basis")}>{t("coin.openCostBasis")}</Button>
+        </div>
+        <Card className="coin-price-strip">
+          <div className="coin-price-strip-primary">
+            <span>{t("common.priceLabel")}</span>
+            <strong>{lastPriceStr}</strong>
+          </div>
+          <div><span>{t("walletAllocation.totalValue")}</span><strong>{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(lastAsset?.value ?? 0))}</strong></div>
+        </Card>
         <StaggerContainer className="space-y-4">
           <UpdatePriceDialog
             open={updatePriceDialogOpen}
@@ -1186,7 +1202,6 @@ const App = ({
               dateRange={dateRange}
               symbol={symbol}
               assetType={assetType}
-              displayAmount={true}
             />
           </FadeUp>
           <FadeUp>

@@ -25,6 +25,7 @@ test("phone quote preference flips numeric gain without changing the displayed v
   await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
   const gain = page.locator(".d2-summary .profit-metric-value[data-tone='gain']").first();
   await expect(gain).toBeVisible();
+  await expect(gain).toHaveCSS("color", /^rgb/);
   await expect(page.locator("html")).toHaveAttribute("data-quote", "green-up");
   const before = await gain.evaluate((node) => ({ text: node.textContent, color: getComputedStyle(node).color }));
   await page.goto("/#/settings/appearance");
@@ -33,6 +34,7 @@ test("phone quote preference flips numeric gain without changing the displayed v
   await page.goto("/#/summary");
   await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
   await expect(gain).toBeVisible();
+  await expect(gain).toHaveCSS("color", /^rgb/);
   const after = await gain.evaluate((node) => ({ text: node.textContent, color: getComputedStyle(node).color }));
   expect(after.text).toBe(before.text);
   expect(after.color).not.toBe(before.color);
@@ -48,7 +50,7 @@ test("phone Sync keeps grouped card styling", async ({ page }) => {
   await expect(card.locator("input").first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
 });
 
-test("phone and iPad keep the Overview hero inset and other unpadded cards flat", async ({ page }) => {
+test("phone and iPad keep the Overview inset, flat History, and bordered analysis cards", async ({ page }) => {
   await installTauriBridge(page, { richPortfolio: true });
   for (const width of [390, 834]) {
     await page.setViewportSize({ width, height: 844 });
@@ -72,12 +74,12 @@ test("phone and iPad keep the Overview hero inset and other unpadded cards flat"
     await page.goto("/#/summary");
     const metrics = page.locator(".profit-metrics-card");
     await expect(metrics).toBeVisible();
-    await expect(metrics).toHaveCSS("border-left-width", "0px");
+    await expect(metrics).toHaveCSS("border-left-width", "1px");
 
     await page.goto("/#/comparison");
     const controls = page.locator(".comparison-controls-card");
     await expect(controls).toBeVisible();
-    await expect(controls).toHaveCSS("border-left-width", "0px");
+    await expect(controls).toHaveCSS("border-left-width", "1px");
   }
 });
 

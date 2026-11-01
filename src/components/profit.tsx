@@ -31,6 +31,7 @@ import {
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import ProfitAttribution from "./profit-attribution";
+import { profitRanks } from "./analyze-values";
 
 function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
   const tone = positiveNegativeTone(value, quoteColor);
@@ -123,12 +124,8 @@ const App = ({
     });
   }, [coinsProfit]);
 
-  const topProfitData = useMemo(
-    () => coinsProfit.filter((coin) => coin.value !== null).slice(-5).reverse(),
-    [coinsProfit],
-  );
-  const topLossData = useMemo(
-    () => coinsProfit.filter((coin) => coin.value !== null).slice(0, 5),
+  const { gainers: topProfitData, decliners: topLossData } = useMemo(
+    () => profitRanks(coinsProfit),
     [coinsProfit],
   );
   const unknownProfitData = useMemo(
@@ -262,7 +259,7 @@ const App = ({
     ));
 
   return (
-    <Card>
+    <Card className="analyze-profit-card">
       <CardHeader className="space-y-2 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">

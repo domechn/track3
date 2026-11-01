@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import CoinsChart from "./coins-amount-and-value-change";
 import { ChartResizeContext } from "@/App";
@@ -19,6 +19,21 @@ vi.mock("@/utils/hook", () => ({ useWindowSize: () => ({ width: 1200, height: 80
 import { queryCoinsAmountChange } from "@/middlelayers/charts";
 
 beforeEach(() => vi.clearAllMocks());
+
+it("derives the price chart from stored value and amount snapshots", async () => {
+  vi.mocked(queryCoinsAmountChange).mockResolvedValue({
+    coin: "BTC", timestamps: [1, 2], values: [200, 330], amounts: [2, 3],
+  });
+  render(<ChartResizeContext.Provider value={{ needResize: 0, setNeedResize: vi.fn() }}>
+    <OverviewLoadingContext.Provider value={{ reportLoaded: vi.fn() }}>
+      <CoinsChart currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
+        dateRange={{ start: new Date("2022-01-01"), end: new Date("2023-01-01") }} symbol="BTC" />
+    </OverviewLoadingContext.Provider>
+  </ChartResizeContext.Provider>);
+  await waitFor(() => expect(screen.getByTestId("coin-line")).toHaveAttribute("data-values", "[[200,330],[2,3]]"));
+  fireEvent.click(screen.getByRole("button", { name: "Price chart" }));
+  expect(screen.getByTestId("coin-line")).toHaveAttribute("data-values", "[[100,110]]");
+});
 
 it("plots bounded aligned coin value and amount points with both extremes", async () => {
   const values = Array.from({ length: 2000 }, (_, i) => i + 100);

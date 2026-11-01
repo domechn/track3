@@ -42,9 +42,10 @@ it("shows realized totals and data gaps from the loaded report", async () => {
   expect((await screen.findAllByText("BTC"))[0]).toBeInTheDocument();
   expect(screen.getByText(/ETH/)).toBeInTheDocument();
   expect(screen.getByText(/Missing lots/)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Export CSV" })).toBeInTheDocument();
-  expect(screen.getByText(/Proceeds:/)).toHaveTextContent("200 USD");
-  expect(screen.getByText(/Cost basis:/)).toHaveTextContent("100 USD");
+  expect(screen.getByRole("button", { name: /^Export$/ })).toBeInTheDocument();
+  const totals = document.querySelector(".cost-dashboard-secondary")!;
+  expect(totals.children[0]).toHaveTextContent("Proceeds$200.00");
+  expect(totals.children[1]).toHaveTextContent("Cost basis$100.00");
 });
 
 it("shows an empty row for each phone cost basis section without records", async () => {
@@ -55,8 +56,8 @@ it("shows an empty row for each phone cost basis section without records", async
     ...report, assets: [], disposals: [], unrealized: [],
   } as never);
   render(<CostBasisPage />);
-  expect(await screen.findByText(/Proceeds:/)).toHaveTextContent("$200.00");
-  expect(screen.getByText(/Proceeds:/)).not.toHaveTextContent("USD");
+  await waitFor(() => expect(document.querySelector(".cost-dashboard-secondary")?.children[0]).toHaveTextContent("Proceeds$200.00"));
+  expect(document.querySelector(".cost-dashboard-secondary")!.children[0]).not.toHaveTextContent("USD");
   fireEvent.click(await screen.findByText("Details"));
   const lists = document.querySelectorAll(".d2-cost .mobile-record-list");
   expect(lists).toHaveLength(3);
@@ -137,6 +138,7 @@ it("persists method changes and reloads the report for that method", async () =>
 it("exports the current report as CSV and JSON", async () => {
   render(<CostBasisPage />);
   await screen.findAllByText("BTC");
+  fireEvent.click(screen.getByRole("button", { name: /^Export$/ }));
   fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
   fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
   await waitFor(() => {
@@ -171,7 +173,7 @@ it("flags a reversed date range and does not load or export it", async () => {
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAttribute("aria-describedby", screen.getByRole("alert").id);
   }
-  expect(screen.getByRole("button", { name: "Export CSV" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /^Export$/ })).toBeDisabled();
   await new Promise((resolve) => setTimeout(resolve, 350));
   expect(loadCostBasisReport).toHaveBeenCalledTimes(calls);
 });
@@ -186,7 +188,7 @@ it("pages large realized and open-lot tables", async () => {
     })),
   } as never);
   render(<CostBasisPage />);
-  await screen.findByText("SALE-0");
+  await screen.findAllByText("SALE-0");
   expect(screen.queryByText("SALE-50")).not.toBeInTheDocument();
   expect(screen.queryByText("OPEN-50")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Next page of Realized disposals" }));

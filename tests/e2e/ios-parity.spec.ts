@@ -95,7 +95,11 @@ for (const phone of phones) {
         await expect(page.locator(".mobile-more-hub")).toBeVisible();
         await expect(page.getByRole("link", { name: "Rebalance" })).toBeVisible();
       } else {
-        await expect(page.locator("#app-main-content h1")).toHaveText(title);
+        const headings = page.locator("#app-main-content h1");
+        await expect.poll(async () => {
+          const text = await headings.allTextContents();
+          return text.length > 0 && text.every((heading) => heading.trim() === title);
+        }).toBe(true);
       }
       await expect(page.locator("#app-main-content")).not.toContainText("Loading page");
       await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);

@@ -21,7 +21,6 @@ import { StaggerContainer, FadeUp } from "./motion";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import PageLoadingOverlay from "./page-loading-overlay";
-import AssetLabel from "./common/asset-label";
 import {
   formatAssetLabel,
   getAssetLogoKey,
@@ -37,6 +36,7 @@ import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { isSameDay } from "date-fns";
 import { useTranslation } from "@/i18n";
+import ComparisonMoversPanel from "./comparison-movers-panel";
 
 type MetricRow = {
   base: number;
@@ -501,8 +501,8 @@ const App = ({
   const hasData = coinComparisons.length > 0;
 
   return (
-    <div className="relative min-h-[400px]" aria-busy={pageLoading}>
-      <h1 className="sr-only">{t("comparison.h1")}</h1>
+    <div className="analyze-comparison relative min-h-[400px]" aria-busy={pageLoading}>
+      <h1 className="mb-4 text-[26px] font-semibold">{t("comparison.h1")}</h1>
       <StaggerContainer className="space-y-3">
         <FadeUp>
           <Card>
@@ -651,24 +651,42 @@ const App = ({
             </FadeUp>
 
             <FadeUp>
-              <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-                {coinComparisons.map((coin) => (
-                  <CoinCard
-                    key={getAssetLogoKey(coin)}
-                    coin={coin}
-                    logo={resolveAssetLogoSrc(
-                      coin,
-                      logoMap[getAssetLogoKey(coin)],
-                    )}
-                    baseDate={baseDate}
-                    headDate={headDate}
-                    formatVal={formatVal}
-                    formatChangePercent={formatChangePercent}
-                    formatDeltaValue={formatDeltaValue}
-                    changeClass={changeClass}
-                  />
-                ))}
-              </div>
+              <Card className="comparison-assets-card">
+                <CardContent className="overflow-x-auto pt-5" tabIndex={0} aria-label={t("comparison.perAsset")}>
+                  <h2 className="mb-3 text-base font-semibold">{t("comparison.perAsset")}</h2>
+                  <table className="comparison-assets-table w-full min-w-[850px] text-sm">
+                    <caption className="sr-only">{t("comparison.perAsset")}</caption>
+                    <thead><tr className="border-b text-xs text-muted-foreground">
+                      <th className="py-3 text-left">{t("cost.asset")}</th>
+                      <th className="py-3 text-right">{t("common.amountLabel")} A</th>
+                      <th className="py-3 text-right">{t("common.amountLabel")} B</th>
+                      <th className="py-3 text-right">{t("common.priceLabel")} A</th>
+                      <th className="py-3 text-right">{t("common.priceLabel")} B</th>
+                      <th className="py-3 text-right">{t("common.valueLabel")} A</th>
+                      <th className="py-3 text-right">{t("common.valueLabel")} B</th>
+                      <th className="py-3 text-right">{t("common.changeLabel")}</th>
+                    </tr></thead>
+                    <tbody>{[...coinComparisons].sort((a, b) =>
+                      Math.abs(b.value.head - b.value.base) - Math.abs(a.value.head - a.value.base),
+                    ).map((coin) => <tr key={getAssetLogoKey(coin)} className="border-b last:border-b-0">
+                      <td className="py-3 font-semibold">{formatAssetLabel(coin)}</td>
+                      <td className="py-3 text-right">{formatVal(coin.amount.base, "amount")}</td>
+                      <td className="py-3 text-right">{formatVal(coin.amount.head, "amount")}</td>
+                      <td className="py-3 text-right">{formatVal(coin.price.base, "price")}</td>
+                      <td className="py-3 text-right">{formatVal(coin.price.head, "price")}</td>
+                      <td className="py-3 text-right">{formatVal(coin.value.base, "value")}</td>
+                      <td className="py-3 text-right">{formatVal(coin.value.head, "value")}</td>
+                      <td className={`py-3 text-right ${changeClass(coin.value.changePercent)}`}>
+                        {formatDeltaValue(coin.value.head - coin.value.base, "value")}
+                        <span className="block text-xs">{formatChangePercent(coin.value.changePercent)}</span>
+                      </td>
+                    </tr>)}</tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </FadeUp>
+            <FadeUp>
+              <ComparisonMoversPanel rows={coinComparisons} currency={currency} quoteColor={quoteColor} t={t} shouldMaskValue={shouldMaskValue} />
             </FadeUp>
           </>
         )}
@@ -855,111 +873,6 @@ function formatSnapshotLabel(createdAt: string | undefined, index: number) {
 
   const time = timeToDateStr(date, true).split(" ")[1];
   return time || `Snapshot ${index}`;
-}
-
-function CoinCard({
-  coin,
-  logo,
-  baseDate,
-  headDate,
-  formatVal,
-  formatChangePercent,
-  formatDeltaValue,
-  changeClass,
-}: {
-  coin: CoinComparison;
-  logo: string;
-  baseDate?: string;
-  headDate?: string;
-  formatVal: (val: number, type: "price" | "amount" | "value") => string;
-  formatChangePercent: (percent: number) => string;
-  formatDeltaValue: (
-    diff: number,
-    type: "price" | "amount" | "value",
-  ) => string;
-  changeClass: (percent: number) => string;
-}) {
-  const { t } = useTranslation();
-  const metrics: {
-    label: string;
-    type: "amount" | "price" | "value";
-    row: MetricRow;
-  }[] = [
-    { label: t("common.amountLabel"), type: "amount", row: coin.amount },
-    { label: t("common.priceLabel"), type: "price", row: coin.price },
-    { label: t("common.valueLabel"), type: "value", row: coin.value },
-  ];
-
-  return (
-    <Card>
-      <CardContent className="pt-4 pb-3">
-        <div className="flex items-center gap-2 mb-3">
-          <img
-            src={logo}
-            alt={formatAssetLabel(coin)}
-            className="w-[18px] h-[18px] rounded-full"
-          />
-          <AssetLabel asset={coin} labelClassName="text-sm font-medium" />
-        </div>
-
-        <div className="grid grid-cols-[56px_minmax(0,1fr)_96px_minmax(0,1fr)] mb-1 gap-2">
-          <span className="text-xs text-muted-foreground">
-            {t("common.metricLabel")}
-          </span>
-          <span className="text-xs text-muted-foreground truncate">
-            {baseDate}
-          </span>
-          <span className="text-xs text-muted-foreground text-center">
-            {t("common.changeLabel")}
-          </span>
-          <span className="text-xs text-muted-foreground text-right truncate">
-            {headDate}
-          </span>
-        </div>
-
-        <div className="space-y-2">
-          {metrics.map((m) => {
-            const baseText = formatVal(m.row.base, m.type);
-            const headText = formatVal(m.row.head, m.type);
-            const diffText = formatDeltaValue(m.row.head - m.row.base, m.type);
-            return (
-              <div
-                key={m.type}
-                className="grid grid-cols-[56px_minmax(0,1fr)_128px_minmax(0,1fr)] items-center gap-3 py-0.5"
-              >
-                <div className="text-xs text-muted-foreground">{m.label}</div>
-                <span
-                  className="text-sm truncate tabular-nums"
-                  title={baseText}
-                >
-                  {baseText}
-                </span>
-                <div
-                  className="min-w-0 text-center truncate"
-                  title={`${formatChangePercent(m.row.changePercent)} (${diffText})`}
-                >
-                  <span
-                    className={`text-xs tabular-nums ${changeClass(m.row.changePercent)}`}
-                  >
-                    {formatChangePercent(m.row.changePercent)}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground tabular-nums ml-1">
-                    ({diffText})
-                  </span>
-                </div>
-                <span
-                  className="text-sm text-right truncate tabular-nums"
-                  title={headText}
-                >
-                  {headText}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
 }
 
 export default App;

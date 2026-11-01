@@ -60,6 +60,7 @@ const App = ({
       values: [],
     });
   const [chartWidth, setChartWidth] = useState(600);
+  const [chartMode, setChartMode] = useState<"trend" | "price">("trend");
   const plottedData = useMemo(() => {
     const source = coinsAmountAndValueChangeData;
     const indices = downsampleIndices(
@@ -183,7 +184,7 @@ const App = ({
         },
       },
       y2: {
-        display: !isMobile,
+        display: !isMobile && chartMode === "trend",
         title: {
           display: false,
         },
@@ -215,7 +216,18 @@ const App = ({
         ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
           { month: "short", day: "numeric" }).format(new Date(x))
         : timeToDateStr(x)),
-      datasets: [
+      datasets: chartMode === "price" ? [{
+        label: t("coinTrend.price"),
+        data: current.values.map((value, index) =>
+          current.amounts[index] > 0 ? currencyWrapper(currency)(value / current.amounts[index]) : null),
+        borderColor: chartColors[0].main,
+        backgroundColor: chartColors[0].bg,
+        borderWidth: 2,
+        tension: 0.4,
+        pointRadius: 0,
+        fill: true,
+        yAxisID: "y1",
+      }] : [
         {
           label: t("common.valueLabel"),
           data: current.values.map((v) => currencyWrapper(currency)(v)),
@@ -245,17 +257,21 @@ const App = ({
   return (
     <div>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="coin-chart-header flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground">
             <span>{t("coinTrend.title")}</span>
             <AssetLabel asset={{ symbol, assetType }} />
           </CardTitle>
+          <div className="coin-chart-modes" role="group" aria-label={t("coinTrend.mode")}>
+            <button type="button" aria-pressed={chartMode === "trend"} onClick={() => setChartMode("trend")}>{t("coinTrend.trend")}</button>
+            <button type="button" aria-pressed={chartMode === "price"} onClick={() => setChartMode("price")}>{t("coinTrend.price")}</button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           <div
             className="flex items-center justify-center"
             style={{
-              height: isMobile ? 220 : Math.max((wsize.height || 100) / 2, 350),
+              height: isMobile ? 220 : Math.max((wsize.height || 100) / 3, 280),
             }}
           >
             {chartHasData ? (

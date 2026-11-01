@@ -916,8 +916,7 @@ const App = ({
 
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
-      <div className="d2-coin relative min-h-[400px]">
-        {!isMobile && <h1 className="sr-only">{formatAssetLabel({ symbol, assetType })}</h1>}
+      <div className="d2-coin analyze-coin relative min-h-[400px]">
         {isMobile && <div className="coin-detail-hero">
           <div className="coin-detail-identity">
             <img src={resolveAssetLogoSrc({ symbol, assetType }, logo)} alt="" />
@@ -946,6 +945,11 @@ const App = ({
             <DeltaPill value={change24h ?? 0}>{change24h === undefined ? "—" : `${change24h > 0 ? "+" : ""}${change24h.toFixed(2)}%`}</DeltaPill>
             <span>{t("coin.change24h")}</span>
           </div>
+          <Button variant="outline" className="coin-cost-link" onClick={() => navigate("/cost-basis")}>{t("coin.openCostBasis")}</Button>
+        </div>}
+        {!isMobile && <div className="coin-page-heading">
+          <h1>{formatAssetLabel({ symbol, assetType })}</h1>
+          <Button variant="outline" onClick={() => navigate("/cost-basis")}>{t("coin.openCostBasis")}</Button>
         </div>}
         <StaggerContainer className="space-y-4">
           <UpdatePriceDialog
@@ -1250,7 +1254,6 @@ const App = ({
               dateRange={dateRange}
               symbol={symbol}
               assetType={assetType}
-              displayAmount={true}
             />
           </FadeUp>
           <FadeUp>
