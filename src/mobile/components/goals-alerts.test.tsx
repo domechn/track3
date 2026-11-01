@@ -4,10 +4,11 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, expect, it, vi } from "vitest";
 import GoalsAlerts from "@/mobile/components/goals-alerts";
-import { listAlertRules, listAlertHistory, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
+import { listAlertRules, listAlertHistory, countUnreadAlerts, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
 import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlelayers/alert-notifications";
 import { queryPNLChartValue } from "@/middlelayers/charts-timeseries";
 import { isIOS } from "@/utils/platform";
+import { I18nProvider, useTranslation } from "@/mobile/i18n";
 vi.mock("@/utils/platform", async (original) => ({
   ...await original<typeof import("@/utils/platform")>(), isIOS: vi.fn(() => false),
 }));
@@ -22,7 +23,7 @@ vi.mock("@/middlelayers/configuration", async (original) => ({
 
 vi.mock("@/middlelayers/alerts", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/middlelayers/alerts")>(),
-  listAlertRules: vi.fn(), listAlertHistory: vi.fn(), saveAlertRule: vi.fn(),
+  listAlertRules: vi.fn(), listAlertHistory: vi.fn(), countUnreadAlerts: vi.fn(), saveAlertRule: vi.fn(),
   setAlertRuleEnabled: vi.fn(), acknowledgeAllAlerts: vi.fn(),
   acknowledgeAlert: vi.fn(), clearAlertHistory: vi.fn(), deleteAlertRule: vi.fn(),
   loadAlertEvaluationData: vi.fn().mockResolvedValue({ snapshots: [], prices: {} }),
@@ -46,6 +47,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listAlertRules).mockResolvedValue([]);
   vi.mocked(listAlertHistory).mockResolvedValue([]);
+  vi.mocked(countUnreadAlerts).mockResolvedValue(0);
   vi.mocked(loadAlertEvaluationData).mockResolvedValue({ snapshots: [], prices: {}, excludedSymbols: [] });
   vi.mocked(systemNotificationsEnabled).mockResolvedValue(false);
   vi.mocked(queryPNLChartValue).mockResolvedValue([]);
@@ -174,6 +176,51 @@ it("shows an AI setup entry before manual rule editing", async () => {
   expect(await screen.findByText("Let the assistant set this up")).toBeInTheDocument();
   expect(await screen.findByText("Alert me if my total value drops 10% in 7 days")).toBeInTheDocument();
   expect(screen.getByText("Manual setup").closest("details")).toHaveAttribute("open");
+});
+
+it("closes the fallback editor when Cancel is pressed", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  render(<GoalsAlerts />);
+  await screen.findByRole("button", { name: "Edit" });
+  await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+  const panel = screen.getByText("Manual setup").closest("details");
+  expect(panel).toHaveAttribute("open");
+  await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(panel).not.toHaveAttribute("open"));
+});
+
+it("labels the capped history count as recent triggers", async () => {
+  render(<GoalsAlerts />);
+  await screen.findByText("No rules yet");
+  expect(screen.getByTestId("goals-summary")).toHaveTextContent("Recent triggers");
+});
+
+it("shows the full unread count when recent history is capped", async () => {
+  vi.mocked(countUnreadAlerts).mockResolvedValue(205);
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(screen.getByText("Unread alerts").nextElementSibling).toHaveTextContent("205"));
+});
+
+it("formats the last check compactly", async () => {
+  vi.mocked(loadAlertEvaluationData).mockResolvedValue({
+    snapshots: [{ at: "2026-04-16T12:00:00.000Z", assets: [] }], prices: {}, excludedSymbols: [],
+  });
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(screen.getByText("Last check").nextElementSibling).toHaveTextContent("4/16/2026, 12:00"));
+});
+
+it("uses the selected Chinese locale for the last check on iPhone", async () => {
+  vi.mocked(isIOS).mockReturnValue(true);
+  vi.mocked(loadAlertEvaluationData).mockResolvedValue({
+    snapshots: [{ at: "2026-04-16T12:00:00.000Z", assets: [] }], prices: {}, excludedSymbols: [],
+  });
+  function SetChinese() {
+    const { setLocale } = useTranslation();
+    return <button onClick={() => setLocale("zh")}>中文</button>;
+  }
+  render(<I18nProvider><SetChinese /><GoalsAlerts /></I18nProvider>);
+  await userEvent.click(screen.getByRole("button", { name: "中文" }));
+  await waitFor(() => expect(screen.getByText("最近检查").nextElementSibling).toHaveTextContent("2026/4/16 12:00"));
 });
 
 it("validates a new goal before saving", async () => {

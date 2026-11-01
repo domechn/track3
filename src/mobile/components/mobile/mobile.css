@@ -554,9 +554,9 @@
   .ios-d3-goals-heading > div { min-width: 0; }
   .ios-d3-goals .ios-d3-goals-add, .ios-d3-goals .ios-d3-goals-add:hover { position: fixed; top: calc(var(--mobile-safe-top) + 6px); right: max(16px, var(--mobile-safe-right)); z-index: 31; display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: transparent; padding: 0; color: hsl(var(--primary)); }
   .ios-d3-goals-add span { font-size: 30px; line-height: 1; font-weight: 500; }
-  .app-layout .ios-d3-goals .ios-d3-rules-card { background: transparent; }
+  .app-layout .ios-d3-goals .ios-d3-rules-card { background: hsl(var(--card)); }
   .ios-d3-goals .ios-d3-rules-card > div:first-child { padding: 2px 12px 8px; }
-  .ios-d3-goals .ios-d3-rules-card > div:nth-child(2) { border-radius: 14px; background: hsl(var(--card)); padding: 16px; }
+  .ios-d3-goals .ios-d3-rules-card > div:nth-child(2) { border-radius: 0; background: transparent; padding: 16px; }
   .ios-d3-goals .ios-d3-rules-card:has(.ios-d3-goal-rule) > div:nth-child(2) { background: transparent; padding: 0; }
   .ios-d3-goal-rule { display: flex; flex-direction: column; scroll-margin-top: 72px; border: 0; border-radius: 14px; background: hsl(var(--card)); padding: 16px; font-variant-numeric: tabular-nums; }
   .ios-d3-goal-rule > div:has([role="progressbar"]) { padding-top: 12px; }
@@ -791,7 +791,7 @@
   .d2-rank-sheet .top-coins-rank-mobile { border: 0; }
   .top-coins-rank-mobile .mobile-list-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, min(36%, 150px)) 16px; min-height: 62px; align-items: center; }
   .top-coins-rank-mobile .mobile-list-label > span { min-width: 0; }
-  .top-coins-rank-mobile .mobile-list-label .truncate { min-width: 4ch; }
+  .top-coins-rank-mobile .mobile-list-label .truncate { min-width: 4.5ch; }
   .top-coins-rank-mobile .mobile-list-value { min-width: 0; white-space: normal; text-align: right; }
   .top-coins-rank-value { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
   .top-coins-rank-value strong { max-width: 100%; color: hsl(var(--foreground)); font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
@@ -1445,3 +1445,69 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
   .mobile-sidebar :is(.mobile-rail-item, .mobile-sidebar-collapse):hover:not([aria-current="page"]) { background: hsl(var(--hover)); color: hsl(var(--foreground)); }
   .mobile-sidebar :is(.mobile-rail-item, .mobile-sidebar-collapse):focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
 }
+
+/* Manage screens retain the mobile interactions with the Terminal surfaces. */
+.t3-manage-history .history-month-rows,
+.t3-manage-history .history-detail-dialog .history-mobile-detail-list,
+.t3-manage-history .history-detail-tools { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
+.t3-manage-history .history-month-heading { margin-inline: 0; font-size: 12px; }
+.t3-manage-history .history-month-heading strong { font-size: 13px; }
+.t3-manage-history .history-mobile-snapshot-button { min-height: 66px; padding: 9px 12px; }
+.t3-manage-history .history-mobile-snapshot-date { color: hsl(var(--foreground)); font-size: 13px; font-weight: 600; }
+.t3-manage-history .history-mobile-snapshot-total { font-size: 15px; line-height: 20px; }
+.t3-manage-history .history-mobile-snapshot-secondary { font-size: 12px; }
+.t3-manage-history .history-mobile-snapshot-delta { border-radius: var(--radius-pill); font-size: 12px; }
+.t3-manage-history .history-page-controls { gap: 10px; }
+.t3-manage-history .history-records-card > :first-child p { font-size: 12px; }
+.t3-manage-history .history-detail-dialog { overflow: auto; border-radius: 0; }
+.t3-manage-history .history-mobile-asset-content { min-height: 58px; }
+.t3-manage-history .history-mobile-delete { border: 1px solid hsl(var(--negative) / .35); border-radius: var(--radius); color: hsl(var(--negative)); }
+
+.ios-d3-rebalance.t3-manage-rebalance { gap: 12px; }
+.ios-d3-rebalance.t3-manage-rebalance > header h1 { font-size: 22px; line-height: 28px; }
+.ios-d3-rebalance.t3-manage-rebalance > details { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
+.ios-d3-rebalance.t3-manage-rebalance details > summary { border-radius: var(--radius); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 13px; }
+.ios-d3-rebalance.t3-manage-rebalance .ios-d3-target { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); padding: 12px; }
+.ios-d3-rebalance.t3-manage-rebalance .ios-d3-target :is(input:not([type="range"]), select) { border: 1px solid hsl(var(--control)); border-radius: var(--radius); background: hsl(var(--sunken)); color: hsl(var(--foreground)); font-size: 16px; }
+.ios-d3-rebalance.t3-manage-rebalance .ios-d3-rebalance-presets { border-radius: var(--radius-pill); background: hsl(var(--secondary)); }
+.ios-d3-rebalance.t3-manage-rebalance .ios-d3-rebalance-presets > button { border-radius: var(--radius-pill); background: transparent; color: hsl(var(--muted-foreground)); }
+.ios-d3-rebalance.t3-manage-rebalance .ios-d3-rebalance-presets > button:active { background: hsl(var(--raised)); color: hsl(var(--foreground)); }
+.ios-d3-rebalance.t3-manage-rebalance .ios-d3-trade { border: 0; border-top: 1px solid hsl(var(--rule)); border-radius: 0; background: transparent; }
+.ios-d3-rebalance.t3-manage-rebalance ul[aria-label] li { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
+.ios-d3-rebalance.t3-manage-rebalance .t3-rebalance-sync-note { margin-top: 10px; }
+
+.ios-d3-goals.t3-manage-goals { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.ios-d3-goals.t3-manage-goals > .t3-goals-rules { order: 1; }
+.ios-d3-goals.t3-manage-goals > .t3-goals-history { order: 2; }
+.ios-d3-goals.t3-manage-goals > .t3-goals-notifications { order: 3; }
+.ios-d3-goals.t3-manage-goals > .t3-goals-editor { order: 4; }
+.ios-d3-goals.t3-manage-goals > :has(canvas) { order: 9; }
+.ios-d3-goals.t3-manage-goals > [data-ai-setup-card] { order: 10; }
+.ios-d3-goals.t3-manage-goals .ios-d3-goals-heading h1 { font-size: 22px; line-height: 28px; }
+.ios-d3-goals.t3-manage-goals .t3-goals-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+.ios-d3-goals.t3-manage-goals .t3-goals-summary > div { min-width: 0; padding: 12px; }
+.ios-d3-goals.t3-manage-goals .t3-goals-summary > div:nth-child(3) { border-top: 1px solid hsl(var(--border)); border-left: 0; }
+.ios-d3-goals.t3-manage-goals .t3-goals-summary > div:nth-child(4) { border-top: 1px solid hsl(var(--border)); }
+.ios-d3-goals.t3-manage-goals .t3-goals-summary strong { font-size: 17px; line-height: 22px; }
+.ios-d3-goals.t3-manage-goals .t3-goals-summary > div:last-child strong { font-size: 14px; white-space: nowrap; }
+.ios-d3-goals.t3-manage-goals .ios-d3-rules-card { border: 1px solid hsl(var(--border)); border-radius: var(--radius); }
+.ios-d3-goals.t3-manage-goals .ios-d3-goal-rule { border: 0; border-top: 1px solid hsl(var(--rule)); border-radius: 0; background: transparent; padding: 12px 0; }
+.ios-d3-goals.t3-manage-goals .t3-goals-history li { border: 0; border-top: 1px solid hsl(var(--rule)); border-radius: 0; padding: 12px 0; }
+.ios-d3-goal-editor .ios-d3-goal-editor-nav { border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
+.ios-d3-goal-editor #goal-rule-editor .ios-d3-goal-editor-content { padding: 16px; }
+.ios-d3-goal-editor #goal-rule-editor :is(input, select) { border: 1px solid hsl(var(--control)); border-radius: var(--radius); background: hsl(var(--sunken)); }
+
+.ios-d3-chat.t3-manage-assistant { background: hsl(var(--background)); border: 0; box-shadow: none; }
+.ios-d3-chat.t3-manage-assistant .ios-d3-chat-header { border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background)); }
+.ios-d3-chat.t3-manage-assistant [data-testid="chat-card"] { background: hsl(var(--background)); }
+.ios-d3-chat.t3-manage-assistant [data-testid="chat-welcome"] h2 { font-size: 22px; line-height: 28px; }
+.ios-d3-chat.t3-manage-assistant [data-testid^="chat-example-"] { min-height: 52px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
+.ios-d3-chat.t3-manage-assistant .ios-d3-chat-bubble[data-testid="user-bubble"] > .ios-d3-chat-body { border-radius: var(--radius); background: hsl(var(--raised)); color: hsl(var(--foreground)); }
+.ios-d3-chat.t3-manage-assistant .ios-d3-chat-bubble[data-testid="assistant-bubble"] > .ios-d3-chat-body { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
+.ios-d3-chat.t3-manage-assistant .ios-d3-chat-composer { border-top: 1px solid hsl(var(--border)); background: hsl(var(--background)); }
+.ios-d3-chat.t3-manage-assistant .ios-d3-chat-composer > div:first-child { border: 1px solid hsl(var(--control)); border-radius: var(--radius); background: hsl(var(--sunken)); }
+.ios-d3-chat.t3-manage-assistant .ios-d3-quick-actions { background: hsl(var(--background)); }
+.ios-d3-chat.t3-manage-assistant .ios-d3-quick-actions button { border: 1px solid hsl(var(--control)); border-radius: var(--radius-pill); background: hsl(var(--card)); }
+.ios-d3-chat.t3-manage-assistant .ios-d3-chat-bubble details { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--secondary)); }
+.ios-d3-chat.t3-manage-assistant .text-\[10px\],
+.ios-d3-chat.t3-manage-assistant .text-\[11px\] { font-size: 12px; }

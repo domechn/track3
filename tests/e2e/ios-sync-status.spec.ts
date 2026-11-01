@@ -37,13 +37,15 @@ test("mobile locked prompt dismisses and turn-off requires confirmation", async 
   const pill = page.getByRole("button", { name: "Sync locked" });
   await expect(page.getByLabel("Sync passphrase")).toBeVisible();
   await expect(page.getByLabel("Sync passphrase")).toBeFocused();
-  await page.keyboard.press("Escape");
+  await page.getByLabel("Sync passphrase").press("Escape");
   await expect(page.getByLabel("Sync passphrase")).toHaveCount(0);
   await expect(pill).toBeFocused();
   await pill.click();
-  await page.touchscreen.tap(20, 100);
+  await expect(page.getByLabel("Sync passphrase")).toBeVisible();
+  await page.touchscreen.tap(370, 500);
   await expect(page.getByLabel("Sync passphrase")).toHaveCount(0);
   await pill.click();
+  await expect(page.getByRole("button", { name: "Turn off sync on this device" })).toBeVisible();
   await page.getByRole("button", { name: "Turn off sync on this device" }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();

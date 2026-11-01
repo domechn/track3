@@ -27,6 +27,7 @@ import { profileFromTargets } from "@/middlelayers/ui-state/rebalance-profile";
 import { rebalanceCsvDialogOptions } from "@/middlelayers/ui-state/rebalance-export";
 import { FinanceChartSkeleton, RebalanceCharts } from "./finance-charts";
 import { rebalanceVisuals } from "./finance-visuals";
+import { RebalanceSummary } from "./rebalance-summary";
 import type { QuoteColor } from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -222,7 +223,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4">
+    <div className="t3-manage-rebalance mx-auto flex max-w-6xl flex-col gap-4">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{t("rebalance.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("rebalance.description")}</p>
@@ -235,8 +236,11 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
       {profileLoadError && !loading && <p role="alert" className="text-sm text-destructive">{t("rebalance.profileLoadError")}</p>}
       {profileReady && (
         <>
+          <RebalanceSummary result={result} portfolioValue={holdings.reduce((sum, holding) => sum + holding.value, 0)}
+            targetTotal={total} targetTotalValid={targets.length > 0 && targets.every((target) => Number.isFinite(target.percent)) && Math.abs(total - 100) <= 0.000001} tolerance={tolerance}
+            tradeCount={visual?.trades.length ?? 0} currency={currency.currency} t={t} />
           {!holdings.length && <p className="text-sm text-muted-foreground">{t("rebalance.noData")}</p>}
-          <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)} className="order-last rounded-lg border bg-card">
+          <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)} className="rounded-lg border bg-card">
             <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
           <Card className="border-0 shadow-none">
             <CardHeader className="px-4 py-3">
@@ -361,6 +365,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
             </CardContent>
           </Card>
           </details>
+          <p className="t3-rebalance-sync-note">{t("rebalance.syncNote")}</p>
           {!optionsValid && <p role="alert" className="text-xs text-destructive">{t("rebalance.validationOptions")}</p>}
           {!targets.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">{t("rebalance.empty")}</p>}
           {result && (

@@ -22,6 +22,7 @@ test("phone quote preference flips numeric gain without changing the displayed v
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/summary");
+  await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
   const gain = page.locator(".d2-summary .profit-metric-value[data-tone='gain']").first();
   await expect(gain).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-quote", "green-up");
@@ -30,6 +31,7 @@ test("phone quote preference flips numeric gain without changing the displayed v
   await page.getByRole("button", { name: "Red Up / Green Down" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-quote", "red-up");
   await page.goto("/#/summary");
+  await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
   await expect(gain).toBeVisible();
   const after = await gain.evaluate((node) => ({ text: node.textContent, color: getComputedStyle(node).color }));
   expect(after.text).toBe(before.text);

@@ -19,6 +19,7 @@ test("data screens expose grouped history and analytics destinations", async ({ 
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
+    await page.clock.setFixedTime(new Date("2026-10-22T12:00:00Z"));
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/history");
     await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
@@ -182,6 +183,7 @@ for (const width of [320, 375, 390, 430]) {
       mkdirSync("test-results/mobile", { recursive: true });
       const capture = (name: string) => page.screenshot({ path: `test-results/mobile/d2-${width}-${theme}-${name}.png` });
       try {
+        await page.clock.setFixedTime(new Date("2026-10-22T12:00:00Z"));
         await page.emulateMedia({ colorScheme: theme });
         await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
         await installTauriBridge(page, { richPortfolio: true });

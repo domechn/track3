@@ -74,6 +74,21 @@ afterEach(() => {
 });
 
 describe("Rebalance page", () => {
+  it("summarizes the current plan on mobile", async () => {
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }],
+      tolerancePercent: 2,
+    });
+    render(<Rebalance currency={currency} />);
+    const summary = await screen.findByTestId("rebalance-summary");
+    expect(summary).toHaveTextContent("Portfolio value");
+    expect(summary).toHaveTextContent("80.00 USD");
+    expect(summary).toHaveTextContent("Outside tolerance");
+  });
+  it("explains that saved targets join encrypted sync when enabled", async () => {
+    render(<Rebalance currency={currency} />);
+    expect(await screen.findByText("Targets are included in encrypted sync when enabled.")).toBeInTheDocument();
+  });
   it("shows detailed results as cards in a narrow touch window", async () => {
     setNarrowTouch();
     vi.mocked(getRebalanceProfile).mockResolvedValue({

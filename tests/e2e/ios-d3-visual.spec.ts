@@ -41,6 +41,33 @@ async function capture(page: Page, phone: string, theme: string, name: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 }
 
+test("phone Rules uses one card surface", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { richPortfolio: true });
+  await page.goto("/#/goals");
+  await expect(page.locator(".ios-d3-rules-card")).toBeVisible();
+  const surfaces = await page.locator(".ios-d3-rules-card").evaluate((card) => {
+    const content = card.children[1];
+    return {
+      outer: getComputedStyle(card).backgroundColor,
+      inner: getComputedStyle(content).backgroundColor,
+      innerRadius: getComputedStyle(content).borderTopLeftRadius,
+    };
+  });
+  expect(surfaces.outer).not.toBe("rgba(0, 0, 0, 0)");
+  expect(surfaces.inner).toBe("rgba(0, 0, 0, 0)");
+  expect(surfaces.innerRadius).toBe("0px");
+  const lastCheck = await page.locator(".ios-d3-goals .t3-goals-summary > div:last-child strong").evaluate((element) => ({
+    height: element.getBoundingClientRect().height,
+    lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+    width: element.getBoundingClientRect().width,
+    scrollWidth: element.scrollWidth,
+    text: element.textContent,
+  }));
+  expect(lastCheck.height, JSON.stringify(lastCheck)).toBeLessThanOrEqual(lastCheck.lineHeight + 1);
+  expect(lastCheck.scrollWidth).toBeLessThanOrEqual(lastCheck.width + 1);
+});
+
 for (const phone of phones) for (const theme of ["light", "dark"] as const) {
   test(`D3 screens are reachable and captured on iPhone ${phone.name} in ${theme}`, async ({ page }) => {
     test.setTimeout(180_000);
@@ -172,7 +199,8 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
       expect(bounds!.height).toBeGreaterThanOrEqual(44);
     }
     const insightFill = await page.locator(".assistant-insights-card").evaluate((node) => getComputedStyle(node).backgroundColor);
-    await expect(page.locator(".ios-d3-chat-composer")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    const composerFill = await page.locator(".ios-d3-chat-composer").evaluate((node) => getComputedStyle(node).backgroundColor);
+    expect(composerFill).not.toBe("rgba(0, 0, 0, 0)");
     await capture(page, phone.name, theme, "assistant-empty");
     const chatHeader = await page.locator(".ios-d3-chat-header").boundingBox();
     const backAction = await page.locator("#app-top-bar .mobile-header-back").boundingBox();

@@ -223,7 +223,7 @@ export function RebalanceCharts({ result, quoteColor, tolerancePercent }: {
       <Bar role="img" aria-label={visual.labels.map((label, index) => `${label}: ${visual.current[index].toFixed(1)}% ${t("rebalance.current")}, ${visual.target[index].toFixed(1)}% ${t("rebalance.target")}`).join("; ")}
         data={{ labels: visual.labels, datasets: [
           { label: t("rebalance.current"), data: visual.current, backgroundColor: palette[0] },
-          { label: t("rebalance.target"), data: visual.target, backgroundColor: palette[2] },
+          { label: t("rebalance.target"), data: visual.target, backgroundColor: chartThemeColor("chart-blue-soft", undefined, resolvedTheme) },
         ] }} options={{ ...labeledOptions, plugins: { ...chartOptions.plugins, legend: { display: true, labels: { color: chartOptions.scales.y.ticks.color, font: { size: 12 } } } } }} />
     </ChartPanel>
     <ChartPanel title={t("rebalance.deviations")} empty={!visual.labels.length} height={rowHeight}>

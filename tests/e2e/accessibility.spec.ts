@@ -10,6 +10,29 @@ const routes = [
   "/settings/systemInfo", "/settings/assistant", "/settings/sync",
 ];
 
+test("desktop Goals drawer saves and restores focus to New rule", async ({ page }) => {
+  await installTauriBridge(page);
+  await page.goto("/#/goals");
+  await expect(page.getByText("No rules yet")).toBeVisible();
+  await page.getByRole("spinbutton", { name: "Threshold" }).fill("100");
+  await page.getByRole("button", { name: "Save rule" }).click();
+  const trigger = page.getByRole("button", { name: "New rule" });
+  await expect(page.getByRole("button", { name: "Edit" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await trigger.click();
+  const drawer = page.getByRole("dialog", { name: "New rule" });
+  await expect(drawer).toBeVisible();
+  await expect.poll(() => drawer.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+  await drawer.getByRole("spinbutton", { name: "Threshold" }).fill("1000");
+  await drawer.getByRole("button", { name: "Save rule" }).click();
+  await expect(drawer).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.keyboard.press("Escape");
+  await expect(drawer).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+});
+
 async function contrastWithBackground(text: Locator): Promise<number> {
   return text.evaluate((node) => {
     const channels = (color: string) => color.match(/[\d.]+/g)!.map(Number);

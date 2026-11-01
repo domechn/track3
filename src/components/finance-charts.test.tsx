@@ -5,6 +5,7 @@ import { CostCharts, FinanceChartSkeleton, GoalChart, RebalanceCharts } from "./
 import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
 import type { RebalanceResult } from "@/middlelayers/rebalance";
 import type { AlertRule } from "@/middlelayers/alerts";
+import { ThemeProvider } from "./common/theme";
 
 vi.mock("react-chartjs-2", () => ({
   Bar: vi.fn(() => <div />),
@@ -86,4 +87,30 @@ it("maps portfolio values and a total value goal to separate line datasets", () 
   const chart = vi.mocked(Line).mock.calls[0][0];
   expect(chart.data.labels).toEqual(["2025-01-01", "2025-01-02"]);
   expect(chart.data.datasets.map((series) => series.data)).toEqual([[100, 120], [150, 150]]);
+});
+
+it("uses theme colors for goal and rebalance management charts", () => {
+  const values = [{ date: "2025-01-01", value: 100 }];
+  const result = {
+    rows: [{ kind: "asset", symbol: "BTC", currentPercent: 60, targetPercent: 40, deviationPercent: 20, tradeValue: -20 }],
+  } as RebalanceResult;
+  const colors = (theme: "light" | "dark") => {
+    const view = render(<ThemeProvider defaultTheme={theme} storageKey={`chart-${theme}`}>
+      <GoalChart rules={[]} snapshots={[]} portfolioValues={values} />
+      <RebalanceCharts result={result} tolerancePercent={0} quoteColor="green-up-red-down" />
+    </ThemeProvider>);
+    const goal = vi.mocked(Line).mock.calls.at(-1)![0].data.datasets[0];
+    const allocation = vi.mocked(Bar).mock.calls.at(-2)![0].data.datasets;
+    const colors = [goal.borderColor, goal.backgroundColor, allocation[0].backgroundColor, allocation[1].backgroundColor];
+    view.unmount();
+    return colors;
+  };
+  const light = colors("light");
+  const dark = colors("dark");
+  expect(light).toEqual([
+    "hsl(213 63% 43%)", "hsla(213, 63%, 43%, 0.12)", "hsl(213 63% 43%)", "hsl(204 48% 43%)",
+  ]);
+  expect(dark).toEqual([
+    "hsl(213 63% 56%)", "hsla(213, 63%, 56%, 0.12)", "hsl(213 63% 56%)", "hsl(204 48% 64%)",
+  ]);
 });

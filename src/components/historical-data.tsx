@@ -95,7 +95,11 @@ const App = ({
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
 }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const snapshotDateFormatter = useMemo(() => new Intl.DateTimeFormat(
+    locale === "zh" ? "zh-CN" : "en-US",
+    { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
+  ), [locale]);
 
   const [data, setData] = useState<HistoricalPageRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -550,8 +554,8 @@ const App = ({
   const totalPages = maxDataPage + 1;
 
   return (
-    <div aria-busy={pageLoading} data-testid="history-content">
-      <h1 className="sr-only">{t("history.h1")}</h1>
+    <div className="t3-manage-history" aria-busy={pageLoading} data-testid="history-content">
+      <h1 className="t3-history-title">{t("history.h1")}</h1>
       <StaggerContainer className="space-y-4">
         <Dialog
           open={isModalOpen}
@@ -563,7 +567,7 @@ const App = ({
             }
           }}
         >
-          <DialogContent className="min-w-[80%] touch:min-w-0 touch:w-[calc(100vw-1rem)] touch:max-w-[1200px] touch:max-h-[calc(100dvh-1rem)]">
+          <DialogContent className="t3-history-detail min-w-[80%] touch:min-w-0 touch:w-[calc(100vw-1rem)] touch:max-w-[1200px] touch:max-h-[calc(100dvh-1rem)]">
             <DialogHeader>
               <DialogTitle>{t("history.detailTitle")}</DialogTitle>
               <DialogDescription className="sr-only">
@@ -571,10 +575,7 @@ const App = ({
               </DialogDescription>
               {selectedData ? (
                 <p className="text-xs text-muted-foreground">
-                  {timeToDateStr(
-                    new Date(selectedData.createdAt).getTime(),
-                    true,
-                  )}
+                  {snapshotDateFormatter.format(new Date(selectedData.createdAt))}
                   {" · "}
                   {currency.symbol}
                   {prettyNumberToLocaleString(
@@ -585,7 +586,7 @@ const App = ({
             </DialogHeader>
             {detailLoading ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p> : null}
             {detailError ? <p role="alert" className="text-sm text-destructive">{t("history.detailLoadFailed")}</p> : null}
-            <div className="grid gap-2 md:grid-cols-3">
+            <div className="t3-history-detail-summary grid gap-2 md:grid-cols-3">
               <div className="rounded-lg border border-border/40 bg-background/30 p-3">
                 <p className="text-sm font-medium text-muted-foreground">
                   {t("history.assets")}
@@ -768,7 +769,7 @@ const App = ({
         </Dialog>
 
         <FadeUp>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="t3-history-kpis grid gap-3 md:grid-cols-3" data-testid="history-kpi-strip">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -815,10 +816,7 @@ const App = ({
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {latestRow
-                    ? timeToDateStr(
-                        new Date(latestRow.createdAt).getTime(),
-                        true,
-                      )
+                    ? snapshotDateFormatter.format(new Date(latestRow.createdAt))
                     : t("history.noDataLabel")}
                 </p>
               </CardContent>
@@ -827,7 +825,7 @@ const App = ({
         </FadeUp>
 
         <FadeUp>
-          <Card>
+          <Card className="t3-history-records">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {t("history.recordsCardTitle")}
@@ -933,7 +931,7 @@ const App = ({
               </div>
 
               <div className="relative">
-                <ScrollArea className="w-full touch:min-w-0 touch:max-w-full rounded-lg border border-border/40 bg-background/20">
+                <ScrollArea className="t3-history-table w-full touch:min-w-0 touch:max-w-full rounded-lg border border-border/40 bg-background/20">
                   <Table className="touch:min-w-[600px]">
                     <TableHeader>
                       <TableRow>
@@ -952,6 +950,7 @@ const App = ({
                       {data.map((row, idx) => {
                         const isLatest = dataPage === 0 && idx === 0;
                         const topAssets = row.topAssets;
+                        const displayDate = snapshotDateFormatter.format(new Date(row.createdAt));
 
                         return (
                           <TableRow
@@ -962,14 +961,9 @@ const App = ({
                           >
                             <TableCell className="py-1.5 text-sm touch:sticky touch:left-0 touch:z-10 touch:bg-card touch:group-hover:bg-muted">
                               <button type="button"
-                                aria-label={t("history.viewSnapshot").replace("{date}", timeToDateStr(new Date(row.createdAt).getTime(), true))}
-                                className="flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <span>
-                                  {timeToDateStr(
-                                    new Date(row.createdAt).getTime(),
-                                    true,
-                                  )}
-                                </span>
+                                aria-label={t("history.viewSnapshot").replace("{date}", `${timeToDateStr(new Date(row.createdAt).getTime(), true)} · ${displayDate}`)}
+                                className="t3-history-date-button flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <span>{displayDate}</span>
                               </button>
                               <span className="block text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
                             </TableCell>

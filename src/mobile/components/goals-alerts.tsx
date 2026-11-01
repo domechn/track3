@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "@/mobile/i18n";
 import {
   ALERTS_CHANGED_EVENT, acknowledgeAlert, acknowledgeAllAlerts, clearAlertHistory,
-  deleteAlertRule, listAlertHistory, listAlertRules, loadAlertEvaluationData,
+  countUnreadAlerts, deleteAlertRule, listAlertHistory, listAlertRules, loadAlertEvaluationData,
   measureRule, saveAlertRule, setAlertRuleEnabled,
   type AlertComparator, type AlertHistory, type AlertKind, type AlertPrices,
   type AlertRule, type AlertSnapshot, type AlertWindow,
@@ -52,11 +52,12 @@ const historySeverity = (kind: AlertKind) =>
   kind === "period_pnl" || kind === "portfolio_value_change" ? "high" : kind === "allocation_deviation" || kind === "asset_price_move" ? "medium" : "low";
 
 export default function GoalsAlerts() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const dataChangedVersion = useDataChangedVersion();
   const [draft, setDraft] = useState<AlertDraft>(emptyDraft);
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [history, setHistory] = useState<AlertHistory[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [snapshots, setSnapshots] = useState<AlertSnapshot[]>([]);
   const [portfolioValues, setPortfolioValues] = useState<Array<{ date: string; value: number }>>([]);
   const [prices, setPrices] = useState<AlertPrices>({});
@@ -71,7 +72,7 @@ export default function GoalsAlerts() {
 
   async function reload() {
     try {
-      const [nextRules, nextHistory] = await Promise.all([listAlertRules(), listAlertHistory()]);
+      const [nextRules, nextHistory, nextUnreadCount] = await Promise.all([listAlertRules(), listAlertHistory(), countUnreadAlerts()]);
       const pnlWindows = nextRules.filter((rule) => rule.enabled && rule.kind === "period_pnl" && rule.window)
         .map((rule) => rule.window as AlertWindow);
       const evaluation = await loadAlertEvaluationData(undefined, undefined, new Date(), pnlWindows);
@@ -84,6 +85,7 @@ export default function GoalsAlerts() {
         manualInitialized.current = true;
       }
       setHistory(nextHistory);
+      setUnreadCount(nextUnreadCount);
       setSnapshots(evaluation.snapshots);
       setPortfolioValues(series.map((point) => ({ date: new Date(point.timestamp).toISOString().slice(0, 10), value: point.totalValue })));
       setPrices(evaluation.prices);
@@ -132,8 +134,8 @@ export default function GoalsAlerts() {
   function edit(rule: AlertRule) {
     setDraft(alertDraftFromRule(rule));
     setStatus("");
-    if (isIOS()) setManualOpen(true);
-    else document.getElementById("goal-rule-editor")?.scrollIntoView?.({ behavior: "smooth" });
+    setManualOpen(true);
+    if (!isIOS()) document.getElementById("goal-rule-editor")?.scrollIntoView?.({ behavior: "smooth" });
   }
 
   async function mutate(action: () => Promise<unknown>) {
@@ -211,29 +213,35 @@ export default function GoalsAlerts() {
       </div>
       {!isIOS() && <div className="ios-d3-goal-editor-actions flex gap-2">
         <Button onClick={() => void save()}>{t("goals.saveRule")}</Button>
-        {draft.id > 0 && <Button variant="outline" onClick={() => setDraft(emptyDraft)}>{t("common.cancel")}</Button>}
+        {draft.id > 0 && <Button variant="outline" onClick={() => { setDraft(emptyDraft); setManualOpen(false); }}>{t("common.cancel")}</Button>}
       </div>}
-      {validationField && status && <p id="goal-rule-status" role="alert" className="text-sm">{status}</p>}
+      {validationField && status && <p id="goal-rule-status" role="alert" className="text-sm text-destructive">{status}</p>}
       {!validationField && status && <p role="status" className="text-sm">{status}</p>}
     </CardContent>
   </Card>;
 
   return (
-    <div className="ios-d3-goals mx-auto flex max-w-5xl flex-col gap-4 pb-8">
+    <div className="t3-manage-goals ios-d3-goals mx-auto gap-4 pb-8">
       {isIOS() && document.getElementById("app-top-bar") && createPortal(
         <span className="ios-d3-pushed-title">{t("goals.title")}</span>, document.getElementById("app-top-bar")!)}
-      <div className="ios-d3-goals-heading flex items-start justify-between gap-2">
+      <div className="t3-goals-heading ios-d3-goals-heading flex items-start justify-between gap-2">
         <div>
           <h1 className={isIOS() ? "ios-large-title" : "text-2xl font-semibold"}>{t("goals.title")}</h1>
           <p className="text-sm text-muted-foreground">{t("goals.subtitle")}</p>
         </div>
         {isIOS() && <Button type="button" variant="ghost" className="ios-d3-goals-add" aria-label={t("goals.mobile.add")} onClick={() => setManualOpen(true)}><span aria-hidden="true">+</span></Button>}
       </div>
+      <div className="t3-goals-summary" data-testid="goals-summary">
+        <div><span>{t("goals.summary.active")}</span><strong>{rules.filter((rule) => rule.enabled).length} / {rules.length}</strong></div>
+        <div><span>{t("goals.summary.unread")}</span><strong>{unreadCount}</strong></div>
+        <div><span>{t("goals.summary.recentTriggered")}</span><strong>{history.length}</strong></div>
+        <div><span>{t("goals.summary.lastCheck")}</span><strong>{snapshots[0] ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(snapshots[0].at)) : "—"}</strong></div>
+      </div>
       <AISetupCard page="goals"
         summary={rules.length ? rules.map((rule) => `${rule.id}: ${rule.kind} ${rule.symbol ?? ""} ${rule.comparator} ${rule.threshold} ${rule.window ?? ""} ${rule.enabled ? "enabled" : "disabled"}`).join("; ") : "No alert rules"}
         suggestions={["goals.ai.drop", "goals.ai.btc", "goals.ai.deviation"].map((key) => t(key))} />
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Card className="order-last">
+      <Card className="t3-goals-notifications">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.notifications")}</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-2xl text-sm text-muted-foreground">{t("goals.notificationExplanation")}</p>
@@ -254,12 +262,12 @@ export default function GoalsAlerts() {
       </> : <details
         open={manualOpen}
         onToggle={(event) => setManualOpen(event.currentTarget.open)}
-        className="order-last rounded-lg border bg-card">
+        className="t3-goals-editor rounded-lg border bg-card">
         <summary className="flex min-h-11 cursor-pointer items-center px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
         {editor}
       </details>}
       {loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}
-      <Card className="ios-d3-rules-card">
+      <Card className="t3-goals-rules ios-d3-rules-card">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.rules")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {loading ? <p className="text-sm text-muted-foreground">{t("goals.loading")}</p>
@@ -310,9 +318,8 @@ export default function GoalsAlerts() {
                   </div>
                   {isGoal && measurement.status === "ready" && <div className="flex items-center gap-3">
                     <div role="img" aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`)) + `: ${progress.toFixed(0)}%`}
-                      className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
-                      style={{ background: `conic-gradient(hsl(var(--primary)) ${progress}%, hsl(var(--muted)) 0)` }}>
-                      <span className="grid h-8 w-8 place-items-center rounded-full bg-card text-[10px] font-semibold">{progress.toFixed(0)}%</span>
+                      className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-muted">
+                      <span className="text-xs font-semibold">{progress.toFixed(0)}%</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <Progress value={progress} aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))} />
@@ -328,7 +335,7 @@ export default function GoalsAlerts() {
               })}
         </CardContent>
       </Card>
-      <Card>
+      <Card className="t3-goals-history">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.history")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {(!isIOS() || history.length > 0) && <div className="flex flex-wrap gap-2">

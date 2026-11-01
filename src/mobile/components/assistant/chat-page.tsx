@@ -369,7 +369,7 @@ function ReadyChat({
   return (
     <div
       ref={layoutRef}
-      className={`relative flex min-w-0 overflow-hidden ${mobile ? "ios-d3-chat" : "h-[calc(100vh-88px)]"}`}
+      className={`t3-manage-assistant relative flex min-w-0 overflow-hidden ${mobile ? "ios-d3-chat" : "h-[calc(100vh-88px)]"}`}
       style={mobile && mobileHeight !== undefined ? { height: mobileHeight } : undefined}
       data-testid="chat-session-layout"
     >
@@ -632,7 +632,7 @@ function ChatHeader({
 
 function LoadingCard() {
   return (
-    <Card className="flex h-[calc(100vh-88px)] min-h-0 flex-col overflow-hidden md:min-h-[560px]">
+    <Card className="t3-manage-assistant flex h-[calc(100vh-88px)] min-h-0 flex-col overflow-hidden md:min-h-[560px]">
       <div className="flex items-center gap-3 border-b border-[var(--glass-border)] bg-card/40 px-5 py-3">
         <Skeleton className="h-8 w-8 rounded-md" />
         <div className="space-y-1.5">
@@ -663,11 +663,11 @@ function NotConfiguredCard() {
     "assistant.chat.capabilities.recent",
   ];
   return (
-    <Card className="overflow-hidden" data-testid="assistant-not-configured">
+    <Card className="t3-manage-assistant overflow-hidden" data-testid="assistant-not-configured">
       <div className="relative">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-primary/[0.06] to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-32"
         />
         <CardHeader className="relative space-y-3 pb-2">
           <div className="flex items-center gap-2">
@@ -736,7 +736,7 @@ function CapabilityDot() {
 function ErrorCard({ message }: { message: string }) {
   const { t } = useTranslation();
   return (
-    <Card data-testid="assistant-error">
+    <Card className="t3-manage-assistant" data-testid="assistant-error">
       <CardHeader className="space-y-2 pb-2">
         <CardTitle className="text-base">
           {t("assistant.chat.error.title")}
@@ -771,11 +771,11 @@ function UpgradeCard() {
     "assistant.upgrade.bullet.privacy",
   ];
   return (
-    <Card className="overflow-hidden" data-testid="assistant-upgrade">
+    <Card className="t3-manage-assistant overflow-hidden" data-testid="assistant-upgrade">
       <div className="relative">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-indigo-500/[0.08] to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-40"
         />
         <CardHeader className="relative space-y-3 pb-2">
           <div className="flex items-center gap-2">
