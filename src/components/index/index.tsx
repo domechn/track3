@@ -502,7 +502,7 @@ function AppRoutes({
           />
           <Route
             path="data"
-            element={<DataManagement onDataImported={onDataChanged} />}
+            element={<DataManagement onDataImported={onDataChanged} currency={currentCurrency} />}
           />
           <Route
             path="systemInfo"

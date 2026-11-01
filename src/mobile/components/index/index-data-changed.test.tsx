@@ -23,6 +23,7 @@ const syncMocks = vi.hoisted(() => ({
       conflicts: string[]; errors: string[]; pulledFrom?: string[] } } },
 }));
 const syncToast = vi.hoisted(() => vi.fn());
+const refreshMounts = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock("@/middlelayers/sync/runtime", () => ({
   syncRuntime: {
@@ -46,7 +47,8 @@ vi.mock("@/mobile/components/settings", () => ({
   default: () => <div>settings</div>,
 }));
 
-vi.mock("@/mobile/components/refresh-data", () => {
+vi.mock("@/mobile/components/refresh-data", async () => {
+  const { useEffect } = await import("react");
   // Surface an event payload through the click handler so the test can
   // confirm a refresh click also bumps the data version.
   return {
@@ -55,6 +57,7 @@ vi.mock("@/mobile/components/refresh-data", () => {
     }: {
       afterRefresh?: (success: boolean) => unknown;
     }) => (
+      <>
       <button
         type="button"
         data-testid="trigger-refresh"
@@ -62,8 +65,14 @@ vi.mock("@/mobile/components/refresh-data", () => {
       >
         refresh
       </button>
+      <RefreshMountProbe />
+      </>
     ),
   };
+  function RefreshMountProbe() {
+    useEffect(() => { refreshMounts.count += 1; }, []);
+    return null;
+  }
 });
 
 vi.mock("@/mobile/components/historical-data", () => ({
@@ -150,6 +159,7 @@ vi.mock("@/middlelayers/charts", () => ({
 }));
 
 vi.mock("@/middlelayers/configuration", () => ({
+  getConfiguration: vi.fn().mockResolvedValue(undefined),
   queryPreferCurrency: vi.fn(),
   getLicenseIfIsPro: vi.fn(),
   getInitialQueryDateRange: vi.fn(),
@@ -201,6 +211,7 @@ beforeEach(() => {
   syncMocks.trigger.mockClear();
   syncMocks.snapshot = { mode: "disabled", sync: { phase: "idle", report: undefined } };
   syncToast.mockClear();
+  refreshMounts.count = 0;
   window.location.hash = "#/summary";
   cacheMocks.clearLocalStorageCache.mockReset();
   cacheMocks.clearMemoryCache.mockReset();
@@ -264,6 +275,25 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it("keeps the refresh runner mounted while moving from Overview to Wallets and back", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    window.location.hash = "#/overview";
+    try {
+      const view = renderApp();
+      await view.findByText("overview");
+      await waitFor(() => expect(refreshMounts.count).toBe(1));
+      window.location.hash = "#/wallets";
+      await view.findByText("wallets");
+      expect(refreshMounts.count).toBe(1);
+      expect(view.getByTestId("trigger-refresh")).not.toBeVisible();
+      window.location.hash = "#/overview";
+      await view.findByText("overview");
+      expect(refreshMounts.count).toBe(1);
+      expect(view.getByTestId("trigger-refresh")).toBeVisible();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("renders mobile tabs and routes to the More hub", async () => {
     const view = renderApp();
     await view.findByTestId("summary-range");

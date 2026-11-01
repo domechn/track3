@@ -48,6 +48,8 @@ import { configurationFromForm, configurationToForm, initialConfiguration } from
 import { isIOS } from "@/utils/platform";
 import { useSearchParams } from "react-router-dom";
 
+import { AutoRetrySetting } from "@/components/configuration/auto-retry-setting";
+import { Switch as MobileSwitch } from "@/mobile/components/ui/switch";
 import { SummaryCards } from "@/components/configuration/summary-cards";
 import { GeneralSettings } from "@/mobile/components/configuration/general-settings";
 import { ExchangeSection } from "@/components/configuration/exchange-section";
@@ -1083,6 +1085,7 @@ const App = ({
       />
     ) : (
       <div className="space-y-6">
+      {mobileSection === "sources" && <AutoRetrySetting t={t} switchComponent={MobileSwitch} />}
       {mobileSection === "sources" && exchanges.length + wallets.length + stockBrokers.length + others.length > 0 && <>
         <p className="t3-mobile-source-summary">{t("settings.phase6.sourceSummary").replace("{count}", String(exchanges.length + wallets.length + stockBrokers.length + others.length))}</p>
         <div role="tablist" aria-label={t("settings.phase6.sources")} className="t3-mobile-source-tabs">

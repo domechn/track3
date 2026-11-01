@@ -8,6 +8,8 @@ import {
   checkIfDuplicatedHistoricalData,
   exportHistoricalData,
   importHistoricalData,
+  importSelected,
+  previewImport,
   readHistoricalDataFromFile,
 } from "@/middlelayers/data";
 import { UniqueIndexConflictResolver } from "@/middlelayers/types";
@@ -21,7 +23,9 @@ import {
   removeFromBlacklist,
   saveAutoBackupDirectory,
 } from "@/middlelayers/configuration";
-import { ExportData } from "@/middlelayers/datamanager";
+import { type ExportData, type ImportChoice, type ImportPreviewRow, type ImportResult } from "@/middlelayers/datamanager";
+import type { CurrencyRateDetail } from "@/middlelayers/types";
+import ImportPreview from "@/components/import-preview";
 import { timeToDateStr } from "@/utils/date";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -55,7 +59,7 @@ import { redactSecrets } from "@/middlelayers/security/redact";
 import { useOutletContext } from "react-router-dom";
 import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-summary";
 
-const App = ({ onDataImported }: { onDataImported?: () => void }) => {
+const App = ({ onDataImported, currency }: { onDataImported?: () => void; currency?: CurrencyRateDetail }) => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const section = useOutletContext<string | null>();
@@ -68,6 +72,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [exportData, setExportData] = useState<ExportData | undefined>(
     undefined,
   );
+  const [itemPreview, setItemPreview] = useState<{ data: ExportData; rows: ImportPreviewRow[] }>();
+  const [itemResult, setItemResult] = useState<ImportResult>();
+  const [itemBusy, setItemBusy] = useState(false);
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
   const { run: runBackupFolderDelete } = useOptimisticDelete(setAutoBackupDirectory);
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
@@ -168,6 +175,43 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
     }
   }
 
+  async function onReviewImportClick() {
+    try {
+      const data = await readHistoricalDataFromFile();
+      if (!data) return;
+      const { rows } = await previewImport(data);
+      setItemResult(undefined);
+      setItemPreview({ data, rows });
+    } catch (error) {
+      toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
+    }
+  }
+
+  async function applyItemChoices(choices: Record<string, ImportChoice>) {
+    if (!itemPreview) return;
+    setItemBusy(true);
+    try {
+      const result = await importSelected(itemPreview.data, choices);
+      if (result.imported + result.replaced > 0) {
+        onDataImported?.();
+        void queryBackupSummary().then(setBackupSummary).catch(() => undefined);
+      }
+      if (result.failures.length) {
+        setItemResult(result);
+        const { rows } = await previewImport(itemPreview.data);
+        setItemPreview({ data: itemPreview.data, rows });
+      }
+      else {
+        setItemPreview(undefined);
+        toast({ description: t("data.importSuccess") });
+      }
+    } catch (error) {
+      toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
+    } finally {
+      setItemBusy(false);
+    }
+  }
+
   async function importData(cr: UniqueIndexConflictResolver) {
     if (!exportData) {
       toast({
@@ -250,6 +294,13 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
   return (
     <div className="space-y-6">
+      <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[680px]">
+          <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>
+          {itemPreview && <ImportPreview rows={itemPreview.rows} result={itemResult} busy={itemBusy} currency={currency}
+            onImport={(choices) => void applyItemChoices(choices)} onCancel={() => setItemPreview(undefined)} />}
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={showConflictResolverDialog}
         onOpenChange={setShowConflictResolverDialog}
@@ -304,6 +355,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </p>
             <Button onClick={onImportDataClick} size="sm" className="mt-auto w-fit">
               {t("data.importButton")}
+            </Button>
+            <Button onClick={onReviewImportClick} size="sm" variant="outline" className="w-fit">
+              {t("data.importPreview.open")}
             </Button>
           </CardContent>
         </Card>

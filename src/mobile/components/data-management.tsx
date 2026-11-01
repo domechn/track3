@@ -7,6 +7,8 @@ import {
   checkIfDuplicatedHistoricalData,
   exportHistoricalData,
   importHistoricalData,
+  importSelected,
+  previewImport,
   readHistoricalDataFromFile,
   readHistoricalDataFromPath,
   shareHistoricalData,
@@ -21,7 +23,9 @@ import {
   removeFromBlacklist,
   saveAutoBackupDirectory,
 } from "@/middlelayers/configuration";
-import type { ExportData } from "@/middlelayers/datamanager";
+import { type ExportData, type ImportChoice, type ImportPreviewRow, type ImportResult } from "@/middlelayers/datamanager";
+import type { CurrencyRateDetail } from "@/middlelayers/types";
+import ImportPreview from "@/components/import-preview";
 import { timeToDateStr } from "@/utils/date";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/mobile/components/ui/switch";
@@ -63,9 +67,9 @@ import { InsetGroup } from "@/mobile/components/mobile";
 import { useSearchParams } from "react-router-dom";
 import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-summary";
 
-const App = ({ onDataImported }: { onDataImported?: () => void }) => {
+const App = ({ onDataImported, currency }: { onDataImported?: () => void; currency?: CurrencyRateDetail }) => {
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [searchParams] = useSearchParams();
   const [exportConfiguration, setExportConfiguration] = useState(false);
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
@@ -73,6 +77,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
   const [exportData, setExportData] = useState<ExportData | undefined>(
     undefined,
   );
+  const [itemPreview, setItemPreview] = useState<{ data: ExportData; rows: ImportPreviewRow[] }>();
+  const [itemResult, setItemResult] = useState<ImportResult>();
+  const [itemBusy, setItemBusy] = useState(false);
   const [backupSummary, setBackupSummary] = useState<BackupSummary>();
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
@@ -236,6 +243,43 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
       return;
     }
     await inspectImport(ed);
+  }
+
+  async function onReviewImportClick() {
+    try {
+      const data = await readHistoricalDataFromFile();
+      if (!data) return;
+      const { rows } = await previewImport(data);
+      setItemResult(undefined);
+      setItemPreview({ data, rows });
+    } catch (error) {
+      toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
+    }
+  }
+
+  async function applyItemChoices(choices: Record<string, ImportChoice>) {
+    if (!itemPreview) return;
+    setItemBusy(true);
+    try {
+      const result = await importSelected(itemPreview.data, choices);
+      if (result.imported + result.replaced > 0) {
+        onDataImported?.();
+        void queryBackupSummary().then(setBackupSummary).catch(() => undefined);
+      }
+      if (result.failures.length) {
+        setItemResult(result);
+        const { rows } = await previewImport(itemPreview.data);
+        setItemPreview({ data: itemPreview.data, rows });
+      }
+      else {
+        setItemPreview(undefined);
+        toast({ description: t("data.importSuccess") });
+      }
+    } catch (error) {
+      toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
+    } finally {
+      setItemBusy(false);
+    }
   }
 
   async function inspectImport(ed: ExportData) {
@@ -407,6 +451,13 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
 
   return (
     <div className="ios-d3-settings-content ios-d3-data-settings space-y-6">
+      {showBackup && <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
+        <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto sm:max-w-[680px]">
+          <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>
+          {itemPreview && <ImportPreview rows={itemPreview.rows} result={itemResult} busy={itemBusy} currency={currency}
+            onImport={(choices) => void applyItemChoices(choices)} onCancel={() => setItemPreview(undefined)} translate={t} locale={locale} />}
+        </DialogContent>
+      </Dialog>}
       {showBackup && showImportConfirm && <ConfirmSheet title={t("data.restoreConfirm.title")} onDismiss={() => {
         setShowImportConfirm(false);
         setExportData(undefined);
@@ -464,6 +515,7 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
         <div className="ios-d3-backup-import-section">
         <InsetGroup title={t("data.import")}>
           <button type="button" className="ios-d3-data-action-row" onClick={onImportDataClick}><span>{t("data.importButton")}</span><ChevronRightIcon aria-hidden="true" /></button>
+          <button type="button" className="ios-d3-data-action-row" onClick={() => void onReviewImportClick()}><span>{t("data.importPreview.open")}</span><ChevronRightIcon aria-hidden="true" /></button>
           <button type="button" className="ios-d3-data-action-row" onClick={() => void onImportBackupFolderClick()} disabled={folderBusy}><span>{t("data.folder.import")}</span><ChevronRightIcon aria-hidden="true" /></button>
         </InsetGroup>
         <p className="ios-d3-settings-note ios-d3-import-note">{t("data.importDesc")}</p>
@@ -520,6 +572,9 @@ const App = ({ onDataImported }: { onDataImported?: () => void }) => {
             </p>
             <Button onClick={onImportDataClick} size="sm" className="mt-auto w-fit">
               {t("data.importButton")}
+            </Button>
+            <Button onClick={onReviewImportClick} size="sm" variant="outline" className="w-fit">
+              {t("data.importPreview.open")}
             </Button>
           </CardContent>
         </Card>

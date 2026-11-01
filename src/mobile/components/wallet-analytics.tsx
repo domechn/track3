@@ -6,12 +6,13 @@ import {
   TDateRange,
 } from "@/middlelayers/types";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { StaggerContainer, FadeUp } from "@/components/motion";
 import PageLoadingOverlay from "@/mobile/components/page-loading-overlay";
 import { useTranslation } from "@/mobile/i18n";
 import { useIsMobile } from "@/mobile/components/mobile";
+import { refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
 import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 import { sourceStatusesChangedEvent } from "@/components/source-status-event";
 import { WalletStatusBanner } from "@/components/wallet-status-banner";
@@ -33,6 +34,7 @@ const App = ({
   const [pageLoading, setPageLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const retrySchedule = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
   useEffect(() => {
     const onChanged = (event: Event) => setStatuses((event as CustomEvent<PortfolioSourceStatus[]>).detail);
     window.addEventListener(sourceStatusesChangedEvent, onChanged);
@@ -61,7 +63,8 @@ const App = ({
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
       <div className="d2-wallets analyze-wallets relative min-h-[400px]" aria-busy={pageLoading}>
         {!isMobile && <h1 className="sr-only">{t("wallets.h1")}</h1>}
-        <WalletStatusBanner statuses={statuses} locale={locale} t={t} />
+        <WalletStatusBanner statuses={statuses} locale={locale} t={t}
+          nextBySource={retrySchedule.nextBySource} stopped={retrySchedule.stopped} />
         <StaggerContainer className="wallet-stack space-y-3">
           <FadeUp>
             <WalletAssetsPercentage currency={currency} dateRange={dateRange}

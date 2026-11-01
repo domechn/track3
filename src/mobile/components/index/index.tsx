@@ -195,10 +195,10 @@ function TopBar({
             value={dateRange}
             onDateChange={onDatePickerValueChange}
           />}
-          {showActions && <TooltipProvider>
+          <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div>
+                <div style={showActions ? undefined : { display: "none" }}>
                   <RefreshButtonLoadingContext.Provider
                     value={{
                       buttonLoading: refreshButtonLoading,
@@ -227,7 +227,7 @@ function TopBar({
                 </p>
               </TooltipContent>
             </Tooltip>
-          </TooltipProvider>}
+          </TooltipProvider>
         </div>
       </div>
       {refreshProgress > 0 && refreshButtonLoading && (
@@ -781,7 +781,7 @@ function AppRoutes({
           />
           <Route
             path="data"
-            element={<DataManagement onDataImported={onDataChanged} />}
+            element={<DataManagement onDataImported={onDataChanged} currency={currentCurrency} />}
           />
           <Route
             path="systemInfo"
