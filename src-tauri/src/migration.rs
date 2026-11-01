@@ -996,6 +996,33 @@ async fn repair_required_schema(
     let sync_state = read_migration_sql(resource_dir, "v08t09/sync_state_up.sql")?;
     let history_snapshots = read_migration_sql(resource_dir, "v08t09/history_snapshots_up.sql")?;
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
+    let additive_schema = if version_is_less(app_version, "0.9.5")? {
+        Vec::new()
+    } else {
+        let directory = resource_dir.join("migrations/v094t095");
+        let mut paths = fs::read_dir(&directory)
+            .map_err(|error| format!("failed to read migrations {}: {error}", directory.display()))?
+            .map(|entry| {
+                entry
+                    .map(|entry| entry.path())
+                    .map_err(|error| error.to_string())
+            })
+            .collect::<MigrationResult<Vec<_>>>()?;
+        paths.retain(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with("_up.sql"))
+        });
+        paths.sort();
+        paths
+            .into_iter()
+            .map(|path| {
+                fs::read_to_string(&path).map_err(|error| {
+                    format!("failed to read migration {}: {error}", path.display())
+                })
+            })
+            .collect::<MigrationResult<Vec<_>>>()?
+    };
     let mut transaction = connection
         .begin()
         .await
@@ -1165,6 +1192,12 @@ async fn repair_required_schema(
         .execute(&mut *transaction)
         .await
         .map_err(|error| format!("failed to ensure required currency_rates table: {error}"))?;
+    for script in additive_schema {
+        sqlx::raw_sql(&script)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to ensure additive schema: {error}"))?;
+    }
     repair_index(
         &mut transaction,
         "currency_rates",

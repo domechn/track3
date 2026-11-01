@@ -65,7 +65,8 @@ fixture diff:
 | `tests/golden/sync-real-wire-0.9.4.json`, `sync-real-bucket-0.9.4.json` | Decrypted pushed sync objects and encrypted bucket bytes; the bucket is pulled back into a fresh repository | `UPDATE_GOLDEN=1 corepack yarn vitest run src/middlelayers/sync/golden-wire.test.ts` |
 | `tests/golden/sync-bucket-0.9.4.json`, `sync-snapshot.json`, `sync-session.json`, `sync-config.json` | Committed 0.9.4 bucket input and the snapshot, session, and config expected after pull | Kept from the released 0.9.4 fixture; `golden-wire.test.ts` reads these and does not regenerate them |
 | `tests/golden/sync-manifest.json` | Archived decrypted manifest for the committed 0.9.4 bucket; no current test reads this file | Kept from the released 0.9.4 fixture; no updater |
-| `src-tauri/tests/fixtures/schema-0.9.4.txt`, `migrations.sha256` | SQLite schema and migration SQL hashes | From `src-tauri/`: `UPDATE_GOLDEN=1 cargo test --locked -p track3-pure-tests schema_dump_matches_0_9_4` |
+| `src-tauri/tests/fixtures/schema-0.9.4.txt`, `migrations.sha256` | Frozen 0.9.4 SQLite schema and migration SQL hashes | Never regenerate from newer code |
+| `src-tauri/tests/fixtures/schema-0.9.5-additions.txt`, `migrations-0.9.5-additions.sha256` | Reviewed additions to the frozen schema and migration hashes | From `src-tauri/`: `UPDATE_GOLDEN=1 cargo test --locked -p track3-pure-tests --lib schema_is_frozen_0_9_4_subset_plus_reviewed_additions`; review every added line |
 
 `tests/e2e/format-golden.spec.ts` reads the export fixture and the static
 `tests/golden/storage-keys.json`; it has no separate fixture updater. The

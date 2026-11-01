@@ -86,6 +86,33 @@ jobs:
       - name: smoke test
         run: corepack yarn test:e2e
 
+  compat-094:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: enable corepack
+        run: |
+          corepack enable
+          corepack prepare yarn@4.9.2 --activate
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - name: install frontend dependencies
+        run: corepack yarn install --immutable
+      - name: test released 0.9.4 compatibility
+        run: timeout 600 node scripts/compat/run-094.mjs
+
   test-tauri:
     needs: quality
     strategy:
