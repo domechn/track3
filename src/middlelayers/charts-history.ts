@@ -11,6 +11,7 @@ import { executeWriteWork, selectFromDatabaseWithSql } from "./database";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { invoke } from "@tauri-apps/api/core";
 import { readSnapshot } from "./snapshot";
+import { partialFromRow, type PartialRow } from "./snapshot-partial";
 
 export type HistoricalPageRow = {
   id: string;
@@ -206,6 +207,15 @@ export async function queryHistoricalData(
         return acc
       }, {})
     : {};
+  const partialByUUID = new Map<string, HistoricalData["partial"]>();
+  for (let index = 0; index < uuids.length; index += 500) {
+    const batch = uuids.slice(index, index + 500);
+    const rows = await selectFromDatabaseWithSql<PartialRow>(
+      `SELECT uuid, sources_total, missing, fill, created_at FROM snapshot_partial WHERE uuid IN (${batch.map(() => "?").join(",")})`,
+      batch,
+    );
+    for (const row of rows) partialByUUID.set(row.uuid, partialFromRow(row));
+  }
 
   const assetsModelsToHistoricalData = (ams: AssetModel[]): HistoricalData => {
     const first = ams[0];
@@ -216,6 +226,7 @@ export async function queryHistoricalData(
       assets: ams,
       transactions: includeTransactions ? (transactionsByUUID[uuid] ?? []) : [],
       total: ams.reduce((s, a) => s + a.value, 0),
+      ...(partialByUUID.has(uuid) ? { partial: partialByUUID.get(uuid) } : {}),
     };
   };
 

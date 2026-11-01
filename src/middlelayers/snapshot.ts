@@ -1,17 +1,21 @@
 import { getDatabase } from "./database";
 import type { Snapshot } from "./sync/engine";
+import { partialFromRow, type PartialRow } from "./snapshot-partial";
 
 export async function readSnapshot(uuid: string): Promise<Snapshot> {
   const db = await getDatabase();
-  const [assets, prices, transactions] = await Promise.all([
+  const [assets, prices, transactions, marker] = await Promise.all([
     db.select<Array<Record<string, unknown>>>("SELECT * FROM assets_v2 WHERE uuid = ?", [uuid]),
     db.select<Array<Record<string, unknown>>>("SELECT * FROM asset_prices WHERE uuid = ?", [uuid]),
     db.select<Array<Record<string, unknown>>>("SELECT * FROM transactions WHERE uuid = ?", [uuid]),
+    db.select<PartialRow[]>(
+      "SELECT uuid, sources_total, missing, fill, created_at FROM snapshot_partial WHERE uuid = ?", [uuid]),
   ]);
   const assetIds = new Set(assets.map((asset) => asset.id));
   return {
     uuid, assets,
     prices: prices.filter((price) => assetIds.has(price.assetID)),
     transactions: transactions.filter((transaction) => assetIds.has(transaction.assetID)),
+    ...(marker[0] ? { partial: partialFromRow(marker[0]) } : {}),
   };
 }

@@ -1,0 +1,67 @@
+{
+  "uuid": "snapshot-000000",
+  "assets": [
+    {
+      "id": 1,
+      "uuid": "snapshot-000000",
+      "createdAt": "2022-01-01T00:00:00.000Z",
+      "wallet": "wallet-golden",
+      "asset_type": "crypto",
+      "symbol": "ASSET0",
+      "amount": 1,
+      "value": 1,
+      "price": 1
+    },
+    {
+      "id": 2,
+      "uuid": "snapshot-000000",
+      "createdAt": "2022-01-01T00:00:00.000Z",
+      "wallet": "wallet-golden",
+      "asset_type": "crypto",
+      "symbol": "ASSET1",
+      "amount": 1,
+      "value": 2,
+      "price": 2
+    }
+  ],
+  "prices": [
+    {
+      "id": 1,
+      "uuid": "snapshot-000000",
+      "assetID": 1,
+      "symbol": "ASSET0",
+      "price": 1,
+      "assetCreatedAt": "2022-01-01T00:00:00.000Z",
+      "updatedAt": "2022-01-01T00:00:00.000Z"
+    }
+  ],
+  "transactions": [
+    {
+      "id": 1,
+      "uuid": "snapshot-000000",
+      "assetID": 1,
+      "asset_type": "crypto",
+      "wallet": "wallet-golden",
+      "symbol": "ASSET0",
+      "amount": 1,
+      "price": 1,
+      "txnType": "buy",
+      "txnCreatedAt": "2022-01-01T00:00:00.000Z",
+      "createdAt": "2022-01-01T00:00:00.000Z",
+      "updatedAt": "2022-01-01T00:00:00.000Z"
+    }
+  ],
+  "partial": {
+    "sourcesTotal": 2,
+    "missing": [
+      {
+        "wallet": "ddf7fe606e048ac89f8a8c62bf23c4be",
+        "kind": "exchange",
+        "provider": "OKX",
+        "category": "network"
+      }
+    ],
+    "fill": "last_known",
+    "createdAt": "2024-04-16T13:00:00.000Z"
+  }
+}

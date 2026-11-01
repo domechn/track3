@@ -168,7 +168,7 @@ async function seededRepository() {
   const SQL = await initSqlJs();
   const db = new SQL.Database();
   state.db = db;
-  for (const table of ["assets_v2", "asset_prices", "transactions", "configuration", "rebalance_profiles", "sync_state", "sync_snapshot_state", "sync_manifest_cache"]) {
+  for (const table of ["assets_v2", "asset_prices", "transactions", "configuration", "rebalance_profiles", "sync_state", "sync_snapshot_state", "sync_manifest_cache", "snapshot_partial"]) {
     db.run(readFileSync(resolve(`src-tauri/migrations/init/${table}_up.sql`), "utf8"));
   }
   const snapshot = [...hourlyHistory(1, 2)][0];
@@ -222,6 +222,29 @@ async function decryptedBodies(store: FakeS3) {
 }
 
 describe("0.9.4 encrypted sync wire", () => {
+  it("carries a partial marker as an optional top-level snapshot field", async () => {
+    const { repo, db, snapshotId } = await seededRepository();
+    try {
+      db.run(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
+        VALUES (?, 2, '[{"wallet":"ddf7fe606e048ac89f8a8c62bf23c4be","kind":"exchange","provider":"OKX","category":"network"}]',
+        'last_known', '2024-04-16T13:00:00.000Z')`, [snapshotId]);
+      const source = new LegacyJsonRepository();
+      source.snapshots.set(snapshotId, await repo.readSnapshot(snapshotId));
+      const store = new FakeS3();
+      await writeSyncHeader(store, header);
+      const engine = new SyncEngine(store, source, "unused", { now: () => fixedTime });
+      expect((await engine.syncOnce()).errors).toEqual([]);
+      const wire = await decryptedBodies(store);
+      const snapshot = Object.entries(wire).find(([name]) => name.includes("/snapshot/"))?.[1];
+      expect(snapshot).toBeDefined();
+      capture("partial-wire", snapshot);
+      engine.dispose();
+    } finally {
+      fixedKey.set(Array.from({ length: 32 }, (_, index) => index + 1));
+      db.close();
+      state.db = undefined;
+    }
+  });
   it("matches the migration fixture to current engine output", async () => {
     const { repo, db, snapshotId } = await seededRepository();
     const changes = await repo.listChangedSnapshotIds();

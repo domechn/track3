@@ -96,6 +96,7 @@ async function freshDatabase() {
     "configuration", "assets_v2", "currency_rates", "asset_prices",
     "transactions", "chat_sessions", "cloud_sync", "rebalance_profiles",
     "alerts", "history_snapshots", "sync_state",
+    "snapshot_partial",
   ]) db.run(readFileSync(resolve(`src-tauri/migrations/init/${name}_up.sql`), "utf8"));
   state.db = db;
   return db;
@@ -147,5 +148,20 @@ describe("0.9.4 export and backup formats", () => {
     const parts = [...state.files.entries()].filter(([path]) => path.includes("/data/")).sort();
     expect(parts).toHaveLength(1);
     capture("backup-v2-part-0.9.4.json", parts[0][1]);
+  });
+
+  it("exports an optional partial marker inside its history record and restores it", async () => {
+    state.db!.run(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
+      VALUES ('snapshot-000001', 2, '[{"wallet":"ddf7fe606e048ac89f8a8c62bf23c4be","kind":"exchange","provider":"OKX","category":"network"}]',
+      'last_known', '2024-04-16T13:00:00.000Z')`);
+    await DATA_MANAGER.exportHistoricalData("/partial.json", false);
+    const text = state.files.get("/partial.json")!;
+    const data = JSON.parse(text) as ExportData;
+    expect(data.historicalData.find((row) => row.assets[0]?.uuid === "snapshot-000001")?.partial?.missing[0].provider).toBe("OKX");
+    capture("export-partial.json", text);
+    await freshDatabase();
+    await DATA_MANAGER.importHistoricalData("REPLACE", data);
+    expect(query("SELECT sources_total, fill FROM snapshot_partial WHERE uuid='snapshot-000001'"))
+      .toEqual([{ sources_total: 2, fill: "last_known" }]);
   });
 });

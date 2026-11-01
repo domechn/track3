@@ -88,7 +88,8 @@ it("invalidates cached fetch data after a pull changes local data", () => {
 
 it("omits prices left behind by a deleted asset row", async () => {
   vi.mocked(getDatabase).mockResolvedValue({
-    select: async (sql: string) => sql.includes("assets_v2") ? [{ id: 2 }] :
+    select: async (sql: string) => sql.includes("snapshot_partial") ? [] :
+      sql.includes("assets_v2") ? [{ id: 2 }] :
       sql.includes("asset_prices") ? [{ assetID: 1 }, { assetID: 2 }] :
       [{ assetID: 1 }, { assetID: 2 }],
   } as never);

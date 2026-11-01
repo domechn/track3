@@ -1,3 +1,4 @@
+use crate::snapshot_partial::PartialSnapshot;
 use crate::types::{RefreshAssetInput, RefreshTransactionInput};
 use sha2::{Digest, Sha256};
 use sqlx::{sqlite::SqliteConnectOptions, Connection, Executor, SqliteConnection};
@@ -18,8 +19,10 @@ pub async fn persist_refresh(
     created_at: &str,
     assets: &[RefreshAssetInput],
     transactions: &[RefreshTransactionInput],
+    partial: Option<serde_json::Value>,
 ) -> Result<(), String> {
     validate_inputs(operation_uuid, created_at, assets, transactions)?;
+    let partial = partial.map(PartialSnapshot::from_value).transpose()?;
     let payload_digest = payload_digest(created_at, assets, transactions);
     let _write_guard = REFRESH_PERSISTENCE_LOCK.lock().await;
 
@@ -46,6 +49,7 @@ pub async fn persist_refresh(
         created_at,
         assets,
         transactions,
+        partial.as_ref(),
         &payload_digest,
     )
     .await;
@@ -71,6 +75,7 @@ async fn persist_in_transaction(
     created_at: &str,
     assets: &[RefreshAssetInput],
     transactions: &[RefreshTransactionInput],
+    partial: Option<&PartialSnapshot>,
     payload_digest: &str,
 ) -> Result<(), String> {
     ensure_refresh_operations_schema(connection).await?;
@@ -125,6 +130,9 @@ async fn persist_in_transaction(
             }
         };
         if committed_digest == payload_digest {
+            if let Some(partial) = partial {
+                partial.insert(connection, operation_uuid).await?;
+            }
             return Ok(());
         }
         return Err("operation UUID conflicts with a different refresh payload".to_string());
@@ -204,6 +212,9 @@ async fn persist_in_transaction(
         })?;
     }
 
+    if let Some(partial) = partial {
+        partial.insert(connection, operation_uuid).await?;
+    }
     sqlx::query(
         "INSERT INTO refresh_operations (operation_uuid, created_at, payload_digest)
          VALUES (?, ?, ?)",
@@ -412,7 +423,7 @@ fn validate_operation_uuid(operation_uuid: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_created_at(created_at: &str) -> Result<(), String> {
+pub(crate) fn validate_created_at(created_at: &str) -> Result<(), String> {
     let bytes = created_at.as_bytes();
     if bytes.len() != 24
         || bytes[4] != b'-'
@@ -710,6 +721,7 @@ mod tests {
             created_at,
             assets,
             transactions,
+            None,
         )
         .await
     }
@@ -1121,7 +1133,7 @@ mod tests {
                     let path = database.path.clone();
                     let assets = assets.clone();
                     tokio::spawn(async move {
-                        persist_refresh(&path, OPERATION_UUID, CREATED_AT, &assets, &[]).await
+                        persist_refresh(&path, OPERATION_UUID, CREATED_AT, &assets, &[], None).await
                     })
                 })
                 .collect::<Vec<_>>();
@@ -1158,7 +1170,15 @@ mod tests {
                 .map(|index| asset("wallet-b", &format!("SECOND-{index}")))
                 .collect::<Vec<_>>();
             let first = tokio::spawn(async move {
-                persist_refresh(&first_path, OPERATION_UUID, CREATED_AT, &first_assets, &[]).await
+                persist_refresh(
+                    &first_path,
+                    OPERATION_UUID,
+                    CREATED_AT,
+                    &first_assets,
+                    &[],
+                    None,
+                )
+                .await
             });
             let second = tokio::spawn(async move {
                 persist_refresh(
@@ -1167,6 +1187,7 @@ mod tests {
                     CREATED_AT,
                     &second_assets,
                     &[],
+                    None,
                 )
                 .await
             });

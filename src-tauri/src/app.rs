@@ -99,6 +99,7 @@ async fn persist_refresh(
     created_at: String,
     assets: Vec<RefreshAssetInput>,
     txns: Vec<RefreshTransactionInput>,
+    partial: Option<serde_json::Value>,
 ) -> Result<(), String> {
     persist_refresh_atomically(
         &database_path.0,
@@ -106,6 +107,7 @@ async fn persist_refresh(
         &created_at,
         &assets,
         &txns,
+        partial,
     )
     .await
 }

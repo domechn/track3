@@ -54,6 +54,7 @@ import {
   getLatestCommittedRefreshCreatedAt,
 } from "./database";
 import { FullRefreshRequiredError } from "./refresh-error";
+import { partialFromSourceStatuses, type PartialSnapshot } from "./snapshot-partial";
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
   ASSET_HANDLER.listAssets(size),
@@ -80,6 +81,7 @@ export type RefreshOperation = {
       createdAt: string;
       assets: RefreshAssetInput[];
       txns: RefreshTransactionDraft[];
+      partial?: PartialSnapshot;
     };
     result: RefreshAllDataResult;
   };
@@ -419,12 +421,16 @@ export async function refreshAllData(
           currentPrices,
         );
         const refreshAssets = generateRefreshAssets(coins, transactions);
+        const partial = sourceStatuses && partialFromSourceStatuses(
+          sourceStatuses, readyQueryResult.portfolioResult.sourceResults, refreshCreatedAt,
+        );
         operation.prepared = {
           payload: {
             operationUuid: operation.operationUuid,
             createdAt: refreshCreatedAt,
             assets: refreshAssets,
             txns: transactions,
+            ...(partial ? { partial } : {}),
           },
           result: {
             failedSources: readyQueryResult.failedSources,

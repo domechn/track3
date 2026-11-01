@@ -3,6 +3,7 @@ import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-st
 import { compareClock, MAX_REMOTE_SKEW_MS, nextClock, validRemoteClock, type Hlc } from "./clock";
 import { syncCategory, type SyncCategory } from "./config-keys";
 import { createSyncDiagnostics, type SyncDiagnostics } from "./diagnostics";
+import type { PartialSnapshot } from "../snapshot-partial";
 
 class InvalidRemoteEntry extends Error {}
 class FutureRemoteEntry extends Error {}
@@ -12,6 +13,7 @@ export type Snapshot = {
   assets: Array<Record<string, unknown>>;
   prices: Array<Record<string, unknown>>;
   transactions: Array<Record<string, unknown>>;
+  partial?: PartialSnapshot;
 };
 export type SyncMessage = { id: string; at: string; role: string; [key: string]: unknown };
 export type SyncSession = {

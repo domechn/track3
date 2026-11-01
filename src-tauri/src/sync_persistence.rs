@@ -1,4 +1,5 @@
 use crate::edit_log;
+use crate::snapshot_partial::PartialSnapshot;
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteConnectOptions, Connection, Executor, SqliteConnection};
 use std::{collections::HashMap, path::Path, time::Duration};
@@ -230,6 +231,16 @@ async fn persist_sync_snapshot(
     log: Option<(&str, &str)>,
     orphan_transactions: Vec<Transaction>,
 ) -> Result<bool, String> {
+    let partial =
+        value
+            .get("partial")
+            .and_then(|value| match PartialSnapshot::from_value(value.clone()) {
+                Ok(marker) => Some(marker),
+                Err(_) => {
+                    eprintln!("Ignoring invalid optional partial snapshot marker");
+                    None
+                }
+            });
     let mut snapshot: Snapshot =
         serde_json::from_value(value).map_err(|_| "Invalid sync snapshot".to_string())?;
     if snapshot.uuid.is_empty()
@@ -424,6 +435,9 @@ async fn persist_sync_snapshot(
     .execute(&mut connection)
     .await
     .map_err(|_| "Failed to record sync snapshot".to_string())?;
+    if let Some(partial) = &partial {
+        partial.insert(&mut connection, &snapshot.uuid).await?;
+    }
     if let Some((origin, action)) = log {
         if !replace || replacement_changed {
             let new_summary = if orphan_transactions.is_empty() {
@@ -605,7 +619,12 @@ async fn delete_snapshot(database_path: &Path, uuid: &str, local: bool) -> Resul
         } else {
             None
         };
-        for table in ["asset_prices", "transactions", "assets_v2"] {
+        for table in [
+            "asset_prices",
+            "transactions",
+            "assets_v2",
+            "snapshot_partial",
+        ] {
             sqlx::query(&format!("DELETE FROM {table} WHERE uuid = ?"))
                 .bind(uuid)
                 .execute(&mut connection)

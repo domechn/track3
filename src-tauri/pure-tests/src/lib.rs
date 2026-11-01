@@ -12,12 +12,17 @@ pub mod ios_share_path;
 pub mod migration;
 #[path = "../../src/refresh_persistence.rs"]
 pub mod refresh_persistence;
+#[path = "../../src/snapshot_partial.rs"]
+pub mod snapshot_partial;
 #[path = "../../src/startup_security.rs"]
 pub mod startup_security;
 #[path = "../../src/sync_persistence.rs"]
 pub mod sync_persistence;
 #[path = "../../src/types.rs"]
 pub mod types;
+
+#[cfg(test)]
+mod partial_tests;
 
 #[cfg(test)]
 mod edit_log_tests {
@@ -114,6 +119,7 @@ mod edit_log_tests {
                 include_str!("../../migrations/init/transactions_up.sql"),
                 include_str!("../../migrations/init/sync_state_up.sql"),
                 include_str!("../../migrations/init/snapshot_edit_log_up.sql"),
+                include_str!("../../migrations/init/snapshot_partial_up.sql"),
             ] { db.execute(sql).await.unwrap(); }
             db.execute("INSERT INTO assets_v2 (uuid, wallet, asset_type, symbol, amount, value, price) VALUES ('one', 'hash', 'crypto', 'ETH', 1, 2, 2)").await.unwrap();
             db.execute("INSERT INTO transactions (id, uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt) VALUES (9, 'one', 99, 'crypto', 'hash', 'ETH', 1, 2, 'buy', '2026-11-01', '2026-11-01', '2026-11-01')").await.unwrap();
@@ -378,6 +384,7 @@ mod sync_tests {
             db.execute(include_str!("../../migrations/init/assets_v2_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/init/asset_prices_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/snapshot_partial_up.sql")).await.unwrap();
             db.execute(include_str!("../../migrations/v08t09/sync_state_up.sql")).await.unwrap();
             db.execute("INSERT INTO assets_v2 (uuid, wallet, symbol, amount, value, price) VALUES ('local', '', 'BTC', 1, 1, 1)").await.unwrap();
             db.close().await.unwrap();
@@ -905,6 +912,7 @@ mod init_schema_tests {
             run_migrations(&db_path, &resource_dir, "0.9.5").await.unwrap();
             let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
             db.execute("INSERT INTO snapshot_edit_log (snapshot_uuid, edited_at, origin, target, action, old_value, new_value) VALUES ('db-compat', '2026-11-01T00:00:00Z', 'local', 'transaction', 'price', '2', '3')").await.unwrap();
+            db.execute("INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at) VALUES ('db-compat', 2, '[{\"wallet\":\"ddf7fe606e048ac89f8a8c62bf23c4be\",\"kind\":\"exchange\",\"provider\":\"OKX\",\"category\":\"network\"}]', 'last_known', '2024-04-16T13:00:00.000Z')").await.unwrap();
             db.close().await.unwrap();
         });
     }

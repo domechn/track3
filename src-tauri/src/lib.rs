@@ -16,6 +16,7 @@ pub mod ios_share_path;
 pub mod key_rotation;
 pub mod migration;
 pub mod refresh_persistence;
+pub mod snapshot_partial;
 pub mod startup_security;
 pub mod sync_persistence;
 pub mod types;

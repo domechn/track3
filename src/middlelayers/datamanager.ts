@@ -22,6 +22,7 @@ import { executeWriteWork, WriteDatabase } from "./database";
 import { getDatabase } from "./database";
 import { invoke } from "@tauri-apps/api/core";
 import { readSnapshot } from "./snapshot";
+import { validatePartialSnapshot } from "./snapshot-partial";
 import { snapshotContent, type Snapshot } from "./sync/engine";
 
 export type ImportStatus = "new" | "same" | "different";
@@ -70,7 +71,7 @@ export type ExportData = {
 
 type PartlyHistoricalData = Pick<
   HistoricalData,
-  "createdAt" | "assets" | "transactions" | "total"
+  "createdAt" | "assets" | "transactions" | "total" | "partial"
 >[];
 
 class DataManagement implements DataManager {
@@ -168,6 +169,11 @@ class DataManagement implements DataManager {
     if (!this.validateHistoricalDataTransactions(transactions)) {
       throw new Error(`invalid data: errorCode 004`);
     }
+    for (const record of historicalData) {
+      if (!("partial" in record)) continue;
+      validatePartialSnapshot(record.partial!);
+      if (!record.assets[0]?.uuid) throw new Error("Invalid partial snapshot");
+    }
   }
 
   private validateExportData(data: ExportData): PartlyHistoricalData {
@@ -189,7 +195,7 @@ class DataManagement implements DataManager {
     return historicalData;
   }
 
-  private fileSnapshot(record: Pick<PartlyHistoricalData[number], "assets" | "transactions">): Snapshot {
+  private fileSnapshot(record: Pick<PartlyHistoricalData[number], "assets" | "transactions" | "partial">): Snapshot {
     const uuid = record.assets[0]?.uuid;
     if (!uuid || record.assets.some((asset) => asset.uuid !== uuid || !Number.isSafeInteger(asset.id) || asset.id <= 0) ||
       record.transactions.some((txn) => txn.uuid !== uuid || !Number.isSafeInteger(txn.assetID))) {
@@ -212,7 +218,8 @@ class DataManagement implements DataManager {
         createdAt: txn.createdAt, updatedAt: txn.updatedAt,
       };
     });
-    return { uuid, assets, prices: [], transactions };
+    return { uuid, assets, prices: [], transactions,
+      ...("partial" in record ? { partial: validatePartialSnapshot(record.partial!) } : {}) };
   }
 
   async previewImport(data: ExportData): Promise<{ rows: ImportPreviewRow[] }> {
@@ -318,6 +325,15 @@ class DataManagement implements DataManager {
       conflictResolver,
       writeDatabase,
     );
+    for (const record of historicalData) {
+      if (!("partial" in record)) continue;
+      const partial = record.partial!;
+      const uuid = record.assets[0].uuid;
+      await writeDatabase.execute(
+        "INSERT OR IGNORE INTO snapshot_partial (uuid, sources_total, missing, fill, created_at) VALUES (?, ?, ?, ?, ?)",
+        [uuid, partial.sourcesTotal, JSON.stringify(partial.missing), partial.fill, partial.createdAt],
+      );
+    }
   }
 
   async importHistoricalData(

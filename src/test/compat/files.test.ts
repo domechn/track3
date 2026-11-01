@@ -1,7 +1,6 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import initSqlJs, { type Database } from "sql.js";
-import md5 from "md5";
 import { describe, expect, it, vi } from "vitest";
 import type { ExportData } from "@/middlelayers/datamanager";
 
@@ -95,6 +94,7 @@ async function freshDb() {
   for (const name of ["configuration", "assets_v2", "asset_prices", "transactions", "history_snapshots"]) {
     db.run(readFileSync(resolve(`src-tauri/migrations/init/${name}_up.sql`), "utf8"));
   }
+  if (mode !== "consume") db.run(readFileSync(resolve("src-tauri/migrations/init/snapshot_partial_up.sql"), "utf8"));
   state.db = db;
   return db;
 }
@@ -122,10 +122,12 @@ describe.skipIf(!mode)("cross-version export and backup", () => {
     await DATA_MANAGER.exportHistoricalData("/export.json", false);
     const original = JSON.parse(state.files.get("/export.json")!) as ExportData;
     writeFileSync(fixture("export-base.json"), JSON.stringify(original));
-    const extended = structuredClone(original) as ExportData & { historicalData: Array<Record<string, unknown>> };
-    extended.historicalData[0].compatOptional = { note: "old readers ignore this record field" };
-    const { md5V2: _oldMd5, ...payload } = extended;
-    extended.md5V2 = md5(JSON.stringify({ data: JSON.stringify(payload) }));
+    state.db!.run(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
+      VALUES ('compat-snapshot', 2, '[{"wallet":"ddf7fe606e048ac89f8a8c62bf23c4be","kind":"exchange","provider":"OKX","category":"network"}]',
+      'last_known', '2024-04-16T13:00:00.000Z')`);
+    await DATA_MANAGER.exportHistoricalData("/forward.json", false);
+    const extended = JSON.parse(state.files.get("/forward.json")!) as ExportData;
+    expect(extended.historicalData[0].partial?.missing[0].provider).toBe("OKX");
     writeFileSync(fixture("export-forward.json"), JSON.stringify(extended));
     await writeBackupV2("/backup", "compat-producer", "0.9.5", extended.historicalData);
     for (const [path, text] of state.files) {
@@ -160,7 +162,7 @@ describe.skipIf(!mode)("cross-version export and backup", () => {
       imported.push(...records);
     }, { strict: true });
     expect(result.imported).toBe(true);
-    const [{ compatOptional: _extra, ...record }] = imported;
+    const [{ partial: _extra, ...record }] = imported;
     expect(record).toStrictEqual(JSON.parse(readFileSync(fixture("export-base.json"), "utf8")).historicalData[0]);
   });
 });
