@@ -9,6 +9,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import HistoricalData from "@/components/historical-data";
+import MobileHistoricalData from "@/mobile/components/historical-data";
 
 vi.mock("@/components/motion", () => ({
   StaggerContainer: ({
@@ -85,6 +86,12 @@ beforeEach(() => {
 });
 
 describe("Historical Data page", () => {
+  it("groups snapshot totals in a readable summary strip", async () => {
+    vi.mocked(queryHistoricalData).mockResolvedValue([]);
+    render(<HistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    expect(await screen.findByTestId("history-kpi-strip")).toHaveTextContent("Total Records");
+    expect(screen.getByTestId("history-kpi-strip")).toHaveTextContent("Latest Snapshot");
+  });
   it("opens snapshot details from a named keyboard control", async () => {
     const localNoon = new Date(2024, 3, 16, 12).toISOString();
     vi.mocked(queryHistoricalData).mockResolvedValue([{
@@ -96,8 +103,10 @@ describe("Historical Data page", () => {
       transactions: [],
     }]);
     render(<HistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
-    const trigger = await screen.findByRole("button", { name: "View snapshot from 2024-4-16 12:00:00" });
-    expect(trigger).toHaveAccessibleName("View snapshot from 2024-4-16 12:00:00");
+    const trigger = await within(await screen.findByTestId("history-snapshot-row")).findByLabelText("View snapshot from 2024-4-16 12:00:00 · Apr 16, 2024, 12:00");
+    expect(trigger).toHaveAccessibleName("View snapshot from 2024-4-16 12:00:00 · Apr 16, 2024, 12:00");
+    expect(trigger).toHaveTextContent("Apr 16, 2024, 12:00");
+    expect(screen.getByText("snapshot")).toBeInTheDocument();
     trigger.focus();
     await userEvent.keyboard("{Enter}");
     const dialog = await screen.findByRole("dialog", { name: /historical data detail/i });
@@ -105,6 +114,15 @@ describe("Historical Data page", () => {
     expect(table).toHaveAttribute("aria-rowcount", "2");
     expect(within(table).getByRole("columnheader", { name: "Asset" })).toHaveAttribute("scope", "col");
     expect(within(table).getByTestId("history-detail-row")).toHaveAttribute("aria-rowindex", "2");
+  });
+  it("uses the same readable row date in the mobile fallback table", async () => {
+    const localNoon = new Date(2024, 3, 16, 12).toISOString();
+    vi.mocked(queryHistoricalData).mockResolvedValue([{
+      id: "snapshot-1", createdAt: localNoon, total: 1200, assets: [], transactions: [],
+    }]);
+    render(<MobileHistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    const trigger = await within(await screen.findByTestId("history-snapshot-row")).findByLabelText("View snapshot from 2024-4-16 12:00:00 · Apr 16, 2024, 12:00");
+    expect(trigger).toHaveTextContent("Apr 16, 2024, 12:00");
   });
   it("shows a heading and keeps the loading status visible while records are unresolved", () => {
     vi.useFakeTimers();

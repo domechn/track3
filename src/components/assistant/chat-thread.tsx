@@ -103,6 +103,7 @@ export default function ChatThread({
   // When a new message turn starts (messages.length grows), always scroll
   // to the bottom and reset the scroll-away lock.
   useEffect(() => {
+    if (messages.length === 0) return;
     const el = scrollRef.current;
     if (!el) return;
 
@@ -124,6 +125,7 @@ export default function ChatThread({
   // (assistant has think blocks but no text blocks yet), skip auto-scroll
   // so the thinking content stays visible.
   useEffect(() => {
+    if (messages.length === 0) return;
     if (userScrolledAwayRef.current) return;
 
     const el = scrollRef.current;

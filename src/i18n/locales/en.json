@@ -1308,5 +1308,15 @@
   "data.phase6.portfolioHistory": "Portfolio history",
   "data.phase6.configuration": "Configuration",
   "data.phase6.configDetail": "Optional saved settings",
-  "data.phase6.historyDetail": "{snapshots} snapshots · {transactions} transactions"
+  "data.phase6.historyDetail": "{snapshots} snapshots · {transactions} transactions",
+  "rebalance.syncNote": "Targets are included in encrypted sync when enabled.",
+  "rebalance.summary.portfolio": "Portfolio value",
+  "rebalance.summary.targets": "Targets total",
+  "rebalance.summary.drift": "Largest drift",
+  "rebalance.summary.outside": "Outside tolerance",
+  "rebalance.summary.trades": "Suggested trades",
+  "goals.summary.active": "Active rules",
+  "goals.summary.unread": "Unread alerts",
+  "goals.summary.recentTriggered": "Recent triggers",
+  "goals.summary.lastCheck": "Last check"
 }

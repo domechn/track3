@@ -47,10 +47,11 @@ test("mobile locked prompt dismisses and turn-off requires confirmation", async 
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
+  await expect(page.locator("#app-main-content")).toContainText("$42,000.00");
   const pill = page.getByRole("button", { name: "Sync locked" });
   await expect(page.getByLabel("Sync passphrase")).toBeVisible();
   await expect(page.getByLabel("Sync passphrase")).toBeFocused();
-  await page.keyboard.press("Escape");
+  await page.getByLabel("Sync passphrase").press("Escape");
   await expect(page.getByLabel("Sync passphrase")).toHaveCount(0);
   await expect(pill).toBeFocused();
   await pill.click();
@@ -60,6 +61,7 @@ test("mobile locked prompt dismisses and turn-off requires confirmation", async 
   await page.touchscreen.tap(popover.x / 2, popover.y + 24);
   await expect(page.getByLabel("Sync passphrase")).toHaveCount(0);
   await pill.click();
+  await expect(page.getByRole("button", { name: "Turn off sync on this device" })).toBeVisible();
   await page.getByRole("button", { name: "Turn off sync on this device" }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();

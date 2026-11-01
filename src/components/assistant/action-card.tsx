@@ -106,7 +106,7 @@ export default function ActionCard({
     ? { route: "/cost-basis", key: "aiSetup.page.cost-basis" } : undefined);
 
   return (
-    <section aria-label={t("assistant.action.confirmation")} className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+    <section aria-label={t("assistant.action.confirmation")} className="t3-action-confirmation rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
       <h3 className="font-semibold">{t(`assistant.action.name.${action.name}`)}</h3>
       <p className="text-xs text-muted-foreground">{t("assistant.action.risk")}: {t(`assistant.action.risk.${action.risk}`)}</p>
       <dl className="mt-2 grid gap-1 text-xs">

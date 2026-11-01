@@ -282,6 +282,7 @@ describe("ChatPage", () => {
     renderAt("/", true);
     await waitFor(() => {
       expect(screen.getByTestId("assistant-not-configured")).toBeTruthy();
+      expect(screen.getByTestId("assistant-not-configured").querySelector("[class*='bg-gradient']")).toBeNull();
     });
     expect(screen.getByText(/Set up the Assistant/i)).toBeTruthy();
     expect(screen.getByText(/Portfolio summary/i)).toBeTruthy();

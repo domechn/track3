@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/i18n";
 import {
   ALERTS_CHANGED_EVENT, acknowledgeAlert, acknowledgeAllAlerts, clearAlertHistory,
-  deleteAlertRule, listAlertHistory, listAlertRules, loadAlertEvaluationData,
+  countUnreadAlerts, deleteAlertRule, listAlertHistory, listAlertRules, loadAlertEvaluationData,
   measureRule, saveAlertRule, setAlertRuleEnabled,
   type AlertComparator, type AlertHistory, type AlertKind, type AlertPrices,
   type AlertRule, type AlertSnapshot, type AlertWindow,
@@ -28,6 +28,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 
 const emptyDraft: AlertDraft = {
   id: 0, kind: "total_value_target", assetType: "crypto", symbol: "",
@@ -47,11 +48,12 @@ const historySeverity = (kind: AlertKind) =>
   kind === "period_pnl" || kind === "portfolio_value_change" ? "high" : kind === "allocation_deviation" || kind === "asset_price_move" ? "medium" : "low";
 
 export default function GoalsAlerts() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const dataChangedVersion = useDataChangedVersion();
   const [draft, setDraft] = useState<AlertDraft>(emptyDraft);
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [history, setHistory] = useState<AlertHistory[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [snapshots, setSnapshots] = useState<AlertSnapshot[]>([]);
   const [portfolioValues, setPortfolioValues] = useState<Array<{ date: string; value: number }>>([]);
   const [prices, setPrices] = useState<AlertPrices>({});
@@ -63,10 +65,12 @@ export default function GoalsAlerts() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [manualOpen, setManualOpen] = useState(true);
   const manualInitialized = useRef(false);
+  const newRuleButton = useRef<HTMLButtonElement>(null);
+  const editorTrigger = useRef<HTMLButtonElement | null>(null);
 
   async function reload() {
     try {
-      const [nextRules, nextHistory] = await Promise.all([listAlertRules(), listAlertHistory()]);
+      const [nextRules, nextHistory, nextUnreadCount] = await Promise.all([listAlertRules(), listAlertHistory(), countUnreadAlerts()]);
       const pnlWindows = nextRules.filter((rule) => rule.enabled && rule.kind === "period_pnl" && rule.window)
         .map((rule) => rule.window as AlertWindow);
       const evaluation = await loadAlertEvaluationData(undefined, undefined, new Date(), pnlWindows);
@@ -79,6 +83,7 @@ export default function GoalsAlerts() {
         manualInitialized.current = true;
       }
       setHistory(nextHistory);
+      setUnreadCount(nextUnreadCount);
       setSnapshots(evaluation.snapshots);
       setPortfolioValues(series.map((point) => ({ date: new Date(point.timestamp).toISOString().slice(0, 10), value: point.totalValue })));
       setPrices(evaluation.prices);
@@ -112,6 +117,8 @@ export default function GoalsAlerts() {
       setDraft(emptyDraft);
       setValidationField(null);
       setStatus(t("goals.saved"));
+      setManualOpen(false);
+      if (rules.length === 0) newRuleButton.current?.focus();
       await reload();
     } catch (cause) {
       setValidationField(cause instanceof Error
@@ -123,10 +130,16 @@ export default function GoalsAlerts() {
     }
   }
 
-  function edit(rule: AlertRule) {
-    setDraft(alertDraftFromRule(rule));
+  function openEditor(nextDraft: AlertDraft, trigger: HTMLButtonElement) {
+    editorTrigger.current = trigger;
+    setDraft(nextDraft);
     setStatus("");
-    document.getElementById("goal-rule-editor")?.scrollIntoView?.({ behavior: "smooth" });
+    setManualOpen(true);
+    if (rules.length === 0) requestAnimationFrame(() => document.getElementById("goal-rule-editor")?.scrollIntoView?.({ behavior: "smooth" }));
+  }
+
+  function edit(rule: AlertRule, trigger: HTMLButtonElement) {
+    openEditor(alertDraftFromRule(rule), trigger);
   }
 
   async function mutate(action: () => Promise<unknown>) {
@@ -139,17 +152,104 @@ export default function GoalsAlerts() {
     }
   }
 
+  const editor = (
+    <Card id="goal-rule-editor" className="border-0 shadow-none">
+      <CardHeader className="pb-3">
+        {rules.length > 0
+          ? <DialogTitle asChild><CardTitle className="text-base">{t(draft.id ? "goals.editRule" : "goals.newRule")}</CardTitle></DialogTitle>
+          : <CardTitle className="text-base">{t(draft.id ? "goals.editRule" : "goals.newRule")}</CardTitle>}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-2" aria-label={t("goals.templates")}>
+          {templates.map((kind) => (
+            <Button key={kind} size="sm" variant={draft.kind === kind ? "default" : "outline"}
+              onClick={() => setDraft({ ...emptyDraft, kind })}>{t(`goals.kind.${kind}`)}</Button>
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="space-y-1 text-sm">
+            <span>{t("goals.kind")}</span>
+            <select className="h-10 w-full rounded-md border bg-background px-3" value={draft.kind}
+              onChange={(e) => setDraft({ ...draft, kind: e.target.value as AlertKind })}>
+              {templates.map((kind) => <option key={kind} value={kind}>{t(`goals.kind.${kind}`)}</option>)}
+            </select>
+          </label>
+          {needsAsset(draft.kind) && <>
+            <label className="space-y-1 text-sm">
+              <span>{t("goals.assetType")}</span>
+              <select className="h-10 w-full rounded-md border bg-background px-3" value={draft.assetType}
+                onChange={(e) => setDraft({ ...draft, assetType: e.target.value as AssetType })}>
+                <option value="crypto">{t("rebalance.crypto")}</option><option value="stock">{t("rebalance.stock")}</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>{t("goals.symbol")}</span>
+              <Input value={draft.symbol} aria-invalid={validationField === "symbol"}
+                aria-describedby={validationField === "symbol" ? "goal-rule-status" : undefined}
+                onChange={(e) => { setValidationField(null); setDraft({ ...draft, symbol: e.target.value }); }} />
+            </label>
+          </>}
+          <label className="space-y-1 text-sm">
+            <span>{t("goals.comparator")}</span>
+            <select className="h-10 w-full rounded-md border bg-background px-3" value={draft.comparator}
+              onChange={(e) => setDraft({ ...draft, comparator: e.target.value as AlertComparator })}>
+              <option value="gte">{t("goals.atLeast")}</option><option value="lte">{t("goals.atMost")}</option>
+            </select>
+          </label>
+          <label className="space-y-1 text-sm">
+            <span>{t("goals.threshold")}</span>
+            <Input type="number" min={needsWindow(draft.kind) ? undefined : "0"} step="any" value={draft.threshold}
+              aria-invalid={validationField === "threshold"}
+              aria-describedby={validationField === "threshold" ? "goal-rule-status" : undefined}
+              onChange={(e) => { setValidationField(null); setDraft({ ...draft, threshold: e.target.value }); }} />
+          </label>
+          {needsWindow(draft.kind) && <label className="space-y-1 text-sm">
+            <span>{t("goals.window")}</span>
+            <select className="h-10 w-full rounded-md border bg-background px-3" value={draft.window}
+              onChange={(e) => setDraft({ ...draft, window: e.target.value as AlertWindow })}>
+              <option value="24h">24h</option><option value="7d">7d</option><option value="30d">30d</option>
+            </select>
+          </label>}
+          <label className="space-y-1 text-sm">
+            <span>{t("goals.cooldown")}</span>
+            <Input type="number" min="0" step="1" value={draft.cooldownMinutes}
+              aria-invalid={validationField === "cooldown"}
+              aria-describedby={validationField === "cooldown" ? "goal-rule-status" : undefined}
+              onChange={(e) => { setValidationField(null); setDraft({ ...draft, cooldownMinutes: e.target.value }); }} />
+          </label>
+        </div>
+        <p className="text-xs text-muted-foreground">{t("goals.units")}</p>
+        <div className="flex gap-2">
+          <Button onClick={() => void save()}>{t("goals.saveRule")}</Button>
+          <Button variant="outline" onClick={() => { setDraft(emptyDraft); setManualOpen(false); }}>{t("common.cancel")}</Button>
+        </div>
+        {validationField && status && <p id="goal-rule-status" role="alert" className="text-sm text-destructive">{status}</p>}
+        {!validationField && status && <p role="status" className="text-sm">{status}</p>}
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 pb-8">
-      <div>
+    <div className="t3-manage-goals mx-auto gap-4 pb-8">
+      <div className="t3-goals-heading">
+        <div>
         <h1 className="text-2xl font-semibold">{t("goals.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("goals.subtitle")}</p>
+        </div>
+        <Button ref={newRuleButton} type="button" onClick={(event) => openEditor(emptyDraft, event.currentTarget)}>{t("goals.newRule")}</Button>
+      </div>
+      <div className="t3-goals-summary" data-testid="goals-summary">
+        <div><span>{t("goals.summary.active")}</span><strong>{rules.filter((rule) => rule.enabled).length} / {rules.length}</strong></div>
+        <div><span>{t("goals.summary.unread")}</span><strong>{unreadCount}</strong></div>
+        <div><span>{t("goals.summary.recentTriggered")}</span><strong>{history.length}</strong></div>
+        <div><span>{t("goals.summary.lastCheck")}</span><strong>{snapshots[0] ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(snapshots[0].at)) : "—"}</strong></div>
       </div>
       <AISetupCard page="goals"
         summary={rules.length ? rules.map((rule) => `${rule.id}: ${rule.kind} ${rule.symbol ?? ""} ${rule.comparator} ${rule.threshold} ${rule.window ?? ""} ${rule.enabled ? "enabled" : "disabled"}`).join("; ") : "No alert rules"}
         suggestions={["goals.ai.drop", "goals.ai.btc", "goals.ai.deviation"].map((key) => t(key))} />
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Card className="order-last">
+      {!manualOpen && status && <p role="status" className="text-sm">{status}</p>}
+      <Card className="t3-goals-notifications">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.notifications")}</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-2xl text-sm text-muted-foreground">{t("goals.notificationExplanation")}</p>
@@ -160,81 +260,23 @@ export default function GoalsAlerts() {
           }}>{notificationsEnabled ? t("goals.notificationEnabled") : t("goals.enableNotifications")}</Button>
         </CardContent>
       </Card>
-      <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)} className="order-last rounded-lg border bg-card">
-        <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
-      <Card id="goal-rule-editor" className="border-0 shadow-none">
-        <CardHeader className="pb-3"><CardTitle className="text-base">{t(draft.id ? "goals.editRule" : "goals.newRule")}</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2" aria-label={t("goals.templates")}>
-            {templates.map((kind) => (
-              <Button key={kind} size="sm" variant={draft.kind === kind ? "default" : "outline"}
-                onClick={() => setDraft({ ...emptyDraft, kind })}>{t(`goals.kind.${kind}`)}</Button>
-            ))}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="space-y-1 text-sm">
-              <span>{t("goals.kind")}</span>
-              <select className="h-10 w-full rounded-md border bg-background px-3" value={draft.kind}
-                onChange={(e) => setDraft({ ...draft, kind: e.target.value as AlertKind })}>
-                {templates.map((kind) => <option key={kind} value={kind}>{t(`goals.kind.${kind}`)}</option>)}
-              </select>
-            </label>
-            {needsAsset(draft.kind) && <>
-              <label className="space-y-1 text-sm">
-                <span>{t("goals.assetType")}</span>
-                <select className="h-10 w-full rounded-md border bg-background px-3" value={draft.assetType}
-                  onChange={(e) => setDraft({ ...draft, assetType: e.target.value as AssetType })}>
-                  <option value="crypto">{t("rebalance.crypto")}</option><option value="stock">{t("rebalance.stock")}</option>
-                </select>
-              </label>
-              <label className="space-y-1 text-sm">
-                <span>{t("goals.symbol")}</span>
-                <Input value={draft.symbol} aria-invalid={validationField === "symbol"}
-                  aria-describedby={validationField === "symbol" ? "goal-rule-status" : undefined}
-                  onChange={(e) => { setValidationField(null); setDraft({ ...draft, symbol: e.target.value }); }} />
-              </label>
-            </>}
-            <label className="space-y-1 text-sm">
-              <span>{t("goals.comparator")}</span>
-              <select className="h-10 w-full rounded-md border bg-background px-3" value={draft.comparator}
-                onChange={(e) => setDraft({ ...draft, comparator: e.target.value as AlertComparator })}>
-                <option value="gte">{t("goals.atLeast")}</option><option value="lte">{t("goals.atMost")}</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>{t("goals.threshold")}</span>
-              <Input type="number" min={needsWindow(draft.kind) ? undefined : "0"} step="any" value={draft.threshold}
-                aria-invalid={validationField === "threshold"}
-                aria-describedby={validationField === "threshold" ? "goal-rule-status" : undefined}
-                onChange={(e) => { setValidationField(null); setDraft({ ...draft, threshold: e.target.value }); }} />
-            </label>
-            {needsWindow(draft.kind) && <label className="space-y-1 text-sm">
-              <span>{t("goals.window")}</span>
-              <select className="h-10 w-full rounded-md border bg-background px-3" value={draft.window}
-                onChange={(e) => setDraft({ ...draft, window: e.target.value as AlertWindow })}>
-                <option value="24h">24h</option><option value="7d">7d</option><option value="30d">30d</option>
-              </select>
-            </label>}
-            <label className="space-y-1 text-sm">
-              <span>{t("goals.cooldown")}</span>
-              <Input type="number" min="0" step="1" value={draft.cooldownMinutes}
-                aria-invalid={validationField === "cooldown"}
-                aria-describedby={validationField === "cooldown" ? "goal-rule-status" : undefined}
-                onChange={(e) => { setValidationField(null); setDraft({ ...draft, cooldownMinutes: e.target.value }); }} />
-            </label>
-          </div>
-          <p className="text-xs text-muted-foreground">{t("goals.units")}</p>
-          <div className="flex gap-2">
-            <Button onClick={() => void save()}>{t("goals.saveRule")}</Button>
-            {draft.id > 0 && <Button variant="outline" onClick={() => setDraft(emptyDraft)}>{t("common.cancel")}</Button>}
-          </div>
-          {validationField && status && <p id="goal-rule-status" role="alert" className="text-sm">{status}</p>}
-          {!validationField && status && <p role="status" className="text-sm">{status}</p>}
-        </CardContent>
-      </Card>
-      </details>
+      {rules.length === 0
+        ? <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)}
+          className="t3-goals-editor rounded-lg border bg-card">
+          <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
+          {editor}
+        </details>
+        : <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+          <DialogContent className="t3-goals-drawer md:w-[min(440px,100vw)]" onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            (editorTrigger.current ?? newRuleButton.current)?.focus();
+          }}>
+            <DialogDescription className="sr-only">{t("goals.units")}</DialogDescription>
+            {editor}
+          </DialogContent>
+        </Dialog>}
       {loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}
-      <Card>
+      <Card className="t3-goals-rules">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.rules")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {loading ? <p className="text-sm text-muted-foreground">{t("goals.loading")}</p>
@@ -271,7 +313,7 @@ export default function GoalsAlerts() {
                           onChange={(e) => void mutate(() => setAlertRuleEnabled(rule.id, e.target.checked))} />
                         {t("goals.enabled")}
                       </label>
-                      <Button size="sm" variant="outline" onClick={() => edit(rule)}>{t("goals.edit")}</Button>
+                      <Button size="sm" variant="outline" onClick={(event) => edit(rule, event.currentTarget)}>{t("goals.edit")}</Button>
                       <ConfirmDeleteDialog
                         trigger={<Button size="sm" variant="ghost">{t("common.delete")}</Button>}
                         title={t("common.delete")}
@@ -283,9 +325,8 @@ export default function GoalsAlerts() {
                   </div>
                   {isGoal && measurement.status === "ready" && <div className="flex items-center gap-3">
                     <div role="img" aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`)) + `: ${progress.toFixed(0)}%`}
-                      className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
-                      style={{ background: `conic-gradient(hsl(var(--primary)) ${progress}%, hsl(var(--muted)) 0)` }}>
-                      <span className="grid h-8 w-8 place-items-center rounded-full bg-card text-[10px] font-semibold">{progress.toFixed(0)}%</span>
+                      className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-muted">
+                      <span className="text-xs font-semibold">{progress.toFixed(0)}%</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <Progress value={progress} aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))} />
@@ -299,7 +340,7 @@ export default function GoalsAlerts() {
               })}
         </CardContent>
       </Card>
-      <Card>
+      <Card className="t3-goals-history">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.history")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">

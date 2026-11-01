@@ -102,6 +102,10 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const { t, locale } = useTranslation();
+  const snapshotDateFormatter = useMemo(() => new Intl.DateTimeFormat(
+    locale === "zh" ? "zh-CN" : "en-US",
+    { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
+  ), [locale]);
   const isMobile = useIsMobile();
   const isWide = useSizeClass().width === "wide";
 
@@ -576,7 +580,7 @@ const App = ({
         >
           <DetailWrapper open={isModalOpen} onOpenChange={closeDetail}
             title={t("history.snapshotDetails")} className="history-detail-sheet" detents={["large"]} initialDetent="large" inline={isWide}>
-          <DetailSurface className="history-detail-dialog min-w-[80%] touch:min-w-0 touch:w-[calc(100vw-1rem)] touch:max-w-[1200px] touch:max-h-[calc(100dvh-1rem)]">
+          <DetailSurface className="t3-history-detail history-detail-dialog min-w-[80%] touch:min-w-0 touch:w-[calc(100vw-1rem)] touch:max-w-[1200px] touch:max-h-[calc(100dvh-1rem)]">
             <DetailHeader className="history-detail-meta">
               {!isMobile && <DialogTitle>{t("history.detailTitle")}</DialogTitle>}
               {!isMobile && <DialogDescription className="sr-only">
@@ -585,9 +589,7 @@ const App = ({
               {selectedData ? (
                 <p className="text-xs text-muted-foreground">
                   {isMobile ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
-                    { year: "numeric", month: "short", day: "numeric" }).format(new Date(selectedData.createdAt)) : timeToDateStr(
-                      new Date(selectedData.createdAt).getTime(), true,
-                    )}
+                    { year: "numeric", month: "short", day: "numeric" }).format(new Date(selectedData.createdAt)) : snapshotDateFormatter.format(new Date(selectedData.createdAt))}
                   {" · "}
                   {currency.symbol}
                   {prettyNumberToLocaleString(
@@ -833,7 +835,7 @@ const App = ({
 
   const listContent = (
         <FadeUp>
-          <Card className={isMobile ? "history-records-card" : undefined}>
+          <Card className={isMobile ? "t3-history-records history-records-card" : "t3-history-records"}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {t("history.recordsCardTitle")}
@@ -984,7 +986,7 @@ const App = ({
                     </div>
                   </section>)}
                 </div>}
-                {!isMobile && <ScrollArea className="history-desktop-table w-full touch:min-w-0 touch:max-w-full rounded-lg border border-border/40 bg-background/20">
+                {!isMobile && <ScrollArea className="t3-history-table history-desktop-table w-full touch:min-w-0 touch:max-w-full rounded-lg border border-border/40 bg-background/20">
                   <Table className="touch:min-w-[600px]">
                     <TableHeader>
                       <TableRow>
@@ -1003,6 +1005,7 @@ const App = ({
                       {data.map((row, idx) => {
                         const isLatest = dataPage === 0 && idx === 0;
                         const topAssets = row.topAssets;
+                        const displayDate = snapshotDateFormatter.format(new Date(row.createdAt));
 
                         return (
                           <TableRow
@@ -1013,14 +1016,9 @@ const App = ({
                           >
                             <TableCell className="py-1.5 text-sm touch:sticky touch:left-0 touch:z-10 touch:bg-card touch:group-hover:bg-muted">
                               <button type="button"
-                                aria-label={t("history.viewSnapshot").replace("{date}", timeToDateStr(new Date(row.createdAt).getTime(), true))}
+                                aria-label={t("history.viewSnapshot").replace("{date}", `${timeToDateStr(new Date(row.createdAt).getTime(), true)} · ${displayDate}`)}
                                 className="flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <span>
-                                  {timeToDateStr(
-                                    new Date(row.createdAt).getTime(),
-                                    true,
-                                  )}
-                                </span>
+                                <span>{displayDate}</span>
                               </button>
                               <span className="block text-xs text-muted-foreground">{row.id.slice(0, 8)}</span>
                             </TableCell>
@@ -1122,7 +1120,7 @@ const App = ({
   );
 
   return (
-    <div className="d2-history" aria-busy={pageLoading} data-testid="history-content">
+    <div className="t3-manage-history d2-history" aria-busy={pageLoading} data-testid="history-content">
       {!isMobile && <h1 className="sr-only">{t("history.h1")}</h1>}
       <StaggerContainer className="space-y-4">
         {isMobile && <ConfirmDeleteDialog
@@ -1139,7 +1137,7 @@ const App = ({
         {!isMobile && detailContent}
 
         {!isMobile && <FadeUp>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="t3-history-kpis grid gap-3 md:grid-cols-3" data-testid="history-kpi-strip">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -1185,12 +1183,7 @@ const App = ({
                     : "-"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {latestRow
-                    ? timeToDateStr(
-                        new Date(latestRow.createdAt).getTime(),
-                        true,
-                      )
-                    : t("history.noDataLabel")}
+                  {latestRow ? snapshotDateFormatter.format(new Date(latestRow.createdAt)) : t("history.noDataLabel")}
                 </p>
               </CardContent>
             </Card>

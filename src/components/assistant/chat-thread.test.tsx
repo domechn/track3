@@ -65,6 +65,24 @@ describe("ChatThread", () => {
     expect(screen.getByText("Try asking")).toBeTruthy();
   });
 
+  it("keeps the welcome heading at the top of a new chat", () => {
+    const frame = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const scrollTo = vi.fn();
+    const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollTo");
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: scrollTo });
+    try {
+      render(<ChatThread messages={[]} isStreaming={false} />);
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      frame.mockRestore();
+      if (original) Object.defineProperty(HTMLElement.prototype, "scrollTo", original);
+      else delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
+    }
+  });
+
   it("renders user and assistant messages", () => {
     const messages: ChatMessage[] = [
       { role: "user", content: "Hello" },

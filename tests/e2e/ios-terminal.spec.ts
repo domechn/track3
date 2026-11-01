@@ -25,6 +25,7 @@ test("phone quote preference flips numeric gain without changing the displayed v
   await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
   const gain = page.locator(".d2-summary .profit-metric-value[data-tone='gain']").first();
   await expect(gain).toBeVisible();
+  await expect(gain).toContainText("$3,219.48");
   await expect(gain).toHaveCSS("color", /^rgb/);
   await expect(page.locator("html")).toHaveAttribute("data-quote", "green-up");
   const before = await gain.evaluate((node) => ({ text: node.textContent, color: getComputedStyle(node).color }));
@@ -34,6 +35,7 @@ test("phone quote preference flips numeric gain without changing the displayed v
   await page.goto("/#/summary");
   await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
   await expect(gain).toBeVisible();
+  await expect(gain).toContainText("$3,219.48");
   await expect(gain).toHaveCSS("color", /^rgb/);
   const after = await gain.evaluate((node) => ({ text: node.textContent, color: getComputedStyle(node).color }));
   expect(after.text).toBe(before.text);

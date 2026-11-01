@@ -1506,5 +1506,15 @@
   "data.phase6.portfolioHistory": "投资组合历史",
   "data.phase6.configuration": "配置",
   "data.phase6.configDetail": "可选的已保存设置",
-  "data.phase6.historyDetail": "{snapshots} 个快照 · {transactions} 条交易"
+  "data.phase6.historyDetail": "{snapshots} 个快照 · {transactions} 条交易",
+  "rebalance.syncNote": "启用加密同步后，目标配置也会同步。",
+  "rebalance.summary.portfolio": "投资组合价值",
+  "rebalance.summary.targets": "目标合计",
+  "rebalance.summary.drift": "最大偏离",
+  "rebalance.summary.outside": "超出容差",
+  "rebalance.summary.trades": "建议交易",
+  "goals.summary.active": "启用中的规则",
+  "goals.summary.unread": "未读提醒",
+  "goals.summary.recentTriggered": "最近触发",
+  "goals.summary.lastCheck": "最近检查"
 }

@@ -10,13 +10,17 @@ import type { Chart as ChartJS } from "chart.js";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
 import { useTheme } from "./common/theme";
+import { chartThemeColor } from "@/utils/chart-theme";
 
 const palette = ["#6366f1", "#06b6d4", "#f59e0b", "#8b5cf6", "#14b8a6", "#f97316", "#ec4899", "#94a3b8"];
 const tone = (positive: boolean, quoteColor: QuoteColor) =>
   (positive === (quoteColor === "green-up-red-down")) ? "#10b981" : "#f43f5e";
-function useChartOptions() {
+function useResolvedTheme(): "light" | "dark" {
   const { theme } = useTheme();
-  const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  return theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+}
+function useChartOptions() {
+  const dark = useResolvedTheme() === "dark";
   const text = dark ? "#cbd5e1" : "#475569";
   return {
     responsive: true, maintainAspectRatio: false,
@@ -140,13 +144,14 @@ export function GoalChart({ rules, snapshots, portfolioValues = [] }: {
   rules: AlertRule[]; snapshots: AlertSnapshot[]; portfolioValues?: Array<{ date: string; value: number }>;
 }) {
   const { t } = useTranslation();
+  const resolvedTheme = useResolvedTheme();
   const chartOptions = useChartOptions();
   const visual = goalVisuals(rules, snapshots);
   const values = portfolioValues.length ? portfolioValues : visual.values;
   return <ChartPanel title={t("finance.portfolioAndGoals")} empty={!values.length}>
     <Line role="img" aria-label={values.map((row) => `${row.date}: ${row.value.toFixed(2)}`).join("; ")}
       data={{ labels: values.map((row) => row.date), datasets: [
-        { label: t("finance.portfolioValue"), data: values.map((row) => row.value), borderColor: palette[0], backgroundColor: "#6366f120", fill: true, tension: 0.2, pointRadius: 1 },
+        { label: t("finance.portfolioValue"), data: values.map((row) => row.value), borderColor: chartThemeColor("accent-data", undefined, resolvedTheme), backgroundColor: chartThemeColor("accent-data", 0.12, resolvedTheme), fill: true, tension: 0.2, pointRadius: 1 },
         ...visual.goals.filter((goal) => goal.kind === "total_value_target").map((goal) => ({
           label: t("finance.goalThreshold"), data: values.map(() => goal.target),
           borderColor: palette[2], borderDash: [5, 4], pointRadius: 0,
@@ -159,14 +164,15 @@ export function RebalanceCharts({ result, quoteColor, tolerancePercent }: {
   result: RebalanceResult; quoteColor: QuoteColor; tolerancePercent: number;
 }) {
   const { t } = useTranslation();
+  const resolvedTheme = useResolvedTheme();
   const chartOptions = useChartOptions();
   const visual = rebalanceVisuals(result);
   return <div className="grid gap-3 lg:grid-cols-2">
     <ChartPanel title={t("finance.currentVsTarget")} empty={!visual.labels.length}>
       <Bar role="img" aria-label={visual.labels.map((label, index) => `${label}: ${visual.current[index].toFixed(1)}% ${t("rebalance.current")}, ${visual.target[index].toFixed(1)}% ${t("rebalance.target")}`).join("; ")}
         data={{ labels: visual.labels, datasets: [
-          { label: t("rebalance.current"), data: visual.current, backgroundColor: palette[0] },
-          { label: t("rebalance.target"), data: visual.target, backgroundColor: palette[1] },
+          { label: t("rebalance.current"), data: visual.current, backgroundColor: chartThemeColor("accent-data", undefined, resolvedTheme) },
+          { label: t("rebalance.target"), data: visual.target, backgroundColor: chartThemeColor("chart-blue-soft", undefined, resolvedTheme) },
         ] }} options={{ ...chartOptions, indexAxis: "y" as const, plugins: { ...chartOptions.plugins, legend: { display: true } } }} />
     </ChartPanel>
     <ChartPanel title={t("rebalance.deviations")} empty={!visual.labels.length}>

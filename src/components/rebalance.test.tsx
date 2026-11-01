@@ -57,6 +57,29 @@ beforeEach(() => {
 afterEach(() => localStorage.removeItem(localeLocalStorageKey));
 
 describe("Rebalance page", () => {
+  it("summarizes the current plan from calculated values", async () => {
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [
+        { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+        { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 50 },
+      ],
+      tolerancePercent: 2,
+    });
+    render(<Rebalance currency={currency} />);
+    const summary = await screen.findByTestId("rebalance-summary");
+    expect(summary).toHaveTextContent("Portfolio value");
+    expect(summary).toHaveTextContent("80.00 USD");
+    expect(summary).toHaveTextContent("Targets total");
+    expect(summary).toHaveTextContent("100.00%");
+    expect(summary).toHaveTextContent("Largest drift");
+    expect(summary).toHaveTextContent("BTC");
+    expect(summary).toHaveTextContent("Outside tolerance");
+    expect(summary).toHaveTextContent("Suggested trades");
+  });
+  it("explains that saved targets join encrypted sync when enabled", async () => {
+    render(<Rebalance currency={currency} />);
+    expect(await screen.findByText("Targets are included in encrypted sync when enabled.")).toBeInTheDocument();
+  });
   it("has no axe violations with a saved target profile", async () => {
     vi.mocked(getRebalanceProfile).mockResolvedValue({
       targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }],
@@ -124,6 +147,8 @@ describe("Rebalance page", () => {
     expect(screen.getByLabelText("Target percentage for BTC")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText("Target percentage for BTC")).toHaveAttribute("aria-describedby", screen.getByRole("alert").id);
     expect(screen.getByRole("button", { name: "Save targets" })).toBeDisabled();
+    expect(screen.getByTestId("rebalance-summary")).toHaveTextContent("80.00 USD");
+    expect(screen.getByTestId("rebalance-summary")).toHaveAttribute("data-valid", "false");
     fireEvent.click(screen.getByRole("button", { name: "Normalize to 100%" }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -210,6 +235,7 @@ describe("Rebalance page", () => {
     await screen.findByRole("table", { name: "Suggested trades" });
     fireEvent.change(screen.getByLabelText("New cash (USD)"), { target: { value: "-1" } });
     expect(screen.getByRole("alert")).toHaveTextContent("Enter non-negative trade amounts.");
+    expect(screen.getByTestId("rebalance-summary")).toHaveAttribute("data-valid", "true");
   });
 
   it("keeps an unsaved target draft when holdings refresh", async () => {

@@ -4,9 +4,10 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, expect, it, vi } from "vitest";
 import GoalsAlerts from "./goals-alerts";
-import { listAlertRules, listAlertHistory, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
+import { listAlertRules, listAlertHistory, countUnreadAlerts, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
 import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlelayers/alert-notifications";
 import { queryPNLChartValue } from "@/middlelayers/charts-timeseries";
+import { I18nProvider, useTranslation } from "@/i18n";
 vi.mock("@/middlelayers/charts-timeseries", async (original) => ({
   ...await original<typeof import("@/middlelayers/charts-timeseries")>(),
   queryPNLChartValue: vi.fn().mockResolvedValue([]),
@@ -18,7 +19,7 @@ vi.mock("@/middlelayers/configuration", async (original) => ({
 
 vi.mock("@/middlelayers/alerts", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/middlelayers/alerts")>(),
-  listAlertRules: vi.fn(), listAlertHistory: vi.fn(), saveAlertRule: vi.fn(),
+  listAlertRules: vi.fn(), listAlertHistory: vi.fn(), countUnreadAlerts: vi.fn(), saveAlertRule: vi.fn(),
   setAlertRuleEnabled: vi.fn(), acknowledgeAllAlerts: vi.fn(),
   acknowledgeAlert: vi.fn(), clearAlertHistory: vi.fn(), deleteAlertRule: vi.fn(),
   loadAlertEvaluationData: vi.fn().mockResolvedValue({ snapshots: [], prices: {} }),
@@ -41,6 +42,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listAlertRules).mockResolvedValue([]);
   vi.mocked(listAlertHistory).mockResolvedValue([]);
+  vi.mocked(countUnreadAlerts).mockResolvedValue(0);
   vi.mocked(loadAlertEvaluationData).mockResolvedValue({ snapshots: [], prices: {}, excludedSymbols: [] });
   vi.mocked(systemNotificationsEnabled).mockResolvedValue(false);
   vi.mocked(queryPNLChartValue).mockResolvedValue([]);
@@ -75,6 +77,113 @@ it("has no axe violations in the goals summary", async () => {
   await screen.findByText("No rules yet");
   const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
   expect(results.violations.map(({ id }) => id)).toEqual([]);
+});
+
+it("summarizes active rules and unread triggers from existing data", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, enabled: true }, { ...savedRule, id: 8, enabled: false }]);
+  vi.mocked(listAlertHistory).mockResolvedValue([{
+    id: 1, ruleId: 7, kind: "total_value_target", title: "Target", message: "Reached", value: 120,
+    triggeredAt: "2026-01-01T00:00:00.000Z", acknowledgedAt: null,
+  }]);
+  vi.mocked(countUnreadAlerts).mockResolvedValue(1);
+  render(<GoalsAlerts />);
+  expect(await screen.findByTestId("goals-summary")).toHaveTextContent("1 / 2");
+  expect(screen.getByTestId("goals-summary")).toHaveTextContent("1");
+});
+
+it("shows the full unread count when recent history is capped", async () => {
+  vi.mocked(countUnreadAlerts).mockResolvedValue(205);
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(screen.getByText("Unread alerts").nextElementSibling).toHaveTextContent("205"));
+});
+
+it("labels the capped history count as recent triggers", async () => {
+  render(<GoalsAlerts />);
+  await screen.findByText("No rules yet");
+  expect(screen.getByTestId("goals-summary")).toHaveTextContent("Recent triggers");
+});
+
+it("shows the last portfolio check instead of a last trigger", async () => {
+  vi.mocked(loadAlertEvaluationData).mockResolvedValue({
+    snapshots: [{ at: "2026-04-16T12:00:00.000Z", assets: [] }], prices: {}, excludedSymbols: [],
+  });
+  render(<GoalsAlerts />);
+  await screen.findByText("No rules yet");
+  expect(screen.getByTestId("goals-summary")).toHaveTextContent("Last check");
+  expect(screen.getByText("Last check").nextElementSibling).toHaveTextContent("Apr 16, 2026, 12:00 PM");
+});
+
+it("uses the selected Chinese locale for the last check", async () => {
+  vi.mocked(loadAlertEvaluationData).mockResolvedValue({
+    snapshots: [{ at: "2026-04-16T12:00:00.000Z", assets: [] }], prices: {}, excludedSymbols: [],
+  });
+  function SetChinese() {
+    const { setLocale } = useTranslation();
+    return <button onClick={() => setLocale("zh")}>中文</button>;
+  }
+  render(<I18nProvider><SetChinese /><GoalsAlerts /></I18nProvider>);
+  await userEvent.click(screen.getByRole("button", { name: "中文" }));
+  await waitFor(() => expect(screen.getByText("最近检查").nextElementSibling).toHaveTextContent("2026年4月16日 12:00"));
+});
+
+it("opens the rule editor when editing a saved rule", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+  expect(screen.getByRole("dialog", { name: "Edit rule" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+});
+
+it("closes the new-rule drawer after saving and returns focus to its trigger", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByRole("button", { name: "Edit" });
+  const trigger = screen.getByRole("button", { name: "New rule" });
+  await user.click(trigger);
+  const dialog = screen.getByRole("dialog", { name: "New rule" });
+  expect(dialog.contains(document.activeElement)).toBe(true);
+  await user.type(within(dialog).getByRole("spinbutton", { name: "Threshold" }), "1000");
+  await user.click(within(dialog).getByRole("button", { name: "Save rule" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(trigger).toHaveFocus();
+});
+
+it("closes the rule drawer with Escape after opening it from an outside button", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByRole("button", { name: "Edit" });
+  const trigger = screen.getByRole("button", { name: "New rule" });
+  await user.click(trigger);
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(trigger).toHaveFocus();
+});
+
+it("does not turn the inline editor into a drawer after the first rule is saved", async () => {
+  vi.mocked(saveAlertRule).mockImplementation(async () => {
+    vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  });
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByText("No rules yet");
+  await user.type(screen.getByRole("spinbutton", { name: "Threshold" }), "1000");
+  await user.click(screen.getByRole("button", { name: "Save rule" }));
+  await screen.findByRole("button", { name: "Edit" });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("scrolls to the inline editor when New rule is pressed before any rules exist", async () => {
+  render(<GoalsAlerts />);
+  await screen.findByText("No rules yet");
+  const editor = document.getElementById("goal-rule-editor")!;
+  const scrollIntoView = vi.fn();
+  editor.scrollIntoView = scrollIntoView;
+  await userEvent.click(screen.getByRole("button", { name: "New rule" }));
+  await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth" }));
 });
 
 it("shows the empty state and a clear explanation before notification permission", async () => {

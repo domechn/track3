@@ -35,7 +35,7 @@ export default function AISetupCard({
       setAvailability("missing");
     }
   }
-  return <Card className="border-primary/25 bg-primary/[0.035]">
+  return <Card data-ai-setup-card className="border-primary/25 bg-primary/[0.035]">
     <CardContent className="space-y-3 p-4">
       <div className="flex items-center gap-2">
         <MagicWandIcon aria-hidden className="h-4 w-4 text-primary" />
