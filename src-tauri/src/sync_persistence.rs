@@ -1,6 +1,103 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteConnectOptions, Connection, Executor, SqliteConnection};
 use std::{collections::HashMap, path::Path, time::Duration};
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotStateRow {
+    pub snapshot_id: String,
+    pub snapshot_hash: Option<String>,
+    pub snapshot_edit: Option<String>,
+    pub pending_snapshot_edit: Option<String>,
+    pub published: i64,
+    pub known: String,
+    pub asset_rows: Option<String>,
+    pub transaction_rows: Option<String>,
+    pub row_events: Option<String>,
+    pub transaction_events: Option<String>,
+}
+
+pub async fn upsert_snapshot_state(
+    connection: &mut SqliteConnection,
+    row: &SnapshotStateRow,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO sync_snapshot_state
+         (snapshot_id, snapshot_hash, snapshot_edit, pending_snapshot_edit, published, known,
+          asset_rows, transaction_rows, row_events, transaction_events)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(snapshot_id) DO UPDATE SET
+         snapshot_hash = excluded.snapshot_hash, snapshot_edit = excluded.snapshot_edit,
+         pending_snapshot_edit = excluded.pending_snapshot_edit, published = excluded.published,
+         known = excluded.known, asset_rows = excluded.asset_rows,
+         transaction_rows = excluded.transaction_rows, row_events = excluded.row_events,
+         transaction_events = excluded.transaction_events",
+    )
+    .bind(&row.snapshot_id)
+    .bind(&row.snapshot_hash)
+    .bind(&row.snapshot_edit)
+    .bind(&row.pending_snapshot_edit)
+    .bind(row.published)
+    .bind(&row.known)
+    .bind(&row.asset_rows)
+    .bind(&row.transaction_rows)
+    .bind(&row.row_events)
+    .bind(&row.transaction_events)
+    .execute(connection)
+    .await
+    .map(|_| ())
+}
+
+pub async fn save_sync_state(
+    database_path: &Path,
+    data: &str,
+    rows: &[SnapshotStateRow],
+    deleted_ids: &[String],
+    clear_snapshots: bool,
+) -> Result<(), String> {
+    if serde_json::from_str::<serde_json::Value>(data).is_err() {
+        return Err("Invalid sync state".to_string());
+    }
+    let mut connection = connect(database_path).await?;
+    let mut transaction = connection
+        .begin()
+        .await
+        .map_err(|_| "Failed to begin sync state save".to_string())?;
+    if clear_snapshots {
+        sqlx::query("DELETE FROM sync_snapshot_state")
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| "Failed to clear sync snapshot state".to_string())?;
+    }
+    for id in deleted_ids {
+        sqlx::query("DELETE FROM sync_snapshot_state WHERE snapshot_id = ?")
+            .bind(id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| "Failed to delete sync snapshot state".to_string())?;
+    }
+    for row in rows {
+        upsert_snapshot_state(&mut transaction, row)
+            .await
+            .map_err(|_| "Failed to save sync snapshot state".to_string())?;
+    }
+    sqlx::query(
+        "INSERT INTO sync_state (id, data) VALUES (1, ?)
+         ON CONFLICT(id) DO UPDATE SET data = excluded.data",
+    )
+    .bind(data)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|_| "Failed to save sync state".to_string())?;
+    transaction
+        .commit()
+        .await
+        .map_err(|_| "Failed to commit sync state".to_string())?;
+    connection
+        .close()
+        .await
+        .map_err(|_| "Failed to close sync database".to_string())
+}
 
 #[derive(Deserialize)]
 struct Snapshot {

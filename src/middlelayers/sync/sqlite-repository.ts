@@ -9,10 +9,69 @@ import { readSnapshot } from "../snapshot";
 import { configurationKey, syncCategory } from "./config-keys";
 import type { Snapshot, SyncRepository, SyncSession, SyncState, SyncMessage } from "./engine";
 
+type SnapshotStateRow = {
+  snapshotId: string;
+  snapshotHash: string | null;
+  snapshotEdit: string | null;
+  pendingSnapshotEdit: string | null;
+  published: number;
+  known: string;
+  assetRows: string | null;
+  transactionRows: string | null;
+  rowEvents: string | null;
+  transactionEvents: string | null;
+};
+
+type DetailPresence = {
+  assetRows: boolean;
+  transactionRows: boolean;
+  rowEvents: boolean;
+  transactionEvents: boolean;
+};
+
+type StateBaseline = {
+  rows: Map<string, SnapshotStateRow>;
+  details: Set<string>;
+  present: Map<string, DetailPresence>;
+  globalData: string;
+};
+
+const snapshotFields = [
+  "snapshotHashes", "snapshotEdits", "pendingSnapshotEdits", "assetRows",
+  "transactionRows", "rowEvents", "transactionEvents",
+] as const;
+
+function snapshotTokenId(token: string): string | undefined {
+  return /^[^:]{36}:snapshot:(.+):[^:]+$/.exec(token)?.[1];
+}
+
+function snapshotKnown(tokens: string[]): { global: string[]; byId: Map<string, string[]> } {
+  const global: string[] = [];
+  const byId = new Map<string, string[]>();
+  for (const token of tokens) {
+    const id = snapshotTokenId(token);
+    if (id) byId.set(id, [...byId.get(id) ?? [], token]);
+    else global.push(token);
+  }
+  return { global, byId };
+}
+
+function globalStateData(state: SyncState, known: string[]): string {
+  const global = { ...state, known } as Record<string, unknown>;
+  for (const field of snapshotFields) delete global[field];
+  delete global.published;
+  return JSON.stringify(global);
+}
+
+function storedJson(value: unknown): string | null {
+  return value === undefined ? null : JSON.stringify(value);
+}
+
 export class SqliteSyncRepository implements SyncRepository {
   private configReadErrors: string[] = [];
   private sessionReadErrors: string[] = [];
   private sessions = new Map<string, { metadata: string; session: SyncSession }>();
+  private baselines = new WeakMap<SyncState, StateBaseline>();
 
   takeReadErrors() {
     const errors = { configIds: this.configReadErrors, sessionIds: this.sessionReadErrors };
@@ -24,16 +83,154 @@ export class SqliteSyncRepository implements SyncRepository {
   async loadState(): Promise<SyncState> {
     const db = await getDatabase();
     const rows = await db.select<Array<{ data: string }>>("SELECT data FROM sync_state WHERE id = 1");
-    return rows[0] ? JSON.parse(rows[0].data) as SyncState : {};
+    const state = rows[0] ? JSON.parse(rows[0].data) as SyncState : {};
+    const snapshotRows = await db.select<Array<SnapshotStateRow & {
+      assetRowsPresent: number; transactionRowsPresent: number;
+      rowEventsPresent: number; transactionEventsPresent: number;
+    }>>(
+      "SELECT snapshot_id AS snapshotId, snapshot_hash AS snapshotHash, snapshot_edit AS snapshotEdit, " +
+      "pending_snapshot_edit AS pendingSnapshotEdit, published, known, " +
+      "NULL AS assetRows, NULL AS transactionRows, NULL AS rowEvents, NULL AS transactionEvents, " +
+      "asset_rows IS NOT NULL AS assetRowsPresent, transaction_rows IS NOT NULL AS transactionRowsPresent, " +
+      "row_events IS NOT NULL AS rowEventsPresent, transaction_events IS NOT NULL AS transactionEventsPresent " +
+      "FROM sync_snapshot_state",
+    );
+    state.snapshotHashes = {};
+    state.snapshotEdits = {};
+    state.pendingSnapshotEdits = {};
+    state.assetRows = {};
+    state.transactionRows = {};
+    state.rowEvents = {};
+    state.transactionEvents = {};
+    state.published = [];
+    state.known ??= [];
+    for (const row of snapshotRows) {
+      if (row.snapshotHash !== null) state.snapshotHashes[row.snapshotId] = row.snapshotHash;
+      if (row.snapshotEdit !== null) state.snapshotEdits[row.snapshotId] = JSON.parse(row.snapshotEdit);
+      if (row.pendingSnapshotEdit !== null) state.pendingSnapshotEdits[row.snapshotId] = JSON.parse(row.pendingSnapshotEdit);
+      if (row.published) state.published.push(row.snapshotId);
+      state.known.push(...JSON.parse(row.known) as string[]);
+    }
+    const baselineRows = new Map<string, SnapshotStateRow>();
+    const present = new Map<string, DetailPresence>();
+    for (const row of snapshotRows) {
+      const { assetRowsPresent, transactionRowsPresent, rowEventsPresent, transactionEventsPresent, ...summary } = row;
+      baselineRows.set(row.snapshotId, summary);
+      present.set(row.snapshotId, {
+        assetRows: !!assetRowsPresent, transactionRows: !!transactionRowsPresent,
+        rowEvents: !!rowEventsPresent, transactionEvents: !!transactionEventsPresent,
+      });
+    }
+    this.baselines.set(state, { rows: baselineRows, details: new Set(), present, globalData: rows[0]?.data ?? "" });
+    return state;
+  }
+
+  async loadDeletedSnapshotRows(state: SyncState, ids: Iterable<string>): Promise<void> {
+    const present = this.baselines.get(state)?.present;
+    if (!present) return;
+    await this.loadSnapshotDetails(state, [...ids].filter((id) =>
+      present.get(id)?.assetRows || present.get(id)?.transactionRows));
+  }
+
+  async loadSnapshotDetails(state: SyncState, ids: Iterable<string>): Promise<void> {
+    const baseline = this.baselines.get(state);
+    if (!baseline) return;
+    const missing = [...new Set(ids)].filter((id) => baseline.rows.has(id) && !baseline.details.has(id));
+    if (!missing.length) return;
+    const db = await getDatabase();
+    for (let offset = 0; offset < missing.length; offset += 500) {
+      const batch = missing.slice(offset, offset + 500);
+      const rows = await db.select<Array<Pick<SnapshotStateRow,
+        "snapshotId" | "assetRows" | "transactionRows" | "rowEvents" | "transactionEvents">>>(
+        "SELECT snapshot_id AS snapshotId, asset_rows AS assetRows, transaction_rows AS transactionRows, " +
+        "row_events AS rowEvents, transaction_events AS transactionEvents " +
+        `FROM sync_snapshot_state WHERE snapshot_id IN (${batch.map(() => "?").join(",")})`, batch,
+      );
+      for (const row of rows) {
+        const original = baseline.rows.get(row.snapshotId);
+        if (!original) continue;
+        for (const [column, field] of [
+          ["assetRows", "assetRows"], ["transactionRows", "transactionRows"],
+          ["rowEvents", "rowEvents"], ["transactionEvents", "transactionEvents"],
+        ] as const) {
+          original[column] = row[column];
+          if (row[column] !== null && !Object.hasOwn(state[field] ?? {}, row.snapshotId)) {
+            (state[field] ??= {})[row.snapshotId] = JSON.parse(row[column]!);
+          }
+        }
+        baseline.details.add(row.snapshotId);
+      }
+    }
   }
 
   async saveState(state: SyncState): Promise<number> {
-    const data = JSON.stringify(state);
-    await executeWrite(
-      "INSERT INTO sync_state (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data",
-      [data],
-    );
-    return new TextEncoder().encode(data).length;
+    const baseline = this.baselines.get(state);
+    const { global, byId } = snapshotKnown(state.known ?? []);
+    const data = globalStateData(state, global);
+    const published = new Set(state.published ?? []);
+    const ids = new Set<string>([...baseline?.rows.keys() ?? [], ...published, ...byId.keys()]);
+    for (const field of snapshotFields) {
+      for (const id of Object.keys(state[field] ?? {})) ids.add(id);
+    }
+    const changed = new Set<string>();
+    const deletedIds: string[] = [];
+    for (const id of ids) {
+      const previous = baseline?.rows.get(id);
+      const exists = published.has(id) || byId.has(id) ||
+        snapshotFields.some((field) => Object.hasOwn(state[field] ?? {}, id)) ||
+        (!!previous && !baseline?.details.has(id) &&
+          Object.values(baseline?.present.get(id) ?? {}).some(Boolean));
+      if (!exists) {
+        if (previous && baseline) deletedIds.push(id);
+        continue;
+      }
+      if (!previous || previous.snapshotHash !== (state.snapshotHashes?.[id] ?? null) ||
+          previous.snapshotEdit !== storedJson(state.snapshotEdits?.[id]) ||
+          previous.pendingSnapshotEdit !== storedJson(state.pendingSnapshotEdits?.[id]) ||
+          previous.published !== Number(published.has(id)) ||
+          previous.known !== JSON.stringify(byId.get(id) ?? []) ||
+          baseline?.details.has(id)) changed.add(id);
+    }
+    if (baseline) await this.loadSnapshotDetails(state, changed);
+    const rows: SnapshotStateRow[] = [];
+    for (const id of changed) {
+      const previous = baseline?.rows.get(id);
+      const fieldJson = (field: "assetRows" | "transactionRows" | "rowEvents" | "transactionEvents") =>
+        baseline?.details.has(id) || !previous ? storedJson(state[field]?.[id]) : previous[field];
+      const row: SnapshotStateRow = {
+        snapshotId: id,
+        snapshotHash: state.snapshotHashes?.[id] ?? null,
+        snapshotEdit: storedJson(state.snapshotEdits?.[id]),
+        pendingSnapshotEdit: storedJson(state.pendingSnapshotEdits?.[id]),
+        published: Number(published.has(id)),
+        known: JSON.stringify(byId.get(id) ?? []),
+        assetRows: fieldJson("assetRows"),
+        transactionRows: fieldJson("transactionRows"),
+        rowEvents: fieldJson("rowEvents"),
+        transactionEvents: fieldJson("transactionEvents"),
+      };
+      if (!previous || JSON.stringify(previous) !== JSON.stringify(row)) rows.push(row);
+    }
+    if (!rows.length && !deletedIds.length && data === baseline?.globalData) return 0;
+    await invoke("save_sync_state", { data, rows, deletedIds, clearSnapshots: !baseline });
+    const updated = baseline ?? {
+      rows: new Map<string, SnapshotStateRow>(), details: new Set<string>(),
+      present: new Map<string, DetailPresence>(), globalData: "",
+    };
+    for (const id of deletedIds) {
+      updated.rows.delete(id); updated.details.delete(id); updated.present.delete(id);
+    }
+    for (const row of rows) {
+      updated.rows.set(row.snapshotId, row);
+      updated.present.set(row.snapshotId, {
+        assetRows: row.assetRows !== null, transactionRows: row.transactionRows !== null,
+        rowEvents: row.rowEvents !== null, transactionEvents: row.transactionEvents !== null,
+      });
+    }
+    updated.globalData = data;
+    this.baselines.set(state, updated);
+    return new TextEncoder().encode(data).length +
+      rows.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).length, 0);
   }
 
   async loadManifestCache(owner: string, salt: string): Promise<{ etag: string; manifest: unknown; lastModified?: string } | null> {

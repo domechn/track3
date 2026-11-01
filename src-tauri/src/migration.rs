@@ -1,6 +1,11 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    fs,
+    path::Path,
+};
 
 use indexmap::IndexSet;
+use sha2::{Digest, Sha256};
 use sqlx::{
     sqlite::SqliteConnectOptions, Connection, Executor, FromRow, Row, Sqlite, SqliteConnection,
     Transaction as SqliteTransaction,
@@ -8,6 +13,7 @@ use sqlx::{
 use uuid::Uuid;
 use version_compare::{compare_to, Cmp};
 
+use crate::sync_persistence::{upsert_snapshot_state, SnapshotStateRow};
 use crate::types::AssetsV1;
 
 static CLIENT_ID_CONFIGURATION_ID: i32 = 998;
@@ -982,6 +988,183 @@ async fn migrate_v8_to_v9(
         .map_err(|error| format!("failed to commit v0.8 to v0.9 migration: {error}"))
 }
 
+const SNAPSHOT_STATE_FIELDS: [&str; 8] = [
+    "snapshotHashes",
+    "snapshotEdits",
+    "pendingSnapshotEdits",
+    "assetRows",
+    "rowEvents",
+    "transactionRows",
+    "transactionEvents",
+    "published",
+];
+
+fn snapshot_token_id(token: &str) -> Option<&str> {
+    let (owner, remainder) = token.split_once(":snapshot:")?;
+    if owner.len() != 36 || owner.contains(':') {
+        return None;
+    }
+    let (id, version) = remainder.rsplit_once(':')?;
+    if id.is_empty() || version.is_empty() {
+        return None;
+    }
+    Some(id)
+}
+
+async fn migrate_sync_snapshot_state(
+    transaction: &mut SqliteTransaction<'_, Sqlite>,
+) -> MigrationResult<()> {
+    let old: Option<String> = sqlx::query_scalar("SELECT data FROM sync_state WHERE id = 1")
+        .fetch_optional(&mut **transaction)
+        .await
+        .map_err(|error| format!("failed to read legacy sync state: {error}"))?;
+    let Some(old) = old else { return Ok(()) };
+    let mut state: serde_json::Value = serde_json::from_str(&old)
+        .map_err(|error| format!("failed to parse legacy sync state: {error}"))?;
+    let Some(object) = state.as_object_mut() else {
+        return Err("legacy sync state is not an object".to_string());
+    };
+    if !SNAPSHOT_STATE_FIELDS
+        .iter()
+        .any(|field| object.contains_key(*field))
+        && !object
+            .get("known")
+            .and_then(|value| value.as_array())
+            .is_some_and(|tokens| {
+                tokens
+                    .iter()
+                    .filter_map(|token| token.as_str())
+                    .any(|token| snapshot_token_id(token).is_some())
+            })
+    {
+        return Ok(());
+    }
+    for field in SNAPSHOT_STATE_FIELDS
+        .iter()
+        .filter(|field| **field != "published")
+    {
+        if object.get(*field).is_some_and(|value| !value.is_object()) {
+            return Err(format!("invalid legacy sync state field {field}"));
+        }
+    }
+    if object
+        .get("snapshotHashes")
+        .and_then(|value| value.as_object())
+        .is_some_and(|hashes| hashes.values().any(|value| !value.is_string()))
+        || object.get("published").is_some_and(|value| {
+            !value
+                .as_array()
+                .is_some_and(|items| items.iter().all(serde_json::Value::is_string))
+        })
+        || object.get("known").is_some_and(|value| {
+            !value
+                .as_array()
+                .is_some_and(|items| items.iter().all(serde_json::Value::is_string))
+        })
+    {
+        return Err("invalid legacy sync state entries".to_string());
+    }
+    let mut ids = BTreeSet::new();
+    for field in SNAPSHOT_STATE_FIELDS
+        .iter()
+        .filter(|field| **field != "published")
+    {
+        if let Some(map) = object.get(*field).and_then(|value| value.as_object()) {
+            ids.extend(map.keys().cloned());
+        }
+    }
+    let published: BTreeSet<String> = object
+        .get("published")
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.as_str().map(str::to_string))
+        .collect();
+    ids.extend(published.iter().cloned());
+    let mut known = BTreeMap::<String, Vec<String>>::new();
+    let mut global_known = Vec::new();
+    for token in object
+        .get("known")
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten()
+    {
+        if let Some(id) = token.as_str().and_then(snapshot_token_id) {
+            ids.insert(id.to_string());
+            known
+                .entry(id.to_string())
+                .or_default()
+                .push(token.as_str().unwrap().to_string());
+        } else {
+            global_known.push(token.clone());
+        }
+    }
+    let field = |name: &str, id: &str| -> Option<String> {
+        object
+            .get(name)
+            .and_then(|value| value.get(id))
+            .map(serde_json::Value::to_string)
+    };
+    let mut expected = Vec::with_capacity(ids.len());
+    for id in ids {
+        expected.push(SnapshotStateRow {
+            snapshot_hash: object
+                .get("snapshotHashes")
+                .and_then(|value| value.get(&id))
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            snapshot_edit: field("snapshotEdits", &id),
+            pending_snapshot_edit: field("pendingSnapshotEdits", &id),
+            published: i64::from(published.contains(&id)),
+            known: serde_json::to_string(known.get(&id).unwrap_or(&Vec::new()))
+                .map_err(|error| format!("failed to encode legacy known tokens: {error}"))?,
+            asset_rows: field("assetRows", &id),
+            transaction_rows: field("transactionRows", &id),
+            row_events: field("rowEvents", &id),
+            transaction_events: field("transactionEvents", &id),
+            snapshot_id: id,
+        });
+    }
+    sqlx::query("DELETE FROM sync_snapshot_state")
+        .execute(&mut **transaction)
+        .await
+        .map_err(|error| format!("failed to prepare sync state migration: {error}"))?;
+    let mut expected_hash = Sha256::new();
+    for row in &expected {
+        upsert_snapshot_state(&mut *transaction, row)
+            .await
+            .map_err(|error| format!("failed to migrate sync snapshot state: {error}"))?;
+        expected_hash.update(serde_json::to_vec(row).map_err(|error| error.to_string())?);
+    }
+    let stored: Vec<SnapshotStateRow> = sqlx::query_as(
+        "SELECT snapshot_id, snapshot_hash, snapshot_edit, pending_snapshot_edit, published,
+                known, asset_rows, transaction_rows, row_events, transaction_events
+         FROM sync_snapshot_state ORDER BY snapshot_id",
+    )
+    .fetch_all(&mut **transaction)
+    .await
+    .map_err(|error| format!("failed to verify migrated sync state: {error}"))?;
+    let mut actual_hash = Sha256::new();
+    for row in &stored {
+        actual_hash.update(serde_json::to_vec(row).map_err(|error| error.to_string())?);
+    }
+    if stored.len() != expected.len() || actual_hash.finalize() != expected_hash.finalize() {
+        return Err("sync state migration row count or hash mismatch".to_string());
+    }
+    for field in SNAPSHOT_STATE_FIELDS {
+        object.remove(field);
+    }
+    if object.contains_key("known") {
+        object.insert("known".to_string(), serde_json::Value::Array(global_known));
+    }
+    sqlx::query("UPDATE sync_state SET data = ? WHERE id = 1")
+        .bind(state.to_string())
+        .execute(&mut **transaction)
+        .await
+        .map_err(|error| format!("failed to finish sync state migration: {error}"))?;
+    Ok(())
+}
+
 async fn repair_required_schema(
     connection: &mut SqliteConnection,
     resource_dir: &Path,
@@ -997,6 +1180,7 @@ async fn repair_required_schema(
     let history_snapshots = read_migration_sql(resource_dir, "v08t09/history_snapshots_up.sql")?;
     let currency_rates = read_migration_sql(resource_dir, "init/currency_rates_up.sql")?;
     let sync_manifest_cache = read_migration_sql(resource_dir, "init/sync_manifest_cache_up.sql")?;
+    let sync_snapshot_state = read_migration_sql(resource_dir, "init/sync_snapshot_state_up.sql")?;
     let additive_schema = if version_is_less(app_version, "0.9.5")? {
         Vec::new()
     } else {
@@ -1158,6 +1342,11 @@ async fn repair_required_schema(
             .execute(&mut *transaction)
             .await
             .map_err(|error| format!("failed to ensure sync manifest cache: {error}"))?;
+        sqlx::raw_sql(&sync_snapshot_state)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("failed to ensure sync snapshot state: {error}"))?;
+        migrate_sync_snapshot_state(&mut transaction).await?;
         // If the table exists but any of its triggers is gone, the index may have drifted
         // (rows added or deleted while untracked): rebuild it fully before re-creating them.
         if migration_table_exists(&mut transaction, "history_snapshots").await? {

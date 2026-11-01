@@ -9,7 +9,7 @@ import { hourlyHistory } from "../../src/test/history-fixtures";
 
 const schemaFiles = [
   "assets_v2", "asset_prices", "transactions", "chat_sessions",
-  "currency_rates", "configuration", "sync_manifest_cache",
+  "currency_rates", "configuration", "sync_manifest_cache", "sync_snapshot_state",
 ];
 
 type BridgeOptions = {
@@ -335,6 +335,31 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       return select(args.query, args.values);
     }
     if (cmd === "plugin:sql|execute") return execute(args.query, args.values);
+    if (cmd === "save_sync_state") {
+      db.run("BEGIN");
+      try {
+        if (args.clearSnapshots) db.run("DELETE FROM sync_snapshot_state");
+        for (const id of args.deletedIds as string[]) {
+          db.run("DELETE FROM sync_snapshot_state WHERE snapshot_id = ?", [id]);
+        }
+        for (const row of args.rows as Array<Record<string, string | number | null>>) {
+          db.run(
+            `INSERT OR REPLACE INTO sync_snapshot_state
+             (snapshot_id, snapshot_hash, snapshot_edit, pending_snapshot_edit, published, known,
+              asset_rows, transaction_rows, row_events, transaction_events)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ["snapshotId", "snapshotHash", "snapshotEdit", "pendingSnapshotEdit", "published", "known",
+              "assetRows", "transactionRows", "rowEvents", "transactionEvents"].map((key) => row[key]),
+          );
+        }
+        db.run("INSERT OR REPLACE INTO sync_state (id, data) VALUES (1, ?)", [args.data]);
+        db.run("COMMIT");
+      } catch (error) {
+        db.run("ROLLBACK");
+        throw error;
+      }
+      return null;
+    }
     if (cmd === "plugin:opener|open_url") { openedUrls.push(args.url); return null; }
     if (cmd === "delete_sync_snapshot") {
       // Mirrors the Rust command: remove the snapshot's rows from every snapshot-scoped table.

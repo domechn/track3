@@ -21,8 +21,47 @@ pub mod types;
 mod sync_tests {
     use super::sync_persistence::{
         delete_sync_snapshot, import_sync_snapshot, replace_import_snapshot, replace_sync_snapshot,
+        save_sync_state, SnapshotStateRow,
     };
     use sqlx::{Connection, Executor, SqliteConnection};
+
+    #[test]
+    fn sync_state_save_rolls_back_snapshot_rows_if_global_write_fails() {
+        let path =
+            std::env::temp_dir().join(format!("track3-sync-save-{}.db", uuid::Uuid::new_v4()));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
+            db.execute(include_str!("../../migrations/init/assets_v2_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/asset_prices_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/sync_state_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/sync_snapshot_state_up.sql")).await.unwrap();
+            db.execute("INSERT INTO sync_state (id, data) VALUES (1, '{\"deviceId\":\"before\"}')").await.unwrap();
+            db.execute("CREATE TRIGGER fail_global BEFORE UPDATE ON sync_state BEGIN SELECT RAISE(ABORT, 'injected failure'); END").await.unwrap();
+            db.close().await.unwrap();
+            let row = SnapshotStateRow {
+                snapshot_id: "one".into(), snapshot_hash: Some("hash".into()), snapshot_edit: None,
+                pending_snapshot_edit: None, published: 1, known: "[]".into(), asset_rows: Some("[\"asset\"]".into()),
+                transaction_rows: None, row_events: Some("{\"row\":{}}".into()), transaction_events: None,
+            };
+            assert!(save_sync_state(&path, "{\"deviceId\":\"after\"}", &[row.clone()], &[], false).await.is_err());
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let global: String = sqlx::query_scalar("SELECT data FROM sync_state WHERE id = 1").fetch_one(&mut db).await.unwrap();
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sync_snapshot_state").fetch_one(&mut db).await.unwrap();
+            assert_eq!(global, "{\"deviceId\":\"before\"}");
+            assert_eq!(count, 0);
+            db.execute("DROP TRIGGER fail_global").await.unwrap();
+            db.close().await.unwrap();
+            save_sync_state(&path, "{\"deviceId\":\"after\"}", &[row], &[], false).await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let events: String = sqlx::query_scalar("SELECT row_events FROM sync_snapshot_state WHERE snapshot_id = 'one'").fetch_one(&mut db).await.unwrap();
+            assert_eq!(events, "{\"row\":{}}");
+            db.close().await.unwrap();
+        });
+        std::fs::remove_file(path).unwrap();
+    }
+
 
     #[test]
     fn import_replace_keeps_cost_prices_and_rejects_unmatched_prices() {
@@ -222,6 +261,7 @@ mod sync_tests {
 #[cfg(test)]
 mod init_schema_tests {
     use super::migration::run_migrations;
+    use super::sync_persistence::SnapshotStateRow;
     use sha2::{Digest, Sha256};
     use sqlx::{Connection, Executor, SqliteConnection};
     use std::path::{Path, PathBuf};
@@ -318,6 +358,154 @@ mod init_schema_tests {
             let after: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sync_manifest_cache'")
                 .fetch_one(&mut db).await.unwrap();
             assert_eq!(after, 1);
+            db.close().await.unwrap();
+        });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn migrates_current_engine_state_with_5000_snapshots_without_losing_events() {
+        let root = std::env::temp_dir().join(format!("track3-sync-split-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let db_path = root.join("state.db");
+        let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            for name in initialization_scripts().into_iter().filter(|name| *name != "sync_snapshot_state_up.sql") {
+                db.execute(std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap().as_str()).await.unwrap();
+            }
+            db.execute("INSERT INTO configuration (id, data) VALUES (999, '0.9.4')").await.unwrap();
+            let mut legacy: serde_json::Value = serde_json::from_str(include_str!("../../../tests/fixtures/sync-state-current-engine.json")).unwrap();
+            let example = legacy["assetRows"]["snapshot-000000"][0].clone();
+            let event = serde_json::json!({"deleted":true,"clock":{"ms":1713272400000_i64,"counter":1,"deviceId":"00000000-0000-4000-8000-000000000001"}});
+            for index in 0..5000 {
+                let id = format!("snapshot-{index:06}");
+                legacy["snapshotHashes"][&id] = serde_json::json!(format!("hash-{index}"));
+                legacy["assetRows"][&id] = serde_json::Value::Array((0..50).map(|asset| serde_json::json!(format!("{example}-{asset}"))).collect());
+                legacy["transactionRows"][&id] = serde_json::json!({"txn":{"price":index,"txnType":"buy"}});
+                legacy["rowEvents"][&id] = serde_json::json!({"row":event});
+                legacy["transactionEvents"][&id] = serde_json::json!({"txn":{"price":{"value":index,"clock":event["clock"]}}});
+                legacy["snapshotEdits"][&id] = event["clock"].clone();
+                legacy["pendingSnapshotEdits"][&id] = event["clock"].clone();
+                if index > 0 {
+                    legacy["published"].as_array_mut().unwrap().push(serde_json::json!(id));
+                    legacy["known"].as_array_mut().unwrap().push(serde_json::json!(format!("00000000-0000-4000-8000-000000000001:snapshot:{id}:1")));
+                }
+            }
+            let old = legacy.to_string();
+            sqlx::query("INSERT INTO sync_state (id, data) VALUES (1, ?)").bind(&old).execute(&mut db).await.unwrap();
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.4").await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.4").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sync_snapshot_state").fetch_one(&mut db).await.unwrap();
+            assert_eq!(count, 5000);
+            let compact: String = sqlx::query_scalar("SELECT data FROM sync_state WHERE id = 1").fetch_one(&mut db).await.unwrap();
+            assert!(compact.len() < 3000, "global state is still proportional to history");
+            let row: (String, String, String) = sqlx::query_as(
+                "SELECT asset_rows, row_events, transaction_events FROM sync_snapshot_state WHERE snapshot_id = 'snapshot-004999'"
+            ).fetch_one(&mut db).await.unwrap();
+            assert_eq!(serde_json::from_str::<serde_json::Value>(&row.0).unwrap().as_array().unwrap().len(), 50);
+            assert_eq!(serde_json::from_str::<serde_json::Value>(&row.1).unwrap()["row"], event);
+            assert_eq!(serde_json::from_str::<serde_json::Value>(&row.2).unwrap()["txn"]["price"]["value"], 4999);
+            let stored: Vec<SnapshotStateRow> = sqlx::query_as(
+                "SELECT snapshot_id, snapshot_hash, snapshot_edit, pending_snapshot_edit, published,
+                        known, asset_rows, transaction_rows, row_events, transaction_events
+                 FROM sync_snapshot_state ORDER BY snapshot_id"
+            ).fetch_all(&mut db).await.unwrap();
+            let mut rebuilt: serde_json::Value = serde_json::from_str(&compact).unwrap();
+            for field in ["snapshotHashes", "snapshotEdits", "pendingSnapshotEdits", "assetRows",
+                "transactionRows", "rowEvents", "transactionEvents"] {
+                rebuilt[field] = serde_json::json!({});
+            }
+            rebuilt["published"] = serde_json::json!([]);
+            for row in stored {
+                if let Some(hash) = row.snapshot_hash {
+                    rebuilt["snapshotHashes"][&row.snapshot_id] = serde_json::json!(hash);
+                }
+                for (field, value) in [
+                    ("snapshotEdits", row.snapshot_edit), ("pendingSnapshotEdits", row.pending_snapshot_edit),
+                    ("assetRows", row.asset_rows), ("transactionRows", row.transaction_rows),
+                    ("rowEvents", row.row_events), ("transactionEvents", row.transaction_events),
+                ] {
+                    if let Some(value) = value {
+                        rebuilt[field][&row.snapshot_id] = serde_json::from_str(&value).unwrap();
+                    }
+                }
+                if row.published != 0 {
+                    rebuilt["published"].as_array_mut().unwrap().push(serde_json::json!(row.snapshot_id));
+                }
+                rebuilt["known"].as_array_mut().unwrap().extend(
+                    serde_json::from_str::<Vec<serde_json::Value>>(&row.known).unwrap()
+                );
+            }
+            for value in [&mut rebuilt, &mut legacy] {
+                for field in ["known", "published"] {
+                    value[field].as_array_mut().unwrap().sort_by(|a, b| a.as_str().cmp(&b.as_str()));
+                }
+            }
+            assert_eq!(rebuilt, legacy, "every migrated snapshot field must round-trip");
+            db.close().await.unwrap();
+        });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn failed_snapshot_state_migration_keeps_legacy_row_for_retry() {
+        let root = std::env::temp_dir().join(format!(
+            "track3-sync-split-rollback-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let db_path = root.join("state.db");
+        let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let old = include_str!("../../../tests/fixtures/sync-state-current-engine.json").trim();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", db_path.display())).await.unwrap();
+            for name in initialization_scripts() {
+                db.execute(std::fs::read_to_string(resource_dir.join("migrations/init").join(name)).unwrap().as_str()).await.unwrap();
+            }
+            db.execute("INSERT INTO configuration (id, data) VALUES (999, '0.9.4')").await.unwrap();
+            sqlx::query("INSERT INTO sync_state (id, data) VALUES (1, ?)").bind(old).execute(&mut db).await.unwrap();
+            db.execute("CREATE TRIGGER fail_split AFTER INSERT ON sync_snapshot_state BEGIN UPDATE sync_snapshot_state SET known = '[]' WHERE snapshot_id = NEW.snapshot_id; END").await.unwrap();
+            db.close().await.unwrap();
+            assert!(run_migrations(&db_path, &resource_dir, "0.9.4").await.unwrap_err().contains("hash mismatch"));
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            let after: String = sqlx::query_scalar("SELECT data FROM sync_state WHERE id = 1").fetch_one(&mut db).await.unwrap();
+            assert_eq!(after, old);
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sync_snapshot_state").fetch_one(&mut db).await.unwrap();
+            assert_eq!(count, 0);
+            db.execute("DROP TRIGGER fail_split").await.unwrap();
+            let mut malformed: serde_json::Value = serde_json::from_str(old).unwrap();
+            malformed["snapshotHashes"]["snapshot-000000"] = serde_json::json!(5);
+            let malformed = malformed.to_string();
+            sqlx::query("UPDATE sync_state SET data = ? WHERE id = 1").bind(&malformed).execute(&mut db).await.unwrap();
+            db.close().await.unwrap();
+            assert!(run_migrations(&db_path, &resource_dir, "0.9.4").await.is_err());
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            let after: String = sqlx::query_scalar("SELECT data FROM sync_state WHERE id = 1").fetch_one(&mut db).await.unwrap();
+            assert_eq!(after, malformed);
+            sqlx::query("UPDATE sync_state SET data = ? WHERE id = 1").bind(old).execute(&mut db).await.unwrap();
+            db.close().await.unwrap();
+            run_migrations(&db_path, &resource_dir, "0.9.4").await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", db_path.display())).await.unwrap();
+            let data: String = sqlx::query_scalar("SELECT data FROM sync_state WHERE id = 1")
+                .fetch_one(&mut db).await.unwrap();
+            let rows: Vec<SnapshotStateRow> = sqlx::query_as(
+                "SELECT snapshot_id, snapshot_hash, snapshot_edit, pending_snapshot_edit, published,
+                        known, asset_rows, transaction_rows, row_events, transaction_events
+                 FROM sync_snapshot_state ORDER BY snapshot_id"
+            ).fetch_all(&mut db).await.unwrap();
+            let migrated = serde_json::json!({ "data": data, "rows": rows });
+            let fixture = resource_dir.canonicalize().unwrap().parent().unwrap()
+                .join("tests/fixtures/sync-state-migrated-current.json");
+            if std::env::var("UPDATE_GOLDEN").as_deref() == Ok("1") {
+                std::fs::write(&fixture, format!("{}\n", serde_json::to_string_pretty(&migrated).unwrap())).unwrap();
+            }
+            let expected: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(fixture).unwrap()).unwrap();
+            assert_eq!(migrated, expected, "migrated rows must match the fixture loaded by TypeScript");
             db.close().await.unwrap();
         });
         std::fs::remove_dir_all(root).unwrap();

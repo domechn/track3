@@ -26,6 +26,7 @@ use crate::{
         import_sync_snapshot as import_sync_snapshot_atomically,
         replace_import_snapshot as replace_import_snapshot_atomically,
         replace_sync_snapshot as replace_sync_snapshot_atomically,
+        save_sync_state as save_sync_state_atomically, SnapshotStateRow,
     },
     types::{CoinWithPrice, RefreshAssetInput, RefreshTransactionInput},
 };
@@ -137,6 +138,24 @@ async fn delete_sync_snapshot(
     uuid: String,
 ) -> Result<(), String> {
     delete_sync_snapshot_atomically(&database_path.0, &uuid).await
+}
+
+#[tauri::command]
+async fn save_sync_state(
+    database_path: tauri::State<'_, DatabasePath>,
+    data: String,
+    rows: Vec<SnapshotStateRow>,
+    deleted_ids: Vec<String>,
+    clear_snapshots: bool,
+) -> Result<(), String> {
+    save_sync_state_atomically(
+        &database_path.0,
+        &data,
+        &rows,
+        &deleted_ids,
+        clear_snapshots,
+    )
+    .await
 }
 
 #[cfg_attr(
@@ -668,6 +687,7 @@ pub fn run() {
         replace_sync_snapshot,
         replace_import_snapshot,
         delete_sync_snapshot,
+        save_sync_state,
         get_database_url,
         ios_key_recovery_needed,
         ios_startup_failure,
@@ -701,6 +721,7 @@ pub fn run() {
         replace_sync_snapshot,
         replace_import_snapshot,
         delete_sync_snapshot,
+        save_sync_state,
         get_database_url,
         ios_key_recovery_needed,
         ios_startup_failure,
@@ -732,6 +753,7 @@ pub fn run() {
         replace_sync_snapshot,
         replace_import_snapshot,
         delete_sync_snapshot,
+        save_sync_state,
         get_database_url,
         mark_frontend_ready,
         record_frontend_error,
@@ -749,6 +771,7 @@ pub fn run() {
         replace_sync_snapshot,
         replace_import_snapshot,
         delete_sync_snapshot,
+        save_sync_state,
         get_database_url,
     ]);
     builder

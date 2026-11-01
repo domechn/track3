@@ -82,6 +82,8 @@ export function resetSyncState(state: SyncState): SyncState {
 export interface SyncRepository {
   loadState(): Promise<SyncState>;
   saveState(state: SyncState): Promise<void | number>;
+  loadSnapshotDetails?(state: SyncState, ids: Iterable<string>): Promise<void>;
+  loadDeletedSnapshotRows?(state: SyncState, ids: Iterable<string>): Promise<void>;
   loadManifestCache?(owner: string, salt: string): Promise<{ etag: string; manifest: unknown; lastModified?: string } | null>;
   saveManifestCache?(owner: string, salt: string, etag: string, manifest: unknown, lastModified?: string): Promise<void>;
   clearManifestCache?(owner?: string): Promise<void>;
@@ -638,6 +640,13 @@ export class SyncEngine {
     }
     const own = manifests.find((item) => item.owner === state.deviceId);
     const entries = manifests.flatMap(({ owner, manifest }) => manifest.entries.map((entry) => ({ owner, entry })));
+    const prePullChanges = enabled("history") ? await this.repo.listChangedSnapshotIds?.(state.snapshotRevision) : undefined;
+    if (enabled("history")) await this.repo.loadSnapshotDetails?.(state, new Set([
+      ...(prePullChanges?.ids ?? localIdsBeforePull),
+      ...Object.keys(state.pendingSnapshotEdits),
+      ...entries.filter(({ owner, entry }) => ["snapshot", "edit", "tombstone"].includes(entry.kind) &&
+        !known.has(entryToken(owner, entry))).map(({ entry }) => entry.id),
+    ]));
     this.roundDiagnostics!.diagnostics.entries = entries.length;
     this.roundDiagnostics?.phase("localScan");
     if (!manifestReadFailed) {
@@ -848,6 +857,7 @@ export class SyncEngine {
       state.pendingConfig[id] = version;
     }
     const changes = enabled("history") ? await this.repo.listChangedSnapshotIds?.(state.snapshotRevision) : undefined;
+    if (enabled("history")) await this.repo.loadSnapshotDetails?.(state, changes?.ids ?? await this.repo.listSnapshotIds());
     let snapshotScanFailed = false;
     const failedSnapshotIds = new Set<string>();
     const locallyChanged = new Set<string>();
@@ -1522,8 +1532,11 @@ export class SyncEngine {
       }
       state.trackedSessions = state.trackedSessions.filter((id) =>
         !state.sessionDeletions?.[id] || !!state.pendingSessionDeletions?.[id]);
-      for (const [id, tombstone] of Object.entries(state.tombstones)) {
-        if (!tombstone.deleted || state.pendingSnapshotEdits[id]) continue;
+      const deletedIds = Object.entries(state.tombstones)
+        .filter(([id, tombstone]) => tombstone.deleted && !state.pendingSnapshotEdits?.[id])
+        .map(([id]) => id);
+      await this.repo.loadDeletedSnapshotRows?.(state, deletedIds);
+      for (const id of deletedIds) {
         delete state.assetRows[id];
         delete state.transactionRows[id];
       }

@@ -15,12 +15,39 @@ vi.mock("../ai/sessions", () => ({
   stableSyncMessage: (_id: string, _createdAt: string, _index: number, message: unknown) => message,
 }));
 
-it("reports the UTF-8 size of the JSON saved in sync_state", async () => {
+it("reports the UTF-8 size of the global JSON saved in sync_state", async () => {
   const state = { deviceId: "device", known: ["标记"] };
   const bytes = await new SqliteSyncRepository().saveState(state);
-  const saved = vi.mocked(executeWrite).mock.calls.at(-1)?.[1]?.[0] as string;
+  const saved = (vi.mocked(invoke).mock.calls.at(-1)?.[1] as { data: string }).data;
   expect(saved).toBe(JSON.stringify(state));
   expect(bytes).toBe(new TextEncoder().encode(saved).length);
+});
+
+it("saves only a touched snapshot while keeping its row and transaction events", async () => {
+  const rows = [
+    { snapshotId: "one", snapshotHash: "old", snapshotEdit: null, pendingSnapshotEdit: null,
+      published: 1, known: '["owner:snapshot:one:1"]' },
+    { snapshotId: "two", snapshotHash: "other", snapshotEdit: null, pendingSnapshotEdit: null,
+      published: 1, known: "[]" },
+  ];
+  vi.mocked(getDatabase).mockResolvedValue({ select: async (sql: string) =>
+    sql.includes("FROM sync_state") ? [{ data: '{"deviceId":"device","known":[]}' }] :
+    sql.includes("asset_rows AS assetRows") ? [
+      { snapshotId: "one", assetRows: '["asset"]', transactionRows: "{}", rowEvents: '{"asset":{"deleted":true}}',
+        transactionEvents: '{"txn":{"price":{"value":2}}}' },
+    ] : rows,
+  } as never);
+  vi.mocked(invoke).mockResolvedValue(undefined);
+  const repo = new SqliteSyncRepository();
+  const state = await repo.loadState();
+  state.snapshotHashes!.one = "new";
+  const bytes = await repo.saveState(state);
+  const [command, args] = vi.mocked(invoke).mock.calls.at(-1)!;
+  expect(command).toBe("save_sync_state");
+  expect((args as { rows: Array<{ snapshotId: string; rowEvents: string; transactionEvents: string }> }).rows)
+    .toEqual([expect.objectContaining({ snapshotId: "one", rowEvents: '{"asset":{"deleted":true}}',
+      transactionEvents: '{"txn":{"price":{"value":2}}}' })]);
+  expect(bytes).toBeLessThan(1000);
 });
 
 it("stores decrypted manifests by owner, header salt, and ETag in the local cache", async () => {

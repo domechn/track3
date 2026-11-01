@@ -230,6 +230,13 @@ snapshots. Old tombstone and version objects remain for now; compaction needs a
 device acknowledgement or retention policy so an offline device cannot
 resurrect deleted data.
 
+The 0.9.5 local sync state migration stops startup if the old JSON row has an
+unexpected snapshot field shape, such as a non-string hash or known token.
+The transaction rolls back and leaves the original row intact. This is
+intentional: starting with only part of that state could lose local edit or
+deletion history. Recover from a database backup or repair the malformed
+`sync_state` row, then restart to retry the migration.
+
 ## User guide
 
 Open **Settings → Sync**. Create a private bucket for Track3, then enter its
