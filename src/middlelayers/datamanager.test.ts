@@ -10,6 +10,8 @@ import {
   runWithPreparedConfigurationWrite,
 } from "./configuration";
 import { DATA_MANAGER, ExportData } from "./datamanager";
+import { invoke } from "@tauri-apps/api/core";
+import { readSnapshot } from "./snapshot";
 import { ASSET_HANDLER } from "./entities/assets";
 import { TRANSACTION_HANDLER } from "./entities/transactions";
 import type { AssetModel, TransactionModel } from "./types";
@@ -27,6 +29,9 @@ const mocks = vi.hoisted(() => ({
   writeTextFile: vi.fn(),
   stat: vi.fn(),
   executeWriteWork: vi.fn(),
+  getDatabase: vi.fn(),
+  invoke: vi.fn(),
+  readSnapshot: vi.fn(),
   writeDatabase: {
     execute: vi.fn(),
     select: vi.fn(),
@@ -57,7 +62,11 @@ vi.mock("./configuration", () => ({
 
 vi.mock("./database", () => ({
   executeWriteWork: mocks.executeWriteWork,
+  getDatabase: mocks.getDatabase,
 }));
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
+vi.mock("./snapshot", () => ({ readSnapshot: mocks.readSnapshot }));
 
 vi.mock("./entities/assets", () => ({
   ASSET_HANDLER: {
@@ -152,6 +161,82 @@ beforeEach(() => {
   mocks.executeWriteWork.mockImplementation(async (operation) =>
     operation(mocks.writeDatabase),
   );
+  mocks.getDatabase.mockResolvedValue(mocks.writeDatabase);
+  mocks.writeDatabase.select.mockResolvedValue([]);
+});
+
+describe("per-item import", () => {
+  it("classifies file snapshots, defaults to safe choices, and warns of colliding transaction IDs", async () => {
+    const same = makeHistoricalData();
+    const different = makeHistoricalData({
+      assets: [{ ...makeAsset(), uuid: "snapshot-2", value: 70000 }],
+      transactions: [{ ...makeTransaction(), id: 11, uuid: "snapshot-2" }],
+    });
+    const fresh = makeHistoricalData({
+      assets: [{ ...makeAsset(), id: 3, uuid: "snapshot-3" }],
+      transactions: [],
+    });
+    const data = makeExportData({ historicalData: [same, different, fresh], configuration: undefined });
+    mocks.writeDatabase.select.mockImplementation(async (sql: string) => {
+      if (sql.includes("SELECT uuid FROM assets_v2")) return [{ uuid: "snapshot-1" }, { uuid: "snapshot-2" }];
+      if (sql.includes("FROM transactions WHERE id IN")) return [{ id: 10, uuid: "snapshot-1" }, { id: 11, uuid: "unrelated" }];
+      return [];
+    });
+    mocks.readSnapshot.mockImplementation(async (uuid: string) => {
+      const row = uuid === "snapshot-1" ? same : makeHistoricalData({
+        assets: [{ ...makeAsset(), uuid: "snapshot-2" }],
+        transactions: [{ ...makeTransaction(), id: 12, uuid: "snapshot-2" }],
+      });
+      return { uuid, assets: row.assets, transactions: row.transactions, prices: [] };
+    });
+
+    const preview = await DATA_MANAGER.previewImport(data);
+
+    expect(preview.rows.map(({ status, choice, transactionIdCollisions }) => [status, choice, transactionIdCollisions]))
+      .toEqual([["same", "skip", 0], ["different", "keep", 1], ["new", "import", 0]]);
+  });
+
+  it("rejects a bad checksum before reading or writing any snapshot", async () => {
+    const data = makeExportData({ configuration: undefined });
+    data.historicalData[0].assets[0].amount = 99;
+    await expect(DATA_MANAGER.previewImport(data)).rejects.toThrow("md5 check failed");
+    await expect(DATA_MANAGER.importSelected(data, { "snapshot-1": "import" })).rejects.toThrow("md5 check failed");
+    expect(readSnapshot).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("treats a local snapshot with no remaining assets as different", async () => {
+    const data = makeExportData({ configuration: undefined });
+    mocks.writeDatabase.select.mockImplementation(async (sql: string) =>
+      sql.includes("SELECT uuid FROM assets_v2") ? [{ uuid: "snapshot-1" }] : []);
+    mocks.readSnapshot.mockResolvedValue({ uuid: "snapshot-1", assets: [], prices: [], transactions: [] });
+
+    const preview = await DATA_MANAGER.previewImport(data);
+
+    expect(preview.rows[0]).toMatchObject({ status: "different", choice: "keep" });
+  });
+
+  it("imports selected rows independently and reports a failed replacement", async () => {
+    const first = makeHistoricalData();
+    const second = makeHistoricalData({ assets: [{ ...makeAsset(), id: 2, uuid: "snapshot-2" }], transactions: [] });
+    const data = makeExportData({ historicalData: [first, second], configuration: undefined });
+    mocks.writeDatabase.select.mockImplementation(async (sql: string) =>
+      sql.includes("SELECT uuid FROM assets_v2") ? [{ uuid: "snapshot-2" }] : []);
+    mocks.readSnapshot.mockResolvedValue({ uuid: "snapshot-2", assets: [{ ...second.assets[0], value: 1 }], transactions: [], prices: [] });
+    mocks.invoke.mockImplementation(async (name: string) => {
+      if (name === "replace_import_snapshot") throw new Error("replace failed");
+      return true;
+    });
+
+    const result = await DATA_MANAGER.importSelected(data, {
+      "snapshot-1": "import",
+      "snapshot-2": "replace",
+    });
+
+    expect(result).toEqual({ imported: 1, replaced: 0, skipped: 0, failures: [{ uuid: "snapshot-2", error: "replace failed" }] });
+    expect(mocks.invoke.mock.calls.map(([name]) => name)).toEqual(["import_sync_snapshot", "replace_import_snapshot"]);
+    expect(mocks.invoke.mock.calls[0][1].snapshot.prices).toEqual([]);
+  });
 });
 
 describe("DATA_MANAGER historical data import/export", () => {

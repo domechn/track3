@@ -412,6 +412,14 @@ export async function importHistoricalData(
   return true;
 }
 
+export async function previewImport(data: ExportData) {
+  return DATA_MANAGER.previewImport(data);
+}
+
+export async function importSelected(data: ExportData, choices: Record<string, import("./datamanager").ImportChoice>) {
+  return DATA_MANAGER.importSelected(data, choices);
+}
+
 const autoBackupHistoricalDataFilename = "track3-auto-backup.json";
 let autoBackupQueue: Promise<unknown> = Promise.resolve();
 

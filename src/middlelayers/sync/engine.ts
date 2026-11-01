@@ -193,7 +193,7 @@ export function mergeSessions(local: SyncSession | undefined, remote: SyncSessio
   return { ...latest, messages: orderedMessages([...messages.values()]), messageCount: messages.size };
 }
 
-function snapshotContent(snapshot: Snapshot): string {
+export function snapshotContent(snapshot: Snapshot): string {
   const identities = new Map(snapshot.assets.map((row) =>
     [row.id, `${row.asset_type}:${row.wallet ?? ""}:${row.symbol}`]));
   const withoutLocalIds = (row: Record<string, unknown>) => {

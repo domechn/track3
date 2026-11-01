@@ -20,9 +20,61 @@ pub mod types;
 #[cfg(test)]
 mod sync_tests {
     use super::sync_persistence::{
-        delete_sync_snapshot, import_sync_snapshot, replace_sync_snapshot,
+        delete_sync_snapshot, import_sync_snapshot, replace_import_snapshot, replace_sync_snapshot,
     };
     use sqlx::{Connection, Executor, SqliteConnection};
+
+    #[test]
+    fn import_replace_keeps_cost_prices_and_rejects_unmatched_prices() {
+        let path = std::env::temp_dir().join(format!("track3-import-prices-{}.db", uuid::Uuid::new_v4()));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", path.display())).await.unwrap();
+            db.execute(include_str!("../../migrations/init/assets_v2_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/asset_prices_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/init/transactions_up.sql")).await.unwrap();
+            db.execute(include_str!("../../migrations/v08t09/sync_state_up.sql")).await.unwrap();
+            db.execute("INSERT INTO assets_v2 (uuid, wallet, symbol, amount, value, price) VALUES ('one', 'wallet', 'BTC', 1, 3, 3)").await.unwrap();
+            db.execute("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) SELECT 'one', id, 'BTC', 2, '2024-01-01', '2024-01-02' FROM assets_v2 WHERE uuid = 'one'").await.unwrap();
+            let revision_before: i64 = sqlx::query_scalar("SELECT revision FROM sync_snapshot_revisions WHERE uuid = 'one'").fetch_one(&mut db).await.unwrap();
+            db.close().await.unwrap();
+            let replacement = serde_json::json!({
+                "uuid": "one",
+                "assets": [{"id": 77, "uuid": "one", "createdAt": "2024-01-01", "wallet": "wallet", "asset_type": "crypto", "symbol": "BTC", "amount": 2, "value": 8, "price": 4}],
+                "prices": [],
+                "transactions": []
+            });
+            replace_import_snapshot(&path, replacement.clone()).await.unwrap();
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let row: (f64, i64, i64) = sqlx::query_as("SELECT p.price, p.assetID, a.id FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID WHERE p.uuid = 'one'").fetch_one(&mut db).await.unwrap();
+            assert_eq!(row.0, 2.0);
+            assert_eq!(row.1, row.2);
+            let revision_after: i64 = sqlx::query_scalar("SELECT revision FROM sync_snapshot_revisions WHERE uuid = 'one'").fetch_one(&mut db).await.unwrap();
+            assert!(revision_after > revision_before);
+            db.close().await.unwrap();
+
+            let mut unmatched = replacement;
+            unmatched["assets"][0]["symbol"] = serde_json::json!("ETH");
+            assert!(replace_import_snapshot(&path, unmatched).await.is_err());
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let row: (String, f64) = sqlx::query_as("SELECT a.symbol, p.price FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID WHERE p.uuid = 'one'").fetch_one(&mut db).await.unwrap();
+            assert_eq!(row, ("BTC".into(), 2.0));
+            db.execute("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) VALUES ('one', 99999, 'ORPHAN', 7, '2024-01-01', '2024-01-02')").await.unwrap();
+            db.close().await.unwrap();
+            let original = serde_json::json!({
+                "uuid": "one",
+                "assets": [{"id": 77, "uuid": "one", "createdAt": "2024-01-01", "wallet": "wallet", "asset_type": "crypto", "symbol": "BTC", "amount": 2, "value": 8, "price": 4}],
+                "prices": [],
+                "transactions": []
+            });
+            assert!(replace_import_snapshot(&path, original).await.is_err());
+            let mut db = SqliteConnection::connect(&format!("sqlite://{}", path.display())).await.unwrap();
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM asset_prices WHERE uuid = 'one'").fetch_one(&mut db).await.unwrap();
+            assert_eq!(count, 2);
+            db.close().await.unwrap();
+        });
+        std::fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn snapshot_revision_tracks_insert_update_and_delete() {
