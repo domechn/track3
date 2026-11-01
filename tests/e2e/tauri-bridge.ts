@@ -323,6 +323,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   }
   directories.add("/e2e/unrelated");
   let exportedPath: string | null = null;
+  let sharedRecoveryFile: string | null = null;
   const requests = new Map<number, { url: string; method?: string; headers?: Record<string, string> | [string, string][]; data?: number[] }>();
   const responses = new Map<number, { bytes: number[]; read: boolean; chunks?: number[][]; chunkIndex?: number }>();
   let nextRid = 1;
@@ -331,6 +332,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
   let sseCalls = 0;
   let haptics = 0;
   let shares = 0;
+  let authentications = 0;
   let checkoutStatus: "pending" | "completed" | "expired" = "pending";
   let checkoutSessions = 0;
   const openedUrls: string[] = [];
@@ -373,12 +375,15 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     if (cmd === "ios_prepare_backup_folder" || cmd === "ios_clear_backup_folder" || cmd === "ios_undo_clear_backup_folder") return null;
     if (cmd === "ios_haptic") { haptics++; return null; }
     if (cmd === "ios_lock_enabled") return false;
+    if (cmd === "ios_authenticate") { authentications++; return true; }
     if (cmd === "ios_auto_retry_allowed") return true;
     if (cmd === "ios_set_badge") return null;
     if (cmd === "ios_share_file") {
-      if (!/^\/e2e\/cache\/[0-9a-f-]{36}\/track3-export-data\.json$/.test(args.path) || !files.has(args.path)) {
+      const recovery = /^\/e2e\/cache\/[0-9a-f-]{36}\/track3-sync-[a-z0-9-]+\.t3key$/.test(args.path);
+      if ((!recovery && !/^\/e2e\/cache\/[0-9a-f-]{36}\/track3-export-data\.json$/.test(args.path)) || !files.has(args.path)) {
         throw new Error(`invalid export file: ${args.path}`);
       }
+      if (recovery) sharedRecoveryFile = files.get(args.path)!;
       shares++;
       return null;
     }
@@ -915,11 +920,12 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     costPrice: () => select("SELECT p.price FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID WHERE p.uuid = 'snapshot-old'")[0]?.price,
     snapshotPrices: (uuid: string) => select("SELECT p.price FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID AND a.uuid = p.uuid WHERE p.uuid = ?", [uuid]).map((row) => row.price),
     snapshotValue: () => select("SELECT value FROM assets_v2 WHERE uuid = 'snapshot-old'")[0]?.value,
-    exportedFile: () => exportedPath === null ? null : files.get(exportedPath) ?? null,
-    setImportFile: (text: string) => {
-      exportedPath = "/e2e/documents/track3-import-golden.json";
+    exportedFile: () => sharedRecoveryFile ?? (exportedPath === null ? null : files.get(exportedPath) ?? null),
+    setImportFile: (text: string, filename = "track3-import-golden.json") => {
+      exportedPath = `/e2e/documents/${filename}`;
       files.set(exportedPath, text);
     },
+    authentications: () => authentications,
     openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; },
     setPublicIpMode: (mode: "loading" | "value" | "error") => { publicIpMode = mode; }, publicIpRequests: () => publicIpRequests };
 }

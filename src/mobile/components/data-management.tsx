@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ChevronRightIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
@@ -67,6 +67,8 @@ import { ConfirmSheet } from "@/mobile/components/mobile/overlays";
 import { InsetGroup } from "@/mobile/components/mobile";
 import { useSearchParams } from "react-router-dom";
 import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-summary";
+import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { SyncRecoveryExport } from "@/components/settings/sync-recovery";
 
 const App = ({ onDataImported, currency }: { onDataImported?: () => void; currency?: CurrencyRateDetail }) => {
   const { toast } = useToast();
@@ -444,6 +446,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const showBackup = !section || section === "backup";
   const showBlacklist = !section || section === "blacklist";
   const showSecurity = !section || section === "security";
+  const syncStatus = useSyncExternalStore(syncRuntime.subscribe, syncRuntime.status);
   const autoBackupFolderName = autoBackupDirectory?.split("/").filter(Boolean).at(-1) ?? autoBackupDirectory;
 
   useEffect(() => {
@@ -743,6 +746,11 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
             </div>
           )}
         </CardContent>
+      </Card>}
+
+      {showSecurity && syncStatus.mode === "ready" && <Card>
+        <CardHeader className="ios-d3-data-panel-header pb-2"><CardTitle>{t("sync.recovery.title")}</CardTitle></CardHeader>
+        <CardContent className="ios-d3-data-panel-content"><SyncRecoveryExport t={t} /></CardContent>
       </Card>}
 
       {showSecurity && isIOS() && <Card className="ios-d3-lock-setting">

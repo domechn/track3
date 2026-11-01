@@ -1,0 +1,20 @@
+{
+  "format": "track3-sync-recovery",
+  "version": 1,
+  "createdAt": "2026-11-01T10:00:00.000Z",
+  "header": {
+    "salt": "AAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "kdf": {
+    "name": "argon2id",
+    "salt": "AAAAAAAAAAAAAAAAAAAAAA==",
+    "memoryKiB": 65536,
+    "iterations": 3,
+    "parallelism": 1
+  },
+  "cipher": {
+    "name": "AES-256-GCM",
+    "nonce": "AAAAAAAAAAAAAAAA"
+  },
+  "ciphertext": "5xufS8berfpvmZHuHvINMeIAci6KuvnXzMsXt5b1RWGz0TPNEE1IMn2v1zNMQMcf"
+}

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { executeWrite, getDatabase } from "@/middlelayers/database";
 import { runWithEncryptionWriteGate } from "@/middlelayers/encryption-write-gate";
-import { unlockSyncHeader } from "./crypto";
+import { unlockSyncHeader, unlockSyncHeaderWithKey } from "./crypto";
 import { isS3Conflict, readSyncHeader, S3Error, SyncTimeoutError, type S3Store } from "./object-store";
 import { S3Client } from "./s3-client";
 
@@ -63,14 +63,16 @@ export function classifySyncError(error: unknown): Exclude<SyncConnectionResult,
   return "network";
 }
 
-export async function testSyncConnection(store: S3Store, passphrase: string): Promise<SyncConnectionResult> {
+export async function testSyncConnection(store: S3Store, passphrase: string, rootKey?: Uint8Array): Promise<SyncConnectionResult> {
   try {
     await store.listObjectsV2({ prefix: "devices/" });
     const header = await readSyncHeader(store);
+    if (!header && rootKey) return "header";
     if (header) {
-      if (!passphrase) return "passphrase";
+      if (!passphrase && !rootKey) return "passphrase";
       try {
-        await unlockSyncHeader(header, passphrase);
+        const key = rootKey ? await unlockSyncHeaderWithKey(header, rootKey) : await unlockSyncHeader(header, passphrase);
+        key.fill(0);
       } catch (error) {
         if (error instanceof Error && error.message === "Incorrect sync passphrase or damaged header") return "passphrase";
         return "header";

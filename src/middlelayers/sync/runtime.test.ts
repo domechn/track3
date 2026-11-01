@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSyncHeader } from "./crypto";
+import { openRecoveryFile } from "./recovery-file";
 import { FakeS3, readSyncHeader, writeSyncHeader } from "./object-store";
 import { SyncRuntime } from "./runtime";
 import { defaultSyncSettings, type SyncSettings } from "./settings";
@@ -12,6 +13,42 @@ const configured: SyncSettings = {
 afterEach(() => vi.useRealTimers());
 
 describe("SyncRuntime", () => {
+  it("exports only while unlocked after checking the sync passphrase, then unlocks from the file", async () => {
+    const store = new FakeS3();
+    const first = new SyncRuntime({
+      load: async () => configured, save: async () => {}, store: () => store,
+      engine: () => ({ engine: { syncOnce: async () => ({
+        pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [],
+      }) }, unregister: () => {} }),
+    });
+    await first.initialize();
+    await expect(first.exportRecoveryFile("sync passphrase long enough", "file passphrase long enough")).rejects.toThrow();
+    expect(await first.configure(configured, "sync passphrase long enough")).toBe("ok");
+    await expect(first.exportRecoveryFile("wrong sync passphrase", "file passphrase long enough")).rejects.toThrow();
+    const file = await first.exportRecoveryFile("sync passphrase long enough", "file passphrase long enough");
+    const header = (await readSyncHeader(store))!;
+    expect((await openRecoveryFile(file, "file passphrase long enough", header)).length).toBe(32);
+    first.stop();
+    const next = new SyncRuntime({
+      load: async () => ({ ...configured, enabled: true }), save: async () => {}, store: () => store,
+      engine: () => ({ engine: { syncOnce: async () => ({
+        pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [],
+      }) }, unregister: () => {} }),
+    });
+    await next.initialize();
+    expect(await next.unlockRecoveryFile(file, "wrong file passphrase")).toBe("passphrase");
+    expect(next.status().mode).toBe("locked");
+    expect(next.status().sync.diagnostics).toBeUndefined();
+    expect(JSON.stringify(next.status())).not.toContain("file passphrase long enough");
+    expect(await next.unlockRecoveryFile(file, "file passphrase long enough")).toBe("ok");
+    expect(next.status().mode).toBe("ready");
+    expect(await next.test({ ...configured, enabled: true }, "")).toBe("ok");
+    expect(await next.configure({ ...configured, enabled: true, categories: {
+      ...configured.categories, history: false,
+    } }, "")).toBe("ok");
+    next.stop();
+    expect(await next.test({ ...configured, enabled: true }, "")).toBe("passphrase");
+  });
   it("hands the unlocked key to the engine and clears its session on disable", async () => {
     let primed = false;
     let unregistered = false;

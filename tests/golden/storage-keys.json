@@ -27,6 +27,8 @@
     "track3-refresh-source-statuses",
     "track3-sync-key-check-v1",
     "track3-sync-object-v${VERSION}:${path}",
+    "track3-sync-recovery",
+    "track3-sync-recovery-v1",
     "track3-sync-v1",
     "track3-ui-locale",
     "track3-ui-theme",

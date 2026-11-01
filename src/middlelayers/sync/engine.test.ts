@@ -55,6 +55,16 @@ class MemoryRepository implements SyncRepository {
   dataChanged() {}
 }
 
+it("syncs with a recovered root key passed to the engine instead of a sync passphrase", async () => {
+  const store = new FakeS3();
+  const { header, key } = await createSyncHeader("sync passphrase long enough");
+  await writeSyncHeader(store, header);
+  const repo = new MemoryRepository();
+  const result = await new SyncEngine(store, repo, "", { rootKey: key }).syncOnce();
+  expect(result.errors).toEqual([]);
+  expect(result.pushed).toBeGreaterThanOrEqual(0);
+});
+
 const snapshot = (uuid: string, amount = 1): Snapshot => ({
   uuid,
   assets: [{ id: 1, uuid, createdAt: "2026-01-01T00:00:00Z", asset_type: "crypto", wallet: "", symbol: "BTC", amount, value: amount, price: 1 }],

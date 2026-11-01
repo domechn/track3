@@ -9,6 +9,7 @@ import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialo
 import { ConfigConflictChoices } from "@/components/sync-conflict-choices";
 import { isIOS } from "@/utils/platform";
 import { SyncActionButton } from "@/components/settings/sync-action-button";
+import { SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
 import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/mobile/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -221,10 +222,10 @@ export default function SyncSettingsPage() {
         <CardHeader><CardTitle>{t("sync.passphrase.title")}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div role="note" className="rounded-lg border-2 border-destructive bg-destructive/10 p-4 font-semibold text-destructive dark:border-red-400 dark:text-red-300">
-            {t("sync.passphrase.warning")}
+            {t(status.mode === "ready" || status.mode === "locked" ? "sync.recovery.passphraseWarning" : "sync.passphrase.warning")}
           </div>
           {status.mode === "ready" ? (
-            <p className="text-sm text-muted-foreground">{t("sync.passphrase.session")}</p>
+            <p className="text-sm text-muted-foreground">{t("sync.recovery.session")}</p>
           ) : (
             <>
               <div className="space-y-2">
@@ -251,6 +252,7 @@ export default function SyncSettingsPage() {
                 onClick={() => void (status.mode === "locked" ? unlock() : enable())}>
                 {t(status.mode === "locked" ? "sync.unlock" : "sync.enable")}
               </SyncActionButton>
+              {status.mode === "locked" && <SyncRecoveryUnlock t={t} />}
             </>
           )}
         </CardContent>

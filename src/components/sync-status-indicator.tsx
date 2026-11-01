@@ -9,6 +9,7 @@ import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import { SyncDetails } from "@/components/sync-details";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
 
 type Props = {
   t: (key: string, fallback?: string) => string;
@@ -129,6 +130,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
                 }}>{t("sync.status.skip")}</Button>
               </div>
               {error && <p id="sync-status-passphrase-error" role="alert" className="text-destructive">{error}</p>}
+              <SyncRecoveryUnlock t={t} />
               {disableError && <p role="alert" className="text-destructive">{disableError}</p>}
               <ConfirmDialog
                 trigger={<Button size="sm" variant="link" disabled={busy}
