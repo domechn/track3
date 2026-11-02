@@ -38,7 +38,7 @@ test("capture Phase 6 screens at the review sizes", async ({ browser }) => {
       });
       const page = await context.newPage();
       await page.addInitScript((next) => localStorage.setItem("track3-ui-theme", next), theme);
-      await installTauriBridge(page, { richPortfolio: true, appVersion: "0.9.4" });
+      await installTauriBridge(page, { richPortfolio: true, appVersion: "0.9.5" });
       for (const [screen, route] of Object.entries(screens)) {
         await page.goto(`/#/${route}`);
         await page.reload();

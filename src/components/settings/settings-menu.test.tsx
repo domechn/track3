@@ -5,7 +5,7 @@ import { getVersion } from "@/utils/app";
 import { SettingsMenu } from "./settings-menu";
 
 vi.mock("@/utils/app", () => ({
-  getVersion: vi.fn().mockResolvedValue("0.9.4"),
+  getVersion: vi.fn().mockResolvedValue("0.9.5"),
 }));
 
 describe("Settings menu", () => {
@@ -18,7 +18,7 @@ describe("Settings menu", () => {
     expect(within(menu).getByRole("link", { name: "Data sources" })).toHaveAttribute("href", "/settings/configuration?section=sources");
     expect(within(menu).getByRole("link", { name: "Currency & display" })).toHaveAttribute("href", "/settings/configuration?section=currency");
     expect(within(menu).getByRole("link", { name: "Backup & sync" })).toHaveAttribute("href", "/settings/sync");
-    expect(await within(menu).findByRole("link", { name: /About.*0\.9\.4/ })).toHaveAttribute("href", "/settings/systemInfo?section=about");
+    expect(await within(menu).findByRole("link", { name: /About.*0\.9\.5/ })).toHaveAttribute("href", "/settings/systemInfo?section=about");
   });
 
   it("shows the running app version in About", async () => {

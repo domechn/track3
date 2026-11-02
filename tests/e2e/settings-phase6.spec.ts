@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 
 test("desktop Settings menu opens focused source and currency sections without changing the legacy page", async ({ page }) => {
-  await installTauriBridge(page, { appVersion: "0.9.4" });
+  await installTauriBridge(page, { appVersion: "0.9.5" });
   await page.goto("/#/settings/configuration");
-  await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.4" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.5" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Exchanges", exact: true }).last()).toBeVisible();
   await expect(page.getByRole("heading", { name: "General", exact: true })).toBeVisible();
 

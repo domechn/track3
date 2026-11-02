@@ -7,7 +7,7 @@ name = "track3"
 default-run = "track3"
 repository = "https://gituhb.com/domechn/track3"
 rust-version = "1.94"
-version = "0.9.4"
+version = "0.9.5"
 
 [lib]
 name = "track3_lib"
