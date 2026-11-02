@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import CostBasisPage from "./cost-basis";
 import { getCostBasisMethod, saveCostBasisMethod } from "@/middlelayers/configuration";
 import { exportCostBasisReport, loadCostBasisReport } from "@/middlelayers/cost-basis-data";
+import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
 import { COST_BASIS_SETTINGS_KEY } from "@/middlelayers/ai/actions/page-settings";
 import { TRANSACTION_HANDLER } from "@/middlelayers/entities/transactions";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
@@ -84,10 +85,14 @@ it("keeps manual setup open after a filter reload", async () => {
 it("shows loading while a changed filter reloads an existing report", async () => {
   render(<CostBasisPage />);
   await screen.findAllByText("BTC");
-  vi.mocked(loadCostBasisReport).mockImplementation(() => new Promise(() => {}));
+  let finishReload!: (next: CostBasisReport) => void;
+  const reload = new Promise<CostBasisReport>((resolve) => { finishReload = resolve; });
+  vi.mocked(loadCostBasisReport).mockImplementationOnce(() => reload);
   fireEvent.change(screen.getByLabelText("Tax year"), { target: { value: "2024" } });
   await waitFor(() => expect(loadCostBasisReport).toHaveBeenCalledWith(expect.objectContaining({ from: "2024-01-01" })));
-  expect(screen.getByRole("status")).toHaveTextContent("Loading");
+  expect(await screen.findByRole("status")).toHaveTextContent("Loading");
+  await act(async () => { finishReload(report as never); });
+  await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
 });
 
 it("leads with AI setup and keeps report details in a collapsible section", async () => {
