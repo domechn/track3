@@ -55,7 +55,7 @@ test("data screens expose grouped history and analytics destinations", async ({ 
     await expect(page.locator(".analytics-tile[href='#/comparison']")).toBeVisible();
     await expect(page.locator(".analytics-tile[href='#/cost-basis']")).toBeVisible();
     await page.locator(".analytics-tile").getByText("Returns", { exact: true }).click();
-    const monthCards = page.getByRole("dialog", { name: "Returns" }).locator(".profit-summary-card .grid > button");
+    const monthCards = page.getByRole("dialog", { name: "Returns" }).locator(".profit-summary-card .profit-period-grid > div");
     await expect(monthCards.first()).toContainText("Dec");
     await expect(monthCards.first()).toContainText("—");
     await expect(monthCards.nth(1)).toContainText("Nov");

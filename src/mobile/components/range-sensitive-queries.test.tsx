@@ -226,6 +226,7 @@ beforeEach(() => {
   vi.mocked(queryTransactionsBySymbolAndDateRange).mockResolvedValue([]);
   vi.mocked(calculateTotalProfit).mockResolvedValue({
     total: 100,
+    knownTotal: 100, unknownCoins: [],
     percentage: 10,
     coins: [
       {

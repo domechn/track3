@@ -29,6 +29,16 @@ import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 
 type SummaryType = "month" | "year";
+type UnknownCoins = Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
+
+function unknownHint(coins: UnknownCoins, t: (key: string) => string) {
+  const names = coins.slice(0, 5).map((coin) => coin.symbol).join(", ");
+  const more = coins.length > 5 ? ` ${t("profitSummary.more").replace("{n}", String(coins.length - 5))}` : "";
+  return t(coins.length === 1 ? "profitSummary.unknownWithdrawal" : "profitSummary.unknownWithdrawals")
+    .replace("{n}", String(coins.length))
+    .replace("{coins}", names + more);
+}
+
 
 function getToneClass(value: number, quoteColor: QuoteColor) {
   if (value === 0) {
@@ -63,6 +73,8 @@ const App = ({
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
       total: number | null;
+      knownTotal: number | null;
+      unknownCoins: UnknownCoins;
       monthFirstDate: Date;
       lastRecordDate?: Date;
       baselineDate?: Date;
@@ -72,6 +84,8 @@ const App = ({
   const [yearlyProfits, setYearlyProfits] = useState<
     {
       total: number | null;
+      knownTotal: number | null;
+      unknownCoins: UnknownCoins;
       year: number;
       hasData: boolean;
     }[]
@@ -80,6 +94,7 @@ const App = ({
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
   const [clickedMonth, setClickedMonth] = useState<number | null>(null);
   const [explainedMonth, setExplainedMonth] = useState<number | null>(null);
+  const [explainedPartial, setExplainedPartial] = useState<string | null>(null);
   const { t, locale } = useTranslation();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
@@ -88,6 +103,8 @@ const App = ({
       string,
       {
         total: number | null;
+        knownTotal: number | null;
+        unknownCoins: UnknownCoins;
         monthFirstDate: Date;
         lastRecordDate?: Date;
         baselineDate?: Date;
@@ -99,6 +116,8 @@ const App = ({
       string,
       {
         total: number | null;
+        knownTotal: number | null;
+        unknownCoins: UnknownCoins;
         year: number;
         hasData: boolean;
       }[]
@@ -179,7 +198,7 @@ const App = ({
       const profits = await bluebird.map(
         dates.filter((d) => d.firstDay.getFullYear() === selectedYear),
         async (date) => {
-          const { total, lastRecordDate } = await calculateTotalProfit({
+          const { total, knownTotal = null, unknownCoins = [], lastRecordDate } = await calculateTotalProfit({
             start: date.firstDay,
             end: new Date(
               date.lastDay.getFullYear(),
@@ -200,7 +219,7 @@ const App = ({
           const baselineDate = lrd
             ? await queryPreviousProfitSnapshotDate(date.firstDay)
             : undefined;
-          return { total, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate };
+          return { total, knownTotal, unknownCoins, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate };
         },
         { concurrency: 4 }
       );
@@ -233,12 +252,12 @@ const App = ({
       const profits = await bluebird.map(
         years,
         async (year) => {
-          const { total, lastRecordDate } = await calculateTotalProfit({
+          const { total, knownTotal = null, unknownCoins = [], lastRecordDate } = await calculateTotalProfit({
             start: new Date(year, 0, 1),
             end: new Date(year, 11, 31, 23, 59, 59, 999),
           });
 
-          return { total, year, hasData: Boolean(lastRecordDate) };
+          return { total, knownTotal, unknownCoins, year, hasData: Boolean(lastRecordDate) };
         },
         { concurrency: 3 }
       );
@@ -310,6 +329,8 @@ const App = ({
         const result = loaded ? monthlyProfitsMap[key] : undefined;
         const p = result ?? {
           total: 0,
+          knownTotal: null,
+          unknownCoins: [],
           monthFirstDate: new Date(selectedYear, month, 1),
         };
 
@@ -317,6 +338,8 @@ const App = ({
           month,
           label: getMonthAbbreviation(month + 1),
           total: p.total,
+          knownTotal: p.knownTotal,
+          unknownCoins: p.unknownCoins,
           hasData: Boolean(p.lastRecordDate),
           noSnapshot: Boolean(result && !result.lastRecordDate),
           inRange: new Date(selectedYear, month, 1) <= dateRange.end
@@ -330,6 +353,8 @@ const App = ({
       month: number;
       label: string;
       total: number | null;
+      knownTotal: number | null;
+      unknownCoins: UnknownCoins;
       hasData: boolean;
       noSnapshot: boolean;
       inRange: boolean;
@@ -342,6 +367,8 @@ const App = ({
     return availableYears.map((year) => ({
         year,
         total: yearlyProfitsMap[year] ? yearlyProfitsMap[year].total : 0,
+        knownTotal: yearlyProfitsMap[year]?.knownTotal ?? null,
+        unknownCoins: yearlyProfitsMap[year]?.unknownCoins ?? [],
         hasData: Boolean(yearlyProfitsMap[year]?.hasData),
       }));
   }, [availableYears, yearlyProfitsMap]);
@@ -352,21 +379,24 @@ const App = ({
     let down = 0;
     let flat = 0;
     let total = 0;
+    let partial = 0;
 
     data.forEach((item) => {
       if (!item.hasData) return;
       total += 1;
-      if (item.total === null) return;
-      if (item.total > 0) {
+      if (item.total === null && item.unknownCoins?.length) partial += 1;
+      const amount = item.total ?? item.knownTotal;
+      if (amount === null || amount === undefined) return;
+      if (amount > 0) {
         up += 1;
-      } else if (item.total < 0) {
+      } else if (amount < 0) {
         down += 1;
       } else {
         flat += 1;
       }
     });
 
-    return { total, shown: data.length, up, down, flat };
+    return { total, shown: data.length, up, down, flat, partial };
   }, [monthCards, yearCards, summaryType]);
 
   function renderAmount(value: number | null) {
@@ -383,6 +413,21 @@ const App = ({
       day: "numeric", month: "short", ...(date.getFullYear() !== year ? { year: "numeric" } : {}),
     }).format(date);
     return t("profitSummary.since").replace("{date}", formatted);
+  }
+
+  function renderPartialInfo(coins: UnknownCoins, label: string, key: string) {
+    const hint = unknownHint(coins, t);
+    return (
+      <>
+        <button type="button" className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2"
+          aria-label={t("profitSummary.explain").replace("{period}", label)}
+          aria-expanded={explainedPartial === key}
+          title={hint}
+          onClick={() => setExplainedPartial(explainedPartial === key ? null : key)}>ⓘ</button>
+        <div className={cn("mt-1 text-xs text-muted-foreground",
+          explainedPartial === key ? "" : "hidden group-hover:block group-focus-within:block")}>{hint}</div>
+      </>
+    );
   }
 
   function renderMonthSummary() {
@@ -410,35 +455,36 @@ const App = ({
 
     return (
       <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
-        {monthCards.map((item) => (
+        {monthCards.map((item) => {
+          const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
+          return <div key={item.key} className={cn("group relative rounded-lg border p-2",
+            !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor))}>
           <button
-            key={item.key}
             type="button"
             disabled={!item.hasData && !item.noSnapshot}
             onClick={() => item.hasData ? onMonthClick(item.month) : setExplainedMonth(item.month)}
             aria-label={item.noSnapshot ? `${item.label}: ${t("profitSummary.noSnapshot")}` : undefined}
             title={item.noSnapshot ? t("profitSummary.noSnapshot") : undefined}
-            className={cn(
-              "group flex flex-col justify-start rounded-lg border p-2 text-left transition-colors enabled:hover:bg-muted/50",
-              !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
-            )}
+            className={cn("flex min-h-11 w-full flex-col justify-start text-left transition-colors", partial && "pr-5")}
           >
             <div className="text-xs text-muted-foreground">{item.label}</div>
             <div
               className={cn(
-                "mt-1 text-sm font-semibold tracking-tight",
+                "analyze-period-amount mt-1 text-sm font-semibold tracking-tight",
                 !item.hasData || item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
               )}
             >
-              {item.hasData ? renderAmount(item.total) : "—"}
+              {item.hasData ? partial && item.knownTotal !== null ? `~${renderAmount(item.knownTotal)}` : renderAmount(item.total) : "—"}
             </div>
             {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
             {item.noSnapshot && <div className={cn("mt-1 text-xs text-muted-foreground",
-              explainedMonth === item.month ? "" : "hidden group-hover:block group-focus:block")}>
+              explainedMonth === item.month ? "" : "hidden group-hover:block group-focus-within:block")}>
               {t("profitSummary.noSnapshot")}
             </div>}
           </button>
-        ))}
+          {partial && renderPartialInfo(item.unknownCoins, item.label, item.key)}
+          </div>;
+        })}
       </div>
     );
   }
@@ -446,25 +492,29 @@ const App = ({
   function renderYearSummary() {
     return (
       <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
-        {yearCards.map((item) => (
+        {yearCards.map((item) => {
+          const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
+          return (
           <div
             key={`y-profit-summary-${item.year}`}
             className={cn(
-              "rounded-lg border p-2 text-left",
+              "group relative rounded-lg border p-2 text-left",
               !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
             )}
           >
             <div className="text-xs text-muted-foreground">{item.year}</div>
             <div
               className={cn(
-                "mt-1 text-sm font-semibold tracking-tight",
+                "analyze-period-amount mt-1 text-sm font-semibold tracking-tight",
                 !item.hasData || item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
               )}
             >
-              {item.hasData ? renderAmount(item.total) : "—"}
+              {item.hasData ? partial && item.knownTotal !== null ? `~${renderAmount(item.knownTotal)}` : renderAmount(item.total) : "—"}
             </div>
+            {partial && renderPartialInfo(item.unknownCoins, String(item.year), `year-${item.year}`)}
           </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -510,6 +560,7 @@ const App = ({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span>{t(visibleSummaryStats.total < visibleSummaryStats.shown ? "profitSummary.periodsOf" : "profitSummary.periods")
             .replace("{n}", String(visibleSummaryStats.total)).replace("{total}", String(visibleSummaryStats.shown))}</span>
+          {visibleSummaryStats.partial > 0 && <span>{t("profitSummary.partial").replace("{n}", String(visibleSummaryStats.partial))}</span>}
           <span>{t("profitSummary.up").replace("{n}", String(visibleSummaryStats.up))}</span>
           <span>{t("profitSummary.down").replace("{n}", String(visibleSummaryStats.down))}</span>
           <span>{t("profitSummary.flat").replace("{n}", String(visibleSummaryStats.flat))}</span>
