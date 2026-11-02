@@ -211,7 +211,7 @@ it("clears the bookmark with the folder and restores it on Undo", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Clear" }));
   fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear" }));
   await waitFor(() => expect(m.invoke).toHaveBeenCalledWith("ios_clear_backup_folder", { kind: "auto" }));
-  const toastView = render(<ToastProvider><Toast defaultOpen>{m.toast.mock.lastCall?.[0].action}</Toast><ToastViewport /></ToastProvider>);
+  const toastView = render(<ToastProvider><Toast defaultOpen duration={Infinity}>{m.toast.mock.lastCall?.[0].action}</Toast><ToastViewport /></ToastProvider>);
   fireEvent.click(toastView.getByRole("button", { name: "Undo" }));
   await waitFor(() => expect(m.invoke).toHaveBeenCalledWith("ios_undo_clear_backup_folder"));
 });
