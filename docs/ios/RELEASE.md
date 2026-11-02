@@ -44,6 +44,7 @@ a persistent client ID and session ID, platform and user agent, locale,
 app and Tauri versions, and event details that can include failed or
 partial source IDs. Review exchange, wallet, price, license, assistant
 provider and optional S3 requests separately.
+CI readiness-probe builds send no telemetry.
 
 Prepare and include `PrivacyInfo.xcprivacy` in the iOS app bundle with
 accurate collected-data, tracking and required-reason API declarations

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   fetchMock,
@@ -43,6 +43,7 @@ import { trackEventWithClientID } from "@/utils/app";
 
 describe("trackEventWithClientID", () => {
   beforeEach(() => {
+    vi.stubEnv("VITE_TRACK3_IOS_READY_PROBE", undefined);
     vi.clearAllMocks();
     getClientIDConfigurationMock.mockResolvedValue("client-123");
     getVersionMock.mockResolvedValue("0.6.1");
@@ -51,6 +52,19 @@ describe("trackEventWithClientID", () => {
       status: 202,
       text: vi.fn().mockResolvedValue(""),
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("does not read the client ID or send telemetry in an iOS readiness-probe build", async () => {
+    vi.stubEnv("VITE_TRACK3_IOS_READY_PROBE", "1");
+
+    await trackEventWithClientID("app_started");
+
+    expect(getClientIDConfigurationMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("sends Aptabase events with client metadata through the Tauri HTTP plugin", async () => {

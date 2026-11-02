@@ -4,6 +4,7 @@ import { exists } from "@tauri-apps/plugin-fs";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { fetch } from "@tauri-apps/plugin-http";
+import { isIOSReadyProbeBuild } from "@/utils/ios-ready";
 
 const APTABASE_APP_KEY = "A-EU-6972874637";
 const APTABASE_HOSTS = {
@@ -28,6 +29,8 @@ export async function trackEventWithClientID(
   event: string,
   props?: AptabaseProps,
 ) {
+  if (isIOSReadyProbeBuild()) return;
+
   try {
     const [cid, appVersion, tauriVersion] = await Promise.all([
       getClientID(),

@@ -2,8 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { isIOS } from "@/utils/platform";
 import { redactSecrets } from "@/middlelayers/security/redact";
 
+export function isIOSReadyProbeBuild(): boolean {
+  return import.meta.env.VITE_TRACK3_IOS_READY_PROBE === "1";
+}
+
 export async function reportIOSFrontendError(message: string): Promise<void> {
-  if (!isIOS() || import.meta.env.VITE_TRACK3_IOS_READY_PROBE !== "1") return;
+  if (!isIOS() || !isIOSReadyProbeBuild()) return;
   try {
     await invoke("record_frontend_error", { message: redactSecrets(message).slice(0, 4000) });
   } catch {
@@ -18,7 +22,7 @@ export function isAppContentRendered(): boolean {
 }
 
 export async function markIOSReady(): Promise<void> {
-  if (!isIOS() || import.meta.env.VITE_TRACK3_IOS_READY_PROBE !== "1") return;
+  if (!isIOS() || !isIOSReadyProbeBuild()) return;
   const writeViewport = () => invoke("mark_frontend_ready", {
     width: window.innerWidth,
     height: window.innerHeight,
