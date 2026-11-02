@@ -86,6 +86,7 @@ beforeEach(() => {
   });
   vi.mocked(calculateTotalProfit).mockResolvedValue({
     total: 140,
+    knownTotal: 140, unknownCoins: [],
     percentage: 14,
     coins: [
       {

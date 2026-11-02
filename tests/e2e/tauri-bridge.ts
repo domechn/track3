@@ -21,6 +21,7 @@ type BridgeOptions = {
   seedLockedSync?: boolean;
   richPortfolio?: boolean;
   sparseProfitHistory?: boolean;
+  partialProfitHistory?: boolean;
   zeroCostUSDC?: boolean;
   slowOverview?: boolean;
   lockedStartup?: boolean;
@@ -56,6 +57,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     seedLockedSync = false,
     richPortfolio = false,
     sparseProfitHistory = false,
+    partialProfitHistory = false,
     zeroCostUSDC = false,
     slowOverview = false,
     lockedStartup = false,
@@ -239,6 +241,30 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     const firstId = db.exec("SELECT id FROM assets_v2 WHERE uuid = 'sparse-dec'")[0].values[0][0];
     db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
       VALUES ('sparse-dec', ?, 'crypto', 'sparse-wallet', 'BTC', 1, 760000, 'buy', '2025-12-31T12:00:00.000Z')`, [firstId]);
+  }
+  if (partialProfitHistory) {
+    db.run("DELETE FROM transactions");
+    db.run("DELETE FROM assets_v2");
+    for (let day = -1; day < 304; day += 1) {
+      const at = new Date(Date.UTC(2026, 0, day + 1, 12)).toISOString();
+      const uuid = `partial-${day}`;
+      const btcPrice = 100000 + (day + 1) * 150;
+      const ethAmount = day < 40 ? 2 : day < 160 ? 1.5 : 1;
+      db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+        VALUES (?, ?, 'partial-btc', 'crypto', 'BTC', 1, ?, ?)`, [uuid, at, btcPrice, btcPrice]);
+      db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+        VALUES (?, ?, 'partial-eth', 'crypto', 'ETH', ?, ?, 50)`, [uuid, at, ethAmount, ethAmount * 50]);
+    }
+    for (const [uuid, symbol, wallet, amount, price, txnType, at] of [
+      ["partial--1", "BTC", "partial-btc", 1, 100000, "buy", "2025-12-31T12:00:00.000Z"],
+      ["partial--1", "ETH", "partial-eth", 2, 50, "buy", "2025-12-31T12:00:00.000Z"],
+      ["partial-40", "ETH", "partial-eth", 0.5, 50, "withdraw", "2026-02-10T12:00:00.000Z"],
+      ["partial-160", "ETH", "partial-eth", 0.5, 50, "withdraw", "2026-06-10T12:00:00.000Z"],
+    ] as const) {
+      const id = db.exec("SELECT id FROM assets_v2 WHERE uuid = ? AND symbol = ?", [uuid, symbol])[0].values[0][0];
+      db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+        VALUES (?, ?, 'crypto', ?, ?, ?, ?, ?, ?)`, [uuid, id, wallet, symbol, amount, price, txnType, at]);
+    }
   }
   if (seedReviewContent) {
     db.run(`INSERT INTO chat_sessions (id, title, createdAt, updatedAt, pinned, messageCount, preview)

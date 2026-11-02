@@ -19,6 +19,8 @@ test("phone explains sparse 2026 profit months and the October baseline", async 
     await expect(summary.getByRole("button", { name: /^Oct/ })).toContainText("since 4 Apr");
     await expect(summary.getByRole("button", { name: /^Oct/ })).toContainText("-$81.9k");
     const feb = summary.getByRole("button", { name: /Feb: No snapshot in this month/ });
+    await feb.focus();
+    await expect(feb.getByText("No snapshot in this month")).toBeVisible();
     await feb.tap();
     await expect(feb.getByText("No snapshot in this month")).toBeVisible();
     expect(await feb.getByText("No snapshot in this month").evaluate((node) =>

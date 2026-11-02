@@ -17,6 +17,8 @@ test("desktop explains sparse 2026 profit months and the October baseline", asyn
     await expect(summary.getByRole("button", { name: /^Oct/ })).toContainText("-$81.9k");
     const feb = summary.getByRole("button", { name: /Feb: No snapshot in this month/ });
     await expect(feb).toContainText("—");
+    await feb.focus();
+    await expect(feb.getByText("No snapshot in this month")).toBeVisible();
     await feb.hover();
     await expect(feb.getByText("No snapshot in this month")).toBeVisible();
     mkdirSync("test-results/profit-summary-sparse", { recursive: true });

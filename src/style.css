@@ -490,7 +490,7 @@ body:has(.t3-refresh-popover[data-state="open"]) [data-radix-popper-content-wrap
   padding: 12px;
 }
 .analyze-profit-summary .analyze-period-grid > *:hover { background: hsl(var(--hover)); }
-.analyze-profit-summary .analyze-period-grid > * > :nth-child(2) { font-size: 18px; }
+.analyze-profit-summary .analyze-period-amount { font-size: 18px; }
 .analyze-wallet-failures {
   display: grid;
   gap: 8px;

@@ -41,7 +41,7 @@ it("uses a dash for a month with no snapshot", async () => {
 
 it("keeps an unknown yearly profit as a dash", async () => {
   vi.mocked(calculateTotalProfit).mockResolvedValue({
-    total: null, percentage: null, coins: [], lastRecordDate: new Date(2024, 3, 16),
+    total: null, knownTotal: null, unknownCoins: [], percentage: null, coins: [], lastRecordDate: new Date(2024, 3, 16),
   });
   render(<ProfitSummary
     dateRange={{ start: new Date(2024, 0, 1), end: new Date(2024, 3, 16) }}
@@ -56,7 +56,8 @@ it("keeps an unknown yearly profit as a dash", async () => {
 
 it("shows a dash for a year without a snapshot", async () => {
   vi.mocked(calculateTotalProfit).mockResolvedValue({
-    total: 0, coins: [], lastRecordDate: undefined,
+    total: 0,
+    knownTotal: 0, unknownCoins: [], coins: [], lastRecordDate: undefined,
   });
   render(<ProfitSummary
     dateRange={{ start: new Date(2024, 0, 1), end: new Date(2024, 3, 16) }}
@@ -71,7 +72,8 @@ it("shows a dash for a year without a snapshot", async () => {
 
 it("lets the phone narrow a month's P&L chart to seven days", async () => {
   vi.mocked(calculateTotalProfit).mockResolvedValue({
-    total: 0, coins: [], lastRecordDate: new Date(2024, 3, 16),
+    total: 0,
+    knownTotal: 0, unknownCoins: [], coins: [], lastRecordDate: new Date(2024, 3, 16),
   });
   vi.mocked(queryPreviousProfitSnapshotDate).mockResolvedValue(undefined);
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({

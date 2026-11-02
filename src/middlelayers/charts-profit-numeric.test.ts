@@ -240,6 +240,47 @@ describe("numeric profit from refresh snapshots", () => {
       .toEqual([0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]);
   });
 
+  it("keeps known monthly profit when daily snapshots include an unpaired withdrawal", async () => {
+    fixture.load(Array.from({ length: 304 }, (_, day) => {
+      const at = new Date(Date.UTC(2026, 0, day + 1, 12)).toISOString();
+      return {
+        at,
+        holdings: [
+          holding("w1", 1, 100 + day, "BTC"),
+          holding("w2", day < 40 ? 2 : day < 160 ? 1.5 : 1, 50, "ETH"),
+        ],
+      };
+    }), generate, (txn) => {
+      if (txn.symbol === "ETH" && txn.txnType === "sell") txn.txnType = "withdraw";
+    });
+    const feb = await calculateTotalProfit(range("2026-02-01T00:00:00.000Z", "2026-02-28T23:59:59.999Z"));
+    const june = await calculateTotalProfit(range("2026-06-01T00:00:00.000Z", "2026-06-30T23:59:59.999Z"));
+    const march = await calculateTotalProfit(range("2026-03-01T00:00:00.000Z", "2026-03-31T23:59:59.999Z"));
+    expect(feb.lastRecordDate).toBeDefined();
+    expect(feb.total).toBeNull();
+    expect(feb.knownTotal).toBe(28);
+    expect(feb.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto" }]);
+    expect(june.total).toBeNull();
+    expect(june.knownTotal).toBe(30);
+    expect(june.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto" }]);
+    expect(march.total).toBe(31);
+    expect(march.knownTotal).toBe(31);
+    expect(march.unknownCoins).toEqual([]);
+  });
+
+  it("returns no known amount when every coin has an unpaired withdrawal", async () => {
+    fixture.load([
+      { at: "2026-01-01T12:00:00.000Z", holdings: [holding("w1", 2, 100)] },
+      { at: "2026-01-02T12:00:00.000Z", holdings: [holding("w1", 1, 110)] },
+    ], generate, (txn) => {
+      if (txn.txnType === "sell") txn.txnType = "withdraw";
+    });
+    const result = await calculateTotalProfit(range("2026-01-01T00:00:00.000Z", "2026-01-31T23:59:59.999Z"));
+    expect(result.total).toBeNull();
+    expect(result.knownTotal).toBeNull();
+    expect(result.unknownCoins).toEqual([{ symbol: "BTC", assetType: "crypto" }]);
+  });
+
   it("uses the latest of several snapshots in each month", async () => {
     fixture.load([
       { at: "2024-01-01T12:00:00.000Z", holdings: [holding("w1", 1, 100)] },

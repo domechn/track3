@@ -29,6 +29,8 @@ const TOTAL_PROFIT_CACHE_SESSION_ID =
 type TotalProfit = {
   // total profit
   total: number | null;
+  knownTotal: number | null;
+  unknownCoins: { symbol: string; assetType: AssetType }[];
   // total profit percentage
   // if it is undefined, means "∞"
   percentage?: number | null;
@@ -301,6 +303,12 @@ export async function calculateTotalProfit(
   const total = coins.some((coin) => coin.value === null)
     ? null
     : coins.reduce((sum, coin) => sum + (coin.value ?? 0), 0);
+  const knownCoins = coins.filter((coin) => coin.value !== null);
+  const knownTotal = knownCoins.length
+    ? knownCoins.reduce((sum, coin) => sum + coin.value!, 0)
+    : null;
+  const unknownCoins = coins.filter((coin) => coin.value === null)
+    .map(({ symbol, assetType }) => ({ symbol, assetType }));
   const totalRealSpent = coins.reduce((s, c) => s + c.realSpentValue, 0);
 
   let lrdAsset: AssetModel | undefined;
@@ -313,6 +321,8 @@ export async function calculateTotalProfit(
 
   const resp = {
     total,
+    knownTotal,
+    unknownCoins,
     percentage: total === null ? null
       : totalRealSpent === 0 ? (total === 0 ? 0 : undefined) : (total / totalRealSpent) * 100,
     coins,
