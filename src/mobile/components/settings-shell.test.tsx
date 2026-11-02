@@ -6,7 +6,7 @@ import { isIOS } from "@/utils/platform";
 import { vi } from "vitest";
 
 vi.mock("@/utils/platform", () => ({ isIOS: vi.fn(() => false) }));
-vi.mock("@/utils/app", () => ({ getVersion: vi.fn().mockResolvedValue("0.9.4") }));
+vi.mock("@/utils/app", () => ({ getVersion: vi.fn().mockResolvedValue("0.9.5") }));
 
 describe("Settings shell", () => {
   it("provides a page heading and labeled navigation", () => {
@@ -57,7 +57,7 @@ describe("Settings shell", () => {
     expect(screen.getByRole("link", { name: "Security" })).toHaveAttribute("href", "/settings/data?section=security");
     expect(screen.getByRole("link", { name: "Backup & data" })).toHaveAttribute("href", "/settings/data?section=backup");
     expect(screen.getByRole("link", { name: "Data sources" }).querySelector(".t3-settings-menu-icon")).toBeInTheDocument();
-    expect((await screen.findByRole("link", { name: "About 0.9.4" })).querySelector(".t3-settings-menu-icon")).toBeInTheDocument();
+    expect((await screen.findByRole("link", { name: "About 0.9.5" })).querySelector(".t3-settings-menu-icon")).toBeInTheDocument();
     vi.mocked(isIOS).mockReturnValue(false);
   });
 });

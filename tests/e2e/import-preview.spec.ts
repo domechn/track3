@@ -39,7 +39,7 @@ test("the fake rejects file prices when replacing local cost prices", async ({ p
 });
 
 test("reviews a 0.9.4 export and imports its new snapshots in one action", async ({ page }) => {
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   bridge.setImportFile(readFileSync(resolve("tests/golden/export-0.9.4.json"), "utf8"));
   await page.goto("/#/settings/data");
   await page.getByRole("button", { name: "Review snapshots" }).click();
@@ -52,7 +52,7 @@ test("reviews a 0.9.4 export and imports its new snapshots in one action", async
 });
 
 test("known-bug: legacy Ignore import drops a file transaction when its ID belongs to another snapshot", async ({ page }) => {
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   bridge.seedTransactionIdCollision();
   bridge.setImportFile(readFileSync(resolve("tests/golden/export-0.9.4.json"), "utf8"));
   await page.goto("/#/settings/data");
@@ -68,7 +68,7 @@ test("known-bug: legacy Ignore import drops a file transaction when its ID belon
 });
 
 test("Replace with file retains the local cost price", async ({ page }) => {
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   bridge.seedCostPrice();
   const payload = {
     exportAt: "2024-01-03T00:00:00.000Z", client: "fixture", clientVersion: "0.9.4",
@@ -97,7 +97,7 @@ test("Replace with file retains the local cost price", async ({ page }) => {
 });
 
 test("a failed snapshot is reported while an earlier snapshot stays imported", async ({ page }) => {
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   const asset = (uuid: string, id: number) => ({
     id, uuid, createdAt: "2024-01-01T00:00:00.000Z", wallet: "wallet-1",
     asset_type: "crypto", symbol: "BTC", amount: 1, value: 1, price: 1,
@@ -129,7 +129,7 @@ test("a failed snapshot is reported while an earlier snapshot stays imported", a
 });
 
 test("desktop backup and review screens are captured in light and dark", async ({ page }) => {
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   bridge.setImportFile(readFileSync(resolve("tests/golden/export-0.9.4.json"), "utf8"));
   mkdirSync("test-results/p5-screens", { recursive: true });
   await page.goto("/#/settings/data");

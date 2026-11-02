@@ -29,7 +29,7 @@ test("Settings export keeps the 0.9.4 JSON shape", async ({ page }) => {
 });
 
 test("Settings imports the committed 0.9.4 file into History", async ({ page }) => {
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   bridge.setImportFile(readFileSync(resolve("tests/golden/export-0.9.4.json"), "utf8"));
   await page.goto("/#/settings/data");
   await page.getByRole("button", { name: "Import", exact: true }).click();

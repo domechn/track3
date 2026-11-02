@@ -13,7 +13,7 @@ test.use({
 test("iOS reviews a 0.9.4 export in Chinese", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => localStorage.setItem("track3-ui-locale", "zh"));
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   bridge.setImportFile(readFileSync(resolve("tests/golden/export-0.9.4.json"), "utf8"));
   await page.goto("/#/settings/data?section=backup");
   await page.getByRole("button", { name: "逐条检查快照" }).click();
@@ -31,7 +31,7 @@ test("iOS reviews a 0.9.4 export in Chinese", async ({ page }) => {
 test("iOS confirms before replacing a local snapshot", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => localStorage.setItem("track3-ui-locale", "zh"));
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   const originalValue = bridge.snapshotValue();
   const payload = {
     exportAt: "2024-01-03T00:00:00.000Z", client: "fixture", clientVersion: "0.9.4",
@@ -62,7 +62,7 @@ test("iOS confirms before replacing a local snapshot", async ({ page }) => {
 
 test("iOS backup and review screens are captured in light and dark", async ({ page }) => {
   test.setTimeout(120_000);
-  const bridge = await installTauriBridge(page, { appVersion: "0.9.4" });
+  const bridge = await installTauriBridge(page, { appVersion: "0.9.5" });
   bridge.setImportFile(readFileSync(resolve("tests/golden/export-0.9.4.json"), "utf8"));
   mkdirSync("test-results/p5-screens", { recursive: true });
   await page.goto("/#/settings/data?section=backup");
