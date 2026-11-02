@@ -705,7 +705,7 @@ mod tests {
         let server = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             let mut request = [0; 512];
-            stream.read(&mut request).unwrap();
+            assert!(stream.read(&mut request).unwrap() > 0);
             let body = r#"[{"id":"atnt-ondo-tokenized-stock","symbol":"ton","name":"AT&T Ondo Stock"},
                 {"id":"tac-bridged-ton-tac","symbol":"ton","name":"TAC Bridged TON"},
                 {"id":"the-open-network","symbol":"gram","name":"Gram (prev. Toncoin)"}]"#;
@@ -880,7 +880,7 @@ mod tests {
             let server = std::thread::spawn(move || {
                 let (mut stream, _) = listener.accept().unwrap();
                 let mut request = [0; 512];
-                stream.read(&mut request).unwrap();
+                assert!(stream.read(&mut request).unwrap() > 0);
                 stream.write_all(response).unwrap();
             });
             let market: CoinsMarketItem = serde_json::from_value(serde_json::json!({

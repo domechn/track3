@@ -224,7 +224,7 @@ describe("Data Management", () => {
       description: '"BTC" removed from blacklist',
       duration: 5000,
     }));
-    const toastView = render(<ToastProvider><Toast defaultOpen>
+    const toastView = render(<ToastProvider><Toast defaultOpen duration={Infinity}>
       {mocks.toast.mock.lastCall?.[0].action}
     </Toast><ToastViewport /></ToastProvider>);
     fireEvent.click(toastView.getByRole("button", { name: "Undo" }));
@@ -253,7 +253,7 @@ describe("Data Management", () => {
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(mocks.removeFromBlacklist).toHaveBeenCalledOnce());
     const undoAction = mocks.toast.mock.lastCall?.[0].action;
-    const toastView = render(<ToastProvider><Toast defaultOpen>{undoAction}</Toast><ToastViewport /></ToastProvider>);
+    const toastView = render(<ToastProvider><Toast defaultOpen duration={Infinity}>{undoAction}</Toast><ToastViewport /></ToastProvider>);
     fireEvent.click(toastView.getByRole("button", { name: "Undo" }));
     await waitFor(() => expect(mocks.addToBlacklist).toHaveBeenCalledWith("BTC"));
     expect(screen.getAllByRole("button", { name: /remove .* from blacklist/i }).map((button) => button.getAttribute("aria-label"))).toEqual([
@@ -288,7 +288,7 @@ describe("Data Management", () => {
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear" }));
     await waitFor(() => expect(mocks.cleanAutoBackupDirectory).toHaveBeenCalledOnce());
     expect(screen.queryByText("/backups")).not.toBeInTheDocument();
-    const toastView = render(<ToastProvider><Toast defaultOpen>
+    const toastView = render(<ToastProvider><Toast defaultOpen duration={Infinity}>
       {mocks.toast.mock.lastCall?.[0].action}
     </Toast><ToastViewport /></ToastProvider>);
     fireEvent.click(toastView.getByRole("button", { name: "Undo" }));

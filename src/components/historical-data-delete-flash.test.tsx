@@ -335,7 +335,7 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     const undoAction = toastMock.mock.lastCall?.[0].action;
     const toastView = render(
       <ToastProvider>
-        <Toast defaultOpen>{undoAction}</Toast>
+        <Toast defaultOpen duration={Infinity}>{undoAction}</Toast>
         <ToastViewport />
       </ToastProvider>,
     );
@@ -368,7 +368,7 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     await waitFor(() => expect(screen.getAllByTestId("history-snapshot-row")).toHaveLength(1));
 
     const undoAction = toastMock.mock.lastCall?.[0].action;
-    const toastView = render(<ToastProvider><Toast defaultOpen>{undoAction}</Toast><ToastViewport /></ToastProvider>);
+    const toastView = render(<ToastProvider><Toast defaultOpen duration={Infinity}>{undoAction}</Toast><ToastViewport /></ToastProvider>);
     fireEvent.click(toastView.getByRole("button", { name: /undo/i }));
     await waitFor(() => expect(restoreHistoricalData).toHaveBeenCalledOnce());
     await waitFor(() => expect(screen.getAllByTestId("history-snapshot-row")).toHaveLength(2));
@@ -478,7 +478,7 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     fireEvent.click(screen.getByRole("button", { name: /next page/i }));
     await screen.findByText("rec-0021");
     const undoAction = toastMock.mock.lastCall?.[0].action;
-    const toastView = render(<ToastProvider><Toast defaultOpen>{undoAction}</Toast><ToastViewport /></ToastProvider>);
+    const toastView = render(<ToastProvider><Toast defaultOpen duration={Infinity}>{undoAction}</Toast><ToastViewport /></ToastProvider>);
     fireEvent.click(toastView.getByRole("button", { name: /undo/i }));
     await waitFor(() => expect(restoreHistoricalData).toHaveBeenCalledOnce());
     expect(screen.queryByText("rec-0000")).not.toBeInTheDocument();
