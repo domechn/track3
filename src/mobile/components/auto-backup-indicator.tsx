@@ -34,7 +34,10 @@ export default function AutoBackupIndicator({
   }
 
   if (isIOS()) {
-    return <div role="status" aria-live="polite" className="ios-d3-auto-backup fixed inset-x-4 z-40 rounded-xl bg-card p-3 text-sm" style={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}>
+    return <div role="status" aria-live="polite"
+      aria-label={preparing ? t("data.folder.downloading")
+        : `${t("autoBackup.indicator.title")}. ${t("autoBackup.indicator.description")}`}
+      className="ios-d3-auto-backup fixed inset-x-4 z-40 rounded-xl bg-card p-3 text-sm" style={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}>
       <p className="font-medium">{t(preparing ? "data.folder.downloading" : "autoBackup.indicator.title")}</p>
       {!preparing && <p className="text-muted-foreground">{t("autoBackup.indicator.description")}</p>}
     </div>;

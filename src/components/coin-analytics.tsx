@@ -12,12 +12,14 @@ import {
   Asset,
   AssetReference,
   CurrencyRateDetail,
+  QuoteColor,
   TDateRange,
   Transaction,
   TransactionType,
 } from "@/middlelayers/types";
 import { AssetType } from "@/middlelayers/datafetch/types";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { SummaryFidelityRangeContext } from "./summary-fidelity-range-context";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -89,6 +91,7 @@ import {
 } from "./ui/select";
 import { useTranslation } from "@/i18n";
 import CoinCustomPrice from "./coin-custom-price";
+import CoinFidelityView from "./coin-fidelity-view";
 
 function formatEditablePrice(value: number): string {
   if (!Number.isFinite(value)) {
@@ -205,19 +208,25 @@ export const UpdateTransactionTypeDialog = ({
 
 const App = ({
   currency,
-  dateRange,
+  dateRange: suppliedDateRange,
   onDataChanged,
+  fidelity = false,
+  quoteColor = "green-up-red-down",
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   onDataChanged?: () => void;
+  fidelity?: boolean;
+  quoteColor?: QuoteColor;
 }) => {
   const { symbol } = useParams() as { symbol: string };
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
+  const fidelityRange = useContext(SummaryFidelityRangeContext).range;
+  const dateRange = fidelity && fidelityRange ? fidelityRange : suppliedDateRange;
   const pageSize = 20;
-  const LOAD_COUNT = 3; // loadSymbolData, CoinsAmountAndValueChange, WalletAssetsPercentage
+  const LOAD_COUNT = fidelity ? 1 : 3;
   const assetType = parseAssetTypeSearchParam(searchParams.get("assetType"));
 
   const [pageLoading, setPageLoading] = useState(true);
@@ -526,15 +535,16 @@ const App = ({
     selectedAssetType: AssetType,
   ) {
     const gen = loadGenRef.current;
+    const transactionRange = fidelity && !fidelityRange ? { start: new Date(0), end: selectedRange.end } : selectedRange;
 
     // fetch all data before setting any state to avoid multiple re-renders
     const [txns, tp, la, ama, lp] = await Promise.all([
       queryTransactionsBySymbolAndDateRange(
         s,
-        selectedRange,
+        transactionRange,
         selectedAssetType,
       ),
-      calculateTotalProfit(selectedRange, s, selectedAssetType),
+      calculateTotalProfit(transactionRange, s, selectedAssetType),
       queryLastAssetsBySymbol(s, selectedRange, selectedAssetType),
       queryAssetMaxAmountBySymbol(s, selectedRange, selectedAssetType),
       getLogoPath(s, selectedAssetType),
@@ -576,8 +586,14 @@ const App = ({
     setAllowSymbols(ss);
   }
 
-  async function onUpdatePriceDialogSaveClick() {
-    const mutationKey = transactionMutationKey(updateTxnId, "price");
+  async function onUpdatePriceDialogSaveClick(override?: { id: number; value: string; rate: number; original: number; dirty: boolean }) {
+    if (typeof override?.id !== "number") override = undefined;
+    const transactionId = override?.id ?? updateTxnId;
+    const value = override?.value ?? updatePriceValue;
+    const rate = override?.rate ?? updatePriceRate;
+    const original = override?.original ?? updatePriceOriginalValue;
+    const dirty = override?.dirty ?? updatePriceDirty;
+    const mutationKey = transactionMutationKey(transactionId, "price");
     if (pendingMutationKeysRef.current.has(mutationKey)) {
       return;
     }
@@ -588,13 +604,13 @@ const App = ({
       });
       return;
     }
-    const quotePrice = Number(updatePriceValue);
+    const quotePrice = Number(value);
     if (
-      updatePriceValue.trim() === "" ||
+      value.trim() === "" ||
       !Number.isFinite(quotePrice) ||
       quotePrice < 0 ||
-      !Number.isFinite(updatePriceRate) ||
-      updatePriceRate <= 0
+      !Number.isFinite(rate) ||
+      rate <= 0
     ) {
       toast({
         description: t("coin.invalidPrice"),
@@ -602,7 +618,7 @@ const App = ({
       });
       return;
     }
-    const txnIndex = txnIndexMap.get(updateTxnId) ?? -1;
+    const txnIndex = txnIndexMap.get(transactionId) ?? -1;
     if (txnIndex === -1) {
       toast({
         description: t("coin.invalidAction"),
@@ -613,7 +629,7 @@ const App = ({
     const act = transactions[txnIndex];
     const editSession = editSessionRef.current;
 
-    const usdPrice = persistedTransactionPrice(updatePriceDirty, quotePrice, updatePriceRate, updatePriceOriginalValue);
+    const usdPrice = persistedTransactionPrice(dirty, quotePrice, rate, original);
     if (!Number.isFinite(usdPrice) || usdPrice < 0) {
       toast({
         description: t("coin.invalidPrice"),
@@ -651,10 +667,14 @@ const App = ({
     setUpdateTxnId(0);
     setUpdatePriceValue("");
     setUpdatePriceDirty(false);
+    return true;
   }
 
-  async function onUpdateTxnTypeDialogSaveClick() {
-    const mutationKey = transactionMutationKey(updateTxnId, "type");
+  async function onUpdateTxnTypeDialogSaveClick(override?: { id: number; type: TransactionType }) {
+    if (typeof override?.id !== "number") override = undefined;
+    const transactionId = override?.id ?? updateTxnId;
+    const selectedType = override?.type ?? updateTxnTypeValue;
+    const mutationKey = transactionMutationKey(transactionId, "type");
     if (pendingMutationKeysRef.current.has(mutationKey)) {
       return;
     }
@@ -665,14 +685,14 @@ const App = ({
       });
       return;
     }
-    if (!updateTxnTypeValue) {
+    if (!selectedType) {
       toast({
         description: t("coin.invalidTxnType"),
         variant: "destructive",
       });
       return;
     }
-    const txnIndex = txnIndexMap.get(updateTxnId) ?? -1;
+    const txnIndex = txnIndexMap.get(transactionId) ?? -1;
     if (txnIndex === -1) {
       toast({
         description: t("coin.invalidAction"),
@@ -681,7 +701,7 @@ const App = ({
       return;
     }
     const act = transactions[txnIndex];
-    const txnType = updateTxnTypeValue;
+    const txnType = selectedType;
     const editSession = editSessionRef.current;
 
     setMutationPending(mutationKey, true);
@@ -712,6 +732,7 @@ const App = ({
     setUpdateTxnTypeDialogOpen(false);
     setUpdateTxnId(0);
     setUpdateTxnTypeValue(undefined);
+    return true;
   }
 
   function HistoryTable() {
@@ -868,6 +889,20 @@ const App = ({
       </Card>
     );
   }
+
+  if (fidelity) return <CoinFidelityView symbol={symbol} assetType={assetType} currency={currency} dateRange={dateRange} lastAsset={lastAsset} transactions={transactions} walletAliasMap={walletAliasMap} quoteColor={quoteColor} onEdit={async (transaction, type, quotePrice) => {
+    if (quotePrice !== undefined && !await onUpdatePriceDialogSaveClick({
+      id: transaction.id, value: String(quotePrice), rate: currency.rate, original: transaction.price, dirty: true,
+    })) return false;
+    if (type !== transaction.txnType && !await onUpdateTxnTypeDialogSaveClick({ id: transaction.id, type })) {
+      if (quotePrice !== undefined) await onUpdatePriceDialogSaveClick({
+        id: transaction.id, value: String(transaction.price * currency.rate),
+        rate: currency.rate, original: transaction.price, dirty: false,
+      });
+      return false;
+    }
+    return true;
+  }} />;
 
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>

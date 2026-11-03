@@ -1,7 +1,8 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
 import { SourceStatusCard, useOverviewPanelsData } from "./overview-panels";
+import { queryAllDataDates } from "@/middlelayers/charts";
 
 const state = vi.hoisted(() => ({ statuses: [] as PortfolioSourceStatus[] }));
 vi.mock("@/middlelayers/ui-state/source-status-store", () => ({
@@ -31,6 +32,13 @@ afterEach(() => {
 });
 
 describe("Overview source status", () => {
+  it("reads snapshot dates once for the Overview panels", async () => {
+    vi.mocked(queryAllDataDates).mockClear();
+    render(<StatusProbe />);
+    await waitFor(() => expect(queryAllDataDates).toHaveBeenCalled());
+    expect(queryAllDataDates).toHaveBeenCalledTimes(1);
+  });
+
   it("shows a stored failed source in the alert and Sources card when Overview mounts", () => {
     state.statuses = [{ sourceId: "cex:1", label: "OKX", status: "failed", lastSuccessAt: "2026-10-30T08:12:00Z" }];
     render(<StatusProbe />);

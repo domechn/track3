@@ -4,6 +4,7 @@ import InsightsCard from "./insights-card";
 import { dismissInsight, formatInsight, loadInsightCard, refreshInsights, INSIGHTS_CHANGED_EVENT } from "@/middlelayers/insights-service";
 import type { InsightCard } from "@/middlelayers/insights-service";
 import { loadAIConfig } from "@/middlelayers/configuration";
+import { takePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
 import axe from "axe-core";
 
 vi.mock("@/middlelayers/insights-service", () => ({
@@ -47,6 +48,30 @@ describe("InsightsCard", () => {
     expect(screen.getByRole("button", { name: /Dismiss insight/ })).toBeVisible();
     const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(results.violations.map(({ id }) => id)).toEqual([]);
+  });
+  it("uses a current saved summary as the Overview AI card", async () => {
+    vi.mocked(loadInsightCard).mockResolvedValue({ ...card,
+      summary: "BTC drove the week — it added $12,286.29.\nStablecoins are 29.1% of the portfolio",
+      summaryLocale: "en", summarySnapshotUuid: "snapshot-a" });
+    vi.mocked(loadAIConfig).mockResolvedValue({} as never);
+    render(<InsightsCard overviewFidelity />);
+    const region = await screen.findByRole("region", { name: "AI insights" });
+    expect(region).toHaveTextContent("BTC drove the week");
+    expect(region).toHaveTextContent("Stablecoins are 29.1% of the portfolio");
+    expect(region.querySelector(".t3-insights-summary-lines h3")).toHaveTextContent("BTC drove the week");
+    expect(region.querySelector(".t3-insights-summary-lines p")).toHaveTextContent("it added $12,286.29.");
+    expect(region).toHaveTextContent("Pro");
+    expect(region).not.toHaveTextContent("insights.newAsset BTC");
+    fireEvent.click(screen.getByRole("link", { name: "Ask the assistant" }));
+    expect(takePendingAssistantQuestion()?.question)
+      .toContain("BTC drove the week");
+  });
+  it("keeps a saved summary visible when AI settings are temporarily unavailable", async () => {
+    vi.mocked(loadInsightCard).mockResolvedValue({ ...card,
+      summary: "BTC drove the week", summaryLocale: "en", summarySnapshotUuid: "snapshot-a" });
+    vi.mocked(loadAIConfig).mockRejectedValue(new Error("settings unavailable"));
+    render(<InsightsCard overviewFidelity />);
+    expect(await screen.findByRole("region", { name: "AI insights" })).toHaveTextContent("BTC drove the week");
   });
   it("renders loading, empty, and error states", async () => {
     let finish: (value: InsightCard | undefined) => void = () => {};

@@ -5,6 +5,7 @@ import { TDateRange } from "@/middlelayers/types";
 import { parseISO } from "date-fns";
 import { Card, CardContent } from "./ui/card";
 import { useTranslation } from "@/i18n";
+import FirstRunOverview from "@/components/first-run-overview";
 
 const emptyDate = parseISO("1970-01-01");
 
@@ -12,16 +13,21 @@ const App = ({
   hasData,
   children,
   dateRange,
+  firstRunOverview = false,
 }: {
   hasData: boolean;
   children: React.ReactNode;
   dateRange: TDateRange;
+  firstRunOverview?: boolean;
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
   if (!hasData) {
     return (
+      <>
+      {firstRunOverview && <div className="t3-first-run-desktop"><FirstRunOverview /></div>}
+      <div className={firstRunOverview ? "t3-first-run-legacy" : ""}>
       <div className="flex items-center justify-center h-[400px]">
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 pb-7 px-6 text-center space-y-4">
@@ -38,6 +44,8 @@ const App = ({
           </CardContent>
         </Card>
       </div>
+      </div>
+      </>
     );
   }
 

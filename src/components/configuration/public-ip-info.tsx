@@ -7,7 +7,7 @@ import { detectPublicIp, type PublicIp } from "@/middlelayers/public-ip";
 let cachedIp: PublicIp | undefined;
 let pendingLookup: Promise<PublicIp | undefined> | undefined;
 
-export function PublicIpInfo({ t, mobile = false, design = false }: { t: (key: string) => string; mobile?: boolean; design?: boolean }) {
+export function PublicIpInfo({ t, mobile = false, design = false, fidelity = false }: { t: (key: string) => string; mobile?: boolean; design?: boolean; fidelity?: boolean }) {
   const [status, setStatus] = useState<"loading" | "value" | "error">("loading");
   const [ip, setIp] = useState(cachedIp);
   const [copied, setCopied] = useState(false);
@@ -74,6 +74,33 @@ export function PublicIpInfo({ t, mobile = false, design = false }: { t: (key: s
     <div className="t3-fidelity-public-ip-guide">{t("fidelity.editor.ipGuide")}<br />
       <button type="button" onClick={() => { void openUrl("https://track3.dev/docs/").catch(() => {}); }}>
         {t("fidelity.editor.apiHelp")} <OpenInNewWindowIcon />
+      </button> <span>track3.dev/docs</span>
+    </div>
+  </div>;
+
+  if (fidelity) return <div className={`fidelity-ip-info${status === "error" ? " is-error" : ""}`}
+    role="group" aria-label={t("config.publicIpLabel")} aria-busy={status === "loading"}>
+    <div className="fidelity-ip-top">
+      <div><strong>{t("fidelity.settings.add.publicIp")}</strong>
+        {status !== "error" && <small>{t(status === "loading" ? "fidelity.settings.add.ipLoading"
+          : "fidelity.settings.add.ipAllow")}</small>}</div>
+      {status === "value" && ip && <span className="fidelity-ip-value">{ip.address}</span>}
+      {status === "loading" && <span className="fidelity-ip-skeleton" role="status" />}
+      {status === "value" && <div className="fidelity-ip-controls">
+        <button type="button" onClick={() => void copy()} aria-label={t(copied ? "config.publicIpCopied" : "config.publicIpCopy")}>
+          {copied ? <CheckIcon aria-hidden="true" /> : <ClipboardCopyIcon aria-hidden="true" />}
+          <span className="sr-only">{t(copied ? "config.publicIpCopied" : "config.publicIpCopy")}</span></button>
+        <button type="button" onClick={() => void refresh()} aria-label={t("config.publicIpRefresh")}>
+          <UpdateIcon aria-hidden="true" /><span className="sr-only">{t("config.publicIpRefresh")}</span></button>
+      </div>}
+    </div>
+    {status === "error" && <div className="fidelity-ip-error" role="alert"><ExclamationTriangleIcon aria-hidden="true" />
+      <span>{t("fidelity.settings.add.ipError")}</span>
+      <button type="button" onClick={() => void refresh()}><UpdateIcon aria-hidden="true" />{t("config.publicIpRetry")}</button>
+    </div>}
+    <div className="fidelity-ip-guide">{t("fidelity.settings.add.ipGuide")}<br />
+      <button type="button" onClick={() => { void openUrl("https://track3.dev/docs/").catch(() => {}); }}>
+        {t("fidelity.settings.add.ipDocs")} <OpenInNewWindowIcon aria-hidden="true" />
       </button> <span>track3.dev/docs</span>
     </div>
   </div>;

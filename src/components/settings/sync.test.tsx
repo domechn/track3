@@ -3,8 +3,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import SyncSettingsPage from "./sync";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { S3Error } from "@/middlelayers/sync/object-store";
+import type { ReactNode } from "react";
 
-const toastMock = vi.fn(() => ({ dismiss: dismissMock }));
+const toastMock = vi.fn((_options: { action?: ReactNode }) => ({ dismiss: dismissMock }));
 const dismissMock = vi.fn();
 const syncListeners = vi.hoisted(() => new Set<() => void>());
 let wide = false;
@@ -291,6 +292,9 @@ describe("Sync settings page", () => {
     await waitFor(() => expect(toastMock).toHaveBeenLastCalledWith(expect.objectContaining({
       title: "Sync failed", variant: "destructive", duration: 8000,
     })));
+    render(<div>{toastMock.mock.lastCall?.[0].action}</div>);
+    expect(screen.getByRole("button", { name: "Copy details" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Details$/ })).toBeVisible();
     expect(dismissMock).toHaveBeenCalledTimes(1);
     status.sync.phase = "idle";
     status.sync.error = undefined;

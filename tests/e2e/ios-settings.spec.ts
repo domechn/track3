@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import md5 from "md5";
 import { installTauriBridge } from "./tauri-bridge";
 
 test.use({
@@ -68,8 +69,7 @@ test("More opens every iPhone settings section through the Settings hub", async 
   await expect(page.getByRole("button", { name: "Back", exact: true })).toHaveCount(1);
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
-  await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
-  await expect(page).toHaveURL(/#\/more$/);
+  await expect(page.locator("#app-top-bar").getByRole("button", { name: "Back" })).toHaveCount(0);
 });
 
 test("iPhone settings hub shows saved preference values", async ({ page }) => {
@@ -90,8 +90,8 @@ test("iPhone can add a custom asset from an empty sources page", async ({ page }
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { emptyPortfolio: true });
   await page.goto("/#/settings/configuration?section=sources");
-  await page.getByRole("button", { name: "Add source" }).click();
-  await page.getByRole("button", { name: "Add custom asset" }).click();
+  await page.getByRole("tab", { name: "Custom assets" }).click();
+  await page.getByRole("button", { name: "Add symbol" }).click();
   await expect(page.getByRole("dialog", { name: "Add custom asset" })).toBeVisible();
 });
 
@@ -99,12 +99,12 @@ test("iPhone custom asset editor stays closed after switching source tabs", asyn
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { emptyPortfolio: true });
   await page.goto("/#/settings/configuration?section=sources");
-  await page.getByRole("button", { name: "Add source" }).click();
-  await page.getByRole("button", { name: "Add custom asset" }).click();
+  await page.getByRole("tab", { name: "Custom assets" }).click();
+  await page.getByRole("button", { name: "Add symbol" }).click();
   const editor = page.getByRole("dialog", { name: "Add custom asset" });
   await editor.getByRole("textbox", { name: "Symbol" }).fill("GOLD");
   await editor.getByRole("textbox", { name: "Amount" }).fill("2");
-  await editor.getByRole("button", { name: "Save" }).click();
+  await editor.getByRole("button", { name: "Add asset" }).click();
   await expect(editor).toHaveCount(0);
   await page.getByRole("tab", { name: "Exchanges" }).click();
   await page.getByRole("tab", { name: "Custom assets" }).click();
@@ -146,8 +146,7 @@ test("an edge swipe inside a source editor leaves the form open", async ({ page,
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page);
   await page.goto("/#/settings/configuration?section=sources");
-  await page.getByRole("button", { name: "Add source" }).click();
-  await page.getByRole("button", { name: "Add exchange" }).click();
+  await page.getByRole("button", { name: "Add exchange" }).first().click();
   const editor = page.getByRole("dialog", { name: "Edit data source" });
   await expect(editor).toBeVisible();
   expect((await editor.boundingBox())!.y).toBe(0);
@@ -181,15 +180,37 @@ test("iPhone source tabs show one saved category at a time", async ({ page }) =>
   await expect(page.getByRole("region", { name: "Exchanges" })).toHaveCount(0);
 });
 
+test("iPhone source balances use the selected base currency", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page);
+  await page.goto("/");
+  await page.evaluate(async (wallet) => {
+    const invoke = (window as any).__e2eInvoke;
+    await invoke("plugin:sql|execute", { query: "INSERT OR REPLACE INTO configuration (id, data) VALUES (10, ?)",
+      values: ['!ent:e2e:exchanges:\n  - name: binance\n    alias: Test exchange\n    initParams:\n      apiKey: test-key\n      secret: test-secret\n'] });
+    await invoke("plugin:sql|execute", { query: "INSERT OR REPLACE INTO configuration (id, data) VALUES (7, 'EUR')", values: [] });
+    await invoke("plugin:sql|execute", { query: "INSERT INTO currency_rates (currency, alias, symbol, rate, priority, updatedAt) VALUES ('EUR', 'Euro', '€', 2, 1, '2099-01-01T00:00:00.000Z')", values: [] });
+    await invoke("plugin:sql|execute", { query: "UPDATE assets_v2 SET wallet = ?, value = 100 WHERE uuid = 'snapshot-new'", values: [wallet] });
+  }, md5("binance-test-key"));
+  await page.goto("/#/settings/configuration?section=sources");
+  await expect(page.locator(".fidelity-source-value").first()).toHaveText("€200.00", { timeout: 20_000 });
+});
+
 test("locked sync status stays clear of the More tab and tab bar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
+  await expect(page.locator(".fd-overview-hero")).toBeVisible();
   const pill = page.getByRole("button", { name: "Sync locked" });
   await expect(pill).toBeVisible();
   const pillBox = (await pill.boundingBox())!;
   const tabBox = (await page.locator(".mobile-tab-bar").boundingBox())!;
   expect(pillBox.y + pillBox.height).toBeLessThanOrEqual(tabBox.y);
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.locator(".fidelity-sync-sheet-backdrop").click({ position: { x: 8, y: 100 } });
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await pill.click();
+  await page.getByRole("button", { name: "Continue without sync" }).click();
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await expect(page).toHaveURL(/#\/more$/);
 });
@@ -211,8 +232,7 @@ test("More and source selections use the native haptic bridge", async ({ page })
   await expect.poll(bridge.haptics).toBe(1);
   await page.getByRole("link", { name: "Data sources" }).click();
   await expect.poll(bridge.haptics).toBe(2);
-  await page.getByRole("button", { name: "Add source" }).click();
-  await page.getByRole("button", { name: "Add exchange" }).click();
+  await page.getByRole("button", { name: "Add exchange" }).first().click();
   await expect.poll(bridge.haptics).toBe(3);
 });
 
@@ -235,10 +255,8 @@ for (const width of [375, 390, 430]) {
     await expect(page.getByRole("link", { name: "Data sources" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.getByRole("link", { name: "Data sources" }).click();
-    await page.getByRole("button", { name: "Add source" }).click();
-    await expect(page.getByRole("button", { name: "Add exchange" })).toBeVisible();
-    await page.getByRole("button", { name: "Add exchange" }).click();
-    await page.getByRole("button", { name: "Binance" }).click();
+    await page.getByRole("button", { name: "Add exchange" }).first().click();
+    await page.getByRole("button", { name: /Binance Key, secret/ }).click();
     await expect(page.getByRole("textbox", { name: "Api Key" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.getByRole("button", { name: "Cancel" }).click();
@@ -254,17 +272,17 @@ for (const width of [375, 390, 430]) {
     await page.setViewportSize({ width, height: 812 });
     await installTauriBridge(page);
     for (const [path, title, content] of [
-      ["/settings/configuration?section=currency", "Currency", "Base currency"],
+      ["/settings/configuration?section=currency", "Currency & display", "Base currency"],
       ["/settings/appearance?section=theme", "Appearance", "Follow system"],
       ["/settings/data?section=blacklist", "Blacklist", "Token Blacklist"],
-      ["/settings/systemInfo?section=pro", "Pro and license", "Track3 Pro"],
+      ["/settings/systemInfo?section=pro", "Pro & license", "Track3 Pro"],
       ["/settings/assistant", "AI assistant", "Endpoint"],
       ["/settings/data?section=security", "Security", "App lock"],
-      ["/settings/sync", "Backup and sync", "S3 endpoint"],
+      ["/settings/sync", "Backup & sync", "Endpoint"],
       ["/settings/systemInfo?section=about", "About", "App Version"],
     ]) {
       await page.goto(`/#${path}`);
-      await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible({ timeout: 20_000 });
       await expect(page.locator("#app-main-content h1")).toHaveCount(1);
       await expect(page.getByText(content, { exact: true }).last()).toBeVisible();
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -278,10 +296,10 @@ for (const width of [375, 390, 430]) {
     await expect(page.getByRole("textbox", { name: "Ask the assistant..." })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.goto("/#/goals");
-    await expect(page.getByRole("heading", { level: 1, name: "Goals & Alerts" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Goals & alerts" })).toBeVisible();
     await expect(page.locator("#app-main-content h1")).toHaveCount(1);
-    await page.getByRole("button", { name: "Add alert" }).click();
-    await expect(page.getByRole("dialog", { name: "Add alert" })).toBeVisible();
+    await page.getByRole("button", { name: "Add rule" }).first().click();
+    await expect(page.getByRole("dialog", { name: "Add rule" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.goto("/#/rebalance");
     await expect(page.getByRole("heading", { level: 1, name: "Rebalance" })).toBeVisible();
@@ -293,7 +311,7 @@ for (const width of [375, 390, 430]) {
     await page.setViewportSize({ width, height: 812 });
     await installTauriBridge(page);
     await page.goto("/#/overview");
-    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   });
@@ -312,32 +330,50 @@ test("custom asset source picker opens from the bottom of the iPhone screen", as
   expect(box!.y).toBeGreaterThan(400);
 });
 
-test("rebalance suggestions use readable cards at 375px when a profile has data", async ({ page }) => {
+test("rebalance suggestions use readable trade rows at 375px when a profile has data", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await installTauriBridge(page, { seedRebalanceProfile: true });
   await page.goto("/#/rebalance");
-  await page.getByText("Details", { exact: true }).click();
-  const cards = page.getByRole("list", { name: "Suggested trades" });
+  const cards = page.locator(".pf-trade-list");
   await expect(cards).toBeVisible();
   await expect(page.getByRole("table", { name: "Suggested trades" })).toHaveCount(0);
-  const btc = cards.getByRole("listitem", { name: "BTC" });
-  await expect(btc).toContainText("Current");
-  await expect(btc).toContainText("Target");
-  await expect(btc).toContainText("Sell");
-  await expect(btc).toContainText("Value");
-  await expect(btc).toContainText("Quantity");
+  const first = cards.locator(".pf-trade").first();
+  await expect(first).toContainText(/BTC|ETH/);
+  await expect(first.locator(".pf-pill")).toHaveText(/Sell|Buy/);
+  await expect(first.locator("strong")).toHaveText(/^\$[0-9]/);
+  await expect(first.locator("small")).toContainText(/(BTC|ETH) at \$[0-9]/);
+  await expect(first).toContainText("→");
+  await expect(first).toContainText("%");
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });
 
-test("collapsed rebalance header shows its full title at 375px", async ({ page }) => {
+test("rebalance keeps its heading and rules at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await installTauriBridge(page);
   await page.goto("/#/rebalance");
   await expect(page.getByRole("heading", { level: 1, name: "Rebalance" })).toBeVisible();
-  await expect(page.getByText("Trade options", { exact: true })).toBeAttached();
+  await expect(page.getByRole("heading", { name: "Rules" })).toBeAttached();
   await page.evaluate(() => window.scrollTo(0, 180));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(64);
-  const title = page.locator("#app-top-bar .ios-d3-pushed-title");
+  const title = page.locator(".pf-head h1");
   await expect(title).toBeVisible();
   expect(await title.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+});
+
+test("pushed plan pages keep a More return path and sync status", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { seedLockedSync: true });
+  await page.goto("/#/more");
+  const skip = page.getByRole("button", { name: "Skip for now" });
+  if (await skip.isVisible()) await skip.click();
+  for (const route of ["/goals", "/rebalance"]) {
+    const title = route === "/goals" ? "Goals & alerts" : "Rebalance";
+    await page.getByRole("link", { name: title }).click();
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    const topBar = page.locator("#app-top-bar");
+    await expect(topBar.getByRole("button", { name: "Back" })).toHaveCount(0);
+    await expect(topBar.getByRole("button", { name: /Sync/ })).toBeVisible();
+    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
+    await expect(page).toHaveURL(/#\/more$/);
+  }
 });

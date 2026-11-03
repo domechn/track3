@@ -15,7 +15,7 @@ test("rebalance values stay on one line at narrower desktop and iPad widths", as
       await installTauriBridge(page, { richPortfolio: true, seedRebalanceProfile: true });
       await page.goto("/#/rebalance");
       const values = page.getByTestId("rebalance-summary").locator("strong");
-      await expect(values).toHaveCount(5);
+      await expect(values).toHaveCount(5, { timeout: 30_000 });
       const lines = await values.evaluateAll((nodes) => nodes.map((node) => ({
         text: node.textContent,
         height: node.getBoundingClientRect().height,

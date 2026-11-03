@@ -57,13 +57,15 @@ test("desktop Sync and AI use the approved two column card layout", async ({ pag
   const passphrase = page.locator(".t3-sync-passphrase");
   await expect(connection).toBeVisible();
   await expect(passphrase).toBeVisible();
-  expect(Math.abs((await connection.boundingBox())!.y - (await passphrase.boundingBox())!.y)).toBeLessThan(4);
+  await expect.poll(async () =>
+    Math.abs((await connection.boundingBox())!.y - (await passphrase.boundingBox())!.y)).toBeLessThan(4);
 
   await page.goto("/#/settings/assistant");
   const endpoint = page.locator("[data-ui-card]").filter({ has: page.locator("#assistant-endpoint") });
   const key = page.locator("[data-ui-card]").filter({ has: page.locator("#assistant-api-key") });
   await expect(endpoint).toBeVisible();
-  expect(Math.abs((await endpoint.boundingBox())!.y - (await key.boundingBox())!.y)).toBeLessThan(4);
+  await expect.poll(async () =>
+    Math.abs((await endpoint.boundingBox())!.y - (await key.boundingBox())!.y)).toBeLessThan(4);
 });
 
 test("desktop Sync uses the available width when no toast is open", async ({ page }) => {

@@ -9,12 +9,17 @@ import { ChartResizeContext } from "@/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { I18nProvider, localeLocalStorageKey } from "@/i18n";
 
-const chartData = vi.hoisted(() => ({ datasets: [] as { label: string; data: number[] }[] }));
+const chartData = vi.hoisted(() => ({
+  datasets: [] as { label: string; data: number[] }[],
+  yScale: {} as { min?: number; max?: number },
+}));
 vi.mock("react-chartjs-2", async () => {
   const React = await import("react");
   return {
-    Line: ({ data }: { data: { datasets: { label: string; data: number[] }[] } }) => {
+    Line: ({ data, options }: { data: { datasets: { label: string; data: number[] }[] };
+      options: { scales?: { y?: { min?: number; max?: number } } } }) => {
       chartData.datasets = data.datasets;
+      chartData.yScale = options.scales?.y ?? {};
       return <div data-testid="line-chart" />;
     },
     Bar: () => <div data-testid="bar-chart" />,
@@ -244,6 +249,31 @@ describe("Overview semantic controls", () => {
       expect.objectContaining({ label: "All-time high", data: [1300, 1300] }),
     ]));
     expect(screen.getByText(/best day/i)).toHaveTextContent("250");
+  });
+
+  it("fits the overview value axis to a small portfolio", async () => {
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>} />);
+    await screen.findByText("$1,250.00");
+    expect(chartData.yScale.min).toBeGreaterThan(0);
+    expect(chartData.yScale.max).toBeLessThan(2_000);
+  });
+
+  it("uses Chinese dates throughout the Overview value chart", async () => {
+    const language = vi.spyOn(window.navigator, "language", "get").mockReturnValue("zh-CN");
+    const day = Date.parse("2026-10-31T09:41:00Z");
+    vi.mocked(queryAssetChange).mockResolvedValue({
+      timestamps: [day - 86400000, day],
+      data: [{ usdValue: 1000 }, { usdValue: 1250 }],
+    });
+    renderWithProviders(<I18nProvider><TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date(day - 86400000), end: new Date(day) }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>}
+      ath={{ timestamp: day, value: 1250 }} /></I18nProvider>);
+    expect(await screen.findByText(/最近快照 10月31日/)).toBeInTheDocument();
+    expect(screen.getByText(/于 10月31日 达到/)).toBeInTheDocument();
+    language.mockRestore();
   });
 
   it("renders labeled buttons for total value chart controls", async () => {

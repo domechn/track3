@@ -27,24 +27,30 @@ import { useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 import { MobileCard, MobileSkeleton } from "@/mobile/components/mobile";
 import InsightsCard from "@/mobile/components/insights-card";
 import { DailyChangeCard, SourceStatusCard, TopCoinsCard, WhatMovedCard, useOverviewPanelsData } from "@/components/overview-panels";
+import OverviewFidelity from "@/mobile/components/overview-fidelity";
+import { isIOS } from "@/utils/platform";
 
 const MAIN_COMPONENT_COUNT = 3;
 
-const App = ({
-  currency,
-  dateRange,
-  quoteColor,
-  allTimeRange,
-  expanded,
-  onExpandedChange,
-}: {
+type OverviewProps = {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
   allTimeRange?: TDateRange;
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
-}) => {
+  onRangeChange?: (selectedTimes: number, range: { from: Date; to: Date } | undefined) => void;
+  onRefresh?: () => void | Promise<void>;
+};
+
+const LegacyOverview = ({
+  currency,
+  dateRange,
+  quoteColor,
+  allTimeRange,
+  expanded,
+  onExpandedChange,
+}: OverviewProps) => {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const phone = useSizeClass().width === "compact";
@@ -180,6 +186,16 @@ const App = ({
       </div>
     </OverviewLoadingContext.Provider>
   );
+};
+
+const App = (props: OverviewProps) => {
+  const compact = useSizeClass().width === "compact" && isIOS();
+  return compact
+    ? <OverviewFidelity currency={props.currency} dateRange={props.dateRange}
+        allTimeRange={props.allTimeRange ?? props.dateRange} quoteColor={props.quoteColor}
+        expanded={props.expanded} onExpandedChange={props.onExpandedChange}
+        onRangeChange={props.onRangeChange} onRefresh={props.onRefresh} />
+    : <LegacyOverview {...props} />;
 };
 
 export default App;

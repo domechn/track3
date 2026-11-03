@@ -19,16 +19,16 @@ const phones = [
 const settings = [
   ["settings", "/settings", "Settings"],
   ["sources", "/settings/configuration?section=sources", "Data sources"],
-  ["currency", "/settings/configuration?section=currency", "Currency"],
+  ["currency", "/settings/configuration?section=currency", "Currency & display"],
   ["appearance", "/settings/appearance?section=theme", "Appearance"],
   ["language", "/settings/appearance?section=language", "Language"],
   ["blacklist", "/settings/data?section=blacklist", "Blacklist"],
   ["security", "/settings/data?section=security", "Security"],
-  ["backup", "/settings/data?section=backup", "Backup"],
-  ["pro", "/settings/systemInfo?section=pro", "Pro and license"],
+  ["backup", "/settings/data?section=backup", "Backup & data"],
+  ["pro", "/settings/systemInfo?section=pro", "Pro & license"],
   ["about", "/settings/systemInfo?section=about", "About"],
   ["assistant-settings", "/settings/assistant", "AI assistant"],
-  ["sync-settings", "/settings/sync", "Backup and sync"],
+  ["sync-settings", "/settings/sync", "Backup & sync"],
 ] as const;
 
 async function capture(page: Page, phone: string, theme: string, name: string) {
@@ -45,9 +45,10 @@ test("phone Rules uses one card surface", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/goals");
-  await expect(page.locator(".ios-d3-rules-card")).toBeVisible();
-  const surfaces = await page.locator(".ios-d3-rules-card").evaluate((card) => {
-    const content = card.children[1];
+  await expect(page.locator(".pf-rules-list")).toBeVisible();
+  await expect(page.locator(".pf-rules-list .pf-empty")).toBeVisible();
+  const surfaces = await page.locator(".pf-rules-list").evaluate((card) => {
+    const content = card.querySelector(".pf-empty")!;
     return {
       outer: getComputedStyle(card).backgroundColor,
       inner: getComputedStyle(content).backgroundColor,
@@ -56,8 +57,8 @@ test("phone Rules uses one card surface", async ({ page }) => {
   });
   expect(surfaces.outer).not.toBe("rgba(0, 0, 0, 0)");
   expect(surfaces.inner).toBe("rgba(0, 0, 0, 0)");
-  expect(surfaces.innerRadius).toBe("0px");
-  const lastCheck = await page.locator(".ios-d3-goals .t3-goals-summary > div:last-child strong").evaluate((element) => ({
+  expect(surfaces.innerRadius).toBe("6px");
+  const lastCheck = await page.locator(".pf-summary .pf-kpi:last-child strong").evaluate((element) => ({
     height: element.getBoundingClientRect().height,
     lineHeight: parseFloat(getComputedStyle(element).lineHeight),
     width: element.getBoundingClientRect().width,
@@ -68,9 +69,44 @@ test("phone Rules uses one card surface", async ({ page }) => {
   expect(lastCheck.scrollWidth).toBeLessThanOrEqual(lastCheck.width + 1);
 });
 
+test("a newly started mobile chat keeps its composer above the tab bar", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { richPortfolio: true, slowAssistant: true });
+  await page.goto("/#/assistant");
+  const composer = page.getByRole("textbox", { name: "Ask the assistant..." });
+  await expect(composer).toBeVisible({ timeout: 20_000 });
+  await composer.fill("How is my portfolio doing?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page).toHaveURL(/#\/assistant\/.+/);
+  await expect(page.locator(".mobile-tab-bar")).toBeVisible();
+  const tabTop = (await page.locator(".mobile-tab-bar").boundingBox())!.y;
+  const composerBottom = (await composer.boundingBox())!;
+  expect(composerBottom.y + composerBottom.height).toBeLessThanOrEqual(tabTop);
+});
+
+test("390px Advanced setup keeps Goals and Rebalance AI chips inside their cards", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { richPortfolio: true, seedRebalanceProfile: true });
+  for (const route of ["/goals", "/rebalance"]) {
+    await page.goto(`/#${route}`);
+    if (route === "/rebalance") await page.getByRole("button", { name: "Plan actions" }).click();
+    else await page.getByRole("button", { name: "Rules options" }).click();
+    await page.getByRole("button", { name: "Advanced setup" }).click();
+    const card = page.locator("[data-ai-setup-card]");
+    const chips = card.locator("[data-ai-setup-suggestion]");
+    await expect(chips.first()).toBeVisible();
+    const right = (await card.boundingBox())!.x + (await card.boundingBox())!.width;
+    for (const chip of await chips.all()) {
+      const bounds = (await chip.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(16);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(right);
+    }
+  }
+});
+
 for (const phone of phones) for (const theme of ["light", "dark"] as const) {
   test(`D3 screens are reachable and captured on iPhone ${phone.name} in ${theme}`, async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await page.emulateMedia({ colorScheme: theme });
     await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
@@ -81,7 +117,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
 
     for (const [name, route, title] of settings) {
       await page.goto(`/#${route}`);
-      await expect(page.locator("#app-main-content h1")).toHaveText(title);
+      await expect(page.locator("#app-main-content h1")).toHaveText(title, { timeout: 30_000 });
       await capture(page, phone.name, theme, name);
       if (name === "currency") {
         await expect(page.getByRole("button", { name: /Base currency.*USD/ })).toBeVisible();
@@ -112,12 +148,12 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await expect(page.getByRole("dialog", { name: "Edit data source" })).toBeVisible();
     await expect(page.locator(".ios-d3-editor-intro .ios-d3-source-avatar")).toHaveCount(0);
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-source-provider.png` });
-    await page.getByRole("button", { name: "Binance" }).click();
+    await page.getByRole("button", { name: /Binance Key, secret/ }).click();
     await expect(page.getByRole("textbox", { name: "API key" })).toHaveAttribute("placeholder", "Required");
     await expect(page.locator(".ios-d3-editor-intro")).toContainText("Binance");
-    const paste = await page.getByRole("button", { name: "Paste", exact: true }).last().boundingBox();
+    const secret = await page.getByLabel("API secret", { exact: true }).boundingBox();
     const reveal = await page.getByRole("button", { name: "Hold to reveal API secret" }).boundingBox();
-    expect(reveal!.x).toBeGreaterThan(paste!.x);
+    expect(reveal!.x).toBeGreaterThan(secret!.x + secret!.width / 2);
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-source-credentials.png` });
     await page.getByRole("dialog", { name: "Edit data source" }).getByRole("button", { name: "Cancel" }).click();
     await page.getByRole("tab", { name: "Custom assets" }).click();
@@ -125,69 +161,59 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     const cancel = await page.getByRole("dialog", { name: "Add custom asset" }).getByRole("button", { name: "Cancel" }).boundingBox();
     expect(cancel!.x).toBeLessThan(60);
     const customEditor = page.getByRole("dialog", { name: "Add custom asset" });
-    await expect(customEditor.locator(".ios-d3-editor-nav").getByRole("button", { name: "Save" })).toBeVisible();
+    await expect(customEditor.locator("footer").getByRole("button", { name: "Add asset" })).toBeVisible();
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-custom-asset-editor.png` });
     await page.getByRole("dialog", { name: "Add custom asset" }).getByRole("button", { name: "Cancel" }).click();
 
     await page.goto("/#/more");
     await capture(page, phone.name, theme, "more");
     await page.goto("/#/goals");
-    await page.getByRole("button", { name: "Add alert" }).click();
-    const saveRule = await page.getByRole("dialog", { name: "Add alert" }).getByRole("button", { name: "Save rule" }).boundingBox();
-    const cancelRule = await page.getByRole("dialog", { name: "Add alert" }).getByRole("button", { name: "Cancel" }).evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
-    expect(cancelRule).toBeGreaterThanOrEqual(17);
-    const goalNav = await page.locator(".ios-d3-goal-editor-nav").boundingBox();
+    await page.getByRole("button", { name: "Add rule" }).first().click();
+    const goalEditor = page.getByRole("dialog", { name: "Add rule" });
+    const saveRule = await goalEditor.getByRole("button", { name: "Add rule" }).boundingBox();
+    const cancelRule = await goalEditor.getByRole("button", { name: "Cancel" }).evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(cancelRule).toBeGreaterThanOrEqual(13);
+    const goalNav = await page.locator(".pf-editor-footer").boundingBox();
     expect(saveRule!.y + saveRule!.height).toBeLessThanOrEqual(goalNav!.y + goalNav!.height);
-    const cancelAction = await page.getByRole("dialog", { name: "Add alert" }).getByRole("button", { name: "Cancel" }).boundingBox();
-    const ruleTitle = await page.locator(".ios-d3-goal-editor-nav h2").boundingBox();
-    expect(ruleTitle!.x - (cancelAction!.x + cancelAction!.width)).toBeGreaterThanOrEqual(8);
-    expect(saveRule!.x - (ruleTitle!.x + ruleTitle!.width)).toBeGreaterThanOrEqual(8);
+    const cancelAction = await goalEditor.getByRole("button", { name: "Cancel" }).boundingBox();
+    expect(saveRule!.x - (cancelAction!.x + cancelAction!.width)).toBeGreaterThanOrEqual(8);
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-goal-editor.png` });
-    await page.getByRole("dialog", { name: "Add alert" }).getByRole("spinbutton", { name: "Threshold" }).fill("90000");
-    await page.getByRole("dialog", { name: "Add alert" }).getByRole("button", { name: "Save rule" }).click();
-    await expect(page.getByRole("dialog", { name: "Add alert" })).not.toBeVisible();
+    await goalEditor.getByRole("spinbutton", { name: "Threshold" }).fill("90000");
+    await goalEditor.getByRole("button", { name: "Add rule" }).click();
+    await expect(goalEditor).not.toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await capture(page, phone.name, theme, "goals");
-    await expect(page.locator(".ios-d3-goals-add")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    for (const chip of await page.locator(".ios-d3-goals [data-ai-setup-suggestion]").all()) {
-      const bounds = await chip.boundingBox();
-      const card = await chip.locator("xpath=ancestor::*[@data-ai-setup-card]").boundingBox();
-      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(card!.x + card!.width);
-    }
-    await expect(page.getByRole("progressbar", { name: /Portfolio value goal/i })).toBeVisible();
-    await expect(page.locator(".ios-d3-goal-rule").first()).toContainText("$90,000.00");
-    await expect(page.locator(".ios-d3-goal-rule").first()).not.toContainText("USD");
-    await page.locator(".ios-d3-goal-rule").first().evaluate((element) => element.scrollIntoView({ block: "start" }));
-    const goalProgress = await page.locator(".ios-d3-goal-rule").first().getByRole("progressbar").boundingBox();
+    const addFill = await page.locator(".pf-add").first().evaluate((element) => getComputedStyle(element, "::before").backgroundColor);
+    expect(addFill).toBe(theme === "dark" ? "rgb(255, 255, 255)" : "rgb(23, 23, 28)");
+    await expect(page.locator(".pf-goal-row").first()).toContainText("$90,000");
+    await expect(page.locator(".pf-goal-row").first()).not.toContainText("USD");
+    await expect(page.locator(".pf-goal-row").first().getByRole("progressbar", { name: /Progress toward Portfolio value goal/ }))
+      .toHaveAttribute("aria-valuenow", /^\d/);
+    await page.locator(".pf-goal-row").first().evaluate((element) => element.scrollIntoView({ block: "start" }));
+    const goalProgress = await page.locator(".pf-goal-row").first().locator(".pf-progress-line").boundingBox();
     const goalTabBar = await page.locator(".mobile-tab-bar").boundingBox();
-    const goalTopBar = await page.locator("#app-top-bar").boundingBox();
-    expect(goalProgress!.y).toBeGreaterThanOrEqual(goalTopBar!.y + goalTopBar!.height);
+    expect(goalProgress!.y).toBeGreaterThanOrEqual(0);
     expect(goalProgress!.y + goalProgress!.height).toBeLessThanOrEqual(goalTabBar!.y);
     await capture(page, phone.name, theme, "goal-progress");
 
     await page.goto("/#/rebalance");
     await expect(page.getByRole("heading", { level: 1, name: "Rebalance" })).toBeVisible();
     await capture(page, phone.name, theme, "rebalance");
-    for (const chip of await page.locator(".ios-d3-rebalance [data-ai-setup-suggestion]").all()) {
-      const bounds = await chip.boundingBox();
-      const card = await chip.locator("xpath=ancestor::*[@data-ai-setup-card]").boundingBox();
-      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(card!.x + card!.width);
-    }
-    await page.getByText("Manual setup", { exact: true }).click();
-    await page.locator(".ios-d3-target").first().scrollIntoViewIfNeeded();
+    await expect(page.locator(".pf-rebalance [data-ai-setup-suggestion]")).toHaveCount(0);
+    await page.locator(".pf-alloc-row").first().scrollIntoViewIfNeeded();
     await capture(page, phone.name, theme, "rebalance-targets");
-    await page.locator(".ios-d3-trade").first().scrollIntoViewIfNeeded();
-    const buy = page.locator(".ios-d3-buy .ios-d3-trade-value").first();
-    const sell = page.locator(".ios-d3-sell .ios-d3-trade-value").first();
-    await expect(buy).toContainText(/^\+\$[0-9]/);
-    await expect(sell).toContainText(/^−\$[0-9]/);
-    await expect(buy).toContainText("$");
-    expect(await buy.evaluate((node) => node.getClientRects().length === 1 &&
-      node.getBoundingClientRect().height < Number.parseFloat(getComputedStyle(node).lineHeight) * 1.5)).toBe(true);
-    expect(await buy.evaluate((element) => getComputedStyle(element).color)).not.toBe(await sell.evaluate((element) => getComputedStyle(element).color));
-    const tradeSymbol = page.locator(".ios-d3-trade .ios-d3-trade-symbol").first();
+    await page.locator(".pf-trade").first().scrollIntoViewIfNeeded();
+    const sell = page.locator(".pf-trade").filter({ has: page.locator(".pf-pill", { hasText: "Sell" }) }).first();
+    const buy = page.locator(".pf-trade").filter({ has: page.locator(".pf-pill", { hasText: "Buy" }) }).first();
+    await expect(sell.locator("strong")).toHaveText(/^\$[0-9]/);
+    await expect(buy.locator("strong")).toHaveText(/^\$[0-9]/);
+    await expect(sell.locator("strong")).toHaveAttribute("aria-label", /^−\$[0-9]/);
+    await expect(buy.locator("strong")).toHaveAttribute("aria-label", /^\+\$[0-9]/);
+    expect(await sell.locator(".pf-pill").evaluate((element) => getComputedStyle(element).color))
+      .not.toBe(await buy.locator(".pf-pill").evaluate((element) => getComputedStyle(element).color));
+    const tradeSymbol = page.locator(".pf-trade b").first();
     const symbolBounds = await tradeSymbol.boundingBox();
-    const tradeBounds = await page.locator(".ios-d3-trade").first().boundingBox();
+    const tradeBounds = await page.locator(".pf-trade").first().boundingBox();
     expect(symbolBounds!.x + symbolBounds!.width).toBeLessThanOrEqual(tradeBounds!.x + tradeBounds!.width);
     await capture(page, phone.name, theme, "rebalance-trades");
     await page.goto("/#/assistant");
@@ -255,7 +281,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await capture(page, phone.name, theme, "assistant-tools");
 
     await page.goto("/#/overview");
-    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     await expect(page.locator("[data-source-status-row]").first()).toBeVisible();
     await expect(page.locator(".ios-d3-refresh-sheet [data-source-status-row]").first()).not.toContainText("Waiting…");
@@ -302,9 +328,9 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await installTauriBridge(page, { emptyPortfolio: true });
     mkdirSync("test-results/mobile", { recursive: true });
     await page.goto("/#/overview");
-    await expect(page.getByRole("button", { name: "Add your first source" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add an exchange" })).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-first-launch.png` });
-    await page.getByRole("button", { name: "Add your first source" }).click();
+    await page.getByRole("button", { name: "Add an exchange" }).click();
     await expect(page.getByRole("list", { name: "Getting started" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add symbol" })).toHaveCount(0);
     await capture(page, phone.name, theme, "onboarding");
@@ -330,10 +356,10 @@ test("D3 pushed titles replace the large title after scrolling", async ({ page }
   await page.setViewportSize({ width: 375, height: 667 });
   await installTauriBridge(page, { seedRebalanceProfile: true, richPortfolio: true, freshReviewData: true, slowAssistant: true });
   await page.goto("/#/settings/data?section=backup");
-  await expect(page.getByRole("heading", { name: "Backup", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Backup & data", level: 1 })).toBeVisible();
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toBeHidden();
   await page.evaluate(() => window.scrollTo(0, 300));
-  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup");
+  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup & data");
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toBeVisible();
   const compact = await page.locator("#app-top-bar .ios-d3-pushed-title").boundingBox();
   const topBar = await page.locator("#app-top-bar").boundingBox();

@@ -8,7 +8,7 @@ const configConflictNames: Record<string, string> = {
   "994": "assistant", "995": "blacklist", rebalance: "rebalance",
 };
 
-export function ConfigConflictChoices({ id, t, resolve, disabled = false, pending, designNames = false, remoteDeviceName, ConfirmDialog = ConfirmDeleteDialog }: {
+export function ConfigConflictChoices({ id, t, resolve, disabled = false, pending, designNames = false, remoteDeviceName, mobile = false, ConfirmDialog = ConfirmDeleteDialog }: {
   id: string;
   t: (key: string, fallback?: string) => string;
   resolve: (id: string, choice: "local" | "remote") => void;
@@ -16,10 +16,11 @@ export function ConfigConflictChoices({ id, t, resolve, disabled = false, pendin
   pending?: "local" | "remote";
   designNames?: boolean;
   remoteDeviceName?: string;
+  mobile?: boolean;
   ConfirmDialog?: typeof ConfirmDeleteDialog;
 }) {
   if (!syncCategory(id)) return null;
-  const name = designNames && (id === "6" || id === "7")
+  const name = mobile && id === "7" ? t("config.mobile.baseCurrency") : designNames && (id === "6" || id === "7")
     ? t(id === "6" ? "fidelity.settingsB.sync.historyCount" : "fidelity.settingsB.sync.baseCurrency")
     : configConflictNames[id]
     ? t(`sync.configConflict.name.${configConflictNames[id]}`)
@@ -32,7 +33,7 @@ export function ConfigConflictChoices({ id, t, resolve, disabled = false, pendin
         return <ConfirmDialog key={choice}
           trigger={<SyncActionButton size="sm" variant="outline" disabled={disabled} pending={pending === choice}
             pendingLabel={t("sync.pending.resolve")} className="h-auto min-h-11 whitespace-normal text-left">{label}</SyncActionButton>}
-          title={t(designNames && choice === "remote" ? "fidelity.settingsB.sync.confirmRemoteTitle" : "sync.details.confirmTitle")}
+          title={mobile ? t(choice === "remote" ? "fidelity.b.sync.useOtherQuestion" : "fidelity.b.sync.useThisQuestion") : t(designNames && choice === "remote" ? "fidelity.settingsB.sync.confirmRemoteTitle" : "sync.details.confirmTitle")}
           description={designNames && choice === "remote"
             ? t("fidelity.settingsB.sync.confirmRemoteDesc").replace("{setting}", name)
               .replace("{device}", remoteDeviceName ?? t("fidelity.settingsB.sync.otherDevice"))

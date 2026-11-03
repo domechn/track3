@@ -39,12 +39,15 @@ const formatBytes = (bytes: number) => bytes >= 1_000_000
   ? `${(bytes / 1_000_000).toFixed(1)} MB`
   : bytes >= 1_000 ? `${(bytes / 1_000).toFixed(1)} KB` : `${bytes.toLocaleString()} B`;
 
-export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialog = ConfirmDeleteDialog }: {
+export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialog = ConfirmDeleteDialog, defaultExpanded = false, showConflicts = true, errorLabel }: {
   report?: SyncReport;
   diagnostics?: SyncDiagnostics;
   t: (key: string, fallback?: string) => string;
   summaryLabel?: string;
   ConfirmDialog?: typeof ConfirmDeleteDialog;
+  defaultExpanded?: boolean;
+  showConflicts?: boolean;
+  errorLabel?: string;
 }) {
   const [busy, setBusy] = useState<{ id: string; choice: "local" | "remote" } | null>(null);
   const [available, setAvailable] = useState<string[] | null>(null);
@@ -92,16 +95,17 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
       setMessage(t("sync.details.copied"));
     } catch { setMessage(t("sync.details.copyFailed")); }
   }
-  return <details className="border-t pt-2">
+  return <details open={defaultExpanded} className="border-t pt-2">
     <summary className="cursor-pointer font-medium">{summaryLabel ?? t("sync.details.title")}</summary>
     <div className="mt-3 space-y-4 text-xs">
       <section className="space-y-1">
         <h3 className="font-semibold">{t("sync.details.errors")}</h3>
+        {errorLabel && <p className="text-destructive">{errorLabel}</p>}
         {errors.size ? <ul className="list-inside list-disc space-y-1">
           {[...errors].map(([text, count]) => <li key={text} className="break-words">{safeError(text, t)} × {count}</li>)}
-        </ul> : <p className="text-muted-foreground">{t("sync.details.none")}</p>}
+        </ul> : !errorLabel && <p className="text-muted-foreground">{t("sync.details.none")}</p>}
       </section>
-      <section className="space-y-2">
+      {showConflicts && <section className="space-y-2">
         <h3 className="font-semibold">{t("sync.details.conflicts")}</h3>
         {!conflicts.length && <p className="text-muted-foreground">{t("sync.details.none")}</p>}
         {config.filter((id) => available?.includes(id)).map((id) => <ConfigConflictChoices key={id} id={id} t={t} resolve={(key, choice) => void resolve(key, choice)}
@@ -109,7 +113,7 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
         {config.filter((id) => available && !available.includes(id)).map((id) =>
           <p key={id} className="break-words">{t("sync.details.config")} {shortId(id)} · {t("sync.details.noResolution")}</p>)}
         {other.map((label, index) => <p key={index} className="break-words">{label} · {t("sync.details.noResolution")}</p>)}
-      </section>
+      </section>}
       {diagnostics && <>
         <section className="space-y-1">
           <h3 className="font-semibold">{t("sync.details.timings")}</h3>

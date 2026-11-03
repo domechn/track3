@@ -18,6 +18,42 @@ export function selectContributionSnapshots(
   return { fromId: selected[Math.max(0, selected.length - 7)].id, toId: selected[selected.length - 1].id, count: Math.min(7, selected.length) };
 }
 
+export function selectSevenDayContributionSnapshots(
+  dates: readonly { id: string; createdAt: string }[],
+  start: Date,
+  end: Date,
+): { fromId: string; toId: string; count: number; weekBased: boolean } | undefined {
+  const selected = dates.filter((date) => {
+    const time = new Date(date.createdAt).getTime();
+    return time >= start.getTime() && time <= end.getTime();
+  }).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const latest = selected.at(-1);
+  if (!latest) return undefined;
+  const target = new Date(latest.createdAt).getTime() - 7 * 24 * 60 * 60 * 1000;
+  const week = selected.find((date) => Math.abs(new Date(date.createdAt).getTime() - target) < 12 * 60 * 60 * 1000);
+  if (week) return { fromId: week.id, toId: latest.id, count: 7, weekBased: true };
+  const fallback = selectContributionSnapshots(dates, start, end);
+  return fallback && { ...fallback, weekBased: false };
+}
+
+export function selectBestDayContributionSnapshots(
+  dates: readonly { id: string; createdAt: string }[],
+  bestDayTimestamp: number,
+  rangeStart: Date,
+): { fromId: string; toId: string } | undefined {
+  const selected = dates
+    .filter((date) => {
+      const time = new Date(date.createdAt).getTime();
+      return time >= rangeStart.getTime() && time <= bestDayTimestamp;
+    })
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const last = selected.at(-1);
+  if (!last) return undefined;
+  const previous = [...selected].reverse().find((date) =>
+    new Date(date.createdAt).toDateString() !== new Date(last.createdAt).toDateString());
+  return previous && { fromId: previous.id, toId: last.id };
+}
+
 export function deriveOverviewSeries(points: readonly Point[], range?: { start: Date; end: Date }): {
   daily: Change[];
   bestDay?: Change;

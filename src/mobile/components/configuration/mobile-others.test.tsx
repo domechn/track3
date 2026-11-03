@@ -16,11 +16,28 @@ it("edits custom holdings on a phone and offers their source attachment", () => 
   expect(attach).toHaveBeenCalledWith(0);
 });
 
-it("labels a new custom holding as an addition", () => {
+it("opens the legacy add-symbol editor", () => {
   render(<MobileOthers others={[]} onSave={vi.fn()} onRemove={vi.fn()} onAttach={vi.fn()} />);
   fireEvent.click(screen.getByRole("button", { name: "Add symbol" }));
+  expect(screen.getByRole("dialog", { name: "Add custom asset" })).toBeVisible();
+});
+
+it("quotes custom holding values in the selected base currency", () => {
+  render(<MobileOthers fidelityLayout others={[{
+    symbol: "GOLD", amount: 2, price: { kind: "manual", usd: 100, setAt: "2026-10-31T00:00:00.000Z" },
+  }]} baseCurrency={{ currency: "EUR", rate: 0.9 }}
+  onSave={vi.fn()} onRemove={vi.fn()} onAttach={vi.fn()} />);
+  expect(screen.getAllByText("€180.00").length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole("button", { name: "Edit GOLD" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Your price" }));
+  expect(screen.getAllByText(/€180\.00/).length).toBeGreaterThan(0);
+});
+
+it("labels a new custom holding as an addition", () => {
+  render(<MobileOthers others={[]} fidelityLayout addRequest={1} onSave={vi.fn()} onRemove={vi.fn()} onAttach={vi.fn()} />);
   expect(screen.getByRole("dialog", { name: "Add custom asset" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Add custom asset" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Add asset" })).toBeVisible();
 });
 
 it("hides the add-symbol action while the first-source guide is shown", () => {
@@ -44,6 +61,19 @@ it("saves a listed asset follow rule with the custom holding", () => {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(save).toHaveBeenCalledWith(0, expect.objectContaining({
     price: { kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 1 },
+  }));
+});
+
+it("saves a stock follow rule from the fidelity editor", () => {
+  const save = vi.fn();
+  render(<MobileOthers fidelityLayout others={[]} addRequest={1} onSave={save} onRemove={vi.fn()} onAttach={vi.fn()} />);
+  fireEvent.change(screen.getByRole("textbox", { name: "Symbol" }), { target: { value: "NVDA-RSU" } });
+  fireEvent.click(screen.getByRole("radio", { name: "Follow a listed asset" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Listed asset type" }), { target: { value: "stock" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Listed asset symbol" }), { target: { value: "nvda" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add asset" }));
+  expect(save).toHaveBeenCalledWith(null, expect.objectContaining({
+    price: { kind: "follow", assetType: "stock", symbol: "NVDA", ratio: 1 },
   }));
 });
 

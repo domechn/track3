@@ -53,6 +53,22 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  it("starts from the same 30-day comparison at narrow desktop widths", async () => {
+    const width = window.innerWidth;
+    window.innerWidth = 1024;
+    try {
+      vi.mocked(queryAllDataDates).mockResolvedValue(Array.from({ length: 31 }, (_, index) => ({
+        id: String(31 - index),
+        date: `2026-10-${String(31 - index).padStart(2, "0")}`,
+      })) as never);
+      vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+      render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+      await waitFor(() => expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2026-10-01"));
+    } finally {
+      window.innerWidth = width;
+    }
+  });
+
   it("consumes an assistant comparison date selection after applying it", async () => {
     localStorage.setItem(COMPARISON_DATES_KEY, JSON.stringify({ base: "2024-04-15", head: "2024-04-16" }));
     vi.mocked(queryAllDataDates).mockResolvedValue([
@@ -156,6 +172,15 @@ describe("Comparison page", () => {
 
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(toggle).toHaveAccessibleName(/show values/i);
+    expect(screen.getByRole("table", { name: "Per asset" })).toHaveTextContent("***");
+    const cells = screen.getByRole("table", { name: "Per asset" }).querySelectorAll("tbody td");
+    for (const index of [1, 2, 5, 6, 7]) expect(cells[index]).toHaveTextContent("***");
+    expect(cells[3]).toHaveTextContent("1,125.00");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(cells[1]).toHaveTextContent("0.8");
+    expect(cells[1]).not.toHaveTextContent("***");
+    expect(screen.getByRole("table", { name: "Per asset" })).not.toHaveTextContent("***");
   });
 
   it("renders the value visibility icon with theme-aware current color", async () => {

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronRightIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import { CheckIcon, ChevronRightIcon, InfoCircledIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
 import { useOptimisticDelete } from "@/mobile/components/common/use-optimistic-delete";
+import { FidelityBlacklist } from "@/mobile/components/fidelity-blacklist";
 import {
   checkIfDuplicatedHistoricalData,
   exportHistoricalData,
@@ -104,6 +105,8 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const [encKeyInput, setEncKeyInput] = useState("");
   const [encKeyConfirm, setEncKeyConfirm] = useState("");
   const [encKeySaving, setEncKeySaving] = useState(false);
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [rotationDone, setRotationDone] = useState(false);
   const [lockEnabled, setLockEnabled] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
   const [lockError, setLockError] = useState(false);
@@ -128,30 +131,33 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         description: t("data.encryption.key.mismatch"),
         variant: "destructive",
       });
-      return;
+      return false;
     }
     if (encKeyInput.length < 8) {
       toast({
         description: t("data.encryption.key.minLength"),
         variant: "destructive",
       });
-      return;
+      return false;
     }
     if (encKeyInput.trim() !== encKeyInput) {
       toast({
         description: t("data.encryption.key.whitespace"),
         variant: "destructive",
       });
-      return;
+      return false;
     }
     setEncKeySaving(true);
     try {
       await runEncryptionKeyRotation(() =>
         invoke("rotate_encryption_key", { newKey: encKeyInput }),
       );
-      toast({ description: t("data.encryption.key.success") });
+      toast({ title: isIOS() ? t("fidelity.b.security.rotatedToast") : undefined,
+        description: t("data.encryption.key.success") });
+      setRotationDone(true);
       setEncKeyInput("");
       setEncKeyConfirm("");
+      return true;
     } catch (e) {
       const description = isRecoveryRequiredRotationError(e)
         ? t("data.encryption.key.recovery.required")
@@ -159,6 +165,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
           ? e.message
           : String(e);
       toast({ description: redactSecrets(description, [encKeyInput]), variant: "destructive" });
+      return false;
     } finally {
       setEncKeySaving(false);
     }
@@ -436,10 +443,17 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       commit: () => removeFromBlacklist(symbol),
       undo: () => addToBlacklist(symbol),
       successMessage: t("data.removedFromBlacklist").replace("{symbol}", symbol),
+      successTitle: isIOS() ? t("fidelity.settings.blacklist.removed").replace("{symbol}", symbol) : undefined,
+      successDescription: isIOS() ? t("fidelity.settings.blacklist.removedHint") : undefined,
       undoLabel: t("common.undo"),
       undoAltText: t("data.undoBlacklistRemoval"),
       undoWindowMs: 5000,
     });
+  }
+  async function onAddToBlacklist(symbol: string) {
+    await addToBlacklist(symbol);
+    setBlacklist((current) => current.some((value) => value.toUpperCase() === symbol.toUpperCase())
+      ? current : [...current, symbol.toUpperCase()]);
   }
 
   const section = isIOS() ? searchParams.get("section") : null;
@@ -453,8 +467,95 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
     if (showBackup) void queryBackupSummary().then(setBackupSummary).catch(() => undefined);
   }, [showBackup]);
 
+  if (isIOS() && section === "security") return <div className="fidelity-b fidelity-b-security">
+    <p className="fidelity-b-subtitle">{t("fidelity.b.security.subtitle")}</p>
+    {rotationDone && <div className="fidelity-b-security-rotation-done" role="status">
+      <CheckIcon aria-hidden="true" />
+      <div><strong>{t("fidelity.b.security.newKeyActive")}</strong>
+        <p>{t("fidelity.b.security.rotationDoneHint")}</p></div>
+    </div>}
+    <section className="fidelity-b-card fidelity-b-security-key">
+      <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.security.keyTitle")}</h2>
+        <p>{t("fidelity.b.security.keyHint")}</p></div>
+        <span className="fidelity-b-pill is-positive">{t("fidelity.b.security.inUse")}</span></div>
+      <div className="fidelity-b-security-kpis">
+        <div><span>{t("fidelity.b.security.keyId")}</span><strong>—</strong></div>
+        <div><span>{t("fidelity.b.security.created")}</span><strong>—</strong></div>
+        <div><span>{t("fidelity.b.security.lastRotated")}</span><strong>—</strong></div>
+      </div>
+      <div className="fidelity-b-security-categories">
+        {(["exchange", "broker", "assistant", "sync"] as const).map((category) =>
+          <div key={category}><strong>{t(`fidelity.b.security.${category}`)}</strong>
+            <small>{t(`fidelity.b.security.${category}Hint`)}</small></div>)}
+      </div>
+      <div className="fidelity-b-security-key-foot">
+        <button type="button" onClick={() => setRotateOpen(true)} disabled={encKeySaving}>
+          <ReloadIcon aria-hidden="true" />{t("fidelity.b.security.rotate")}</button>
+        <span>{t("fidelity.b.security.rotationHint")}</span>
+      </div>
+    </section>
+    <section className="fidelity-b-card fidelity-b-security-recovery">
+      <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.security.recovery")}</h2>
+        <p>{t("fidelity.b.security.recoveryHint")}</p></div>
+        <span className="fidelity-b-pill">{syncStatus.mode === "ready"
+          ? t("fidelity.b.security.available") : t("fidelity.b.security.unavailable")}</span></div>
+      <div className="fidelity-b-security-warning">
+        <InfoCircledIcon aria-hidden="true" /><div><strong>{t("fidelity.b.security.keepRecovery")}</strong>
+          <p>{t("fidelity.b.security.keepRecoveryHint")}</p></div>
+      </div>
+      {syncStatus.mode === "ready"
+        ? <><h2>{t("sync.recovery.title")}</h2><SyncRecoveryExport t={t} /></>
+        : <p className="fidelity-b-security-recovery-note">{t("fidelity.b.security.syncUnlockHint")}</p>}
+    </section>
+    <section className="fidelity-b-card fidelity-b-security-lock">
+      <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.security.appLock")}</h2>
+        <p>{t("fidelity.b.security.appLockHint")}</p></div>
+        <span className="fidelity-b-pill">{t("fidelity.b.security.ios")}</span></div>
+      <div className="fidelity-b-switch-row">
+        <div><Label htmlFor="app-lock-switch">{t("fidelity.b.security.requireBiometric")}</Label>
+          <p>{t("fidelity.b.security.requireBiometricHint")}</p></div>
+        <Switch id="app-lock-switch" checked={lockEnabled}
+          disabled={lockBusy} onCheckedChange={() => void toggleAppLock()} />
+      </div>
+      {lockError && <p role="alert" className="fidelity-b-result is-error">{t("data.appLock.failed")}</p>}
+      <div className={`fidelity-b-security-lock-note ${lockEnabled ? "" : "is-warning"}`}>
+        {t(lockEnabled ? "fidelity.b.security.lockOnNote" : "fidelity.b.security.lockOffNote")}</div>
+    </section>
+    <section className="fidelity-b-card fidelity-b-security-preview" aria-label={t("fidelity.b.security.preview")}>
+      <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.security.preview")}</h2>
+        <p>{t("fidelity.b.security.previewHint")}</p></div></div>
+      <div className="fidelity-b-security-preview-screen" aria-hidden="true">
+        <span>♙</span><strong>{t("fidelity.b.security.locked")}</strong>
+        <small>{t("fidelity.b.security.valuesHidden")}</small>
+        <span className="fidelity-b-security-preview-button">{t("fidelity.b.security.unlockPreview")}</span>
+      </div>
+    </section>
+    <Dialog open={rotateOpen} onOpenChange={(open) => { if (!encKeySaving) setRotateOpen(open); }}>
+      <DialogContent className="fidelity-b-security-rotate-dialog">
+        <DialogHeader><DialogTitle>{t("fidelity.b.security.rotateQuestion")}</DialogTitle>
+          <DialogDescription>{t("fidelity.b.security.rotateDescription")}</DialogDescription></DialogHeader>
+        <div className="fidelity-b-fields">
+          <div className="fidelity-b-field"><Label htmlFor="new-encryption-key">{t("data.encryption.key.newPlaceholder")}</Label>
+            <Input id="new-encryption-key" type="password" value={encKeyInput}
+              onChange={(e) => setEncKeyInput(e.target.value)} autoComplete="new-password"
+              placeholder={t("data.encryption.key.newPlaceholder")} /></div>
+          <div className="fidelity-b-field"><Label htmlFor="confirm-encryption-key">{t("data.encryption.key.confirmPlaceholder")}</Label>
+            <Input id="confirm-encryption-key" type="password" value={encKeyConfirm}
+              onChange={(e) => setEncKeyConfirm(e.target.value)} autoComplete="new-password"
+              placeholder={t("data.encryption.key.confirmPlaceholder")} /></div>
+        </div>
+        <DialogFooter><Button variant="outline" onClick={() => setRotateOpen(false)}
+          disabled={encKeySaving}>{t("common.cancel")}</Button>
+          <Button variant="destructive" onClick={() => void handleChangeEncryptionKey().then((ok) => {
+            if (ok) setRotateOpen(false);
+          })} disabled={encKeySaving}>{encKeySaving
+            ? t("data.encryption.key.saving") : t("data.encryption.key.update")}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </div>;
+
   return (
-    <div className="ios-d3-settings-content ios-d3-data-settings space-y-6">
+    <div className={`ios-d3-settings-content ios-d3-data-settings space-y-6${isIOS() && section === "backup" ? " fidelity-b fidelity-b-backup" : ""}`}>
       {showBackup && <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
         <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto sm:max-w-[680px]">
           <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>
@@ -506,8 +607,9 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </p>
       </div>}
 
-      {showBackup && <section role="region" aria-label={t("data.phase6.onDevice")} className="rounded-lg border border-border bg-card p-4">
-        <h4 className="mb-3 text-sm font-semibold">{t("data.phase6.onDevice")}</h4>
+      {showBackup && isIOS() && section === "backup" && <p className="fidelity-b-subtitle">{t("fidelity.b.backup.subtitle")}</p>}
+      {showBackup && <section role="region" aria-label={t("data.phase6.onDevice")} className="fidelity-b-backup-device rounded-lg border border-border bg-card p-4">
+        <h2 className="mb-3 text-sm font-semibold">{t("data.phase6.onDevice")}</h2>
         <div className="grid grid-cols-3 gap-2">
           {(["snapshots", "assets", "transactions"] as const).map((field) => <div key={field} className="rounded-md border border-border/50 bg-background/40 p-2">
             <p className="text-lg font-semibold tabular-nums">{backupSummary?.[field].toLocaleString() ?? t("data.na")}</p>
@@ -518,7 +620,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
 
       {showBackup && isIOS() && <div className="ios-d3-backup-actions">
         <div className="ios-d3-backup-import-section">
-        <InsetGroup title={t("data.import")}>
+        <InsetGroup title={section === "backup" ? t("fidelity.b.backup.import") : t("data.import")} className="fidelity-b-backup-import">
           <button type="button" className="ios-d3-data-action-row" onClick={onImportDataClick}><span>{t("data.importButton")}</span><ChevronRightIcon aria-hidden="true" /></button>
           <button type="button" className="ios-d3-data-action-row" onClick={() => void onReviewImportClick()}><span>{t("data.importPreview.open")}</span><ChevronRightIcon aria-hidden="true" /></button>
           <button type="button" className="ios-d3-data-action-row" onClick={() => void onImportBackupFolderClick()} disabled={folderBusy}><span>{t("data.folder.import")}</span><ChevronRightIcon aria-hidden="true" /></button>
@@ -545,7 +647,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </InsetGroup>}
 
         </div>
-        <InsetGroup title={t("data.export")}>
+        <InsetGroup title={section === "backup" ? t("fidelity.b.backup.export") : t("data.export")} className="fidelity-b-backup-export">
           <div className="ios-d3-setting-switch-row">
             <Label htmlFor="exportConfigurationCheckbox">
               <span className="block">{t("data.phase6.configuration")}</span>
@@ -598,7 +700,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
                 onCheckedChange={(v) => setExportConfiguration(!!v)}
                 aria-label={t("data.includeConfig")}
               />
-              <Label htmlFor="exportConfigurationCheckbox" className="min-w-0 flex-1 cursor-pointer text-sm">
+              <Label htmlFor="exportConfigurationCheckbox" className="min-w-0 flex-1 cursor-pointer text-sm touch:flex touch:min-h-11 touch:flex-col touch:justify-center">
                 <span className="block">{t("data.phase6.configuration")}</span>
                 <span className="block text-xs font-normal text-muted-foreground">{t("data.phase6.configDetail")}</span>
               </Label>
@@ -623,7 +725,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       {showBackup && <Card className="ios-d3-auto-backup-setting">
         <CardHeader className="ios-d3-data-panel-header pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t("data.autoBackup")}
+            {section === "backup" ? t("fidelity.b.backup.auto") : t("data.autoBackup")}
           </CardTitle>
         </CardHeader>
         <CardContent className="ios-d3-data-panel-content space-y-4">
@@ -699,14 +801,16 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </CardContent>
       </Card>}
 
-      {showBackup && <InsetGroup title={t("data.restore.title")}>
+      {showBackup && <InsetGroup title={t("data.restore.title")} className="fidelity-b-backup-restore">
         <div className="p-4">
           <BackupRestoreList directory={autoBackupDirectory} prepare={isIOS() ? prepareRestoreBackupPath : undefined} t={t} locale={locale}
             onPreview={(data, rows) => { setItemResult(undefined); setItemPreview({ data, rows, backup: true }); }} />
         </div>
       </InsetGroup>}
 
-      {showBlacklist && <Card className="ios-d3-blacklist-setting">
+      {showBlacklist && isIOS() && section === "blacklist" && <FidelityBlacklist
+        symbols={blacklist} onAdd={onAddToBlacklist} onRemove={onRemoveFromBlacklist} />}
+      {showBlacklist && !(isIOS() && section === "blacklist") && <Card className="ios-d3-blacklist-setting">
         <CardHeader className="ios-d3-data-panel-header pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("data.blacklist")}

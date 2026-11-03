@@ -41,17 +41,19 @@ function useModal(onDismiss?: () => void) {
   return ref;
 }
 
-export function ModalPage({ title, children, onDismiss }: { title: string; children: ReactNode; onDismiss?: () => void }) {
+export function ModalPage({ title, children, onDismiss, className = "" }: { title: string; children: ReactNode; onDismiss?: () => void; className?: string }) {
   const ref = useModal(onDismiss);
-  return createPortal(<div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 overflow-y-auto bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
+  return createPortal(<div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className={`fixed inset-0 z-50 overflow-y-auto bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+1rem)] ${className}`}>
     {children}
   </div>, document.body);
 }
 
-export function ConfirmSheet({ title, children, onDismiss }: { title: string; children: ReactNode; onDismiss?: () => void }) {
+export function ConfirmSheet({ title, children, onDismiss, className, panelClassName }: {
+  title: string; children: ReactNode; onDismiss?: () => void; className?: string; panelClassName?: string;
+}) {
   const ref = useModal(onDismiss);
-  return createPortal(<div ref={ref} tabIndex={-1} role="alertdialog" aria-modal="true" aria-label={title} onClick={(event) => { if (event.target === event.currentTarget) onDismiss?.(); }} className="fixed inset-0 z-50 flex items-end bg-black/50 p-3">
-    <div className="w-full space-y-2 rounded-2xl bg-card p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+  return createPortal(<div ref={ref} tabIndex={-1} role="alertdialog" aria-modal="true" aria-label={title} onClick={(event) => { if (event.target === event.currentTarget) onDismiss?.(); }} className={`fixed inset-0 z-50 flex items-end bg-black/50 p-3 ${className ?? ""}`}>
+    <div className={`w-full space-y-2 rounded-2xl bg-card p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] ${panelClassName ?? ""}`}>
       {children}
     </div>
   </div>, document.body);

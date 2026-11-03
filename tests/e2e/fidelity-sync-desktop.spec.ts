@@ -219,7 +219,7 @@ for (const state of ["default", "setup", "locked", "loading", "testing", "test-f
     } else if (state === "toast") {
       await page.getByRole("button", { name: "Sync now" }).click();
       await expect(page.getByText("312 items uploaded, 0 downloaded.", { exact: true })).toBeVisible();
-      const close = page.locator(".desktop-toast-viewport [toast-close]");
+      const close = page.locator(".desktop-toast-viewport > li").filter({ hasText: "312 items uploaded" }).locator("[toast-close]");
       await expect(close).toBeVisible();
       const closeBox = await close.boundingBox();
       expect(closeBox?.width).toBeGreaterThanOrEqual(44);

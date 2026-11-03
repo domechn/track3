@@ -70,3 +70,17 @@ it("joins the Chinese reset note without a stray space", () => {
   }} />);
   expect(screen.getByText("2026年11月3日 重置。一次钱包刷新计为一次。")).toBeInTheDocument();
 });
+
+it("puts phone usage counts beside their labels and shows meter endpoints", () => {
+  render(<ProUsageRows locale="en" t={(key) => ({
+    "system.usage.erc20": "ERC20 wallet refreshes",
+    "system.usage.tron": "TRON wallet refreshes",
+    "fidelity.b.pro.meterSummary": "{used} of {limit} · {remaining} left",
+  })[key] ?? key} compact usage={{
+    erc20: { limit: 300, used: 143, remaining: 157, periodStart: "2026-10-03", periodEnd: "2026-11-03" },
+    tron: { limit: 300, used: 41, remaining: 259, periodStart: "2026-10-03", periodEnd: "2026-11-03" },
+  }} />);
+  const meter = screen.getByRole("progressbar", { name: "ERC20 wallet refreshes" }).parentElement!;
+  expect(meter.querySelector(".fidelity-pro-meter-head")).toHaveTextContent("ERC20 wallet refreshes143 of 300 · 157 left");
+  expect(meter.querySelector(".fidelity-pro-meter-ends")).toHaveTextContent("0300");
+});

@@ -1,0 +1,64 @@
+# Summary desktop fidelity specification
+
+Sources viewed: `desktop/analyze/summary-desktop.jpg`, `summary-empty-desktop.jpg`, `summary-loading-desktop.jpg`; authoritative HTML `ds/pages/analyze-summary*.html`, `analyze-summary.js`, `analyze-data.js`, `analyze.css`, `ds.css`, and `lib.js`. Measurements below are Chromium `getBoundingClientRect` and `getComputedStyle` at a 1600 × 1000 viewport, device scale 1.
+
+The coordinates and example copy below describe the reference HTML. The app keeps its DatePicker, live total, refresh and sync controls in the heading area. The app reads dates, assets, currency and quote colours from the portfolio.
+
+## Shared frame and tokens
+
+- Rail: fixed 56 px wide on the left, `#0d0d0e`, 1 px right border `#222224`; 36 px icon rows, 6 px selected row radius and 2 px blue selection rule. Summary icon is selected. Main starts at x=56, padding 20 px top, 28 px sides, 40 px bottom; content spans x=84…1572, width 1488 px.
+- Public Sans, tabular figures. Page title `Summary` is 26/32 px weight 600 at x=84 y=20. Subtitle is 13/18 px muted `#b4b6bc` with inline white emphasis. Right controls: pill segmented range `1D 7D 30D 90D 1Y All` (28 px option height); green-dot `Synced 09:41`; outlined `Refresh` pill with refresh icon, 34 px high. Heading is 52 px high with 16 px gap to cards.
+- Cards use surface `#131217`, 1 px border `#222224`, 6 px radius, 20 px padding, shadow `0 12px 28px rgba(0,0,0,.2)`. Card title is 15/20 px weight 600; right caption 12 px `#9b9da3`. Body is 13/18 px, secondary 12 px. Grid is 12 equal columns, 16 px gaps: s8 left width 986.7 px, s4 right width 485.3 px. The three grid rows pair left and right cards with a shared bottom edge and 16 px vertical gap.
+- Colours: ground `#0d0d0e`, sunken `#0a0a0b`, surface `#131217`, raised `#1b1a20`, text `#fff`, muted `#b4b6bc`, faint `#9b9da3`, rule `#1b1a1f`, accent/chart `#4a8ad6`, positive `#5fc39c`, negative `#ee6a82`, warning `#d9a441`. Missing values are grey dashes; true zero is `$0` or `0.0%`. Changes carry a leading + or Unicode minus.
+
+## Populated image
+
+Grid begins at y=88. Row 1 is y=88…507 (419 px): left `Profit and loss`, right `All-time high`.
+
+- Left card header: `Profit and loss` / `net P&L, USD`. Four equal, divider-separated KPI columns occupy x=105…1050 and y=143…219. Each label is 12 px, large net value 34/38 weight 600, other values 22/28 weight 500, note 12 px. Values: `Net P&L (all time)` `+$188,809.27` `since 1 Jul 2025`; `P&L %` `+32.84%` `on $575,000 invested`; `Breakeven` `$575,000` `value where P&L is $0`; `Positions` `8` `4 up · 2 down · 2 flat`. A 12 px caption says `Cumulative net P&L at each month end, since 1 Jul 2025`. Below is a straight blue 2 px line chart with 0/100K/200K/300K y ticks, 1 Jul 25/Oct 25/Feb 26/Jun 26/Oct 26 x ticks, the vertical `Best month, Mar 2026: +$101,300` annotation and `$188,809` end label.
+- ATH header caption `since 1 Jul 2025`. Label `Highest value recorded`, value `$801,240.50` at 34/38 weight 600, note `19 Mar 2026 · 226 days ago`. A 6 px blue progress meter marks current 95.3%, with white ATH marker and `Now 95.3% of ATH` / `ATH`. Below a rule, five 13 px facts: `Distance from ATH −$37,431.23 · −4.67%`, `Gain needed to reach it +4.90%`, `Previous high $668,200.00 · 27 Jan 2026`, `Lowest since ATH $681,300.00 · 22 Apr 2026`, `Current value $763,809.27`.
+
+Row 2 is y=523…977 (454 px): left `Profit summary` / `Months of 2026`, right `By year` / `2026 to date`.
+
+- Month grid is 5 columns by 2 rows with 12 px gaps; each month card is 179.3 × 167 px, ground fill, 1 px border, 6 px radius, padding 14/14/12. Month name is 15 px weight 600, year or `to 31 Oct` at right is 12 px. P&L is 17/24 px, percentage 12 px, centred positive/negative mini bar 4 px, a hairline, then coloured up/down counts. Jan…Oct order and P&L values: `+$31,700`, `−$42,600`, `+$101,300`, `−$41,600`, `+$9,400`, `−$35,600`, `+$38,300`, `−$15,800`, `−$19,632`, `+$34,641`. Percentages: `+5.08%`, `−6.50%`, `+15.76%`, `−5.59%`, `+1.30%`, `−4.80%`, `+5.42%`, `−2.07%`, `−2.62%`, `+4.75%`. Counts: `5/1`, `0/6`, `6/0`, `2/4`, `4/2`, `2/4`, `5/1`, `3/3`, `2/4`, `5/1` up/down. Footer: `P&L % is P&L divided by opening value plus deposits in the period. Up and down count BTC, ETH, SOL, BNB, NVDA and AAPL; stablecoins are left out.`
+- Year cards stack with 12 px gap; each is 443.3 × 183 px and 14 px padding. Selected 2026 is accent border and `rgba(74,138,214,.14)` fill. `2026` `Jan–Oct` `+$60,109` `+8.54%` `Deposits +$105,000` `4 up · 2 down` `10 months`; `2025` `Jul–Dec` `+$128,700` `+27.38%` `Deposits +$160,000` `5 up · 1 down` `6 months`. Year values are 22/28 px.
+
+Row 3 is y=993…1581 (588 px): left `Profit attribution` / `1 Jul 2025 to 31 Oct 2026, USD`, right `Top profit and loss coins` / `all time`.
+
+- Attribution begins with square blue `Market move` and grey `Quantity change (deposits, buys)` legend. Header `Asset | Market | Quantity | Total`; each asset is a 48 px high ruled row with ticker, stacked horizontal blue/grey bar on a shared zero axis, and right aligned amounts. Row order and market/quantity/total: BTC `+$104,329 / +$38,000 / +$142,329`; USDT `$0 / +$120,000 / +$120,000`; ETH `+$69,400 / +$25,000 / +$94,400`; USDC `$0 / +$40,000 / +$40,000`; BNB `+$17,650 / +$6,000 / +$23,650`; NVDA `+$9,850 / +$8,000 / +$17,850`; SOL `−$9,300 / +$22,000 / +$12,700`; AAPL `−$3,120 / +$6,000 / +$2,880`. Axis labels `$0 $50k $100k $150k`. Final rule and total: `$310,000 → $763,809`, `+$188,809`, `+$265,000`, `+$453,809`.
+- Right card groups `Top profit`, `Top loss`, `No market P&L`. Each coin is a 42 px ruled row, ticker, 8 px positive/negative diverging bar, amount and percentage: BTC `+$104,329 +102.9%`, ETH `+$69,400 +84.8%`, BNB `+$17,650 +54.9%`, NVDA `+$9,850 +46.4%`; SOL `−$9,300 −11.9%`, AAPL `−$3,120 −8.3%`; USDT and USDC `$0 0.0%`. Footer explains period, denominator and stablecoins at $1.
+
+Interactive parts: range segments change the period; refresh starts a new snapshot; month and year cards select a period; ticker rows open coin detail; chart exposes values through a tooltip; the sync status retains its popover and mask/quote-colour settings still apply.
+
+## Empty image
+
+Header: `Is the portfolio earning, or only growing? One snapshot so far, so there is nothing to compare yet.` Range is disabled with `1D` visually selected; sync remains green and refresh enabled. Row 1 y=88…485 (397 px), row 2 y=501…727 (226 px), row 3 y=743…1079 (336 px).
+
+- Profit KPI values are dashes with `Needs a second snapshot`, `on invested capital`, `value where P&L is $0`; positions is `8` / `in 1 snapshot`. Chart area is a 227 px tall dashed empty panel with `The P&L line starts once you have a second snapshot.` and white `Refresh now` pill.
+- ATH reads `from 1 snapshot`, `Highest value so far`, `$763,809.27`, `31 Oct 2026, your only snapshot`; full blue meter and `You are at the high, so the distance is $0.`; facts `First snapshot 31 Oct 2026, 09:41`, `Assets 8`, `Sources 5`, `Current value $763,809.27`.
+- Month, year, attribution, top coins retain their normal card frames and 150/260 px tall dashed panels. Messages: `Month cards appear after the second snapshot.`, `The year view appears after the second snapshot.`, `Attribution needs two snapshots to split market moves from deposits.`, `Top profit and loss coins appear after the second snapshot.`
+
+## Loading image
+
+Header subtitle `Reading snapshots from the local database…`; range and Refresh disabled, grey-dot `Loading`. Same six-card grid at y=88; row 1 height 399 px, row 2 height 388 px, row 3 height 396 px. Card titles/captions remain visible. Four KPI columns have 12/24/12 px fixed dark skeleton bars, chart a 227 px skeleton box; ATH 12/30/12 px bars, 6 px meter and three 14 px fact bars. Months show a 5 × 2 grid of 126 px skeleton cards, years two 150 px skeletons. Attribution has eight 40 px bar rows; right card has six 42 px bar rows. Skeletons are static `#1d1d22` and `#16161a`, with no shimmer.
+
+## Error and transient states
+
+The design provides no error, open dialog, popover or toast image for Summary. Keep the six-card frame for a query error, show a concise error and Retry inside the failed card, retain last good sync time when available. Existing period detail, sync status popover, loading and sparse-month/unknown-profit explanations must remain reachable. Missing monthly snapshots stay grey dashes with their explanation; a partial unknown P&L stays marked partial instead of being coloured as certain.
+
+## Pixel comparison
+
+Fresh 3 Nov 2026 Chromium renders of the source HTML are in `/tmp/fidelity-desktop/source-final/`; app captures are in `/tmp/fidelity-desktop/summary/`. Both use a 1600 px viewport. A pixel differs when its absolute RGB channel differences sum to more than 48; the denominator is the overlapping image area. The source chart ticks, attribution header, and axis were remeasured with `getBoundingClientRect` and `getComputedStyle` in `source-final/measure.json`.
+
+| State | Pixel difference | App capture |
+| --- | ---: | --- |
+| Populated | 0.376% | `/tmp/fidelity-desktop/summary/summary-full-desktop.png` |
+| One snapshot | 0.247% | `/tmp/fidelity-desktop/summary/summary-empty-desktop.png` |
+| Loading | 0.068% | `/tmp/fidelity-desktop/summary/summary-loading-desktop.png` |
+
+## Remaining differences
+
+- The header keeps the live total, DatePicker, refresh control, and sync-status popover because those existing controls provide portfolio actions absent from the static design page. `Updated 09:41` describes a local refresh; the source's `Synced 09:41` would incorrectly imply S3 synchronization.
+- The one-snapshot attribution caption starts on the real first snapshot, 31 Oct 2026. The source says 1 Jul 2025 despite that snapshot being absent from its empty data.
+- The attribution date has a small disclosure chevron and a screen-reader name for its coin/source/wallet/asset-type grouping menu. The source shows the date alone. An `Unexplained` column appears only when recorded market and quantity effects leave a residual, so the total remains accountable; the design sample has no residual.
+- Histories over 60 month endpoints use a bounded sample because `calculateTotalProfit` accepts one range per call. The chart then omits the Best month annotation when it cannot identify adjacent months. A batched query would need a middlelayer change outside this task's allowed paths.

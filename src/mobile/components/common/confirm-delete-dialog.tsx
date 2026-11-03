@@ -22,7 +22,7 @@ type ConfirmDeleteDialogProps = {
   description: ReactNode;
   children?: ReactNode;
   cancelLabel: string;
-  actions: { label: string; onClick: () => void; disabled?: boolean; pending?: boolean; keepOpen?: boolean }[];
+  actions: { label: string; onClick: () => void; icon?: ReactNode; disabled?: boolean; pending?: boolean; keepOpen?: boolean }[];
   contentClassName?: string;
   overlayClassName?: string;
 };
@@ -75,7 +75,7 @@ export default function ConfirmDeleteDialog({
           <AlertDialogCancel onClick={stopPropagation}>
             {cancelLabel}
           </AlertDialogCancel>
-          {actions.map(({ label, onClick, disabled, pending, keepOpen }, index) => (
+          {actions.map(({ label, onClick, icon, disabled, pending, keepOpen }, index) => (
             <AlertDialogAction
               key={index}
               disabled={disabled}
@@ -87,6 +87,7 @@ export default function ConfirmDeleteDialog({
               }}
             >
               {pending && <ReloadIcon aria-hidden="true" className="mr-2 h-4 w-4 motion-safe:animate-spin" />}
+              {icon}
               {label}
             </AlertDialogAction>
           ))}

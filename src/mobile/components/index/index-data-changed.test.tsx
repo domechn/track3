@@ -393,7 +393,7 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     expect(view.getByTestId("trigger-history-delete")).toBe(history);
   });
 
-  it("shows the no-data panel after leaving and returning to empty History", async () => {
+  it("keeps History available after leaving and returning with no portfolio data", async () => {
     window.location.hash = "#/history";
     const view = renderApp();
     const history = await view.findByTestId("trigger-history-delete");
@@ -409,8 +409,8 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     await view.findByText("settings");
     window.location.hash = "#/history";
 
-    expect(await view.findByText("There is not enough data")).toBeInTheDocument();
-    expect(view.queryByTestId("trigger-history-delete")).not.toBeInTheDocument();
+    expect(await view.findByTestId("trigger-history-delete")).toBeInTheDocument();
+    expect(view.queryByText("There is not enough data")).not.toBeInTheDocument();
   });
 
   it("bumps the data-changed version when the refresh button succeeds", async () => {

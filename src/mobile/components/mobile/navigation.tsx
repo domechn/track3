@@ -48,7 +48,7 @@ function Navigation({ unread = 0, onTabSwitch, sidebar = false, collapsed = fals
       aria-description={id === "analytics" && analyticsMenuAvailable ? t("mobile.analyticsDestinationsHint") : undefined}
       onClick={(event) => {
         haptic("selection");
-        if (selected === id && pathname === tabRoots[id] && !search && !hash) {
+        if (selected === id && pathname === tabRoots[id] && window.location.hash === `#${tabRoots[id]}` && !search && !hash) {
           event.preventDefault();
           onTabSwitch?.(true);
           if (id === "analytics" && !sidebar) {

@@ -136,16 +136,21 @@ test("navigation follows visual order and shows a keyboard focus ring", async ({
   await page.goto("/#/overview");
   await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeAttached();
   const skip = page.getByRole("link", { name: "Skip to main content" });
+  const collapse = page.getByRole("button", { name: "Expand sidebar" });
   const overview = page.getByRole("link", { name: "Overview" });
   const summary = page.getByRole("link", { name: "Summary" });
   await page.keyboard.press("Tab");
   await expect(skip).toBeFocused();
   expect(await skip.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
   await page.keyboard.press("Tab");
+  await expect(collapse).toBeFocused();
+  expect(await collapse.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
+  await page.keyboard.press("Tab");
   await expect(overview).toBeFocused();
   expect(await overview.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
   await page.keyboard.press("Tab");
   await expect(summary).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Shift+Tab");
   await expect(skip).toBeFocused();
@@ -202,9 +207,8 @@ async function checkAttributionAccessibility(page: Page, width: number) {
     await installTauriBridge(page);
     await page.goto("/#/summary");
     await expect(page.getByRole("heading", { name: "Summary", exact: true })).toBeAttached();
-    await page.getByRole("radio", { name: "Attribution" }).click();
-    await expect(page.getByRole("radio", { name: "Attribution" })).toHaveAttribute("data-state", "checked");
-    await expect(page.locator(".analyze-profit-card").getByText("Attribution details")).toBeAttached();
+    await page.locator(".fidelity-attribution-options summary").click();
+    await expect(page.locator(".fidelity-attribution-options")).toHaveAttribute("open", "");
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     expect(results.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -229,6 +233,13 @@ test("expanded overview and asset charts expose text summaries", async ({ page }
   await expect(page.getByText("Coins Percentage Overview")).toBeVisible();
   for (const route of ["/overview", "/wallets", "/coins/BTC?assetType=crypto"]) {
     if (route !== "/overview") await page.goto(`/#${route}`);
+    if (route.startsWith("/coins/")) {
+      const chart = page.locator(".coin-fidelity-plot > svg");
+      await expect(chart).toBeVisible();
+      await expect(chart).toHaveAttribute("role", "img");
+      await expect(chart).toHaveAttribute("aria-label", /\S/);
+      continue;
+    }
     await expect(page.locator("main canvas").first()).toBeVisible();
     const unnamed = await page.locator("main canvas").evaluateAll((canvases) =>
       canvases.filter((canvas) => canvas.getAttribute("role") !== "img" || !canvas.getAttribute("aria-label")?.trim()).length);
@@ -242,7 +253,8 @@ test("expanded Overview content passes axe with its percentage rows visible", as
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Show More" }).click();
-  await expect(page.locator("[data-testid='tcpc-row']").first()).toBeVisible();
+  // Show More loads the percentage rows asynchronously before the axe scan.
+  await expect(page.locator("[data-testid='tcpc-row']").first()).toBeVisible({ timeout: 15000 });
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(results.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => `${node.target.join(" ")} ${node.failureSummary}`).join(", ")}`)).toEqual([]);
 });
@@ -309,15 +321,24 @@ test("history first cell shows the row hover feedback with a mouse", async ({ pa
   expect(await firstCell.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
 });
 
-test("P&L rank column moves with its table instead of pinning", async ({ page }) => {
+test("P&L leader rows remain in normal flow", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/summary");
-  const table = page.getByText("Top Profit", { exact: true }).locator("xpath=..").getByRole("table");
-  await expect(table).toBeVisible();
-  const wrapper = table.locator("xpath=..");
-  const rank = table.locator("td").first();
-  await wrapper.evaluate((node) => { node.style.width = "80px"; });
+  const leadersTable = page.getByRole("table", { name: "Top profit and loss coins" });
+  await expect(leadersTable).toBeVisible();
+  await expect(leadersTable.getByRole("rowheader").first()).toBeVisible();
+  const row = page.locator(".fidelity-leader-row").first();
+  await expect(row).toBeVisible();
+  const card = page.locator(".fidelity-leaders");
+  await row.evaluate((node) => { (node as HTMLElement).style.minWidth = "700px"; });
+  await card.evaluate((node) => { node.style.overflowX = "auto"; });
+  const rank = row.locator("b").first();
+  const before = (await rank.boundingBox())!.x;
+  const widths = await card.evaluate((node) => ({ scroll: node.scrollWidth, client: node.clientWidth }));
+  expect(widths.scroll).toBeGreaterThan(widths.client);
+  await card.evaluate((node) => { node.scrollLeft = 100; });
+  expect((await rank.boundingBox())!.x).toBeLessThan(before - 50);
   expect(await rank.evaluate((node) => getComputedStyle(node).position)).not.toBe("sticky");
 });
 
@@ -367,12 +388,19 @@ test("visible controls across routes have 44px targets or 44px labels", async ({
   await installTauriBridge(page);
   for (const route of routes) {
     await page.goto(`/#${route}`);
+    await page.reload();
+    if (route.startsWith("/settings/")) {
+      await expect(page.locator(".t3-settings-layout")).toBeVisible();
+    }
     await expect(page.locator("main > div")).toHaveAttribute("aria-busy", "false");
+    if (route === "/summary") await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false");
+    if (route === "/assistant") await expect(page.locator("main .t3-manage-assistant")).toBeVisible();
     const small = await page.locator("main button, main a, main input, main select, aside button, aside a, header button, header a").evaluateAll((controls) =>
       controls.filter((control) => {
         const style = getComputedStyle(control);
         const box = control.getBoundingClientRect();
-        if (box.width === 0 || box.height === 0 || style.opacity === "0" || control.classList.contains("sr-only")) return false;
+        if (box.width === 0 || box.height === 0 || style.opacity === "0" || style.visibility === "hidden" ||
+          control.closest("details:not([open])") || control.classList.contains("sr-only")) return false;
         const labelledBy = control.id ? document.querySelector(`label[for="${control.id}"]`) : control.closest("label");
         const labelBox = labelledBy?.getBoundingClientRect();
         return (box.width < 44 || box.height < 44) && !(labelBox && labelBox.width >= 44 && labelBox.height >= 44);
@@ -500,10 +528,9 @@ test("wide cost basis tables keep their first column visible while scrolling", a
   await page.setViewportSize({ width: 360, height: 740 });
   await installTauriBridge(page);
   await page.goto("/#/cost-basis");
-  await page.getByText("Details", { exact: true }).click();
-  const table = page.locator("main table").first();
+  const table = page.locator(".fidelity-cost-averages table");
   await expect(table).toBeVisible();
-  const wrapper = table.locator("xpath=..");
+  const wrapper = page.locator(".fidelity-cost-averages");
   const widths = await wrapper.evaluate((node) => ({ scroll: node.scrollWidth, visible: node.clientWidth }));
   expect(widths.scroll).toBeGreaterThan(widths.visible);
   const first = table.locator("th").first();
@@ -516,15 +543,16 @@ test("wide cost basis tables keep their first column visible while scrolling", a
 });
 });
 
-test("summary detail dialog fits and passes axe", async ({ page }) => {
+test("summary month detail fits and passes axe", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page);
   await page.goto("/#/summary");
-  await page.getByRole("button", { name: "2", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  const box = await dialog.boundingBox();
+  await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
+  await page.locator(".fidelity-month-card .fidelity-month-main").first().click();
+  const detail = page.locator("#month-detail");
+  await expect(detail).toBeVisible();
+  const box = await detail.boundingBox();
   expect(box).not.toBeNull();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(360);
@@ -568,10 +596,10 @@ test("refresh status dialog fits and has no axe violations", async ({ page }) =>
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page);
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Refresh" }).click();
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
   const trigger = page.getByRole("button", { name: "Source status" });
   await expect(trigger).toBeVisible();
-  await expect(page.getByRole("button", { name: "Refresh" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled();
   await trigger.click();
   const dialog = page.getByRole("alertdialog", { name: "Source status" });
   await expect(dialog).toBeVisible();

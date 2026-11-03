@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ExclamationTriangleIcon, InfoCircledIcon, Cross2Icon, ReloadIcon } from "@radix-ui/react-icons";
+import { ExclamationTriangleIcon, InfoCircledIcon, Cross2Icon, ReloadIcon, GearIcon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -23,6 +23,8 @@ type AssistantInsightData = {
   trades: Array<{ symbol: string; tradeValue: number }>;
 };
 
+import { loadAIConfig } from "@/middlelayers/configuration";
+
 function SeverityIcon({ severity }: { severity: InsightSeverity }) {
   return severity === "info"
     ? <InfoCircledIcon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
@@ -31,10 +33,11 @@ function SeverityIcon({ severity }: { severity: InsightSeverity }) {
     }`} />;
 }
 
-export default function InsightsCard({ currency, assistantView = false, onPickPrompt }: {
+export default function InsightsCard({ currency, assistantView = false, onPickPrompt, overviewFidelity = false }: {
   currency?: CurrencyRateDetail;
   assistantView?: boolean;
   onPickPrompt?: (prompt: string) => void;
+  overviewFidelity?: boolean;
 }) {
   const { t, locale } = useTranslation();
   const [card, setCard] = useState<StoredInsightCard>();
@@ -43,6 +46,7 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
   const [error, setError] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
   const [assistantData, setAssistantData] = useState<AssistantInsightData>();
+  const [aiConfigured, setAiConfigured] = useState<boolean>();
   const reload = useCallback(async () => {
     try {
       const loaded = await loadInsightCard();
@@ -86,12 +90,22 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
     })().catch(() => {});
     return () => { cancelled = true; };
   }, [assistantView, currency]);
+  useEffect(() => {
+    if (!overviewFidelity) return;
+    let active = true;
+    void loadAIConfig().then(() => { if (active) setAiConfigured(true); })
+      .catch(() => { if (active) setAiConfigured(false); });
+    return () => { active = false; };
+  }, [overviewFidelity]);
 
   const visible = card?.insights.filter((insight) =>
     !card.dismissedIds.includes(insight.id) && !card.repeatedIds?.includes(insight.id)) ?? [];
   const summaryRepeatsInsight = visible.some((insight) =>
     card?.summary?.includes(formatInsight(insight, t, locale, currency)) ||
     card?.summary?.includes(formatInsight(insight, t, locale)));
+  const currentSummary = card?.summary && card.summaryLocale === locale &&
+    card.summarySnapshotUuid === card.snapshotUuid && !card.summaryNeedsRefresh &&
+    visible.length > 0 && !summaryRepeatsInsight ? card.summary : undefined;
   const regenerate = async () => {
     setRegenerating(true);
     setSummaryError(false);
@@ -197,6 +211,47 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
           <Button size="sm" variant="outline" onClick={() => ask(row.prompt)}>{row.action}</Button>
         </div>)}
       </CardContent>
+    </Card>;
+  }
+
+  if (overviewFidelity && !loading && aiConfigured === false && !visible.length) {
+    return <Card className="t3-insights-card t3-insights-off" role="region" aria-label={t("overview.fidelity.aiInsights")}>
+      <header><h2>{t("overview.fidelity.aiInsights")}</h2><span>{t("overview.fidelity.off")}</span></header>
+      <div className="t3-insights-off-frame"><div>
+        <h3>{t("overview.fidelity.insightsOff")}</h3>
+        <p>{t("overview.fidelity.insightsOffDescription")}</p>
+        <a href="#/settings/assistant"><GearIcon aria-hidden="true" />{t("overview.fidelity.openAiSettings")}</a>
+      </div></div>
+      <p>{t("overview.fidelity.insightsOffPath")}</p>
+    </Card>;
+  }
+
+  if (overviewFidelity && currentSummary) {
+    return <Card className="t3-insights-card t3-insights-summary" role="region" aria-label={t("overview.fidelity.aiInsights")}>
+      <header>
+        <h2>{t("overview.fidelity.aiInsights")}</h2>
+        <span>{t("overview.fidelity.pro")}</span>
+        <Button size="sm" variant="ghost" onClick={() => void regenerate()} disabled={regenerating}
+          aria-label={t("insights.regenerate")} className="ml-auto h-8 gap-1.5 px-2 text-xs">
+          <ReloadIcon aria-hidden="true" className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
+          {t("insights.regenerate")}
+        </Button>
+      </header>
+      <div className="t3-insights-summary-lines">
+        {currentSummary.split("\n").filter(Boolean).map((line, index) => {
+          const separator = line.indexOf(" — ");
+          return <div key={index}>
+            {separator >= 0
+              ? <><h3>{line.slice(0, separator)}</h3><p>{line.slice(separator + 3)}</p></>
+              : <p>{line}</p>}
+          </div>;
+        })}
+      </div>
+      <a href="#/assistant" onClick={() => {
+        try {
+          storePendingAssistantQuestion({ question: t("insights.askQuestion").replace("{insight}", currentSummary) });
+        } catch { /* The link still opens the assistant. */ }
+      }}>{t("insights.ask")}</a>
     </Card>;
   }
 

@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/components/ui/use-toast";
 import { useOptimisticDelete } from "./use-optimistic-delete";
 
-function Fixture({ commit, restore }: { commit: () => Promise<void>; restore: () => Promise<void> }) {
+function Fixture({ commit, restore, successDetail }: {
+  commit: () => Promise<void>; restore: () => Promise<void>; successDetail?: string;
+}) {
   const [items, setItems] = useState(["a", "b"]);
   const { run } = useOptimisticDelete(setItems);
   return <>
@@ -15,6 +18,7 @@ function Fixture({ commit, restore }: { commit: () => Promise<void>; restore: ()
       commit,
       undo: restore,
       successMessage: "Deleted",
+      successDetail,
       undoLabel: "Undo",
       undoAltText: "Restore item",
       undoWindowMs: 5000,
@@ -42,9 +46,22 @@ function ConcurrentFixture({ commit }: { commit: (item: string) => Promise<void>
   </>;
 }
 
-beforeEach(() => vi.useRealTimers());
+beforeEach(() => {
+  vi.useRealTimers();
+  const { result, unmount } = renderHook(() => useToast());
+  act(() => result.current.dismiss());
+  unmount();
+});
 
 describe("useOptimisticDelete", () => {
+  it("shows a dated confirmation under the undo toast title", async () => {
+    render(<Fixture commit={async () => {}} restore={async () => {}}
+      successDetail="28 Oct 2026, 08:51" />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Delete" })); });
+    expect(screen.getByText("Deleted")).toBeInTheDocument();
+    expect(screen.getByText("28 Oct 2026, 08:51")).toBeInTheDocument();
+  });
+
   it("removes locally before the API completes and restores through Undo", async () => {
     let finish!: () => void;
     const commit = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));

@@ -11,7 +11,7 @@ import {
 } from "@/middlelayers/configuration";
 import { QuoteColor } from "@/middlelayers/types";
 import { useTheme } from "@/mobile/components/common/theme";
-import { type Theme, THEME_VALUES, QUOTE_COLOR_VALUES } from "@/middlelayers/ui-state/appearance";
+import { type Theme } from "@/middlelayers/ui-state/appearance";
 import {
   LOCALE_LABELS,
   SUPPORTED_LOCALES,
@@ -20,7 +20,7 @@ import {
 } from "@/mobile/i18n";
 import { isIOS } from "@/utils/platform";
 import { useSearchParams } from "react-router-dom";
-import { InsetGroup, ListRow } from "@/mobile/components/mobile";
+import { FidelityAppearance } from "@/mobile/components/fidelity-appearance";
 
 const App = ({
   onQuoteColorChange,
@@ -78,38 +78,17 @@ const App = ({
   const showLanguage = !section || section === "language";
 
   if (isIOS()) return <div className="ios-d3-mobile-appearance">
-    {showTheme && <>
-      <InsetGroup title={t("appearance.theme")}>
-        {(["light", "dark", "system"] as const satisfies readonly Theme[]).map((value) => <button key={value} type="button"
-          aria-label={t(`appearance.theme.${value}`)}
-          aria-pressed={selectedTheme === value}
-          className="t3-mobile-theme-choice" onClick={() => {
+    {showTheme && <FidelityAppearance section="theme" selectedTheme={selectedTheme} quoteColor={quoteColor}
+      selectedLocale={selectedLocale} onThemeChange={(value) => {
           setSelectedTheme(value);
           currentTheme.setTheme(value);
           void saveTheme(value);
-        }}>
-          <span data-testid="theme-preview" aria-hidden="true" className={`t3-theme-preview t3-theme-preview-${value}`}>
-            <span className="t3-theme-preview-rail" />
-            <span className="t3-theme-preview-content"><i /><b /><i /><em /></span>
-          </span>
-          <span className="t3-mobile-theme-choice-label">
-            <span>{t(`appearance.theme.${value}`)}</span>
-            <small>{t(`settings.phase6.themeHint.${value}`)}</small>
-          </span>
-          <span className="t3-mobile-theme-choice-radio" aria-hidden="true" />
-        </button>)}
-      </InsetGroup>
-      <InsetGroup title={t("appearance.quoteColor")}>
-        {QUOTE_COLOR_VALUES.map((value) => <ListRow key={value} className="ios-d3-choice-row" onClick={() => void handleQuoteColorValueChange(value)} trailing={<span className="ios-d3-choice-check" aria-hidden="true">{quoteColor === value ? "✓" : ""}</span>}>
-          {t(value === "green-up-red-down" ? "appearance.quoteColorGreenUp" : "appearance.quoteColorRedUp")}
-        </ListRow>)}
-      </InsetGroup>
-    </>}
-    {showLanguage && <InsetGroup title={t("appearance.language")}>
-      {SUPPORTED_LOCALES.map((value) => <ListRow key={value} className="ios-d3-choice-row" onClick={() => handleLanguageValueChange(value)} trailing={<span className="ios-d3-choice-check" aria-hidden="true">{selectedLocale === value ? "✓" : ""}</span>}>
-        {LOCALE_LABELS[value]}
-      </ListRow>)}
-    </InsetGroup>}
+      }}
+      onQuoteColorChange={(value) => void handleQuoteColorValueChange(value)}
+      onLanguageChange={handleLanguageValueChange} />}
+    {showLanguage && <FidelityAppearance section="language" selectedTheme={selectedTheme} quoteColor={quoteColor}
+      selectedLocale={selectedLocale} onThemeChange={() => {}}
+      onQuoteColorChange={() => {}} onLanguageChange={handleLanguageValueChange} />}
   </div>;
 
   return (

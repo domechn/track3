@@ -1,5 +1,7 @@
-import { calculateTotalProfit } from "@/middlelayers/charts";
+import { calculateTotalProfit, queryLatestAssets } from "@/middlelayers/charts";
+import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { queryPreviousProfitSnapshotDate } from "@/middlelayers/charts-profit";
+import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
 import {
   CurrencyRateDetail,
   QuoteColor,
@@ -27,9 +29,12 @@ import PNLChart from "@/components/pnl-chart";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
+import { SummaryFidelityYearContext } from "./summary-fidelity-range-context";
+import { formatMoverNames, yearSpan } from "./fidelity-data";
 
 type SummaryType = "month" | "year";
 type UnknownCoins = Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
+type PeriodCount = { up: number; down: number };
 
 function unknownHint(coins: UnknownCoins, t: (key: string) => string) {
   const names = coins.slice(0, 5).map((coin) => coin.symbol).join(", ");
@@ -50,6 +55,11 @@ function getToneClass(value: number, quoteColor: QuoteColor) {
   return value > 0 ? positiveClass : negativeClass;
 }
 
+function countTone(count: number, up: boolean, quoteColor: QuoteColor) {
+  if (count === 0) return "fidelity-zero";
+  return up === (quoteColor === "green-up-red-down") ? "text-positive" : "text-negative";
+}
+
 function getToneSurfaceClass(value: number, quoteColor: QuoteColor) {
   const tone = positiveNegativeTone(value, quoteColor);
   if (tone === "green") {
@@ -65,10 +75,16 @@ const App = ({
   dateRange,
   currency,
   quoteColor,
+  fidelity,
+  initialType = "month",
+  oneSnapshot = false,
 }: {
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
+  fidelity?: boolean;
+  initialType?: SummaryType;
+  oneSnapshot?: boolean;
 }) => {
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
@@ -78,6 +94,9 @@ const App = ({
       monthFirstDate: Date;
       lastRecordDate?: Date;
       baselineDate?: Date;
+      percentage?: number | null;
+      count?: PeriodCount;
+      deposits?: number;
     }[]
   >([]);
   const [loadedMonthlyKey, setLoadedMonthlyKey] = useState<string | null>(null);
@@ -88,14 +107,21 @@ const App = ({
       unknownCoins: UnknownCoins;
       year: number;
       hasData: boolean;
+      percentage?: number | null;
+      count?: PeriodCount;
+      deposits?: number;
     }[]
   >([]);
-  const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
-  const [summaryType, setSummaryType] = useState<SummaryType>("month");
+  const [localYear, setLocalYear] = useState(dateRange.end.getFullYear());
+  const sharedYear = useContext(SummaryFidelityYearContext);
+  const selectedYear = fidelity && sharedYear.year ? sharedYear.year : localYear;
+  const setSelectedYear = fidelity && sharedYear.year ? sharedYear.setYear : setLocalYear;
+  const [summaryType, setSummaryType] = useState<SummaryType>(initialType);
   const [clickedMonth, setClickedMonth] = useState<number | null>(null);
   const [explainedMonth, setExplainedMonth] = useState<number | null>(null);
   const [explainedPartial, setExplainedPartial] = useState<string | null>(null);
   const { t, locale } = useTranslation();
+  const [moverNames, setMoverNames] = useState("");
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
   const monthlyCacheRef = useRef<
@@ -108,6 +134,9 @@ const App = ({
         monthFirstDate: Date;
         lastRecordDate?: Date;
         baselineDate?: Date;
+        percentage?: number | null;
+        count?: PeriodCount;
+        deposits?: number;
       }[]
     >
   >(new Map());
@@ -120,6 +149,9 @@ const App = ({
         unknownCoins: UnknownCoins;
         year: number;
         hasData: boolean;
+        percentage?: number | null;
+        count?: PeriodCount;
+        deposits?: number;
       }[]
     >
   >(new Map());
@@ -129,6 +161,21 @@ const App = ({
   );
   const dataChangedVersion = useDataChangedVersion();
   const monthlyKey = `${rangeKey}-${selectedYear}-${dataChangedVersion}`;
+
+  useEffect(() => {
+    if (!fidelity || initialType !== "month") return;
+    let active = true;
+    Promise.all([calculateTotalProfit(dateRange), new StableCoinsQuery().listAllStableCoins(), queryLatestAssets()]).then(([profit, stable, assets]) => {
+      if (!active) return;
+      const stableSymbols = new Set(stable);
+      const holdings = new Map<string, number>();
+      for (const asset of assets) holdings.set(asset.symbol, (holdings.get(asset.symbol) ?? 0) + asset.value);
+      const movers = profit.coins.filter((coin) => !stableSymbols.has(coin.symbol) && coin.value !== null && Math.abs(coin.value) > 0.005)
+        .map((coin) => ({ symbol: coin.symbol, value: holdings.get(coin.symbol) ?? 0 }));
+      setMoverNames(formatMoverNames(movers, locale));
+    }).catch(() => { if (active) setMoverNames(""); });
+    return () => { active = false; };
+  }, [fidelity, initialType, rangeKey, dataChangedVersion, locale]);
 
   useEffect(() => {
     if (summaryType !== "month") {
@@ -194,11 +241,12 @@ const App = ({
 
     try {
       const dates = listAllFirstAndLastDays(start, end);
+      const stableCoins = new Set(await new StableCoinsQuery().listAllStableCoins());
 
       const profits = await bluebird.map(
         dates.filter((d) => d.firstDay.getFullYear() === selectedYear),
         async (date) => {
-          const { total, knownTotal = null, unknownCoins = [], lastRecordDate } = await calculateTotalProfit({
+          const { total, knownTotal = null, unknownCoins = [], lastRecordDate, percentage, coins } = await calculateTotalProfit({
             start: date.firstDay,
             end: new Date(
               date.lastDay.getFullYear(),
@@ -219,7 +267,9 @@ const App = ({
           const baselineDate = lrd
             ? await queryPreviousProfitSnapshotDate(date.firstDay)
             : undefined;
-          return { total, knownTotal, unknownCoins, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate };
+          return { total, knownTotal, unknownCoins, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate,
+            percentage, count: { up: coins.filter((coin) => !stableCoins.has(coin.symbol) && coin.value !== null && coin.value > 0.005).length,
+              down: coins.filter((coin) => !stableCoins.has(coin.symbol) && coin.value !== null && coin.value < -0.005).length } };
         },
         { concurrency: 4 }
       );
@@ -249,15 +299,23 @@ const App = ({
     }
 
     try {
+      const stableCoins = new Set(await new StableCoinsQuery().listAllStableCoins());
       const profits = await bluebird.map(
         years,
         async (year) => {
-          const { total, knownTotal = null, unknownCoins = [], lastRecordDate } = await calculateTotalProfit({
+          const yearRange = {
             start: new Date(year, 0, 1),
             end: new Date(year, 11, 31, 23, 59, 59, 999),
-          });
+          };
+          const [{ total, knownTotal = null, unknownCoins = [], lastRecordDate, percentage, coins }, attribution] = await Promise.all([
+            calculateTotalProfit(yearRange),
+            fidelity ? queryAttribution(yearRange) : Promise.resolve(null),
+          ]);
 
-          return { total, knownTotal, unknownCoins, year, hasData: Boolean(lastRecordDate) };
+          return { total, knownTotal, unknownCoins, year, hasData: Boolean(lastRecordDate), percentage,
+            deposits: attribution?.attribution.totals.flowEffect,
+            count: { up: coins.filter((coin) => !stableCoins.has(coin.symbol) && coin.value !== null && coin.value > 0.005).length,
+              down: coins.filter((coin) => !stableCoins.has(coin.symbol) && coin.value !== null && coin.value < -0.005).length } };
         },
         { concurrency: 3 }
       );
@@ -346,6 +404,8 @@ const App = ({
             && new Date(selectedYear, month + 1, 1) > dateRange.start,
           gapDate: p.baselineDate && p.baselineDate < new Date(selectedYear, month - 1, 1)
             ? p.baselineDate : undefined,
+          percentage: p.percentage,
+          count: p.count,
           key: `m-profit-summary-${p.monthFirstDate.getTime()}`,
         };
       })
@@ -359,19 +419,24 @@ const App = ({
       noSnapshot: boolean;
       inRange: boolean;
       gapDate?: Date;
+      percentage?: number | null;
+      count?: PeriodCount;
       key: string;
     }[];
   }, [monthlyProfitsMap, loadedMonthlyKey, monthlyKey, selectedYear, dateRange.start, dateRange.end]);
 
   const yearCards = useMemo(() => {
-    return availableYears.map((year) => ({
+    return (fidelity ? [...availableYears].sort((a, b) => b - a) : availableYears).map((year) => ({
         year,
         total: yearlyProfitsMap[year] ? yearlyProfitsMap[year].total : 0,
         knownTotal: yearlyProfitsMap[year]?.knownTotal ?? null,
         unknownCoins: yearlyProfitsMap[year]?.unknownCoins ?? [],
         hasData: Boolean(yearlyProfitsMap[year]?.hasData),
+        percentage: yearlyProfitsMap[year]?.percentage,
+        count: yearlyProfitsMap[year]?.count,
+        deposits: yearlyProfitsMap[year]?.deposits,
       }));
-  }, [availableYears, yearlyProfitsMap]);
+  }, [availableYears, yearlyProfitsMap, fidelity]);
 
   const visibleSummaryStats = useMemo(() => {
     const data = summaryType === "month" ? monthCards.filter((item) => item.inRange) : yearCards;
@@ -406,6 +471,18 @@ const App = ({
       currency.symbol +
       simplifyNumber(currencyWrapper(currency)(Math.abs(value)))
     );
+  }
+
+  function fidelityAmount(value: number | null, decimals = 0) {
+    if (value === null) return "–";
+    return `${value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: decimals, maximumFractionDigits: decimals,
+    }).format(Math.abs(currencyWrapper(currency)(value)))}`;
+  }
+
+  function fidelityPercentage(value?: number | null) {
+    if (value === null || value === undefined) return "–";
+    return `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(2)}%`;
   }
 
   function gapHint(date: Date, year: number) {
@@ -453,6 +530,34 @@ const App = ({
       );
     }
 
+    if (fidelity) return (
+      oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.monthEmpty")}</div> :
+      <div className="fidelity-month-grid">
+        {monthCards.filter((item) => item.inRange).map((item) => {
+          const value = item.hasData ? item.total : null;
+          const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
+          return <div key={item.key} className="fidelity-month-card group">
+            <button type="button" className="fidelity-month-main" disabled={!item.hasData && !item.noSnapshot}
+              onClick={() => item.hasData ? onMonthClick(item.month) : setExplainedMonth(item.month)}
+              aria-label={item.noSnapshot ? `${item.label}: ${t("profitSummary.noSnapshot")}` : undefined}>
+              <span className="fidelity-month-head"><b>{item.label}</b><span>{item.month === dateRange.end.getMonth() && selectedYear === dateRange.end.getFullYear()
+                ? t("summary.fidelity.toDate").replace("{date}", `${dateRange.end.getDate()} ${item.label}`) : selectedYear}</span></span>
+              <span className={cn("fidelity-month-value", value == null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
+                {partial && item.knownTotal !== null ? `~${fidelityAmount(item.knownTotal)}` : fidelityAmount(value)}
+              </span>
+              <span className="fidelity-month-percent">{fidelityPercentage(item.percentage)}</span>
+              <span className="fidelity-month-bar"><i className={value != null && value < 0 ? "negative" : "positive"}
+                style={{ width: `${Math.min(50, Math.abs(item.percentage ?? 0) / 16 * 50)}%` }} /></span>
+              <span className="fidelity-month-count"><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{item.count?.up ?? 0} {t("summary.fidelity.up")}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{item.count?.down ?? 0} {t("summary.fidelity.down")}</span></span>
+            </button>
+            {item.noSnapshot && <span className={cn("fidelity-month-hint", explainedMonth === item.month ? "" : "hidden group-hover:block group-focus-within:block")}>{t("profitSummary.noSnapshot")}</span>}
+            {item.gapDate && <span className="fidelity-month-hint">{gapHint(item.gapDate, selectedYear)}</span>}
+            {partial && renderPartialInfo(item.unknownCoins, item.label, item.key)}
+          </div>;
+        })}
+      </div>
+    );
+
     return (
       <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
         {monthCards.map((item) => {
@@ -490,6 +595,21 @@ const App = ({
   }
 
   function renderYearSummary() {
+    if (fidelity) return oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.yearEmpty")}</div> : <div className="fidelity-year-stack">{yearCards.map((item) => {
+      const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
+      const span = yearSpan(item.year, dateRange.start, dateRange.end);
+      return <div className="fidelity-year-item group" key={item.year}><button type="button" className={cn("fidelity-year-card", item.year === selectedYear && "selected")}
+        onClick={() => setSelectedYear(item.year)}>
+        <span className="fidelity-year-head"><b>{item.year}</b><span>{getMonthAbbreviation(span.first)}–{getMonthAbbreviation(span.last)}</span></span>
+        <strong className={item.total == null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)}>
+          {partial && item.knownTotal !== null ? `~${fidelityAmount(item.knownTotal)}` : fidelityAmount(item.hasData ? item.total : null)}
+        </strong>
+        <span className={cn("fidelity-year-percent", item.total == null ? "text-muted-foreground" : getToneClass(item.total, quoteColor))}>{fidelityPercentage(item.percentage)}</span>
+        <span className="fidelity-year-deposits"><span>{t("summary.fidelity.deposits")}</span><span>{item.deposits == null ? "–" : fidelityAmount(item.deposits)}</span></span>
+        <span className="fidelity-year-foot"><span><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{item.count?.up ?? 0} {t("summary.fidelity.up")}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{item.count?.down ?? 0} {t("summary.fidelity.down")}</span></span><span>{span.last - span.first + 1} {t("summary.fidelity.months")}</span></span>
+      </button>{partial && renderPartialInfo(item.unknownCoins, String(item.year), `year-${item.year}`)}</div>;
+    })}</div>;
+
     return (
       <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
         {yearCards.map((item) => {
@@ -519,13 +639,23 @@ const App = ({
     );
   }
 
+  const statsRow = <div className={fidelity ? "sr-only" : "flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"}>
+    <span>{t(visibleSummaryStats.total < visibleSummaryStats.shown ? "profitSummary.periodsOf" : "profitSummary.periods")
+      .replace("{n}", String(visibleSummaryStats.total)).replace("{total}", String(visibleSummaryStats.shown))}</span>
+    {visibleSummaryStats.partial > 0 && <span>{t("profitSummary.partial").replace("{n}", String(visibleSummaryStats.partial))}</span>}
+    <span>{t("profitSummary.up").replace("{n}", String(visibleSummaryStats.up))}</span>
+    <span>{t("profitSummary.down").replace("{n}", String(visibleSummaryStats.down))}</span>
+    <span>{t("profitSummary.flat").replace("{n}", String(visibleSummaryStats.flat))}</span>
+  </div>;
   return (
-    <Card className="analyze-profit-summary min-h-[280px]">
+    <Card className={cn("analyze-profit-summary min-h-[280px]", fidelity && "fidelity-card fidelity-period-card", fidelity && initialType === "year" && "fidelity-year-section")}>
       <CardHeader className="space-y-2 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t("profitSummary.title")}
+          <CardTitle className={fidelity ? "" : "text-sm font-medium text-muted-foreground"}>
+            {fidelity ? t(initialType === "year" ? "summary.fidelity.byYear" : "summary.fidelity.profitSummary") : t("profitSummary.title")}
           </CardTitle>
+          {fidelity && <span className="fidelity-card-caption">{t(initialType === "year" ? "summary.fidelity.currentYear" : "summary.fidelity.monthsOf").replace("{year}", String(initialType === "year" ? dateRange.end.getFullYear() : selectedYear))}</span>}
+          {!fidelity && <>
           <div className="flex items-center gap-2">
             {summaryType === "month" && (
               <Select
@@ -554,18 +684,14 @@ const App = ({
               <ButtonGroupItem value="year">{t("profitSummary.year")}</ButtonGroupItem>
             </ButtonGroup>
           </div>
+          </>}
         </div>
+        {fidelity && statsRow}
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>{t(visibleSummaryStats.total < visibleSummaryStats.shown ? "profitSummary.periodsOf" : "profitSummary.periods")
-            .replace("{n}", String(visibleSummaryStats.total)).replace("{total}", String(visibleSummaryStats.shown))}</span>
-          {visibleSummaryStats.partial > 0 && <span>{t("profitSummary.partial").replace("{n}", String(visibleSummaryStats.partial))}</span>}
-          <span>{t("profitSummary.up").replace("{n}", String(visibleSummaryStats.up))}</span>
-          <span>{t("profitSummary.down").replace("{n}", String(visibleSummaryStats.down))}</span>
-          <span>{t("profitSummary.flat").replace("{n}", String(visibleSummaryStats.flat))}</span>
-        </div>
+        {!fidelity && statsRow}
         {summaryType === "month" ? renderMonthSummary() : renderYearSummary()}
+        {fidelity && initialType === "month" && !oneSnapshot && <p className="fidelity-caption">{moverNames ? t("summary.fidelity.periodNoteAssets").replace("{assets}", moverNames) : t("summary.fidelity.periodNote")}</p>}
       </CardContent>
     </Card>
   );

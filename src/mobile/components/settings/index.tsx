@@ -27,7 +27,9 @@ import {
 import { LOCALE_LABELS, useTranslation } from "@/mobile/i18n";
 import { isIOS } from "@/utils/platform";
 import { SplitView, useHaptics, useSizeClass } from "@/mobile/components/mobile";
-import { getCachedPreferCurrency } from "@/middlelayers/configuration";
+import { getBlacklistCoins, getCachedPreferCurrency, loadAIConfig } from "@/middlelayers/configuration";
+import { isProVersion } from "@/middlelayers/license";
+import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { useTheme } from "@/mobile/components/common/theme";
 import AssistantSettings from "@/mobile/components/settings/assistant";
 import { SettingsMenu } from "@/components/settings/settings-menu";
@@ -115,15 +117,51 @@ const App = () => {
   const isWide = useSizeClass().width === "wide";
   const lo = useLocation();
   const [topBar, setTopBar] = useState<HTMLElement | null>(null);
+  const [menuValues, setMenuValues] = useState<Record<string, string>>({});
   useEffect(() => setTopBar(document.getElementById("app-top-bar")), []);
+  useEffect(() => {
+    if (!isIOS() || lo.pathname !== "/settings") return;
+    let live = true;
+    const put = (key: string, value: string) => {
+      if (live) setMenuValues((current) => ({ ...current, [key]: value }));
+    };
+    void getBlacklistCoins().then((symbols) =>
+      put("blacklist", t("fidelity.settings.menu.hidden").replace("{count}", String(symbols.length)))).catch(() => {});
+    void isProVersion().then((license) => {
+      if (license.isPro) put("pro", t("fidelity.settings.menu.pro"));
+    }).catch(() => {});
+    void loadAIConfig().then(() => put("ai", t("fidelity.settings.menu.on"))).catch(() => {});
+    const syncMenuValue = () => setMenuValues((current) => {
+      if (!live) return current;
+      const next = { ...current };
+      if (syncRuntime.getSettings().enabled) next.sync = t("fidelity.settings.menu.on");
+      else delete next.sync;
+      return next;
+    });
+    syncMenuValue();
+    const unsubscribe = syncRuntime.subscribe(syncMenuValue);
+    return () => { live = false; unsubscribe(); };
+  }, [lo.pathname, t]);
   if (isIOS()) {
     const isHub = lo.pathname === "/settings";
     const selectedHref = mobileSettings.find((item) =>
       item.href === `${lo.pathname}${lo.search}`)?.href ??
       mobileSettings.find((item) => item.href.split("?")[0] === lo.pathname)?.href;
-    const title = mobileSettings.find((item) => item.href === selectedHref)?.key;
+    const title = lo.pathname === "/settings/systemInfo" && lo.search.includes("section=pro")
+      ? "fidelity.b.pro.pageTitle"
+      : lo.pathname === "/settings/data" && lo.search.includes("section=backup")
+        ? "fidelity.b.backup.pageTitle"
+      : lo.pathname === "/settings/sync"
+        ? "fidelity.b.sync.pageTitle"
+      : lo.pathname === "/settings/configuration" && lo.search.includes("currency")
+      ? "fidelity.settings.currency.title"
+      : mobileSettings.find((item) => item.href === selectedHref)?.key;
+    const subtitle = lo.pathname === "/settings/appearance"
+      ? lo.search.includes("language") ? t("fidelity.settings.language.subtitle") : t("fidelity.settings.appearance.subtitle")
+      : lo.pathname === "/settings/configuration" && lo.search.includes("currency")
+        ? t("fidelity.settings.currency.subtitle") : undefined;
     return (
-      <div className="ios-d3-settings mx-auto w-full min-w-0 pb-6">
+      <div className={`ios-d3-settings mx-auto w-full min-w-0 pb-6${isHub ? " fidelity-settings-hub" : ""}`}>
         {topBar && createPortal(
           <span className="ios-d3-pushed-title">{t(title ?? "settings.title")}</span>,
           topBar)}
@@ -136,12 +174,19 @@ const App = () => {
                 currency: getCachedPreferCurrency() ?? "USD",
                 language: LOCALE_LABELS[locale],
                 appearance: theme === "system" ? t("settings.mobile.system") : t(`appearance.theme.${theme}`),
-              }} />
+                ...menuValues,
+              }} mobileFidelity />
             </div>
           </> : null}
           detail={isHub ? <p className="analytics-empty">{t("settings.selectDetail")}</p> : <>
             <header className="space-y-3 pt-1">
-              <h1 className="ios-large-title mb-5">{t(title ?? "settings.title")}</h1>
+              <h1 className="ios-large-title mb-5"
+                aria-label={title === "fidelity.b.pro.pageTitle" ? t("fidelity.b.pro.pageTitle")
+                  : title === "fidelity.b.backup.pageTitle" ? t("fidelity.b.backup.pageTitle")
+                  : title === "fidelity.b.sync.pageTitle" ? t("fidelity.b.sync.pageTitle") : undefined}>
+                {t(title ?? "settings.title")}
+              </h1>
+              {subtitle && <p className="fidelity-settings-subtitle">{subtitle}</p>}
             </header>
             <div className="ios-d3-settings-page"><Outlet context={new URLSearchParams(lo.search).get("section")} /></div>
           </>} />

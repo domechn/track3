@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DesktopIndicator from "./sync-status-indicator";
+import { SyncStatusIndicatorView } from "./sync-status-indicator";
 import MobileIndicator from "@/mobile/components/sync-status-indicator";
+import mobileEn from "@/mobile/en.json";
 import { syncRuntime, type RuntimeStatus } from "@/middlelayers/sync/runtime";
 import type { SyncReport } from "@/middlelayers/sync/engine";
 
@@ -27,6 +29,7 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
     disable: vi.fn(async () => publish({ mode: "disabled", sync: { phase: "idle" } })),
     unlock: vi.fn(async () => "ok"),
     syncNow: vi.fn(),
+    getSettings: vi.fn(() => ({ endpoint: "https://fixture.r2.cloudflarestorage.com", bucket: "sync-fixture" })),
   },
 }));
 
@@ -45,6 +48,7 @@ beforeEach(() => {
   state.prompted = false;
   vi.clearAllMocks();
 });
+afterEach(() => { window.location.hash = ""; });
 
 describe.each([
   ["desktop", DesktopIndicator],
@@ -189,4 +193,58 @@ describe.each([
     fireEvent.click(screen.getByRole("button", { name: "Unlock sync" }));
     await waitFor(() => expect(syncRuntime.unlock).toHaveBeenCalledWith("secret"));
   });
+});
+
+it("shows the phone first-sync sheet with its status and settings action", () => {
+  window.location.hash = "#/settings/sync";
+  publish({ mode: "ready", sync: { phase: "idle", report: { ...zeroReport,
+    devices: [{ id: "remote", name: "iPhone", lastUpload: "2026-10-30T22:07:00Z" }] } } });
+  render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
+  fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("Never synced");
+  expect(screen.getByRole("dialog")).toHaveTextContent("Nothing has been uploaded from this device yet.");
+  expect(screen.getByRole("dialog").querySelector("a[href='#/settings/sync']")).toHaveTextContent("Settings");
+});
+
+it("shows phone upload progress with elapsed time and remaining items", () => {
+  window.location.hash = "#/settings/sync";
+  publish({ mode: "ready", sync: {
+    phase: "syncing", startedAt: Date.now() - 134_000,
+    progress: { phase: "push", completed: 1240, total: 4567 },
+  } });
+  render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
+  fireEvent.click(screen.getByRole("button", { name: "Syncing" }));
+  const sheet = screen.getByRole("dialog");
+  expect(sheet).toHaveTextContent("Uploading");
+  expect(sheet).toHaveTextContent("Uploading 1,240 / 4,567");
+  expect(sheet).toHaveTextContent("02:14");
+  expect(sheet).toHaveTextContent("3,327");
+  expect(sheet).toHaveTextContent("about 6 min");
+  expect(sheet).not.toHaveTextContent("Started:");
+  expect(sheet).not.toHaveTextContent("Settings");
+});
+
+it("shows the phone successful sheet with last upload and inline details", () => {
+  window.location.hash = "#/settings/sync";
+  publish({ mode: "ready", sync: { phase: "idle", report: { ...zeroReport, pushed: 312,
+    devices: [{ id: "remote", name: "iPhone", lastUpload: "2026-10-28T12:00:00Z" }] }, lastSync: previous } });
+  render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
+  fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+  const sheet = screen.getByRole("dialog");
+  expect(sheet).toHaveTextContent("Last upload");
+  expect(sheet).toHaveTextContent("Cloudflare R2 · sync-fixture");
+  expect(sheet.querySelector(".fidelity-sync-sheet-actions details")).toBeInTheDocument();
+  expect(sheet.querySelector(".fidelity-sync-sheet-actions")).not.toHaveTextContent("Settings");
+});
+
+it("shows the known failure in expanded phone diagnostics", () => {
+  window.location.hash = "#/settings/sync";
+  publish({ mode: "ready", sync: { phase: "error", error: "bucket", report: zeroReport } });
+  render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
+  fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
+  const details = screen.getByRole("dialog").querySelector("details");
+  expect(details).toHaveAttribute("open");
+  expect(details).toHaveTextContent("Bucket not found");
+  expect(details).not.toHaveTextContent("None");
+  expect(screen.getByRole("dialog").querySelector(".fidelity-sync-sheet-actions")).toHaveTextContent("Retry now");
 });

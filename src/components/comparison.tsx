@@ -29,14 +29,21 @@ import {
 } from "@/utils/assets";
 import {
   CalendarIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClockIcon,
   EyeClosedIcon,
   EyeOpenIcon,
 } from "@radix-ui/react-icons";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { isSameDay } from "date-fns";
+import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { useTranslation } from "@/i18n";
 import ComparisonMoversPanel from "./comparison-movers-panel";
+import ComparisonFidelity from "./comparison-fidelity";
+import { useWindowSize } from "@/utils/hook";
+import { TRANSACTION_HANDLER } from "@/middlelayers/entities/transactions";
 
 type MetricRow = {
   base: number;
@@ -52,7 +59,7 @@ type CoinComparison = {
   value: MetricRow;
 };
 
-type QuickCompareType = "7D" | "1M" | "1Y" | "YTD" | "ALL";
+type QuickCompareType = "1D" | "7D" | "1M" | "SOM" | "1Y" | "YTD" | "ALL";
 
 type DateOption = {
   label: string;
@@ -70,6 +77,8 @@ const App = ({
   quoteColor: QuoteColor;
 }) => {
   const { t } = useTranslation();
+  const windowSize = useWindowSize();
+  const wide = (windowSize.width ?? window.innerWidth) >= 1400;
   const [pageLoading, setPageLoading] = useState(true);
   const loadGenRef = useRef(0);
 
@@ -110,6 +119,7 @@ const App = ({
   const [headData, setHeadData] = useState<Asset[]>([]);
 
   const [shouldMaskValue, setShouldMaskValue] = useState<boolean>(false);
+  const [noTransactionsBetween, setNoTransactionsBetween] = useState(false);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const dataChangedVersion = useDataChangedVersion();
   const downloadedLogosRef = useRef<Set<string>>(new Set());
@@ -186,7 +196,11 @@ const App = ({
         if (prev && options.some((o) => o.value === prev)) {
           return prev;
         }
-        return options[1]?.value || options[0].value;
+        const latest = options[0];
+        if (options[1]?.label === latest.label) return options[1].value;
+        const target = parseDateToTS(latest.label) - 30 * 86400000;
+        return [...options].sort((a, b) =>
+          Math.abs(parseDateToTS(a.label) - target) - Math.abs(parseDateToTS(b.label) - target))[0]?.value ?? latest.value;
       });
       setHeadId((prev) => {
         if (prev && options.some((o) => o.value === prev)) {
@@ -342,12 +356,14 @@ const App = ({
       return;
     }
 
-    const latestDate = dateOptions[0];
+    const latestDate = dateOptions.find((option) => option.value === headId) ?? dateOptions[0];
     setHeadId(latestDate.value);
 
     const days = parseDaysQuickCompareType(currentQuickCompare);
-    const targetBaseDate =
-      days >= 0
+    const targetBaseDate = currentQuickCompare === "SOM"
+      ? new Date(new Date(parseDateToTS(latestDate.label)).getFullYear(),
+        new Date(parseDateToTS(latestDate.label)).getMonth(), 1)
+      : days >= 0
         ? new Date(parseDateToTS(latestDate.label) - days * 24 * 60 * 60 * 1000)
         : new Date(0);
 
@@ -361,10 +377,12 @@ const App = ({
     if (closestDate) {
       setBaseId(closestDate.value);
     }
-  }, [currentQuickCompare, dateOptions]);
+  }, [currentQuickCompare, dateOptions, headId]);
 
   function parseDaysQuickCompareType(type: QuickCompareType): number {
     switch (type) {
+      case "1D":
+        return 1;
       case "7D":
         return 7;
       case "1M":
@@ -381,6 +399,8 @@ const App = ({
       }
       case "ALL":
         return -1;
+      case "SOM":
+        return 0;
       default:
         return 0;
     }
@@ -499,9 +519,68 @@ const App = ({
   }
 
   const hasData = coinComparisons.length > 0;
+  const baseOption = dateOptions.find((option) => option.value === baseId);
+  const headOption = dateOptions.find((option) => option.value === headId);
+  const selectionMonth = headOption ? new Date(parseDateToTS(headOption.label)) : undefined;
+  const snapshotCount = selectionMonth
+    ? dateOptions.filter((option) => {
+      const date = new Date(parseDateToTS(option.label));
+      return date.getFullYear() === selectionMonth.getFullYear() && date.getMonth() === selectionMonth.getMonth();
+    }).length : dateOptions.length;
+  useEffect(() => {
+    if ((windowSize.width ?? window.innerWidth) < 1400 || !baseOption || !headOption) {
+      setNoTransactionsBetween(false);
+      return;
+    }
+    let active = true;
+    setNoTransactionsBetween(false);
+    const baseTime = new Date(baseOption.createdAt ?? parseDateToTS(baseOption.label)).getTime();
+    const headTime = new Date(headOption.createdAt ?? parseDateToTS(headOption.label)).getTime();
+    void TRANSACTION_HANDLER.listTransactionsByDateRange(
+      new Date(Math.min(baseTime, headTime)), new Date(Math.max(baseTime, headTime)),
+    ).then((groups) => { if (active) setNoTransactionsBetween(groups.flat().length === 0); })
+      .catch(() => { if (active) setNoTransactionsBetween(false); });
+    return () => { active = false; };
+  }, [baseOption?.value, headOption?.value, dataChangedVersion, windowSize.width]);
 
   return (
     <div className="analyze-comparison relative min-h-[400px]" aria-busy={pageLoading}>
+      {wide && <ComparisonFidelity
+        currency={currency}
+        quoteColor={quoteColor}
+        rows={coinComparisons}
+        baseOption={baseOption}
+        headOption={headOption}
+        basePicker={<ComparisonDatePicker label={t("comparison.fidelity.snapshotA")} value={baseId}
+          dateOptions={dateOptions} onChange={onBaseDateChange} fidelity
+          comparisonOption={headOption} selectedTotal={totalValue.base} currency={currency} masked={shouldMaskValue} />}
+        headPicker={<ComparisonDatePicker label={t("comparison.fidelity.snapshotB")} value={headId}
+          dateOptions={dateOptions} onChange={onHeadDateChange} fidelity
+          comparisonOption={baseOption} selectedTotal={totalValue.head} currency={currency} masked={shouldMaskValue} />}
+        baseTotal={totalValue.base}
+        headTotal={totalValue.head}
+        snapshotCount={snapshotCount}
+        noTransactions={noTransactionsBetween}
+        quickRange={currentQuickCompare ?? (baseOption && headOption
+          && Math.round((parseDateToTS(headOption.label) - parseDateToTS(baseOption.label)) / 86400000) === 30 ? "1M" : "")}
+        onQuickRange={onQuickCompareButtonClick}
+        onSwap={() => {
+          clearAssistantComparisonDates();
+          setCurrentQuickCompare(null);
+          setBaseId(headId);
+          setHeadId(baseId);
+        }}
+        mask={shouldMaskValue}
+        onToggleMask={onViewOrHideClick}
+        onCopy={() => {
+          const content = [
+            `${baseOption?.displayLabel ?? ""} → ${headOption?.displayLabel ?? ""}`,
+            ...coinComparisons.map((row) => `${row.symbol}: ${formatVal(row.value.base, "value")} → ${formatVal(row.value.head, "value")}`),
+          ].join("\n");
+          void navigator.clipboard?.writeText(content);
+        }}
+      />}
+      {!wide && <div className="t3-cmp-legacy">
       <h1 className="mb-4 text-[26px] font-semibold">{t("comparison.h1")}</h1>
       <StaggerContainer className="space-y-3">
         <FadeUp>
@@ -691,6 +770,7 @@ const App = ({
           </>
         )}
       </StaggerContainer>
+      </div>}
       {pageLoading && (
         <PageLoadingOverlay
           title={t("loading.comparison")}
@@ -706,15 +786,27 @@ function ComparisonDatePicker({
   value,
   dateOptions,
   onChange,
+  fidelity = false,
+  comparisonOption,
+  selectedTotal,
+  currency,
+  masked = false,
 }: {
   label: string;
   value: string;
   dateOptions: DateOption[];
   onChange: (value: string) => void;
+  fidelity?: boolean;
+  comparisonOption?: DateOption;
+  selectedTotal?: number;
+  currency?: CurrencyRateDetail;
+  masked?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "zh" ? "zh-CN" : "en-GB";
   const [open, setOpen] = useState(false);
   const [activeDateLabel, setActiveDateLabel] = useState<string | undefined>();
+  const [shownMonth, setShownMonth] = useState<Date>(new Date());
   const selectedOption = useMemo(
     () => dateOptions.find((item) => item.value === value),
     [dateOptions, value],
@@ -722,6 +814,9 @@ function ComparisonDatePicker({
   const selectedDate = selectedOption
     ? dateOptionToDate(selectedOption)
     : undefined;
+  const fidelityTime = (option?: DateOption) => option?.createdAt
+    ? new Date(option.createdAt).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit", hour12: false })
+    : option?.snapshotLabel ?? "—";
   const optionsByDate = useMemo(
     () =>
       dateOptions.reduce(
@@ -755,6 +850,7 @@ function ComparisonDatePicker({
   useEffect(() => {
     if (open) {
       setActiveDateLabel(selectedOption?.label);
+      if (selectedDate) setShownMonth(selectedDate);
     }
   }, [open, selectedOption?.label]);
 
@@ -787,6 +883,11 @@ function ComparisonDatePicker({
   function isDayDisabled(day: Date) {
     return !selectableDates.some((date) => isSameDay(date, day));
   }
+  const monthDays = eachDayOfInterval({
+    start: startOfWeek(startOfMonth(shownMonth), { weekStartsOn: 1 }),
+    end: endOfWeek(endOfMonth(shownMonth), { weekStartsOn: 1 }),
+  });
+  const activeSnapshotOptions = activeDateLabel ? optionsByDate[activeDateLabel] ?? [] : [];
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -794,17 +895,74 @@ function ComparisonDatePicker({
         <Button
           type="button"
           variant="outline"
-          className="w-[150px] touch:w-[min(150px,100%)] justify-start gap-2 px-3 font-normal"
+          className={fidelity ? "t3-cmp-picker-trigger" : "w-[150px] touch:w-[min(150px,100%)] justify-start gap-2 px-3 font-normal"}
           disabled={dateOptions.length === 0}
         >
-          <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          {fidelity ? <ClockIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+            : <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />}
           <span className="sr-only">{label}: </span>
           <span className="truncate">
-            {selectedOption?.displayLabel || label}
+            {fidelity && selectedOption
+              ? new Date(parseDateToTS(selectedOption.label)).toLocaleDateString(dateLocale,
+                { day: "numeric", month: "short", year: "numeric" })
+              : selectedOption?.displayLabel || label}
           </span>
+          {fidelity && selectedOption && <span className="t3-cmp-picker-detail">
+            {fidelityTime(selectedOption)} · {masked ? "***" : currency?.symbol}{masked ? "" : selectedTotal === undefined || !currency ? "—" :
+              Math.round(currencyWrapper(currency)(selectedTotal)).toLocaleString("en-US")}
+          </span>}
+          {fidelity && <ChevronDownIcon className="t3-cmp-chevron" aria-hidden="true" />}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className={fidelity ? "t3-cmp-picker-popover" : "w-auto p-0"} align="start" sideOffset={6}>
+        {fidelity ? <div className="t3-cmp-calendar">
+          <div className="t3-cmp-calendar-head">
+            <button type="button" aria-label={t("comparison.fidelity.previousMonth")}
+              onClick={() => setShownMonth((month) => addMonths(month, -1))}><ChevronLeftIcon /></button>
+            <strong>{shownMonth.toLocaleDateString(dateLocale, { month: "long", year: "numeric" })}</strong>
+            <button type="button" aria-label={t("comparison.fidelity.nextMonth")}
+              disabled={selectableDates.length === 0 || shownMonth.getFullYear() * 12 + shownMonth.getMonth() >=
+                Math.max(...selectableDates.map((date) => date.getFullYear() * 12 + date.getMonth()))}
+              onClick={() => setShownMonth((month) => addMonths(month, 1))}><ChevronRightIcon /></button>
+          </div>
+          <div className="t3-cmp-calendar-weekdays">
+            {Array.from({ length: 7 }, (_, index) => {
+              const day = new Date(2026, 10, 2 + index);
+              return <span key={index}>{locale === "zh"
+                ? day.toLocaleDateString(dateLocale, { weekday: "short" })
+                : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"][index]}</span>;
+            })}
+          </div>
+          <div className="t3-cmp-calendar-days">
+            {monthDays.map((day) => {
+              const available = !isDayDisabled(day);
+              const selected = selectedDate && isSameDay(day, selectedDate);
+              const compared = comparisonOption && isSameDay(day, dateOptionToDate(comparisonOption));
+              const selectedTime = selectedDate?.getTime() ?? 0;
+              const comparedTime = comparisonOption ? dateOptionToDate(comparisonOption).getTime() : selectedTime;
+              const inRange = available && day.getTime() > Math.min(selectedTime, comparedTime)
+                && day.getTime() < Math.max(selectedTime, comparedTime);
+              return <button key={day.toISOString()} type="button"
+                disabled={!available} className={`${!isSameMonth(day, shownMonth) ? "outside" : ""} ${selected ? "selected" : ""} ${compared ? "compared" : ""} ${inRange ? "inrange" : ""} ${available ? "available" : ""}`}
+                aria-label={day.toLocaleDateString(dateLocale, { year: "numeric", month: "long", day: "numeric" })}
+                onClick={() => onDateSelect(day)}>{day.getDate()}</button>;
+            })}
+          </div>
+          <div className="t3-cmp-calendar-legend"><span><i />{t("comparison.fidelity.hasSnapshot")}</span>
+            <span>{t("comparison.fidelity.noSnapshot")}</span></div>
+          <div className="t3-cmp-calendar-snapshots">
+            {activeSnapshotOptions.map((option) => <button type="button" key={option.value}
+              className={option.value === value ? "selected" : ""}
+              onClick={() => onSnapshotSelect(option)}>
+              <span>{new Date(parseDateToTS(option.label)).toLocaleDateString(dateLocale,
+                { day: "numeric", month: "short", year: "numeric" })}, {fidelityTime(option)}</span>
+              {option.value === value && selectedTotal !== undefined && currency
+                ? masked ? <span>***</span>
+                  : <span>{currency.symbol}{currencyWrapper(currency)(selectedTotal).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                : null}
+            </button>)}
+          </div>
+        </div> : <>
         <Calendar
           mode="single"
           selected={calendarSelectedDate}
@@ -852,6 +1010,7 @@ function ComparisonDatePicker({
             </div>
           </div>
         )}
+        </>}
       </PopoverContent>
     </Popover>
   );

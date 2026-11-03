@@ -12,6 +12,8 @@ const reportCounts = {
   profit: 0,
   walletAssetsPercentage: 0,
   walletAssetsChange: 0,
+  summaryProfitLoss: 0,
+  summaryMarketCard: 0,
 };
 
 function createReporter(key: keyof typeof reportCounts) {
@@ -30,6 +32,14 @@ function createReporter(key: keyof typeof reportCounts) {
 
 vi.mock("@/components/ath-value", () => ({
   default: createReporter("athValue"),
+}));
+
+vi.mock("@/components/summary-profit-loss", () => ({
+  default: createReporter("summaryProfitLoss"),
+}));
+
+vi.mock("@/components/summary-market-card", () => ({
+  default: createReporter("summaryMarketCard"),
 }));
 
 vi.mock("@/components/profit-metrics", () => ({
@@ -65,6 +75,7 @@ const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
 beforeEach(() => {
   vi.useRealTimers();
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
   Object.keys(reportCounts).forEach((key) => {
     reportCounts[key as keyof typeof reportCounts] = 0;
   });
@@ -83,20 +94,20 @@ describe("Summary page shell", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: /summary/i })).toBeInTheDocument();
-    expect(screen.getByText(/loading summary data/i).closest('[role="status"]'))
-      .toHaveTextContent(/loading summary data/i);
+    expect(screen.getByRole("status", { name: /reading snapshots/i }))
+      .toBeInTheDocument();
 
     vi.advanceTimersByTime(9000);
 
-    expect(screen.getByText(/loading summary data/i).closest('[role="status"]'))
-      .toHaveTextContent(/loading summary data/i);
+    expect(screen.getByRole("status", { name: /reading snapshots/i }))
+      .toBeInTheDocument();
   });
 
   it("clears the loading status after summary sections report loaded", async () => {
     reportCounts.athValue = 1;
-    reportCounts.profitMetrics = 1;
+    reportCounts.summaryProfitLoss = 1;
     reportCounts.profitSummary = 1;
-    reportCounts.profit = 1;
+    reportCounts.summaryMarketCard = 1;
 
     render(
       <Summary

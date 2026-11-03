@@ -69,6 +69,7 @@ import { useTranslation } from "@/i18n";
 import { ScrollArea } from "./ui/scroll-area";
 import HistoryEditLog from "./history-edit-log";
 import { HistoryPartialDetails, HistoryPartialPill } from "./history-partial";
+import HistoricalDataDesktop from "./historical-data-desktop";
 
 type RankData = {
   id: number;
@@ -433,7 +434,14 @@ const App = ({
             afterDataChanged("undoDeletion", uuid, undefined);
           }
         },
-        successMessage: t("history.deleted"),
+        successTitle: t("history.fidelity.snapshotDeleted"),
+        successMessage: t("history.fidelity.snapshotRemoved").replace("{date}", (() => {
+          const date = new Date(removed.createdAt);
+          const tag = locale === "zh" ? "zh-CN" : "en-GB";
+          return `${date.toLocaleDateString(tag, { day: "numeric", month: "short" })} ${date.toLocaleTimeString(tag, {
+            hour: "2-digit", minute: "2-digit", hour12: false,
+          })}`;
+        })()),
         undoLabel: t("common.undo"),
         undoAltText: t("history.undoDelete"),
         undoWindowMs: 5000,
@@ -1092,9 +1100,14 @@ const App = ({
 
                 {emptyState ? (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <p className="text-lg text-muted-foreground">
-                      {t("history.noRecords")}
-                    </p>
+                    <section className="fidelity-card fidelity-history-empty text-center">
+                      <h2>{t("history.fidelity.noSnapshots")}</h2>
+                      <p>{t("history.fidelity.noSnapshotsHint")}</p>
+                      <Button type="button" className="mt-3" onClick={() =>
+                        document.querySelector<HTMLButtonElement>(".t3-refresh-button")?.click()}>
+                        {t("history.fidelity.refreshNow")}
+                      </Button>
+                    </section>
                   </div>
                 ) : null}
               </div>
@@ -1106,4 +1119,18 @@ const App = ({
   );
 };
 
-export default App;
+export default function HistoricalDataPage(props: Parameters<typeof App>[0]) {
+  const [desktop, setDesktop] = useState(() => window.matchMedia?.("(min-width: 761px)").matches ?? false);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 761px)");
+    const changed = () => {
+      // Chromium briefly reports a 1 × 1 viewport during full-page captures.
+      // Keep the current layout while the window has no usable content width.
+      if (window.innerWidth < 320) return;
+      setDesktop(media.matches);
+    };
+    media.addEventListener("change", changed);
+    return () => media.removeEventListener("change", changed);
+  }, []);
+  return desktop ? <HistoricalDataDesktop {...props} /> : <App {...props} />;
+}

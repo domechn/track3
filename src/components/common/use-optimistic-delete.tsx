@@ -1,5 +1,6 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import { ToastAction } from "@/components/ui/toast";
+import { CheckIcon, ResetIcon } from "@radix-ui/react-icons";
 import { useToast } from "@/components/ui/use-toast";
 import { recordSnapshotDeleted, recordSnapshotUndone } from "@/middlelayers/sync/delete-hook";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -14,6 +15,7 @@ type DeleteOptions<T, Result> = {
   onUndone?: () => void;
   successMessage: string;
   successTitle?: string;
+  successDetail?: string;
   undoLabel: string;
   undoAltText: string;
   undoWindowMs: number;
@@ -34,6 +36,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
     onUndone,
     successMessage,
     successTitle,
+    successDetail,
     undoLabel,
     undoAltText,
     undoWindowMs,
@@ -57,11 +60,13 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
       
       onDeleted?.(result);
       toast({
-        ...(successTitle ? { title: successTitle } : {}),
-        description: successMessage,
+        className: successDetail ? "fidelity-history-undo-toast" : undefined,
+        title: successTitle ?? (successDetail ? <span className="fidelity-undo-title"><CheckIcon aria-hidden="true" />{successMessage}</span> : undefined),
+        description: successDetail ?? successMessage,
         duration: undoWindowMs,
         action: (
           <ToastAction
+            className={successDetail ? "fidelity-undo-action" : undefined}
             altText={undoAltText}
             onClick={() => {
               if (syncTimer) clearTimeout(syncTimer);
@@ -77,6 +82,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
                 });
             }}
           >
+            {successDetail && <ResetIcon aria-hidden="true" />}
             {undoLabel}
           </ToastAction>
         ),

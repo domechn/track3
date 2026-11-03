@@ -109,14 +109,14 @@ others:
       VALUES (?, ?, ?, ?, 1, '2026-10-31T09:30:00.000Z')`, [currency, alias, symbol, rate]);
   }
   const identities = [
-    ["Binance", md5(`binance-${binanceKey}`)],
-    ["OKX", md5(`okex-${okxKey}`)],
-    ["Ledger cold wallet", md5(ledger)],
-    ["0x4f…a91c", md5(ethereum)],
-    ["Interactive Brokers", md5(`ibkr:${queryId}`)],
+    ["Binance", md5(`binance-${binanceKey}`), md5("binance-fidelity-binance-key")],
+    ["OKX", md5(`okex-${okxKey}`), md5("okex-fidelity-okx-key")],
+    ["Ledger cold wallet", md5(ledger), md5("bc1qfidelityledgerwallet")],
+    ["0x4f…a91c", md5(ethereum), md5("0x4f0000000000000000000000000000000000a91c")],
+    ["Interactive Brokers", md5(`ibkr:${queryId}`), md5("ibkr:fidelity-query")],
   ];
-  for (const [name, identity] of identities) {
-    await settingsASql(page, "UPDATE assets_v2 SET wallet = ? WHERE wallet = ?", [identity, name]);
+  for (const [name, identity, seededIdentity] of identities) {
+    await settingsASql(page, "UPDATE assets_v2 SET wallet = ? WHERE wallet IN (?, ?)", [identity, name, seededIdentity]);
   }
   return bridge;
 }

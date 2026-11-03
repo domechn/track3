@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { isValidElement, useCallback, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
@@ -166,11 +166,26 @@ const components: Components = {
   pre: ({ children }) => <>{children}</>,
 };
 
-export default function MarkdownRenderer({ content }: { content: string }) {
+function plainText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(plainText).join("");
+  return isValidElement<{ children?: ReactNode }>(node) ? plainText(node.props.children) : "";
+}
+
+export default function MarkdownRenderer({ content, signedValues = false }: { content: string; signedValues?: boolean }) {
+  const renderers: Components = signedValues ? {
+    ...components,
+    td: ({ children }) => {
+      const text = plainText(children);
+      const sign = /^[+＋]/.test(text) ? "fidelity-signed-positive"
+        : /^[−-]/.test(text) ? "fidelity-signed-negative" : "";
+      return <td className={`px-3 py-2 text-sm text-foreground/80 ${sign}`}>{children}</td>;
+    },
+  } : components;
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      components={components}
+      components={renderers}
     >
       {content}
     </ReactMarkdown>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/i18n";
+import { useDarkTheme } from "./common/theme";
 import {
   ALERTS_CHANGED_EVENT, acknowledgeAlert, acknowledgeAllAlerts, clearAlertHistory,
   countUnreadAlerts, deleteAlertRule, listAlertHistory, listAlertRules, loadAlertEvaluationData,
@@ -11,6 +12,7 @@ import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlel
 import { formatAlert } from "@/middlelayers/alert-notifications";
 import type { RebalanceProfile } from "@/middlelayers/rebalance";
 import type { AssetType } from "@/middlelayers/datafetch/types";
+import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { alertRuleFromDraft, alertDraftFromRule, needsAsset, needsWindow, type AlertDraft } from "@/middlelayers/ui-state/alert-draft";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { Button } from "./ui/button";
@@ -29,6 +31,7 @@ import {
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+import GoalsDesktop from "./goals-desktop";
 
 const emptyDraft: AlertDraft = {
   id: 0, kind: "total_value_target", assetType: "crypto", symbol: "",
@@ -47,8 +50,16 @@ const ruleIcons = {
 const historySeverity = (kind: AlertKind) =>
   kind === "period_pnl" || kind === "portfolio_value_change" ? "high" : kind === "allocation_deviation" || kind === "asset_price_move" ? "medium" : "low";
 
-export default function GoalsAlerts() {
+export default function GoalsAlerts({ currency, isProUser }: { currency?: CurrencyRateDetail; isProUser?: boolean }) {
   const { t, locale } = useTranslation();
+  const darkTheme = useDarkTheme();
+  const [wideDesktop, setWideDesktop] = useState(() => window.innerWidth >= 1500);
+  const [desktopEditorOpen, setDesktopEditorOpen] = useState(false);
+  useEffect(() => {
+    const onResize = () => setWideDesktop(window.innerWidth >= 1500);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const dataChangedVersion = useDataChangedVersion();
   const [draft, setDraft] = useState<AlertDraft>(emptyDraft);
   const [rules, setRules] = useState<AlertRule[]>([]);
@@ -118,6 +129,7 @@ export default function GoalsAlerts() {
       setValidationField(null);
       setStatus(t("goals.saved"));
       setManualOpen(false);
+      setDesktopEditorOpen(false);
       if (rules.length === 0) newRuleButton.current?.focus();
       await reload();
     } catch (cause) {
@@ -135,6 +147,7 @@ export default function GoalsAlerts() {
     setDraft(nextDraft);
     setStatus("");
     setManualOpen(true);
+    setDesktopEditorOpen(true);
     if (rules.length === 0) requestAnimationFrame(() => document.getElementById("goal-rule-editor")?.scrollIntoView?.({ behavior: "smooth" }));
   }
 
@@ -228,6 +241,25 @@ export default function GoalsAlerts() {
       </CardContent>
     </Card>
   );
+
+  const removeRule = deleteAlertRule;
+  if (wideDesktop && darkTheme) return <GoalsDesktop
+    rules={rules} history={history} unreadCount={unreadCount} snapshots={snapshots} prices={prices}
+    targets={targets} loading={loading} error={error} status={status} draft={draft} currencySymbol={currency?.symbol}
+    editorOpen={desktopEditorOpen} onDraft={setDraft} onEditorOpen={setDesktopEditorOpen}
+    onEditorCloseFocus={() => editorTrigger.current?.focus()}
+    onEdit={edit} onAdd={(trigger) => openEditor({ ...emptyDraft, cooldownMinutes: "1440" }, trigger)}
+    onSave={() => void save()}
+    onToggle={(rule, enabled) => void mutate(() => setAlertRuleEnabled(rule.id, enabled))}
+    onDelete={(rule) => void mutate(() => removeRule(rule.id))}
+    onAcknowledge={(id) => void mutate(() => acknowledgeAlert(id))}
+    onAcknowledgeAll={() => void mutate(acknowledgeAllAlerts)}
+    onClear={() => void mutate(clearAlertHistory)}
+    notificationsEnabled={notificationsEnabled} isProUser={isProUser}
+    onEnableNotifications={() => void enableSystemNotifications().then((allowed) => {
+      setNotificationsEnabled(allowed);
+      setStatus(t(allowed ? "goals.notificationEnabled" : "goals.notificationFallback"));
+    })} />;
 
   return (
     <div className="t3-manage-goals mx-auto gap-4 pb-8">

@@ -7,7 +7,7 @@ import { queryLastAssetsBySymbol } from "@/middlelayers/charts-assets";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { BellIcon, CheckIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 
-const fieldKeys: Record<string, string> = {
+export const actionFieldKeys: Record<string, string> = {
   method: "assistant.action.field.method",
   holdingPeriodDays: "cost.holdingDays",
   from: "cost.from",
@@ -142,7 +142,7 @@ export default function ActionCard({
       <p className="text-xs text-muted-foreground">{t("assistant.action.risk")}: {t(`assistant.action.risk.${action.risk}`)}</p>
       <dl className="mt-2 grid gap-1 text-xs">
         {changes.length ? changes.map(([field, value]) => <div key={field} className="grid grid-cols-[minmax(90px,auto)_1fr] gap-2 rounded bg-background/70 px-2 py-1">
-          <dt className="font-medium">{fieldKeys[field] ? t(fieldKeys[field]) : field}</dt>
+          <dt className="font-medium">{actionFieldKeys[field] ? t(actionFieldKeys[field]) : field}</dt>
           <dd className="break-words">{shownValue(field, before?.[field], before?.kind)} → {shownValue(field, value, after?.kind)}</dd>
         </div>) : <>
           <div><dt className="font-medium">{t("assistant.action.before")}: </dt><dd className="whitespace-pre-wrap break-words">{readable(action.preview.before)}</dd></div>

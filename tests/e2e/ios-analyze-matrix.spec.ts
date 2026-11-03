@@ -11,9 +11,10 @@ test("phone Wallets shows snapshot changes without horizontal page overflow", as
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/wallets");
+  await page.getByRole("button", { name: "Detailed analysis" }).click();
   await expect(page.locator(".analyze-wallets")).toHaveAttribute("aria-busy", "false", { timeout: 20_000 });
-  await expect(page.getByRole("heading", { name: "30-day change by source" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Asset changes by source" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "30-day change by source", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Asset changes per source" })).toBeVisible();
   await expect(page.locator(".wallet-asset-change-mobile > div").first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
