@@ -278,10 +278,10 @@ for (const width of [375, 390, 430]) {
     await expect(page.getByRole("textbox", { name: "Ask the assistant..." })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.goto("/#/goals");
-    await expect(page.getByRole("heading", { level: 1, name: "Goals & Alerts" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Goals & alerts" })).toBeVisible();
     await expect(page.locator("#app-main-content h1")).toHaveCount(1);
-    await page.getByRole("button", { name: "Add alert" }).click();
-    await expect(page.getByRole("dialog", { name: "Add alert" })).toBeVisible();
+    await page.getByRole("button", { name: "Add rule" }).first().click();
+    await expect(page.getByRole("dialog", { name: "Add rule" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.goto("/#/rebalance");
     await expect(page.getByRole("heading", { level: 1, name: "Rebalance" })).toBeVisible();
@@ -312,32 +312,50 @@ test("custom asset source picker opens from the bottom of the iPhone screen", as
   expect(box!.y).toBeGreaterThan(400);
 });
 
-test("rebalance suggestions use readable cards at 375px when a profile has data", async ({ page }) => {
+test("rebalance suggestions use readable trade rows at 375px when a profile has data", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await installTauriBridge(page, { seedRebalanceProfile: true });
   await page.goto("/#/rebalance");
-  await page.getByText("Details", { exact: true }).click();
-  const cards = page.getByRole("list", { name: "Suggested trades" });
+  const cards = page.locator(".pf-trade-list");
   await expect(cards).toBeVisible();
   await expect(page.getByRole("table", { name: "Suggested trades" })).toHaveCount(0);
-  const btc = cards.getByRole("listitem", { name: "BTC" });
-  await expect(btc).toContainText("Current");
-  await expect(btc).toContainText("Target");
-  await expect(btc).toContainText("Sell");
-  await expect(btc).toContainText("Value");
-  await expect(btc).toContainText("Quantity");
+  const first = cards.locator(".pf-trade").first();
+  await expect(first).toContainText(/BTC|ETH/);
+  await expect(first.locator(".pf-pill")).toHaveText(/Sell|Buy/);
+  await expect(first.locator("strong")).toHaveText(/^\$[0-9]/);
+  await expect(first.locator("small")).toContainText(/(BTC|ETH) at \$[0-9]/);
+  await expect(first).toContainText("→");
+  await expect(first).toContainText("%");
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });
 
-test("collapsed rebalance header shows its full title at 375px", async ({ page }) => {
+test("rebalance keeps its heading and rules at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await installTauriBridge(page);
   await page.goto("/#/rebalance");
   await expect(page.getByRole("heading", { level: 1, name: "Rebalance" })).toBeVisible();
-  await expect(page.getByText("Trade options", { exact: true })).toBeAttached();
+  await expect(page.getByRole("heading", { name: "Rules" })).toBeAttached();
   await page.evaluate(() => window.scrollTo(0, 180));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(64);
-  const title = page.locator("#app-top-bar .ios-d3-pushed-title");
+  const title = page.locator(".pf-head h1");
   await expect(title).toBeVisible();
   expect(await title.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+});
+
+test("pushed plan pages keep a More return path and sync status", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { seedLockedSync: true });
+  await page.goto("/#/more");
+  const skip = page.getByRole("button", { name: "Skip for now" });
+  if (await skip.isVisible()) await skip.click();
+  for (const route of ["/goals", "/rebalance"]) {
+    const title = route === "/goals" ? "Goals & alerts" : "Rebalance";
+    await page.getByRole("link", { name: title }).click();
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    const topBar = page.locator("#app-top-bar");
+    await expect(topBar.getByRole("button", { name: "Back" })).toHaveCount(0);
+    await expect(topBar.getByRole("button", { name: /Sync/ })).toBeVisible();
+    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
+    await expect(page).toHaveURL(/#\/more$/);
+  }
 });

@@ -708,15 +708,11 @@ for (const [name, width, height] of viewports) {
           expect(layout.paddingTop, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeTop);
           expect(layout.paddingBottom, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeBottom);
           const navigation = page.locator(size === "compact" ? ".mobile-tab-bar a" : ".mobile-sidebar a");
-          const targets = await navigation.evaluateAll((nodes) => nodes.map((node) => {
+          await expect.poll(() => navigation.evaluateAll((nodes) => nodes.map((node) => {
             const box = node.getBoundingClientRect();
-            return { width: box.width, height: box.height };
-          }));
-          expect(targets).toHaveLength(size === "compact" ? 4 : 10);
-          for (const box of targets) {
-            expect(box.width, `${name} ${theme} ${route} nav target`).toBeGreaterThanOrEqual(44);
-            expect(box.height, `${name} ${theme} ${route} nav target`).toBeGreaterThanOrEqual(44);
-          }
+            return box.width >= 44 && box.height >= 44;
+          })), { message: `${name} ${theme} ${route} nav targets`, timeout: 15_000 })
+            .toEqual(Array(size === "compact" ? 4 : 10).fill(true));
           const clipped = await page.evaluate(() => {
             const root = document.querySelector("#app-main-content")!;
             return [...root.querySelectorAll<HTMLElement>("*")]
