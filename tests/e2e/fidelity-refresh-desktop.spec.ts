@@ -12,7 +12,7 @@ function sourceStatuses(mode: "ok" | "partial" | "quota", finishedTime = "09:41:
   return ["Binance", "OKX", "Ledger cold wallet", "0x4f…a91c", "Interactive Brokers"].map((label, index) => ({
     sourceId: index === 3 ? "erc20:0" : `source:${index}`, label,
     kind: index < 2 ? "exchange" : index < 4 ? "wallet" : "broker",
-    provider: index < 2 ? ["binance", "okx"][index] : index === 4 ? "ibkr" : "wallet",
+    provider: index < 2 ? ["binance", "okx"][index] : index === 3 ? "ERC20" : index === 4 ? "ibkr" : "wallet",
     status: mode === "partial" && index === 1 || mode === "quota" && index === 3 ? "failed" : "ok",
     category: mode === "partial" && index === 1 ? "network" : mode === "quota" && index === 3 ? "quota" : undefined,
     startedAt: new Date(Date.parse(finished(index)) - durations[index] * 1000).toISOString(),
@@ -52,7 +52,7 @@ for (const state of states) test(`Refresh desktop captures ${state} with real so
           await invoke("plugin:sql|execute", {
             query: "INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at) VALUES ('fidelity-day-30', 5, ?, 'last_known', '2026-10-31T09:41:00.000Z')",
             values: [JSON.stringify([{ wallet: missingWallet, kind: mode === "partial" ? "exchange" : "wallet",
-              provider: mode === "partial" ? "okx" : "ETH", category: mode === "partial" ? "timeout" : "quota",
+              provider: mode === "partial" ? "okx" : "ERC20", category: mode === "partial" ? "timeout" : "quota",
               lastSuccessAt: "2026-10-30T21:14:00.000Z" }])],
           });
         }, { missingWallet, mode });

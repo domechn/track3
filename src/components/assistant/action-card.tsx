@@ -120,7 +120,7 @@ export default function ActionCard({
 
   return (
     <section aria-label={t("assistant.action.confirmation")} className="t3-action-confirmation rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
-      {action.name === "create_alert" && action.args.kind === "asset_price_target" && typeof action.args.symbol === "string" && typeof action.args.threshold === "number" && <div className="t3-assistant-action-design">
+      {action.name === "create_alert" && action.args.kind === "asset_price_target" && action.args.comparator === "gte" && typeof action.args.symbol === "string" && typeof action.args.threshold === "number" && <div className="t3-assistant-action-design">
         <div className="t3-assistant-action-head">
           <span>{status === "approved" ? <CheckIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}{status === "approved" ? t("fidelity.assistant.alertCreated") : t("fidelity.assistant.approvalNeeded")}</span>
           <span className={status === "approved" ? "approved" : "waiting"}>{status === "approved" ? t("assistant.action.status.approved") : t("fidelity.assistant.waiting")}</span>

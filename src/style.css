@@ -3405,6 +3405,10 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .coin-fidelity-price-history-row small { display: block; margin-top: 0; color: #9b9da3; font-size: 12px; }
 .coin-fidelity-set-price { display: block; gap: 8px; height: 28px; margin-top: 14px; padding: 0 11px; border: 1px solid #36353a; border-radius: 20px; color: #9b9da3; font-size: 12px; font-weight: 500; }
 .coin-fidelity-set-price svg { display: inline; vertical-align: baseline; }
+@media (pointer: coarse) {
+  .coin-fidelity-controls button { min-width: 44px; min-height: 44px; }
+  .coin-fidelity-chart-controls .coin-fidelity-controls:nth-child(2) { width: auto; }
+}
 @media (max-width: 1499px) {
   .fidelity-kpis strong.big { font-size: clamp(24px, 2.1vw, 34px); }
 }

@@ -109,6 +109,7 @@ test("shared delete dialog stays in the viewport and restores focus after Escape
   const expand = page.getByRole("button", { name: "Expand sidebar" });
   await expect(expand).toBeInViewport();
   await expand.click();
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
   const trigger = page.getByTestId("history-delete-latest");
   await trigger.locator("xpath=ancestor::tr").locator("td").first().hover();
   await trigger.click();
