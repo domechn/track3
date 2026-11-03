@@ -110,9 +110,6 @@ vi.mock("../coin-analytics", () => ({
 vi.mock("../date-picker", () => ({
   default: () => <div>date picker</div>,
 }));
-vi.mock("../realtime-total-value", () => ({
-  default: () => null,
-}));
 vi.mock("../sidebar", () => ({
   default: () => null,
 }));
@@ -161,7 +158,7 @@ vi.mock("@/middlelayers/data", () => ({
   autoBackupHistoricalData: vi.fn(),
   autoImportHistoricalData: vi.fn(),
 }));
-vi.mock("@/middlelayers/alerts", () => ({ processAlerts: vi.fn() }));
+vi.mock("@/middlelayers/alerts", () => ({ processAlerts: vi.fn(), countUnreadAlerts: vi.fn().mockResolvedValue(0), ALERTS_CHANGED_EVENT: "alerts-changed" }));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
   invalidateCacheGroups: cacheMocks.invalidateCacheGroups,
@@ -258,6 +255,18 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it("keeps the Pro live portfolio control on wide Goals pages", async () => {
+    vi.stubGlobal("innerWidth", 1600);
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("pro");
+    window.location.hash = "#/goals/kinds";
+    try {
+      const view = renderApp();
+      expect(await view.findByRole("button", { name: "Show real-time portfolio value" })).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("finishes boot while startup alert evaluation is pending", async () => {
     vi.mocked(processAlerts).mockImplementation(() => new Promise(() => {}));
     const view = renderApp();
