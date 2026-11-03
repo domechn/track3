@@ -69,7 +69,7 @@ import TopCoinsRank from "@/mobile/components/top-coins-rank";
 import ProfitSummary from "@/mobile/components/profit-summary";
 import LatestAssetsPercentage from "@/mobile/components/latest-assets-percentage";
 import AssetsPercentageChange from "@/mobile/components/assets-percentage-change";
-import { MobileNavigation, MobileSidebar, routeTitle, tabForPath, tabRoots, type MobileTab } from "@/mobile/components/mobile/navigation";
+import { ANALYTICS_DESTINATIONS_EVENT, MobileNavigation, MobileSidebar, routeTitle, tabForPath, tabRoots, type MobileTab } from "@/mobile/components/mobile/navigation";
 import { MobileIcon, type MobileIconName } from "@/mobile/components/mobile/icons";
 import { useAlertBadge } from "@/mobile/components/use-alert-badge";
 import { MobileHeaderTotal } from "@/mobile/components/mobile/header-total";
@@ -296,7 +296,7 @@ function Layout({
   const unread = useAlertBadge();
   const location = useLocation();
   const navigate = useNavigate();
-  const currentTab = tabForPath(location.pathname);
+  const currentTab = tabForPath(location.pathname, sizeClass.width === "wide");
   const routePath = location.pathname + location.search + location.hash;
   const rootPath = tabRoots[currentTab];
   const tabStacks = useRef<Record<"overview" | "history" | "analytics" | "more", string[]>>({
@@ -387,7 +387,8 @@ function Layout({
 
   return (
     <div className="app-layout min-h-screen" data-width-class={sizeClass.width}
-      data-height-class={sizeClass.height} data-sidebar-collapsed={sidebarCollapsed}>
+      data-height-class={sizeClass.height} data-sidebar-collapsed={sidebarCollapsed}
+      data-header-collapsed={headerCollapsed}>
       <MobileSidebar unread={unread} collapsed={sidebarCollapsed} onCollapse={() => setSidebarCollapsed((value) => !value)}
         onTabSwitch={onTabSwitch} />
       <div
@@ -509,8 +510,16 @@ function AnalyticsHub({ currency, dateRange, quoteColor }: {
   currency: CurrencyRateDetail; dateRange: { start: Date; end: Date }; quoteColor: QuoteColor;
 }) {
   const { t } = useTranslation();
-  const isWide = useSizeClass().width === "wide";
+  const widthClass = useSizeClass().width;
+  const isWide = widthClass === "wide";
+  const isCompact = widthClass === "compact";
   const [sheet, setSheet] = useState<"allocation" | "rank" | "profit" | "positions" | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setMenuOpen(true);
+    window.addEventListener(ANALYTICS_DESTINATIONS_EVENT, open);
+    return () => window.removeEventListener(ANALYTICS_DESTINATIONS_EVENT, open);
+  }, []);
   const items: { label: string; detail: string; icon: "allocation" | "rank" | "wallets" | "comparison" | "profit" | "positions" | "cost"; href?: string; sheet?: "allocation" | "rank" | "profit" | "positions" }[] = [
     { sheet: "allocation", label: t("overview.allocation"), detail: t("analytics.allocationDetail"), icon: "allocation" },
     { sheet: "rank", label: t("analytics.rank"), detail: t("analytics.rankDetail"), icon: "rank" },
@@ -520,23 +529,20 @@ function AnalyticsHub({ currency, dateRange, quoteColor }: {
     { sheet: "positions", label: t("analytics.positionChanges"), detail: t("analytics.positionChangesDetail"), icon: "positions" },
     { href: "#/cost-basis", label: t("nav.costBasis"), detail: t("analytics.costDetail"), icon: "cost" },
   ];
-  return <div className="mobile-analytics-hub" data-open-sheet={sheet ?? undefined}>
-    <SplitView selected={false} className="analytics-split"
-      masterLabel={t("nav.analytics")} detailLabel={t("nav.analytics")}
-      master={<div className="analytics-tile-grid">
-      {items.map((item) => {
-        const content = <><span className="analytics-tile-icon"><AnalyticsTileIcon name={item.icon} /></span>
-          <strong>{item.label}</strong><small>{item.detail}</small></>;
-        return item.href
-          ? <a className="analytics-tile" key={item.label} href={item.href}>{content}</a>
-          : <button className="analytics-tile" type="button" key={item.label}
-            aria-current={isWide && sheet === item.sheet ? "true" : undefined}
-            onClick={() => setSheet(item.sheet!)}>{content}</button>;
-      })}
-    </div>}
-      detail={sheet === null && isWide
-        ? <div className="mobile-inline-detail analytics-empty">{t("analytics.selectDetail")}</div>
-        : <BottomSheet open={sheet !== null} onOpenChange={(open) => { if (!open) setSheet(null); }}
+  const tiles = <div className="analytics-tile-grid">
+    {items.map((item) => {
+      const content = <><span className="analytics-tile-icon"><AnalyticsTileIcon name={item.icon} /></span>
+        <strong>{item.label}</strong><small>{item.detail}</small></>;
+      return item.href
+        ? <a className="analytics-tile" key={item.label} href={item.href} onClick={() => setMenuOpen(false)}>{content}</a>
+        : <button className="analytics-tile" type="button" key={item.label}
+          aria-current={isWide && sheet === item.sheet ? "true" : undefined}
+          onClick={() => { setMenuOpen(false); setSheet(item.sheet!); }}>{content}</button>;
+    })}
+  </div>;
+  const detail = sheet === null && isWide
+    ? <div className="mobile-inline-detail analytics-empty">{t("analytics.selectDetail")}</div>
+    : <BottomSheet open={sheet !== null} onOpenChange={(open) => { if (!open) setSheet(null); }}
       title={sheet === "allocation" ? t("overview.allocation")
         : sheet === "rank" ? t("analytics.rank")
         : sheet === "positions" ? t("analytics.positionChanges") : t("analytics.profit")}
@@ -545,7 +551,14 @@ function AnalyticsHub({ currency, dateRange, quoteColor }: {
       {sheet === "rank" && <div className="d2-rank-sheet"><TopCoinsRank dateRange={dateRange} currency={currency} /></div>}
       {sheet === "profit" && <div className="d2-profit-sheet"><ProfitSummary dateRange={dateRange} currency={currency} quoteColor={quoteColor} /></div>}
       {sheet === "positions" && <div className="d2-positions-sheet"><AssetsPercentageChange dateRange={dateRange} /></div>}
-    </BottomSheet>} />
+    </BottomSheet>;
+  return <div className="mobile-analytics-hub" data-open-sheet={sheet ?? undefined}>
+    {isCompact ? <><BottomSheet open={menuOpen} onOpenChange={setMenuOpen} title={t("nav.analytics")} detents={["large"]} initialDetent="large">
+      {tiles}
+    </BottomSheet>{detail}</> : <SplitView selected={false} className="analytics-split"
+      masterLabel={t("nav.analytics")} detailLabel={t("nav.analytics")}
+      master={tiles}
+      detail={detail} />}
   </div>;
 }
 

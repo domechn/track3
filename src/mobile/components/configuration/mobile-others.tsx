@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,18 +22,27 @@ export function MobileOthers(props: {
   hideEmpty?: boolean;
   addRequest?: number;
   onAddRequestHandled?: () => void;
+  editSymbol?: string;
 }) {
   const { t } = useTranslation();
   const [editor, setEditor] = useState<{ index: number | null; value: OtherRow; amount: string; priceDraft: PriceDraft }>();
   const [removal, setRemoval] = useState<number | null>(null);
   const [menu, setMenu] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const openedSymbol = useRef<string | null>(null);
   const customSymbols = props.others.map((row) => row.symbol);
   const open = (index: number | null) => {
     const value = index === null ? { symbol: "", amount: 0, alias: "" } : props.others[index];
     setEditor({ index, value: { ...value, alias: value.alias ?? "" }, amount: String(value.amount), priceDraft: priceDraft(value.price, props.baseCurrency?.rate) });
     setError("");
   };
+  useEffect(() => {
+    if (!props.editSymbol || openedSymbol.current === props.editSymbol) return;
+    const index = props.others.findIndex((row) => row.symbol.toUpperCase() === props.editSymbol?.toUpperCase());
+    if (index < 0) return;
+    openedSymbol.current = props.editSymbol;
+    open(index);
+  }, [props.editSymbol, props.others]);
   useEffect(() => {
     if (props.addRequest) {
       open(null);

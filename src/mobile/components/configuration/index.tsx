@@ -1127,6 +1127,7 @@ const App = ({
       />}
       {(mobileSection !== "sources" || sourceTab === "custom" || exchanges.length + wallets.length + stockBrokers.length + others.length === 0) && <MobileOthers
         others={others}
+        editSymbol={searchParams.get("edit") ?? undefined}
         baseCurrency={customPriceCurrency}
         addRequest={addOtherRequest}
         onAddRequestHandled={() => setAddOtherRequest(0)}

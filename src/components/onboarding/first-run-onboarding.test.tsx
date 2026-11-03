@@ -32,6 +32,7 @@ it("waits for shell readiness before checking data", () => {
   expect(queryLastRefreshAt).not.toHaveBeenCalled()
 })
 it("opens for a fresh install and remembers Skip without navigating", async () => {
+  await Promise.all([import("@/middlelayers/onboarding"), import("./onboarding-guide")])
   render(<App />)
   fireEvent.click(await screen.findByTestId("onboarding-skip"))
   await waitFor(() => expect(screen.queryByTestId("onboarding-dialog")).not.toBeInTheDocument())

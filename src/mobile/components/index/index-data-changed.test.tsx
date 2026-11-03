@@ -1,5 +1,5 @@
 import React from "react";
-import { act, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/mobile/components/index";
 import { ChartResizeContext } from "@/mobile/App";
@@ -300,7 +300,10 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     const nav = view.container.querySelector(".mobile-tab-bar");
     expect(nav).not.toBeNull();
     expect(nav!.querySelectorAll("a")).toHaveLength(4);
-    expect(view.container.querySelector('.mobile-analytics-hub a[href="#/cost-basis"]')).toBeInTheDocument();
+    fireEvent.click(nav!.querySelector('a[href="#/summary"]')!);
+    const destinations = await view.findByRole("dialog", { name: "Analytics" });
+    expect(destinations.querySelector('a[href="#/cost-basis"]')).toBeInTheDocument();
+    fireEvent.click(within(destinations).getByRole("button", { name: "Close" }));
     fireEvent.click(nav!.querySelector('a[href="#/more"]')!);
     await waitFor(() => expect(view.container.querySelector(".mobile-more-hub")).toBeInTheDocument());
     expect(view.container.querySelector('.mobile-more-hub a[href="#/cost-basis"]')).not.toBeInTheDocument();

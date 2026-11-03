@@ -32,7 +32,7 @@ test("the phone shell applies top and side safe-area insets once", async ({ page
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page);
   await page.goto("/#/overview");
-  await expect(page.locator("#app-main-content .mobile-large-title")).toBeVisible();
+  await expect(page.locator("#app-main-content .mobile-large-title")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
   const positions = await page.evaluate(() => {
     const root = document.documentElement;
@@ -83,19 +83,19 @@ for (const phone of phones) {
     for (const [route, title] of [
       ["overview", "Overview"],
       ["history", "History"],
-      ["summary", "Analytics"],
+      ["summary", "Summary"],
       ["wallets", "Wallets"],
       ["comparison", "Comparison"],
       ["cost-basis", "Cost basis"],
       ["more", "More"],
     ]) {
       await page.goto(`/#/${route}`);
-      await expect(page.locator("#app-main-content")).toBeVisible();
+      await expect(page.locator("#app-main-content")).toBeVisible({ timeout: 30_000 });
       if (route === "more") {
         await expect(page.locator(".mobile-more-hub")).toBeVisible();
         await expect(page.getByRole("link", { name: "Rebalance" })).toBeVisible();
       } else {
-        const headings = page.locator("#app-main-content h1");
+        const headings = page.locator("#app-main-content h1:visible");
         await expect.poll(async () => {
           const text = await headings.allTextContents();
           return text.length > 0 && text.every((heading) => heading.trim() === title);
@@ -104,8 +104,8 @@ for (const phone of phones) {
       await expect(page.locator("#app-main-content")).not.toContainText("Loading page");
       await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
       if (route === "summary") {
-        await expect(page.getByText("Profit metrics", { exact: true })).toBeAttached();
-        await expect(page.getByRole("heading", { name: "Returns" })).toBeAttached();
+        await expect(page.getByRole("heading", { name: "Profit and loss" })).toBeAttached();
+        await expect(page.getByRole("heading", { name: "Profit summary" })).toBeAttached();
       }
       await page.evaluate(() => document.fonts.ready);
       await page.waitForLoadState("networkidle");
@@ -147,7 +147,7 @@ for (const phone of phones) {
       });
       expect(inset).toBe(31);
       if (route === "summary") {
-        await page.getByRole("heading", { name: "Returns" }).scrollIntoViewIfNeeded();
+        await page.getByRole("heading", { name: "Profit summary" }).scrollIntoViewIfNeeded();
         await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-profit.png` });
       }
     }

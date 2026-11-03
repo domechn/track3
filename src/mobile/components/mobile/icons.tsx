@@ -5,8 +5,22 @@ export type MobileIconName = "overview" | "history" | "analytics" | "more" | "re
 export function MobileIcon({ name, filled = false, ...props }: SVGProps<SVGSVGElement> & {
   name: MobileIconName; filled?: boolean;
 }) {
+  const phoneTabPaths = {
+    overview: <><rect x="2.5" y="2.5" width="5.5" height="5.5" rx="1" /><rect x="10" y="2.5" width="5.5" height="5.5" rx="1" /><rect x="2.5" y="10" width="5.5" height="5.5" rx="1" /><rect x="10" y="10" width="5.5" height="5.5" rx="1" /></>,
+    history: <path d="M2.5 9a6.5 6.5 0 1 0 2-4.7M2.5 3v3h3M9 5.5V9l2.5 1.5" />,
+    analytics: <path d="M3 15V8M7 15V3M11 15v-5M15 15V6" />,
+    more: <><circle cx="3.5" cy="9" r="1.2" /><circle cx="9" cy="9" r="1.2" /><circle cx="14.5" cy="9" r="1.2" /></>,
+  };
+  if (name in phoneTabPaths) {
+    return <svg viewBox="0 0 18 18" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      {phoneTabPaths[name as keyof typeof phoneTabPaths]}
+    </svg>;
+  }
   const paths = {
-    overview: <><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z" /></>,
+    overview: <><rect x="3.3" y="3.3" width="7.4" height="7.4" rx="1.3" />
+      <rect x="13.3" y="3.3" width="7.4" height="7.4" rx="1.3" />
+      <rect x="3.3" y="13.3" width="7.4" height="7.4" rx="1.3" />
+      <rect x="13.3" y="13.3" width="7.4" height="7.4" rx="1.3" /></>,
     history: <><circle cx="12" cy="12" r="9" fill={filled ? "currentColor" : "none"} />
       <path d="M12 7v5l3.5 2" stroke={filled ? "hsl(var(--card))" : "currentColor"} fill="none" /></>,
     analytics: <><path d="M4 20V12m5 8V5m5 15v-9m5 9V8" strokeLinecap="round" /></>,
@@ -19,6 +33,6 @@ export function MobileIcon({ name, filled = false, ...props }: SVGProps<SVGSVGEl
     settings: <><path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" /><circle cx="9" cy="7" r="2" fill="hsl(var(--card))" /><circle cx="15" cy="12" r="2" fill="hsl(var(--card))" /><circle cx="10" cy="17" r="2" fill="hsl(var(--card))" /></>,
   };
   return <svg viewBox="0 0 24 24" width="24" height="24"
-    fill={filled && (name === "overview" || name === "more") ? "currentColor" : "none"}
+    fill={filled && name === "more" ? "currentColor" : "none"}
     stroke="currentColor" strokeWidth={filled ? 2.3 : 1.9} aria-hidden="true" {...props}>{paths[name]}</svg>;
 }

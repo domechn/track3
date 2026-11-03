@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { MobileNavigation, MobileSidebar, routeTitle } from "@/mobile/components/mobile/navigation";
+import { MobileNavigation, MobileSidebar, routeTitle, tabForPath } from "@/mobile/components/mobile/navigation";
 
 function Path() {
   const location = useLocation();
@@ -29,6 +29,14 @@ describe("mobile navigation", () => {
   });
   it("names an asset detail page for its asset", () => {
     expect(routeTitle("/coins/BTC", (key) => key)).toBe("BTC");
+    expect(tabForPath("/coins/BTC")).toBe("overview");
+    expect(tabForPath("/coins/BTC", true)).toBe("analytics");
+  });
+  it("uses the four-square overview icon in the phone rail", () => {
+    render(<MemoryRouter initialEntries={["/coins/BTC"]}><MobileNavigation /></MemoryRouter>);
+    const overview = screen.getByRole("link", { name: /overview/i });
+    expect(overview).toHaveAttribute("aria-current", "page");
+    expect(overview.querySelectorAll("svg rect")).toHaveLength(4);
   });
   it("shows four tabs and opens each tab at its root", () => {
     render(<MemoryRouter initialEntries={["/cost-basis"]}>
@@ -52,6 +60,13 @@ describe("mobile navigation", () => {
     fireEvent.click(screen.getByRole("link", { name: /history/i, hidden: true }));
     fireEvent.click(screen.getByRole("link", { name: /analytics/i, hidden: true }));
     expect(screen.getByText("/summary")).toBeInTheDocument();
+  });
+
+  it("shows that the active Analytics tab opens more destinations", () => {
+    render(<MemoryRouter initialEntries={["/summary"]}><MobileNavigation /></MemoryRouter>);
+    const analytics = screen.getByRole("link", { name: "Analytics" });
+    expect(analytics).toHaveAttribute("aria-description", "Tap again for Wallets, Comparison, and Cost basis");
+    expect(analytics.querySelector(".mobile-analytics-disclosure")).toBeInTheDocument();
   });
 
   it.each(["?range=7d", "#details"])("clears an active tab's %s when tapping its root", (suffix) => {

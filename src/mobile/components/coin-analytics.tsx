@@ -91,7 +91,8 @@ import {
 } from "@/components/ui/select";
 import { useTranslation } from "@/mobile/i18n";
 import CoinCustomPrice from "@/components/coin-custom-price";
-import { BottomSheet, DeltaPill, MobileRecordList, useIsMobile } from "@/mobile/components/mobile";
+import { BottomSheet, DeltaPill, MobileRecordList, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
+import CoinFidelity from "@/mobile/components/coin-fidelity";
 
 function formatEditablePrice(value: number): string {
   if (!Number.isFinite(value)) {
@@ -1273,4 +1274,21 @@ const App = ({
   );
 };
 
-export default App;
+const CoinAnalytics = (props: { currency: CurrencyRateDetail; dateRange: TDateRange; onDataChanged?: () => void }) => {
+  const { symbol } = useParams() as { symbol: string };
+  const [searchParams] = useSearchParams();
+  const isMobile = useIsMobile();
+  const compact = useSizeClass().width === "compact";
+  if (isMobile && compact) {
+    return <CoinFidelity
+      symbol={symbol}
+      assetType={parseAssetTypeSearchParam(searchParams.get("assetType"))}
+      commitPrice={updateTransactionPrice}
+      commitType={updateTransactionTxnType}
+      {...props}
+    />;
+  }
+  return <App {...props} />;
+};
+
+export default CoinAnalytics;
