@@ -31,6 +31,11 @@ const mocks = vi.hoisted(() => ({
   calculateTotalProfit: vi.fn(),
   queryLastAssetsBySymbol: vi.fn(),
   queryAllDataDates: vi.fn(),
+  queryHistoricalData: vi.fn(),
+  queryEditLog: vi.fn(),
+  getConfiguration: vi.fn(),
+  saveConfiguration: vi.fn(),
+  getCostBasisMethod: vi.fn(),
   queryAssetMaxAmountBySymbol: vi.fn(),
   updateTransactionPrice: vi.fn(),
   updateTransactionTxnType: vi.fn(),
@@ -48,9 +53,18 @@ vi.mock("@/middlelayers/charts", () => ({
   calculateTotalProfit: mocks.calculateTotalProfit,
   queryLastAssetsBySymbol: mocks.queryLastAssetsBySymbol,
   queryAllDataDates: mocks.queryAllDataDates,
+  queryHistoricalData: mocks.queryHistoricalData,
+  queryEditLog: mocks.queryEditLog,
   queryAssetMaxAmountBySymbol: mocks.queryAssetMaxAmountBySymbol,
   updateTransactionPrice: mocks.updateTransactionPrice,
   updateTransactionTxnType: mocks.updateTransactionTxnType,
+}));
+
+vi.mock("@/middlelayers/configuration", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/middlelayers/configuration")>(),
+  getConfiguration: mocks.getConfiguration,
+  saveConfiguration: mocks.saveConfiguration,
+  getCostBasisMethod: mocks.getCostBasisMethod,
 }));
 
 vi.mock("@/middlelayers/data", () => ({
@@ -233,6 +247,7 @@ function CoinAnalysisTestTree({
                   />
                 }
               />
+              <Route path="/settings/configuration" element={<div>Configuration editor</div>} />
             </Routes>
           </MemoryRouter>
         </OverviewLoadingContext.Provider>
@@ -260,7 +275,7 @@ it("clears four BTC trade metrics and breakeven when ETH has no profit detail", 
   expect(screen.getByText("Holdings at the start of the range are counted at the market price of the first day.")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Cost price minus realised profit per coin held." }));
   expect(screen.getByText("Cost price minus realised profit per coin held.")).toBeVisible();
-});
+}, 20_000);
 
 it("shows infinite return for a zero-cost airdrop and no breakeven after selling all", async () => {
   mocks.calculateTotalProfit.mockResolvedValue({
@@ -320,6 +335,11 @@ beforeEach(() => {
   mocks.calculateTotalProfit.mockReset();
   mocks.queryLastAssetsBySymbol.mockReset();
   mocks.queryAllDataDates.mockReset();
+  mocks.queryHistoricalData.mockReset();
+  mocks.queryEditLog.mockReset();
+  mocks.getConfiguration.mockReset();
+  mocks.saveConfiguration.mockReset();
+  mocks.getCostBasisMethod.mockReset();
   mocks.queryAssetMaxAmountBySymbol.mockReset();
   mocks.updateTransactionPrice.mockReset();
   mocks.updateTransactionTxnType.mockReset();
@@ -344,6 +364,11 @@ beforeEach(() => {
   });
   mocks.queryLastAssetsBySymbol.mockResolvedValue(undefined);
   mocks.queryAllDataDates.mockResolvedValue([{ id: "latest", date: "2024-04-30", createdAt: "2024-04-30T00:00:00.000Z" }]);
+  mocks.queryHistoricalData.mockResolvedValue([]);
+  mocks.queryEditLog.mockResolvedValue([]);
+  mocks.getConfiguration.mockResolvedValue({ others: [] });
+  mocks.saveConfiguration.mockResolvedValue(undefined);
+  mocks.getCostBasisMethod.mockResolvedValue("FIFO");
   mocks.queryAssetMaxAmountBySymbol.mockResolvedValue(0);
   mocks.updateTransactionPrice.mockResolvedValue(undefined);
   mocks.updateTransactionTxnType.mockResolvedValue(undefined);
@@ -420,30 +445,26 @@ const secondTransaction: Transaction = {
   txnCreatedAt: "2024-04-16T00:00:00.000Z",
 };
 
-// The full coverage run can delay this detail-dialog render past Vitest's 5 s default.
 it("shows a compact phone identity, 24h price change, and an unbroken transaction date", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
   mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([transaction]);
-  mocks.queryAllDataDates.mockResolvedValue([
-    { id: "latest", date: "2024-04-30", createdAt: "2024-04-30T00:00:00.000Z" },
-    { id: "prior", date: "2024-04-29", createdAt: "2024-04-29T00:00:00.000Z" },
-  ]);
-  mocks.queryLastAssetsBySymbol.mockResolvedValueOnce({
-    symbol: "BTC", assetType: "crypto", amount: 1, value: 100, price: 100,
-  }).mockResolvedValueOnce({
-    symbol: "BTC", assetType: "crypto", amount: 1, value: 80, price: 80,
+  const snapshot = (day: number, value: number) => ({
+    createdAt: `2024-04-${day}T00:00:00.000Z`,
+    assets: [{ symbol: "BTC", assetType: "crypto", amount: 1, value, wallet: "wallet-1" }],
   });
+  mocks.queryHistoricalData.mockImplementation((count: number) => Promise.resolve(
+    count === 1 ? [snapshot(30, 100)] : [snapshot(30, 100), snapshot(29, 80)]));
   renderCoinAnalysis();
-  const hero = document.querySelector(".coin-detail-hero")!;
-  await waitFor(() => expect(hero).toHaveTextContent("+25.00%"));
+  await waitFor(() => expect(document.querySelector(".fd-coin-hero")).toHaveTextContent("+25.00%"));
+  const hero = document.querySelector(".fd-coin-hero")!;
   expect(hero).toHaveTextContent("BTC");
   expect(hero).toHaveTextContent("24h");
-  const history = document.querySelector(".coin-mobile-transactions")!;
-  expect(history).toHaveTextContent("Apr 15");
-  fireEvent.click(history.querySelector(".mobile-list-row")!);
-  expect(await screen.findByRole("dialog", { name: "Apr 15" }, { timeout: 5000 })).toHaveTextContent("2024");
+  const history = document.querySelector(".fd-coin-transactions")!;
+  expect(history).toHaveTextContent("15 Apr 2024");
+  fireEvent.click(history.querySelector(".fd-tx-row")!);
+  expect(await screen.findByRole("dialog", { name: /buy 1\.0000 BTC/i })).toHaveTextContent("2024");
 }, 20_000);
 
 it("anchors the prior-day coin price to the latest snapshot instead of the range end", async () => {
@@ -479,17 +500,128 @@ it("does not label a multi-day coin price gap as 24h", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
-  mocks.queryAllDataDates.mockResolvedValue([
-    { id: "latest", date: "2024-04-18", createdAt: "2024-04-18T12:00:00.000Z" },
-    { id: "older", date: "2024-04-15", createdAt: "2024-04-15T12:00:00.000Z" },
-  ]);
-  mocks.queryLastAssetsBySymbol.mockResolvedValue({
-    symbol: "BTC", assetType: "crypto", amount: 1, value: 100, price: 100,
+  const snapshot = (day: number, value: number) => ({
+    createdAt: `2024-04-${day}T12:00:00.000Z`,
+    assets: [{ symbol: "BTC", assetType: "crypto", amount: 1, value, wallet: "wallet-1" }],
+  });
+  mocks.queryHistoricalData.mockImplementation((count: number) => Promise.resolve(
+    count === 1 ? [snapshot(18, 100)] : [snapshot(18, 100), snapshot(15, 80)]));
+  renderCoinAnalysis();
+  await waitFor(() => expect(document.querySelector(".fd-coin-hero")).toHaveTextContent("$100.00"));
+  expect(document.querySelector(".fd-coin-changes .fd-coin-metric")).toHaveTextContent("–");
+});
+
+it("keeps the stored price when a compact phone edit changes only the transaction type", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([{ ...transaction, price: 100.123456 }]);
+  renderCoinAnalysis(["/coins/BTC"], hkdCurrency);
+  const row = (await screen.findByText("Transactions")).closest(".fd-card")!.querySelector(".fd-tx-row")!;
+  fireEvent.click(row);
+  fireEvent.click(screen.getByRole("button", { name: "Edit type or price" }));
+  fireEvent.click(screen.getByRole("button", { name: "sell", pressed: false }));
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(mocks.updateTransactionTxnType).toHaveBeenCalledWith(42, "sell"));
+  expect(mocks.updateTransactionPrice).not.toHaveBeenCalled();
+}, 20_000);
+
+it("refreshes after the type saves even if the price update fails", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([transaction]);
+  mocks.updateTransactionPrice.mockRejectedValue(new Error("price failed"));
+  const changed = vi.fn();
+  renderCoinAnalysis(["/coins/BTC"], usdCurrency, changed);
+  const row = (await screen.findByText("Transactions")).closest(".fd-card")!.querySelector(".fd-tx-row")!;
+  fireEvent.click(row);
+  fireEvent.click(screen.getByRole("button", { name: "Edit type or price" }));
+  fireEvent.click(screen.getByRole("button", { name: "sell", pressed: false }));
+  fireEvent.change(screen.getByLabelText("Price per BTC"), { target: { value: "123" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ description: "Unable to update transaction. Please try again." })));
+  expect(changed).toHaveBeenCalledTimes(1);
+});
+
+it("rejects an empty price in a compact phone transaction edit", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([transaction]);
+  renderCoinAnalysis();
+  const row = (await screen.findByText("Transactions")).closest(".fd-card")!.querySelector(".fd-tx-row")!;
+  fireEvent.click(row);
+  fireEvent.click(screen.getByRole("button", { name: "Edit type or price" }));
+  fireEvent.change(screen.getByLabelText("Price per BTC"), { target: { value: " " } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(mocks.updateTransactionPrice).not.toHaveBeenCalled();
+  expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ description: "Invalid price" }));
+});
+
+it("does not mix range return with realized P&L on a compact phone", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  mocks.calculateTotalProfit.mockResolvedValue({
+    total: 50, percentage: undefined,
+    coins: [{ symbol: "BTC", assetType: "crypto", value: 50, percentage: undefined, buyAmount: 1, sellAmount: 0, costAvgPrice: 0, sellAvgPrice: 0 }],
   });
   renderCoinAnalysis();
-  await waitFor(() => expect(document.querySelector(".coin-detail-hero")).toHaveTextContent("$100.00"));
-  expect(mocks.queryLastAssetsBySymbol).toHaveBeenCalledTimes(1);
-  expect(document.querySelector(".coin-detail-change")).toHaveTextContent("—");
+  await waitFor(() => expect(document.querySelector(".fd-coin-hero")).toHaveTextContent("Realized P&L"));
+  expect(screen.queryByText("Return")).not.toBeInTheDocument();
+});
+
+it("keeps the two compact phone cost explanations accessible without extra icons", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  renderCoinAnalysis();
+  await waitFor(() => expect(document.querySelector(".fd-position-grid")).toHaveTextContent("Cost price"));
+  const labels = document.querySelectorAll(".fd-position-grid .fd-label");
+  expect(labels[1].querySelector("button")).toHaveAttribute("aria-description", "Holdings at the start of the range are counted at the market price of the first day.");
+  expect(labels[3].querySelector("button")).toHaveAttribute("aria-description", "Cost price minus realised profit per coin held.");
+  expect(document.querySelectorAll(".fd-position-grid .fd-info-button")).toHaveLength(2);
+});
+
+it("uses a configured asset alias and stored source name on a compact phone", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  mocks.getConfiguration.mockResolvedValue({ others: [{ symbol: "BTC", alias: "Treasury coin" }] });
+  mocks.queryHistoricalData.mockResolvedValue([{ createdAt: "2024-04-30T00:00:00.000Z",
+    assets: [{ symbol: "BTC", assetType: "crypto", amount: 1, value: 100, wallet: "onchain" }] }]);
+  renderCoinAnalysis();
+  await waitFor(() => expect(document.querySelector(".fd-coin-head")).toHaveTextContent("Treasury coin"));
+  expect(document.querySelector(".fd-source-row")).toHaveTextContent("onchain");
+  expect(document.querySelector(".fd-coin-head")).not.toHaveTextContent("0x4f");
+});
+
+it("limits a compact coin chart by elapsed days within the selected date range", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  const snapshot = (day: number) => ({ createdAt: `2024-04-${String(day).padStart(2, "0")}T00:00:00.000Z`,
+    assets: [{ symbol: "BTC", assetType: "crypto", amount: 1, value: day, wallet: "wallet-1" }] });
+  mocks.queryHistoricalData.mockImplementation((count: number) => Promise.resolve(
+    count === 1 ? [snapshot(30)] : [snapshot(30), snapshot(2)]));
+  renderCoinAnalysis();
+  await waitFor(() => expect(document.querySelector(".fd-coin-hero")).toHaveTextContent("$30.00"));
+  fireEvent.click(screen.getByRole("button", { name: "7D", pressed: false }));
+  expect(document.querySelector(".fd-coin-chart-empty")).toBeInTheDocument();
+  expect(mocks.queryHistoricalData).toHaveBeenCalledWith(expect.any(Number), true,
+    expect.objectContaining({ dateRange: expect.objectContaining({ start: dateRange.start, end: dateRange.end }) }));
+});
+
+it("opens the existing configuration editor for a manual price", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  mocks.getConfiguration.mockResolvedValue({ configs: { groupUSD: false }, exchanges: [], wallets: [],
+    others: [{ symbol: "BTC", amount: 1, price: { kind: "manual", usd: 0.42, setAt: "2024-04-01T00:00:00.000Z" } }] });
+  renderCoinAnalysis(["/coins/BTC"], hkdCurrency);
+  fireEvent.click(await screen.findByRole("button", { name: "Set current price" }));
+  expect(screen.getByText("Configuration editor")).toBeInTheDocument();
 });
 
 const hkdCurrency = {

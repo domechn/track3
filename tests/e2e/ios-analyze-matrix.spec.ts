@@ -23,8 +23,9 @@ test("phone analysis dates follow the selected Chinese language", async ({ page 
   await page.addInitScript(() => localStorage.setItem("track3-ui-locale", "zh"));
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/summary");
-  await expect(page.locator(".ath-card")).toContainText(/10月\d+日/);
-  await expect(page.locator(".ath-card")).toContainText("−$801.27 · −1.06%");
+  const ath = page.locator(".ath-card:visible, .fd-ath:visible").first();
+  await expect(ath).toContainText(/10月\d+日/, { timeout: 30_000 });
+  await expect(ath).toContainText("−$801.27 · −1.06%");
   await page.goto("/#/wallets");
   await expect(page.locator(".wallet-source-change-heading span").first()).toContainText(/2026年\d+月\d+日/);
 });

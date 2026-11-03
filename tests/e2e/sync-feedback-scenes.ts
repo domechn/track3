@@ -247,6 +247,7 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           await shotPending(page, `${prefix}-now-pending`);
           store.release();
           await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Sync complete" : "同步完成");
+          await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
           await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Pushed 5" : "已推送 5 项");
           await shot(page, `${prefix}-now-success`);
 

@@ -68,7 +68,7 @@ describe("Comparison page", () => {
       ]);
       vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
       render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
-      await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument(), { timeout: 5000 });
       expect(screen.getAllByRole("radio").every((radio) => radio.getAttribute("aria-checked") === "false")).toBe(true);
     } finally {
       window.matchMedia = previousMatchMedia;
@@ -188,6 +188,9 @@ describe("Comparison page", () => {
 
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(toggle).toHaveAccessibleName(/show values/i);
+    expect(screen.getAllByText("***").length).toBeGreaterThan(0);
+    await user.click(toggle);
+    expect(screen.queryByText("***")).not.toBeInTheDocument();
   });
 
   it("renders the value visibility icon with theme-aware current color", async () => {

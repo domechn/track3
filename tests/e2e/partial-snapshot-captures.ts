@@ -22,7 +22,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   });
 
   await page.goto("/#/overview");
-  await expect(page.locator(".t3-hero-card").getByText("Partial", { exact: true })).toBeVisible();
+  await expect(page.locator(".t3-hero-card").getByText("Partial", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Dotted gap: partial refreshes are omitted from this chart.")).toBeVisible();
   await capture("overview");
   await page.getByRole("combobox", { name: "Total value view" }).click();

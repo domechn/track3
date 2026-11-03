@@ -26,40 +26,54 @@ test("coin metrics and Profit Summary remain legible across platforms, themes, a
           await installTauriBridge(page, { richPortfolio: true, zeroCostUSDC: true });
 
           await page.goto("/#/coins/BTC");
-          const buyTitle = locale === "en" ? "Avg. buy price (selected range)" : "所选区间平均买入价";
-          const sellTitle = locale === "en" ? "Avg. sell price (selected range)" : "所选区间平均卖出价";
+          const buyTitle = locale === "en" ? "Avg. buy price (selected range)"
+            : platform === "mobile" ? "平均买入价（所选时间）" : "所选区间平均买入价";
+          const sellTitle = platform === "mobile"
+            ? locale === "en" ? "Avg. sell price" : "平均卖出价"
+            : locale === "en" ? "Avg. sell price (selected range)" : "所选区间平均卖出价";
           await expect(page.getByText(buyTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
           await expect(page.getByText(sellTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
-          const sellCard = page.getByText(sellTitle, { exact: true }).locator("../..");
-          await expect(sellCard.locator(".text-xl")).not.toHaveText("—");
+          const sellCard = page.getByText(sellTitle, { exact: true }).locator(platform === "mobile" ? ".." : "../..");
+          await expect(sellCard.locator(platform === "mobile" ? "strong" : ".text-xl")).not.toHaveText(/^[—–]$/);
           if (platform === "mobile") {
-            await expect(page.getByTestId("coin-page-loading-overlay")).toHaveClass(/opacity-0/);
             await sellCard.scrollIntoViewIfNeeded();
             await sellCard.screenshot({ path: `${directory}/${platform}-${theme}-${locale}-sell-price.png` });
           }
           await page.screenshot({ path: `${directory}/${platform}-${theme}-${locale}-coin.png`, fullPage: true });
-
           if (platform === "mobile" && theme === "light" && locale === "en") {
-            await page.getByRole("button", { name: "Holdings at the start of the range are counted at the market price of the first day." }).tap();
-            await expect(page.getByText("Holdings at the start of the range are counted at the market price of the first day.")).toBeVisible();
-            await page.keyboard.press("Escape");
-            await page.getByRole("button", { name: "Cost price minus realised profit per coin held." }).tap();
-            await expect(page.getByText("Cost price minus realised profit per coin held.")).toBeVisible();
+            await expect(page.getByText("Breakeven price", { exact: true })).toBeVisible();
             await page.goto("/#/coins/AVAX");
-            const emptySellCard = page.getByText(sellTitle, { exact: true }).locator("../..");
-            await expect(emptySellCard.locator(".text-xl")).toHaveText("—");
+            const emptySellCard = page.getByText(sellTitle, { exact: true }).locator("..");
+            await expect(emptySellCard.locator("strong")).toHaveText("–");
             await emptySellCard.screenshot({ path: `${directory}/mobile-no-sales.png` });
+          }
+
+          if (platform === "mobile") {
+            await page.goto("/#/coins/BTC");
+            const costHelp = locale === "en"
+              ? "Holdings at the start of the range are counted at the market price of the first day."
+              : "区间开始时持有的资产按首日市场价格计入。";
+            await expect(page.locator(".fd-position-grid .fd-coin-metric").nth(1).locator(".fd-info-button"))
+              .toHaveAttribute("aria-description", costHelp);
+            const breakevenHelp = locale === "en"
+              ? "Cost price minus realised profit per coin held."
+              : "成本价减去每单位当前持仓分摊的已实现利润。";
+            await expect(page.locator(".fd-position-grid .fd-coin-metric").nth(3).locator(".fd-info-button"))
+              .toHaveAttribute("aria-description", breakevenHelp);
+            await expect(page.locator(".fd-position-grid .fd-info-button")).toHaveCount(2);
             await page.goto("/#/coins/USDC");
-            await expect(page.locator(".coin-metric-card").filter({ hasText: "Return" })).toContainText("∞");
-            await page.locator(".coin-metric-card").filter({ hasText: "Return" }).screenshot({ path: `${directory}/mobile-infinite-return.png` });
+            await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready");
+            await expect(page.getByText(locale === "en" ? "Return" : "收益率", { exact: true })).toHaveCount(0);
           }
 
           await page.goto("/#/summary");
           const summary = platform === "desktop"
             ? page.getByText(locale === "en" ? "Profit Summary" : "盈亏汇总", { exact: true }).locator("../../..")
-            : page.locator(".d2-summary .profit-summary-card");
+            : page.locator(".fd-summary .fd-profit-summary");
           await expect(summary).toBeVisible({ timeout: 30_000 });
-          await expect(summary).toContainText(locale === "en" ? "Periods" : "共");
+          await expect(summary).toContainText(platform === "desktop"
+            ? locale === "en" ? "Periods" : "共"
+            : locale === "en" ? "Profit summary" : "盈亏摘要");
           await summary.screenshot({ path: `${directory}/${platform}-${theme}-${locale}-profit-summary.png` });
         } finally {
           await context.close();

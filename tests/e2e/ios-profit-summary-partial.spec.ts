@@ -20,7 +20,15 @@ test("phone shows partial months and year with a tap explanation", async ({ brow
       await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
       await installTauriBridge(page, { partialProfitHistory: true });
       await page.goto("/#/summary");
-      const summary = page.locator(".d2-summary .profit-summary-card");
+      const main = page.locator(".fd-summary");
+      await expect(main).toHaveAttribute("data-state", "ready");
+      await expect(main.locator(".fd-month").filter({ hasText: "Feb" })).toContainText("~+$4,200");
+      await expect(main.locator(".fd-month").filter({ hasText: "Jun" })).toContainText("~+$4,500");
+      await expect(main.locator(".fd-month").filter({ hasText: "Feb" })).toContainText("1 coin (ETH) has a withdrawal without a matching deposit");
+      await expect(main.locator(".fd-summary-chart")).toContainText("31 Dec 25");
+      await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
+      await page.getByRole("dialog", { name: "Analytics" }).getByRole("button", { name: /^Returns\b/ }).click();
+      const summary = page.getByRole("dialog", { name: "Returns" }).locator(".profit-summary-card");
       await expect(summary).toContainText("Periods 10", { timeout: 30_000 });
       await expect(summary).toContainText("Partial 2");
       const feb = summary.getByRole("button", { name: /^Feb / });

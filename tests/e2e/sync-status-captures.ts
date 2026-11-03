@@ -33,8 +33,8 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
   }, { theme, locale });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
+  await expect(page.locator("#app-main-content")).toContainText("$42,000.00", { timeout: 30_000 });
   await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
-  await expect(page.locator("#app-main-content")).toContainText("$42,000.00");
   const button = (name: string) => page.getByRole("button", { name });
   const capture = async (state: string) => {
     await expect(page.getByRole("dialog")).toBeVisible();

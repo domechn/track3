@@ -96,7 +96,7 @@ test("rich dark Analytics drawdown has readable loss text", async ({ page }) => 
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/summary");
   await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
-  const drawdown = page.locator(".ath-card").getByText("Distance from ATH").locator("..").locator("strong");
+  const drawdown = page.locator(".ath-card:visible, .fd-ath:visible").getByText("Distance from ATH").locator("..").locator("strong, span").last();
   await expect(drawdown).toContainText("−");
   const contrast = await drawdown.evaluate((node) => {
     const rgb = (color: string) => color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
@@ -108,7 +108,7 @@ test("rich dark Analytics drawdown has readable loss text", async ({ page }) => 
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
     const foreground = luminance(getComputedStyle(node).color);
-    const background = luminance(getComputedStyle(node.closest(".ath-card")!).backgroundColor);
+    const background = luminance(getComputedStyle(node.closest(".ath-card, .fd-ath")!).backgroundColor);
     return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
   });
   expect(contrast).toBeGreaterThanOrEqual(4.5);
@@ -118,12 +118,12 @@ test("phone titles share one page inset and performance metrics share one layout
   await page.setViewportSize({ width: 320, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   for (const [route, label] of [
-    ["/overview", "Overview"], ["/history", "History"], ["/summary", "Analytics"],
+    ["/overview", "Overview"], ["/history", "History"], ["/summary", "Summary"],
     ["/goals", "Goals & Alerts"], ["/settings", "Settings"],
     ["/settings/configuration?section=sources", "Data sources"],
   ]) {
     await page.goto(`/#${route}`);
-    const title = page.locator("#app-main-content h1.ios-large-title:visible").first();
+    const title = page.locator("#app-main-content h1:visible").first();
     await expect(title).toHaveText(label);
     await expect.poll(() => title.evaluate((node) => node.getBoundingClientRect().x)).toBe(16);
   }

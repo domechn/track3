@@ -49,7 +49,9 @@ test("custom price screens work in both shells, themes, and languages", async ({
     await expect(page.getByRole("radio", { name: locale === "en" ? "Market" : "市场价格" })).toBeVisible();
     await capture(page, `${prefix}-add.png`);
     await page.goto("/#/coins/NOVA");
-    await expect(page.getByText(locale === "en" ? /Fallback configured, set/ : /已设置后备价格，设置于/)).toBeVisible();
+    await expect(page.getByText(mobile && width < 700
+      ? locale === "en" ? /Set by you/ : /由您设置/
+      : locale === "en" ? /Fallback configured, set/ : /已设置后备价格，设置于/)).toBeVisible();
     await capture(page, `${prefix}-coin.png`);
     await page.goto("/#/coins/STBTC");
     await expect(page.getByText(locale === "en" ? /Fallback configured: follows BTC/ : /已设置后备价格：跟随 BTC/)).toBeVisible();
