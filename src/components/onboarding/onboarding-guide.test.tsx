@@ -1,8 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useState } from "react"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { I18nProvider, useTranslation } from "@/i18n"
 import OnboardingGuide from "./onboarding-guide"
+
+afterEach(async () => {
+  // Radix schedules focus restoration after the dialog unmounts.
+  await new Promise((resolve) => setTimeout(resolve, 0))
+})
 
 function Guide({ onClose = vi.fn(), variant = "desktop" as "desktop" | "ios" }) {
   const [step, setStep] = useState(0)

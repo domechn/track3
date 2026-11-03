@@ -364,7 +364,7 @@ for (const width of [320, 375, 390, 430]) {
       expect(cells.overflow, JSON.stringify(cells)).toBeLessThanOrEqual(0);
       await rank.getByRole("button", { name: "Close" }).click();
       await page.goto("/#/overview");
-      await page.getByRole("button", { name: "Show More" }).click();
+      await page.getByRole("button", { name: "Show More: More analytics" }).click();
       for (const shortRow of await page.locator(".top-coins-rank-mobile .mobile-list-row").all()) {
         const symbol = shortRow.locator(".mobile-list-label .truncate");
         const text = (await symbol.textContent())?.trim() ?? "";

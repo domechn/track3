@@ -1153,3 +1153,11 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
   }, { sample, fidelitySample });
   return result;
 }
+
+export async function seedSettingsSnapshots(page: Page) {
+  await page.evaluate(async () => {
+    const execute = (query: string) => (window as any).__e2eInvoke("plugin:sql|execute", { query, values: [] });
+    await execute("DELETE FROM history_snapshots");
+    await execute("INSERT INTO history_snapshots (uuid, createdAt) SELECT uuid, MAX(createdAt) FROM assets_v2 GROUP BY uuid");
+  });
+}

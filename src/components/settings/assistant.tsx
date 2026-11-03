@@ -20,9 +20,12 @@ import { probeConnection } from "@/middlelayers/ai";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { serializeAdvanced, parseAdvanced, assistantConfigFromForm, assistantPriceInvalid, assistantSettingsSecrets } from "@/middlelayers/ui-state/config-form";
+import { AssistantDesign } from "./assistant-design";
+import { useWideDesktop } from "@/components/use-wide-desktop";
 
 const App = () => {
   const { t } = useTranslation();
+  const wide = useWideDesktop();
   const { toast } = useToast();
   const [endpoint, setEndpoint] = useState("");
   const apiKeyRef = useRef<HTMLInputElement>(null);
@@ -43,6 +46,8 @@ const App = () => {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [probeError, setProbeError] = useState<string | undefined>();
+  const [probeSuccess, setProbeSuccess] = useState(false);
+  const [keyDisplay, setKeyDisplay] = useState("");
   const [proactiveInsightsSummary, setProactiveInsightsSummary] = useState(false);
 
   useEffect(() => {
@@ -53,6 +58,7 @@ const App = () => {
         if (!active) return;
         setEndpoint(cfg.endpoint);
         if (apiKeyRef.current) apiKeyRef.current.value = cfg.apiKey;
+        setKeyDisplay(cfg.apiKey);
         setModel(cfg.model);
         setContextSize(cfg.contextSize);
         setAllowActions(cfg.allowActions !== false);
@@ -99,7 +105,9 @@ const App = () => {
     setSaving(true);
     try {
       await saveAIConfig(cfg);
-      toast({ description: t("settings.assistant.saved") });
+      toast(wide
+        ? { title: t("fidelity.settingsB.ai.savedTitle"), description: t("fidelity.settingsB.ai.savedDesc") }
+        : { description: t("settings.assistant.saved") });
     } catch (err) {
       toast({
         description: redactSecrets((err as Error).message ?? String(err), [currentKey(), ...settingsSecrets()]),
@@ -113,6 +121,7 @@ const App = () => {
   async function onTest() {
     if (testing) return;
     setProbeError(undefined);
+    setProbeSuccess(false);
     setTesting(true);
     try {
       const err = await probeConnection({
@@ -128,6 +137,7 @@ const App = () => {
           variant: "destructive",
         });
       } else {
+        setProbeSuccess(true);
         toast({ description: t("settings.assistant.testSuccess") });
       }
     } catch (err) {
@@ -140,6 +150,25 @@ const App = () => {
     } finally {
       setTesting(false);
     }
+  }
+
+  if (wide) {
+    return <AssistantDesign endpoint={endpoint} setEndpoint={setEndpoint} apiKeyRef={apiKeyRef}
+      keyDisplay={keyDisplay} setKeyDisplay={setKeyDisplay} showKey={showKey} setShowKey={setShowKey}
+      model={model} setModel={setModel} contextSize={contextSize} setContextSize={setContextSize}
+      inputPrice={inputPrice} setInputPrice={setInputPrice} outputPrice={outputPrice} setOutputPrice={setOutputPrice}
+      priceError={priceError} allowActions={allowActions} setAllowActions={setAllowActions}
+      proactiveInsightsSummary={proactiveInsightsSummary} setProactiveInsightsSummary={setProactiveInsightsSummary}
+      advancedRef={advancedRef} advancedError={advancedError} advancedWarnings={advancedWarnings}
+      probeError={probeError} probeSuccess={probeSuccess} loaded={loaded} testing={testing} saving={saving}
+      onTest={() => { void onTest(); }} onSave={() => { void onSave(); }}
+      onResetAdvanced={() => { if (advancedRef.current) advancedRef.current.value = ""; setAdvancedError(undefined); }}
+      onFormatAdvanced={() => {
+        const parsed = parseAdvanced(currentAdvanced());
+        if (parsed.error) { setAdvancedError(parsed.error); return; }
+        if (advancedRef.current) advancedRef.current.value = serializeAdvanced(parsed.value);
+        setAdvancedError(undefined);
+      }} />;
   }
 
   return (

@@ -114,6 +114,7 @@ function TopBar({
   onDatePickerValueChange,
   lastRefreshAt,
   onRefreshSuccess,
+  hideWide = false,
 }: {
   isProUser: boolean;
   quoteColor: QuoteColor;
@@ -126,6 +127,7 @@ function TopBar({
   ) => void;
   lastRefreshAt?: string;
   onRefreshSuccess: () => void;
+  hideWide?: boolean;
 }) {
   const { t } = useTranslation();
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
@@ -133,7 +135,7 @@ function TopBar({
   const selectedSnapshots = availableDates.filter((date) => dateRange?.from && dateRange.to && date >= dateRange.from && date <= dateRange.to).length;
 
   return (
-    <div className="sticky top-0 z-10 glass-subtle border-b relative">
+    <div className={`sticky top-0 z-10 glass-subtle border-b relative${hideWide ? " t3-fidelity-settings-topbar" : ""}`}>
       <div className="flex h-12 items-center px-4">
         {isProUser && (
           <div className="mr-4">
@@ -249,6 +251,9 @@ function Layout({
   onRefreshSuccess,
 }: LayoutProps) {
   const { t } = useTranslation();
+  const location = useLocation();
+  const assistantPage = location.pathname === "/assistant" || location.pathname.startsWith("/assistant/");
+  const settingsPage = location.pathname.startsWith("/settings");
   const sidebarWidth = sidebarCollapsed ? 56 : 216;
 
   return (
@@ -263,7 +268,7 @@ function Layout({
         style={{ marginLeft: sidebarWidth }}
         className="transition-[margin-left] duration-300 ease-in-out"
       >
-        <TopBar
+        {!assistantPage && <TopBar
           isProUser={isProUser}
           quoteColor={quoteColor}
           currentCurrency={currentCurrency}
@@ -272,7 +277,8 @@ function Layout({
           onDatePickerValueChange={onDatePickerValueChange}
           lastRefreshAt={lastRefreshAt}
           onRefreshSuccess={onRefreshSuccess}
-        />
+          hideWide={settingsPage}
+        />}
 
         {/* Main content */}
         <main id="app-main-content" tabIndex={-1} className="mx-auto w-full max-w-[1560px] px-7 py-5">

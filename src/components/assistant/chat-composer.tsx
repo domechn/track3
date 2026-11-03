@@ -5,7 +5,6 @@ import { remove } from "@tauri-apps/plugin-fs";
 import { appDataDir } from "@tauri-apps/api/path";
 import {
   KeyboardIcon,
-  PaperPlaneIcon,
   ReloadIcon,
   StopIcon,
   Cross2Icon,
@@ -30,6 +29,7 @@ export default function ChatComposer({
   onStop,
   isStreaming,
   disabled,
+  placeholder,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -37,6 +37,7 @@ export default function ChatComposer({
   onStop: () => void;
   isStreaming: boolean;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -221,7 +222,7 @@ export default function ChatComposer({
                 }
               }
             }}
-            placeholder={t("assistant.chat.placeholder")}
+            placeholder={placeholder ?? t("assistant.chat.placeholder")}
             rows={1}
             disabled={disabled}
             className="min-h-[36px] touch:min-h-11 max-h-40 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm leading-relaxed focus-visible:outline-none disabled:opacity-50"
@@ -251,7 +252,7 @@ export default function ChatComposer({
               data-testid="chat-send"
               className="inline-flex h-9 w-9 touch:h-11 touch:w-11 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-all duration-200 ease-out hover:bg-primary/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
             >
-              <PaperPlaneIcon className="h-3.5 w-3.5" />
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 9l12-5.5L11.5 15 9 10.5z" /></svg>
             </button>
           )}
         </div>
@@ -261,6 +262,9 @@ export default function ChatComposer({
           <KeyboardIcon className="h-3 w-3" />
           {t("assistant.chat.composer.hint")}
         </span>
+        <span className="t3-assistant-composer-hint">{t("fidelity.assistant.composerHint").split(/(Enter|Shift)/g).map((part, index) =>
+          part === "Enter" || part === "Shift" ? <kbd key={index}>{part}</kbd> : part)}</span>
+        <span className="t3-assistant-composer-context">{t("fidelity.assistant.composerContext")}</span>
         {isStreaming && (
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <ReloadIcon className="h-3 w-3 animate-spin" />

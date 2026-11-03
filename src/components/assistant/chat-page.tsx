@@ -44,11 +44,16 @@ import type { AIConfig, CurrencyRateDetail } from "@/middlelayers/types";
 import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/redact";
 import type { ChatMessage, AssistantBlock } from "./use-chat";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
+import type { ChatSessionMeta } from "@/middlelayers/ai";
 import UsageLabel from "./usage-label";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
 import { takeInsightQuestion, persistedToRuntime, runtimeToPersisted } from "@/middlelayers/ui-state/chat-persist";
 export * from "@/middlelayers/ui-state/chat-persist";
 import { takePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
+import { getRebalanceProfile, loadRebalanceHoldings } from "@/middlelayers/rebalance";
+import { queryHistoricalPage, queryLastRefreshAt } from "@/middlelayers/charts";
+import { listAlertRules, listAlertHistory } from "@/middlelayers/alerts";
+import SyncStatusIndicator from "@/components/sync-status-indicator";
 
 type LoadState =
   | { status: "loading" }
@@ -58,6 +63,10 @@ type LoadState =
 
 export default function ChatPage({ isProUser }: { isProUser: boolean }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [refreshedAt, setRefreshedAt] = useState<string | undefined>();
+  useEffect(() => {
+    void queryLastRefreshAt().then(setRefreshedAt).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const refreshCurrency = () => {
@@ -96,27 +105,125 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
   }, []);
 
   if (!isProUser) {
-    return <UpgradeCard />;
+    return <div className="t3-assistant-page"><AssistantPageHeading ready={false} isProUser={false} /><UpgradeCard /></div>;
   }
 
   if (state.status === "loading") {
-    return <LoadingCard />;
+    return <div className="t3-assistant-page"><AssistantPageHeading ready={false} isProUser /><LoadingCard /></div>;
   }
 
   if (state.status === "missing") {
-    return <NotConfiguredCard />;
+    return <div className="t3-assistant-page"><AssistantPageHeading ready={false} isProUser /><NotConfiguredCard /></div>;
   }
 
   if (state.status === "error") {
-    return <ErrorCard message={state.message} />;
+    return <div className="t3-assistant-page"><AssistantPageHeading ready={false} isProUser /><ErrorCard message={state.message} /></div>;
   }
 
   return (
-    <ReadyChat
+    <div className="t3-assistant-page"><AssistantPageHeading ready isProUser model={state.config.model} refreshedAt={refreshedAt} /><ReadyChat
       config={state.config}
       baseCurrency={state.baseCurrency}
-    />
+    /></div>
   );
+}
+
+function AssistantPageHeading({ ready, isProUser, model, refreshedAt }: {
+  ready: boolean; isProUser: boolean; model?: string; refreshedAt?: string;
+}) {
+  const { t } = useTranslation();
+  return <header className="t3-assistant-page-heading">
+    <div>
+      <h1>{t("nav.assistant")}</h1>
+      <p>{t(ready ? "fidelity.assistant.subtitle" : "fidelity.assistant.subtitleNoKey")}</p>
+    </div>
+    <div className="t3-assistant-page-actions">
+      <SyncStatusIndicator />
+      {ready && <span className="t3-assistant-model"><span className="t3-assistant-model-dot" />{model}{refreshedAt ? ` · ${t("fidelity.assistant.dataAsOf")} ${new Date(refreshedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}</span>}
+      {isProUser && <span className={`t3-assistant-pro ${ready ? "" : "missing"}`}>{ready ? t("fidelity.assistant.proBadge") : t("fidelity.assistant.keyMissing")}</span>}
+    </div>
+  </header>;
+}
+
+function AssistantContextPanel({ config, sessions, baseCurrency }: { config: AIConfig; sessions: ChatSessionMeta[]; baseCurrency: CurrencyRateDetail }) {
+  const { t } = useTranslation();
+  const usageCache = useRef(new Map<string, { updatedAt: string; input: number; output: number; requests: number }>());
+  const [data, setData] = useState<{
+    assets: number; total: number; snapshots: number; first: string; last: string;
+    targets: number; targetTotal: number; rules: number; unread: number;
+    requests: number; tokensIn: number; tokensOut: number;
+  }>();
+  useEffect(() => {
+    let cancelled = false;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    void Promise.all([
+      loadRebalanceHoldings(baseCurrency),
+      getRebalanceProfile(),
+      listAlertRules(),
+      listAlertHistory(),
+      queryHistoricalPage({ start: new Date(monthStart), end: new Date(nextMonth) }, 1, 0),
+      Promise.all(sessions.filter((session) => session.updatedAt >= monthStart).map(async (session) => {
+        const cached = usageCache.current.get(session.id);
+        if (cached?.updatedAt === session.updatedAt) return cached;
+        const loaded = await loadSession(session.id).catch(() => null);
+        const usage = (loaded?.messages ?? []).filter((message) =>
+          message.role === "assistant" && message.at && message.at >= monthStart && message.at < nextMonth && message.usage);
+        const entry = {
+          updatedAt: session.updatedAt,
+          requests: usage.length,
+          input: usage.reduce((sum, message) => sum + (message.role === "assistant" ? message.usage?.promptTokens ?? 0 : 0), 0),
+          output: usage.reduce((sum, message) => sum + (message.role === "assistant" ? message.usage?.completionTokens ?? 0 : 0), 0),
+        };
+        usageCache.current.set(session.id, entry);
+        return entry;
+      })),
+    ]).then(async ([portfolio, profile, rules, history, snapshots, usage]) => {
+      const first = snapshots.totalCount > 0
+        ? (await queryHistoricalPage({ start: new Date(monthStart), end: new Date(nextMonth) }, 1, snapshots.totalCount - 1)).rows[0]?.createdAt ?? ""
+        : "";
+      if (!cancelled) setData({
+        assets: portfolio.holdings.length, total: portfolio.holdings.reduce((sum, holding) => sum + holding.value, 0),
+        snapshots: snapshots.totalCount, first, last: snapshots.rows[0]?.createdAt ?? "",
+        targets: profile?.targets.length ?? 0,
+        targetTotal: profile?.targets.reduce((sum, target) => sum + target.percent, 0) ?? 0,
+        rules: rules.length, unread: history.filter((item) => !item.acknowledgedAt).length,
+        requests: usage.reduce((sum, item) => sum + item.requests, 0),
+        tokensIn: usage.reduce((sum, item) => sum + item.input, 0),
+        tokensOut: usage.reduce((sum, item) => sum + item.output, 0),
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [sessions, baseCurrency]);
+  const currency = new Intl.NumberFormat(undefined, { style: "currency", currency: baseCurrency.currency });
+  const month = new Date().toLocaleDateString(undefined, { month: "short" });
+  const cost = ((data?.tokensIn ?? 0) * (config.inputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0)
+    + (data?.tokensOut ?? 0) * (config.outputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0)) / 1_000_000;
+  return <aside className="t3-assistant-context">
+      <div className="t3-assistant-context-heading"><h2>{t("fidelity.assistant.context")}</h2><span>{t("fidelity.assistant.contextHint")}</span></div>
+    <div className="t3-assistant-context-source"><b>{t("fidelity.assistant.holdings")}</b><small>{data ? `${data.assets} ${t("fidelity.assistant.assets")}, ${currency.format(data.total)}` : "—"}</small></div>
+    <div className="t3-assistant-context-source"><b>{t("fidelity.assistant.snapshots")}</b><small>{data ? data.snapshots ? t("fidelity.assistant.snapshotRangeActual").replace("{count}", String(data.snapshots)).replace("{start}", String(new Date(data.first).getDate())).replace("{end}", String(new Date(data.last).getDate())).replace("{month}", month) : t("fidelity.assistant.snapshotEmpty") : "—"}</small></div>
+    <div className="t3-assistant-context-source"><b>{t("fidelity.assistant.targets")}</b><small>{data ? `${data.targets} ${t("fidelity.assistant.targetsLower")} ${data.targetTotal.toFixed(1)}%` : "—"}</small></div>
+    <div className="t3-assistant-context-source"><b>{t("fidelity.assistant.alertRules")}</b><small>{data ? `${data.rules} ${t("fidelity.assistant.rules")}, ${data.unread} ${t("fidelity.assistant.unread")}` : "—"}</small></div>
+    <div className="t3-assistant-context-section">
+      <div className="t3-assistant-context-heading"><h2>{t("fidelity.assistant.usageMonth")}</h2><span>1–{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()} {month}</span></div>
+      <div><span>{t("fidelity.assistant.requests")}</span><b>{data?.requests.toLocaleString() ?? "—"}</b></div>
+      <div><span>{t("fidelity.assistant.tokensIn")}</span><b>{data?.tokensIn.toLocaleString() ?? "—"}</b></div>
+      <div><span>{t("fidelity.assistant.tokensOut")}</span><b>{data?.tokensOut.toLocaleString() ?? "—"}</b></div>
+      <div><span>{t("fidelity.assistant.estimatedCost")}</span><b>{data ? currency.format(cost * baseCurrency.rate) : "—"}</b></div>
+      <p>{t("fidelity.assistant.usageNote").replace("{input}", (config.inputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0).toFixed(2)).replace("{output}", (config.outputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0).toFixed(2))}</p>
+    </div>
+    <div className="t3-assistant-context-section">
+      <div><span>{t("fidelity.assistant.actions")}</span><b>{config.allowActions === false ? t("fidelity.assistant.off") : t("fidelity.assistant.askFirst")}</b></div>
+      <div><span>{t("fidelity.assistant.dailyInsights")}</span><b>{config.proactiveInsightsSummary ? t("fidelity.assistant.on") : t("fidelity.assistant.off")}</b></div>
+    </div>
+    <div className="t3-assistant-context-section t3-assistant-context-tools">
+      <div className="t3-assistant-context-heading"><h2>{t("fidelity.assistant.tools")}</h2><span>{t("fidelity.assistant.toolsHint")}</span></div>
+      {["lookUp", "compare", "readTargets", "changeAlerts"].map((key) => <div key={key}><span>{t(`fidelity.assistant.tool.${key}`)}</span><b className={key === "changeAlerts" && config.allowActions !== false ? "t3-assistant-ask-first" : ""}>{t(key === "changeAlerts" ? config.allowActions === false ? "fidelity.assistant.off" : "fidelity.assistant.askFirstStatus" : "fidelity.assistant.allowed")}</b></div>)}
+    </div>
+    <Link to="/settings/assistant">{t("fidelity.assistant.settings")}<ChevronRightIcon aria-hidden="true" /></Link>
+  </aside>;
 }
 
 function ReadyChat({
@@ -130,11 +237,12 @@ function ReadyChat({
   const secrets = useMemo(() => configuredSecretValues(config), [config]);
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
   const { sessions, isLoading, refresh, createNew, remove, pin } =
     useChatSessions();
   const [initialMsgs, setInitialMsgs] = useState<ChatMessage[]>([]);
+  const [initialTimes, setInitialTimes] = useState<Array<string | undefined>>([]);
   const [initialSummary, setInitialSummary] = useState<ConversationSummary | undefined>();
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
@@ -172,6 +280,7 @@ function ReadyChat({
       // and cause an unwanted auto-scroll from top to bottom.
       if (sessionId !== loadedSessionId) {
         setInitialMsgs([]);
+        setInitialTimes([]);
         setInitialSummary(undefined);
       }
       let cancelled = false;
@@ -186,11 +295,13 @@ function ReadyChat({
         if (cancelled) return;
         if (session) {
           setInitialMsgs(session.messages.map(persistedToRuntime));
+          setInitialTimes(session.messages.map((message) => message.at));
           setInitialSummary(session.summary);
         } else {
           // New or empty session — always reset so the previous session's
           // messages don't leak into the new chat.
           setInitialMsgs([]);
+          setInitialTimes([]);
           setInitialSummary(undefined);
         }
         setLoadedSessionId(sessionId);
@@ -337,7 +448,7 @@ function ReadyChat({
 
   return (
     <div
-      className="t3-manage-assistant relative flex h-[calc(100vh-88px)] overflow-hidden"
+      className="t3-manage-assistant relative flex h-[calc(100vh-88px)] min-h-[560px] gap-4 overflow-hidden"
       data-testid="chat-session-layout"
     >
       {deleteError && (
@@ -347,10 +458,10 @@ function ReadyChat({
       )}
       <div
         className={`overflow-hidden transition-[width] duration-200 ease-in-out ${
-          sidebarOpen ? "w-[260px]" : "w-0"
+          sidebarOpen ? "w-[300px]" : "w-0"
         }`}
       >
-        <div className="w-[260px]">
+        <div className="w-[300px]">
           <SessionSidebar
             sessions={sessions}
             activeId={sessionId ?? null}
@@ -371,9 +482,11 @@ function ReadyChat({
        <div className="flex-1 p-6"><Skeleton className="h-24 w-full" /></div>
      ) : <ChatContent
        sessionId={sessionId ?? null}
+       sessionTitle={sessions.find((session) => session.id === sessionId)?.title}
        config={config}
        baseCurrency={baseCurrency}
        initialMessages={initialMsgs}
+       initialTimes={initialTimes}
        initialSummary={initialSummary}
        onStreamComplete={handleStreamComplete}
        saveError={saveError}
@@ -381,6 +494,7 @@ function ReadyChat({
        sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
      />}
+     <AssistantContextPanel config={config} sessions={sessions} baseCurrency={baseCurrency} />
     </div>
   );
 }
@@ -389,7 +503,9 @@ function ChatContent({
   config,
   baseCurrency,
   sessionId,
+  sessionTitle,
   initialMessages,
+  initialTimes,
   initialSummary,
   onStreamComplete,
   saveError,
@@ -400,7 +516,9 @@ function ChatContent({
   config: AIConfig;
   baseCurrency: CurrencyRateDetail;
   sessionId?: string | null;
+  sessionTitle?: string;
   initialMessages: ChatMessage[];
+  initialTimes: Array<string | undefined>;
   initialSummary?: ConversationSummary;
   onStreamComplete?: (messages: ChatMessage[], summary?: ConversationSummary) => void;
   saveError?: string | null;
@@ -446,9 +564,14 @@ function ChatContent({
   return (
     <Card
       data-testid="chat-card"
+      data-approved-view={chat.messages.some((message) => message.role === "assistant"
+        && message.blocks.some((block) => block.kind === "pending_action" && block.status === "approved"))
+        && chat.messages.length > 2 ? "true" : undefined}
       className="flex min-w-0 flex-1 flex-col overflow-hidden"
     >
-      <ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />
+      <ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage} sessionTitle={sessionTitle} replyCount={chat.messages.filter((message) => message.role === "assistant").length}
+        requestFailed={chat.messages.some((message) => message.role === "assistant" && message.blocks.some((block) => block.kind === "text" && /^\[error\]/i.test(block.text)))}
+        sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />
       {saveError && (
         <p role="alert" className="px-4 py-2 text-sm text-destructive">
           {t("assistant.chat.saveFailed")}: {saveError}
@@ -456,15 +579,25 @@ function ChatContent({
       )}
       <ChatThread
         messages={chat.messages}
+        model={config.model}
+        messageTimes={initialTimes}
         isStreaming={chat.isStreaming}
         pricePerMillionTokens={config.pricePerMillionTokens}
         inputPricePerMillionTokens={config.inputPricePerMillionTokens}
         outputPricePerMillionTokens={config.outputPricePerMillionTokens}
         onPickPrompt={(text) => void chat.send(text)}
+        onRetry={(text) => void chat.send(text)}
         currency={baseCurrency}
         onDecideAction={(id, decision) => void chat.decideAction(id, decision)}
         canDecideAction={!!sessionId && config.allowActions !== false && !chat.isStreaming && !saveError}
       />
+      <div className="t3-assistant-design-prompts">
+        {(["summarize", "risks", "rebalance", "profit"] as const).map((key) =>
+          <button key={key} type="button" disabled={chat.isStreaming}
+            onClick={() => void chat.send(t(`fidelity.assistant.prompt.${key}`))}>
+            {t(`fidelity.assistant.prompt.${key}`)}
+          </button>)}
+      </div>
       {chat.messages.length > 0 && (
         <QuickActions
           disabled={chat.isStreaming}
@@ -481,22 +614,31 @@ function ChatContent({
         onStop={chat.stop}
         isStreaming={chat.isStreaming}
         disabled={false}
+        placeholder={t("fidelity.assistant.composerPlaceholder")}
       />
     </Card>
   );
 }
 
 function ChatHeader({
-  config, contextTokens, sessionUsage, sidebarOpen, onToggleSidebar,
+  config, contextTokens, sessionUsage, sessionTitle, replyCount, requestFailed, sidebarOpen, onToggleSidebar,
 }: {
   config: AIConfig;
   contextTokens: number;
   sessionUsage: import("@/middlelayers/ai/budget").TokenUsage;
+  sessionTitle?: string;
+  replyCount: number;
+  requestFailed: boolean;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
 }) {
   const { t } = useTranslation();
   const percent = Math.min(100, Math.round(contextTokens / config.contextSize * 100));
+  const sessionCost = (sessionUsage.promptTokens * (config.inputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0)
+    + sessionUsage.completionTokens * (config.outputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0)) / 1_000_000;
+  const meta = requestFailed ? t("fidelity.assistant.requestFailed")
+    : replyCount ? `${replyCount} ${t(replyCount === 1 ? "fidelity.assistant.reply" : "fidelity.assistant.replies")} · $${sessionCost.toFixed(3)} · `
+      : "Pro · ";
   return (
     <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b border-[var(--glass-border)] bg-card/40 px-5 py-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -521,13 +663,13 @@ function ChatHeader({
         </span>
         <div className="min-w-0">
           <CardTitle className="text-sm font-semibold leading-tight">
-            {t("assistant.chat.title")}
+            {sessionTitle || t("fidelity.assistant.newChat")}
           </CardTitle>
           <p className="truncate text-xs text-muted-foreground">
-            <span className="font-mono">{config.model}</span>
-            <span className="mx-1.5 opacity-50">·</span>
             <span className="font-mono">{config.endpoint}</span>
           </p>
+          <p className="t3-assistant-thread-meta" data-model={requestFailed ? undefined : config.model}
+            aria-label={requestFailed ? meta : meta + config.model}>{meta}</p>
         </div>
       </div>
       <div className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
@@ -592,6 +734,11 @@ function NotConfiguredCard() {
   ];
   return (
     <Card className="t3-manage-assistant overflow-hidden" data-testid="assistant-not-configured">
+      <div className="t3-assistant-no-key">
+        <div className="t3-assistant-no-key-head"><div><b>{t("nav.assistant")}</b><small>{t("fidelity.assistant.notConfigured")}</small></div><Link to="/settings/assistant" aria-label={t("fidelity.assistant.settings")}>···</Link></div>
+        <div className="t3-assistant-no-key-body"><span className="t3-assistant-no-key-icon"><svg width="22" height="22" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="6" cy="11" r="3" /><path d="M8 9l6-6M12 5l1.5 1.5" /></svg></span><h2>{t("fidelity.assistant.addKey")}</h2><p>{t("fidelity.assistant.keyExplanation")}</p><Link to="/settings/assistant" className="t3-assistant-no-key-cta">{t("fidelity.assistant.openSettings")}<ChevronRightIcon aria-hidden="true" /></Link><small>{t("fidelity.assistant.settingsNote")}</small></div>
+        <div className="t3-assistant-no-key-composer"><div>{t("fidelity.assistant.disabledPlaceholder")}<span><svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 9l12-5.5L11.5 15 9 10.5z" /></svg></span></div></div>
+      </div>
       <div className="relative">
         <div
           aria-hidden

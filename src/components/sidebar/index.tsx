@@ -1,28 +1,40 @@
 import { cn } from "@/lib/utils";
 import { Link, useMatch, useResolvedPath } from "react-router-dom";
-import {
-  DashboardIcon, BarChartIcon, BackpackIcon, MixIcon, ActivityLogIcon,
-  ClockIcon, LayersIcon, GearIcon, RocketIcon, ChevronLeftIcon,
-  ChevronRightIcon, BellIcon,
-} from "@radix-ui/react-icons";
+import type { ReactNode } from "react";
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import { useAlertBadge } from "../use-alert-badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-const overview = { to: "/overview", labelKey: "nav.overview", icon: DashboardIcon };
+const railIcon = (content: ReactNode) => function RailIcon({ className }: { className?: string }) {
+  return <svg viewBox="0 0 18 18" className={className} fill="none" stroke="currentColor" strokeWidth="1.5"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{content}</svg>;
+};
+const OverviewIcon = railIcon(<><rect x="2.5" y="2.5" width="5.5" height="5.5" rx="1" /><rect x="10" y="2.5" width="5.5" height="5.5" rx="1" /><rect x="2.5" y="10" width="5.5" height="5.5" rx="1" /><rect x="10" y="10" width="5.5" height="5.5" rx="1" /></>);
+const SummaryIcon = railIcon(<path d="M3 15V8M7 15V3M11 15v-5M15 15V6" />);
+const WalletsIcon = railIcon(<><rect x="2.5" y="4.5" width="13" height="9.5" rx="2" /><path d="M2.5 7.5h13M12 11h1.5" /></>);
+const ComparisonIcon = railIcon(<path d="M6 3v12M12 3v12M3 6l3-3 3 3M9 12l3 3 3-3" />);
+const CostIcon = railIcon(<path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" />);
+const HistoryIcon = railIcon(<path d="M2.5 9a6.5 6.5 0 1 0 2-4.7M2.5 3v3h3M9 5.5V9l2.5 1.5" />);
+const RebalanceIcon = railIcon(<path d="M3 6h9M9 3l3 3-3 3M15 12H6M9 9l-3 3 3 3" />);
+const GoalsIcon = railIcon(<><circle cx="9" cy="9" r="6.5" /><circle cx="9" cy="9" r="3" /></>);
+const AssistantIcon = railIcon(<path d="M3 4h12v8H8l-3.5 3v-3H3z" />);
+const SettingsIcon = railIcon(<><circle cx="9" cy="9" r="2.5" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" /></>);
+
+const overview = { to: "/overview", labelKey: "nav.overview", icon: OverviewIcon };
 const analyze = [
-  { to: "/summary", labelKey: "nav.summary", icon: BarChartIcon },
-  { to: "/wallets", labelKey: "nav.wallets", icon: BackpackIcon },
-  { to: "/comparison", labelKey: "nav.comparison", icon: MixIcon },
-  { to: "/cost-basis", labelKey: "nav.costBasis", icon: LayersIcon },
+  { to: "/summary", labelKey: "nav.summary", icon: SummaryIcon },
+  { to: "/wallets", labelKey: "nav.wallets", icon: WalletsIcon },
+  { to: "/comparison", labelKey: "nav.comparison", icon: ComparisonIcon },
+  { to: "/cost-basis", labelKey: "nav.costBasis", icon: CostIcon },
 ];
 const manage = [
-  { to: "/history", labelKey: "nav.history", icon: ClockIcon },
-  { to: "/rebalance", labelKey: "nav.rebalance", icon: ActivityLogIcon },
-  { to: "/goals", labelKey: "nav.goals", icon: BellIcon },
-  { to: "/assistant", labelKey: "nav.assistant", icon: RocketIcon },
+  { to: "/history", labelKey: "nav.history", icon: HistoryIcon },
+  { to: "/rebalance", labelKey: "nav.rebalance", icon: RebalanceIcon },
+  { to: "/goals", labelKey: "nav.goals", icon: GoalsIcon },
+  { to: "/assistant", labelKey: "nav.assistant", icon: AssistantIcon },
 ];
-const settings = { to: "/settings", labelKey: "nav.settings", icon: GearIcon };
+const settings = { to: "/settings", labelKey: "nav.settings", icon: SettingsIcon };
 
 type NavEntry = typeof overview;
 
@@ -57,7 +69,7 @@ function NavItem({ item, collapsed, unread }: { item: NavEntry; collapsed: boole
 function NavGroup({ label, items, collapsed, unread }: {
   label: string; items: NavEntry[]; collapsed: boolean; unread: number;
 }) {
-  return <div className="mt-2 border-t border-border pt-2">
+  return <div className="mt-[10px] space-y-[2px] border-t border-border pt-[10px]">
     {!collapsed && <div className="px-[9px] pb-1 text-xs text-muted-foreground">{label}</div>}
     {items.map((item) => <NavItem key={item.to} item={item} collapsed={collapsed}
       unread={item.to === "/goals" ? unread : undefined} />)}
@@ -70,15 +82,15 @@ export default function Sidebar({ collapsed, onToggle, isProUser }: {
   const { t } = useTranslation();
   const unread = useAlertBadge();
   return <aside style={{ width: collapsed ? "var(--sidebar-collapsed-width)" : "var(--sidebar-width)" }}
-    className="fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out">
-    <div className="flex h-14 shrink-0 items-center gap-2 px-[10px]">
+    className="t3-desktop-rail fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out">
+    <div className="flex h-[62px] shrink-0 items-start gap-2 px-[10px] pt-[14px]">
       <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-accent-data text-background dark:text-background">
-        <BarChartIcon className="h-[18px] w-[18px]" />
+        <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true"><path d="M8 20v-6M14 20V8M20 20v-4.5" fill="none" stroke="#0d0d0e" strokeWidth="2.4" strokeLinecap="round" /></svg>
       </span>
       {!collapsed && <span className="truncate text-[15px] font-bold">{t("app.brand")}</span>}
       {isProUser && !collapsed && <span className="rounded-pill bg-accent-data/15 px-2 text-xs text-foreground dark:text-accent-data">{t("app.proBadge")}</span>}
     </div>
-    <TooltipProvider delayDuration={220}><nav aria-label={t("nav.main", "Main navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-[10px] touch:px-[5px] pb-2">
+    <TooltipProvider delayDuration={220}><nav aria-label={t("nav.main", "Main navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-[10px] touch:px-[5px] pb-3">
       <NavItem item={overview} collapsed={collapsed} />
       <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} />
       <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} />

@@ -10,6 +10,18 @@ import {
 import type { InsightSeverity } from "@/middlelayers/insights";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { storePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
+import type { RebalanceHolding } from "@/middlelayers/rebalance";
+import { queryHistoricalPage } from "@/middlelayers/charts-history";
+import { queryLastRefreshAt } from "@/middlelayers/charts-assets";
+
+type AssistantInsightData = {
+  holdings: RebalanceHolding[];
+  total: number;
+  previousTotal?: number;
+  refreshedAt: string;
+  targets: { symbol: string; percent: number }[];
+  trades: Array<{ symbol: string; tradeValue: number }>;
+};
 
 function SeverityIcon({ severity }: { severity: InsightSeverity }) {
   return severity === "info"
@@ -19,13 +31,18 @@ function SeverityIcon({ severity }: { severity: InsightSeverity }) {
     }`} />;
 }
 
-export default function InsightsCard({ currency }: { currency?: CurrencyRateDetail }) {
+export default function InsightsCard({ currency, assistantView = false, onPickPrompt }: {
+  currency?: CurrencyRateDetail;
+  assistantView?: boolean;
+  onPickPrompt?: (prompt: string) => void;
+}) {
   const { t, locale } = useTranslation();
   const [card, setCard] = useState<StoredInsightCard>();
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
+  const [assistantData, setAssistantData] = useState<AssistantInsightData>();
   const reload = useCallback(async () => {
     try {
       const loaded = await loadInsightCard();
@@ -44,6 +61,31 @@ export default function InsightsCard({ currency }: { currency?: CurrencyRateDeta
     window.addEventListener(INSIGHTS_CHANGED_EVENT, onChanged);
     return () => window.removeEventListener(INSIGHTS_CHANGED_EVENT, onChanged);
   }, [reload]);
+  useEffect(() => {
+    if (!assistantView) return;
+    let cancelled = false;
+    void (async () => {
+      const { calculateRebalance, getRebalanceProfile, loadRebalanceHoldings } = await import("@/middlelayers/rebalance");
+      const refreshedAt = await queryLastRefreshAt();
+      if (!refreshedAt) return;
+      const referenceDate = new Date(Date.parse(refreshedAt) - 7 * 86400000);
+      const baseCurrency = currency ?? { currency: "USD", rate: 1, alias: "USD", symbol: "$" };
+      const [portfolio, previous, profile] = await Promise.all([
+        loadRebalanceHoldings(baseCurrency),
+        queryHistoricalPage({ start: new Date(0), end: referenceDate }, 1, 0),
+        getRebalanceProfile(),
+      ]);
+      const holdings = portfolio.holdings;
+      if (!cancelled) setAssistantData({
+        holdings, total: holdings.reduce((sum, row) => sum + row.value, 0),
+        previousTotal: previous.rows[0] ? previous.rows[0].total * baseCurrency.rate : undefined, refreshedAt,
+        trades: profile ? calculateRebalance(holdings, profile.targets, { stablecoinSymbols: portfolio.stablecoinSymbols, partialSnapshot: portfolio.partialSnapshot }).rows : [],
+        targets: profile?.targets.flatMap((target) => target.kind === "asset"
+          ? [{ symbol: target.symbol, percent: target.percent }] : []) ?? [],
+      });
+    })().catch(() => {});
+    return () => { cancelled = true; };
+  }, [assistantView, currency]);
 
   const visible = card?.insights.filter((insight) =>
     !card.dismissedIds.includes(insight.id) && !card.repeatedIds?.includes(insight.id)) ?? [];
@@ -63,6 +105,100 @@ export default function InsightsCard({ currency }: { currency?: CurrencyRateDeta
       setRegenerating(false);
     }
   };
+
+  if (assistantView && card && assistantData && visible.length > 0) {
+    const number = new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US",
+      { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const money = new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US",
+      { style: "currency", currency: currency?.currency ?? "USD" });
+    const wholeMoney = new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US",
+      { style: "currency", currency: currency?.currency ?? "USD", maximumFractionDigits: 0 });
+    const bySymbol = (symbol: string) => assistantData.holdings.find((holding) => holding.symbol === symbol);
+    const targetOf = (symbol: string) => assistantData.targets.find((target) => target.symbol === symbol)?.percent;
+    const toDisplay = (value: number) => money.format(value);
+    const rows = visible.flatMap((insight) => {
+      if (insight.messageKey === "insights.mover" && insight.data.window === "7d") {
+        const symbol = String(insight.data.symbol);
+        const holding = bySymbol(symbol);
+        const target = targetOf(symbol);
+        if (!holding || target === undefined || !Number.isFinite(Number(insight.data.changePercent))) return [];
+        const share = holding.value / assistantData.total * 100;
+        const title = t("fidelity.assistant.insightMoverTitle")
+          .replace("{symbol}", symbol).replace("{change}", number.format(Number(insight.data.changePercent)));
+        return [{
+          id: insight.id, title,
+          description: t("fidelity.assistant.insightMoverDescription")
+            .replace("{share}", number.format(share))
+            .replace("{difference}", number.format(Math.abs(share - target)))
+            .replace("{direction}", t(share >= target ? "fidelity.assistant.above" : "fidelity.assistant.below"))
+            .replace("{target}", number.format(target)),
+          action: t("fidelity.assistant.askAbout").replace("{symbol}", symbol),
+          prompt: t("insights.askQuestion").replace("{insight}", title),
+        }];
+      }
+      if (insight.messageKey === "insights.drift") {
+        const symbol = String(insight.data.symbol);
+        const target = targetOf(symbol);
+        const holding = bySymbol(symbol);
+        if (!holding || target === undefined) return [];
+        const difference = target - holding.value / assistantData.total * 100;
+        const buy = assistantData.trades.find((row) => row.symbol === symbol)?.tradeValue ?? 0;
+        const seller = assistantData.trades.filter((row) => row.tradeValue < 0)
+          .sort((a, b) => a.tradeValue - b.tradeValue)[0]?.symbol;
+        const title = t("fidelity.assistant.insightDriftTitle")
+          .replace("{symbol}", symbol).replace("{difference}", number.format(Math.abs(difference)))
+          .replace("{direction}", t(difference >= 0 ? "fidelity.assistant.under" : "fidelity.assistant.over"));
+        return [{
+          id: insight.id, title,
+          description: t("fidelity.assistant.insightDriftDescription")
+            .replace("{amount}", toDisplay(Math.abs(buy)))
+            .replace("{symbol}", symbol)
+            .replace("{target}", number.format(target))
+            .replace("{seller}", seller ?? t("fidelity.assistant.otherHoldings")),
+          action: t("fidelity.assistant.prompt.rebalance"),
+          prompt: t("fidelity.assistant.prompt.rebalance"),
+        }];
+      }
+      if (insight.messageKey === "insights.goalNear") {
+        const threshold = Number(insight.data.threshold);
+        if (!Number.isFinite(threshold) || threshold <= 0) return [];
+        const value = assistantData.total;
+        const gain = assistantData.previousTotal === undefined ? undefined : value - assistantData.previousTotal;
+        const title = t("fidelity.assistant.insightGoalTitle")
+          .replace("{progress}", number.format(value / (threshold * (currency?.rate ?? 1)) * 100))
+          .replace("{threshold}", wholeMoney.format(threshold * (currency?.rate ?? 1)));
+        return [{
+          id: insight.id, title,
+          description: t(gain === undefined ? "fidelity.assistant.insightGoalNoHistory" : "fidelity.assistant.insightGoalDescription")
+            .replace("{value}", toDisplay(value)).replace("{remaining}", toDisplay(threshold * (currency?.rate ?? 1) - value))
+            .replace("{gain}", toDisplay(gain ?? 0)),
+          action: t("fidelity.assistant.goalAction"),
+          prompt: t("fidelity.assistant.goalQuestion").replace("{threshold}", wholeMoney.format(threshold * (currency?.rate ?? 1))),
+        }];
+      }
+      const text = formatInsight(insight, t, locale, currency);
+      return [{ id: insight.id, title: text, description: "", action: t("insights.ask"), prompt: t("insights.askQuestion").replace("{insight}", text) }];
+    });
+    const ask = (prompt: string) => {
+      if (onPickPrompt) onPickPrompt(prompt);
+      else try { storePendingAssistantQuestion({ question: prompt }); } catch { /* The saved card stays readable. */ }
+    };
+    return <Card className="t3-insights-card t3-assistant-insights-card" role="region" aria-label={t("insights.title")}>
+      <CardHeader>
+        <CardTitle>{t("fidelity.assistant.insightsToday")}</CardTitle>
+        <span>{t("fidelity.assistant.insightsUpdated").replace("{time}", new Date(assistantData.refreshedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }))}</span>
+        <Button size="sm" variant="ghost" onClick={() => void regenerate()} disabled={regenerating}>
+          <ReloadIcon aria-hidden="true" className="h-3.5 w-3.5" />{t("fidelity.assistant.refresh")}
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {rows.map((row) => <div key={row.id} className="t3-assistant-insight-row">
+          <div><b>{row.title}</b><small>{row.description}</small></div>
+          <Button size="sm" variant="outline" onClick={() => ask(row.prompt)}>{row.action}</Button>
+        </div>)}
+      </CardContent>
+    </Card>;
+  }
 
   return (
     <Card className="t3-insights-card min-h-[104px]" role="region" aria-label={t("insights.title")}>

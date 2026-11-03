@@ -654,6 +654,33 @@ const routes = [
   "goals", "rebalance", "assistant",
 ];
 
+test("phone landscape assistant keeps thread, actions, and composer inside side safe areas", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent,
+    viewport: { width: 667, height: 375 }, hasTouch: true, isMobile: true });
+  try {
+    const page = await context.newPage();
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/assistant");
+    await expect(page.getByTestId("chat-thread")).toBeVisible();
+    await page.getByRole("button", { name: "Portfolio summary" }).click();
+    await expect(page.getByTestId("quick-action-analysis")).toBeVisible();
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty("--mobile-safe-left", "44px");
+      document.documentElement.style.setProperty("--mobile-safe-right", "34px");
+    });
+    for (const selector of ['[data-testid="chat-thread"]', ".ios-d3-quick-actions", ".ios-d3-chat-composer"]) {
+      const inset = await page.locator(`.ios-d3-chat ${selector}`).evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight) };
+      });
+      expect(inset.left, selector).toBeGreaterThanOrEqual(44);
+      expect(inset.right, selector).toBeGreaterThanOrEqual(34);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 for (const [name, width, height] of viewports) {
   for (const theme of ["light", "dark"] as const) {
     test(`${name} ${theme} route matrix fits the window without clipped text`, async ({ browser }) => {
@@ -677,6 +704,7 @@ for (const [name, width, height] of viewports) {
           if (route === "wallets") await expect(page.locator(".d2-wallets")).toBeVisible();
           if (route === "coins/BTC") await expect(page.locator(".d2-coin")).toBeVisible();
           if (route === "settings/sync") await expect(page.locator(".sync-settings-page")).toBeVisible();
+          if (route === "assistant") await expect(page.locator('[data-testid="chat-session-layout"], [data-testid="assistant-not-configured"]')).toBeVisible();
           await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
           await page.evaluate(({ left, right, top, bottom }) => {
             document.documentElement.style.setProperty("--mobile-safe-left", `${left}px`);
@@ -703,8 +731,14 @@ for (const [name, width, height] of viewports) {
           });
           expect(layout.documentWidth, `${name} ${theme} ${route}`).toBeLessThanOrEqual(width + 1);
           expect(layout.mainWidth, `${name} ${theme} ${route}`).toBeGreaterThan(0);
-          expect(layout.paddingLeft, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeLeft);
-          expect(layout.paddingRight, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeRight);
+          const horizontalInset = route === "assistant" && width < 700
+            ? await page.getByTestId("chat-thread").evaluate((thread) => {
+              const style = getComputedStyle(thread);
+              return { left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight) };
+            })
+            : { left: layout.paddingLeft, right: layout.paddingRight };
+          expect(horizontalInset.left, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeLeft);
+          expect(horizontalInset.right, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeRight);
           expect(layout.paddingTop, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeTop);
           expect(layout.paddingBottom, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeBottom);
           const navigation = page.locator(size === "compact" ? ".mobile-tab-bar a" : ".mobile-sidebar a");

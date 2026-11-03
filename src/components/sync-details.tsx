@@ -39,10 +39,11 @@ const formatBytes = (bytes: number) => bytes >= 1_000_000
   ? `${(bytes / 1_000_000).toFixed(1)} MB`
   : bytes >= 1_000 ? `${(bytes / 1_000).toFixed(1)} KB` : `${bytes.toLocaleString()} B`;
 
-export function SyncDetails({ report, diagnostics, t, ConfirmDialog = ConfirmDeleteDialog }: {
+export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialog = ConfirmDeleteDialog }: {
   report?: SyncReport;
   diagnostics?: SyncDiagnostics;
   t: (key: string, fallback?: string) => string;
+  summaryLabel?: string;
   ConfirmDialog?: typeof ConfirmDeleteDialog;
 }) {
   const [busy, setBusy] = useState<{ id: string; choice: "local" | "remote" } | null>(null);
@@ -92,7 +93,7 @@ export function SyncDetails({ report, diagnostics, t, ConfirmDialog = ConfirmDel
     } catch { setMessage(t("sync.details.copyFailed")); }
   }
   return <details className="border-t pt-2">
-    <summary className="cursor-pointer font-medium">{t("sync.details.title")}</summary>
+    <summary className="cursor-pointer font-medium">{summaryLabel ?? t("sync.details.title")}</summary>
     <div className="mt-3 space-y-4 text-xs">
       <section className="space-y-1">
         <h3 className="font-semibold">{t("sync.details.errors")}</h3>

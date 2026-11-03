@@ -13,6 +13,7 @@ type DeleteOptions<T, Result> = {
   onDeleted?: (result: Result) => void;
   onUndone?: () => void;
   successMessage: string;
+  successTitle?: string;
   undoLabel: string;
   undoAltText: string;
   undoWindowMs: number;
@@ -32,6 +33,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
     onDeleted,
     onUndone,
     successMessage,
+    successTitle,
     undoLabel,
     undoAltText,
     undoWindowMs,
@@ -55,6 +57,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
       
       onDeleted?.(result);
       toast({
+        ...(successTitle ? { title: successTitle } : {}),
         description: successMessage,
         duration: undoWindowMs,
         action: (

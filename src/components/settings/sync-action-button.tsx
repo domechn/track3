@@ -10,7 +10,7 @@ export function SyncActionButton({
       ? "sync-action-pending" : ""} ${props.className ?? ""}`}
       disabled={props.disabled || pending} aria-busy={pending}>
       <span className="inline-grid place-items-center">
-        <span className={`col-start-1 row-start-1 ${pending ? "invisible" : ""}`} aria-hidden={pending}>{children}</span>
+        <span className={`col-start-1 row-start-1 inline-flex items-center gap-2 ${pending ? "invisible" : ""}`} aria-hidden={pending}>{children}</span>
         <span className={`col-start-1 row-start-1 inline-flex items-center ${pending ? "" : "invisible"}`} aria-hidden={!pending}>
           <ReloadIcon aria-hidden="true" className="mr-2 h-4 w-4 motion-safe:animate-spin" />
           {pendingLabel}

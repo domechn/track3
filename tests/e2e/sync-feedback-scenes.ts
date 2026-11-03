@@ -233,6 +233,11 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           const now = page.getByRole("button", { name: locale === "en" ? "Sync now" : "立即同步" });
           await expect(now).toBeEnabled({ timeout: 15000 });
           await expect(page.getByRole("button", { name: locale === "en" ? "Sync idle" : "同步空闲" })).toBeVisible({ timeout: 15000 });
+          await expect.poll(() => page.evaluate(async () => {
+            const runtimeModule = "/src/middlelayers/sync/runtime.ts";
+            const { syncRuntime } = await import(runtimeModule);
+            return syncRuntime.status().sync.report?.pushed;
+          })).toBe(5);
 
           const nowWidth = (await now.boundingBox())!.width;
           const nowBackground = await now.evaluate((node) => getComputedStyle(node).backgroundColor);
@@ -248,7 +253,7 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           store.release();
           await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Sync complete" : "同步完成");
           await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Pushed 5" : "已推送 5 项");
+          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Up to date" : "已是最新");
           await shot(page, `${prefix}-now-success`);
 
           store.failList = true;

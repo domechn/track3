@@ -20,6 +20,9 @@ import {
   type Locale,
 } from "@/i18n";
 import { useOutletContext } from "react-router-dom";
+import { AppearanceDesign } from "./appearance-design";
+import { LanguageDesign } from "./language-design";
+import { useToast } from "./ui/use-toast";
 
 const App = ({
   onQuoteColorChange,
@@ -27,18 +30,29 @@ const App = ({
   onQuoteColorChange?: (val: QuoteColor) => void;
 }) => {
   const { t, locale, setLocale } = useTranslation();
+  const { toast } = useToast();
   const section = useOutletContext<string | null>();
   const showTheme = !section || section === "theme";
   const showLanguage = !section || section === "language";
   const [quoteColor, setQuoteColor] = useState<QuoteColor>("green-up-red-down");
   const [selectedTheme, setSelectedTheme] = useState<Theme>("light");
   const [selectedLocale, setSelectedLocale] = useState<Locale>(locale);
+  const languageToastRef = useRef<Locale>();
   const originalThemeRef = useRef<Theme>("light");
   const currentTheme = useTheme();
 
   useEffect(() => {
     loadGeneralSettings();
   }, []);
+  useEffect(() => {
+    if (languageToastRef.current !== locale) return;
+    languageToastRef.current = undefined;
+    toast({
+      title: t("fidelity.language.switched"),
+      description: locale === "zh" ? t("fidelity.language.switchedZh") : t("fidelity.language.switchedEn"),
+      className: "t3-fidelity-language-toast",
+    });
+  }, [locale, t, toast]);
 
   async function loadGeneralSettings() {
     const color = await getQuoteColor();
@@ -70,18 +84,29 @@ const App = ({
     if (!SUPPORTED_LOCALES.includes(next)) {
       return;
     }
+    languageToastRef.current = next;
     setSelectedLocale(next);
     setLocale(next);
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 t3-settings-appearance-content">
       <div>
         <h3 className="text-lg font-medium tracking-tight">{t(section === "language" ? "settings.phase6.language" : "appearance.title")}</h3>
         <p className="text-sm text-muted-foreground">
           {t("appearance.subtitle")}
         </p>
       </div>
+      {section === "theme" && <AppearanceDesign
+        selectedTheme={selectedTheme}
+        quoteColor={quoteColor}
+        onThemeChange={handleThemeValueChange}
+        onQuoteColorChange={handleQuoteColorValueChange}
+      />}
+      {section === "language" && <LanguageDesign
+        value={selectedLocale}
+        onChange={handleLanguageValueChange}
+      />}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
