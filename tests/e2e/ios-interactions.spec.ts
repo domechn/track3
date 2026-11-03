@@ -104,7 +104,7 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await clickCoinBack(page);
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
-  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20);
+  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50);
   await page.evaluate(() => scrollTo(0, 450));
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
@@ -122,6 +122,16 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+});
+
+test("History tab opens Analytics after its first load", async ({ page }) => {
+  await installTauriBridge(page, { richPortfolio: true });
+  await page.goto("/#/history");
+  await expect(page.locator(".history-mobile-list")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Analytics" }).click();
+  await expect(page).toHaveURL(/#\/summary$/);
+  await expect(page.locator("#app-main-content")).toHaveAttribute("data-route", "/summary", { timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Summary", exact: true })).toBeVisible({ timeout: 15_000 });
 });
 
 test("Back to an expanded Overview rank list restores its scroll", async ({ page }) => {
@@ -208,7 +218,7 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await historyRow.scrollIntoViewIfNeeded();
   const historyScroll = await page.evaluate(() => scrollY);
   await historyRow.click();
-  await page.getByRole("dialog", { name: /snapshot details/i }).getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog", { name: /snapshot details/i }).getByRole("button", { name: "Back" }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(historyScroll);
   await page.goto("/#/summary");
   await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
@@ -223,18 +233,17 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(summaryScroll);
 });
 
-test("History controls and Settings links preserve their page scroll", async ({ page }) => {
+test("History paging stays bounded and Settings links preserve their page scroll", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/history");
-  const rows = page.locator(".history-rows-trigger");
+  const rows = page.locator(".fidelity-history-pager button");
   await rows.scrollIntoViewIfNeeded();
   const historyScroll = await page.evaluate(() => scrollY);
   expect(historyScroll).toBeGreaterThan(0);
   await rows.click();
-  await expect(page.getByRole("option", { name: "50" })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(historyScroll);
+  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(10);
+  await expect(page.getByText("51–60 of 60")).toBeVisible();
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await page.locator(".mobile-more-hub").getByRole("link", { name: "Settings" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
@@ -255,7 +264,7 @@ test("History controls and Settings links preserve their page scroll", async ({ 
 test("rich History and Overview scrolling stay bounded without rebuilding charts", async ({ page, context }) => {
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/history");
-  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20);
+  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50, { timeout: 15_000 });
   const rowVisibility = await page.locator(".history-mobile-snapshot").first().evaluate((node) =>
     getComputedStyle(node).getPropertyValue("content-visibility"));
   const cdp = await context.newCDPSession(page);
@@ -273,6 +282,10 @@ test("rich History and Overview scrolling stay bounded without rebuilding charts
   };
   await page.goto("/#/overview");
   await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByRole("switch", { name: "Percent" })).toBeVisible();
+  await page.evaluate(() => new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   const start = await cdp.send("Performance.getMetrics");
   await page.evaluate(() => {
     const state = window as Window & { __perf?: { tasks: number; canvasAdds: number; canvasContexts: number } };
@@ -364,7 +377,7 @@ for (const width of [320, 375, 390, 430]) {
       expect(cells.overflow, JSON.stringify(cells)).toBeLessThanOrEqual(0);
       await rank.getByRole("button", { name: "Close" }).click();
       await page.goto("/#/overview");
-      await page.getByRole("button", { name: "Show More" }).click();
+      await page.locator(".t3-top-more").click();
       for (const shortRow of await page.locator(".top-coins-rank-mobile .mobile-list-row").all()) {
         const symbol = shortRow.locator(".mobile-list-label .truncate");
         const text = (await symbol.textContent())?.trim() ?? "";
@@ -377,17 +390,19 @@ for (const width of [320, 375, 390, 430]) {
       await expect(page.locator(".history-mobile-snapshot-button").first()).toBeVisible();
       await page.locator(".history-mobile-snapshot-button").first().click();
       const detail = page.getByRole("dialog", { name: /snapshot details/i });
-      await detail.getByRole("button", { name: "Delete snapshot" }).click();
-      await page.getByRole("alertdialog").getByRole("button", { name: "Confirm" }).click();
+      await detail.getByRole("button", { name: "Delete", exact: true }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "Delete snapshot" }).click();
       const undo = page.getByRole("button", { name: "Undo" });
-      const close = page.locator("[toast-close]").last();
       await expect(undo).toBeVisible();
       const undoBox = (await undo.boundingBox())!;
-      const closeBox = (await close.boundingBox())!;
       expect(await undo.evaluate((node) => getComputedStyle(node).marginLeft)).toBe("0px");
-      expect(undoBox.x + undoBox.width <= closeBox.x || closeBox.x + closeBox.width <= undoBox.x ||
-        undoBox.y + undoBox.height <= closeBox.y || closeBox.y + closeBox.height <= undoBox.y).toBe(true);
-      expect(Math.max(undoBox.y + undoBox.height, closeBox.y + closeBox.height)).toBeLessThanOrEqual(
+      const close = page.locator(".ios-d3-toast-viewport [toast-close]").last();
+      await expect(close).toBeVisible();
+      expect(undoBox.x + undoBox.width).toBeLessThanOrEqual((await close.boundingBox())!.x);
+      expect(undoBox.y + undoBox.height).toBeLessThanOrEqual(
+        (await page.locator(".mobile-tab-bar").boundingBox())!.y);
+      const closeBox = (await close.boundingBox())!;
+      expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(
         (await page.locator(".mobile-tab-bar").boundingBox())!.y);
     });
   }
@@ -399,10 +414,9 @@ test("Chinese long undo toast leaves the close target clear", async ({ page }) =
   await installTauriBridge(page);
   await page.goto("/#/history");
   await page.locator(".history-mobile-snapshot-button").first().click();
-  await page.getByRole("dialog").getByRole("button", { name: "删除快照" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: /确认/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: /删除快照/ }).click();
   const undo = page.getByRole("button", { name: "撤销" });
-  const close = page.getByRole("button", { name: "关闭" });
   await expect(undo).toBeVisible();
   await page.locator(".mobile-toast-copy").last().evaluate((node) => {
     node.textContent = "已删除记录；这是一段很长的提示文字，用来检查窄屏幕上的操作按钮布局。";
@@ -410,10 +424,11 @@ test("Chinese long undo toast leaves the close target clear", async ({ page }) =
   expect(await page.locator(".mobile-toast-copy").last().evaluate((node) =>
     getComputedStyle(node).userSelect)).toBe("text");
   const a = (await undo.boundingBox())!;
-  const b = (await close.boundingBox())!;
-  expect(a.x + a.width <= b.x || b.x + b.width <= a.x ||
-    a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
-  expect(Math.max(a.y + a.height, b.y + b.height)).toBeLessThanOrEqual(
+  const close = page.locator(".ios-d3-toast-viewport [toast-close]").last();
+  await expect(close).toBeVisible();
+  const closeBox = (await close.boundingBox())!;
+  expect(a.x + a.width).toBeLessThanOrEqual(closeBox.x);
+  expect(a.y + a.height).toBeLessThanOrEqual(
     (await page.locator(".mobile-tab-bar").boundingBox())!.y);
 });
 

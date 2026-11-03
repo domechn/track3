@@ -526,6 +526,9 @@ body:has(.t3-refresh-popover[data-state="open"]) [data-radix-popper-content-wrap
 }
 .analyze-source-picker button[aria-pressed="true"] { border-color: hsl(var(--foreground)); background: hsl(var(--foreground)); color: hsl(var(--background)); }
 .analyze-source-picker button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .analyze-source-picker button { min-height: 44px; }
+}
 .analyze-coin-source-list { display: none; }
 .analyze-coin .analyze-coin-source-list { display: block; }
 .analyze-source-list { display: grid; }
@@ -615,6 +618,9 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .coin-chart-modes button { min-height: 30px; border-radius: var(--radius-pill); padding: 4px 11px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .coin-chart-modes button[aria-pressed="true"] { background: hsl(var(--raised)); color: hsl(var(--foreground)); }
 .coin-chart-modes button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+@media (pointer: coarse) {
+  .coin-chart-modes button { min-height: 44px; }
+}
 @media (max-width: 1100px) {
   .analyze-summary-hero { grid-template-columns: minmax(0, 1fr); }
   .analyze-profit-summary .analyze-period-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -901,6 +907,12 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .t3-settings-source-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid hsl(var(--border)); }
 @media (pointer: coarse) {
   .t3-settings-menu-link { min-height: 44px; }
+  .t3-settings-content label[for="exportConfigurationCheckbox"] {
+    display: flex;
+    min-height: 44px;
+    flex-direction: column;
+    justify-content: center;
+  }
 }
 .t3-settings-source-tabs button { position: relative; min-height: 42px; flex: none; padding: 0 12px; color: hsl(var(--muted-foreground)); font-size: 13px; }
 .t3-settings-source-tabs button[aria-pressed="true"] { color: hsl(var(--foreground)); }

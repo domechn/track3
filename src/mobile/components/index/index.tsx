@@ -74,6 +74,7 @@ import { MobileIcon, type MobileIconName } from "@/mobile/components/mobile/icon
 import { useAlertBadge } from "@/mobile/components/use-alert-badge";
 import { MobileHeaderTotal } from "@/mobile/components/mobile/header-total";
 import { ChevronLeftIcon } from "@radix-ui/react-icons";
+import { hasActiveSource } from "@/mobile/components/common/active-source";
 
 const Setting = React.lazy(() => import("@/mobile/components/settings"));
 const HistoricalData = React.lazy(() => import("@/mobile/components/historical-data"));
@@ -157,13 +158,7 @@ function TopBar({
     let active = true;
     void getConfiguration().then((config) => {
       if (!active) return;
-      const chains = ["erc20", "sol", "btc", "doge", "trc20", "ton", "sui"] as const;
-      setConfiguredSource(Boolean(
-        config?.others?.length || config?.exchanges?.some((exchange) => exchange.active !== false) ||
-        config?.stockConfig?.brokers?.some((broker) => broker.active !== false) ||
-        chains.some((chain) => config?.[chain]?.addresses?.some((address) =>
-          typeof address === "string" || address.active !== false)),
-      ));
+      setConfiguredSource(hasActiveSource(config));
     }).catch(() => { if (active) setConfiguredSource(false); });
     return () => { active = false; };
   }, [mobile, overview, availableDates.length]);
@@ -332,6 +327,11 @@ function Layout({
   const swipeStart = useRef<{ id: number; x: number; y: number } | null>(null);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const refreshAction = useRef<(() => Promise<void>) | null>(null);
+  useEffect(() => {
+    const refresh = () => { void refreshAction.current?.(); };
+    window.addEventListener("track3:full-refresh", refresh);
+    return () => window.removeEventListener("track3:full-refresh", refresh);
+  }, []);
   useLayoutEffect(() => {
     const previous = previousRoute.current;
     if (previous.tab === currentTab && previous.path === routePath) return;
@@ -411,7 +411,7 @@ function Layout({
         />
 
         {/* Main content */}
-        <main id="app-main-content" tabIndex={-1} className="p-5"
+        <main id="app-main-content" tabIndex={-1} className="p-5" data-route={location.pathname}
           onContextMenuCapture={(event) => {
             if ((event.target as Element).closest("canvas")) event.preventDefault();
           }}
@@ -440,7 +440,9 @@ function Layout({
           }}
           onPointerCancel={() => { swipeStart.current = null; }}>
           <PullToRefresh disabled={/^\/assistant(\/|$)/.test(location.pathname)} onRefresh={onLocalRefresh}>
-          {!/^\/(settings|goals|rebalance)(\/|$)/.test(location.pathname) && <div className="mobile-route-heading">
+          {!/^\/(settings|goals|rebalance)(\/|$)/.test(location.pathname)
+            && !(mobile && sizeClass.width === "compact" && location.pathname === "/history")
+            && <div className="mobile-route-heading">
             <MobilePage title={routeTitle(location.pathname, t)} />
           </div>}
           <div className="relative min-h-[400px] min-w-0" aria-busy={initializing}>
@@ -625,6 +627,7 @@ function AppRoutes({
   handleConfigurationSave,
 }: AppRoutesProps) {
   const location = useLocation();
+  const isPhone = useSizeClass().width === "compact";
   const [overviewExpanded, setOverviewExpanded] = useState(false);
 
   useEffect(() => {
@@ -737,6 +740,7 @@ function AppRoutes({
               <PageWrapper
                 dateRange={tDateRange}
                 hasData={hasData || retainHistory}
+                allowEmpty={isPhone}
               >
                 <HistoricalData
                   currency={currentCurrency}

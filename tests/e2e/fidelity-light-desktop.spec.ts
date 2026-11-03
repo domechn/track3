@@ -47,6 +47,7 @@ test("system theme switches wide Rebalance and Goals layouts when OS appearance 
   await page.goto("/#/goals/kinds");
   await expect(page.locator(".t3-fidelity-rail")).toBeVisible();
   await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.locator("html")).toHaveClass(/light/);
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
-  await expect(page.locator(".t3-fidelity-rail")).toHaveCount(0);
+  await expect(page.locator(".t3-fidelity-rail")).toBeHidden();
 });

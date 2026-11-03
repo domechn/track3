@@ -20,8 +20,9 @@ import { readCostBasisSettings, setCostBasisSettingsFromPage } from "@/middlelay
 import { FinanceChartSkeleton } from "@/mobile/components/finance-charts";
 import { CostBasisPanels } from "@/components/cost-basis-panels";
 import type { QuoteColor } from "@/middlelayers/types";
-import { MobileRecordList, useIsMobile, type MobileRecord } from "@/mobile/components/mobile";
+import { MobileRecordList, useIsMobile, useSizeClass, type MobileRecord } from "@/mobile/components/mobile";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
+import { PhoneCostBasis } from "@/mobile/components/cost-basis-phone";
 
 const methods: CostBasisMethod[] = ["FIFO", "LIFO", "HIFO", "AVERAGE"];
 const pageSize = 50;
@@ -68,6 +69,8 @@ function PageControls({
 export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { quoteColor?: QuoteColor }) {
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
+  const widthClass = useSizeClass().width;
+  const isPhone = isMobile && widthClass === "compact";
   const dataVersion = useDataChangedVersion();
   const currentYear = String(new Date().getFullYear());
   const [method, setMethod] = useState<CostBasisMethod>("FIFO");
@@ -194,6 +197,22 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
   const aiSetup = <AISetupCard page="cost-basis"
     summary={`${t("cost.method")}: ${method}; ${t("cost.from")}: ${from}; ${t("cost.to")}: ${to}; ${t("cost.holdingDays")}: ${holdingDaysInput}`}
     suggestions={["cost.ai.fifo", "cost.ai.average", "cost.ai.export"].map((key) => t(key))} />;
+
+  if (isPhone) return <><PhoneCostBasis report={report} loading={loading} method={method} year={year}
+    from={from} to={to} holdingDays={holdingDaysInput} validRange={validRange} filtersCurrent={filtersCurrent}
+    quoteColor={quoteColor} onMethod={(next) => { void changeMethod(next); }}
+    onHoldingDays={(next) => { manualFilterEdit.current = true; setHoldingDaysInput(next); }}
+    onYear={(next) => {
+      manualFilterEdit.current = true;
+      setYear(next);
+      if (/^\d{4}$/.test(next)) {
+        setFrom(`${next}-01-01`);
+        setTo(`${next}-12-31`);
+      }
+    }}
+    onFrom={(next) => { manualFilterEdit.current = true; setFrom(next); setYear(""); }}
+    onTo={(next) => { manualFilterEdit.current = true; setTo(next); setYear(""); }}
+    onExport={(format) => { void exportReport(format); }} />{aiSetup}</>;
 
   return (
     <div className="d2-cost flex flex-col gap-5">

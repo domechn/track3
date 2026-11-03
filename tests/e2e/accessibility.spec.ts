@@ -367,6 +367,10 @@ test("visible controls across routes have 44px targets or 44px labels", async ({
   await installTauriBridge(page);
   for (const route of routes) {
     await page.goto(`/#${route}`);
+    await page.reload();
+    if (route.startsWith("/settings/")) {
+      await expect(page.locator(".t3-settings-layout")).toBeVisible();
+    }
     await expect(page.locator("main > div")).toHaveAttribute("aria-busy", "false");
     const small = await page.locator("main button, main a, main input, main select, aside button, aside a, header button, header a").evaluateAll((controls) =>
       controls.filter((control) => {

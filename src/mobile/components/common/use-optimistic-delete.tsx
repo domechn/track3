@@ -13,6 +13,7 @@ type DeleteOptions<T, Result> = {
   onDeleted?: (result: Result) => void;
   onUndone?: () => void;
   successMessage: string;
+  successTitle?: string;
   undoLabel: string;
   undoAltText: string;
   undoWindowMs: number;
@@ -32,6 +33,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
     onDeleted,
     onUndone,
     successMessage,
+    successTitle,
     undoLabel,
     undoAltText,
     undoWindowMs,
@@ -55,6 +57,8 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
 
       onDeleted?.(result);
       toast({
+        className: successTitle ? "fidelity-history-delete-toast" : undefined,
+        title: successTitle,
         description: successMessage,
         duration: undoWindowMs,
         action: (
@@ -74,6 +78,10 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
                 });
             }}
           >
+            {successTitle && <svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor"
+              strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 7h6a3.5 3.5 0 0 1 0 7H7M5 7l2.5-2.5M5 7l2.5 2.5" />
+            </svg>}
             {undoLabel}
           </ToastAction>
         ),
