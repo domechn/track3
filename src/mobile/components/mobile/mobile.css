@@ -617,8 +617,8 @@
       padding-inline: max(1rem, var(--mobile-safe-left)) max(1rem, var(--mobile-safe-right));
     }
     #app-main-content .ios-d3-chat {
-      width: calc(100% + max(1rem, var(--mobile-safe-left)) + max(1rem, var(--mobile-safe-right)));
-      margin-left: calc(-1 * max(1rem, var(--mobile-safe-left)));
+      width: calc(100% + var(--mobile-safe-left) + var(--mobile-safe-right));
+      margin-left: calc(-1 * var(--mobile-safe-left));
     }
   }
   .ios-d3-chat [data-testid="chat-thread"] { padding-inline: max(16px, var(--mobile-safe-left)) max(16px, var(--mobile-safe-right)); }

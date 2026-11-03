@@ -68,8 +68,8 @@ test("startup failure leaves recovery routes and pushed titles reachable", async
 test("pushed titles and goal editor actions use the same balanced insets", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await installTauriBridge(page, { richPortfolio: true });
-  await page.goto("/#/goals");
-  await expect(page.getByRole("heading", { name: "Goals & Alerts" })).toBeVisible();
+  await page.goto("/#/settings/data?section=backup");
+  await expect(page.getByRole("heading", { name: "Backup & data" })).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 500));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(64);
   const pushedTitle = page.locator("#app-top-bar .ios-d3-pushed-title");

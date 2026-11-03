@@ -96,7 +96,8 @@ test("replay asks for confirmation before showing the guide", async ({ page }) =
   await expect(page.getByRole("dialog", { name: "Replay the first-run guide?" })).toBeVisible()
   await page.getByRole("button", { name: "Start guide" }).click()
   await expect(page.getByTestId("onboarding-dialog")).toHaveAttribute("data-step", "welcome")
-  await expect(page.getByRole("heading", { name: "Welcome to Track3" })).toBeVisible()
+  await expect(page.getByRole("region", { name: "Welcome to Track3" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Your data stays on this device" })).toBeVisible()
 })
 
 test("startup lock hides the guide", async ({ page }) => {

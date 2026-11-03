@@ -14,8 +14,6 @@ export async function exerciseRecoveryFile(page: Page) {
   page.on("console", (message) => logs.push(message.text()));
   await page.goto("/#/settings/sync");
   await expect(page.locator(".sync-settings-page")).toBeVisible();
-  const skip = page.getByRole("button", { name: "Skip for now" });
-  if (await skip.isVisible()) await skip.click();
   await page.locator(".sync-settings-page").getByLabel("Sync passphrase").fill(syncPassphrase);
   await page.locator(".sync-settings-page").getByRole("button", { name: "Unlock sync" }).click();
   await expect(page.locator(".sync-settings-page")).toContainText("Sync is unlocked for this app session");
@@ -52,8 +50,6 @@ export async function exerciseRecoveryFile(page: Page) {
   await page.goto("/#/settings/sync");
   await page.reload();
   await expect(page.locator(".sync-settings-page")).toBeVisible();
-  const skipAgain = page.getByRole("button", { name: "Skip for now" });
-  if (await skipAgain.isVisible()) await skipAgain.click();
   await page.locator(".sync-settings-page").getByRole("button", { name: "Use recovery file" }).click();
   await page.locator(".sync-settings-page").getByRole("button", { name: "Choose .t3key file" }).click();
   await page.locator(".sync-settings-page").getByLabel("Recovery file passphrase", { exact: true }).fill(filePassphrase);
