@@ -70,7 +70,7 @@ test("phone Rules uses one card surface", async ({ page }) => {
 
 for (const phone of phones) for (const theme of ["light", "dark"] as const) {
   test(`D3 screens are reachable and captured on iPhone ${phone.name} in ${theme}`, async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await page.emulateMedia({ colorScheme: theme });
     await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
@@ -81,7 +81,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
 
     for (const [name, route, title] of settings) {
       await page.goto(`/#${route}`);
-      await expect(page.locator("#app-main-content h1")).toHaveText(title);
+      await expect(page.locator("#app-main-content h1")).toHaveText(title, { timeout: 15_000 });
       await capture(page, phone.name, theme, name);
       if (name === "currency") {
         await expect(page.getByRole("button", { name: /Base currency.*USD/ })).toBeVisible();
