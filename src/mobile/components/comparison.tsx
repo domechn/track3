@@ -39,6 +39,9 @@ import { BottomSheet, DeltaPill, SegmentedControl, useHaptics, useIsMobile } fro
 import { isSameDay } from "date-fns";
 import { useTranslation } from "@/mobile/i18n";
 import ComparisonMoversPanel from "@/components/comparison-movers-panel";
+import ComparisonFidelity from "@/mobile/components/comparison-fidelity";
+import { useSizeClass } from "@/mobile/components/mobile";
+import { isIOS } from "@/utils/platform";
 
 type MetricRow = {
   base: number;
@@ -46,7 +49,7 @@ type MetricRow = {
   changePercent: number;
 };
 
-type CoinComparison = {
+export type CoinComparison = {
   symbol: string;
   assetType: "crypto" | "stock";
   amount: MetricRow;
@@ -57,7 +60,7 @@ type CoinComparison = {
 type QuickCompareType = "7D" | "1M" | "1Y" | "YTD" | "ALL";
 const quickRanges: QuickCompareType[] = ["7D", "1M", "1Y", "YTD", "ALL"];
 
-type DateOption = {
+export type DateOption = {
   label: string;
   value: string;
   createdAt?: string;
@@ -74,6 +77,7 @@ const App = ({
 }) => {
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
+  const compact = useSizeClass().width === "compact" && isIOS();
   const haptic = useHaptics();
   const quickSwipeStart = useRef<{ x: number; y: number } | null>(null);
   const initialHeadRef = useRef(new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("head"));
@@ -513,6 +517,10 @@ const App = ({
 
   const hasData = coinComparisons.length > 0;
 
+  if (compact) return <ComparisonFidelity currency={currency} quoteColor={quoteColor} busy={pageLoading}
+    dateOptions={dateOptions} baseId={baseId} headId={headId} onBaseChange={onBaseDateChange}
+    onHeadChange={onHeadDateChange} coins={coinComparisons} baseTotal={totalValue.base} headTotal={totalValue.head}
+    masked={shouldMaskValue} onToggleMask={onViewOrHideClick} />;
   return (
     <div className="d2-comparison analyze-comparison relative min-h-[400px]" aria-busy={pageLoading}>
       {!isMobile && <h1 className="sr-only">{t("comparison.h1")}</h1>}

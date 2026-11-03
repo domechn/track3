@@ -11,6 +11,7 @@ const pill = {
   zh: { locked: "同步已锁定", skipped: "同步已锁定，点按以解锁", idle: "同步空闲", syncing: "正在同步", error: "同步错误" },
 };
 const skip = { en: "Skip for now", zh: "暂时跳过" };
+const mobileSkip = { en: "Continue without sync", zh: "不使用同步，继续" };
 
 async function publish(page: Page, sync: Record<string, unknown>) {
   await page.evaluate(async (sync) => {
@@ -42,8 +43,12 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
   };
   await expect(button(pill[locale].locked)).toBeVisible();
   await expect(page.getByRole("dialog")).toBeVisible();
+  if (platform === "mobile") {
+    await expect(button(locale === "en" ? "Unlock" : "解锁")).toBeVisible();
+    await expect(button(mobileSkip[locale])).toBeVisible();
+  }
   await capture("locked");
-  await button(skip[locale]).click();
+  await button(platform === "mobile" ? mobileSkip[locale] : skip[locale]).click();
   await expect(button(pill[locale].skipped)).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.screenshot({ path: `${output}/${size}-${theme}-${locale}-skipped.png`, animations: "disabled" });
@@ -92,7 +97,7 @@ export async function captureSyncStatusWithToast(page: Page, platform: Platform)
   await page.setViewportSize({ width: mobile ? 390 : 1280, height: mobile ? 844 : 800 });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/settings/sync");
-  await page.getByRole("button", { name: "Skip for now" }).click();
+  await page.getByRole("button", { name: platform === "mobile" ? "Continue without sync" : "Skip for now" }).click();
   await publish(page, { phase: "error", error: "bucket" });
   await page.evaluate(async (mobile) => {
     const { toast } = await import(/* @vite-ignore */ (mobile

@@ -220,7 +220,7 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
   const sourceKind = (wallet: string) => {
     if (assetType === "stock") return label("broker");
     const kind = (data?.aliases[wallet]?.type ?? wallet).toLowerCase();
-    return ["binance", "okx", "kraken", "bybit", "coinbase", "gate", "bitget", "htx", "mexc"].includes(kind)
+    return ["binance", "okx", "okex", "kraken", "bybit", "coinbase", "gate", "bitget", "htx", "mexc"].includes(kind)
       ? label("exchange") : kind === "ibkr" ? label("broker") : label("wallet");
   };
   const description = data?.manual

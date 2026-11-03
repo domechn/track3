@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/mobile/i18n";
 import { isIOS } from "@/utils/platform";
 import { useHaptics } from "@/utils/use-haptics";
+import { refreshProgressEvent, type RefreshProgressDetail } from "@/mobile/components/refresh-progress-event";
 import "@/mobile/components/mobile/mobile.css";
 export { AnimatedAmount, Button, DeltaPill, EmptyState, IconButton, MobileCard, MobileSkeleton, Pill, SectionHeader } from "@/mobile/components/mobile/design";
 export { MobileIcon } from "@/mobile/components/mobile/icons";
@@ -233,15 +234,22 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
   </div>;
 }
 
-export function PullToRefresh({ children, onRefresh, disabled, className }: React.PropsWithChildren<{
-  onRefresh: () => void | Promise<void>; disabled?: boolean; className?: string;
+export function PullToRefresh({ children, onRefresh, disabled, className, sourceProgress, lastRefreshAt }: React.PropsWithChildren<{
+  onRefresh: () => void | Promise<void>; disabled?: boolean; className?: string; sourceProgress?: boolean; lastRefreshAt?: string;
 }>) {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [progress, setProgress] = useState<RefreshProgressDetail | null>(null);
   const haptic = useHaptics();
   const { t } = useTranslation();
   const start = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => () => { start.current = null; }, []);
+  useEffect(() => {
+    if (!sourceProgress) return;
+    const update = (event: Event) => setProgress((event as CustomEvent<RefreshProgressDetail>).detail);
+    window.addEventListener(refreshProgressEvent, update);
+    return () => window.removeEventListener(refreshProgressEvent, update);
+  }, [sourceProgress]);
   return <div data-testid="pull-to-refresh" className={className}
     onTouchStart={(event) => {
       if (!event.currentTarget.contains(event.target as Node)) return;
@@ -271,9 +279,19 @@ export function PullToRefresh({ children, onRefresh, disabled, className }: Reac
       setRefreshing(true);
       void Promise.resolve(onRefresh()).finally(() => setRefreshing(false));
     }}>
-    {(pull > 0 || refreshing) && <div className="mobile-pull-indicator" role="status"
+    {sourceProgress && progress?.active && <div className="fd-pull-progress" role="status">
+      <span className="fd-pull-ring" aria-hidden="true" />
+      <div><b>{t("fidelity.overview.refreshingSources")}</b><span>{t("fidelity.overview.refreshProgress")
+        .replace("{done}", String(progress.completed.length))
+        .replace("{total}", String(progress.total))
+        .replace("{sources}", progress.completed.join(", "))}</span></div>
+    </div>}
+    {(pull > 0 || refreshing) && !(sourceProgress && progress?.active) && <div className="mobile-pull-indicator" role="status"
       aria-label={t("mobile.refreshView")} style={{ minHeight: pull || 44 }}>
-      <span className={refreshing ? "animate-spin" : ""} aria-hidden="true">↻</span>
+      {sourceProgress ? <>
+        <svg className={refreshing ? "animate-spin" : ""} width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="#2a2a2e" strokeWidth="2" /><path d="M12 2a10 10 0 1 1-9.5 7" stroke="#4a8ad6" strokeWidth="2" strokeLinecap="round" /></svg>
+        <span>{pull >= 72 ? t("fidelity.refresh.releaseToRefresh").replace("{time}", lastRefreshAt?.match(/\d\d:\d\d/)?.[0] ?? "—") : t("mobile.refreshView")}</span>
+      </> : <span className={refreshing ? "animate-spin" : ""} aria-hidden="true">↻</span>}
     </div>}
     {children}
   </div>;

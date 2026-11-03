@@ -24,7 +24,7 @@ export function Toaster() {
                   className={syncStatus ? "line-clamp-3 !text-sm leading-5 opacity-100" : ""}>{description}</ToastDescription>
               )}
             </div>
-            {action}
+            {Array.isArray(action) ? <div className="mobile-toast-actions">{action}</div> : action}
             <ToastClose />
           </Toast>
         )

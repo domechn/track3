@@ -214,16 +214,16 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
             .toBeLessThan(1);
           if (platform === "desktop" && theme === "light" && locale === "en") {
             await page.waitForTimeout(4200);
-            await expect(toast.locator("> li[data-state=open]")).toContainText("Testing…");
+            await expect(toast.locator("> li[data-state=open]").filter({ hasText: "Testing…" })).toBeVisible();
           }
           await shotPending(page, `${prefix}-test-pending`);
           store.release();
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Connection OK" : "连接正常");
+          await expect(toast.locator("> li[data-state=open]").filter({ hasText: locale === "en" ? "Connection OK" : "连接正常" })).toBeVisible();
           await shot(page, `${prefix}-test-success`);
 
           store.ignoreConditions = true;
           await testButton.click();
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "conditional writes" : "条件写入");
+          await expect(toast.locator("> li[data-state=open]").filter({ hasText: locale === "en" ? "conditional writes" : "条件写入" })).toBeVisible();
           await shot(page, `${prefix}-test-error`);
           store.ignoreConditions = false;
 
@@ -236,7 +236,6 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           await expect(now).toBeEnabled({ timeout: 15000 });
           await expect(page.getByRole("button", { name: locale === "en" ? "Sync idle" : "同步空闲" })).toBeVisible({ timeout: 15000 });
           await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
-          await expect(page.getByRole("button", { name: locale === "en" ? "Sync idle" : "同步空闲" })).toBeVisible({ timeout: 15000 });
           await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
             query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
               VALUES ('manual-sync-snapshot', '2024-01-03T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 43000, 43000)`,
@@ -263,7 +262,7 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
 
           store.failList = true;
           await now.click();
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Bucket not found." : "存储桶");
+          await expect(toast.locator("> li[data-state=open]").filter({ hasText: locale === "en" ? "Bucket not found." : "存储桶" })).toBeVisible();
           await shot(page, `${prefix}-now-error`);
 
           await page.evaluate(async ({ mobile, locale }) => {
@@ -289,8 +288,11 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
             await page.waitForTimeout(350);
             await shot(page, `${prefix}-collapsed-long-error`);
           }
-          await toast.locator("> li[data-state=open] [toast-close]").click();
-          await expect(toast.locator("> li[data-state=open]")).toHaveCount(0);
+          const longToast = toast.locator("> li[data-state=open]").filter({
+            hasText: locale === "en" ? "The sync store did not finish" : "同步存储未完成请求",
+          });
+          await longToast.locator("[toast-close]").click();
+          await expect(longToast).toHaveCount(0);
         } finally {
           await context.close();
         }

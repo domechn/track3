@@ -1,5 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { LockClosedIcon } from "@radix-ui/react-icons";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ExclamationTriangleIcon, EyeClosedIcon, EyeOpenIcon, InfoCircledIcon, LockClosedIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,8 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
   const [disableError, setDisableError] = useState("");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showPassphrase, setShowPassphrase] = useState(false);
+  const recoveryRef = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -65,7 +67,8 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
     setBusy(true);
     try {
       const result = await syncRuntime.unlock(passphrase);
-      setError(result === "ok" ? "" : t(`sync.connection.${result}`));
+      setError(result === "ok" ? "" : mobile && result === "passphrase"
+        ? t("fidelity.startup.syncWrongPassphrase") : t(`sync.connection.${result}`));
       if (result === "ok") {
         setPassphrase("");
         setOpen(false);
@@ -106,6 +109,9 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
               : "t3-topbar-sync-button flex min-h-9 touch:min-h-11 items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"}>
             {muted ? <LockClosedIcon aria-hidden="true" /> : <>
               <span aria-hidden="true" className={`h-2 w-2 rounded-full ${phase === "error" || phase === "unreadable" ? "bg-destructive" : phase === "conflict" ? "bg-amber-500" : phase === "syncing" ? "bg-primary animate-pulse motion-reduce:animate-none" : "bg-muted-foreground"}`} />
+              {mobile && <svg className="fd-sync-cloud-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                <path d="M5.3 14.5h9a3.4 3.4 0 0 0 .2-6.8 4.8 4.8 0 0 0-9.1-1.2 4 4 0 0 0-.1 8z" />
+              </svg>}
               {statusLabel}
             </>}
           </button>
@@ -118,12 +124,52 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           onInteractOutside={(event) => {
             if (document.querySelector('[role="alertdialog"]')) event.preventDefault();
           }}
+          data-locked={mobile && locked}
           className={`t3-sync-popover max-h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${mobile ? "ios-d3-sync-popover" : ""}`}>
-          <h2 className="text-base font-semibold">{t("sync.status.details")}</h2>
+          {!(mobile && locked) && <h2 className="text-base font-semibold">{t("sync.status.details")}</h2>}
           {status.mode === "unreadable" ? <>
             <p role="alert" className="text-destructive">{t("sync.unreadable")}</p>
             <a href="#/settings/sync" className="text-primary underline">{t("sync.reenter")}</a>
-          </> : locked ? (
+          </> : locked && mobile ? (
+            <div className="fd-sync-locked">
+              <LockClosedIcon className="fd-sync-lock-icon" aria-hidden="true" />
+              <h2>{t("fidelity.startup.syncLocked")}</h2>
+              <p>{t("fidelity.startup.syncDescription")}</p>
+              <Label htmlFor="sync-status-passphrase">{t("fidelity.startup.syncPassphrase")}</Label>
+              <div className="fd-sync-passphrase">
+                <Input id="sync-status-passphrase" type={showPassphrase ? "text" : "password"} autoComplete="off"
+                  aria-invalid={!!error} aria-describedby={error ? "sync-status-passphrase-error" : undefined}
+                  value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
+                <button type="button" aria-label={t(showPassphrase ? "fidelity.startup.hidePassphrase" : "fidelity.startup.showPassphrase")}
+                  onClick={() => setShowPassphrase((shown) => !shown)}>
+                  {showPassphrase ? <EyeClosedIcon aria-hidden="true" /> : <EyeOpenIcon aria-hidden="true" />}
+                </button>
+              </div>
+              {!error && <p className="fd-sync-passphrase-hint">{t("fidelity.startup.syncHint")}</p>}
+              {error && <p id="sync-status-passphrase-error" role="alert" className="ios-d3-sync-unlock-error">
+                <ExclamationTriangleIcon aria-hidden="true" />{error}</p>}
+              <button type="button" className="fd-sync-forgot" onClick={() => recoveryRef.current?.scrollIntoView({ block: "start" })}>
+                {t("fidelity.startup.forgotPassphrase")}</button>
+              <Button className="fd-sync-unlock" disabled={busy} onClick={() => void unlock()}>{t("fidelity.startup.unlock")}</Button>
+              <Button className="fd-sync-skip" disabled={busy} onClick={() => {
+                syncRuntime.skip();
+                setOpen(false);
+              }}>{t("fidelity.startup.continueWithoutSync")}</Button>
+              <div className="fd-sync-secondary" ref={recoveryRef}>
+                <SyncRecoveryUnlock t={t} />
+                {disableError && <p role="alert" className="text-destructive">{disableError}</p>}
+                <ConfirmDialog
+                  trigger={<Button size="sm" variant="link" disabled={busy}
+                    className="h-auto min-h-11 justify-start whitespace-normal px-0 text-left text-muted-foreground"
+                  >{t("sync.status.turnOffDevice")}</Button>}
+                  title={t("sync.status.turnOffTitle")}
+                  description={t("sync.status.turnOffDescription")}
+                  cancelLabel={t("common.cancel")}
+                  actions={[{ label: t("sync.status.turnOffConfirm"), onClick: () => { void disable(); } }]}
+                />
+              </div>
+            </div>
+          ) : locked ? (
             <div className="space-y-2">
               <Label htmlFor="sync-status-passphrase">{t("sync.passphrase.label")}</Label>
               <Input id="sync-status-passphrase" type="password" autoComplete="off"
@@ -136,7 +182,8 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
                   setOpen(false);
                 }}>{t("sync.status.skip")}</Button>
               </div>
-              {error && <p id="sync-status-passphrase-error" role="alert" className="text-destructive">{error}</p>}
+              {error && <p id="sync-status-passphrase-error" role="alert" className={mobile ? "ios-d3-sync-unlock-error" : "text-destructive"}>
+                {mobile && <InfoCircledIcon aria-hidden="true" />}{error}</p>}
               <SyncRecoveryUnlock t={t} />
               {disableError && <p role="alert" className="text-destructive">{disableError}</p>}
               <ConfirmDialog

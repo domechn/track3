@@ -185,11 +185,13 @@ test("locked sync status stays clear of the More tab and tab bar", async ({ page
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
+  await expect(page.locator(".fd-overview-hero")).toBeVisible();
   const pill = page.getByRole("button", { name: "Sync locked" });
   await expect(pill).toBeVisible();
   const pillBox = (await pill.boundingBox())!;
   const tabBox = (await page.locator(".mobile-tab-bar").boundingBox())!;
   expect(pillBox.y + pillBox.height).toBeLessThanOrEqual(tabBox.y);
+  await page.getByRole("button", { name: "Continue without sync" }).click();
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await expect(page).toHaveURL(/#\/more$/);
 });
@@ -293,7 +295,7 @@ for (const width of [375, 390, 430]) {
     await page.setViewportSize({ width, height: 812 });
     await installTauriBridge(page);
     await page.goto("/#/overview");
-    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   });

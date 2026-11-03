@@ -14,7 +14,7 @@ test("iOS Pro screen shows usage and an exhausted wallet shows quota status", as
   await expect(page.getByText("TRON wallet refreshes")).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "ERC20 wallet refreshes" })).toHaveAttribute("aria-valuenow", "12");
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.locator("#app-top-bar .t3-refresh-button").click();
   const status = page.getByRole("alertdialog", { name: "Source status" });
   await expect(status).toContainText("Monthly refresh limit reached", { timeout: 15_000 });
 });
@@ -56,7 +56,7 @@ test("iOS manages an active subscription before offering deactivation", async ({
 test("iOS asks before an exhausted Pro wallet refresh", async ({ page }) => {
   await installTauriBridge(page, { quotaExhaustedFixture: true, preflightExhaustedFixture: true });
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.locator("#app-top-bar .t3-refresh-button").click();
   const preflight = page.getByRole("alertdialog", { name: "Refresh limit" });
   await expect(preflight).toContainText("ERC20 wallet refreshes needed: 1; remaining: 0");
   await expect(preflight.getByRole("button", { name: "Continue refresh" })).toBeVisible();

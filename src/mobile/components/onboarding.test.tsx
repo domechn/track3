@@ -30,16 +30,16 @@ afterEach(async () => {
   cleanup()
   await new Promise((resolve) => setTimeout(resolve, 0))
 })
-it("uses iPhone Refresh and Backup copy, omits Pro, and navigates to Sources", async () => {
+it("shows the visible iPhone source and backup guidance, omits Pro, and navigates to Sources", async () => {
   await import("@/components/onboarding/onboarding-guide")
   render(<App />)
   const dialog = await screen.findByTestId("onboarding-dialog")
   for (let i = 0; i < 4; i++) {
     expect(dialog).not.toHaveTextContent(/\bPro\b|\bsubscribe\b|\bpurchase\b/i)
     fireEvent.click(screen.getByTestId("onboarding-next"))
-    if (i === 0) expect(dialog).toHaveTextContent("tap Refresh or pull down")
+    if (i === 0) expect(dialog).toHaveTextContent("Connect an exchange with a read-only API key")
   }
-  expect(dialog).toHaveTextContent("Settings → Backup")
+  expect(dialog).toHaveTextContent("Export JSON any time")
   expect(dialog).not.toHaveTextContent(/\bPro\b|\bsubscribe\b|\bpurchase\b/i)
   fireEvent.click(screen.getByTestId("onboarding-cta-add-source"))
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/settings/configuration?section=sources"))
@@ -50,7 +50,7 @@ it("reads the Chinese mobile catalog", async () => {
   const dialog = await screen.findByTestId("onboarding-dialog")
   expect(dialog).toHaveTextContent("欢迎使用 Track3")
   fireEvent.click(screen.getByTestId("onboarding-next"))
-  expect(dialog).toHaveTextContent("在总览页下拉")
+  expect(dialog).toHaveTextContent("使用只读 API 密钥连接交易所")
   for (let i = 0; i < 3; i++) fireEvent.click(screen.getByTestId("onboarding-next"))
-  expect(dialog).toHaveTextContent("设置 → 备份")
+  expect(dialog).toHaveTextContent("您可以随时导出 JSON")
 })

@@ -88,7 +88,7 @@ test("edited snapshot detail", async ({ page }) => {
   await page.screenshot({ path: `${dir}/history-detail-phone.png` });
   await detail.getByRole("link", { name: "Compare" }).click();
   await expect(page).toHaveURL(/#\/comparison\?head=2026-10-28-m$/);
-  await expect(page.getByRole("button", { name: /head date/i })).toContainText("Oct 28, 2026");
+  await expect(page.getByRole("button", { name: "Snapshot B: 28 Oct 2026" })).toContainText("28 Oct 2026");
 });
 
 test("detail change percent follows reversed quote colour", async ({ page }) => {
