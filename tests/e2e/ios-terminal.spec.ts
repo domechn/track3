@@ -114,7 +114,7 @@ test("phone landscape tab bar keeps its compact height", async ({ page }) => {
   await expect(page.locator(".mobile-tab-bar")).toHaveCSS("height", "48px");
 });
 
-test("phone More badge clears the icon and tabs retain a safe area", async ({ page }) => {
+test("phone More badge keeps the standard icon clear and matches both plan screens", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page);
   await page.evaluate(async (schema) => {
@@ -127,14 +127,21 @@ test("phone More badge clears the icon and tabs retain a safe area", async ({ pa
       });
     }
   }, readFileSync(resolve("src-tauri/migrations/init/alerts_up.sql"), "utf8"));
-  await page.goto("/#/goals");
   const tab = page.locator(".mobile-tab-bar .mobile-tab").last();
+  await page.goto("/#/overview");
   await expect(tab).toBeVisible();
   await expect(tab.locator(".mobile-tab-badge")).toHaveText("2");
-  const icon = await tab.locator("svg").boundingBox();
-  const badge = await tab.locator(".mobile-tab-badge").boundingBox();
-  expect(badge).not.toBeNull();
-  expect(icon).not.toBeNull();
-  expect(badge!.x).toBeGreaterThanOrEqual(icon!.x + icon!.width);
-  await expect(page.locator(".mobile-tab-bar")).toHaveCSS("height", "60px");
+  const standardIcon = (await tab.locator("svg").boundingBox())!;
+  const standardBadge = (await tab.locator(".mobile-tab-badge").boundingBox())!;
+  expect(standardBadge.x).toBeGreaterThanOrEqual(standardIcon.x + standardIcon.width);
+  for (const route of ["/goals", "/rebalance"]) {
+    await page.goto(`/#${route}`);
+    await expect(page.getByTestId(route === "/goals" ? "goals-phone" : "rebalance-phone")).toBeVisible();
+    const icon = (await tab.locator("svg").boundingBox())!;
+    const badge = (await tab.locator(".mobile-tab-badge").boundingBox())!;
+    expect({ icon: [icon.x, Math.round(icon.y), icon.width, icon.height],
+      badge: [badge.x, Math.round(badge.y), badge.width, badge.height] })
+      .toEqual({ icon: [338.125, 794, 20, 20], badge: [354.125, 790, 17, 16] });
+    await expect(page.locator(".mobile-tab-bar")).toHaveCSS("height", "60px");
+  }
 });

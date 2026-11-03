@@ -70,6 +70,7 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down",
     appliedFilters.to === to && appliedFilters.holdingPeriodDays === Number(holdingDaysInput);
   const reportKey = `${dataVersion}:${method}:${appliedFilters.from}:${appliedFilters.to}:${appliedFilters.holdingPeriodDays}`;
   const report = reportResult?.key === reportKey ? reportResult.value : undefined;
+  const viewReport = report ?? reportResult?.value;
 
   useEffect(() => {
     let active = true;
@@ -155,7 +156,12 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down",
     };
     buildCostBasisViewReport(context.transactions, context.latestAssets, options)
       .then((next) => { if (active) setReportResult({ key: reportKey, value: next }); })
-      .catch(() => { if (active) toast({ description: t("cost.loadError"), variant: "destructive" }); })
+      .catch(() => {
+        if (active) {
+          setReportResult(undefined);
+          toast({ description: t("cost.loadError"), variant: "destructive" });
+        }
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [ready, method, appliedFilters, context, dataVersion, t]);
@@ -263,9 +269,9 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down",
       </div>
     </section>
     {!validRange && <p id="cost-range-error" role="alert" className="fidelity-error">{t("cost.invalidRange")}</p>}
-    {loading && !report && <FinanceChartSkeleton />}
+    {loading && !viewReport && <FinanceChartSkeleton />}
     {loading && report && <p role="status">{t("common.loading")}</p>}
-    {report && validYear && validRange && <CostBasisDesktopView report={report} method={method}
+    {viewReport && validYear && validRange && <CostBasisDesktopView report={viewReport} method={method} pending={!report}
       year={year} quoteColor={quoteColor} t={t} locale={locale} transactions={context?.transactions ?? []}
       from={appliedFilters.from} to={appliedFilters.to} holdingPeriodDays={appliedFilters.holdingPeriodDays}
       holdingValues={context?.holdingValues ?? new Map()} onChooseYear={() => {

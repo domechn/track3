@@ -499,6 +499,7 @@ it("hides an old method's report while the next report loads", async () => {
   fireEvent.click(screen.getByRole("button", { name: "HIFO" }));
   await waitFor(() => expect(loadCostBasisReport).toHaveBeenCalledWith(expect.objectContaining({ method: "HIFO" })));
   expect(screen.queryByTestId("cost-desktop-table")).not.toBeInTheDocument();
+  expect(document.querySelector(".fidelity-cost-kpis")).toBeInTheDocument();
   await act(async () => finish({ ...report, method: "HIFO" } as never));
   expect(screen.getByTestId("cost-desktop-table")).toBeInTheDocument();
 });

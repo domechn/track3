@@ -45,9 +45,10 @@ function pooledOpenLots(rows: CostBasisReport["unrealized"]): CostBasisReport["u
   return [...groups.values()];
 }
 
-export function CostBasisDesktopView({ report, method, year, quoteColor, t, locale, transactions, from, to, holdingPeriodDays, holdingValues, onChooseYear }: {
+export function CostBasisDesktopView({ report, method, pending = false, year, quoteColor, t, locale, transactions, from, to, holdingPeriodDays, holdingValues, onChooseYear }: {
   report: CostBasisReport;
   method: CostBasisReport["method"];
+  pending?: boolean;
   year: string;
   quoteColor: QuoteColor;
   t: (key: string) => string;
@@ -134,7 +135,7 @@ export function CostBasisDesktopView({ report, method, year, quoteColor, t, loca
   const unknownSource = storedSource && !/^[a-f0-9]{32}$/i.test(storedSource) ? storedSource : null;
 
   return <>
-    {report.warnings.some((warning) => warning.code === "unknown-disposal") && <div className="fidelity-cost-warning">
+    {!pending && report.warnings.some((warning) => warning.code === "unknown-disposal") && <div className="fidelity-cost-warning">
       <ExclamationTriangleIcon aria-hidden="true" /><div><b>{t("cost.fidelity.unknownTitle").replace("{asset}", report.warnings.find((w) => w.code === "unknown-disposal")!.symbol)}</b>
         <span>{t(unknownSource ? "cost.fidelity.unknownSourceText" : "cost.fidelity.unknownText")
           .replace("{amount}", quantity(report.warnings.find((w) => w.code === "unknown-disposal")!.amount))
@@ -143,8 +144,9 @@ export function CostBasisDesktopView({ report, method, year, quoteColor, t, loca
           .replace("{date}", date(report.warnings.find((w) => w.code === "unknown-disposal")!.date, locale))}</span></div>
       <a href={`#/coins/${unknown[0].symbol}?assetType=${unknown[0].assetType}`}>{t("cost.fidelity.reviewWithdrawal")}</a>
     </div>}
-    <div className="fidelity-cost-grid">
+    <div className="fidelity-cost-grid" data-pending={pending}>
       <section className="fidelity-card fidelity-cost-kpis">
+        {pending ? <p role="status">{t("common.loading")}</p> : <>
         <div className="fidelity-cost-kpi-row">
           {metric(t("cost.design.realizedPnl"), report.totals.gainLoss,
             disposed.length ? t(unknown.length ? "cost.fidelity.salesUnknown" : "cost.fidelity.sales")
@@ -159,6 +161,7 @@ export function CostBasisDesktopView({ report, method, year, quoteColor, t, loca
           {metric(t("cost.fidelity.soldCost"), report.totals.costBasis, t("cost.fidelity.proceedsMinusCost"), false)}
           {metric(t("cost.design.openValue"), openValue, t("cost.fidelity.openCost").replace("{cost}", money(openCost)), false)}
         </div>
+        </>}
       </section>
       <section className="fidelity-card fidelity-cost-holding" data-testid="cost-desktop-holding">
         <div className="fidelity-card-head"><h2>{t("cost.design.holdingPeriod")}</h2><span>{t("cost.fidelity.realizedOnly")}</span></div>
@@ -207,7 +210,7 @@ export function CostBasisDesktopView({ report, method, year, quoteColor, t, loca
               <td>{soldQty ? money(price!.averageSell) : <span className="zero">–</span>}</td></tr>;
           })}</tbody></table>
       </section>
-      <section className="fidelity-card fidelity-cost-table" data-testid="cost-desktop-table">
+      <section className="fidelity-card fidelity-cost-table" data-testid={pending ? undefined : "cost-desktop-table"}>
         <div className="fidelity-card-head">
           <div className="fidelity-segment" role="group" aria-label={t("cost.fidelity.reportRows")}>
             <button type="button" aria-pressed={tab === "disposals"} onClick={() => { setTab("disposals"); setTablePage(0); }}>
@@ -272,9 +275,9 @@ export function CostBasisDesktopView({ report, method, year, quoteColor, t, loca
         {pager(tablePage, flatRows.length, setTablePage, tab === "open" ? t("cost.unrealized") : t("cost.realized"))}
       </section>
     </div>
-    <p className="fidelity-cost-footnote"><InfoCircledIcon aria-hidden="true" />
-      {t("cost.fidelity.stablecoinFootnote")}</p>
-    {allGaps.length > 0 && <section className="fidelity-card fidelity-cost-gaps" tabIndex={0}>
+    {!pending && <p className="fidelity-cost-footnote"><InfoCircledIcon aria-hidden="true" />
+      {t("cost.fidelity.stablecoinFootnote")}</p>}
+    {!pending && allGaps.length > 0 && <section className="fidelity-card fidelity-cost-gaps" tabIndex={0}>
       <div className="fidelity-card-head"><h2>{t("cost.warnings")}</h2>
         <label>{t("cost.fidelity.reason")} <select value={reason} onChange={(event) => { setReason(event.target.value); setGapPage(0); }}>
           <option value="all">{t("cost.fidelity.allReasons")}</option>

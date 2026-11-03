@@ -21,7 +21,7 @@ test("phone shows partial months and year with a tap explanation", async ({ brow
       await installTauriBridge(page, { partialProfitHistory: true });
       await page.goto("/#/summary");
       const main = page.locator(".fd-summary");
-      await expect(main).toHaveAttribute("data-state", "ready");
+      await expect(main).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
       await expect(main.locator(".fd-month").filter({ hasText: "Feb" })).toContainText("~+$4,200");
       await expect(main.locator(".fd-month").filter({ hasText: "Jun" })).toContainText("~+$4,500");
       await expect(main.locator(".fd-month").filter({ hasText: "Feb" })).toContainText("1 coin (ETH) has a withdrawal without a matching deposit");

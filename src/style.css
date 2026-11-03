@@ -1057,6 +1057,7 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
 .fidelity-cost-warning b, .fidelity-cost-warning span { display: block; }
 .fidelity-cost-warning > a { display: inline-flex; align-items: center; min-height: 28px; padding: 0 11px; border: 1px solid var(--f-control); border-radius: 999px; color: var(--f-muted); font-size: 12px; }
 .fidelity-cost-grid { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: 16px; margin-top: 16px; }
+.fidelity-cost-grid[data-pending="true"] > :not(.fidelity-cost-kpis) { display: none; }
 .fidelity-cost-kpis { grid-column: span 8; display: flex; flex-direction: column; justify-content: space-between; min-height: 236px; }
 .fidelity-cost-grid:has(.fidelity-cost-holding > p) .fidelity-cost-kpis { min-height: 256px; }
 .fidelity-cost-holding { grid-column: span 4; min-height: 236px; }
