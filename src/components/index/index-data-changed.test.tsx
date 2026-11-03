@@ -110,9 +110,6 @@ vi.mock("../coin-analytics", () => ({
 vi.mock("../date-picker", () => ({
   default: () => <div>date picker</div>,
 }));
-vi.mock("../realtime-total-value", () => ({
-  default: () => null,
-}));
 vi.mock("../sidebar", () => ({
   default: () => null,
 }));
@@ -161,7 +158,7 @@ vi.mock("@/middlelayers/data", () => ({
   autoBackupHistoricalData: vi.fn(),
   autoImportHistoricalData: vi.fn(),
 }));
-vi.mock("@/middlelayers/alerts", () => ({ processAlerts: vi.fn() }));
+vi.mock("@/middlelayers/alerts", () => ({ processAlerts: vi.fn(), countUnreadAlerts: vi.fn().mockResolvedValue(0), ALERTS_CHANGED_EVENT: "alerts-changed" }));
 
 vi.mock("@/middlelayers/datafetch/utils/cache", () => ({
   invalidateCacheGroups: cacheMocks.invalidateCacheGroups,
@@ -258,6 +255,25 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it("keeps the Pro live portfolio control on wide Goals pages", async () => {
+    vi.stubGlobal("innerWidth", 1600);
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("pro");
+    window.location.hash = "#/goals/kinds";
+    try {
+      const view = renderApp();
+      expect(await view.findByRole("button", { name: "Show real-time portfolio value" })).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("shows no TopBar sync status on records pages, which provide their own status", async () => {
+    syncMocks.snapshot = { mode: "ready", sync: { phase: "idle", report: undefined } };
+    window.location.hash = "#/history";
+    const view = renderApp();
+    await view.findByTestId("trigger-history-delete");
+    expect(view.container.querySelectorAll(".desktop-sync-status-indicator")).toHaveLength(0);
+  });
   it("finishes boot while startup alert evaluation is pending", async () => {
     vi.mocked(processAlerts).mockImplementation(() => new Promise(() => {}));
     const view = renderApp();
@@ -331,24 +347,20 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     expect(view.getByTestId("trigger-history-delete")).toBe(history);
   });
 
-  it("shows the no-data panel after leaving and returning to empty History", async () => {
+  it("returns to empty History after leaving and coming back", async () => {
     window.location.hash = "#/history";
     const view = renderApp();
     const history = await view.findByTestId("trigger-history-delete");
 
-    const initialQueryCount = vi.mocked(queryLastRefreshAt).mock.calls.length;
     vi.mocked(queryLastRefreshAt).mockResolvedValueOnce(undefined);
     vi.mocked(getAvailableDates).mockResolvedValueOnce([]);
     fireEvent.click(history);
-    await waitFor(() => expect(vi.mocked(queryLastRefreshAt).mock.calls.length).toBeGreaterThan(initialQueryCount));
-    expect(view.getByTestId("trigger-history-delete")).toBe(history);
-
     window.location.hash = "#/settings";
     await view.findByText("settings");
     window.location.hash = "#/history";
 
-    expect(await view.findByText("There is not enough data")).toBeInTheDocument();
-    expect(view.queryByTestId("trigger-history-delete")).not.toBeInTheDocument();
+    expect(await view.findByTestId("trigger-history-delete")).toBeInTheDocument();
+    expect(view.queryByText("There is not enough data")).not.toBeInTheDocument();
   });
 
   it("bumps the data-changed version when the refresh button succeeds", async () => {

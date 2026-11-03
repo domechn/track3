@@ -1,5 +1,5 @@
 import { themeLocalStorageKey } from '@/middlelayers/configuration'
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { readStoredTheme, writeStoredTheme, type Theme } from "@/middlelayers/ui-state/appearance";
 
 export type { Theme } from "@/middlelayers/ui-state/appearance";
@@ -53,6 +53,11 @@ export function ThemeProvider({
   // Keep DOM in sync when theme changes after initial render
   useEffect(() => {
     applyThemeToDOM(theme);
+    if (theme !== "system") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => applyThemeToDOM("system");
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
   }, [theme]);
 
   const value = {
@@ -78,3 +83,16 @@ export const useTheme = () => {
 
   return context;
 };
+
+const subscribeSystemTheme = (notify: () => void) => {
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  media.addEventListener("change", notify);
+  return () => media.removeEventListener("change", notify);
+};
+const systemDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+export function useDarkTheme() {
+  const { theme } = useTheme();
+  const prefersDark = useSyncExternalStore(subscribeSystemTheme, systemDark, () => false);
+  return theme === "dark" || (theme === "system" && prefersDark);
+}

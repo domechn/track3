@@ -22,6 +22,11 @@ const mocks = vi.hoisted(() => ({
   queryAssetMaxAmountBySymbol: vi.fn(),
   updateTransactionPrice: vi.fn(),
   updateTransactionTxnType: vi.fn(),
+  queryCoinsAmountChange: vi.fn(),
+  queryTotalValue: vi.fn(),
+  queryWalletAssetsPercentage: vi.fn(),
+  loadCostBasisReport: vi.fn(),
+  getConfiguration: vi.fn(),
   queryPreferCurrency: vi.fn(),
   getLicenseIfIsPro: vi.fn(),
   getInitialQueryDateRange: vi.fn(),
@@ -92,32 +97,14 @@ vi.mock("../coins-amount-and-value-change", () => ({
 vi.mock("../wallet-assets-percentage", () => ({
   default: () => <div data-testid="wallet-assets-percentage-stub" />,
 }));
+vi.mock("@/middlelayers/cost-basis-data", () => ({
+  loadCostBasisReport: mocks.loadCostBasisReport,
+}));
 vi.mock("../common/asset-label", () => ({
   default: ({ asset }: { asset: { symbol: string } }) => (
     <span>{asset.symbol}</span>
   ),
 }));
-
-vi.mock("@radix-ui/react-icons", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@radix-ui/react-icons")>();
-  return {
-    ...actual,
-    Pencil2Icon: ({
-      onClick,
-    }: {
-      onClick?: React.MouseEventHandler<HTMLButtonElement>;
-    }) => (
-      <button
-        type="button"
-        data-testid="transaction-edit"
-        onClick={onClick}
-      >
-        edit
-      </button>
-    ),
-  };
-});
 
 vi.mock("@/middlelayers/charts", () => ({
   getAvailableDates: mocks.getAvailableDates,
@@ -131,8 +118,12 @@ vi.mock("@/middlelayers/charts", () => ({
   queryAssetMaxAmountBySymbol: mocks.queryAssetMaxAmountBySymbol,
   updateTransactionPrice: mocks.updateTransactionPrice,
   updateTransactionTxnType: mocks.updateTransactionTxnType,
+  queryCoinsAmountChange: mocks.queryCoinsAmountChange,
+  queryTotalValue: mocks.queryTotalValue,
+  WALLET_ANALYZER: { queryWalletAssetsPercentage: mocks.queryWalletAssetsPercentage },
 }));
 vi.mock("@/middlelayers/configuration", () => ({
+  getConfiguration: mocks.getConfiguration,
   queryPreferCurrency: mocks.queryPreferCurrency,
   getLicenseIfIsPro: mocks.getLicenseIfIsPro,
   getInitialQueryDateRange: mocks.getInitialQueryDateRange,
@@ -229,6 +220,11 @@ beforeEach(() => {
   mocks.queryAssetMaxAmountBySymbol.mockResolvedValue(0);
   mocks.updateTransactionPrice.mockResolvedValue(undefined);
   mocks.updateTransactionTxnType.mockResolvedValue(undefined);
+  mocks.queryCoinsAmountChange.mockResolvedValue({ timestamps: [], values: [], amounts: [] });
+  mocks.queryTotalValue.mockResolvedValue({ totalValue: 0 });
+  mocks.queryWalletAssetsPercentage.mockResolvedValue([]);
+  mocks.loadCostBasisReport.mockResolvedValue({ openLots: [], unrealized: [], disposals: [] });
+  mocks.getConfiguration.mockResolvedValue({ others: [] });
   mocks.appCacheDir.mockResolvedValue("/tmp/track3-cache");
   mocks.getImageApiPath.mockResolvedValue("");
   mocks.listWalletAliases.mockResolvedValue({});
@@ -269,26 +265,20 @@ describe("Coin Analytics data-changed integration", () => {
 
     try {
       renderApp();
-      await screen.findByText("buy");
-      const transactionRow = screen.getByText("buy").closest("tr");
-      expect(transactionRow).not.toBeNull();
-      const editButtons = within(transactionRow!).getAllByTestId(
-        "transaction-edit",
-      );
-      fireEvent.click(editButtons[1]);
-
-      const dialog = await screen.findByRole("dialog");
-      fireEvent.change(within(dialog).getByRole("spinbutton"), {
-        target: { value: "120" },
-      });
+      const editButton = await screen.findByRole("button", { name: /Edit.*transaction/i }, { timeout: 10_000 });
+      fireEvent.click(editButton);
+      const input = await screen.findByLabelText("Price per BTC", {}, { timeout: 10_000 });
+      fireEvent.change(input, { target: { value: "120.00" } });
       mocks.clearLocalStorageCache.mockImplementationOnce(() => {
         throw new Error("sensitive localStorage details");
       });
-      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      fireEvent.click(within(screen.getByRole("dialog", { name: "Edit transaction" })).getByRole("button", { name: "Save" }));
 
       await waitFor(() => {
         expect(mocks.updateTransactionPrice).toHaveBeenCalledWith(42, 120);
-        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog", { name: "Edit transaction" })).not.toBeInTheDocument();
       });
       await new Promise((resolve) => window.setTimeout(resolve, 0));
 

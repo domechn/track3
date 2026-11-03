@@ -39,6 +39,7 @@ describe("SyncStatusIndicator", () => {
     Object.assign(state.current.sync, {
       report: { pulled: 2, pushed: 1, conflicts: ["a"], errors: ["read failed"], tombstonesApplied: 0, configChanges: 0 },
       retryStopped: false,
+      lastSync: undefined,
     });
     vi.mocked(syncRuntime.unlock).mockResolvedValue("ok");
     vi.clearAllMocks();
@@ -78,6 +79,20 @@ describe("SyncStatusIndicator", () => {
     expect(await screen.findByText("Not synced yet")).toBeInTheDocument();
     expect(screen.queryByText(/Pulled 0, pushed 0/)).not.toBeInTheDocument();
   });
+
+  it("shows the completed sync time in the records header and keeps its details popover", async () => {
+    state.current.sync.phase = "idle";
+    Object.assign(state.current.sync, {
+      report: undefined,
+      error: undefined,
+      lastSync: Date.parse("2026-10-31T09:41:00.000Z"),
+    });
+    render(<SyncStatusIndicator recordsStamp />);
+    expect(screen.getByRole("status")).toHaveTextContent("Synced 09:41");
+    fireEvent.click(screen.getByRole("button", { name: "Synced 09:41" }));
+    expect(await screen.findByText(/Last synced:/)).toBeInTheDocument();
+  });
+
   it("explains when automatic retries stop", async () => {
     state.current.sync.error = "sync";
     Object.assign(state.current.sync, { report: undefined, retryStopped: true });

@@ -14,6 +14,8 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { REBALANCE_OPTIONS_KEY } from "@/middlelayers/ai/actions/page-settings";
 import axe from "axe-core";
+import { MemoryRouter } from "react-router-dom";
+import { ThemeProvider } from "./common/theme";
 vi.mock("@/middlelayers/configuration", async (original) => ({
   ...await original<typeof import("@/middlelayers/configuration")>(),
   loadAIConfig: vi.fn().mockResolvedValue({ endpoint: "http://localhost", apiKey: "", model: "test", contextSize: 8192 }),
@@ -57,6 +59,47 @@ beforeEach(() => {
 afterEach(() => localStorage.removeItem(localeLocalStorageKey));
 
 describe("Rebalance page", () => {
+  it("persists wide target edits and clears the unsaved label only after saving", async () => {
+    vi.stubGlobal("innerWidth", 1600);
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [
+        { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 75 },
+        { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 25 },
+      ],
+      tolerancePercent: 2,
+    });
+    try {
+      render(<ThemeProvider defaultTheme="dark"><MemoryRouter><Rebalance currency={currency} /></MemoryRouter></ThemeProvider>);
+      const btc = await screen.findByRole("textbox", { name: "Target percentage for BTC" });
+      fireEvent.change(btc, { target: { value: "70" } });
+      fireEvent.change(screen.getByRole("textbox", { name: "Target percentage for ETH" }), { target: { value: "30" } });
+      expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Save targets" }));
+      await waitFor(() => expect(saveRebalanceProfile).toHaveBeenCalledWith({
+        targets: [
+          { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 70 },
+          { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 30 },
+        ],
+        tolerancePercent: 2,
+      }));
+      await screen.findByText("Saved on this device");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("shows the wide loading shell before the profile resolves", () => {
+    vi.stubGlobal("innerWidth", 1600);
+    vi.mocked(getRebalanceProfile).mockImplementation(() => new Promise(() => {}));
+    try {
+      render(<ThemeProvider defaultTheme="dark"><MemoryRouter><Rebalance currency={currency} /></MemoryRouter></ThemeProvider>);
+      expect(screen.getByText("Loading portfolio...")).toBeInTheDocument();
+      expect(screen.queryByText("Manual setup")).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("summarizes the current plan from calculated values", async () => {
     vi.mocked(getRebalanceProfile).mockResolvedValue({
       targets: [

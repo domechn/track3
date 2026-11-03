@@ -15,11 +15,13 @@ const App = ({
   children,
   dateRange,
   fidelityFirstRun = false,
+  allowEmpty = false,
 }: {
   hasData: boolean;
   children: React.ReactNode;
   dateRange: TDateRange;
   fidelityFirstRun?: boolean;
+  allowEmpty?: boolean;
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -27,8 +29,7 @@ const App = ({
   const sizeClass = useSizeClass();
   const useFidelityFirstRun = fidelityFirstRun && isIOS() && sizeClass.width === "compact";
 
-  if (!hasData) {
-    if (useFidelityFirstRun) return <>{children}</>;
+  if (!hasData && !allowEmpty && !useFidelityFirstRun) {
     if (isMobile) return <EmptyState title={t("overview.emptyTitle")} description={t("overview.emptyDescription")}
       illustrationLabel={t("overview.emptyIllustration")}
       action={t("overview.addFirstSource")} onAction={() => navigate("/settings/configuration")} />;
@@ -52,7 +53,7 @@ const App = ({
     );
   }
 
-  if (!useFidelityFirstRun && (dateRange.start.getTime() === emptyDate.getTime() || dateRange.end.getTime() === emptyDate.getTime())) {
+  if (!allowEmpty && !useFidelityFirstRun && (dateRange.start.getTime() === emptyDate.getTime() || dateRange.end.getTime() === emptyDate.getTime())) {
     return <div className="min-h-[400px]" />;
   }
 

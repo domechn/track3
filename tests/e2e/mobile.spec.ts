@@ -23,10 +23,7 @@ test("data screens expose grouped history and analytics destinations", async ({ 
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/history");
     await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
-    await page.getByRole("combobox", { name: "Rows 20" }).click();
-    await page.getByRole("option", { name: "50" }).click();
-    await expect(page.locator(".history-month-heading")).toHaveCount(2);
-    await expect(page.locator(".history-month-heading").first()).toContainText("$");
+    await expect(page.getByRole("heading", { name: "Snapshots" })).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(".history-mobile-list .history-mobile-snapshot")).toHaveCount(50);
 
     await page.goto("/#/summary");
@@ -47,18 +44,17 @@ test("data screens expose grouped history and analytics destinations", async ({ 
     await page.goto("/#/wallets");
     await expect(page.getByRole("heading", { name: "Allocation by source" })).toBeVisible();
     await page.goto("/#/cost-basis");
-    const realizedMetric = page.locator(".d2-cost .cost-dashboard-metric").first();
+    const realizedMetric = page.locator(".fidelity-cost-kpis .fidelity-kpi-metric").first();
     await expect(realizedMetric).toContainText("Realized P&L");
-    await expect(page.locator(".d2-cost .flex.flex-wrap.gap-x-5 > span")).toHaveCount(0);
     const exportButton = (await page.locator(".d2-cost").getByRole("button", { name: "Export", exact: true }).boundingBox())!;
     const costPage = (await page.locator(".d2-cost").boundingBox())!;
-    expect(exportButton.x + exportButton.width).toBeGreaterThan(costPage.x + costPage.width - 25);
+    expect(exportButton.x).toBeLessThan(costPage.x + 25);
     await expect(realizedMetric).not.toContainText("0 USD");
     expect(await realizedMetric.evaluate((node) =>
-      Boolean(node.compareDocumentPosition(document.querySelector(".d2-cost [data-ai-setup-suggestion]")!) & Node.DOCUMENT_POSITION_FOLLOWING),
+      Boolean(node.compareDocumentPosition(document.querySelector("[data-ai-setup-suggestion]")!) & Node.DOCUMENT_POSITION_FOLLOWING),
     )).toBe(true);
-    const openPnL = page.locator(".d2-cost .cost-dashboard-metric").nth(1).locator("strong");
-    const costValueTops = await page.locator(".d2-cost .cost-dashboard-metric strong").evaluateAll((values) =>
+    const openPnL = page.locator(".fidelity-cost-kpis .fidelity-kpi-metric").nth(1).locator("strong");
+    const costValueTops = await page.locator(".fidelity-cost-kpis .fidelity-kpi-metric strong").evaluateAll((values) =>
       values.map((value) => value.getBoundingClientRect().top));
     expect(Math.abs(costValueTops[1] - costValueTops[2])).toBeLessThanOrEqual(1);
     expect(await openPnL.evaluate((node) => getComputedStyle(node).whiteSpace)).toBe("nowrap");
@@ -174,17 +170,17 @@ for (const width of [320, 375, 390, 430]) {
         await installTauriBridge(page, { richPortfolio: true });
 
         await page.goto("/#/history");
-        await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20, { timeout: 30_000 });
+        await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50);
         await page.locator(".history-mobile-snapshot-button").first().click();
         const detail = page.getByRole("dialog", { name: /snapshot details/i });
-        await expect(detail.locator(".history-mobile-asset")).toHaveCount(7);
-        const assetIndent = await detail.locator(".history-mobile-asset").first().evaluate((row) => ({
-          symbol: row.querySelector(".history-mobile-asset-content > div:first-child > span:first-child > span:last-child")!.getBoundingClientRect().left,
-          amount: row.querySelector(".history-mobile-asset-meta > span:first-child")!.getBoundingClientRect().left,
+        await expect(detail.locator(".fidelity-history-detail-asset")).toHaveCount(7);
+        const assetIndent = await detail.locator(".fidelity-history-detail-asset").first().evaluate((row) => ({
+          symbol: row.querySelector(".fidelity-history-detail-asset-body strong")!.getBoundingClientRect().left,
+          amount: row.querySelector(".fidelity-history-detail-asset-body small")!.getBoundingClientRect().left,
         }));
         expect(Math.abs(assetIndent.symbol - assetIndent.amount)).toBeLessThanOrEqual(2);
-        const deleteButton = (await detail.getByRole("button", { name: "Delete snapshot" }).boundingBox())!;
-        const stats = (await detail.locator(".grid").first().boundingBox())!;
+        const deleteButton = (await detail.getByRole("button", { name: "Delete", exact: true }).boundingBox())!;
+        const stats = (await detail.locator(".fidelity-history-detail-kpis").boundingBox())!;
         expect(deleteButton.y).toBeGreaterThan(stats.y + stats.height);
         await capture("history-detail");
 
@@ -233,13 +229,9 @@ for (const width of [320, 375, 390, 430]) {
         await capture("comparison-rows");
 
         await page.goto("/#/cost-basis");
-        await expect(page.locator(".d2-cost .cost-dashboard-metric").first()).toContainText("Realized P&L");
-        await page.getByText("Details", { exact: true }).click();
-        await expect(page.locator(".d2-cost .mobile-record-list").first()).toBeVisible();
-        const lot = page.locator(".d2-cost .cost-lot-list").first().locator(".cost-lot").first();
-        await lot.locator("button").click();
+        await expect(page.locator(".fidelity-cost-kpis .fidelity-kpi-metric").first()).toContainText("Realized P&L");
+        const lot = page.locator(".fidelity-cost-lots .fidelity-lot-row").first();
         await expect(lot).toContainText("Acquired");
-        await expect(lot.locator("button")).toHaveAttribute("aria-expanded", "true");
         await capture("cost-lots");
 
         await page.goto("/#/coins/BTC");
@@ -599,7 +591,7 @@ for (const size of sizes) {
             routeHeading[route]);
         }
         if (route === "comparison") await expect(page.locator(".fd-comparison-total")).toBeVisible();
-        if (route === "cost-basis") await expect(page.locator(".d2-cost .cost-dashboard-metric").first()).toContainText("Realized P&L");
+        if (route === "cost-basis") await expect(page.locator(".fidelity-cost-kpis .fidelity-kpi-metric").first()).toContainText("Realized P&L");
         if (route.startsWith("coins/")) {
           await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready");
           if (size.width === 320) {
@@ -704,7 +696,7 @@ for (const size of sizes) {
                 image.src.startsWith("data:image/svg+xml") && image.complete && image.naturalWidth > 0))).toBe(true);
           }
           if (route === "comparison") await expect(page.locator(".fd-comparison-total")).toBeVisible();
-          if (route === "cost-basis") await expect(page.locator(".d2-cost .cost-dashboard-metric").first()).toContainText("Realized P&L");
+          if (route === "cost-basis") await expect(page.locator(".fidelity-cost-kpis .fidelity-kpi-metric").first()).toContainText("Realized P&L");
           if (route === "overview") await expect(page.locator(".mobile-header-total-value")).toHaveText(
             (await page.locator(".fd-overview-value").textContent()) ?? "",
           );
@@ -758,7 +750,7 @@ test(`a ${width}pt landscape iPhone keeps the touch shell`, async ({ browser }) 
 });
 }
 
-test("history snapshots use touch rows and a detail sheet", async ({ browser }) => {
+test("history snapshots use touch rows and a full-page detail", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
@@ -770,10 +762,10 @@ test("history snapshots use touch rows and a detail sheet", async ({ browser }) 
     await row.click();
     const detail = page.getByRole("dialog", { name: /snapshot details/i });
     await expect(detail).toBeVisible();
-    await expect.poll(async () => (await detail.boundingBox())?.x).toBe(0);
-    await expect(detail.locator(".mobile-sheet-handle")).toBeVisible();
-    await expect(detail.locator(".history-mobile-asset .history-mobile-delete")).toHaveCount(0);
-    const asset = detail.locator(".history-mobile-asset").first();
+    await expect.poll(async () => (await detail.boundingBox())?.x).toBe(16);
+    await expect(detail.getByRole("button", { name: "Back" })).toBeVisible();
+    await expect(detail.locator(".fidelity-history-detail-asset .history-mobile-delete")).toHaveCount(0);
+    const asset = detail.locator(".fidelity-history-detail-asset").first();
     const bounds = (await asset.boundingBox())!;
     await asset.dispatchEvent("pointerdown", { clientX: bounds.x + bounds.width - 15, clientY: bounds.y + bounds.height / 2 });
     await asset.dispatchEvent("pointerup", { clientX: bounds.x + bounds.width - 95, clientY: bounds.y + bounds.height / 2 });
@@ -782,7 +774,7 @@ test("history snapshots use touch rows and a detail sheet", async ({ browser }) 
     const confirm = page.getByRole("alertdialog");
     await expect(confirm).toBeVisible();
     await confirm.getByRole("button", { name: "Cancel" }).click();
-    await detail.getByRole("button", { name: "Close" }).click();
+    await detail.getByRole("button", { name: "Back" }).click();
     await expect(row).toBeVisible();
   } finally {
     await context.close();
@@ -813,7 +805,7 @@ test("history swipe reveals delete, then confirm and undo restore the row", asyn
     await expect(row.locator(".mobile-swipe-actions")).toHaveClass(/mobile-swipe-actions-revealed/);
     await row.getByRole("button", { name: "Delete" }).click();
     await expect(page.getByRole("alertdialog", { name: /delete/i })).toBeVisible();
-    await page.getByRole("alertdialog").getByRole("button", { name: "Confirm" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete snapshot" }).click();
     await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
     const close = page.locator("[toast-close]").last();
     await expect(close).toHaveCSS("opacity", "1");
@@ -825,21 +817,20 @@ test("history swipe reveals delete, then confirm and undo restore the row", asyn
   }
 });
 
-test("history pagination controls stay together at phone width", async ({ browser }) => {
+test("history filter chips retain touch targets at phone width", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
     await installTauriBridge(page);
     await page.goto("/#/history");
-    const previous = await page.getByRole("button", { name: "Previous page" }).boundingBox();
-    const next = await page.getByRole("button", { name: "Next page" }).boundingBox();
-    expect(previous).not.toBeNull();
-    expect(next).not.toBeNull();
-    expect(Math.abs((next!.y + next!.height / 2) - (previous!.y + previous!.height / 2))).toBeLessThan(2);
+    await expect(page.locator(".fidelity-history-chips button")).toHaveCount(3);
+    for (const chip of await page.locator(".fidelity-history-chips button").all()) {
+      expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
     await page.evaluate(() => localStorage.setItem("track3-ui-locale", "zh"));
     await page.reload();
-    await expect(page.locator(".history-rows-trigger, .history-page-trigger")).toHaveCount(2);
-    for (const trigger of await page.locator(".history-rows-trigger, .history-page-trigger").all()) {
+    await expect(page.locator(".fidelity-history-chips button")).toHaveCount(3);
+    for (const trigger of await page.locator(".fidelity-history-chips button").all()) {
       const box = (await trigger.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(44);
     }
@@ -1130,7 +1121,7 @@ test("large route titles collapse into the sticky header while scrolling", async
     await expect(page.locator("#app-top-bar")).toContainText("Overview");
     await page.goto("/#/history");
     await expect(page.locator(".history-mobile-list")).toBeVisible();
-    await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20);
+    await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50);
     await page.evaluate(() => scrollTo(0, 180));
     const historyTitle = page.locator("#app-top-bar .mobile-compact-title");
     await expect(historyTitle).toBeVisible();
@@ -1319,8 +1310,8 @@ test("the latest history snapshot has a visible delete action in its detail", as
     await page.goto("/#/history");
     await page.getByTestId("history-mobile-row").first().click();
     const detail = page.getByRole("dialog", { name: /snapshot details/i });
-    await expect(detail.getByRole("button", { name: "Delete snapshot" })).toBeVisible();
-    await detail.getByRole("button", { name: "Delete snapshot" }).click();
+    await expect(detail.getByRole("button", { name: "Delete", exact: true })).toBeVisible();
+    await detail.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(page.getByRole("alertdialog", { name: /delete/i })).toBeVisible();
   } finally {
     await context.close();

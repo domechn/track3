@@ -14,10 +14,11 @@ import { SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
 type Props = {
   t: (key: string, fallback?: string) => string;
   mobile?: boolean;
+  recordsStamp?: boolean;
   ConfirmDialog?: typeof ConfirmDeleteDialog;
 };
 
-export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = ConfirmDeleteDialog }: Props) {
+export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = false, ConfirmDialog = ConfirmDeleteDialog }: Props) {
   const status = useSyncExternalStore(syncRuntime.subscribe, syncRuntime.status);
   const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState("");
@@ -46,6 +47,11 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
   const phase = status.mode === "unreadable" ? "unreadable" :
     status.mode === "locked" ? (muted ? "skipped" : "locked") :
       status.sync.phase === "idle" && report?.conflicts.length ? "conflict" : status.sync.phase;
+  const syncedAt = recordsStamp && phase === "idle" && status.sync.lastSync !== undefined
+    ? t("sync.status.syncedAt").replace("{time}", new Date(status.sync.lastSync).toLocaleTimeString("en-GB", {
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    })) : undefined;
+  const statusLabel = syncedAt ?? t(`sync.status.${phase}`);
   const changed = !!report && (report.pulled > 0 || report.pushed > 0 || report.conflicts.length > 0 || report.errors.length > 0);
   const counts = report && t("sync.status.counts")
     .replace("{pulled}", String(report.pulled))
@@ -92,11 +98,12 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
   return (
     <div className={mobile ? "ios-d3-sync-indicator t3-topbar-sync" : "desktop-sync-status-indicator t3-topbar-sync"}>
       <span role="status" aria-live="polite" className="sr-only">
-        {busy ? t("common.loading") : t(`sync.status.${phase}`)}
+        {busy ? t("common.loading") : statusLabel}
       </span>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" aria-label={t(`sync.status.${phase}`)} title={muted ? t("sync.status.skipped") : undefined}
+          <button type="button" aria-label={statusLabel} title={muted ? t("sync.status.skipped") : undefined}
+            data-synced={syncedAt ? "true" : undefined}
             className={muted
               ? "t3-topbar-sync-button flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-full border border-border bg-background/70 text-muted-foreground opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               : "t3-topbar-sync-button flex min-h-9 touch:min-h-11 items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"}>
@@ -105,7 +112,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
               {mobile && <svg className="fd-sync-cloud-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                 <path d="M5.3 14.5h9a3.4 3.4 0 0 0 .2-6.8 4.8 4.8 0 0 0-9.1-1.2 4 4 0 0 0-.1 8z" />
               </svg>}
-              {t(`sync.status.${phase}`)}
+              {statusLabel}
             </>}
           </button>
         </PopoverTrigger>
@@ -233,7 +240,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
   );
 }
 
-export default function SyncStatusIndicator() {
+export default function SyncStatusIndicator({ recordsStamp = false }: { recordsStamp?: boolean }) {
   const { t } = useTranslation();
-  return <SyncStatusIndicatorView t={t} />;
+  return <SyncStatusIndicatorView t={t} recordsStamp={recordsStamp} />;
 }

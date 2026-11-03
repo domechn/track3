@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { useSizeClass } from "@/mobile/components/mobile/size-class";
+import { describe, expect, it, vi } from "vitest";
+import { usePhoneWidth, useSizeClass } from "@/mobile/components/mobile/size-class";
 
 function Probe() {
   const size = useSizeClass();
@@ -43,4 +43,29 @@ describe("useSizeClass", () => {
       act(() => window.dispatchEvent(new Event("resize")));
     }
   });
+});
+
+it("updates phone layout when an iPad split view crosses 760px", () => {
+  const originalWidth = window.innerWidth;
+  const originalMatchMedia = window.matchMedia;
+  function PhoneProbe() {
+    return <output>{usePhoneWidth() ? "phone" : "tablet"}</output>;
+  }
+  try {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+      get matches() { return query === "(max-width: 760px)" && window.innerWidth <= 760; },
+      media: query, onchange: null, addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    }));
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 744 });
+    render(<PhoneProbe />);
+    expect(screen.getByRole("status")).toHaveTextContent("phone");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+    act(() => window.dispatchEvent(new Event("resize")));
+    expect(screen.getByRole("status")).toHaveTextContent("tablet");
+  } finally {
+    window.matchMedia = originalMatchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    act(() => window.dispatchEvent(new Event("resize")));
+  }
 });

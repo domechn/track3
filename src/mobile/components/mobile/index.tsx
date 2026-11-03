@@ -136,6 +136,7 @@ export function BottomSheet({
       <Dialog.Portal>
         <Dialog.Overlay className="mobile-sheet-backdrop" />
         <Dialog.Content className={cn("mobile-sheet", `mobile-sheet-${detent}`, className)} aria-describedby={undefined}
+          aria-modal="true"
           style={{ ...(viewport ? { bottom: viewport.bottom, maxHeight: viewport.height } : {}), height: dragHeight }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
@@ -156,7 +157,7 @@ export function BottomSheet({
   );
 }
 
-export type SheetAction = { label: string; onClick: () => void; destructive?: boolean; disabled?: boolean };
+export type SheetAction = { label: string; onClick: () => void; icon?: React.ReactNode; destructive?: boolean; disabled?: boolean };
 
 export function ActionSheet({ open, onOpenChange, title, actions }: {
   open: boolean;
@@ -211,7 +212,7 @@ export function SwipeableRow({ children, actions, className, allowImmediateActio
       {actions.map((action) => <button type="button" key={action.label} disabled={action.disabled}
         tabIndex={revealed ? 0 : -1}
         className={cn("mobile-swipe-action", action.destructive && "mobile-swipe-destructive")}
-        onClick={() => { action.onClick(); setRevealed(false); }}>{action.label}</button>)}
+        onClick={() => { action.onClick(); setRevealed(false); }}>{action.icon}{action.label}</button>)}
     </div>
   </div>;
 }

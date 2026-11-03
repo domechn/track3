@@ -80,6 +80,7 @@ const App = ({
   const compact = useSizeClass().width === "compact" && isIOS();
   const haptic = useHaptics();
   const quickSwipeStart = useRef<{ x: number; y: number } | null>(null);
+  const initialHeadRef = useRef(new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("head"));
   const [pageLoading, setPageLoading] = useState(true);
   const loadGenRef = useRef(0);
 
@@ -189,18 +190,25 @@ const App = ({
         setPageLoading(false);
         return;
       }
+      const selectedHead = options.find((option) => option.value === initialHeadRef.current);
+      initialHeadRef.current = null;
+      const selectedIndex = selectedHead ? options.indexOf(selectedHead) : -1;
+      const selectedBase = selectedIndex < 0 ? undefined :
+        options[selectedIndex + 1] ?? options[selectedIndex - 1] ?? selectedHead;
 
       // Seed the initial selection on first load. On subsequent
       // refreshes the user may have picked a specific base/head pair,
       // so we keep their selection rather than snapping to the new
       // latest snapshot.
       setBaseId((prev) => {
+        if (selectedBase) return selectedBase.value;
         if (prev && options.some((o) => o.value === prev)) {
           return prev;
         }
         return options[1]?.value || options[0].value;
       });
       setHeadId((prev) => {
+        if (selectedHead) return selectedHead.value;
         if (prev && options.some((o) => o.value === prev)) {
           return prev;
         }
