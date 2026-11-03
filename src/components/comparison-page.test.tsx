@@ -156,6 +156,9 @@ describe("Comparison page", () => {
 
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(toggle).toHaveAccessibleName(/show values/i);
+    expect(screen.getByRole("table", { name: "Per asset" })).toHaveTextContent("***");
+    await user.click(toggle);
+    expect(screen.getByRole("table", { name: "Per asset" })).not.toHaveTextContent("***");
   });
 
   it("renders the value visibility icon with theme-aware current color", async () => {

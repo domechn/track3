@@ -14,7 +14,7 @@ import { publishSourceStatuses } from "./source-status-event";
 import { Button } from "./ui/button";
 import {
   ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
-  ExclamationTriangleIcon, GlobeIcon, UpdateIcon,
+  ExclamationTriangleIcon, GlobeIcon, ReloadIcon, UpdateIcon,
 } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
@@ -39,15 +39,18 @@ import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failu
 import { listPortfolioSources } from "@/middlelayers/data";
 import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
+import { FULL_REFRESH_REQUEST_EVENT } from "./refresh-request";
 
 let lastRetryResult: RefreshAllDataResult | undefined;
 
 const App = ({
   loading: refreshLoading,
   afterRefresh,
+  fidelity = false,
 }: {
   loading: boolean;
   afterRefresh?: (success: boolean) => unknown;
+  fidelity?: boolean;
 }) => {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
@@ -230,6 +233,14 @@ const App = ({
     await runRefresh(sourceId);
   };
 
+  const requestRefreshRef = useRef(requestRefresh);
+  requestRefreshRef.current = requestRefresh;
+  useEffect(() => {
+    const listener = () => { void requestRefreshRef.current(); };
+    window.addEventListener(FULL_REFRESH_REQUEST_EVENT, listener);
+    return () => window.removeEventListener(FULL_REFRESH_REQUEST_EVENT, listener);
+  }, []);
+
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
   const hasPartial = sourceStatuses.some((source) => source.status === "partial");
   const sourceLabel = (source: PortfolioSourceStatus) => {
@@ -285,7 +296,8 @@ const App = ({
     <div className="t3-refresh-controls flex items-center gap-2">
       <span role="status" className="sr-only">{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
       <Button variant="outline" className="t3-refresh-button" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
-        <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
+        {fidelity ? <svg aria-hidden="true" className={`h-[14px] w-[14px] ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>
+          : <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />}
         <p className="hidden sm:inline-block">{t("common.refresh")}</p>
       </Button>
       {(sourceStatuses.length > 0 || refreshLoading) && (

@@ -26,20 +26,24 @@ test("coin metrics and Profit Summary remain legible across platforms, themes, a
           await installTauriBridge(page, { richPortfolio: true, zeroCostUSDC: true });
 
           await page.goto("/#/coins/BTC");
-          const buyTitle = locale === "en" ? "Avg. buy price (selected range)"
-            : platform === "mobile" ? "平均买入价（所选时间）" : "所选区间平均买入价";
-          const sellTitle = platform === "mobile"
-            ? locale === "en" ? "Avg. sell price" : "平均卖出价"
-            : locale === "en" ? "Avg. sell price (selected range)" : "所选区间平均卖出价";
-          await expect(page.getByText(buyTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
-          await expect(page.getByText(sellTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
-          const sellCard = page.getByText(sellTitle, { exact: true }).locator(platform === "mobile" ? ".." : "../..");
-          await expect(sellCard.locator(platform === "mobile" ? "strong" : ".text-xl")).not.toHaveText(/^[—–]$/);
+          const buyTitle = platform === "desktop"
+            ? locale === "en" ? "Cost price" : "成本价格"
+            : locale === "en" ? "Avg. buy price (selected range)" : "平均买入价（所选时间）";
+          const sellTitle = platform === "desktop"
+            ? locale === "en" ? "Avg. sell price" : "平均卖出价格"
+            : locale === "en" ? "Avg. sell price" : "平均卖出价";
+          const buyLabel = platform === "desktop" ? page.locator(".coin-fidelity-metric > span").filter({ hasText: buyTitle }) : page.getByText(buyTitle, { exact: true });
+          const sellLabel = platform === "desktop" ? page.locator(".coin-fidelity-metric > span").filter({ hasText: sellTitle }) : page.getByText(sellTitle, { exact: true });
+          await expect(buyLabel).toBeVisible({ timeout: 30_000 });
+          await expect(sellLabel).toBeVisible({ timeout: 30_000 });
+          const sellCard = sellLabel.locator(platform === "desktop" ? ".." : "..");
+          await expect(sellCard.locator("strong")).not.toHaveText(/^[—–]$/);
           if (platform === "mobile") {
             await sellCard.scrollIntoViewIfNeeded();
             await sellCard.screenshot({ path: `${directory}/${platform}-${theme}-${locale}-sell-price.png` });
           }
           await page.screenshot({ path: `${directory}/${platform}-${theme}-${locale}-coin.png`, fullPage: true });
+
           if (platform === "mobile" && theme === "light" && locale === "en") {
             await expect(page.getByText("Breakeven price", { exact: true })).toBeVisible();
             await page.goto("/#/coins/AVAX");
@@ -47,7 +51,6 @@ test("coin metrics and Profit Summary remain legible across platforms, themes, a
             await expect(emptySellCard.locator("strong")).toHaveText("–");
             await emptySellCard.screenshot({ path: `${directory}/mobile-no-sales.png` });
           }
-
           if (platform === "mobile") {
             await page.goto("/#/coins/BTC");
             const costHelp = locale === "en"
@@ -68,12 +71,11 @@ test("coin metrics and Profit Summary remain legible across platforms, themes, a
 
           await page.goto("/#/summary");
           const summary = platform === "desktop"
-            ? page.getByText(locale === "en" ? "Profit Summary" : "盈亏汇总", { exact: true }).locator("../../..")
+            ? page.locator(".fidelity-period-card").first()
             : page.locator(".fd-summary .fd-profit-summary");
           await expect(summary).toBeVisible({ timeout: 30_000 });
-          await expect(summary).toContainText(platform === "desktop"
-            ? locale === "en" ? "Periods" : "共"
-            : locale === "en" ? "Profit summary" : "盈亏摘要");
+          if (platform === "desktop") await expect(summary.locator(".fidelity-month-card").first()).toBeVisible();
+          else await expect(summary).toContainText(locale === "en" ? "Profit summary" : "盈亏摘要");
           await summary.screenshot({ path: `${directory}/${platform}-${theme}-${locale}-profit-summary.png` });
         } finally {
           await context.close();
