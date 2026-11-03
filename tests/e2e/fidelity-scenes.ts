@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { FakeS3 } from "../../src/middlelayers/sync/object-store";
-import { installTauriBridge as installBaseBridge } from "./tauri-bridge";
+import { installTauriBridge as installBaseBridge } from "./fidelity-captures";
 import md5 from "md5";
 
 type BaseOptions = Exclude<Parameters<typeof installBaseBridge>[1], FakeS3>;

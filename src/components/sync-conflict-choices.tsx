@@ -8,16 +8,17 @@ const configConflictNames: Record<string, string> = {
   "994": "assistant", "995": "blacklist", rebalance: "rebalance",
 };
 
-export function ConfigConflictChoices({ id, t, resolve, disabled = false, pending, ConfirmDialog = ConfirmDeleteDialog }: {
+export function ConfigConflictChoices({ id, t, resolve, disabled = false, pending, mobile = false, ConfirmDialog = ConfirmDeleteDialog }: {
   id: string;
   t: (key: string, fallback?: string) => string;
   resolve: (id: string, choice: "local" | "remote") => void;
   disabled?: boolean;
   pending?: "local" | "remote";
+  mobile?: boolean;
   ConfirmDialog?: typeof ConfirmDeleteDialog;
 }) {
   if (!syncCategory(id)) return null;
-  const name = configConflictNames[id]
+  const name = mobile && id === "7" ? t("config.mobile.baseCurrency") : configConflictNames[id]
     ? t(`sync.configConflict.name.${configConflictNames[id]}`)
     : t("sync.details.config");
   return <div className="min-w-0 space-y-2 rounded-md border p-2">
@@ -28,7 +29,8 @@ export function ConfigConflictChoices({ id, t, resolve, disabled = false, pendin
         return <ConfirmDialog key={choice}
           trigger={<SyncActionButton size="sm" variant="outline" disabled={disabled} pending={pending === choice}
             pendingLabel={t("sync.pending.resolve")} className="h-auto min-h-11 whitespace-normal text-left">{label}</SyncActionButton>}
-          title={t("sync.details.confirmTitle")}
+          title={mobile ? t(choice === "remote" ? "fidelity.b.sync.useOtherQuestion" : "fidelity.b.sync.useThisQuestion")
+            : t("sync.details.confirmTitle")}
           description={t(`sync.details.confirm.${choice}`)}
           cancelLabel={t("common.cancel")}
           actions={[{ label, onClick: () => resolve(id, choice) }]} />;

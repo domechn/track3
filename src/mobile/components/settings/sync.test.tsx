@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import SyncSettingsPage from "./sync";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { S3Error } from "@/middlelayers/sync/object-store";
+import { I18nProvider } from "@/mobile/i18n";
 
 const toastMock = vi.fn(() => ({ dismiss: dismissMock }));
 const dismissMock = vi.fn();
@@ -65,6 +66,23 @@ afterEach(() => {
 });
 
 describe("Sync settings page", () => {
+  it("formats remote upload dates with the selected Chinese locale", async () => {
+    const timezone = process.env.TZ;
+    process.env.TZ = "UTC";
+    const language = vi.spyOn(navigator, "language", "get").mockReturnValue("zh-CN");
+    status.mode = "ready";
+    vi.mocked(syncRuntime.devices).mockResolvedValue([{
+      id: "device-one", name: "Laptop", current: true, lastUpload: "2026-11-03T09:51:00.000Z",
+    }]);
+    try {
+      const view = render(<I18nProvider><SyncSettingsPage /></I18nProvider>);
+      await waitFor(() => expect(view.container.querySelector(".sync-device-last-upload"))
+        .toHaveTextContent("2026/11/3 09:51:00"));
+    } finally {
+      language.mockRestore();
+      process.env.TZ = timezone;
+    }
+  });
   function fillConnection() {
     for (const [label, value] of [
       ["S3 endpoint", "https://s3.example.test"], ["Region", "us-east-1"],

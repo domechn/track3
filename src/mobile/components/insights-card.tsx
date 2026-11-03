@@ -12,6 +12,7 @@ import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { storePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
 import { IconButton, SectionHeader } from "@/mobile/components/mobile";
 import { useIsMobile } from "@/mobile/components/mobile";
+import AssistantInsights from "@/mobile/components/assistant/assistant-insights";
 
 function SeverityIcon({ severity }: { severity: InsightSeverity }) {
   return severity === "info"
@@ -21,7 +22,14 @@ function SeverityIcon({ severity }: { severity: InsightSeverity }) {
     }`} />;
 }
 
-export default function InsightsCard({ currency, overview = false, fidelity = false }: { currency?: CurrencyRateDetail; overview?: boolean; fidelity?: boolean }) {
+export default function InsightsCard({ currency, overview = false, assistant = false, onAsk, fidelity = false }: {
+  currency?: CurrencyRateDetail; overview?: boolean; assistant?: boolean; onAsk?: (question: string) => void; fidelity?: boolean;
+}) {
+  return assistant ? <AssistantInsights currency={currency} onAsk={onAsk} />
+    : <GenericInsightsCard currency={currency} overview={overview} fidelity={fidelity} />;
+}
+
+function GenericInsightsCard({ currency, overview, fidelity }: { currency?: CurrencyRateDetail; overview: boolean; fidelity: boolean }) {
   const { t, locale } = useTranslation();
   const mobile = useIsMobile();
   const [card, setCard] = useState<StoredInsightCard>();

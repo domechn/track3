@@ -5,6 +5,38 @@
   background: hsl(var(--background) / .8);
   backdrop-filter: blur(4px);
 }
+.fidelity-guide-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(0 0 0 / .72);
+}
+.fidelity-guide-confirm {
+  position: fixed;
+  z-index: 61;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  gap: 10px;
+  border: 1px solid #3a3a3e;
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background: #131217;
+  padding: 20px 16px 24px;
+  color: white;
+}
+.fidelity-guide-confirm h2 { margin: 0; font-size: 16px; font-weight: 600; line-height: 22px; }
+.fidelity-guide-confirm p { margin: 0 0 10px; color: #b4b6bc; font-size: 13px; line-height: 18px; }
+.fidelity-guide-confirm button {
+  min-height: 44px;
+  border: 1px solid #3a3a3e;
+  border-radius: 999px;
+  background: transparent;
+  color: white;
+  font-size: 13px;
+}
+.fidelity-guide-confirm button.is-primary { border-color: white; background: white; color: #0d0d0e; }
 .ob-overlay[data-closing="true"], .ob-dialog[data-closing="true"] {
   opacity: 0 !important;
   transition: opacity 150ms linear !important;

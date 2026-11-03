@@ -19,16 +19,16 @@ const phones = [
 const settings = [
   ["settings", "/settings", "Settings"],
   ["sources", "/settings/configuration?section=sources", "Data sources"],
-  ["currency", "/settings/configuration?section=currency", "Currency"],
+  ["currency", "/settings/configuration?section=currency", "Currency & display"],
   ["appearance", "/settings/appearance?section=theme", "Appearance"],
   ["language", "/settings/appearance?section=language", "Language"],
   ["blacklist", "/settings/data?section=blacklist", "Blacklist"],
   ["security", "/settings/data?section=security", "Security"],
-  ["backup", "/settings/data?section=backup", "Backup"],
-  ["pro", "/settings/systemInfo?section=pro", "Pro and license"],
+  ["backup", "/settings/data?section=backup", "Backup & data"],
+  ["pro", "/settings/systemInfo?section=pro", "Pro & license"],
   ["about", "/settings/systemInfo?section=about", "About"],
   ["assistant-settings", "/settings/assistant", "AI assistant"],
-  ["sync-settings", "/settings/sync", "Backup and sync"],
+  ["sync-settings", "/settings/sync", "Backup & sync"],
 ] as const;
 
 async function capture(page: Page, phone: string, theme: string, name: string) {
@@ -67,6 +67,21 @@ test("phone Rules uses one card surface", async ({ page }) => {
   }));
   expect(lastCheck.height, JSON.stringify(lastCheck)).toBeLessThanOrEqual(lastCheck.lineHeight + 1);
   expect(lastCheck.scrollWidth).toBeLessThanOrEqual(lastCheck.width + 1);
+});
+
+test("a newly started mobile chat keeps its composer above the tab bar", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTauriBridge(page, { richPortfolio: true, slowAssistant: true });
+  await page.goto("/#/assistant");
+  const composer = page.getByRole("textbox", { name: "Ask the assistant..." });
+  await expect(composer).toBeVisible({ timeout: 20_000 });
+  await composer.fill("How is my portfolio doing?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page).toHaveURL(/#\/assistant\/.+/);
+  await expect(page.locator(".mobile-tab-bar")).toBeVisible();
+  const tabTop = (await page.locator(".mobile-tab-bar").boundingBox())!.y;
+  const composerBottom = (await composer.boundingBox())!;
+  expect(composerBottom.y + composerBottom.height).toBeLessThanOrEqual(tabTop);
 });
 
 test("390px Advanced setup keeps Goals and Rebalance AI chips inside their cards", async ({ page }) => {
@@ -133,12 +148,12 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await expect(page.getByRole("dialog", { name: "Edit data source" })).toBeVisible();
     await expect(page.locator(".ios-d3-editor-intro .ios-d3-source-avatar")).toHaveCount(0);
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-source-provider.png` });
-    await page.getByRole("button", { name: "Binance" }).click();
+    await page.getByRole("button", { name: /Binance Key, secret/ }).click();
     await expect(page.getByRole("textbox", { name: "API key" })).toHaveAttribute("placeholder", "Required");
     await expect(page.locator(".ios-d3-editor-intro")).toContainText("Binance");
-    const paste = await page.getByRole("button", { name: "Paste", exact: true }).last().boundingBox();
+    const secret = await page.getByLabel("API secret", { exact: true }).boundingBox();
     const reveal = await page.getByRole("button", { name: "Hold to reveal API secret" }).boundingBox();
-    expect(reveal!.x).toBeGreaterThan(paste!.x);
+    expect(reveal!.x).toBeGreaterThan(secret!.x + secret!.width / 2);
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-source-credentials.png` });
     await page.getByRole("dialog", { name: "Edit data source" }).getByRole("button", { name: "Cancel" }).click();
     await page.getByRole("tab", { name: "Custom assets" }).click();
@@ -146,7 +161,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     const cancel = await page.getByRole("dialog", { name: "Add custom asset" }).getByRole("button", { name: "Cancel" }).boundingBox();
     expect(cancel!.x).toBeLessThan(60);
     const customEditor = page.getByRole("dialog", { name: "Add custom asset" });
-    await expect(customEditor.locator(".ios-d3-editor-nav").getByRole("button", { name: "Save" })).toBeVisible();
+    await expect(customEditor.locator("footer").getByRole("button", { name: "Add asset" })).toBeVisible();
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-custom-asset-editor.png` });
     await page.getByRole("dialog", { name: "Add custom asset" }).getByRole("button", { name: "Cancel" }).click();
 
@@ -341,10 +356,10 @@ test("D3 pushed titles replace the large title after scrolling", async ({ page }
   await page.setViewportSize({ width: 375, height: 667 });
   await installTauriBridge(page, { seedRebalanceProfile: true, richPortfolio: true, freshReviewData: true, slowAssistant: true });
   await page.goto("/#/settings/data?section=backup");
-  await expect(page.getByRole("heading", { name: "Backup", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Backup & data", level: 1 })).toBeVisible();
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toBeHidden();
   await page.evaluate(() => window.scrollTo(0, 300));
-  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup");
+  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup & data");
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toBeVisible();
   const compact = await page.locator("#app-top-bar .ios-d3-pushed-title").boundingBox();
   const topBar = await page.locator("#app-top-bar").boundingBox();

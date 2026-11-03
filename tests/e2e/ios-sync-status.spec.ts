@@ -39,8 +39,8 @@ test("locked sync opens as a full-width bottom sheet over the iPhone tab bar", a
   await expect.poll(async () => {
     const box = (await dialog.boundingBox())!;
     const tabs = (await page.locator(".mobile-tab-bar").boundingBox())!;
-    return box.x <= 1 && box.x + box.width >= 389 &&
-      Math.abs(box.y + box.height - 844) <= 1 && box.y < tabs.y;
+    return box.x <= 1 && box.x + box.width >= 389 && Math.abs(box.y + box.height - 844) <= 1 &&
+      box.y < tabs.y && tabs.y < box.y + box.height;
   }).toBe(true);
 });
 

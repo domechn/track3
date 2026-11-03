@@ -1,9 +1,13 @@
 import { useTranslation } from "@/mobile/i18n";
 import { MagicWandIcon, ArchiveIcon } from "@radix-ui/react-icons";
+import { isIOS } from "@/utils/platform";
 
 export const QUICK_ACTION_KEYS = {
   recentAnalysis: "recentAnalysis",
   recentOperations: "recentOperations",
+  summarizeWeek: "summarizeWeek",
+  biggestRisks: "biggestRisks",
+  planRebalance: "planRebalance",
 } as const;
 
 export type QuickActionKey =
@@ -16,6 +20,9 @@ const PROMPTS: Record<QuickActionKey, string> = {
   recentOperations:
     "List my most recent transactions across all wallets, grouped by " +
     "type, and flag any unusual activity.",
+  summarizeWeek: "Summarize this week's portfolio changes.",
+  biggestRisks: "What are the biggest risks in my portfolio?",
+  planRebalance: "Plan a rebalance of my portfolio.",
 };
 
 export function quickActionPrompt(key: QuickActionKey, translate?: (key: string) => string): string {
@@ -30,6 +37,16 @@ export default function QuickActions({
   onRun: (key: QuickActionKey) => void;
 }) {
   const { t } = useTranslation();
+  if (isIOS()) {
+    return <div className="ios-d3-quick-actions fidelity-chat-actions" role="group" aria-label={t("assistant.chat.quickActions.label")}>
+      {(["summarizeWeek", "biggestRisks", "planRebalance"] as const).map((key) =>
+        <button key={key} type="button" onClick={() => onRun(QUICK_ACTION_KEYS[key])} disabled={disabled}
+          data-testid={key === "summarizeWeek" ? "quick-action-analysis"
+            : key === "biggestRisks" ? "quick-action-operations" : `quick-action-${key}`}>
+          {t(`fidelity.assistant.quick.${key}`)}
+        </button>)}
+    </div>;
+  }
   return (
     <div className="ios-d3-quick-actions flex flex-wrap items-center gap-2 border-t border-[var(--glass-border)] bg-card/30 px-4 py-2">
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">

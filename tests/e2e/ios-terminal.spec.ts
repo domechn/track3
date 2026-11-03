@@ -50,7 +50,7 @@ test("phone Sync keeps grouped card styling", async ({ page }) => {
   const card = page.locator(".ios-d3-sync-settings > .glass").first();
   await expect(card).toBeVisible();
   await expect(card.locator("h3")).toBeHidden();
-  await expect(card.locator("input").first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(card.locator("input").first()).toHaveCSS("background-color", "rgb(10, 10, 11)");
 });
 
 test("phone and iPad keep the Overview inset and approved card borders", async ({ page }) => {

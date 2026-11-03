@@ -519,6 +519,7 @@ const App = ({
           }
         },
         successTitle: isPhone ? t("fidelity.history.deletedTitle") : undefined,
+        toastClassName: isPhone ? "fidelity-history-delete-toast" : undefined,
         successMessage: isPhone
           ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
             day: "numeric", month: "short", year: "numeric",

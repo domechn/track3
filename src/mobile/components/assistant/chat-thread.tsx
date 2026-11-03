@@ -15,8 +15,21 @@ import {
 import { useTranslation } from "@/mobile/i18n";
 import { cn } from "@/lib/utils";
 import { isIOS } from "@/utils/platform";
+import { FidelityIcon } from "@/mobile/components/fidelity-icon";
+import { useSizeClass } from "@/mobile/components/mobile";
 import MessageBubble from "@/mobile/components/assistant/message-bubble";
 import type { ChatMessage } from "@/components/assistant/use-chat";
+
+function precedingApprovedAlert(messages: ChatMessage[], index: number): { symbol: string; threshold: number } | undefined {
+  if (index < 2 || messages[index - 1]?.role !== "user") return;
+  const prior = messages[index - 2];
+  if (prior?.role !== "assistant") return;
+  const action = prior.blocks.find((block) => block.kind === "pending_action" &&
+    block.name === "create_alert" && block.status === "approved");
+  if (action?.kind !== "pending_action") return;
+  const threshold = Number(action.args.threshold);
+  return Number.isFinite(threshold) ? { symbol: String(action.args.symbol), threshold } : undefined;
+}
 
 type CapabilityKey =
   | "assistant.chat.capabilities.summary"
@@ -54,6 +67,7 @@ const EXAMPLES: Array<{ key: ExampleKey; Icon: React.ComponentType<{ className?:
 
 export default function ChatThread({
   messages,
+  initialTimes,
   isStreaming,
   onPickPrompt,
   currency,
@@ -62,8 +76,11 @@ export default function ChatThread({
   outputPricePerMillionTokens,
   onDecideAction,
   canDecideAction,
+  model,
+  onRetry,
 }: {
   messages: ChatMessage[];
+  initialTimes?: Array<string | undefined>;
   isStreaming: boolean;
   onPickPrompt?: (prompt: string) => void;
   currency?: CurrencyRateDetail;
@@ -72,7 +89,10 @@ export default function ChatThread({
   outputPricePerMillionTokens?: number;
   onDecideAction?: (id: string, decision: "approve" | "reject") => void;
   canDecideAction?: boolean;
+  model?: string;
+  onRetry?: () => void;
 }) {
+  const { t, locale } = useTranslation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const userScrolledAwayRef = useRef(false);
   const isEmpty = messages.length === 0 && !isStreaming;
@@ -156,6 +176,22 @@ export default function ChatThread({
     });
   }, [messages, isStreaming]);
 
+  useEffect(() => {
+    if (!isIOS() || messages.length === 0 || !scrollRef.current) return;
+    const viewport = scrollRef.current.parentElement?.closest(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement | null;
+    if (!viewport) return;
+    const observer = new ResizeObserver(() => {
+      if (!userScrolledAwayRef.current || document.activeElement?.matches('[data-testid="chat-input"]')) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
+    });
+    observer.observe(scrollRef.current);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [messages.length]);
+
   return (
     <ScrollArea className="flex-1">
       <div
@@ -166,9 +202,28 @@ export default function ChatThread({
         {isEmpty ? (
           <WelcomePanel onPickPrompt={onPickPrompt} currency={currency} />
         ) : (
-          messages.map((m, i) => (
-            <MessageBubble key={i} message={m} isStreaming={isStreaming && i === messages.length - 1} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} onDecideAction={onDecideAction} canDecideAction={canDecideAction} />
-          ))
+          <>
+          {messages.map((m, i) => {
+            const at = initialTimes?.[i];
+            const date = at && Number.isFinite(Date.parse(at)) ? new Date(at) : new Date();
+            const previousAt = initialTimes?.[i - 1];
+            const previousDate = previousAt && Number.isFinite(Date.parse(previousAt)) ? new Date(previousAt) : new Date();
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            const label = date.toDateString() === today.toDateString() ? t("fidelity.assistant.today")
+              : date.toDateString() === yesterday.toDateString() ? t("fidelity.assistant.yesterday")
+              : new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+                day: "numeric", month: "short", ...(date.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
+              }).format(date);
+            return <div key={i} className="contents">
+              {isIOS() && (i === 0 || date.toDateString() !== previousDate.toDateString()) &&
+                <div className="fidelity-chat-day">{label}</div>}
+              <MessageBubble message={m} at={at} isStreaming={isStreaming && i === messages.length - 1} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} onDecideAction={onDecideAction} canDecideAction={canDecideAction} model={model} onRetry={onRetry} baseCurrency={currency}
+                precedingApprovedAlert={precedingApprovedAlert(messages, i)} />
+            </div>;
+          })}
+          </>
         )}
         {isStreaming && messages.at(-1)?.role !== "assistant" && (
           <p className="text-sm italic text-muted-foreground">
@@ -192,6 +247,27 @@ function WelcomePanel({
   currency?: CurrencyRateDetail;
 }) {
   const { t } = useTranslation();
+  const fidelityPhone = useSizeClass().width === "compact";
+
+  if (isIOS() && fidelityPhone) {
+    return <div className="fidelity-chat-welcome" data-testid="chat-welcome">
+      <div className="fidelity-chat-welcome-intro">
+        <span className="fidelity-chat-spark" aria-hidden="true">
+          <FidelityIcon name="spark" />
+        </span>
+        <h2>{t("fidelity.assistant.welcomeTitle")}</h2>
+        <p>{t("fidelity.assistant.welcomeBody")}</p>
+      </div>
+      <InsightsCard currency={currency} assistant onAsk={onPickPrompt} />
+      <section className="fidelity-chat-more-prompts" aria-label={t("assistant.chat.examples.title")}>
+        {EXAMPLES.map(({ key }) => <button type="button" key={key} data-testid={`chat-example-${key.split(".").pop()}`}
+          aria-label={t(`assistant.chat.examples.short.${key.split(".").pop()}`)}
+          onClick={() => onPickPrompt?.(t(key))} disabled={!onPickPrompt}>
+          {t(`assistant.chat.examples.short.${key.split(".").pop()}`)}
+        </button>)}
+      </section>
+    </div>;
+  }
 
   return (
     <div

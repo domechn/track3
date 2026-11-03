@@ -15,12 +15,15 @@ const ease = [0.2, 0.8, 0.2, 1] as const
 type Variant = "desktop" | "ios"
 type CloseReason = "completed" | "skipped"
 
-export default function OnboardingGuide({ open, variant, step, onStep, onClose }: {
+export default function OnboardingGuide({ open, variant, step, onStep, onClose, confirmReplay = false, onConfirmReplay, onCancelReplay }: {
   open: boolean
   variant: Variant
   step: number
   onStep: (step: number) => void
   onClose: (reason: CloseReason) => void
+  confirmReplay?: boolean
+  onConfirmReplay?: () => void
+  onCancelReplay?: () => void
 }) {
   const { t } = useTranslation()
   const initialReduced = useReducedMotion()
@@ -97,6 +100,20 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
   const back = <button type="button" data-testid="onboarding-back" className="ob-ios-text-btn" style={step === 0 ? { visibility: "hidden" } : undefined} onClick={() => go(-1)} tabIndex={step === 0 ? -1 : 0}>{t("onboarding.back")}</button>
   const skipButton = <button type="button" data-testid="onboarding-skip" className="ob-ios-text-btn" onClick={skip}>{label}</button>
   const next = <button type="button" ref={nextRef} data-testid={last ? "onboarding-cta-add-source" : "onboarding-next"} className="ob-ios-primary" onClick={last ? complete : () => go(1)}>{primary}</button>
+
+  if (confirmReplay) return <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onCancelReplay?.() }}>
+    <Dialog.Portal>
+      <Dialog.Overlay className="fidelity-guide-confirm-overlay" />
+      <Dialog.Content className="fidelity-guide-confirm" data-testid="onboarding-dialog" data-step="welcome"
+        aria-describedby="fidelity-guide-confirm-description"
+        onEscapeKeyDown={(event) => { event.preventDefault(); onCancelReplay?.() }}>
+        <Dialog.Title>{t("fidelity.b.about.replayConfirmTitle")}</Dialog.Title>
+        <Dialog.Description id="fidelity-guide-confirm-description">{t("fidelity.b.about.replayConfirmBody")}</Dialog.Description>
+        <button type="button" className="is-primary" onClick={onConfirmReplay}>{t("fidelity.b.about.startGuide")}</button>
+        <button type="button" onClick={onCancelReplay}>{t("common.cancel")}</button>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
 
   return <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) skip() }}>
     <Dialog.Portal>

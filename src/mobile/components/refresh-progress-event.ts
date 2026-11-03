@@ -15,4 +15,3 @@ export const refreshSourceEvent = "fidelity:mobile-refresh-source";
 export function requestRefreshSource(sourceId: string) {
   window.dispatchEvent(new CustomEvent(refreshSourceEvent, { detail: sourceId }));
 }
-

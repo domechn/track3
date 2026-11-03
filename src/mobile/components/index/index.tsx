@@ -130,6 +130,7 @@ function TopBar({
   compactTitle,
   refreshAction,
   onBack,
+  backLabel,
   overview,
   unread,
 }: {
@@ -148,6 +149,7 @@ function TopBar({
   compactTitle?: string;
   refreshAction: React.MutableRefObject<(() => Promise<void>) | null>;
   onBack?: () => void;
+  backLabel?: string;
   overview: boolean;
   unread: number;
 }) {
@@ -175,7 +177,7 @@ function TopBar({
       <div className="flex h-12 items-center px-4">
         {mobile && onBack && <button type="button" className="mobile-back mobile-header-back"
           onClick={onBack} aria-label={t("common.back", "Back")}>
-          <ChevronLeftIcon aria-hidden="true" />{t("common.back", "Back")}
+          <ChevronLeftIcon aria-hidden="true" />{backLabel ?? t("common.back", "Back")}
         </button>}
         {compactTitle && <span className={`mobile-compact-title${overview ? " mobile-overview-compact-title" : ""}`}>{compactTitle}</span>}
         {(!mobile || compactTitle || fidelityOverview && availableDates.length > 0) && !(mobile && onBack && compactTitle) &&
@@ -320,7 +322,7 @@ function Layout({
   const previousRoute = useRef({ tab: currentTab, path: routePath });
   const backPath = routeParents.current.get(routePath) ?? stack.at(-2) ?? rootPath;
   const canGoBack = routePath !== rootPath;
-  const showBack = canGoBack && !(sizeClass.width === "wide" &&
+  const showBack = canGoBack && location.pathname !== "/settings" && !(sizeClass.width === "wide" &&
     /^\/(settings|assistant|goals|rebalance)(\/|$)/.test(location.pathname));
   const routeScroll = useRef(new Map<string, number>());
   const containerScroll = useRef(new Map<string, number[]>());
@@ -339,10 +341,15 @@ function Layout({
   const swipeStart = useRef<{ id: number; x: number; y: number } | null>(null);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   useEffect(() => {
+    const retrySource = () => { void refreshAction.current?.(); };
+    window.addEventListener("portfolio:retry-source", retrySource);
+    return () => window.removeEventListener("portfolio:retry-source", retrySource);
+  }, [refreshAction]);
+  useEffect(() => {
     const refresh = () => { void refreshAction.current?.(); };
     window.addEventListener("track3:full-refresh", refresh);
     return () => window.removeEventListener("track3:full-refresh", refresh);
-  }, []);
+  }, [refreshAction]);
   useLayoutEffect(() => {
     const previous = previousRoute.current;
     if (previous.tab === currentTab && previous.path === routePath) return;
@@ -418,6 +425,7 @@ function Layout({
           overview={location.pathname === "/overview"}
           unread={unread}
           onBack={showBack ? () => { rememberScroll(); navigate(backPath); } : undefined}
+          backLabel={mobile && location.pathname.startsWith("/settings/") ? t("settings.title") : undefined}
           onRefreshSuccess={onRefreshSuccess}
           refreshAction={refreshAction}
         />

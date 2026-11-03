@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SessionSidebar from "@/mobile/components/assistant/session-sidebar";
+import { I18nProvider } from "@/mobile/i18n";
 import type { ChatSessionMeta } from "@/middlelayers/ai";
 import axe from "axe-core";
 
@@ -19,6 +20,28 @@ function makeSession(overrides: Partial<ChatSessionMeta> = {}): ChatSessionMeta 
 }
 
 describe("SessionSidebar", () => {
+  it("keeps the current thread and pinned state visible on the phone list", () => {
+    const onBack = vi.fn();
+    render(<SessionSidebar mobile sessions={[makeSession({ pinned: 1 })]} activeId="s1" isLoading={false}
+      onBack={onBack} onSelect={vi.fn()} onNew={vi.fn()} onDelete={vi.fn()} onPin={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Back" })).toBeVisible();
+    expect(screen.getByTestId("session-item-s1")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("session-item-s1")).toHaveTextContent("Pinned");
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
+  it("formats phone session dates in Chinese for the Chinese locale", () => {
+    const storedLocale = vi.spyOn(Storage.prototype, "getItem").mockReturnValue("zh");
+    try {
+      render(<I18nProvider><SessionSidebar mobile sessions={[makeSession()]} activeId={null} isLoading={false}
+        onSelect={vi.fn()} onNew={vi.fn()} onDelete={vi.fn()} onPin={vi.fn()} /></I18nProvider>);
+      expect(screen.getByText("1月1日")).toBeVisible();
+    } finally {
+      storedLocale.mockRestore();
+    }
+  });
+
   it("reveals session actions with a left swipe on iPhone", () => {
     render(<SessionSidebar mobile sessions={[makeSession()]} activeId={null} isLoading={false}
       onSelect={vi.fn()} onNew={vi.fn()} onDelete={vi.fn()} onPin={vi.fn()} />);

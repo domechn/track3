@@ -86,6 +86,15 @@ describe("ChatThread", () => {
     expect(screen.getAllByTestId("assistant-bubble")).toHaveLength(1);
   });
 
+  it("labels an older conversation with its date instead of Today", () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    render(<ChatThread messages={[{ role: "user", content: "Hello" }]}
+      initialTimes={["2020-10-27T12:00:00.000Z"]} isStreaming={false} />);
+    expect(screen.queryByText("fidelity.assistant.today")).toBeNull();
+    expect(screen.getByText(/27 Oct 2020/)).toBeVisible();
+    vi.mocked(isIOS).mockReturnValue(false);
+  });
+
   it("renders capability tags in welcome panel", () => {
     render(<ChatThread messages={[]} isStreaming={false} />);
     expect(screen.getAllByText("Portfolio summary").length).toBeGreaterThanOrEqual(1);
@@ -99,6 +108,19 @@ describe("ChatThread", () => {
     expect(screen.getByRole("button", { name: "Portfolio summary" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Bitcoin position" })).toBeInTheDocument();
     vi.mocked(isIOS).mockReturnValue(false);
+  });
+
+  it("keeps the designed welcome panel on a 375px iPhone", () => {
+    const width = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 375 });
+    vi.mocked(isIOS).mockReturnValue(true);
+    try {
+      render(<ChatThread messages={[]} isStreaming={false} />);
+      expect(screen.getByTestId("chat-welcome")).toHaveClass("fidelity-chat-welcome");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+      vi.mocked(isIOS).mockReturnValue(false);
+    }
   });
 
   it("calls onPickPrompt when an example is clicked", async () => {

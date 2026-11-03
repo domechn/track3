@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,17 +19,51 @@ const AttachModal = memo(function AttachModal({
   cexOptions,
   walletOptions,
   onSelect,
-}: AttachModalProps) {
+  fidelityLayout = false,
+  assetName = "",
+  pausedValues = [],
+}: AttachModalProps & { fidelityLayout?: boolean; assetName?: string; pausedValues?: string[] }) {
   const { t } = useTranslation();
 
   // Encode the current attachTo for comparison with option values
   const currentEncoded = currentAttachTo
     ? `${currentAttachTo.kind}:${currentAttachTo.type}:${currentAttachTo.identity}`
     : "";
+  const [selected, setSelected] = useState(currentEncoded);
+  useEffect(() => {
+    if (open) setSelected(currentEncoded);
+  }, [open, currentEncoded]);
 
   const selectOption = (encoded: string) => {
     onSelect(encoded);
   };
+  if (isIOS() && fidelityLayout) {
+    const title = t("fidelity.settings.sources.attachTitle").replace("{asset}", assetName);
+    const options = [
+      { value: "", label: t("fidelity.settings.sources.standalone"), detail: t("fidelity.settings.sources.notAttached") },
+      ...cexOptions.map((option) => ({ value: option.value, label: option.label, detail: pausedValues.includes(option.value)
+        ? t("fidelity.settings.sources.exchangePaused") : t("fidelity.settings.sources.exchange") })),
+      ...walletOptions.map((option) => ({ value: option.value, label: option.label, detail: t("fidelity.settings.sources.wallet") })),
+    ];
+    return <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="fidelity-attach-dialog" aria-label={title}>
+        <div className="fidelity-attach-handle" aria-hidden="true" />
+        <DialogHeader className="fidelity-attach-header">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{t("fidelity.settings.sources.attachHint")}</DialogDescription>
+        </DialogHeader>
+        <div className="fidelity-attach-options" role="radiogroup" aria-label={title}>
+          {options.map((option) => <button key={option.value} type="button" role="radio"
+            aria-checked={selected === option.value} onClick={() => setSelected(option.value)}>
+            <i className={selected === option.value ? "is-selected" : ""} />
+            <strong>{option.label}</strong><span>{option.detail}</span>
+          </button>)}
+        </div>
+        <footer><button type="button" onClick={() => onOpenChange(false)}>{t("common.cancel")}</button>
+          <button type="button" className="is-primary" onClick={() => selectOption(selected)}>{t("fidelity.settings.sources.attach")}</button></footer>
+      </DialogContent>
+    </Dialog>;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

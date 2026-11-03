@@ -23,11 +23,13 @@ export function subscriptionSummary(info: SubscriptionInfo, t: Translate, locale
   return parts.join(" · ");
 }
 
-export function SystemInfoCard({ title, headingLevel = 3, status, description, action, version, footerAction, children, t }: {
+export function SystemInfoCard({ title, displayTitle, headingLevel = 3, status, description, headerDetails, action, version, footerAction, children, t }: {
   title: string;
+  displayTitle?: string;
   headingLevel?: 2 | 3;
   status?: { label: string; value: string | null };
   description?: string;
+  headerDetails?: ReactNode;
   action?: ReactNode;
   version: string;
   footerAction?: ReactNode;
@@ -44,7 +46,9 @@ export function SystemInfoCard({ title, headingLevel = 3, status, description, a
     <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2.5">
-          <Heading className="text-lg font-semibold tracking-tight">{title}</Heading>
+          <Heading className="text-lg font-semibold tracking-tight" aria-label={displayTitle ? title : undefined}>
+            {displayTitle ?? title}
+          </Heading>
           {status && <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${tone}`}>
             <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
             {status.label}
@@ -56,6 +60,7 @@ export function SystemInfoCard({ title, headingLevel = 3, status, description, a
               <span key={index} className="whitespace-nowrap">{index > 0 && "·\u00a0"}{part}</span>)}
           </p>
           : <p className="mt-1 text-sm text-muted-foreground">{description}</p>)}
+        {headerDetails}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
