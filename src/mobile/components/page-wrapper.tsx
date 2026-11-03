@@ -13,16 +13,18 @@ const App = ({
   hasData,
   children,
   dateRange,
+  allowEmpty = false,
 }: {
   hasData: boolean;
   children: React.ReactNode;
   dateRange: TDateRange;
+  allowEmpty?: boolean;
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
-  if (!hasData) {
+  if (!hasData && !allowEmpty) {
     if (isMobile) return <EmptyState title={t("overview.emptyTitle")} description={t("overview.emptyDescription")}
       illustrationLabel={t("overview.emptyIllustration")}
       action={t("overview.addFirstSource")} onAction={() => navigate("/settings/configuration")} />;
@@ -46,7 +48,7 @@ const App = ({
     );
   }
 
-  if (dateRange.start.getTime() === emptyDate.getTime() || dateRange.end.getTime() === emptyDate.getTime()) {
+  if (!allowEmpty && (dateRange.start.getTime() === emptyDate.getTime() || dateRange.end.getTime() === emptyDate.getTime())) {
     return <div className="min-h-[400px]" />;
   }
 

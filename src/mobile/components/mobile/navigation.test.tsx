@@ -52,6 +52,15 @@ describe("mobile navigation", () => {
     expect(screen.getByText("/summary")).toBeInTheDocument();
   });
 
+  it("uses the records grid and outline history artwork", () => {
+    render(<MemoryRouter initialEntries={["/history"]}><MobileNavigation /></MemoryRouter>);
+    const overview = document.querySelector('.mobile-tab-bar a[href="/overview"] svg')!;
+    const history = document.querySelector('.mobile-tab-bar a[href="/history"] svg')!;
+    expect(overview.querySelectorAll("rect")).toHaveLength(4);
+    expect(history.querySelector("circle")).toBeNull();
+    expect(history.querySelector("path")).toBeTruthy();
+  });
+
   it("does not retain a stock detail query when returning to Analytics", () => {
     render(<MemoryRouter initialEntries={["/coins/AAPL?assetType=stock"]}>
       <MobileNavigation />

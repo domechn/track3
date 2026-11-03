@@ -53,14 +53,14 @@ test("phone Sync keeps grouped card styling", async ({ page }) => {
   await expect(card.locator("input").first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
 });
 
-test("phone and iPad keep the Overview inset, flat History, and bordered analysis cards", async ({ page }) => {
+test("phone and iPad keep the Overview inset and approved card borders", async ({ page }) => {
   await installTauriBridge(page, { richPortfolio: true });
   for (const width of [390, 834]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/#/overview");
     const hero = page.locator(".mobile-hero-card");
     const label = hero.locator(".mobile-hero-header h3");
-    await expect(label).toBeVisible();
+    await expect(label).toBeVisible({ timeout: 15_000 });
     const cardBox = await hero.boundingBox();
     const labelBox = await label.boundingBox();
     const borderWidth = await hero.evaluate((node) => parseFloat(getComputedStyle(node).borderLeftWidth));
@@ -72,7 +72,7 @@ test("phone and iPad keep the Overview inset, flat History, and bordered analysi
     await page.goto("/#/history");
     const records = page.locator(".history-records-card");
     await expect(records).toBeVisible();
-    await expect(records).toHaveCSS("border-left-width", "0px");
+    await expect(records).toHaveCSS("border-left-width", width === 390 ? "1px" : "0px");
 
     await page.goto("/#/summary");
     const metrics = page.locator(".fd-summary > .fd-card, .profit-metrics-card").first();

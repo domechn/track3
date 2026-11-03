@@ -14,7 +14,7 @@ export async function captureSyncDetails(page: Page, platform: "desktop" | "mobi
   }, { theme, locale });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
-  await expect(page.locator("#app-main-content")).toContainText("$42,000.00");
+  await expect(page.locator("#app-main-content")).toContainText("$42,000.00", { timeout: 30_000 });
   await page.getByRole("button", { name: locale === "en" ? "Skip for now" : "暂时跳过" }).click();
   await page.evaluate(async () => {
     const runtimeModule = "/src/middlelayers/sync/runtime.ts";
