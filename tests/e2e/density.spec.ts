@@ -74,7 +74,7 @@ test("mouse cost basis column stays in normal flow", async ({ page }) => {
   await page.setViewportSize({ width: 600, height: 800 });
   await installTauriBridge(page);
   await page.goto("/#/cost-basis");
-  await expect(page.getByRole("heading", { name: "Cost basis and realized P&L", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cost basis", exact: true })).toBeVisible();
   await page.evaluate(() => {
     const wrapper = document.createElement("div");
     wrapper.className = "table-scroll";
@@ -104,35 +104,32 @@ test("history snapshot rows keep their compact desktop height", async ({ page })
   expect((await row.boundingBox())!.height).toBeLessThanOrEqual(50);
 });
 
-test("mouse history dialog keeps its original width and unclipped layout", async ({ page }) => {
+test("mouse history detail stays beside the list without clipping", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 500 });
   await installTauriBridge(page);
   await page.goto("/#/history");
   const row = page.getByTestId("history-snapshot-row").first();
   await expect(row).toBeVisible();
   await row.click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await expect.poll(async () => (await dialog.boundingBox())!.width).toBe(1024);
-  expect(await dialog.evaluate((node) => getComputedStyle(node).maxHeight)).toBe("none");
-  expect(await dialog.evaluate((node) => getComputedStyle(node).overflow)).toBe("visible");
-  const close = dialog.getByRole("button", { name: "Close" });
-  expect(await close.evaluate((node) => getComputedStyle(node).display)).not.toBe("flex");
-  await close.click();
-  const tableFrame = row.locator("xpath=ancestor::div[contains(@class, 'rounded-lg')][1]");
-  expect(await tableFrame.evaluate((node) => getComputedStyle(node).overflow)).toBe("hidden");
+  const detail = page.getByTestId("history-desktop-detail");
+  await expect(detail).toBeVisible();
+  const listBox = (await page.locator(".fidelity-history-list").boundingBox())!;
+  const detailBox = (await detail.boundingBox())!;
+  expect(detailBox.x).toBeGreaterThan(listBox.x + listBox.width);
+  expect(detailBox.x + detailBox.width).toBeLessThanOrEqual(1280);
 });
 
-test("mouse alert dialogs retain their original overflow", async ({ page }) => {
+test("mouse history delete dialog fits inside the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 500 });
   await installTauriBridge(page);
   await page.goto("/#/history");
-  const row = page.getByTestId("history-snapshot-row").first();
-  await expect(row).toBeVisible();
-  await row.hover();
-  await page.getByTestId("history-delete-latest").click();
+  const detail = page.getByTestId("history-desktop-detail");
+  await expect(detail).toBeVisible();
+  await detail.getByRole("button", { name: "Delete", exact: true }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toBeVisible();
+  expect((await dialog.boundingBox())!.width).toBeLessThanOrEqual(520);
+  expect((await dialog.boundingBox())!.height).toBeLessThanOrEqual(500);
   expect(await dialog.evaluate((node) => getComputedStyle(node).maxHeight)).toBe("none");
   expect(await dialog.evaluate((node) => getComputedStyle(node).overflow)).toBe("visible");
 });

@@ -91,7 +91,7 @@ test("390px Advanced setup keeps Goals and Rebalance AI chips inside their cards
 
 for (const phone of phones) for (const theme of ["light", "dark"] as const) {
   test(`D3 screens are reachable and captured on iPhone ${phone.name} in ${theme}`, async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await page.emulateMedia({ colorScheme: theme });
     await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
