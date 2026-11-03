@@ -229,6 +229,8 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
 
           await page.locator("#sync-passphrase").fill("correct horse battery staple");
           await page.locator("#sync-confirm").fill("correct horse battery staple");
+          // Hold the scheduler's startup debounce until the explicit Sync now run begins.
+          await page.clock.pauseAt(new Date());
           await page.getByRole("button", { name: locale === "en" ? "Enable sync" : "启用同步" }).click();
           const now = page.getByRole("button", { name: locale === "en" ? "Sync now" : "立即同步" });
           await expect(now).toBeEnabled({ timeout: 15000 });
@@ -245,6 +247,7 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           const nowBackground = await now.evaluate((node) => getComputedStyle(node).backgroundColor);
           store.hold();
           await now.click();
+          await page.clock.resume();
           const syncingButton = page.locator(".sync-settings-page button[aria-busy=true]");
           await expect(syncingButton).toHaveCount(1);
           await expect.poll(() => syncingButton.evaluate((node) => getComputedStyle(node).backgroundColor))

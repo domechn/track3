@@ -33,6 +33,8 @@ import {
 } from "@/mobile/components/ui/alert-dialog";
 import { isIOS } from "@/utils/platform";
 import { ModalPage } from "@/mobile/components/mobile/overlays";
+import GoalsFidelity from "@/mobile/components/goals-fidelity";
+import { usePhoneWidth } from "@/mobile/components/mobile/size-class";
 
 const emptyDraft: AlertDraft = {
   id: 0, kind: "total_value_target", assetType: "crypto", symbol: "",
@@ -53,6 +55,7 @@ const historySeverity = (kind: AlertKind) =>
 
 export default function GoalsAlerts() {
   const { t, locale } = useTranslation();
+  const phoneWidth = usePhoneWidth();
   const dataChangedVersion = useDataChangedVersion();
   const [draft, setDraft] = useState<AlertDraft>(emptyDraft);
   const [rules, setRules] = useState<AlertRule[]>([]);
@@ -67,6 +70,7 @@ export default function GoalsAlerts() {
   const [status, setStatus] = useState("");
   const [validationField, setValidationField] = useState<"threshold" | "cooldown" | "symbol" | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(!isIOS());
   const manualInitialized = useRef(false);
 
@@ -147,6 +151,44 @@ export default function GoalsAlerts() {
       setStatus(t("goals.saveError"));
     }
   }
+
+  if (isIOS() && phoneWidth) return <>
+    <GoalsFidelity
+    rules={rules} history={history} unreadCount={unreadCount} snapshots={snapshots}
+    prices={prices} targets={targets} loading={loading} error={error} status={status}
+    draft={draft} editorOpen={manualOpen} onDraft={setDraft}
+    onOpenEditor={(rule) => { if (rule) edit(rule); else { setDraft(emptyDraft); setStatus(""); setManualOpen(true); } }}
+    onCloseEditor={() => { setManualOpen(false); setValidationField(null); setStatus(""); }}
+    onSave={save}
+    onToggle={(rule, enabled) => void mutate(() => setAlertRuleEnabled(rule.id, enabled))}
+    onDelete={(rule) => void mutate(() => deleteAlertRule(rule.id))}
+    onAck={(alert) => void mutate(() => acknowledgeAlert(alert.id))}
+    onAckAll={() => void mutate(acknowledgeAllAlerts)}
+    onClear={() => void mutate(clearAlertHistory)}
+    onAdvanced={() => setAdvancedOpen(true)} />
+    {advancedOpen && <ModalPage title={t("fidelity.goals.advanced")} onDismiss={() => setAdvancedOpen(false)}>
+      <div className="pf-advanced">
+        <button className="pf-advanced-back" onClick={() => setAdvancedOpen(false)}>{t("common.back")}</button>
+        <h1>{t("fidelity.goals.advanced")}</h1>
+        <Card className="t3-goals-notifications">
+          <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.notifications")}</CardTitle></CardHeader>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-2xl text-sm text-muted-foreground">{t("goals.notificationExplanation")}</p>
+            <Button variant="outline" onClick={async () => {
+              const allowed = await enableSystemNotifications();
+              setNotificationsEnabled(allowed);
+              setStatus(t(allowed ? "goals.notificationEnabled" : "goals.notificationFallback"));
+            }}>{notificationsEnabled ? t("goals.notificationEnabled") : t("goals.enableNotifications")}</Button>
+            {status && <p role="status">{status}</p>}
+          </CardContent>
+        </Card>
+        <AISetupCard page="goals"
+          summary={rules.length ? rules.map((rule) => `${rule.id}: ${rule.kind} ${rule.symbol ?? ""} ${rule.comparator} ${rule.threshold} ${rule.window ?? ""} ${rule.enabled ? "enabled" : "disabled"}`).join("; ") : "No alert rules"}
+          suggestions={["goals.ai.drop", "goals.ai.btc", "goals.ai.deviation"].map((key) => t(key))} />
+        {loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}
+      </div>
+    </ModalPage>}
+  </>;
 
   const editor = <Card id="goal-rule-editor" className="border-0 shadow-none">
     <CardHeader className="ios-d3-goal-editor-heading pb-3"><CardTitle className="text-base">{t(draft.id ? "goals.editRule" : "goals.newRule")}</CardTitle></CardHeader>

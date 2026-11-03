@@ -136,16 +136,21 @@ test("navigation follows visual order and shows a keyboard focus ring", async ({
   await page.goto("/#/overview");
   await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeAttached();
   const skip = page.getByRole("link", { name: "Skip to main content" });
+  const collapse = page.getByRole("button", { name: "Expand sidebar" });
   const overview = page.getByRole("link", { name: "Overview" });
   const summary = page.getByRole("link", { name: "Summary" });
   await page.keyboard.press("Tab");
   await expect(skip).toBeFocused();
   expect(await skip.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
   await page.keyboard.press("Tab");
+  await expect(collapse).toBeFocused();
+  expect(await collapse.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
+  await page.keyboard.press("Tab");
   await expect(overview).toBeFocused();
   expect(await overview.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
   await page.keyboard.press("Tab");
   await expect(summary).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Shift+Tab");
   await expect(skip).toBeFocused();
@@ -372,6 +377,7 @@ test("visible controls across routes have 44px targets or 44px labels", async ({
       await expect(page.locator(".t3-settings-layout")).toBeVisible();
     }
     await expect(page.locator("main > div")).toHaveAttribute("aria-busy", "false");
+    if (route === "/assistant") await expect(page.locator("main .t3-manage-assistant")).toBeVisible();
     const small = await page.locator("main button, main a, main input, main select, aside button, aside a, header button, header a").evaluateAll((controls) =>
       controls.filter((control) => {
         const style = getComputedStyle(control);
@@ -504,10 +510,9 @@ test("wide cost basis tables keep their first column visible while scrolling", a
   await page.setViewportSize({ width: 360, height: 740 });
   await installTauriBridge(page);
   await page.goto("/#/cost-basis");
-  await page.getByText("Details", { exact: true }).click();
-  const table = page.locator("main table").first();
+  const table = page.locator(".fidelity-cost-averages table");
   await expect(table).toBeVisible();
-  const wrapper = table.locator("xpath=..");
+  const wrapper = page.locator(".fidelity-cost-averages");
   const widths = await wrapper.evaluate((node) => ({ scroll: node.scrollWidth, visible: node.clientWidth }));
   expect(widths.scroll).toBeGreaterThan(widths.visible);
   const first = table.locator("th").first();

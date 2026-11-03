@@ -45,6 +45,8 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
     await page.locator(".fidelity-history-chips button").nth(1).click();
     await page.getByRole("button", { name: /Issues/ }).click();
     await page.getByRole("button", { name: /^Show / }).click();
+  } else if (shell === "desktop") {
+    await page.getByRole("button", { name: /With issues/ }).click();
   } else {
     await page.getByRole("combobox", { name: "History filter" }).click();
     await page.getByRole("option", { name: "Partial" }).click();

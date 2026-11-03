@@ -267,6 +267,13 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     }
   });
 
+  it("shows no TopBar sync status on records pages, which provide their own status", async () => {
+    syncMocks.snapshot = { mode: "ready", sync: { phase: "idle", report: undefined } };
+    window.location.hash = "#/history";
+    const view = renderApp();
+    await view.findByTestId("trigger-history-delete");
+    expect(view.container.querySelectorAll(".desktop-sync-status-indicator")).toHaveLength(0);
+  });
   it("finishes boot while startup alert evaluation is pending", async () => {
     vi.mocked(processAlerts).mockImplementation(() => new Promise(() => {}));
     const view = renderApp();
@@ -340,24 +347,20 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     expect(view.getByTestId("trigger-history-delete")).toBe(history);
   });
 
-  it("shows the no-data panel after leaving and returning to empty History", async () => {
+  it("returns to empty History after leaving and coming back", async () => {
     window.location.hash = "#/history";
     const view = renderApp();
     const history = await view.findByTestId("trigger-history-delete");
 
-    const initialQueryCount = vi.mocked(queryLastRefreshAt).mock.calls.length;
     vi.mocked(queryLastRefreshAt).mockResolvedValueOnce(undefined);
     vi.mocked(getAvailableDates).mockResolvedValueOnce([]);
     fireEvent.click(history);
-    await waitFor(() => expect(vi.mocked(queryLastRefreshAt).mock.calls.length).toBeGreaterThan(initialQueryCount));
-    expect(view.getByTestId("trigger-history-delete")).toBe(history);
-
     window.location.hash = "#/settings";
     await view.findByText("settings");
     window.location.hash = "#/history";
 
-    expect(await view.findByText("There is not enough data")).toBeInTheDocument();
-    expect(view.queryByTestId("trigger-history-delete")).not.toBeInTheDocument();
+    expect(await view.findByTestId("trigger-history-delete")).toBeInTheDocument();
+    expect(view.queryByText("There is not enough data")).not.toBeInTheDocument();
   });
 
   it("bumps the data-changed version when the refresh button succeeds", async () => {

@@ -64,8 +64,8 @@ test("long press selection is limited to editable and explicitly selectable cont
   }))).toEqual({ select: "none", highlight: "rgba(0, 0, 0, 0)" });
   await sheet.getByRole("button", { name: "Close" }).click();
   await page.goto("/#/goals");
-  await page.getByRole("button", { name: "Add alert" }).click();
-  expect(await page.getByRole("dialog", { name: "Add alert" }).getByRole("heading", { name: "New rule" }).evaluate((node) =>
+  await page.getByRole("button", { name: "Add rule" }).first().click();
+  expect(await page.getByRole("dialog", { name: "Add rule" }).locator(".pf-editor-head b").evaluate((node) =>
     getComputedStyle(node).userSelect)).toBe("none");
 });
 
@@ -119,8 +119,11 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await expect(page).toHaveURL(/#\/more$/);
   await expect(page.locator(".mobile-more-hub")).toBeVisible();
-  await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
-  await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
+  const historyTab = page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" });
+  await historyTab.click();
+  await expect(historyTab).toHaveAttribute("aria-current", "page");
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
+  await historyTab.click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
 });
 
@@ -199,6 +202,7 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await page.goto("/#/overview");
   await expect(page.getByRole("button", { name: "Choose date range" })).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".t3-holdings-row").first()).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeGreaterThan(250);
   await page.evaluate(() => scrollTo(0, 250));
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(250);
   await page.getByRole("button", { name: "Choose date range" }).click();
@@ -207,11 +211,22 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(250);
   await page.goto("/#/goals");
-  await expect(page.getByRole("button", { name: "Add alert" })).toBeVisible();
-  await page.evaluate(() => scrollTo(0, 150));
+  await page.evaluate(async () => {
+    for (let index = 0; index < 7; index += 1) {
+      await (window as any).__e2eInvoke("plugin:sql|execute", {
+        query: "INSERT INTO alert_rules (kind, asset_type, symbol, comparator, threshold, window, enabled, cooldown_seconds) VALUES ('total_value_target', NULL, NULL, 'gte', ?, NULL, 1, 3600)",
+        values: [100_000 + index * 10_000],
+      });
+    }
+  });
+  await page.reload();
+  await expect(page.locator(".pf-goal-row")).toHaveCount(7);
+  const editRule = page.locator(".pf-goal-row").nth(2).getByRole("button", { name: /Edit/ });
+  await editRule.scrollIntoViewIfNeeded();
   const before = await page.evaluate(() => scrollY);
-  await page.getByRole("button", { name: "Add alert" }).click();
-  await page.getByRole("dialog", { name: "Add alert" }).getByRole("button", { name: "Cancel" }).click();
+  expect(before).toBeGreaterThan(100);
+  await editRule.click();
+  await page.getByRole("dialog", { name: "Edit rule" }).getByRole("button", { name: "Cancel" }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(before);
   await page.goto("/#/history");
   const historyRow = page.locator(".history-mobile-snapshot-button").first();

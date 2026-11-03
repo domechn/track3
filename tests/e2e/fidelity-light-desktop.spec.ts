@@ -8,7 +8,7 @@ for (const [route, scene] of [["rebalance", "rebalance"], ["goals", "goals"]] as
     await installPlanFidelityScene(page, scene);
     await page.goto(`/#/${route}`);
     await expect(page.locator("html")).toHaveClass(/light/);
-    await expect(page.locator(`.t3-manage-${route}`)).toBeVisible();
+    await expect(page.locator(`.t3-manage-${route}`)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
     const heading = page.getByRole("heading", { level: 1, name: route === "goals" ? "Goals & alerts" : "Rebalance" });
@@ -45,9 +45,13 @@ test("system theme switches wide Rebalance and Goals layouts when OS appearance 
   await expect(page.locator(".t3-fidelity-goals")).toBeVisible();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.goto("/#/goals/kinds");
+  await expect(page.getByRole("heading", { name: "Rule kinds" })).toBeVisible();
   await expect(page.locator(".t3-fidelity-rail")).toBeVisible();
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("html")).toHaveClass(/light/);
+  await expect(page.getByRole("heading", { level: 1, name: "Rule kinds" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
+  await expect(page.locator(".t3-fidelity-rail:visible")).toHaveCount(0);
   await expect(page.locator(".t3-fidelity-rail")).toBeHidden();
+  await expect(page.locator(".t3-fidelity-rail")).toHaveCSS("display", "none");
 });

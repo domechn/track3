@@ -13,7 +13,7 @@ test("desktop Cost basis keeps Export in the page header at 1024px", async ({ pa
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/cost-basis");
-  const header = page.locator(".analyze-cost-basis > div").first();
+  const header = page.locator(".analyze-cost-basis > header").first();
   const exportButton = page.getByRole("button", { name: "Export", exact: true });
   await expect(exportButton).toBeVisible();
   const headerBox = (await header.boundingBox())!;

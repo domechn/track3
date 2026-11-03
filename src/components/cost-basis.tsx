@@ -1,50 +1,48 @@
 import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
+import { zhCN } from "date-fns/locale";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { getCostBasisMethod, saveCostBasisMethod } from "@/middlelayers/configuration";
-import { exportCostBasisReport, loadCostBasisReport } from "@/middlelayers/cost-basis-data";
+import { exportCostBasisReport } from "@/middlelayers/cost-basis-data";
 import type { CostBasisMethod } from "@/middlelayers/cost-basis";
 import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Input } from "./ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Label } from "./ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { toast } from "./ui/use-toast";
-import AISetupCard from "./common/ai-setup-card";
+import type { AssetModel, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions/page-settings";
 import { readCostBasisSettings, setCostBasisSettingsFromPage } from "@/middlelayers/ui-state/page-prefs";
+import { TRANSACTION_HANDLER } from "@/middlelayers/entities/transactions";
+import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
+import type { TransactionModel } from "@/middlelayers/types";
+import { useToast } from "./ui/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { FinanceChartSkeleton } from "./finance-charts";
-import { CostBasisPanels } from "./cost-basis-panels";
-import type { QuoteColor } from "@/middlelayers/types";
+import SyncStatusIndicator from "./sync-status-indicator";
+import { CostBasisDesktopView } from "./cost-basis-desktop-view";
+import { buildCostBasisViewReport } from "./cost-basis-view-data";
+import { FidelityDateInput } from "./fidelity-date-input";
+import AISetupCard from "./common/ai-setup-card";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 const methods: CostBasisMethod[] = ["FIFO", "LIFO", "HIFO", "AVERAGE"];
-const pageSize = 50;
 
-function PageControls({
-  label, page, count, onPageChange,
-}: {
-  label: string; page: number; count: number; onPageChange: (page: number) => void;
-}) {
-  const { t } = useTranslation();
-  const pages = Math.ceil(count / pageSize);
-  if (pages <= 1) return null;
-  return <div className="flex items-center justify-end gap-2 pt-3 text-sm">
-    <Button variant="outline" size="sm" disabled={page === 0}
-      aria-label={t("cost.previousPage").replace("{table}", label)}
-      onClick={() => onPageChange(page - 1)}>{t("common.back")}</Button>
-    <span>{page + 1} / {pages}</span>
-    <Button variant="outline" size="sm" disabled={page >= pages - 1}
-      aria-label={t("cost.nextPage").replace("{table}", label)}
-      onClick={() => onPageChange(page + 1)}>{t("common.next")}</Button>
-  </div>;
+function DownloadGlyph() {
+  return <svg aria-hidden="true" viewBox="0 0 18 18" fill="none" stroke="currentColor"
+    strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 3v8M5.5 8L9 11.5 12.5 8M3.5 14.5h11" />
+  </svg>;
 }
 
-export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { quoteColor?: QuoteColor }) {
-  const { t } = useTranslation();
+function ChevronGlyph() {
+  return <svg aria-hidden="true" viewBox="0 0 18 18" fill="none" stroke="currentColor"
+    strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 7l5 5 5-5" />
+  </svg>;
+}
+
+export default function CostBasisPage({ quoteColor = "green-up-red-down",
+}: { quoteColor?: QuoteColor; currency?: CurrencyRateDetail }) {
+  const { t, locale } = useTranslation();
+  const { toast } = useToast();
   const dataVersion = useDataChangedVersion();
   const currentYear = String(new Date().getFullYear());
   const [method, setMethod] = useState<CostBasisMethod>("FIFO");
@@ -54,19 +52,25 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
   const [to, setTo] = useState(`${currentYear}-12-31`);
   const [holdingDaysInput, setHoldingDaysInput] = useState("365");
   const [appliedFilters, setAppliedFilters] = useState({ from, to, holdingPeriodDays: 365 });
-  const [report, setReport] = useState<CostBasisReport>();
+  const [reportResult, setReportResult] = useState<{ key: string; value: CostBasisReport }>();
+  const [context, setContext] = useState<{
+    version: number; transactions: TransactionModel[]; latestAssets: AssetModel[];
+    holdingValues: Map<string, number>;
+  }>();
   const [loading, setLoading] = useState(false);
-  const [pages, setPages] = useState({ warnings: 0, assets: 0, disposals: 0, unrealized: 0 });
-  const [manualOpen, setManualOpen] = useState(false);
-  const manualInitialized = useRef(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [settingsVersion, setSettingsVersion] = useState(0);
   const manualFilterEdit = useRef(false);
-  const validHoldingDays = /^[1-9]\d*$/.test(holdingDaysInput) &&
-    Number.isSafeInteger(Number(holdingDaysInput));
+  const methodSaveQueue = useRef(Promise.resolve());
+  const latestMethodChoice = useRef(0);
+  const validHoldingDays = /^[1-9]\d*$/.test(holdingDaysInput) && Number.isSafeInteger(Number(holdingDaysInput));
+  const validYear = !year || /^\d{4}$/.test(year);
   const validRange = !from || !to || from <= to;
-  const filtersCurrent = validHoldingDays && validRange && appliedFilters.from === from &&
+  const filtersCurrent = validYear && validHoldingDays && validRange && appliedFilters.from === from &&
     appliedFilters.to === to && appliedFilters.holdingPeriodDays === Number(holdingDaysInput);
+  const reportKey = `${dataVersion}:${method}:${appliedFilters.from}:${appliedFilters.to}:${appliedFilters.holdingPeriodDays}`;
+  const report = reportResult?.key === reportKey ? reportResult.value : undefined;
+  const viewReport = report ?? reportResult?.value;
 
   useEffect(() => {
     let active = true;
@@ -80,9 +84,15 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
           if (typeof stored.to === "string") setTo(stored.to);
           if (typeof stored.from === "string" && typeof stored.to === "string") {
             const selectedYear = stored.from.slice(0, 4);
-            setYear(stored.from === `${selectedYear}-01-01` && stored.to === `${selectedYear}-12-31` ? selectedYear : "");
+            setYear(stored.from === `${selectedYear}-01-01` &&
+              stored.to === `${selectedYear}-12-31` ? selectedYear : "");
           }
           if (typeof stored.holdingPeriodDays === "number") setHoldingDaysInput(String(stored.holdingPeriodDays));
+          setAppliedFilters((previous) => ({
+            from: typeof stored.from === "string" ? stored.from : previous.from,
+            to: typeof stored.to === "string" ? stored.to : previous.to,
+            holdingPeriodDays: typeof stored.holdingPeriodDays === "number" ? stored.holdingPeriodDays : previous.holdingPeriodDays,
+          }));
         } catch { /* Local preferences are optional. */ }
       })
       .catch(() => { toast({ description: t("cost.loadError"), variant: "destructive" }); })
@@ -100,169 +110,173 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
   }, []);
 
   useEffect(() => {
-    if (!validHoldingDays || !validRange) return;
+    if (!validYear || !validHoldingDays || !validRange) return;
     const timeout = setTimeout(() => {
       const holdingPeriodDays = Number(holdingDaysInput);
       setAppliedFilters((previous) =>
         previous.from === from && previous.to === to && previous.holdingPeriodDays === holdingPeriodDays
-          ? previous : { from, to, holdingPeriodDays },
-      );
-      if (manualFilterEdit.current) {
-        setCostBasisSettingsFromPage({ from, to, holdingPeriodDays });
-      }
+          ? previous : { from, to, holdingPeriodDays });
+      if (manualFilterEdit.current) setCostBasisSettingsFromPage({ from, to, holdingPeriodDays });
     }, 300);
     return () => clearTimeout(timeout);
-  }, [from, to, holdingDaysInput, validHoldingDays, validRange]);
+  }, [from, to, holdingDaysInput, validYear, validHoldingDays, validRange]);
 
   useEffect(() => {
     if (!ready) return;
     let active = true;
     setLoading(true);
-    loadCostBasisReport({
+    void Promise.all([
+      TRANSACTION_HANDLER.listTransactions(),
+      ASSET_HANDLER.listAssets(1),
+    ]).then(([transactions, snapshots]) => {
+      if (!active) return;
+      const latestAssets = snapshots[0] ?? [];
+      const holdingValues = new Map<string, number>();
+      for (const asset of latestAssets) {
+        const key = `${asset.assetType}:${asset.symbol}`;
+        holdingValues.set(key, (holdingValues.get(key) ?? 0) + asset.value);
+      }
+      setContext({ version: dataVersion, transactions, latestAssets, holdingValues });
+    }).catch(() => {
+      if (active) {
+        setLoading(false);
+        toast({ description: t("cost.loadError"), variant: "destructive" });
+      }
+    });
+    return () => { active = false; };
+  }, [ready, dataVersion, t]);
+
+  useEffect(() => {
+    if (!ready || context?.version !== dataVersion) return;
+    let active = true;
+    setLoading(true);
+    const options = {
       method, from: appliedFilters.from || undefined, to: appliedFilters.to || undefined,
       holdingPeriodDays: appliedFilters.holdingPeriodDays,
-    })
-      .then((next) => {
+    };
+    buildCostBasisViewReport(context.transactions, context.latestAssets, options)
+      .then((next) => { if (active) setReportResult({ key: reportKey, value: next }); })
+      .catch(() => {
         if (active) {
-          setReport(next);
-          if (!manualInitialized.current) {
-            setManualOpen(next.disposals.length === 0 && next.unrealized.length === 0);
-            manualInitialized.current = true;
-          }
-          setPages({ warnings: 0, assets: 0, disposals: 0, unrealized: 0 });
+          setReportResult(undefined);
+          toast({ description: t("cost.loadError"), variant: "destructive" });
         }
       })
-      .catch(() => { if (active) toast({ description: t("cost.loadError"), variant: "destructive" }); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [ready, method, appliedFilters, dataVersion, t]);
+  }, [ready, method, appliedFilters, context, dataVersion, t]);
 
   async function changeMethod(next: CostBasisMethod) {
+    const choice = ++latestMethodChoice.current;
+    const prior = methodSaveQueue.current;
+    let release!: () => void;
+    methodSaveQueue.current = new Promise<void>((resolve) => { release = resolve; });
+    await prior;
     try {
       await saveCostBasisMethod(next);
-      setMethod(next);
+      if (choice === latestMethodChoice.current) setMethod(next);
     } catch {
       toast({ description: t("cost.saveError"), variant: "destructive" });
+    } finally {
+      release();
     }
   }
 
-  async function exportReport(format: "csv" | "json") {
+  async function exportReport(fileFormat: "csv" | "json") {
     if (!report) return;
     try {
-      if (await exportCostBasisReport(report, format)) {
-        toast({ description: t("cost.exportSuccess") });
-      }
+      if (await exportCostBasisReport(report, fileFormat)) toast({ description: t("cost.exportSuccess") });
     } catch {
       toast({ description: t("cost.exportError"), variant: "destructive" });
     }
+    setExportOpen(false);
   }
 
-  const money = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  const qty = (value: number) => value !== 0 && Math.abs(value) < 1e-8
-    ? String(value) : value.toLocaleString(undefined, { maximumFractionDigits: 8 });
+  const date = (value: string, omitYear = false) => value
+    ? format(new Date(`${value}T00:00:00`), omitYear ? "d MMM" : "d MMM yyyy", locale === "zh" ? { locale: zhCN } : undefined) : "–";
+  const displayTo = to && to > format(new Date(), "yyyy-MM-dd") ? format(new Date(), "yyyy-MM-dd") : to;
+  const shortFrom = from.slice(0, 4) === displayTo.slice(0, 4) ? date(from, true) : date(from);
+  const periodName = year ? t("cost.fidelity.taxYearNumber").replace("{year}", year) : t("cost.fidelity.customRangeLower");
+  const methodName = method === "AVERAGE" ? t("cost.fidelity.averageLower") : method;
+  const [subtitleBeforePeriod, subtitleAfterPeriod = ""] = t("cost.fidelity.subtitle").split("{period}");
+  const [subtitleBeforeMethod, subtitleAfterMethod = ""] = subtitleAfterPeriod
+    .replace("{from}", shortFrom).replace("{to}", date(displayTo)).split("{method}");
+  const exportCount = report?.disposals.length ?? 0;
+  const [beforeHoldingDays, afterHoldingDays = ""] = (holdingDaysInput === "365"
+    ? t("cost.fidelity.holdingRule").replace("365", "{days}") : t("cost.fidelity.holdingRuleDays")).split("{days}");
+  const selectTaxYear = () => {
+    const next = from.slice(0, 4) || currentYear;
+    setYear(next); setFrom(`${next}-01-01`); setTo(`${next}-12-31`); manualFilterEdit.current = true;
+  };
 
-  return (
-    <div className="analyze-cost-basis flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{t("cost.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("cost.subtitle")}</p>
-        </div>
-        <Popover>
-          <PopoverTrigger asChild><Button variant="outline" disabled={!report || loading || !filtersCurrent}>{t("cost.design.export")}</Button></PopoverTrigger>
-          <PopoverContent align="end" className="w-48 p-2">
-            <Button className="w-full justify-start" variant="ghost" onClick={() => void exportReport("csv")}>{t("cost.exportCsv")}</Button>
-            <Button className="w-full justify-start" variant="ghost" onClick={() => void exportReport("json")}>{t("cost.exportJson")}</Button>
+  return <div className="analyze-cost-basis fidelity-cost">
+    {exportOpen && <div className="fidelity-export-scrim" aria-hidden="true" />}
+    <header className="fidelity-page-head">
+      <div><h1>{t("cost.fidelity.title")}</h1><p>{subtitleBeforePeriod}<strong>{periodName}</strong>{
+        subtitleBeforeMethod}<strong>{methodName}</strong>{subtitleAfterMethod}</p></div>
+      <div className="fidelity-head-actions">
+        <SyncStatusIndicator recordsStamp />
+        <Popover open={exportOpen} onOpenChange={setExportOpen}>
+          <PopoverTrigger asChild><button type="button" className="fidelity-export" disabled={!report || loading || !filtersCurrent}>
+            <DownloadGlyph />{t("cost.design.export")}<ChevronGlyph /></button></PopoverTrigger>
+          <PopoverContent align="end" sideOffset={6} className="fidelity-export-popover">
+            <button type="button" onClick={() => void exportReport("csv")}><DownloadGlyph /><span><b>{t("cost.exportCsv")}</b><small>{t("cost.fidelity.exportCsvNote").replace("{count}", String(exportCount))}</small></span></button>
+            <button type="button" onClick={() => void exportReport("json")}><DownloadGlyph /><span><b>{t("cost.exportJson")}</b><small>{t("cost.fidelity.exportJsonNote")}</small></span></button>
+            <p>{t("cost.fidelity.exportNote").replace("{method}", methodName).replace("{from}", shortFrom).replace("{to}", date(displayTo))}</p>
           </PopoverContent>
         </Popover>
       </div>
+    </header>
+    <div className="fidelity-cost-assistant">
       <AISetupCard page="cost-basis"
         summary={`${t("cost.method")}: ${method}; ${t("cost.from")}: ${from}; ${t("cost.to")}: ${to}; ${t("cost.holdingDays")}: ${holdingDaysInput}`}
         suggestions={["cost.ai.fifo", "cost.ai.average", "cost.ai.export"].map((key) => t(key))} />
-      <details open={manualOpen} onToggle={(event) => setManualOpen(event.currentTarget.open)} className="rounded-lg border bg-card">
-        <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
-      <Card>
-        <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="space-y-2">
-            <Label htmlFor="cost-method">{t("cost.method")}</Label>
-            <Select value={method} onValueChange={(value) => void changeMethod(value as CostBasisMethod)}>
-              <SelectTrigger id="cost-method"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {methods.map((value) => <SelectItem key={value} value={value}>{t(`cost.method.${value.toLowerCase()}`)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="cost-year">{t("cost.taxYear")}</Label>
-            <Input id="cost-year" type="number" min="1970" max="9999" value={year} onChange={(e) => {
-              manualFilterEdit.current = true;
-              const next = e.target.value;
-              setYear(next);
-              if (/^\d{4}$/.test(next)) {
-                setFrom(`${next}-01-01`);
-                setTo(`${next}-12-31`);
-              }
-            }} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="cost-from">{t("cost.from")}</Label>
-            <Input id="cost-from" type="date" aria-invalid={!validRange}
-              aria-describedby={!validRange ? "cost-range-error" : undefined}
-              value={from} onChange={(e) => { manualFilterEdit.current = true; setFrom(e.target.value); setYear(""); }} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="cost-to">{t("cost.to")}</Label>
-            <Input id="cost-to" type="date" aria-invalid={!validRange}
-              aria-describedby={!validRange ? "cost-range-error" : undefined}
-              value={to} onChange={(e) => { manualFilterEdit.current = true; setTo(e.target.value); setYear(""); }} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="cost-days">{t("cost.holdingDays")}</Label>
-            <Input id="cost-days" type="number" min="1" value={holdingDaysInput}
-              onChange={(e) => { manualFilterEdit.current = true; setHoldingDaysInput(e.target.value); }} />
-          </div>
-        </CardContent>
-      </Card>
-      </details>
-      {!validRange && <p id="cost-range-error" role="alert" className="text-sm text-destructive">{t("cost.invalidRange")}</p>}
-      {loading && (report ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p> : <FinanceChartSkeleton />)}
-      {report && validRange && <>
-        <CostBasisPanels report={report} quoteColor={quoteColor} t={t} />
-        {report.warnings.length > 0 && <Card className="border-amber-500/50"><CardHeader className="px-4 pb-1 pt-3"><CardTitle className="text-sm">{t("cost.warnings")}</CardTitle></CardHeader><CardContent className="px-4 pb-3"><ul className="list-disc space-y-1 pl-5 text-xs">{report.warnings.slice(pages.warnings * pageSize, (pages.warnings + 1) * pageSize).map((warning, index) => (
-          <li key={`${warning.eventId}-${index}`}>{t(`cost.warning.${warning.code}`).replace("{asset}", warning.symbol).replace("{amount}", qty(warning.amount))}</li>
-        ))}</ul>
-          <PageControls label={t("cost.warnings")} page={pages.warnings} count={report.warnings.length}
-            onPageChange={(page) => setPages((previous) => ({ ...previous, warnings: page }))} />
-        </CardContent></Card>}
-        <details open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)} className="rounded-lg border bg-card">
-          <summary className="cursor-pointer px-4 py-2 text-sm font-medium">{t("aiSetup.details")}</summary>
-        <Card>
-          <CardHeader><CardTitle>{t("cost.byAsset")}</CardTitle></CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table className="sticky-first-column"><TableHeader><TableRow><TableHead>{t("cost.asset")}</TableHead><TableHead className="text-right">{t("cost.proceeds")}</TableHead><TableHead className="text-right">{t("cost.costBasis")}</TableHead><TableHead className="text-right">{t("cost.gainLoss")}</TableHead></TableRow></TableHeader>
-              <TableBody>{report.assets.slice(pages.assets * pageSize, (pages.assets + 1) * pageSize).map((asset) => <TableRow key={`${asset.assetType}:${asset.symbol}`}><TableCell>{asset.symbol}</TableCell><TableCell className="text-right">{money(asset.proceeds)}</TableCell><TableCell className="text-right">{money(asset.costBasis)}</TableCell><TableCell className="text-right">{money(asset.gainLoss)}</TableCell></TableRow>)}</TableBody>
-            </Table>
-            {report.assets.length === 0 && <p className="py-4 text-sm text-muted-foreground">{t("cost.noDisposals")}</p>}
-            <PageControls label={t("cost.byAsset")} page={pages.assets} count={report.assets.length}
-              onPageChange={(page) => setPages((previous) => ({ ...previous, assets: page }))} />
-          </CardContent>
-        </Card>
-        <Card><CardHeader><CardTitle>{t("cost.realized")}</CardTitle></CardHeader><CardContent className="overflow-x-auto">
-          <Table className="sticky-first-column"><TableHeader><TableRow>{["asset", "acquired", "disposed", "quantity", "proceeds", "costBasis", "gainLoss", "term", "lot"].map((key) => <TableHead key={key}>{t(`cost.${key}`)}</TableHead>)}</TableRow></TableHeader><TableBody>{report.disposals.slice(pages.disposals * pageSize, (pages.disposals + 1) * pageSize).map((row, index) => (
-            <TableRow key={`${row.eventId}:${row.lotId}:${index}`}><TableCell>{row.symbol}</TableCell><TableCell>{format(new Date(row.acquiredAt), "yyyy-MM-dd")}</TableCell><TableCell>{format(new Date(row.disposedAt), "yyyy-MM-dd")}</TableCell><TableCell>{qty(row.amount)}</TableCell><TableCell>{money(row.proceeds)}</TableCell><TableCell>{money(row.costBasis)}</TableCell><TableCell>{money(row.gainLoss)}</TableCell><TableCell>{t(`cost.term.${row.term}`)}</TableCell><TableCell>{row.lotId}</TableCell></TableRow>
-          ))}</TableBody></Table>
-          <PageControls label={t("cost.realized")} page={pages.disposals} count={report.disposals.length}
-            onPageChange={(page) => setPages((previous) => ({ ...previous, disposals: page }))} />
-        </CardContent></Card>
-        <Card><CardHeader><CardTitle>{t("cost.unrealized")}</CardTitle></CardHeader><CardContent className="overflow-x-auto">
-          <Table className="sticky-first-column"><TableHeader><TableRow>{["asset", "lot", "acquired", "quantity", "costBasis", "marketValue", "gainLoss"].map((key) => <TableHead key={key}>{t(`cost.${key}`)}</TableHead>)}</TableRow></TableHeader><TableBody>{report.unrealized.slice(pages.unrealized * pageSize, (pages.unrealized + 1) * pageSize).map((asset) => (
-            <TableRow key={`${asset.assetType}:${asset.symbol}:${asset.id}`}><TableCell>{asset.symbol}</TableCell><TableCell>{asset.id}</TableCell><TableCell>{format(new Date(asset.acquiredAt), "yyyy-MM-dd")}</TableCell><TableCell>{qty(asset.amount)}</TableCell><TableCell>{money(asset.costBasis)}</TableCell><TableCell>{money(asset.marketValue)}</TableCell><TableCell>{money(asset.gainLoss)}</TableCell></TableRow>
-          ))}</TableBody></Table>
-          <PageControls label={t("cost.unrealized")} page={pages.unrealized} count={report.unrealized.length}
-            onPageChange={(page) => setPages((previous) => ({ ...previous, unrealized: page }))} />
-        </CardContent></Card>
-        </details>
-      </>}
     </div>
-  );
+    <section className="fidelity-card fidelity-cost-filters">
+      <div className="fidelity-filter-group"><span>{t("cost.fidelity.method")}</span>
+        <div className="fidelity-segment" role="group" aria-label={t("cost.fidelity.method")}>
+          {methods.map((value) => <button key={value} type="button" aria-pressed={method === value}
+            onClick={() => void changeMethod(value)}>{t(`cost.fidelity.method.${value.toLowerCase()}`)}</button>)}
+        </div>
+      </div>
+      <div className="fidelity-filter-group"><span>{t("cost.fidelity.period")}</span>
+        <div className="fidelity-segment" role="group" aria-label={t("cost.fidelity.period")}>
+          <button type="button" aria-pressed={!!year} onClick={selectTaxYear}>{t("cost.taxYear")}</button>
+          <button type="button" aria-pressed={!year} onClick={() => { setYear(""); manualFilterEdit.current = true; }}>{t("cost.fidelity.customRange")}</button>
+        </div>
+        {year ? <span className="fidelity-year-input"><input id="cost-year" type="number" min="1970" max="9999" aria-label={t("cost.taxYear")}
+          value={year} onChange={(event) => {
+            const next = event.target.value;
+            setYear(next); manualFilterEdit.current = true;
+            if (/^\d{4}$/.test(next)) { setFrom(`${next}-01-01`); setTo(`${next}-12-31`); }
+          }} /><ChevronGlyph /></span> : <>
+          <FidelityDateInput label={t("cost.from")} placeholder={t("cost.from")} invalid={!validRange}
+            describedBy={!validRange ? "cost-range-error" : undefined}
+            value={from} onChange={(event) => { setFrom(event.target.value); manualFilterEdit.current = true; }} />
+          <span>{t("cost.fidelity.to")}</span>
+          <FidelityDateInput label={t("cost.to")} placeholder={t("cost.to")} invalid={!validRange}
+            describedBy={!validRange ? "cost-range-error" : undefined}
+            value={to} onChange={(event) => { setTo(event.target.value); manualFilterEdit.current = true; }} />
+        </>}
+      </div>
+      <div className="fidelity-holding-rule">
+        <InfoCircledIcon aria-hidden="true" />
+        {method === "AVERAGE" ? t("cost.fidelity.averageRule") : <>
+          <span>{beforeHoldingDays}<input type="number" min="1" aria-label={t("cost.holdingDays")} value={holdingDaysInput}
+            style={{ width: `calc(${Math.max(3, holdingDaysInput.length)}ch + 2px)` }}
+            onChange={(event) => { setHoldingDaysInput(event.target.value); manualFilterEdit.current = true; }} />{afterHoldingDays}</span>
+        </>}
+      </div>
+    </section>
+    {!validRange && <p id="cost-range-error" role="alert" className="fidelity-error">{t("cost.invalidRange")}</p>}
+    {loading && !viewReport && <FinanceChartSkeleton />}
+    {loading && report && <p role="status">{t("common.loading")}</p>}
+    {viewReport && validYear && validRange && <CostBasisDesktopView report={viewReport} method={method} pending={!report}
+      year={year} quoteColor={quoteColor} t={t} locale={locale} transactions={context?.transactions ?? []}
+      from={appliedFilters.from} to={appliedFilters.to} holdingPeriodDays={appliedFilters.holdingPeriodDays}
+      holdingValues={context?.holdingValues ?? new Map()} onChooseYear={() => {
+        selectTaxYear();
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>("#cost-year")?.focus());
+      }} />}
+  </div>;
 }
