@@ -18,6 +18,7 @@ export default function FirstRunOnboarding({ variant, ready }: { variant: "deskt
   const removeVisibility = useRef<(() => void) | undefined>(undefined)
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
+  const [confirmReplay, setConfirmReplay] = useState(false)
 
   function show() {
     if (openRef.current) return
@@ -34,6 +35,7 @@ export default function FirstRunOnboarding({ variant, ready }: { variant: "deskt
     const replay = () => {
       if (openRef.current) return
       replayFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      setConfirmReplay(variant === "ios")
       show()
     }
     const storage = (event: StorageEvent) => {
@@ -89,11 +91,21 @@ export default function FirstRunOnboarding({ variant, ready }: { variant: "deskt
     }
     replayFocus.current = null
     if (reason === "completed") {
-      navigate(variant === "ios" ? "/settings/configuration?section=sources" : "/settings/configuration")
+      navigate(variant === "ios" ? "/settings/configuration?section=sources" : "/settings/configuration",
+        { state: variant === "ios" ? { fromOnboarding: true } : undefined })
     }
   }
 
+  function cancelReplay() {
+    setConfirmReplay(false)
+    closeWithoutWriting()
+    const control = replayFocus.current
+    window.setTimeout(() => control?.isConnected && control.focus(), 0)
+    replayFocus.current = null
+  }
+
   return open ? <Suspense fallback={null}>
-    <OnboardingGuide open={open} variant={variant} step={step} onStep={setStep} onClose={close} />
+    <OnboardingGuide open={open} variant={variant} step={step} onStep={setStep} onClose={close}
+      confirmReplay={confirmReplay} onConfirmReplay={() => setConfirmReplay(false)} onCancelReplay={cancelReplay} />
   </Suspense> : null
 }

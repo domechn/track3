@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -116,6 +116,7 @@ const config: AIConfig = {
      <MemoryRouter initialEntries={[path]}>
        <Link to="/assistant">Assistant route</Link>
        <Routes>
+        <Route path="/more" element={<p>More page</p>} />
          <Route
            path="/assistant/:sessionId"
            element={<ChatPage isProUser={isPro} />}
@@ -277,6 +278,14 @@ describe("ChatPage", () => {
     expect(await screen.findByLabelText(/context usage: 50%/i)).toBeTruthy();
     expect(screen.getByText(/120.*30/)).toBeTruthy();
   });
+  it("keeps context occupancy accessible in the phone chat header", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    chatStats.contextTokens = 4096;
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    expect(await screen.findByRole("progressbar", { name: /context usage: 50%/i })).toBeVisible();
+  });
   it("renders the Pro upsell when the user is not Pro", async () => {
     renderAt("/", false);
     await waitFor(() => {
@@ -312,6 +321,18 @@ describe("ChatPage", () => {
     expect(screen.getByTestId("assistant-empty-cta").getAttribute("href")).toBe(
       "/settings/assistant",
     );
+  });
+
+  it("gives a directly opened phone setup screen a working route back to More", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    vi.mocked(loadAIConfig).mockRejectedValue(
+      new (await import("@/middlelayers/configuration")).AIConfigMissingError(),
+    );
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    const back = await screen.findByRole("button", { name: "Back" });
+    fireEvent.click(back);
+    expect(screen.getByText("More page")).toBeVisible();
   });
 
   it("renders the chat header and welcome panel when AI is configured", async () => {

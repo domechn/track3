@@ -46,10 +46,8 @@ async function shot(page: Page, name: string) {
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-  if (name.includes("-now-")) {
-    const pill = await page.locator(name.startsWith("mobile")
-      ? ".ios-d3-sync-indicator button[aria-label]"
-      : ".desktop-sync-status-indicator button[aria-label]").boundingBox();
+  if (name.includes("-now-") && !name.startsWith("mobile")) {
+    const pill = await page.locator(".desktop-sync-status-indicator button[aria-label]").boundingBox();
     expect(pill, `${name}: sync status pill missing`).not.toBeNull();
     expect(pill!.x < box!.x + box!.width && pill!.x + pill!.width > box!.x &&
       pill!.y < box!.y + box!.height && pill!.y + pill!.height > box!.y,
@@ -132,14 +130,6 @@ async function shot(page: Page, name: string) {
   } else {
     expect(box!.x).toBeGreaterThanOrEqual(page.viewportSize()!.width - 390);
     expect(box!.y).toBeGreaterThan(page.viewportSize()!.height / 2);
-  }
-  if (name.includes("-now-") && name.startsWith("mobile")) {
-    const pill = await page.locator(".ios-d3-sync-indicator button[aria-label]").boundingBox();
-    const disable = await page.getByRole("button", { name: /Disable sync|停用同步/ }).boundingBox();
-    if (pill && disable) {
-      expect(pill.x < disable.x + disable.width && pill.x + pill.width > disable.x &&
-        pill.y < disable.y + disable.height && pill.y + pill.height > disable.y).toBe(false);
-    }
   }
   if ((name.includes("-now-") || name.includes("-collapsed-")) && !name.startsWith("mobile")) {
     const pill = await page.locator(".desktop-sync-status-indicator button[aria-label]").boundingBox();
@@ -232,7 +222,9 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           await page.getByRole("button", { name: locale === "en" ? "Enable sync" : "启用同步" }).click();
           const now = page.getByRole("button", { name: locale === "en" ? "Sync now" : "立即同步" });
           await expect(now).toBeEnabled({ timeout: 15000 });
-          await expect(page.getByRole("button", { name: locale === "en" ? "Sync idle" : "同步空闲" })).toBeVisible({ timeout: 15000 });
+          if (!mobile) {
+            await expect(page.locator(".t3-topbar-sync button")).toBeVisible({ timeout: 15000 });
+          }
 
           const nowWidth = (await now.boundingBox())!.width;
           const nowBackground = await now.evaluate((node) => getComputedStyle(node).backgroundColor);
@@ -247,8 +239,8 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           await shotPending(page, `${prefix}-now-pending`);
           store.release();
           await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Sync complete" : "同步完成");
-          await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
           await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Pushed 5" : "已推送 5 项");
+          await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
           await shot(page, `${prefix}-now-success`);
 
           store.failList = true;

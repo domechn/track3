@@ -93,6 +93,7 @@ export async function captureSyncStatusWithToast(page: Page, platform: Platform)
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/settings/sync");
   await page.getByRole("button", { name: "Skip for now" }).click();
+  if (mobile) await page.goto("/#/overview");
   await publish(page, { phase: "error", error: "bucket" });
   await page.evaluate(async (mobile) => {
     const { toast } = await import(/* @vite-ignore */ (mobile

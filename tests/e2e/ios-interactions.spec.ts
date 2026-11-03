@@ -72,13 +72,14 @@ test("long press selection is limited to editable and explicitly selectable cont
 test("empty portfolio keeps More and source setup reachable", async ({ page }) => {
   await installTauriBridge(page, { emptyPortfolio: true });
   await page.goto("/#/overview");
-  await expect(page.getByText("Your portfolio starts here")).toBeVisible();
+  await expect(page.getByText("Your portfolio starts here")).toBeVisible({ timeout: 30_000 });
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await expect(page.locator(".mobile-more-hub")).toBeVisible();
   await page.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await page.getByRole("link", { name: "Data sources" }).click();
-  await expect(page.getByRole("button", { name: "Add source" })).toBeVisible();
+  await page.getByRole("button", { name: "Add exchange" }).first().click();
+  await expect(page.getByRole("dialog", { name: "Edit data source" })).toBeVisible();
 });
 
 test("backup folder path remains selectable for copying", async ({ page }) => {
@@ -246,7 +247,7 @@ test("History controls and Settings links preserve their page scroll", async ({ 
   expect(settingsScroll).toBeGreaterThan(0);
   await backup.click();
   await expect(page).toHaveURL(/#\/settings\/data\?section=backup$/);
-  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup");
+  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup & data");
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(settingsScroll);

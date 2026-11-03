@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { LockClosedIcon } from "@radix-ui/react-icons";
+import { createPortal } from "react-dom";
+import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
   if (status.mode === "loading" || status.mode === "disabled") return null;
 
   const report = status.sync.report;
+  const never = status.sync.phase === "idle" && status.sync.lastSync === undefined;
   const muted = status.mode === "locked" && status.skipped;
   const phase = status.mode === "unreadable" ? "unreadable" :
     status.mode === "locked" ? (muted ? "skipped" : "locked") :
@@ -53,6 +55,17 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
   const locked = status.mode === "locked";
   const progressCompleted = status.sync.progress
     ? Math.min(status.sync.progress.completed, status.sync.progress.total) : 0;
+  const elapsedSeconds = status.sync.startedAt === undefined ? 0 : Math.max(0, Math.floor((now - status.sync.startedAt) / 1000));
+  const remainingItems = status.sync.progress ? Math.max(0, status.sync.progress.total - progressCompleted) : 0;
+  const itemsPerSecond = elapsedSeconds > 0 ? progressCompleted / elapsedSeconds : 0;
+  const remainingMinutes = itemsPerSecond > 0 ? Math.ceil(remainingItems / itemsPerSecond / 60) : undefined;
+  const elapsedTime = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+  const syncSettings = mobile ? syncRuntime.getSettings() : undefined;
+  const remoteLabel = syncSettings?.endpoint.includes(".r2.cloudflarestorage.com")
+    ? `Cloudflare R2 · ${syncSettings.bucket}` : syncSettings?.bucket;
+  const lastUpload = status.sync.lastSync === undefined ? undefined : new Date(status.sync.lastSync);
+  const lastUploadText = lastUpload && `${lastUpload.toDateString() === new Date(now).toDateString() ? t("fidelity.b.sync.sheetToday")
+    : lastUpload.toLocaleDateString()} ${lastUpload.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}`;
 
   async function unlock() {
     if (busy) return;
@@ -91,6 +104,10 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
       <span role="status" aria-live="polite" className="sr-only">
         {busy ? t("common.loading") : t(`sync.status.${phase}`)}
       </span>
+      {mobile && open && createPortal(
+        <div className="fidelity-sync-sheet-backdrop" aria-hidden="true" onClick={() => setOpen(false)} />,
+        document.body,
+      )}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button type="button" aria-label={t(`sync.status.${phase}`)} title={muted ? t("sync.status.skipped") : undefined}
@@ -111,19 +128,32 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
           onInteractOutside={(event) => {
             if (document.querySelector('[role="alertdialog"]')) event.preventDefault();
           }}
-          className={`t3-sync-popover max-h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${mobile ? "ios-d3-sync-popover" : ""}`}>
-          <h2 className="text-base font-semibold">{t("sync.status.details")}</h2>
+          className={`t3-sync-popover max-h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${mobile ? `ios-d3-sync-popover${locked ? " is-locked" : status.sync.retryStopped ? " is-stopped" : status.sync.phase === "error" ? " is-error" : ""}` : ""}`}>
+          {mobile ? <div className="fidelity-sync-sheet-head">
+            <h2>{t(locked ? "fidelity.b.sync.sheetLocked" : status.sync.retryStopped ? "fidelity.b.sync.stopped" : phase === "error" || phase === "unreadable"
+              ? "fidelity.b.sync.sheetFailed" : phase === "syncing" ? "fidelity.b.sync.syncing"
+                : never ? "settings.tab.sync" : "fidelity.b.sync.sheetUpToDate")}</h2>
+            <span className={`fidelity-sync-sheet-pill${locked ? " is-warning" : phase === "error" || phase === "unreadable"
+              ? " is-error" : report && status.sync.phase === "idle" ? " is-positive" : ""}`}>
+              {t(locked ? "fidelity.b.sync.sheetPassphraseNeeded" : status.sync.retryStopped
+                ? "fidelity.b.sync.sheetNeedsAttention" : phase === "error" || phase === "unreadable"
+                  ? "fidelity.b.sync.sheetRetrying"
+                : phase === "syncing" ? status.sync.progress?.phase === "pull" ? "fidelity.b.sync.sheetDownloading" : "fidelity.b.sync.sheetUploading"
+                  : never ? "fidelity.b.sync.sheetNever" : "fidelity.b.sync.synced")}
+            </span>
+          </div> : <h2 className="text-base font-semibold">{t("sync.status.details")}</h2>}
           {status.mode === "unreadable" ? <>
             <p role="alert" className="text-destructive">{t("sync.unreadable")}</p>
             <a href="#/settings/sync" className="text-primary underline">{t("sync.reenter")}</a>
           </> : locked ? (
             <div className="space-y-2">
-              <Label htmlFor="sync-status-passphrase">{t("sync.passphrase.label")}</Label>
+              {mobile && <p className="fidelity-sync-sheet-description">{t("fidelity.b.sync.sheetLockedBody")}</p>}
+              <Label htmlFor="sync-status-passphrase" className={mobile ? "sr-only" : undefined}>{t("sync.passphrase.label")}</Label>
               <Input id="sync-status-passphrase" type="password" autoComplete="off"
                 aria-invalid={!!error} aria-describedby={error ? "sync-status-passphrase-error" : undefined}
                 value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" disabled={busy} onClick={() => void unlock()}>{t("sync.unlock")}</Button>
+              <div className={mobile ? "fidelity-sync-sheet-actions" : "flex flex-wrap gap-2"}>
+                <Button size="sm" className={mobile ? "is-primary" : undefined} disabled={busy} onClick={() => void unlock()}>{t("sync.unlock")}</Button>
                 <Button size="sm" variant="outline" disabled={busy} onClick={() => {
                   syncRuntime.skip();
                   setOpen(false);
@@ -143,7 +173,23 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
               />
             </div>
           ) : <>
-            {status.sync.phase === "syncing" ? <>
+            {mobile && status.sync.phase === "syncing" ? <>
+              {status.sync.progress && status.sync.progress.total > 0 && <div className="fidelity-sync-sheet-progress">
+                <p id="sync-progress-label">{t(status.sync.progress.phase === "push" ? "sync.status.uploading" : "sync.status.downloading")
+                  .replace("{completed}", progressCompleted.toLocaleString("en-US"))
+                  .replace("{total}", status.sync.progress.total.toLocaleString("en-US"))}</p>
+                <Progress value={progressCompleted} max={status.sync.progress.total} aria-labelledby="sync-progress-label" />
+              </div>}
+              <dl className="fidelity-sync-sheet-progress-stats">
+                <div><dt>{t("fidelity.b.sync.sheetElapsed")}</dt><dd>{elapsedTime}</dd></div>
+                {itemsPerSecond > 0 && <div><dt>{t("fidelity.b.sync.sheetSpeed")}</dt>
+                  <dd>{t("fidelity.b.sync.sheetItemsPerSecond").replace("{count}", itemsPerSecond.toFixed(1))}</dd></div>}
+                {remainingMinutes !== undefined && <div><dt>{t("fidelity.b.sync.sheetTimeLeft")}</dt>
+                  <dd>{t("fidelity.b.sync.sheetAboutMinutes").replace("{count}", String(remainingMinutes))}</dd></div>}
+                {status.sync.progress && <div><dt>{t("fidelity.b.sync.sheetItemsLeft")}</dt>
+                  <dd>{remainingItems.toLocaleString("en-US")}</dd></div>}
+              </dl>
+            </> : status.sync.phase === "syncing" ? <>
               <p>{t("sync.status.running")}</p>
               {status.sync.startedAt !== undefined && <p className="text-muted-foreground">
                 {t("sync.status.started").replace("{time}", new Date(status.sync.startedAt).toLocaleString())}
@@ -158,27 +204,49 @@ export function SyncStatusIndicatorView({ t, mobile = false, ConfirmDialog = Con
               </div>}
             </> : <>
               {status.sync.retryStopped
-                ? <p className="text-destructive">{t("sync.status.retryStopped")}</p>
+                ? <p className={mobile ? "fidelity-sync-sheet-stopped-warning" : "text-destructive"}>{t("sync.status.retryStopped")}</p>
                 : report?.errors.length && status.sync.phase === "error"
                   ? <p className="text-destructive">{t("sync.status.errorsPresent")}</p>
                   : null}
               {status.sync.error && status.sync.error !== "sync" &&
                 <p className="text-destructive">{t(`sync.connection.${status.sync.error}`)}</p>}
-              {status.sync.phase === "idle" && !report && <p>{t("sync.status.never")}</p>}
-              {status.sync.phase === "idle" && report && !changed && <p>{t("sync.status.upToDate")}</p>}
-              {report && changed && (status.sync.phase === "idle" || report.errors.length > 0) && <p>{counts}</p>}
+              {status.sync.phase === "idle" && (mobile ? never : !report) && (mobile
+                ? <p className="fidelity-sync-sheet-description">{t("fidelity.b.sync.sheetNeverBody")}<span className="sr-only">{t("sync.status.never")}</span></p>
+                : <p>{t("sync.status.never")}</p>)}
+              {status.sync.phase === "idle" && report && !changed && !mobile && <p>{t("sync.status.upToDate")}</p>}
+              {report && changed && (status.sync.phase === "idle" || report.errors.length > 0) && !mobile && <p>{counts}</p>}
               {status.sync.phase === "error" && status.sync.lastSync === undefined && <p>{t("sync.status.never")}</p>}
-              {status.sync.lastSync !== undefined && <p className="text-muted-foreground">
-                {t(status.sync.phase === "error" ? "sync.status.last" : "sync.status.lastSynced")
-                  .replace("{time}", new Date(status.sync.lastSync).toLocaleString())}
-              </p>}
-              {report?.conflicts.length ? <p className="text-amber-600 dark:text-amber-400">
+              {status.sync.lastSync !== undefined && (mobile
+                ? <p className="fidelity-sync-sheet-description">{t("fidelity.b.sync.sheetLastUpload").replace("{time}", lastUploadText ?? "")}</p>
+                : <p className="text-muted-foreground">
+                  {t(status.sync.phase === "error" ? "sync.status.last" : "sync.status.lastSynced")
+                    .replace("{time}", new Date(status.sync.lastSync).toLocaleString())}
+                </p>)}
+              {mobile && report && status.sync.phase === "idle" && !never && <dl className="fidelity-sync-sheet-stats">
+                <div><dt>{t("fidelity.b.sync.sheetUploaded")}</dt><dd>{report.pushed} {t("fidelity.b.sync.sheetItems")}</dd></div>
+                <div><dt>{t("fidelity.b.sync.sheetDownloaded")}</dt><dd>{report.pulled} {t("fidelity.b.sync.sheetItems")}</dd></div>
+                {report.devices && <div><dt>{t("fidelity.b.sync.devices")}</dt><dd>{report.devices.length}</dd></div>}
+                <div><dt>{t("fidelity.b.sync.sheetRemote")}</dt><dd>{remoteLabel}</dd></div>
+              </dl>}
+              {report?.conflicts.length && !mobile ? <p className="text-amber-600 dark:text-amber-400">
                 {t("sync.status.conflictSummary").replace("{count}", String(report.conflicts.length))}
               </p> : null}
             </>}
-            <Button size="sm" variant="outline" disabled={status.sync.phase === "syncing"}
-              onClick={() => void syncRuntime.syncNow()}>{t("sync.now")}</Button>
-            <SyncDetails report={report} diagnostics={status.sync.diagnostics} t={t} ConfirmDialog={ConfirmDialog} />
+            {(!mobile || status.sync.phase !== "syncing") && <div className={mobile ? "fidelity-sync-sheet-actions" : undefined}>
+              <Button size="sm" variant={mobile && never ? "default" : "outline"}
+                className={mobile && never ? "is-primary" : undefined} disabled={status.sync.phase === "syncing"}
+                onClick={() => void syncRuntime.syncNow()}>{mobile && <ReloadIcon aria-hidden="true" />}
+                {t(mobile && status.sync.phase === "error" ? "fidelity.b.sync.sheetRetryNow" : "sync.now")}</Button>
+              {mobile && status.sync.phase === "idle" && !never
+                ? <SyncDetails report={report} diagnostics={status.sync.diagnostics} t={t} ConfirmDialog={ConfirmDialog} />
+                : mobile && <a href="#/settings/sync" onClick={() => setOpen(false)}>{t("settings.title")}</a>}
+            </div>}
+            {(!mobile || status.sync.phase !== "idle" || never) &&
+              <SyncDetails report={mobile && never ? undefined : report} diagnostics={status.sync.diagnostics} t={t}
+                ConfirmDialog={ConfirmDialog} defaultExpanded={mobile && status.sync.phase === "error" && !status.sync.retryStopped}
+                showConflicts={!mobile || status.sync.phase !== "error"}
+                errorLabel={mobile && status.sync.phase === "error" && status.sync.error
+                  ? t(status.sync.error === "sync" ? "sync.status.errorsPresent" : `sync.connection.${status.sync.error}`) : undefined} />}
           </>}
         </PopoverContent>
       </Popover>

@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  CheckIcon,
+  ChevronDownIcon,
+  ExclamationTriangleIcon,
   EyeClosedIcon,
   EyeOpenIcon,
   ReloadIcon,
@@ -20,6 +23,7 @@ import { probeConnection } from "@/middlelayers/ai";
 import { useTranslation } from "@/mobile/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { serializeAdvanced, parseAdvanced, assistantConfigFromForm, assistantPriceInvalid, assistantSettingsSecrets } from "@/middlelayers/ui-state/config-form";
+import { isIOS } from "@/utils/platform";
 
 const App = () => {
   const { t } = useTranslation();
@@ -43,6 +47,9 @@ const App = () => {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [probeError, setProbeError] = useState<string | undefined>();
+  const [probeSuccess, setProbeSuccess] = useState(false);
+  const [probeStats, setProbeStats] = useState<{ ms: number; time: string }>();
+  const [advancedText, setAdvancedText] = useState("");
   const [proactiveInsightsSummary, setProactiveInsightsSummary] = useState(false);
 
   useEffect(() => {
@@ -62,6 +69,7 @@ const App = () => {
         setInputPrice(input === undefined ? "" : String(input));
         setOutputPrice(output === undefined ? "" : String(output));
         if (advancedRef.current) advancedRef.current.value = serializeAdvanced(cfg.advanced);
+        setAdvancedText(serializeAdvanced(cfg.advanced));
       } catch (err) {
         if (!(err instanceof AIConfigMissingError) && active) {
           toast({
@@ -113,7 +121,10 @@ const App = () => {
   async function onTest() {
     if (testing) return;
     setProbeError(undefined);
+    setProbeSuccess(false);
+    setProbeStats(undefined);
     setTesting(true);
+    const started = performance.now();
     try {
       const err = await probeConnection({
         endpoint: endpoint.trim(),
@@ -128,6 +139,9 @@ const App = () => {
           variant: "destructive",
         });
       } else {
+        setProbeSuccess(true);
+        setProbeStats({ ms: Math.round(performance.now() - started),
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) });
         toast({ description: t("settings.assistant.testSuccess") });
       }
     } catch (err) {
@@ -140,6 +154,168 @@ const App = () => {
     } finally {
       setTesting(false);
     }
+  }
+
+  if (isIOS()) {
+    const configured = !!(endpoint && currentKey() && model);
+    const parsedOptions = parseAdvanced(advancedText);
+    const options = parsedOptions.value && typeof parsedOptions.value === "object"
+      ? Object.entries(parsedOptions.value) : [];
+    return <div className="fidelity-b fidelity-b-ai">
+      <p className="fidelity-b-subtitle">{t("fidelity.b.ai.subtitle")}</p>
+      <section className="fidelity-b-card fidelity-b-ai-connection">
+        <div className="fidelity-b-card-head">
+          <div><h2>{t("fidelity.b.ai.connection")}</h2>
+            <p>{t("fidelity.b.ai.connectionHint")}</p></div>
+          <span className={`fidelity-b-pill ${probeError ? "is-error" : probeSuccess ? "is-positive" : ""}`}>
+            {probeError ? t("fidelity.b.ai.failed") : probeSuccess
+              ? t("fidelity.b.ai.connected") : configured ? t("fidelity.b.ai.configured") : t("fidelity.b.ai.notConfigured")}
+          </span>
+        </div>
+        <div className="fidelity-b-fields">
+          <div className="fidelity-b-field">
+            <Label htmlFor="assistant-endpoint">{t("settings.assistant.endpoint")}</Label>
+            <Input id="assistant-endpoint" value={endpoint} onChange={(e) => setEndpoint(e.target.value)}
+              placeholder="https://api.openai.com/v1" data-testid="assistant-endpoint"
+              autoComplete="off" spellCheck={false} disabled={!loaded} />
+            <p>{t("fidelity.b.ai.endpointHint")}</p>
+          </div>
+          <div className="fidelity-b-field">
+            <Label htmlFor="assistant-api-key">{t("settings.assistant.apiKey")}</Label>
+            <div className="fidelity-b-input-end">
+              <Input id="assistant-api-key" ref={apiKeyRef} type={showKey ? "text" : "password"}
+                data-testid="assistant-api-key" autoComplete="off" spellCheck={false} disabled={!loaded} />
+              <button type="button" onClick={() => setShowKey((value) => !value)}
+                aria-label={t(showKey ? "settings.assistant.hideKey" : "settings.assistant.showKey")}
+                data-testid="assistant-show-key" disabled={!loaded}>
+                {showKey ? <EyeClosedIcon /> : <EyeOpenIcon />}
+              </button>
+            </div>
+            <p>{t("fidelity.b.ai.keyHint")}</p>
+          </div>
+          <div className="fidelity-b-field">
+            <Label htmlFor="assistant-model">{t("settings.assistant.model")}</Label>
+            <div className="fidelity-b-model-input">
+              <Input id="assistant-model" value={model} onChange={(e) => setModel(e.target.value)}
+                placeholder="gpt-4o-mini" data-testid="assistant-model" list="fidelity-b-ai-models"
+                autoComplete="off" spellCheck={false} disabled={!loaded} />
+              <ChevronDownIcon aria-hidden="true" />
+            </div>
+            <datalist id="fidelity-b-ai-models">
+              <option value="anthropic/claude-sonnet-4.5" />
+              <option value="gpt-4o-mini" />
+            </datalist>
+          </div>
+        </div>
+        <div className="fidelity-b-card-foot fidelity-b-ai-test">
+          <Button variant="outline" onClick={onTest} disabled={testing || saving || !loaded}
+            data-testid="assistant-test-connection">
+            {testing ? t("settings.assistant.testingStatus") : t("settings.assistant.testConnection")}
+          </Button>
+          {probeError && <p className="fidelity-b-result is-error" data-testid="assistant-probe-error" role="alert">
+            <ExclamationTriangleIcon aria-hidden="true" /><span>{probeError}</span></p>}
+          {probeSuccess && <p className="fidelity-b-result is-positive"><CheckIcon aria-hidden="true" />
+            <span>{probeStats ? t("fidelity.b.ai.testMeasured")
+              .replace("{ms}", String(probeStats.ms)).replace("{model}", model.trim())
+              .replace("{time}", probeStats.time) : t("fidelity.b.ai.testSuccess")}</span></p>}
+          {!probeError && !probeSuccess && !testing && <p className="fidelity-b-result">{t("fidelity.b.ai.testPrompt")}</p>}
+        </div>
+      </section>
+
+      <section className="fidelity-b-card fidelity-b-ai-context">
+        <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.ai.context")}</h2>
+          <p>{t("fidelity.b.ai.contextHint")}</p></div></div>
+        <div className="fidelity-b-fields">
+          <div className="fidelity-b-field">
+            <Label htmlFor="assistant-context-size">{t("settings.assistant.contextSize")}</Label>
+            <Input id="assistant-context-size" type="number" min={1} value={Number.isFinite(contextSize) ? contextSize : ""}
+              onChange={(e) => setContextSize(Number(e.target.value) || 0)}
+              data-testid="assistant-context-size" disabled={!loaded} />
+            <p>{t("fidelity.b.ai.contextSizeHint")}</p>
+          </div>
+          <div className="fidelity-b-field">
+            <Label htmlFor="assistant-input-price">{t("fidelity.b.ai.inputPrice")}</Label>
+            <div className="fidelity-b-input-end"><Input id="assistant-input-price" type="number" min={0} step="any"
+              aria-invalid={priceError} aria-describedby={priceError ? "assistant-price-error" : undefined}
+              value={inputPrice} onChange={(e) => { setInputPrice(e.target.value); setPriceError(false); }} disabled={!loaded} />
+              <span>/ 1M</span></div>
+          </div>
+          <div className="fidelity-b-field">
+            <Label htmlFor="assistant-output-price">{t("fidelity.b.ai.outputPrice")}</Label>
+            <div className="fidelity-b-input-end"><Input id="assistant-output-price" type="number" min={0} step="any"
+              aria-invalid={priceError} aria-describedby={priceError ? "assistant-price-error" : undefined}
+              value={outputPrice} onChange={(e) => { setOutputPrice(e.target.value); setPriceError(false); }} disabled={!loaded} />
+              <span>/ 1M</span></div>
+            {priceError && <p id="assistant-price-error" role="alert" className="is-error">{t("settings.assistant.invalidPrice")}</p>}
+          </div>
+        </div>
+        <div className="fidelity-b-card-foot">
+          <h3>{t("fidelity.b.ai.usage")}</h3>
+          <p>{t("fidelity.b.ai.usageUnavailable")}</p>
+        </div>
+      </section>
+
+      <section className="fidelity-b-card fidelity-b-ai-behaviour">
+        <div className="fidelity-b-card-head"><h2>{t("fidelity.b.ai.behaviour")}</h2></div>
+        <div className="fidelity-b-switch-row">
+          <div><Label htmlFor="assistant-allow-actions">{t("fidelity.b.ai.allowActions")}</Label>
+            <p>{t("fidelity.b.ai.allowActionsHint")}</p></div>
+          <Switch id="assistant-allow-actions" checked={allowActions} onCheckedChange={setAllowActions} disabled={!loaded} />
+        </div>
+        <div className="fidelity-b-switch-row">
+          <div><Label htmlFor="assistant-insight-summary">{t("fidelity.b.ai.proactive")}</Label>
+            <p>{t("fidelity.b.ai.proactiveHint")}</p></div>
+          <Switch id="assistant-insight-summary" checked={proactiveInsightsSummary}
+            onCheckedChange={setProactiveInsightsSummary} disabled={!loaded} />
+        </div>
+      </section>
+
+      <section className="fidelity-b-card fidelity-b-ai-advanced">
+        <div className="fidelity-b-card-head">
+          <div><h2>{t("fidelity.b.ai.advanced")}</h2><p>{t("fidelity.b.ai.advancedHint")}</p></div>
+          <div className="fidelity-b-head-actions">
+            <button type="button" onClick={() => {
+              if (advancedRef.current) advancedRef.current.value = "";
+              setAdvancedText("");
+              setAdvancedError(undefined);
+            }}>{t("fidelity.b.ai.reset")}</button>
+            <button type="button" onClick={() => {
+              const parsed = parseAdvanced(currentAdvanced());
+              if (parsed.error) { setAdvancedError(parsed.error); return; }
+              const formatted = serializeAdvanced(parsed.value ?? {});
+              if (advancedRef.current) advancedRef.current.value = formatted;
+              setAdvancedText(formatted);
+              setAdvancedError(undefined);
+            }}>{t("fidelity.b.ai.format")}</button>
+          </div>
+        </div>
+        <textarea id="assistant-advanced" ref={advancedRef} data-testid="assistant-advanced"
+          value={advancedText} onChange={(e) => { setAdvancedText(e.target.value); setAdvancedError(undefined); }}
+          aria-invalid={!!advancedError} aria-describedby={advancedError ? "assistant-advanced-error" : undefined}
+          rows={10} disabled={!loaded} spellCheck={false} />
+        {advancedError
+          ? <p id="assistant-advanced-error" role="alert" data-testid="assistant-advanced-error"
+              className="fidelity-b-result is-error">{t(advancedError)}</p>
+          : <p className="fidelity-b-result is-positive">{t("fidelity.b.ai.validJson")
+            .replace("{count}", String(options.length))}</p>}
+        {advancedWarnings.length > 0 && <p data-testid="assistant-advanced-warnings">
+          {t("settings.assistant.unknownKeysIgnored").replace("{keys}", advancedWarnings.join(", "))}
+        </p>}
+        <div className="fidelity-b-option-list">
+          {options.map(([name, value]) => <div key={name}>
+            <span aria-hidden="true">✓</span><strong>{name}</strong>
+            <span>{typeof value === "object" ? Array.isArray(value) ? `${value.length} items`
+              : `${Object.keys(value ?? {}).length} keys` : String(value)}</span>
+          </div>)}
+        </div>
+      </section>
+      <div className="fidelity-b-ai-save">
+        <span role="status" className="sr-only">{saving ? t("settings.assistant.savingStatus") : ""}</span>
+        <Button onClick={onSave} disabled={saving || testing || !loaded} data-testid="assistant-save">
+          {saving ? t("settings.assistant.savingStatus") : t("settings.assistant.save")}
+        </Button>
+      </div>
+    </div>;
   }
 
   return (

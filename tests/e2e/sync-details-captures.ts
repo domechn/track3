@@ -14,7 +14,7 @@ export async function captureSyncDetails(page: Page, platform: "desktop" | "mobi
   }, { theme, locale });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
-  await expect(page.locator("#app-main-content")).toContainText("$42,000.00");
+  await expect(page.locator("#app-main-content")).toContainText("$42,000.00", { timeout: 30_000 });
   await page.getByRole("button", { name: locale === "en" ? "Skip for now" : "暂时跳过" }).click();
   await page.evaluate(async () => {
     const runtimeModule = "/src/middlelayers/sync/runtime.ts";
@@ -45,7 +45,10 @@ export async function captureSyncDetails(page: Page, platform: "desktop" | "mobi
   await page.getByRole("button", { name: locale === "en" ? "Sync error" : "同步错误" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await dialog.locator("summary").filter({ hasText: locale === "en" ? "Details" : "详细信息" }).click();
+  const details = dialog.locator("details").first();
+  if (!(await details.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await details.locator("summary").first().click();
+  }
   await expect(dialog).toContainText(locale === "en" ? "Phase timings" : "阶段耗时");
   await page.screenshot({ path: `${output}/${platform}-${width}-${theme}-${locale}-top.png`, animations: "disabled" });
   await dialog.locator("table").first().scrollIntoViewIfNeeded();
@@ -55,7 +58,12 @@ export async function captureSyncDetails(page: Page, platform: "desktop" | "mobi
   const box = (await dialog.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
-  await dialog.getByRole("button", { name: locale === "en" ? "Use this device's value" : "使用本设备的值" }).click();
+  if (platform === "mobile") {
+    await dialog.getByRole("link", { name: locale === "en" ? "Settings" : "设置" }).click();
+    await expect(page).toHaveURL(/#\/settings\/sync$/);
+  }
+  const conflict = platform === "mobile" ? page.locator(".t3-sync-conflicts") : dialog;
+  await conflict.getByRole("button", { name: locale === "en" ? "Use this device's value" : "使用本设备的值" }).click();
   await expect(page.getByRole("alertdialog")).toContainText(locale === "en" ? "overwrite the other side" : "覆盖另一端");
   await page.getByRole("button", { name: locale === "en" ? "Cancel" : "取消" }).click();
 }

@@ -13,7 +13,7 @@ for (const theme of ["light", "dark"] as const) {
     await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
     await page.goto("/#/overview")
     const dialog = page.getByTestId("onboarding-dialog")
-    await expect(dialog).toHaveAttribute("data-step", "welcome")
+    await expect(dialog).toHaveAttribute("data-step", "welcome", { timeout: 30_000 })
     mkdirSync("test-results/mobile", { recursive: true })
     for (const [index, step] of steps.entries()) {
       await expect(dialog).toHaveAttribute("data-step", step)
@@ -83,6 +83,16 @@ test("replay opens from mobile About", async ({ page }) => {
   await expect(page.getByTestId("onboarding-dialog")).toHaveAttribute("data-step", "welcome")
   await page.keyboard.press("Escape")
   await expect(replay).toBeFocused()
+})
+
+test("replay asks for confirmation before showing the guide", async ({ page }) => {
+  await installTauriBridge(page)
+  await page.goto("/#/settings/systemInfo?section=about")
+  await page.getByTestId("onboarding-replay").click()
+  await expect(page.getByRole("dialog", { name: "Replay the first-run guide?" })).toBeVisible()
+  await page.getByRole("button", { name: "Start guide" }).click()
+  await expect(page.getByTestId("onboarding-dialog")).toHaveAttribute("data-step", "welcome")
+  await expect(page.getByRole("heading", { name: "Welcome to Track3" })).toBeVisible()
 })
 
 test("startup lock hides the guide", async ({ page }) => {

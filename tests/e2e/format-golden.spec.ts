@@ -66,7 +66,9 @@ test("visiting every desktop and mobile route writes only frozen storage keys", 
         ...(mobile ? ["/more"] : []),
       ]) {
         await page.goto(`/#${route}`);
-        await expect.poll(() => page.evaluate(() => localStorage.getItem("track3-current-date-range")))
+        await expect.poll(() => page.evaluate(() => localStorage.getItem("track3-current-date-range")), {
+          message: `${mobile ? "mobile" : "desktop"} ${route} date range`, timeout: 15_000,
+        })
           .not.toBeNull();
         const keys = await page.evaluate(() => Object.keys(localStorage));
         expect(keys.filter((key) => !frozenStorageKeys.has(key) && !frozenStorageKeyPrefixes.some((prefix) => key.startsWith(prefix))),

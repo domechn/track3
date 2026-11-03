@@ -195,13 +195,13 @@ for (const phone of phones) {
     await page.getByRole("navigation", { name: "Settings sections" })
       .getByRole("link", { name: "Data sources" }).click();
 
-    await page.getByRole("button", { name: "Add source" }).click();
-    await page.getByRole("button", { name: "Add wallet" }).click();
+    await page.getByRole("tab", { name: "Wallets" }).click();
+    await page.getByRole("button", { name: "Add wallet" }).first().click();
     const wallet = page.getByRole("dialog", { name: "Edit data source" });
     await wallet.getByRole("button", { name: "BTC" }).click();
-    await wallet.getByRole("textbox", { name: "Alias" }).fill("Long-term BTC");
+    await wallet.getByRole("textbox", { name: /Label/ }).fill("Long-term BTC");
     await wallet.getByRole("textbox", { name: "Address" }).fill("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
-    await wallet.getByRole("button", { name: "Add" }).click();
+    await wallet.getByRole("button", { name: "Add wallet" }).click();
     await expect(wallet).not.toBeVisible();
     await page.getByRole("tab", { name: "Wallets" }).click();
     await expect(page.getByRole("region", { name: "Wallet" }).getByRole("button", { name: /^Long-term BTC / })).toBeVisible();
@@ -209,11 +209,11 @@ for (const phone of phones) {
     await page.getByRole("tab", { name: "Exchanges" }).click();
     await page.getByRole("button", { name: "Add exchange" }).click();
     const exchange = page.getByRole("dialog", { name: "Edit data source" });
-    await exchange.getByRole("button", { name: "Binance" }).click();
-    await exchange.getByRole("textbox", { name: "Alias" }).fill("Portfolio Binance");
-    await exchange.getByRole("textbox", { name: "Api Key" }).fill("e2e-api-key");
-    await exchange.getByRole("textbox", { name: "Api Secret" }).fill("e2e-api-secret");
-    await exchange.getByRole("button", { name: "Add" }).click();
+    await exchange.getByRole("button", { name: /Binance Key, secret/ }).click();
+    await exchange.getByRole("textbox", { name: /Label/ }).fill("Portfolio Binance");
+    await exchange.getByRole("textbox", { name: "API key" }).fill("e2e-api-key");
+    await exchange.getByRole("textbox", { name: "API secret" }).fill("e2e-api-secret");
+    await exchange.getByRole("button", { name: "Save and test" }).click();
     await expect(exchange).not.toBeVisible();
     await expect(page.getByRole("region", { name: "Exchanges" }).getByRole("button", { name: /^Portfolio Binance / })).toBeVisible();
     await page.reload();

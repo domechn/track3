@@ -209,21 +209,53 @@ describe("System Info subscription management", () => {
     mocks.getLicenseIfIsPro.mockResolvedValue("pro");
     mocks.getUsage.mockResolvedValue({ enforced: true, usage: exhaustedUsage });
     mocks.getSubscriptionInfo.mockResolvedValue({
-      planType: "monthly", status: "active", currentPeriodEnd: "2026-11-03T00:00:00.000Z",
+      planType: "monthly", status: "active", currentPeriodEnd: "2026-12-03T00:00:00.000Z",
       cancelAtPeriodEnd: false, isLegacy: false,
       usage: exhaustedUsage,
     });
     window.location.hash = "#/settings?section=pro";
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    expect(await screen.findByText("ERC20 wallet refreshes")).toBeInTheDocument();
+    expect(await screen.findAllByText("ERC20 wallet refreshes")).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "This month's usage" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Track3 Pro" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 3, name: "This month's usage" })).toBeInTheDocument();
     expect(screen.getByText("TRON wallet refreshes")).toBeInTheDocument();
+    expect(screen.getByText("TRON / TRC20 wallet refreshes")).toBeInTheDocument();
+    const warning = screen.getByRole("alert");
+    expect(within(warning).getByText("ERC20 refresh limit reached")).toBeInTheDocument();
+    expect(warning).toHaveTextContent("300 of 300 used this month");
+    expect(warning).toHaveTextContent("3 Nov");
+    expect(warning).toHaveTextContent("TRON refreshes still work: 292 left");
+    const planCard = screen.getByRole("heading", { level: 2, name: "Track3 Pro" }).closest("[data-ui-card]");
+    expect(within(planCard?.querySelector(".fidelity-b-pro-actions") as HTMLElement)
+      .queryByRole("button", { name: "Deactivate license" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Deactivate license" })).toBeInTheDocument();
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
     expect(screen.getAllByText(/Resets/)).toHaveLength(1);
     expect(within(screen.getByTestId("system-info-card")).getByText("0.6.1").parentElement).toHaveTextContent(/Track3 0.6.1/);
     await waitFor(() => expect(screen.getByRole("progressbar", { name: "ERC20 wallet refreshes" }).firstElementChild).toHaveClass("bg-destructive"));
+  });
+  it("shows the reported expiry date and paused features on the iOS Pro screen", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    mocks.getLicenseIfIsPro.mockResolvedValue("pro");
+    mocks.getSubscriptionInfo.mockResolvedValue({
+      planType: "yearly", status: "canceled", currentPeriodEnd: "2026-10-14T00:00:00.000Z",
+      cancelAtPeriodEnd: true, isLegacy: false,
+    });
+    const now = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-31T09:45:00.000Z"));
+    try {
+      window.location.hash = "#/settings/systemInfo?section=pro";
+      render(<SystemInfo onProStatusChange={vi.fn()} />);
+      const warning = await screen.findByRole("alert");
+      expect(warning).toHaveTextContent("Pro expired on 14 Oct 2026");
+      expect(warning).toHaveTextContent("AI insights are paused");
+      expect(warning.closest(".fidelity-b-pro")).toHaveClass("is-expired");
+      expect(screen.getByText("Yearly, not renewed")).toBeInTheDocument();
+      expect(screen.getByText("Last period")).toBeInTheDocument();
+    } finally {
+      now.mockRestore();
+      window.location.hash = "";
+    }
   });
   it("manages an active iOS subscription before the deactivation control", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
@@ -253,7 +285,7 @@ describe("System Info subscription management", () => {
     });
     window.location.hash = "#/settings/systemInfo?section=pro";
     render(<SystemInfo onProStatusChange={vi.fn()} />);
-    expect(await screen.findByText((_, element) => element?.tagName === "P" && element.textContent === "300 / 300")).toBeInTheDocument();
+    expect(await screen.findByText((_, element) => element?.tagName === "P" && element.textContent === "300 of 300 · 0 left")).toBeInTheDocument();
     await waitFor(() => expect(mocks.getUsage).toHaveBeenCalled());
     expect(screen.getByRole("progressbar", { name: "ERC20 wallet refreshes" }).firstElementChild).not.toHaveClass("bg-destructive");
   });
@@ -271,6 +303,7 @@ describe("System Info subscription management", () => {
     window.location.hash = "#/settings/systemInfo?section=pro";
     render(<SystemInfo onProStatusChange={vi.fn()} />);
     expect(await screen.findByRole("heading", { name: "Track3 Free" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Track3 Free" }).closest(".fidelity-b-pro")).toHaveClass("is-free");
     expect(screen.queryByRole("button", { name: /view pro benefits/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /subscribe monthly/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /subscribe yearly/i })).not.toBeInTheDocument();

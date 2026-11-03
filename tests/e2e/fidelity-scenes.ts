@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { FakeS3 } from "../../src/middlelayers/sync/object-store";
-import { installTauriBridge as installBaseBridge } from "./tauri-bridge";
+import { installTauriBridge as installBaseBridge } from "./fidelity-captures";
 
 type BaseOptions = Exclude<Parameters<typeof installBaseBridge>[1], FakeS3>;
 type SampleMode = "full" | "empty" | "loading" | "BTC" | "NVDA" | "NOVA";

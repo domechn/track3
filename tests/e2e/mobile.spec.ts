@@ -1023,8 +1023,8 @@ test("insight actions fit full size phone touch targets", async ({ browser }) =>
     const card = page.getByRole("region", { name: "Insights" });
     await expect(card).toBeVisible();
     for (const control of [
-      card.getByRole("button", { name: "Regenerate" }),
-      card.getByRole("link", { name: "Ask the assistant" }),
+      card.getByRole("button", { name: "Refresh" }),
+      card.getByRole("button", { name: "Ask the assistant" }),
       card.getByRole("button", { name: "Dismiss insight" }),
     ]) {
       await expect(control).toBeVisible();
@@ -1107,7 +1107,7 @@ test("back navigation returns to the previous page in the More tab", async ({ br
     await expect(page.getByRole("heading", { level: 1, name: "Appearance" })).toBeVisible();
     await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
     await expect(page).toHaveURL(/#\/settings$/);
-    await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
+    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
     await expect(page).toHaveURL(/#\/more$/);
   } finally {
     await context.close();

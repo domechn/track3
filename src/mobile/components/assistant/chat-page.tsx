@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -19,6 +19,7 @@ import {
   RocketIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/mobile/i18n";
+import { FidelityIcon } from "@/mobile/components/fidelity-icon";
 import { useChat } from "@/components/assistant/use-chat";
 import ChatThread from "@/mobile/components/assistant/chat-thread";
 import ChatComposer from "@/mobile/components/assistant/chat-composer";
@@ -135,6 +136,10 @@ function ReadyChat({
   const widthClass = useSizeClass().width;
   const layoutRef = useRef<HTMLDivElement>(null);
   const [mobileHeight, setMobileHeight] = useState<number>();
+  const { sessionId } = useParams();
+  const location = useLocation();
+  const startedHere = (location.state as { liveNewChat?: boolean } | null)?.liveNewChat === true;
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   useLayoutEffect(() => {
     if (!mobile) return;
     const visual = window.visualViewport;
@@ -144,26 +149,40 @@ function ReadyChat({
       const viewportBottom = visual ? visual.offsetTop + visual.height : window.innerHeight;
       const tab = document.querySelector(".mobile-tab-bar");
       const tabTop = tab?.getClientRects().length ? tab.getBoundingClientRect().top : viewportBottom;
-      setMobileHeight(Math.max(0, Math.floor(Math.min(viewportBottom, tabTop) - top - 8)));
+      setMobileHeight(Math.max(0, Math.floor(Math.min(viewportBottom, tabTop) - top)));
     };
-    update();
-    window.addEventListener("resize", update);
-    visual?.addEventListener("resize", update);
-    visual?.addEventListener("scroll", update);
+    let frame = 0;
+    let settledFrame = 0;
+    const scheduleHeight = () => {
+      update();
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(settledFrame);
+      frame = requestAnimationFrame(() => {
+        update();
+        settledFrame = requestAnimationFrame(update);
+      });
+    };
+    scheduleHeight();
+    window.addEventListener("resize", scheduleHeight);
+    window.addEventListener("scroll", scheduleHeight, true);
+    visual?.addEventListener("resize", scheduleHeight);
+    visual?.addEventListener("scroll", scheduleHeight);
     return () => {
-      window.removeEventListener("resize", update);
-      visual?.removeEventListener("resize", update);
-      visual?.removeEventListener("scroll", update);
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(settledFrame);
+      window.removeEventListener("resize", scheduleHeight);
+      window.removeEventListener("scroll", scheduleHeight, true);
+      visual?.removeEventListener("resize", scheduleHeight);
+      visual?.removeEventListener("scroll", scheduleHeight);
     };
-  }, [mobile, keyboardHeight]);
+  }, [mobile, keyboardHeight, sessionId, sidebarOpen]);
   const secrets = useMemo(() => configuredSecretValues(config), [config]);
-  const { sessionId } = useParams();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
   const { sessions, isLoading, refresh, createNew, remove, pin } =
     useChatSessions();
   const [initialMsgs, setInitialMsgs] = useState<ChatMessage[]>([]);
+  const [initialTimes, setInitialTimes] = useState<Array<string | undefined>>([]);
   const [initialSummary, setInitialSummary] = useState<ConversationSummary | undefined>();
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
@@ -175,6 +194,7 @@ function ReadyChat({
   const inNoSessionRef = useRef(!sessionId);
   const newSessionRef = useRef<Promise<string> | null>(null);
   const createdSessionIdRef = useRef<string | null>(null);
+  const liveSessionIdRef = useRef<string | null>(null);
   const currentSessionIdRef = useRef(sessionId);
   currentSessionIdRef.current = sessionId;
   const mountedRef = useRef(true);
@@ -201,6 +221,7 @@ function ReadyChat({
       // and cause an unwanted auto-scroll from top to bottom.
       if (sessionId !== loadedSessionId) {
         setInitialMsgs([]);
+        setInitialTimes([]);
         setInitialSummary(undefined);
       }
       let cancelled = false;
@@ -215,11 +236,13 @@ function ReadyChat({
         if (cancelled) return;
         if (session) {
           setInitialMsgs(session.messages.map(persistedToRuntime));
+          setInitialTimes(session.messages.map((message) => message.at));
           setInitialSummary(session.summary);
         } else {
           // New or empty session — always reset so the previous session's
           // messages don't leak into the new chat.
           setInitialMsgs([]);
+          setInitialTimes([]);
           setInitialSummary(undefined);
         }
         setLoadedSessionId(sessionId);
@@ -237,6 +260,7 @@ function ReadyChat({
       // session.  A new session is created lazily when the user sends
       // their first message (see handleStreamComplete).
       setInitialMsgs([]);
+      setInitialTimes([]);
       setInitialSummary(undefined);
       setLoadedSessionId(null);
     }
@@ -285,8 +309,9 @@ function ReadyChat({
         const msgCount = newMessages.length;
 
         if (!sessionId && mountedRef.current && currentSessionIdRef.current == null && noSessionEpoch === noSessionEpochRef.current) {
+          liveSessionIdRef.current = targetId;
           createdSessionIdRef.current = targetId;
-          navigate(`/assistant/${targetId}`, { replace: true });
+          navigate(`/assistant/${targetId}`, { replace: true, state: { liveNewChat: true } });
         }
         if (mountedRef.current) await refresh().catch(() => {});
         if (sessionId) {
@@ -336,12 +361,14 @@ function ReadyChat({
 
   const handleNewChat = useCallback(async () => {
     const meta = await createNew();
-    navigate(`/assistant/${meta.id}`);
+    liveSessionIdRef.current = meta.id;
+    navigate(`/assistant/${meta.id}`, { state: { liveNewChat: true } });
     setSidebarOpen(false);
   }, [createNew, navigate]);
 
   const handleSelectSession = useCallback(
     (id: string) => {
+      liveSessionIdRef.current = null;
       navigate(`/assistant/${id}`);
       setSidebarOpen(false);
     },
@@ -370,6 +397,8 @@ function ReadyChat({
     <div
       ref={layoutRef}
       className={`t3-manage-assistant relative flex min-w-0 overflow-hidden ${mobile ? "ios-d3-chat" : "h-[calc(100vh-88px)]"}`}
+      data-chat-view={sidebarOpen ? "sessions" : "thread"}
+      data-chat-session={sessionId && sessionId !== liveSessionIdRef.current && !startedHere ? "saved" : "new"}
       style={mobile && mobileHeight !== undefined ? { height: mobileHeight } : undefined}
       data-testid="chat-session-layout"
     >
@@ -381,13 +410,11 @@ function ReadyChat({
       {mobile ? <SplitView selected={!sidebarOpen} className="ios-chat-split"
         masterLabel={t("ai.session.show")} detailLabel={t("nav.assistant")}
         master={sidebarOpen || widthClass === "wide" ? <div className="flex h-full w-full min-w-0 flex-col">
-        <button className="min-h-11 self-start px-4 text-primary" onClick={() => setSidebarOpen(false)}>
-          {t("common.back")}
-        </button>
         <SessionSidebar
           mobile
           sessions={sessions}
           activeId={sessionId ?? null}
+          onBack={() => setSidebarOpen(false)}
           isLoading={isLoading}
           onSelect={handleSelectSession}
           onNew={handleNewChat}
@@ -407,12 +434,15 @@ function ReadyChat({
           config={config}
           baseCurrency={baseCurrency}
           initialMessages={initialMsgs}
+          initialTimes={initialTimes}
           initialSummary={initialSummary}
           onStreamComplete={handleStreamComplete}
           saveError={saveError}
           onStreamingChange={handleStreamingChange}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={handleToggleSidebar}
+          sessionTitle={sessionId && sessionId !== liveSessionIdRef.current
+            ? sessions.find((session) => session.id === sessionId)?.title : undefined}
         />} /> : <><div
         className={`overflow-hidden transition-[width] duration-200 ease-in-out ${
           sidebarOpen ? "w-[260px]" : "w-0"
@@ -442,12 +472,14 @@ function ReadyChat({
        config={config}
        baseCurrency={baseCurrency}
        initialMessages={initialMsgs}
+       initialTimes={initialTimes}
        initialSummary={initialSummary}
        onStreamComplete={handleStreamComplete}
        saveError={saveError}
         onStreamingChange={handleStreamingChange}
        sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
+        sessionTitle={sessions.find((session) => session.id === sessionId)?.title}
      />}</>}
     </div>
   );
@@ -458,23 +490,27 @@ function ChatContent({
   baseCurrency,
   sessionId,
   initialMessages,
+  initialTimes,
   initialSummary,
   onStreamComplete,
   saveError,
   onStreamingChange,
   sidebarOpen,
   onToggleSidebar,
+  sessionTitle,
 }: {
   config: AIConfig;
   baseCurrency: CurrencyRateDetail;
   sessionId?: string | null;
   initialMessages: ChatMessage[];
+  initialTimes: Array<string | undefined>;
   initialSummary?: ConversationSummary;
   onStreamComplete?: (messages: ChatMessage[], summary?: ConversationSummary) => void;
   saveError?: string | null;
   onStreamingChange?: (streaming: boolean) => void;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  sessionTitle?: string;
 }) {
   const { t } = useTranslation();
   const sizeClass = useSizeClass();
@@ -512,15 +548,22 @@ function ChatContent({
       // Assistant remains usable when session storage is unavailable.
     }
   }, [chat.setInput, chat.send, sessionId, t]);
+  const lastMessage = chat.messages.at(-1);
+  const failed = lastMessage?.role === "assistant" &&
+    lastMessage.blocks.some((block) => block.kind === "text" && block.text.includes("[error]"));
 
   return (
     <Card
       data-testid="chat-card"
       className="flex min-w-0 flex-1 flex-col overflow-hidden"
     >
-      {mobileHeaderHost
-        ? createPortal(<ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />, mobileHeaderHost)
-        : <ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />}
+      {mobileHeaderHost ? createPortal(<ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage}
+        replyCount={chat.messages.filter((message) => message.role === "assistant").length}
+        failed={failed} sessionTitle={sessionTitle} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />, mobileHeaderHost)
+        : <ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage}
+        replyCount={chat.messages.filter((message) => message.role === "assistant").length}
+        failed={failed}
+        sessionTitle={sessionTitle} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />}
       {saveError && (
         <p role="alert" className="px-4 py-2 text-sm text-destructive">
           {t("assistant.chat.saveFailed")}: {saveError}
@@ -528,6 +571,7 @@ function ChatContent({
       )}
       <ChatThread
         messages={chat.messages}
+        initialTimes={initialTimes}
         isStreaming={chat.isStreaming}
         pricePerMillionTokens={config.pricePerMillionTokens}
         inputPricePerMillionTokens={config.inputPricePerMillionTokens}
@@ -536,8 +580,13 @@ function ChatContent({
         currency={baseCurrency}
         onDecideAction={(id, decision) => void chat.decideAction(id, decision)}
         canDecideAction={!!sessionId && config.allowActions !== false && !chat.isStreaming && !saveError}
+        model={config.model}
+        onRetry={() => {
+          const question = [...chat.messages].reverse().find((message) => message.role === "user");
+          if (question?.role === "user") void chat.send(question.content);
+        }}
       />
-      {chat.messages.length > 0 && (
+      {(chat.messages.length > 0 || isIOS()) && (
         <QuickActions
           disabled={chat.isStreaming}
           onRun={(key) => {
@@ -559,16 +608,44 @@ function ChatContent({
 }
 
 function ChatHeader({
-  config, contextTokens, sessionUsage, sidebarOpen, onToggleSidebar,
+  config, contextTokens, sessionUsage, replyCount, failed, sessionTitle, sidebarOpen, onToggleSidebar,
 }: {
   config: AIConfig;
   contextTokens: number;
   sessionUsage: import("@/middlelayers/ai/budget").TokenUsage;
+  replyCount: number;
+  failed?: boolean;
+  sessionTitle?: string;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
 }) {
   const { t } = useTranslation();
+  const compact = useSizeClass().width !== "wide";
   const percent = Math.min(100, Math.round(contextTokens / config.contextSize * 100));
+  if (isIOS() && compact) {
+    const priceIn = config.inputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0;
+    const priceOut = config.outputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0;
+    const cost = (sessionUsage.promptTokens * priceIn + sessionUsage.completionTokens * priceOut) / 1_000_000;
+    return <header className="fidelity-chat-header ios-d3-chat-header">
+      <div className="fidelity-chat-header-primary">
+      <button type="button" onClick={onToggleSidebar} aria-label={t(sidebarOpen ? "ai.session.hide" : "ai.session.show")}
+        data-testid="sidebar-toggle" className="fidelity-chat-header-button"><FidelityIcon name="back" /></button>
+      <div className="fidelity-chat-header-title">
+        <h3>{sessionTitle || t("assistant.chat.title")}</h3>
+        <span>{failed ? t("fidelity.assistant.requestFailed") : replyCount > 0
+          ? t(replyCount === 1 ? "fidelity.assistant.oneReply" : "fidelity.assistant.manyReplies")
+            .replace("{count}", String(replyCount)).replace("{cost}", `$${cost.toFixed(3)}`).replace("{model}", config.model)
+          : t("fidelity.assistant.proModel").replace("{model}", config.model)}</span>
+      </div>
+      </div>
+      {contextTokens > 0 && <span role="progressbar"
+        aria-label={t("assistant.usage.context").replace("{percent}", String(percent))}
+        aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}
+        className="fidelity-chat-header-context">{percent}%</span>}
+      <Link to="/settings/assistant" aria-label={t("settings.tab.assistant")} data-testid="chat-open-settings"
+        className="fidelity-chat-header-button"><FidelityIcon name="more" /></Link>
+    </header>;
+  }
   return (
     <CardHeader className="ios-d3-chat-header flex flex-row items-center justify-between gap-3 space-y-0 border-b border-[var(--glass-border)] bg-card/40 px-5 py-3 touch:px-3">
       <div className="ios-d3-chat-header-primary flex min-w-0 items-center gap-3">
@@ -654,6 +731,49 @@ function LoadingCard() {
 
 function NotConfiguredCard() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  if (isIOS()) {
+    return <div className="fidelity-no-key" data-testid="assistant-not-configured">
+      <div className="fidelity-no-key-page-head">
+        <h1>{t("nav.assistant")}</h1>
+        <p>{t("fidelity.assistant.noKeyDescription")}</p>
+        <span>{t("fidelity.assistant.noKeyBadge")}</span>
+      </div>
+      <section className="fidelity-no-key-chat">
+        <header className="fidelity-chat-header">
+          <button type="button" className="fidelity-chat-header-button" onClick={() => navigate("/more")} aria-label={t("common.back")}>
+            <FidelityIcon name="back" />
+          </button>
+          <div className="fidelity-chat-header-title"><strong>{t("nav.assistant")}</strong><span>{t("fidelity.assistant.notConfigured")}</span></div>
+          <Link to="/settings/assistant" className="fidelity-chat-header-button" aria-label={t("settings.tab.assistant")}>
+            <FidelityIcon name="more" />
+          </Link>
+        </header>
+        <div className="fidelity-no-key-content">
+          <div className="fidelity-no-key-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="7" cy="17" r="4" /><path d="M10 14 20 4m-2 2 2 2m-5 1 2 2" />
+            </svg>
+          </div>
+          <h2>{t("fidelity.assistant.noKeyTitle")}</h2>
+          <p>{t("fidelity.assistant.noKeyBody")}</p>
+          <Link to="/settings/assistant" className="fidelity-no-key-cta" data-testid="assistant-empty-cta">
+            {t("fidelity.assistant.openAiSettings")}<ChevronRightIcon aria-hidden="true" />
+          </Link>
+          <p className="fidelity-no-key-help">{t("fidelity.assistant.noKeyHelp")}</p>
+        </div>
+        <div className="fidelity-no-key-composer">
+          <div><textarea disabled aria-label={t("assistant.chat.placeholder")} placeholder={t("fidelity.assistant.noKeyPlaceholder")} rows={1} />
+            <button type="button" aria-label={t("assistant.chat.send")} disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 10 18-7-7 18-3-8-8-3Zm8 3 4-4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>;
+  }
   const capabilities = [
     "assistant.chat.capabilities.summary",
     "assistant.chat.capabilities.history",

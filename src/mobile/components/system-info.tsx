@@ -9,7 +9,7 @@ import HideIcon from "@/assets/icons/hide-icon.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/mobile/components/ui/card";
-import { EyeOpenIcon, EyeClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { EyeOpenIcon, EyeClosedIcon, ReloadIcon, ExternalLinkIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import {
   activateLicenseOnDevice,
   clearLicenseCache,
@@ -319,14 +319,60 @@ const App = ({
   const section = isIOS() ? searchParams.get("section") : null;
   const showPurchaseUI = !isIOS();
 
-  if (isIOS() && section === "about") return <div className="ios-d3-system-settings">
-    <InsetGroup>
-      <ListRow value={version}>{t("system.appVersion")}</ListRow>
-    </InsetGroup>
-    <p className="ios-d3-settings-note ios-d3-version-note">{t("system.appVersionNote")}</p>
-    <InsetGroup>
-      <ListRow onClick={requestOnboardingReplay} data-testid="onboarding-replay">{t("onboarding.replay.action")}</ListRow>
-    </InsetGroup>
+  if (isIOS() && section === "about") return <div className="ios-d3-system-settings fidelity-b fidelity-b-about">
+    <p className="fidelity-b-subtitle">{t("fidelity.b.about.subtitle")}</p>
+    <section className="fidelity-b-card fidelity-b-about-app">
+      <div className="fidelity-b-about-brand">
+        <span className="fidelity-b-about-logo" aria-hidden="true"><i /><i /><i /></span>
+        <div><h2>Track3</h2><p>{t("fidelity.b.about.versionLine").replace("{version}", version)}</p></div>
+      </div>
+      <dl className="fidelity-b-pro-dl">
+        <div><dt>{t("system.appVersion")}</dt><dd>Track3 <span className="mobile-list-value">{version}</span></dd></div>
+        <div><dt>{t("fidelity.b.about.platform")}</dt><dd>iOS</dd></div>
+        <div><dt>{t("fidelity.b.about.database")}</dt><dd>SQLite</dd></div>
+        <div><dt>{t("fidelity.b.about.dataFolder")}</dt><dd>{t("fidelity.b.about.local")}</dd></div>
+      </dl>
+      <div className="fidelity-b-card-foot">
+        <button type="button" className="fidelity-b-about-check"
+          onClick={() => void openUrl("https://github.com/domechn/track3/releases")}>
+          <ExternalLinkIcon aria-hidden="true" />{t("fidelity.b.about.viewReleases")}</button>
+        <p className="fidelity-b-result">{t("fidelity.b.about.updateHint")}</p>
+      </div>
+    </section>
+    <section className="fidelity-b-card fidelity-b-about-help">
+      <h2>{t("fidelity.b.about.help")}</h2>
+      <div className="fidelity-b-about-row">
+        <div><strong>{t("fidelity.b.about.firstRun")}</strong>
+          <small>{t("fidelity.b.about.firstRunHint")}</small></div>
+        <button type="button" onClick={requestOnboardingReplay}
+          data-testid="onboarding-replay">{t("fidelity.b.about.replay")}</button>
+      </div>
+      {([
+        ["fidelity.b.about.docs", "docs.track3.dev", "https://docs.track3.dev"],
+        ["fidelity.b.about.website", "track3.dev", "https://track3.dev"],
+        ["fidelity.b.about.github", "github.com/domechn/track3", "https://github.com/domechn/track3"],
+      ] as const).map(([key, label, url]) => <button type="button" key={key}
+        className="fidelity-b-about-row" onClick={() => void openUrl(url)}>
+        <span><strong>{t(key)}</strong><small>{label}</small></span>
+        <ExternalLinkIcon aria-hidden="true" />
+      </button>)}
+    </section>
+    <section className="fidelity-b-card fidelity-b-about-licenses">
+      <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.about.licenses")}</h2>
+        <p>{t("fidelity.b.about.licensesHint")}</p></div></div>
+      <button type="button" className="fidelity-b-about-link"
+        onClick={() => void openUrl("https://github.com/domechn/track3/blob/master/LICENSE")}>
+        {t("fidelity.b.about.viewLicenses")}<ExternalLinkIcon aria-hidden="true" />
+      </button>
+    </section>
+    <section className="fidelity-b-card fidelity-b-about-notes">
+      <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.about.whatsNew").replace("{version}", version)}</h2>
+        <p>{t("fidelity.b.about.notesHint")}</p></div></div>
+      <button type="button" className="fidelity-b-about-link"
+        onClick={() => void openUrl("https://github.com/domechn/track3/releases")}>
+        {t("fidelity.b.about.fullNotes")}<ExternalLinkIcon aria-hidden="true" />
+      </button>
+    </section>
   </div>;
 
   if (!licenseLoaded) return <div className={isIOS() ? "ios-d3-system-settings" : "space-y-6"}>
@@ -337,64 +383,160 @@ const App = ({
     <SystemInfoCard title="Track3" headingLevel={isIOS() ? 2 : 3} description={t("common.loading")} version={version} t={t} />
   </div>;
 
-  if (isIOS() && section === "pro") return <div className="ios-d3-system-settings space-y-4">
-    <SystemInfoCard
-      title={activeLicense ? t("system.track3Pro") : t("system.track3Free")}
-      headingLevel={2}
-      status={activeLicense && !subInfoLoading && subscriptionInfo
-        ? { label: subscriptionStatusLabel(subscriptionInfo.status), value: subscriptionInfo.status }
-        : undefined}
-      description={activeLicense
-        ? subInfoLoading ? t("common.loading") : subscriptionInfo?.isLegacy
-          ? t("system.legacyNote") : subscriptionInfo
-            ? subscriptionSummary(subscriptionInfo, t, locale) : t("system.proStatus.legacy")
-        : undefined}
-      action={activeLicense && !subInfoLoading && !subscriptionInfo?.isLegacy && <Button onClick={onManageSubscription} disabled={portalLoading}>{t("system.manageSub")}</Button>}
-      version={version}
-      t={t}
-      footerAction={activeLicense && !subInfoLoading && <ConfirmDeleteDialog
-        trigger={<Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-red-400/50 dark:text-red-400 dark:hover:bg-red-400/10 dark:hover:text-red-400" disabled={inactiveLicenseLoading}>
-          {inactiveLicenseLoading && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
-          {t("system.inactivateLicense")}
-        </Button>}
-        title={t("system.inactivateTitle")}
-        description={t("system.inactivateDescLegacy")}
-        cancelLabel={t("common.cancel")}
-        actions={[{ label: t("common.confirm"), onClick: onInactiveLicenseClick }]}
-      />}
-    >
-      {activeLicense
-        ? subscriptionInfo?.usage || subscriptionInfo?.isLegacy ? <>
-            {subscriptionInfo?.usage && <><h3 className="sr-only">{t("system.usage.heading")}</h3><ProUsageRows usage={subscriptionInfo.usage} enforced={usageEnforced} t={t} locale={locale} /></>}
-            {subscriptionInfo?.isLegacy && <div className={`p-6 ${subscriptionInfo.usage ? "border-t" : ""}`}>
-              <div className="ios-d3-license-field flex w-full items-center rounded-[10px] bg-secondary pr-2">
-                <Input id="license" aria-label={t("system.licensePlaceholder")} autoComplete="off" value={inputLicense ?? ""} type={showLicense ? "text" : "password"}
-                  onChange={(e) => setInputLicense(e.target.value)} placeholder={t("system.licensePlaceholder")} disabled />
-                <Button type="button" variant="ghost" size="icon" onClick={() => setShowLicense(!showLicense)}
-                  aria-label={t(showLicense ? "settings.assistant.hideKey" : "settings.assistant.showKey")}>
-                  {showLicense ? <EyeClosedIcon /> : <EyeOpenIcon />}
-                </Button>
-              </div>
-            </div>}
-          </> : null
-        : <section className="space-y-4 p-6">
-          <h3 className="text-sm font-semibold">{t("system.checkout.restore")}</h3>
-          <div className="ios-d3-license-field flex w-full items-center rounded-[10px] bg-secondary pr-2">
-            <Input id="license" aria-label={t("system.checkout.restore")} autoComplete="off" value={inputLicense ?? ""}
-              type={showLicense ? "text" : "password"} onChange={(e) => setInputLicense(e.target.value)}
-              placeholder={t("system.licensePlaceholder")} disabled={!!activeLicense} />
-            <Button type="button" variant="ghost" size="icon" onClick={() => setShowLicense(!showLicense)}
-              aria-label={t(showLicense ? "settings.assistant.hideKey" : "settings.assistant.showKey")}>
-              {showLicense ? <EyeClosedIcon /> : <EyeOpenIcon />}
-            </Button>
+  if (isIOS() && section === "pro") {
+    const expired = !!subscriptionInfo?.currentPeriodEnd &&
+      new Date(subscriptionInfo.currentPeriodEnd).getTime() < Date.now();
+    const end = subscriptionInfo?.currentPeriodEnd ? new Date(subscriptionInfo.currentPeriodEnd) : null;
+    const formatDate = (date: Date) => date.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB",
+      { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+    const endText = end && Number.isFinite(end.getTime()) ? formatDate(end) : "—";
+    const daysExpired = end && Number.isFinite(end.getTime())
+      ? Math.max(0, Math.floor((Date.now() - end.getTime()) / 86_400_000)) : 0;
+    const deviceCount = licenseDevices?.devices.length;
+    const deviceLimit = licenseDevices?.limit;
+    const usage = subscriptionInfo?.usage;
+    const benefits = [
+      ["fidelity.b.pro.erc20", "fidelity.b.pro.monthly"],
+      ["fidelity.b.pro.tron", "fidelity.b.pro.monthly"],
+      ["fidelity.b.pro.assistant", "fidelity.b.pro.assistantDetail"],
+      ["fidelity.b.pro.insights", "fidelity.b.pro.optional"],
+    ] as const;
+    const deactivate = activeLicense && !subInfoLoading && <ConfirmDeleteDialog
+      trigger={<Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-red-400/50 dark:text-red-400 dark:hover:bg-red-400/10 dark:hover:text-red-400" disabled={inactiveLicenseLoading}>
+        {inactiveLicenseLoading && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
+        {t("system.inactivateLicense")}
+      </Button>}
+      title={t("system.inactivateTitle")} description={t("system.inactivateDescLegacy")}
+      cancelLabel={t("common.cancel")}
+      actions={[{ label: t("common.confirm"), onClick: onInactiveLicenseClick }]} />;
+    return <div className={`ios-d3-system-settings fidelity-b fidelity-b-pro${!activeLicense ? " is-free" : expired ? " is-expired" : ""}`}>
+      <p className="fidelity-b-subtitle">{t("fidelity.b.pro.subtitle")}</p>
+      {expired && <div className="fidelity-b-pro-banner is-warning" role="alert">
+        <ExclamationTriangleIcon aria-hidden="true" />
+        <div>
+          <strong>{t("fidelity.b.pro.expiredBannerTitle").replace("{date}", endText)}</strong>
+          <p>{t("fidelity.b.pro.expiredBannerBody")}</p>
+        </div>
+      </div>}
+      {usage && usage.erc20?.used === usage.erc20?.limit && usageEnforced &&
+        <div className="fidelity-b-pro-banner is-error" role="alert">
+          <ExclamationTriangleIcon aria-hidden="true" />
+          <div>
+            <strong>{t("fidelity.b.pro.limitBannerTitle")}</strong>
+            <p>{t("fidelity.b.pro.limitBannerUsage").replace("{used}", String(usage.erc20.used))
+              .replace("{limit}", String(usage.erc20.limit))}
+              {usage.erc20.periodEnd && Number.isFinite(Date.parse(usage.erc20.periodEnd)) && ` ${t("fidelity.b.pro.limitBannerReset")
+                .replace("{date}", formatDate(new Date(usage.erc20.periodEnd)))}`}
+              {usage.tron && ` ${t("fidelity.b.pro.limitBannerTron").replace("{remaining}", String(usage.tron.remaining))}`}</p>
           </div>
-          <p className="text-xs text-muted-foreground">{t("system.checkout.iosRestoreHint")}</p>
-          <Button className="w-full" onClick={onSaveLicenseClick} disabled={saveLicenseLoading || !inputLicense}>{t("system.activate")}</Button>
+        </div>}
+      <SystemInfoCard title={activeLicense ? t("system.track3Pro") : t("system.track3Free")}
+        displayTitle={activeLicense ? undefined : t("system.track3Pro")} headingLevel={2}
+        status={{ label: !activeLicense ? t("fidelity.b.pro.free") : expired ? t("fidelity.b.pro.expired")
+          : subInfoLoading ? t("common.loading")
+            : subscriptionInfo ? subscriptionStatusLabel(subscriptionInfo.status) : t("system.legacyLabel"),
+          value: !activeLicense ? null : expired ? "canceled" : subscriptionInfo?.status ?? null }}
+        description={activeLicense
+          ? subInfoLoading ? t("common.loading") : subscriptionInfo?.isLegacy
+            ? t("system.legacyNote") : subscriptionInfo ? subscriptionSummary(subscriptionInfo, t, locale)
+              : t("system.proStatus.legacy") : undefined}
+        headerDetails={<div className="fidelity-b-pro-details">
+          <div className="fidelity-b-pro-kpis">
+            <div><span>{t("fidelity.b.pro.plan")}</span><strong>{activeLicense
+              ? subscriptionInfo?.planType === "monthly" ? t("fidelity.b.pro.monthlyPlan")
+                : subscriptionInfo?.planType === "yearly" ? t("fidelity.b.pro.yearlyPlan")
+                  : t("fidelity.b.pro.legacyPlan") : t("fidelity.b.pro.free")}</strong></div>
+            <div><span>{t(expired ? "fidelity.b.pro.expired" : "fidelity.b.pro.renews")}</span>
+              <strong>{activeLicense ? endText : "—"}</strong></div>
+            <div><span>{t("fidelity.b.pro.devices")}</span>
+              <strong>{deviceCount === undefined ? "—" : `${deviceCount} of ${deviceLimit}`}</strong></div>
+          </div>
+          <p className="fidelity-b-pro-summary">{!activeLicense ? t("fidelity.b.pro.freeSummary")
+            : expired ? t(daysExpired === 0 ? "fidelity.b.pro.expiredSummaryToday"
+              : daysExpired === 1 ? "fidelity.b.pro.expiredSummaryOne" : "fidelity.b.pro.expiredSummaryDays")
+              .replace("{days}", String(daysExpired))
+              : end && !subscriptionInfo?.isLegacy
+                ? t("fidelity.b.pro.renewSummary").replace("{date}", endText)
+                : t("system.legacyNote")}</p>
+          <dl className="fidelity-b-pro-dl">
+            <div><dt>{t("fidelity.b.pro.billing")}</dt><dd>{!activeLicense ? "—"
+              : subscriptionInfo?.planType === "monthly" ? t(expired ? "fidelity.b.pro.monthlyNotRenewed" : "fidelity.b.pro.monthlyBilling")
+                : subscriptionInfo?.planType === "yearly" ? t(expired ? "fidelity.b.pro.yearlyNotRenewed" : "fidelity.b.pro.yearlyBilling") : "—"}</dd></div>
+            <div><dt>{t("fidelity.b.pro.memberSince")}</dt><dd>—</dd></div>
+            <div><dt>{t(expired ? "fidelity.b.pro.lastPeriod" : "fidelity.b.pro.period")}</dt><dd>{end ? t("fidelity.b.pro.until").replace("{date}", endText) : "—"}</dd></div>
+          </dl>
+        </div>}
+        action={activeLicense && !subInfoLoading && !subscriptionInfo?.isLegacy &&
+          <div className="fidelity-b-pro-actions"><Button onClick={onManageSubscription} disabled={portalLoading}
+            aria-label={t("system.manageSub")}>{t("fidelity.b.pro.manage")}</Button></div>}
+        version={version} t={t}>
+        {!subInfoLoading && <section className="fidelity-b-card fidelity-b-pro-benefits">
+          <h2>{t("fidelity.b.pro.benefits")}</h2>
+          <div>{benefits.map(([name, detail]) => <div className="fidelity-b-pro-benefit" key={name}>
+            <span className={activeLicense && !expired ? "is-positive" : ""} aria-hidden="true">
+              <svg viewBox="0 0 18 18" width="18" height="18" fill="none" stroke="currentColor"
+                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                {activeLicense && !expired
+                  ? <path d="M3.5 9.5l3.5 3.5 7.5-8" />
+                  : <><rect x="4" y="8" width="10" height="7" rx="1.5" /><path d="M6 8V6a3 3 0 0 1 6 0v2" /></>}
+              </svg>
+            </span>
+            <div><strong>{t(name)}</strong><small>{t(detail)}</small></div>
+          </div>)}</div>
         </section>}
-    </SystemInfoCard>
-    {activeLicense && licenseDevices && <ProLicenseDevices value={licenseDevices} locale={locale} t={t} />}
-    <p className="ios-d3-settings-note">{t("system.checkout.iosNote")}</p>
-  </div>;
+        {usage && <section className="fidelity-b-card fidelity-b-pro-usage">
+          <div className="fidelity-b-card-head"><div><h3>{t("system.usage.heading")}</h3>
+            <p>{t("fidelity.b.pro.usageHint")}</p></div>
+            </div>
+          <ProUsageRows usage={usage} enforced={usageEnforced} t={t} locale={locale} compact />
+        </section>}
+        <section className="fidelity-b-card fidelity-b-pro-license">
+          <div className="fidelity-b-card-head"><div>
+            <h2>{t("fidelity.b.pro.license")}</h2>
+            <p>{t("fidelity.b.pro.licenseHint")}</p></div></div>
+          {!activeLicense && <h3 className="sr-only">{t("system.checkout.restore")}</h3>}
+          <label htmlFor="license">{t("fidelity.b.pro.key")}</label>
+          <div className="fidelity-b-pro-keyrow">
+            <div className="ios-d3-license-field fidelity-b-pro-keyinput">
+              <Input id="license" aria-label={activeLicense ? t("system.licensePlaceholder") : t("system.checkout.restore")}
+                autoComplete="off" value={inputLicense ?? ""} type={showLicense ? "text" : "password"}
+                onChange={(e) => setInputLicense(e.target.value)}
+                placeholder={t("fidelity.b.pro.keyPlaceholder")} disabled={!!activeLicense} />
+              {activeLicense && !showLicense && <span className="fidelity-b-pro-keymask" aria-hidden="true">
+                {activeLicense.length > 9 ? `${activeLicense.slice(0, 4)}-••••-••••-••••-${activeLicense.slice(-4)}` : "••••••••"}
+              </span>}
+              <button type="button" onClick={() => setShowLicense(!showLicense)}
+                aria-label={t(showLicense ? "settings.assistant.hideKey" : "settings.assistant.showKey")}>
+                {showLicense ? <EyeClosedIcon /> : <EyeOpenIcon />}
+              </button>
+            </div>
+            {activeLicense ? <Button variant="outline" onClick={() => void loadSubscriptionInfo()}>{t("fidelity.b.pro.verify")}</Button>
+              : <Button onClick={onSaveLicenseClick} disabled={saveLicenseLoading || !inputLicense}>
+                {saveLicenseLoading ? t("fidelity.b.pro.activating") : t("fidelity.b.pro.verify")}</Button>}
+          </div>
+          <p className={`fidelity-b-pro-key-result ${activeLicense && !expired ? "is-positive" : expired ? "is-warning" : ""}`}>
+            {activeLicense ? expired ? t("fidelity.b.pro.keyExpired")
+              : t("fidelity.b.pro.keyValid") : t("fidelity.b.pro.slotHint")}</p>
+          <dl className="fidelity-b-pro-dl">
+            <div><dt>{t("fidelity.b.pro.deviceSlots")}</dt><dd>{deviceCount === undefined ? "—"
+              : `${deviceCount} of ${deviceLimit} ${t("fidelity.b.pro.used")}`}</dd></div>
+            <div><dt>{t("fidelity.b.pro.activated")}</dt><dd>{licenseDevices?.devices.find((device) => device.current)
+              ? formatDate(new Date(licenseDevices.devices.find((device) => device.current)!.activatedAt)) : "—"}</dd></div>
+          </dl>
+        </section>
+        {activeLicense && licenseDevices
+          ? <section className="fidelity-b-pro-device-card">
+            <ProLicenseDevices value={licenseDevices} locale={locale} t={t} />
+            <div className="fidelity-b-pro-deactivate">{deactivate}</div>
+          </section>
+          : <section className="fidelity-b-card fidelity-b-pro-no-devices">
+            {t("fidelity.b.pro.noDevices")}
+          </section>}
+        {activeLicense && !licenseDevices && <div className="fidelity-b-pro-deactivate">{deactivate}</div>}
+      </SystemInfoCard>
+      <p className="fidelity-b-pro-ios-note">{t("system.checkout.iosNote")}</p>
+    </div>;
+  }
 
   return (
     <div className="space-y-6">

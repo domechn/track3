@@ -12,6 +12,7 @@ import {
   Cross2Icon,
   PlusIcon,
   DotsHorizontalIcon,
+  LockClosedIcon,
 } from "@radix-ui/react-icons";
 import type { ChatSessionMeta } from "@/middlelayers/ai";
 
@@ -24,6 +25,7 @@ export type SessionSidebarProps = {
   onNew: () => void;
   onDelete: (id: string) => void;
   onPin: (id: string, pinned: boolean) => void;
+  onBack?: () => void;
   mobile?: boolean;
 };
 
@@ -38,6 +40,16 @@ function relativeTime(iso: string, t: (key: string) => string): string {
   return t("ai.session.relative.daysAgo").replace("{n}", String(diffDays));
 }
 
+function phoneSessionDate(iso: string, t: (key: string) => string, locale: string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const currentDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  if (day === currentDay) return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+  if (currentDay - day === 86_400_000) return t("fidelity.assistant.yesterday");
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short" }).format(date);
+}
+
 export default function SessionSidebar({
   sessions,
   activeId,
@@ -47,12 +59,44 @@ export default function SessionSidebar({
   onNew,
   onDelete,
   onPin,
+  onBack,
   mobile = false,
 }: SessionSidebarProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const pinned = useMemo(() => sessions.filter((s) => s.pinned === 1), [sessions]);
   const recent = useMemo(() => sessions.filter((s) => s.pinned === 0), [sessions]);
+
+  if (mobile) {
+    const today = new Date();
+    const isToday = (session: ChatSessionMeta) => new Date(session.updatedAt).toDateString() === today.toDateString();
+    const groups = [
+      { title: t("fidelity.assistant.today"), rows: sessions.filter(isToday) },
+      { title: t("fidelity.assistant.earlier"), rows: sessions.filter((session) => !isToday(session)) },
+    ];
+    return <div className="fidelity-session-list" data-testid="session-sidebar">
+      <div className="fidelity-session-page-head relative">
+        {onBack && <button type="button" className="fidelity-session-back absolute right-0 top-0 min-h-11 min-w-11" onClick={onBack}>{t("common.back")}</button>}
+        <h1>{t("nav.assistant")}</h1>
+        <p>{t("fidelity.assistant.sessionsDescription")}</p>
+      </div>
+      <div className="fidelity-session-section-head">
+        <h2>{t("fidelity.assistant.chats")}</h2>
+        <Button variant="outline" onClick={onNew} data-testid="session-new-chat"><PlusIcon aria-hidden="true" />{t("ai.session.newChat")}</Button>
+      </div>
+      <ScrollArea className="fidelity-session-scroll">
+        {isLoading ? <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
+          : sessions.length === 0 ? <p>{t("ai.session.empty")}</p>
+          : groups.map((group) => group.rows.length > 0 && <section key={group.title} className="fidelity-session-group">
+            <h3>{group.title}</h3>
+            {group.rows.map((session) => <PhoneSessionRow key={session.id} session={session}
+              date={phoneSessionDate(session.updatedAt, t, locale)} active={session.id === activeId}
+              onSelect={onSelect} onDelete={onDelete} onPin={onPin} t={t} />)}
+          </section>)}
+      </ScrollArea>
+      <p className="fidelity-session-foot"><LockClosedIcon aria-hidden="true" />{t("fidelity.assistant.sessionsPrivacy")}</p>
+    </div>;
+  }
 
   return (
     <div
@@ -142,6 +186,52 @@ export default function SessionSidebar({
       </ScrollArea>
     </div>
   );
+}
+
+function PhoneSessionRow({ session, date, active, onSelect, onDelete, onPin, t }: {
+  session: ChatSessionMeta;
+  date: string;
+  active: boolean;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  onPin: (id: string, pinned: boolean) => void;
+  t: (key: string) => string;
+}) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const touchStart = useRef<{ x: number; y: number }>();
+  return <div className="fidelity-session-row" data-testid={`session-item-${session.id}`}
+    data-active={active ? "true" : undefined}
+    data-actions-open={String(actionsOpen)}
+    onTouchStart={(event) => { touchStart.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }; }}
+    onTouchEnd={(event) => {
+      if (!touchStart.current) return;
+      const dx = event.changedTouches[0].clientX - touchStart.current.x;
+      const dy = event.changedTouches[0].clientY - touchStart.current.y;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) setActionsOpen(dx < 0);
+      touchStart.current = undefined;
+    }}>
+    <button type="button" className="fidelity-session-select" onClick={() => onSelect(session.id)}
+      aria-current={active ? "true" : undefined}
+      data-testid={`session-select-${session.id}`}>
+      <span className="fidelity-session-title">{session.title || t("ai.session.untitled")}
+        {session.pinned === 1 && <span className="fidelity-session-pinned"><DrawingPinIcon aria-hidden="true" />{t("ai.session.pinned")}</span>}</span>
+      <span className="fidelity-session-date">{date}</span>
+      <span className="fidelity-session-preview">{session.preview}</span>
+    </button>
+    <button type="button" className="fidelity-session-more" onClick={() => setActionsOpen((open) => !open)}
+      aria-label={`${t("ai.session.moreActions")} ${session.title || t("ai.session.untitled")}`} aria-expanded={actionsOpen}>
+      <DotsHorizontalIcon aria-hidden="true" />
+    </button>
+    {actionsOpen && <div className="fidelity-session-actions">
+      <button type="button" data-testid={`session-pin-${session.id}`}
+        onClick={() => { onPin(session.id, session.pinned !== 1); setActionsOpen(false); }}>
+        {session.pinned === 1 ? t("ai.session.unpin") : t("ai.session.pin")}
+      </button>
+      <ConfirmDeleteDialog trigger={<button type="button" data-testid={`session-delete-${session.id}`}>{t("ai.session.delete")}</button>}
+        title={t("ai.session.confirmDeleteTitle")} description={t("ai.session.confirmDeleteBody")}
+        cancelLabel={t("ai.session.cancel")} actions={[{ label: t("ai.session.delete"), onClick: () => onDelete(session.id) }]} />
+    </div>}
+  </div>;
 }
 
 function SessionItem({

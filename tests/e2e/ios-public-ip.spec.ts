@@ -23,10 +23,10 @@ test("phone exchange form shows public IP states in both themes and languages", 
     }, { locale, theme });
     await page.reload();
     const before = bridge.publicIpRequests();
-    await page.getByRole("button", { name: locale === "en" ? "Add exchange" : "添加交易所" }).click();
+    await page.getByRole("button", { name: locale === "en" ? "Add exchange" : "添加交易所" }).first().click();
     expect(bridge.publicIpRequests()).toBe(before);
     if (mode === "loading") await page.clock.pauseAt(new Date());
-    await page.getByRole("button", { name: "Binance" }).click();
+    await page.locator(".fidelity-editor-pick").filter({ hasText: "Binance" }).click();
     const nav = await page.locator(".ios-d3-editor-nav").boundingBox();
     const intro = await page.locator(".ios-d3-editor-intro").boundingBox();
     expect(intro!.y).toBeGreaterThanOrEqual(nav!.y + nav!.height);
@@ -35,11 +35,11 @@ test("phone exchange form shows public IP states in both themes and languages", 
     await page.evaluate(() => document.fonts.ready);
     if (mode === "loading") {
       await expect(info).toHaveAttribute("aria-busy", "true");
-      await expect(info).toContainText(locale === "en" ? "Detecting IP" : "正在检测 IP");
+      await expect(info).toContainText(locale === "en" ? "Looking it up" : "正在查询");
     }
     if (mode === "value") await expect(info.getByText("8.8.8.8")).toHaveCSS("user-select", "text");
     if (mode === "error") {
-      await expect(info.getByRole("alert")).toContainText(locale === "en" ? "Couldn't detect your IP" : "无法检测你的 IP");
+      await expect(info.getByRole("alert")).toContainText(locale === "en" ? "Couldn’t reach the lookup service" : "无法连接查询服务");
       await expect(info.getByRole("button", { name: locale === "en" ? "Copy" : "复制" })).toHaveCount(0);
     }
     if (mode !== "value") await expect(info).not.toContainText(locale === "en" ? "Add this address" : "请将此地址");
@@ -58,12 +58,11 @@ test("phone exchange form shows public IP states in both themes and languages", 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     for (const label of mode === "error"
       ? [locale === "en" ? "Retry" : "重试"]
-      : locale === "en" ? ["Copy", "Refresh"] : ["复制", "刷新"]) {
+      : mode === "loading" ? [] : locale === "en" ? ["Copy", "Refresh"] : ["复制", "刷新"]) {
       const box = await info.getByRole("button", { name: label }).boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(44);
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(width);
-      if (mode === "loading") await expect(info.getByRole("button", { name: label })).toBeDisabled();
     }
     if (mode === "value") {
       const copyButton = info.getByRole("button", { name: locale === "en" ? /^(Copy|Copied)$/ : /^(复制|已复制)$/ });
@@ -93,7 +92,7 @@ test("phone exchange form shows public IP states in both themes and languages", 
       expect(Math.abs(afterCopy.cardHeight - beforeCopy.cardHeight)).toBeLessThanOrEqual(1);
       await page.clock.resume();
     }
-    await expect(info).toContainText(locale === "en" ? "On cellular and Wi-Fi" : "蜂窝网络和 Wi-Fi");
+    await expect(info).not.toContainText(locale === "en" ? "On cellular and Wi-Fi" : "蜂窝网络和 Wi-Fi");
     if (mode === "loading") await page.clock.resume();
   }
 });

@@ -30,7 +30,7 @@ test("locked sync popover and controls fit at 320px", async ({ page }) => {
   }
 });
 
-test("sync details open as a bottom sheet above the iPhone tab bar", async ({ page }) => {
+test("sync details open as a bottom sheet covering the iPhone tab bar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
@@ -39,7 +39,8 @@ test("sync details open as a bottom sheet above the iPhone tab bar", async ({ pa
   await expect.poll(async () => {
     const box = (await dialog.boundingBox())!;
     const tabs = (await page.locator(".mobile-tab-bar").boundingBox())!;
-    return box.x <= 1 && box.x + box.width >= 389 && Math.abs(box.y + box.height - tabs.y) <= 1;
+    return box.x <= 1 && box.x + box.width >= 389 && Math.abs(box.y + box.height - 844) <= 1 &&
+      tabs.y < box.y + box.height;
   }).toBe(true);
 });
 
