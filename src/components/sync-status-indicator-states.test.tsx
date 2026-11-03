@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DesktopIndicator from "./sync-status-indicator";
 import { SyncStatusIndicatorView } from "./sync-status-indicator";
 import MobileIndicator from "@/mobile/components/sync-status-indicator";
@@ -48,6 +48,7 @@ beforeEach(() => {
   state.prompted = false;
   vi.clearAllMocks();
 });
+afterEach(() => { window.location.hash = ""; });
 
 describe.each([
   ["desktop", DesktopIndicator],
@@ -195,6 +196,7 @@ describe.each([
 });
 
 it("shows the phone first-sync sheet with its status and settings action", () => {
+  window.location.hash = "#/settings/sync";
   publish({ mode: "ready", sync: { phase: "idle", report: { ...zeroReport,
     devices: [{ id: "remote", name: "iPhone", lastUpload: "2026-10-30T22:07:00Z" }] } } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
@@ -205,6 +207,7 @@ it("shows the phone first-sync sheet with its status and settings action", () =>
 });
 
 it("shows phone upload progress with elapsed time and remaining items", () => {
+  window.location.hash = "#/settings/sync";
   publish({ mode: "ready", sync: {
     phase: "syncing", startedAt: Date.now() - 134_000,
     progress: { phase: "push", completed: 1240, total: 4567 },
@@ -222,6 +225,7 @@ it("shows phone upload progress with elapsed time and remaining items", () => {
 });
 
 it("shows the phone successful sheet with last upload and inline details", () => {
+  window.location.hash = "#/settings/sync";
   publish({ mode: "ready", sync: { phase: "idle", report: { ...zeroReport, pushed: 312,
     devices: [{ id: "remote", name: "iPhone", lastUpload: "2026-10-28T12:00:00Z" }] }, lastSync: previous } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
@@ -234,6 +238,7 @@ it("shows the phone successful sheet with last upload and inline details", () =>
 });
 
 it("shows the known failure in expanded phone diagnostics", () => {
+  window.location.hash = "#/settings/sync";
   publish({ mode: "ready", sync: { phase: "error", error: "bucket", report: zeroReport } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
   fireEvent.click(screen.getByRole("button", { name: "Sync error" }));

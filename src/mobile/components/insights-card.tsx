@@ -22,14 +22,14 @@ function SeverityIcon({ severity }: { severity: InsightSeverity }) {
     }`} />;
 }
 
-export default function InsightsCard({ currency, overview = false, assistant = false, onAsk }: {
-  currency?: CurrencyRateDetail; overview?: boolean; assistant?: boolean; onAsk?: (question: string) => void;
+export default function InsightsCard({ currency, overview = false, assistant = false, onAsk, fidelity = false }: {
+  currency?: CurrencyRateDetail; overview?: boolean; assistant?: boolean; onAsk?: (question: string) => void; fidelity?: boolean;
 }) {
   return assistant ? <AssistantInsights currency={currency} onAsk={onAsk} />
-    : <GenericInsightsCard currency={currency} overview={overview} />;
+    : <GenericInsightsCard currency={currency} overview={overview} fidelity={fidelity} />;
 }
 
-function GenericInsightsCard({ currency, overview = false }: { currency?: CurrencyRateDetail; overview?: boolean }) {
+function GenericInsightsCard({ currency, overview, fidelity }: { currency?: CurrencyRateDetail; overview: boolean; fidelity: boolean }) {
   const { t, locale } = useTranslation();
   const mobile = useIsMobile();
   const [card, setCard] = useState<StoredInsightCard>();
@@ -85,7 +85,7 @@ function GenericInsightsCard({ currency, overview = false }: { currency?: Curren
     {overview && <SectionHeader action={<IconButton label={t("insights.regenerate")}
       onClick={() => void regenerate()} disabled={regenerating}>
       <ReloadIcon aria-hidden="true" className={regenerating ? "animate-spin" : undefined} />
-    </IconButton>}>{t("insights.title")}</SectionHeader>}
+    </IconButton>}>{t(fidelity ? "fidelity.overview.aiInsights" : "insights.title")}</SectionHeader>}
     <Card className={`assistant-insights-card min-h-[104px]${overview ? " overview-insights-card" : ""}`} role="region" aria-label={t("insights.title")}>
       {!overview && <>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 pb-2 pt-4 sm:px-6">

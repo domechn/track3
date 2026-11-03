@@ -41,12 +41,9 @@ test("Settings imports the committed 0.9.4 file into History", async ({ page }) 
   expect(bridge.historyIds()).toStrictEqual(["snapshot-000000", "snapshot-000001", "snapshot-new", "snapshot-old"]);
   await page.reload();
   await page.goto("/#/history");
-  await page.getByRole("button", { name: "Choose date range" }).click();
-  await page.getByRole("button", { name: "All", exact: true }).click();
-  await page.getByRole("button", { name: "Submit", exact: true }).click();
-  await expect(page.getByText("Total 4 records")).toBeVisible();
-  await expect(page.getByRole("button", { name: "View snapshot from 2022-1-1 01:00:00" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "View snapshot from 2022-1-1 00:00:00" })).toBeVisible();
+  await expect(page.getByTestId("history-snapshot-row")).toHaveCount(4);
+  await expect(page.getByRole("button", { name: /View snapshot from 1 Jan 2022, 01:00/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /View snapshot from 1 Jan 2022, 00:00/ })).toBeVisible();
 });
 
 test("visiting every desktop and mobile route writes only frozen storage keys", async ({ browser }) => {
@@ -67,7 +64,8 @@ test("visiting every desktop and mobile route writes only frozen storage keys", 
       ]) {
         await page.goto(`/#${route}`);
         await expect.poll(() => page.evaluate(() => localStorage.getItem("track3-current-date-range")), {
-          message: `${mobile ? "mobile" : "desktop"} ${route} date range`, timeout: 15_000,
+          message: `${mobile ? "mobile" : "desktop"} ${route} should initialize the date range`,
+          timeout: 15_000,
         })
           .not.toBeNull();
         const keys = await page.evaluate(() => Object.keys(localStorage));

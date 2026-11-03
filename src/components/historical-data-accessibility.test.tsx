@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import HistoricalData from "@/components/historical-data";
 import MobileHistoricalData from "@/mobile/components/historical-data";
 
@@ -61,6 +62,9 @@ vi.mock("@/middlelayers/charts", async () => ({
 vi.mock("@/middlelayers/configuration", () => ({
   addToBlacklist: vi.fn(),
 }));
+vi.mock("@/middlelayers/entities/assets", () => ({
+  ASSET_HANDLER: { listAssetsByUUIDs: vi.fn(async () => []) },
+}));
 
 import {
   deleteHistoricalDataByUUID,
@@ -88,6 +92,28 @@ beforeEach(() => {
 });
 
 describe("Historical Data page", () => {
+  it("uses stablecoin precision for configured stable assets beyond USDT and USDC", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+    const createdAt = "2024-04-16T12:00:00.000Z";
+    const page = {
+      totalCount: 1, latest: { id: "snapshot-1", createdAt, total: 1234.62345 },
+      rows: [{ id: "snapshot-1", createdAt, total: 1234.62345, change: null,
+        assetCount: 1, topAssets: [] }],
+    };
+    vi.mocked(queryHistoricalPage).mockResolvedValueOnce(page).mockResolvedValueOnce(page).mockResolvedValueOnce(page);
+    vi.mocked(queryHistoricalDetail).mockResolvedValueOnce({
+      id: "snapshot-1", createdAt, total: 1234.62345, assets: [
+        { id: 7, uuid: "snapshot-1", createdAt, assetType: "crypto", symbol: "DAI",
+          amount: 1234.5, value: 1234.62345, price: 1.0001 },
+      ], transactions: [],
+    });
+    render(<MemoryRouter><HistoricalData currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" /></MemoryRouter>);
+    const row = await screen.findByTestId("history-desktop-detail");
+    await waitFor(() => expect(row.querySelectorAll("tbody tr:first-child td")[1]).toHaveTextContent(/^1,234\.50$/));
+    const cells = row.querySelectorAll("tbody tr:first-child td");
+    expect(cells[2]).toHaveTextContent("$1.0001");
+    vi.unstubAllGlobals();
+  });
   it.each([HistoricalData, MobileHistoricalData])("marks a carried snapshot in the list and explains its missing source in detail", async (Page) => {
     const createdAt = "2024-04-16T12:00:00.000Z";
     const partial = {

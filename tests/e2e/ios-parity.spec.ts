@@ -32,18 +32,18 @@ test("the phone shell applies top and side safe-area insets once", async ({ page
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page);
   await page.goto("/#/overview");
-  await expect(page.locator("#app-main-content .mobile-large-title")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#app-main-content .fd-overview-head h1")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
   const positions = await page.evaluate(() => {
     const root = document.documentElement;
     const header = document.querySelector<HTMLElement>("#app-top-bar")!;
     const main = document.querySelector<HTMLElement>("#app-main-content")!;
-    const title = main.querySelector<HTMLElement>(".mobile-large-title")!;
-    const refresh = header.querySelector<HTMLElement>('button[aria-label="Refresh"]')!;
+    const title = main.querySelector<HTMLElement>(".fd-overview-head h1")!;
+    const lastAction = header.querySelector<HTMLElement>(".fd-header-alerts")!;
     const originalHeaderHeight = header.getBoundingClientRect().height;
     const originalContentTop = main.getBoundingClientRect().top;
     const originalTitleTop = title.getBoundingClientRect().top;
-    const originalRefreshTop = refresh.getBoundingClientRect().top;
+    const originalActionTop = lastAction.getBoundingClientRect().top;
     root.style.setProperty("--mobile-safe-top", "47px");
     root.style.setProperty("--mobile-safe-left", "59px");
     root.style.setProperty("--mobile-safe-right", "59px");
@@ -56,8 +56,8 @@ test("the phone shell applies top and side safe-area insets once", async ({ page
       headerHeightDelta: header.getBoundingClientRect().height - originalHeaderHeight,
       contentTopDelta: main.getBoundingClientRect().top - originalContentTop,
       titleTopDelta: title.getBoundingClientRect().top - originalTitleTop,
-      refreshTopDelta: refresh.getBoundingClientRect().top - originalRefreshTop,
-      refreshRight: innerWidth - refresh.getBoundingClientRect().right,
+      actionTopDelta: lastAction.getBoundingClientRect().top - originalActionTop,
+      actionRight: innerWidth - lastAction.getBoundingClientRect().right,
       contentPaddingLeft: parseFloat(getComputedStyle(main).paddingLeft),
       contentPaddingRight: parseFloat(getComputedStyle(main).paddingRight),
     };
@@ -67,10 +67,10 @@ test("the phone shell applies top and side safe-area insets once", async ({ page
   expect(positions.headerHeightDelta).toBe(0);
   expect(positions.contentTopDelta).toBe(0);
   expect(positions.titleTopDelta).toBe(47);
-  expect(positions.refreshTopDelta).toBe(47);
+  expect(positions.actionTopDelta).toBe(47);
   expect(positions.contentLeft).toBe(0);
   expect(positions.contentRight).toBe(0);
-  expect(positions.refreshRight).toBe(59);
+  expect(positions.actionRight).toBe(59);
   expect(positions.contentPaddingLeft).toBe(59);
   expect(positions.contentPaddingRight).toBe(59);
 });
@@ -153,15 +153,17 @@ for (const phone of phones) {
     }
   });
 
-  test(`rebalance disclosures have 44px targets on iPhone ${phone.name}`, async ({ page }) => {
+  test(`rebalance controls have 44px targets on iPhone ${phone.name}`, async ({ page }) => {
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await installTauriBridge(page, { seedRebalanceProfile: true });
     await page.goto("/#/rebalance");
-    await expect(page.getByText("Manual setup", { exact: true })).toBeVisible();
-    for (const title of ["Manual setup", "Details"]) {
-      const summary = page.locator("summary").filter({ hasText: title });
-      if (title === "Details") await summary.scrollIntoViewIfNeeded();
-      const box = (await summary.boundingBox())!;
+    await expect(page.getByRole("heading", { name: "Target allocation" })).toBeVisible();
+    for (const control of [
+      page.locator(".pf-target").first(),
+      page.locator(".pf-money-input"),
+    ]) {
+      await control.scrollIntoViewIfNeeded();
+      const box = (await control.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(44);
     }
   });
@@ -170,9 +172,9 @@ for (const phone of phones) {
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await installTauriBridge(page, { emptyPortfolio: true });
     await page.goto("/#/overview");
-    await expect(page.getByText("Your portfolio starts here")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add your first source" })).toBeVisible();
     await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-first-launch.png` });
-    await page.getByRole("button", { name: "Add your first source" }).click();
+    await page.getByRole("button", { name: "Add an exchange" }).click();
     await expect(page).toHaveURL(/#\/settings\/configuration$/);
     await page.getByRole("button", { name: "Add source" }).click();
     await page.getByRole("button", { name: "Add custom asset" }).click();
@@ -182,7 +184,7 @@ for (const phone of phones) {
     await form.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("button", { name: "Edit ETH" })).toBeVisible();
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
-    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page.getByRole("button", { name: "Refresh now" }).click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phone.width);
   });
@@ -249,27 +251,27 @@ for (const phone of phones) {
     await installTauriBridge(page, { seedRebalanceProfile: true });
     await page.goto("/#/more");
     await page.getByRole("link", { name: "Goals & Alerts" }).click();
-    await page.getByRole("button", { name: "Add alert" }).click();
-    const goal = page.getByRole("dialog", { name: "Add alert" });
+    await page.getByRole("button", { name: "Add rule" }).first().click();
+    const goal = page.getByRole("dialog", { name: "Add rule" });
     await goal.getByRole("spinbutton", { name: "Threshold" }).fill("50000");
-    await goal.getByRole("button", { name: "Save rule" }).click();
+    await goal.getByRole("button", { name: "Add rule" }).click();
     await expect(goal).not.toBeVisible();
-    const createdRule = page.getByRole("button", { name: "Edit" }).first()
-      .locator("xpath=ancestor::div[contains(@class, 'rounded-md')][1]");
+    const createdRule = page.locator(".pf-goal-row").first();
     await expect(createdRule).toBeVisible();
     await expect(createdRule).toContainText("$50,000");
     await createdRule.evaluate((rule) => {
-      window.scrollTo({ top: window.scrollY + rule.getBoundingClientRect().top - 90, behavior: "auto" });
+      window.scrollTo({ top: window.scrollY + rule.getBoundingClientRect().top - 16, behavior: "auto" });
     });
     await expect.poll(async () => {
       const rule = (await createdRule.boundingBox())!;
       const tabs = (await page.getByRole("navigation", { name: "Tabs" }).boundingBox())!;
-      return rule.y >= 80 && rule.y + rule.height <= tabs.y;
+      return rule.y >= 0 && rule.y + rule.height <= tabs.y;
     }).toBe(true);
     await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-created-goal.png` });
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
     await page.getByRole("link", { name: "Rebalance" }).click();
-    await page.getByText("Manual setup", { exact: true }).click();
+    await page.getByRole("button", { name: "2.0 pts" }).click();
+    await page.getByRole("button", { name: "Plan actions" }).click();
     await page.getByRole("button", { name: "Save targets" }).click();
     await expect(page.getByText("Targets saved.")).toBeVisible();
     await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-rebalance.png` });

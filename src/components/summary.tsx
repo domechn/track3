@@ -1,116 +1,124 @@
-import {
-  CurrencyRateDetail,
-  QuoteColor,
-  TDateRange,
-} from "../middlelayers/types";
-import AthValue from "./ath-value";
-import ProfitSummary from "./profit-summary";
-import ProfitMetrics from "./profit-metrics";
-import Profit from "./profit";
-import { StaggerContainer, FadeUp } from "./motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
+import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
-import PageLoadingOverlay from "./page-loading-overlay";
-import { useLayoutEffect } from "react";
 import { useTranslation } from "@/i18n";
-const SUMMARY_COMPONENT_COUNT = 4;
+import { currencyWrapper } from "@/utils/currency";
+import SummaryProfitLoss from "./summary-profit-loss";
+import AthValue from "./ath-value";
+import ProfitSummary from "./profit-summary";
+import SummaryMarketCard from "./summary-market-card";
+import { SummaryLoadingContext } from "./summary-loading-context";
+import { SummaryFidelityRangeContext, SummaryFidelityYearContext } from "./summary-fidelity-range-context";
 
-const App = ({
-  currency,
-  dateRange,
-  quoteColor,
-}: {
-  currency: CurrencyRateDetail;
-  dateRange: TDateRange;
-  quoteColor: QuoteColor;
-}) => {
-  const { t } = useTranslation();
-  const [pageLoading, setPageLoading] = useState(true);
-  const loadedCountRef = useRef(0);
-  const rangeKey = useMemo(
-    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end]
-  );
-  const dataChangedVersion = useDataChangedVersion();
-  const hasValidRange = useMemo(
-    () =>
-      dateRange.start.getTime() > new Date("1970-01-01").getTime() &&
-      dateRange.end.getTime() >= dateRange.start.getTime(),
-    [dateRange.start, dateRange.end]
-  );
+const SECTION_COUNT = 6;
+function SkeletonCard({ title, caption, kind }: { title: string; caption: string; kind: "pnl" | "ath" | "months" | "years" | "attribution" | "leaders" }) {
+  return <section className={`fidelity-card fidelity-skeleton ${kind}`}>
+    <div className="fidelity-card-head"><h2>{title}</h2><span>{caption}</span></div>
+    {kind === "pnl" && <><div className="fidelity-skeleton-kpis">{[0, 1, 2, 3].map((i) => <div key={i}><i /><i /><i /></div>)}</div><div className="fidelity-skeleton-box" /></>}
+    {kind === "ath" && <><i className="short" /><i className="large" /><i className="medium" /><i className="meter" />{[0, 1, 2].map((i) => <i className="fact" key={i} />)}</>}
+    {kind === "months" && <div className="fidelity-skeleton-months">{Array.from({ length: 10 }, (_, i) => <div key={i} />)}</div>}
+    {kind === "years" && <div className="fidelity-skeleton-years"><div /><div /></div>}
+    {kind === "attribution" && <div className="fidelity-skeleton-rows">{Array.from({ length: 8 }, (_, i) => <div key={i}><i /><i /></div>)}</div>}
+    {kind === "leaders" && <div className="fidelity-skeleton-rows">{Array.from({ length: 6 }, (_, i) => <div key={i}><i /><i /></div>)}</div>}
+  </section>;
+}
+
+function FidelitySummary({ currency, dateRange, quoteColor }: {
+  currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor;
+}) {
+  const { t, locale } = useTranslation();
+  const setSummaryLoading = useContext(SummaryLoadingContext);
+  const money = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(Math.abs(currencyWrapper(currency)(value)))}`;
+  const dataVersion = useDataChangedVersion();
+  const [loading, setLoading] = useState(true);
+  const [subtitle, setSubtitle] = useState("");
+  const [subtitleEmphasis, setSubtitleEmphasis] = useState("");
+  const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
+  const loaded = useRef(0);
+  const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
+  const hasValidRange = dateRange.start.getTime() > new Date("1970-01-01").getTime() &&
+    dateRange.end.getTime() >= dateRange.start.getTime();
+  const oneSnapshot = dateRange.start.getTime() === dateRange.end.getTime();
+
+  useEffect(() => { setSummaryLoading(loading); }, [loading, setSummaryLoading]);
+  useEffect(() => () => { setSummaryLoading(false); }, [setSummaryLoading]);
+  useEffect(() => { setSelectedYear(dateRange.end.getFullYear()); }, [dateRange.end.getFullYear()]);
+
   useLayoutEffect(() => {
-    setPageLoading(hasValidRange);
-    loadedCountRef.current = 0;
-  }, [rangeKey, hasValidRange, dataChangedVersion]);
+    setLoading(hasValidRange);
+    setSubtitle("");
+    setSubtitleEmphasis("");
+    loaded.current = 0;
+  }, [rangeKey, dataVersion, hasValidRange]);
+
+  useEffect(() => {
+    let active = true;
+    if (!hasValidRange || oneSnapshot) return;
+    queryAttribution(dateRange).then((data) => {
+      if (!active) return;
+      const totals = data.attribution.totals;
+      setSubtitleEmphasis(money(totals.priceEffect));
+      setSubtitle(t("summary.fidelity.fullSubtitle")
+        .replace("{market}", money(totals.priceEffect))
+        .replace("{gain}", money(totals.totalChange).replace(/^\+/, ""))
+        .replace("{date}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(dateRange.start))
+        .replace("{deposits}", `${currency.symbol}${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(currencyWrapper(currency)(totals.flowEffect))}`));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [rangeKey, dataVersion, hasValidRange, oneSnapshot, t, locale]);
 
   const reportLoaded = useCallback(() => {
-    if (!hasValidRange) {
-      return;
-    }
-    loadedCountRef.current += 1;
-    if (loadedCountRef.current >= SUMMARY_COMPONENT_COUNT) {
-      setPageLoading(false);
-    }
-  }, [hasValidRange]);
+    loaded.current += 1;
+    if (loaded.current >= SECTION_COUNT) setLoading(false);
+  }, []);
+  const context = useMemo(() => ({ reportLoaded }), [reportLoaded]);
+  const cardCaption = t("summary.fidelity.netPnlUsd").replace("{currency}", currency.currency);
+  const periodCaption = t("summary.fidelity.monthsOf").replace("{year}", String(dateRange.end.getFullYear()));
+  const yearCaption = t("summary.fidelity.currentYear").replace("{year}", String(dateRange.end.getFullYear()));
+  const attributionCaption = `${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(dateRange.start)} ${t("summary.fidelity.to")} ${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(dateRange.end)}, ${currency.currency}`;
 
-  const overviewLoadingContext = useMemo(() => ({ reportLoaded }), [reportLoaded]);
+  return <OverviewLoadingContext.Provider value={context}>
+    <SummaryFidelityYearContext.Provider value={{ year: selectedYear, setYear: setSelectedYear }}>
+    <div className={`analyze-summary fidelity-summary${oneSnapshot ? " fidelity-summary-single" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`} aria-busy={loading}>
+      <header className="fidelity-page-head">
+        <h1>{t("summary.h1")}</h1>
+        <p>{loading ? t("summary.fidelity.loadingSubtitle") : oneSnapshot ? (() => {
+          const text = t("summary.fidelity.emptySubtitle");
+          const emphasis = t("summary.fidelity.emptyEmphasis");
+          const index = text.indexOf(emphasis);
+          return index < 0 ? text : <>{text.slice(0, index)}<strong>{emphasis}</strong>{text.slice(index + emphasis.length)}</>;
+        })() : subtitle && subtitleEmphasis && subtitle.includes(subtitleEmphasis)
+          ? <>{subtitle.slice(0, subtitle.indexOf(subtitleEmphasis))}<strong>{subtitleEmphasis}</strong>{subtitle.slice(subtitle.indexOf(subtitleEmphasis) + subtitleEmphasis.length)}</>
+          : subtitle || t("summary.fidelity.defaultSubtitle")}</p>
+      </header>
+      {!hasValidRange ? <div className="fidelity-card fidelity-empty">{t("summary.noData")}</div> : <>
+        <div className="fidelity-summary-grid" style={loading ? { visibility: "hidden", position: "absolute", inset: 0, height: 0, overflow: "hidden", pointerEvents: "none" } : undefined}>
+          <SummaryProfitLoss currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
+          <AthValue fidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} />
+          <ProfitSummary fidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
+          <ProfitSummary fidelity initialType="year" currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
+          <SummaryMarketCard mode="attribution" currency={currency} dateRange={dateRange} quoteColor={quoteColor} />
+          <SummaryMarketCard mode="leaders" currency={currency} dateRange={dateRange} quoteColor={quoteColor} />
+        </div>
+        {loading && <div className="fidelity-summary-grid" role="status" aria-label={t("summary.fidelity.loadingSubtitle")}>
+          <SkeletonCard kind="pnl" title={t("summary.fidelity.profitLoss")} caption={cardCaption} />
+          <SkeletonCard kind="ath" title={t("summary.fidelity.allTimeHigh")} caption={t("summary.fidelity.since").replace("{date}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(dateRange.start))} />
+          <SkeletonCard kind="months" title={t("summary.fidelity.profitSummary")} caption={periodCaption} />
+          <SkeletonCard kind="years" title={t("summary.fidelity.byYear")} caption={yearCaption} />
+          <SkeletonCard kind="attribution" title={t("summary.attributionTitle")} caption={attributionCaption} />
+          <SkeletonCard kind="leaders" title={t("summary.fidelity.topCoins")} caption={t("summary.fidelity.allTime")} />
+        </div>}
+      </>}
+    </div>
+    </SummaryFidelityYearContext.Provider>
+  </OverviewLoadingContext.Provider>;
+}
 
-  return (
-    <OverviewLoadingContext.Provider value={overviewLoadingContext}>
-      <div className="analyze-summary relative min-h-[400px]" aria-busy={pageLoading}>
-        <h1 className="analyze-page-title">{t("summary.h1")}</h1>
-        <StaggerContainer className="analyze-summary-stack space-y-3">
-          {hasValidRange && (
-            <>
-              <FadeUp className="analyze-summary-hero grid gap-3 grid-cols-1 xl:grid-cols-2">
-                <Profit
-                  currency={currency}
-                  dateRange={dateRange}
-                  quoteColor={quoteColor}
-                  showCoinsProfitPercentage={true}
-                />
-                <AthValue
-                  currency={currency}
-                  dateRange={dateRange}
-                  quoteColor={quoteColor}
-                />
-              </FadeUp>
-              <FadeUp>
-                <ProfitSummary
-                  currency={currency}
-                  dateRange={dateRange}
-                  quoteColor={quoteColor}
-                />
-              </FadeUp>
-              <FadeUp>
-                <ProfitMetrics
-                  currency={currency}
-                  dateRange={dateRange}
-                  quoteColor={quoteColor}
-                />
-              </FadeUp>
-            </>
-          )}
-          {!hasValidRange && (
-            <FadeUp>
-              <div className="rounded-xl border bg-card text-card-foreground shadow glass px-4 py-10 text-center">
-                <div className="text-lg text-muted-foreground">
-                  {t("summary.noData")}
-                </div>
-              </div>
-            </FadeUp>
-          )}
-        </StaggerContainer>
-        {pageLoading && (
-          <PageLoadingOverlay
-            title={t("loading.summary")}
-            description={t("loading.summaryDesc")}
-          />
-        )}
-      </div>
-    </OverviewLoadingContext.Provider>
-  );
-};
-
-export default App;
+export default function Summary(props: { currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor }) {
+  const { range } = useContext(SummaryFidelityRangeContext);
+  return <FidelitySummary {...props} dateRange={range ?? props.dateRange} />;
+}

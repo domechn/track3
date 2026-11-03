@@ -146,13 +146,13 @@ for (const state of states) {
           if (kind !== "start") trigger.call(this, kind);
         };
       });
-      const skip = page.getByRole("button", { name: "Skip for now" });
+      const skip = page.getByRole("button", { name: "Continue without sync" });
       await expect(skip).toBeVisible({ timeout: 20_000 });
       if (state === "sync-locked" || state === "sync-pop-locked") {
         await skip.click();
       } else {
         await page.getByRole("dialog").getByLabel("Sync passphrase").fill(passphrase);
-        await page.getByRole("dialog").getByRole("button", { name: "Unlock sync" }).click();
+        await page.getByRole("dialog").getByRole("button", { name: "Unlock", exact: true }).click();
         await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: 20_000 });
         await page.evaluate(async () => {
           const runtimeModuleUrl: string = "/src/middlelayers/sync/runtime.ts";

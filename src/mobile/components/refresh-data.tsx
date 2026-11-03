@@ -11,6 +11,7 @@ import { retries, retryInterval, readStoredStatuses, writeStoredStatuses, retryR
 import { publishSourceStatuses } from "@/components/source-status-event";
 import { bindRefreshRetry, refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
 import { useToast } from "@/mobile/components/ui/use-toast";
+import { ToastAction } from "@/mobile/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import {
   ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
@@ -39,8 +40,10 @@ import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failu
 import { isIOS } from "@/utils/platform";
 import { invoke } from "@tauri-apps/api/core";
 import { listPortfolioSources } from "@/middlelayers/data";
+import { publishRefreshProgress, refreshSourceEvent } from "@/mobile/components/refresh-progress-event";
 import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
+import SourceMark from "@/mobile/components/source-mark";
 
 let lastRetryResult: RefreshAllDataResult | undefined;
 
@@ -159,14 +162,18 @@ const App = ({
           : result.usedLastKnownData
             ? unavailable ? t("refresh.partial").replace("{sources}", unavailable) : t("refresh.partialGeneric")
             : "";
-        toast({ description: [statusWarning, partialWarning].filter(Boolean).join(" ") || t("refresh.success") });
+        toast({ description: [statusWarning, partialWarning].filter(Boolean).join(" ") || t("refresh.success"),
+          action: statusWarning || partialWarning ? <ToastAction altText={t("refresh.details")} onClick={() => setStatusDialogOpen(true)}>{t("refresh.details")}</ToastAction> : undefined });
       } else if (!succeeded && !automatic) {
         const unavailable = insightStatuses.filter((source) => source.status !== "ok" &&
           (!sourceId || source.sourceId === sourceId)).map((source) =>
           sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
         const key = sourceId ? "refresh.sourceRetryFailed" : "refresh.allSourcesFailed";
         toast({ description: unavailable ? t(key).replace("{sources}", unavailable) : t(`${key}Generic`),
-          variant: "destructive" });
+          variant: "destructive", action: [
+            <ToastAction key="retry" altText={t("refresh.retryButton")} onClick={() => void requestRefresh(sourceId)}>{t("refresh.retryButton")}</ToastAction>,
+            <ToastAction key="details" altText={t("refresh.details")} onClick={() => setStatusDialogOpen(true)}>{t("refresh.details")}</ToastAction>,
+          ] });
       }
       trackRefreshEvent({
         failedSources: result.sourceStatuses?.filter((source) => source.status === "stale" || source.status === "failed")
@@ -181,7 +188,11 @@ const App = ({
         : error instanceof Error && error.message.startsWith("no configuration found")
           ? "refresh.noConfiguration"
           : "refresh.unexpectedError";
-      if (!automatic) toast({ description: t(messageKey), variant: "destructive" });
+      if (!automatic) toast({ description: t(messageKey), variant: "destructive",
+        action: [
+          <ToastAction key="retry" altText={t("refresh.retryButton")} onClick={() => void requestRefresh(sourceId)}>{t("refresh.retryButton")}</ToastAction>,
+          <ToastAction key="details" altText={t("refresh.details")} onClick={() => setStatusDialogOpen(true)}>{t("refresh.details")}</ToastAction>,
+        ] });
       trackRefreshEvent({ failed: "true" });
       if (automatic) throw error;
     } finally {
@@ -253,6 +264,11 @@ const App = ({
     refreshAction.current = () => requestRefresh();
     return () => { refreshAction.current = null; };
   }, [refreshAction, requestRefresh]);
+  useEffect(() => {
+    const retrySource = (event: Event) => void requestRefresh((event as CustomEvent<string>).detail);
+    window.addEventListener(refreshSourceEvent, retrySource);
+    return () => window.removeEventListener(refreshSourceEvent, retrySource);
+  }, [requestRefresh]);
 
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
   const hasPartial = sourceStatuses.some((source) => source.status === "partial");
@@ -271,8 +287,17 @@ const App = ({
     source.kind === "exchange" && source.hint && !source.hint.startsWith("#")
       ? `${t("refresh.hint.apikey")} ${source.hint}` : source.hint;
   const sortedStatuses = sortSourceStatuses(sourceStatuses);
+  const sourceOrder = new Map(sourceStatuses.map((source, index) => [source.sourceId, index]));
   const progressSources = [...pendingSources, ...liveSources.filter((source) =>
-    !pendingSources.some((pending) => pending.sourceId === source.sourceId))];
+    !pendingSources.some((pending) => pending.sourceId === source.sourceId))]
+    .sort((a, b) => (sourceOrder.get(a.sourceId) ?? Infinity) - (sourceOrder.get(b.sourceId) ?? Infinity));
+  useEffect(() => {
+    publishRefreshProgress({
+      active: refreshLoading,
+      total: progressSources.length,
+      completed: liveSources.map((source) => source.label),
+    });
+  }, [refreshLoading, pendingSources, liveSources]);
   const failedStatuses = sortedStatuses.filter((source) => source.status === "failed");
   const partialStatuses = sortedStatuses.filter((source) => source.status === "partial");
   const failedNames = failedStatuses.map(displayIdentity).join(", ");
@@ -319,12 +344,16 @@ const App = ({
           variant="outline"
           size="sm"
           className="t3-refresh-source-trigger"
+          aria-label={t("refresh.sourceStatus")}
           data-tone={hasFailure ? "err" : hasPartial ? "warn" : "ok"}
           onClick={() => setStatusDialogOpen(true)}
           disabled={preflightPending}
         >
           {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
-          {t("refresh.sourceStatus")}
+          <svg className="t3-refresh-source-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M5.3 14.5h9a3.4 3.4 0 0 0 .2-6.8 4.8 4.8 0 0 0-9.1-1.2 4 4 0 0 0-.1 8z" />
+          </svg>
+          <span className="t3-refresh-source-label">{t("refresh.sourceStatus")}</span>
         </Button>
       )}
       <AlertDialog open={!!preflight} onOpenChange={(open) => { if (!open) setPreflight(null); }}>
@@ -355,12 +384,20 @@ const App = ({
         if (!open) setShowLastKnownOffer(false);
       }}>
         <AlertDialogContent overlayProps={isIOS() ? undefined : { className: "t3-refresh-overlay" }} className={isIOS()
-          ? "ios-d3-refresh-sheet t3-refresh-popover bottom-0 left-0 top-auto max-h-[90dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+          ? `ios-d3-refresh-sheet t3-refresh-popover bottom-0 left-0 top-auto max-h-[90dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+1rem)]${refreshing ? " fd-refresh-progress-sheet" : ""}`
           : "t3-refresh-popover sm:max-w-md"}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("refresh.sourceStatus")}</AlertDialogTitle>
+          <AlertDialogHeader className={isIOS() && refreshing ? "fd-refresh-progress-head" : undefined}>
+            <AlertDialogTitle>{isIOS() && refreshing
+              ? <><span className="sr-only">{t("refresh.sourceStatus")}</span><span aria-hidden="true">{t("fidelity.overview.refreshingSources")}</span></>
+              : t("refresh.sourceStatus")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {refreshing ? t("refresh.inProgress") : partialStatuses.length
+              {refreshing && isIOS()
+                ? <><span className="sr-only">{t("refresh.inProgress")}</span>
+                  {t("fidelity.refresh.progressMeta")
+                    .replace("{done}", String(liveSources.length))
+                    .replace("{total}", String(progressSources.length))
+                    .replace("{failed}", String(liveSources.filter((source) => source.status === "stale").length))}</>
+                : refreshing ? t("refresh.inProgress") : partialStatuses.length
                 ? t("refresh.partialSummary")
                   .replace("{total}", String(sourceStatuses.length))
                   .replace("{failed}", String(failedStatuses.length))
@@ -386,7 +423,27 @@ const App = ({
             </div>}
           </AlertDialogHeader>
           <div className="ios-d3-refresh-status-list my-2 max-h-80 overflow-y-auto">
-            {refreshing && (progressSources.length ? progressSources : [{ sourceId: "loading", label: t("refresh.inProgress") }]).map((pending) => {
+            {refreshing && isIOS() && (progressSources.length ? progressSources : [{ sourceId: "loading", label: t("refresh.inProgress") }]).map((pending) => {
+              const completed = liveSources.find((source) => source.sourceId === pending.sourceId);
+              const previous = sourceStatuses.find((source) => source.sourceId === pending.sourceId);
+              const duration = completed?.startedAt && completed.finishedAt
+                ? `${((Date.parse(completed.finishedAt) - Date.parse(completed.startedAt)) / 1000).toFixed(1)}s` : "—";
+              const StatusIcon = completed?.status === "stale" || completed?.status === "partial"
+                ? ExclamationTriangleIcon : completed ? CheckIcon : UpdateIcon;
+              return <div key={pending.sourceId} data-source-status-row role="group" aria-label={sourceLabel(pending)} className="fd-refresh-progress-row">
+                <SourceMark initialsOnly source={{ ...pending, kind: completed?.kind ?? previous?.kind, provider: completed?.provider ?? previous?.provider }} />
+                <div><b>{sourceLabel(pending)}</b><small data-tone={completed?.status === "stale" ? "loss" : completed ? "gain" : "neutral"}>
+                  <StatusIcon aria-hidden="true" className={completed ? undefined : "animate-spin motion-reduce:animate-none"} />
+                  {completed?.status === "ok" ? t("fidelity.refresh.doneIn").replace("{duration}", duration)
+                    : completed?.status === "stale" ? <>{t("refresh.status.stale")} · {t(`refresh.reason.${completed.category ?? "other"}`)}</>
+                    : completed?.status === "partial" ? t("refresh.status.partial")
+                    : <>{t("fidelity.refresh.readingBalances")}<span className="sr-only">{t("refresh.inProgress")}</span></>}</small></div>
+                {(previous?.status === "failed" || completed?.status === "stale") && completed?.category !== "quota" && previous?.category !== "quota" &&
+                  <Button size="sm" variant="secondary" disabled
+                    aria-label={t("refresh.retrySource").replace("{source}", sourceLabel(pending))}>{t("refresh.retryButton")}</Button>}
+              </div>;
+            })}
+            {refreshing && !isIOS() && (progressSources.length ? progressSources : [{ sourceId: "loading", label: t("refresh.inProgress") }]).map((pending) => {
               const completed = liveSources.find((source) => source.sourceId === pending.sourceId);
               const previousFailed = sourceStatuses.some((source) => source.sourceId === pending.sourceId && source.status === "failed");
               const StatusIcon = completed?.status === "stale" || completed?.status === "partial" ? ExclamationTriangleIcon
@@ -469,7 +526,7 @@ const App = ({
               setStatusDialogOpen(false);
             }}>{t("refresh.useLastKnown")}</Button>
           </div>}
-          <AlertDialogFooter>
+          <AlertDialogFooter className={isIOS() && refreshing ? "fd-refresh-progress-foot" : undefined}>
             {!refreshing && retrySchedule.stopped && hasFailure && <Button variant="outline"
               disabled={refreshLoading || preflightPending} onClick={() => requestRefresh()}>{t("refresh.autoRetry.fullRefresh")}</Button>}
             {!refreshing && !retrySchedule.stopped && failedStatuses.some((source) => source.category !== "quota") && <Button variant="outline"

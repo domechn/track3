@@ -113,8 +113,8 @@ async function seed(page: Page, state: string) {
       [currency, alias, symbol, rate, priority, state === "currency-rates-error"
         ? "2026-10-30T09:30:00.000Z" : "2026-10-31T09:30:00.000Z"],
     );
-    for (const [name, identity] of identities) {
-      await run("UPDATE assets_v2 SET wallet = ? WHERE wallet = ?", [identity, name]);
+    for (const [source, identity] of identities) {
+      await run("UPDATE assets_v2 SET wallet = ? WHERE wallet = ?", [identity, source]);
     }
     if (state === "sources-error") {
       const latest = await invoke("plugin:sql|select", {
@@ -144,11 +144,11 @@ async function seed(page: Page, state: string) {
   }, {
     binanceKey, okxKey, krakenKey, btcAddress, ethAddress, brokerQuery, state,
     identities: [
-      ["Binance", md5(`binance-${binanceKey}`)],
-      ["OKX", md5(`okex-${okxKey}`)],
-      ["Ledger cold wallet", md5(btcAddress)],
-      ["0x4f…a91c", md5(ethAddress)],
-      ["Interactive Brokers", md5(`ibkr:${brokerQuery}`)],
+      [md5("binance-fidelity-binance-key"), md5(`binance-${binanceKey}`)],
+      [md5("okex-fidelity-okx-key"), md5(`okex-${okxKey}`)],
+      [md5("bc1qfidelityledgerwallet"), md5(btcAddress)],
+      [md5("0x4f0000000000000000000000000000000000a91c"), md5(ethAddress)],
+      [md5("ibkr:fidelity-query"), md5(`ibkr:${brokerQuery}`)],
     ],
   });
 }
@@ -185,7 +185,7 @@ for (const state of [
     await page.goto(state === "menu" ? "/#/settings" : "/#/settings/configuration?section=sources");
     if (state === "menu") {
       await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible({ timeout: 20_000 });
-      await page.getByRole("button", { name: "Skip for now" }).click();
+      await page.getByRole("button", { name: "Continue without sync" }).click();
       await expect(page.getByRole("link", { name: "Backup & sync" })).toContainText("On");
     }
     else {

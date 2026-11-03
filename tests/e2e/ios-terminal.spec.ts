@@ -53,14 +53,14 @@ test("phone Sync keeps grouped card styling", async ({ page }) => {
   await expect(card.locator("input").first()).toHaveCSS("background-color", "rgb(10, 10, 11)");
 });
 
-test("phone and iPad keep the Overview inset, flat History, and bordered analysis cards", async ({ page }) => {
+test("phone and iPad keep the Overview inset and approved card borders", async ({ page }) => {
   await installTauriBridge(page, { richPortfolio: true });
   for (const width of [390, 834]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/#/overview");
-    const hero = page.locator(".mobile-hero-card");
-    const label = hero.locator(".mobile-hero-header h3");
-    await expect(label).toBeVisible();
+    const hero = page.locator(width === 390 ? ".fd-overview-hero" : ".mobile-hero-card");
+    const label = hero.locator(width === 390 ? "> .fd-overview-hero-head .fd-label" : ".mobile-hero-header h3");
+    await expect(label).toBeVisible({ timeout: 15_000 });
     const cardBox = await hero.boundingBox();
     const labelBox = await label.boundingBox();
     const borderWidth = await hero.evaluate((node) => parseFloat(getComputedStyle(node).borderLeftWidth));
@@ -72,7 +72,7 @@ test("phone and iPad keep the Overview inset, flat History, and bordered analysi
     await page.goto("/#/history");
     const records = page.locator(".history-records-card");
     await expect(records).toBeVisible();
-    await expect(records).toHaveCSS("border-left-width", "0px");
+    await expect(records).toHaveCSS("border-left-width", width === 390 ? "1px" : "0px");
 
     await page.goto("/#/summary");
     const metrics = page.locator(".fd-summary > .fd-card, .profit-metrics-card").first();
@@ -90,7 +90,7 @@ test("phone loading skeleton animates until reduced motion is requested", async 
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { richPortfolio: true, slowOverview: true });
   await page.goto("/#/overview");
-  const skeleton = page.locator(".overview-skeleton .mobile-skeleton").first();
+  const skeleton = page.locator(".fd-overview-loading-page .fd-loading-skeleton").first();
   await expect(skeleton).toBeVisible();
   await expect(skeleton).toHaveCSS("animation-name", "mobile-shimmer");
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -102,7 +102,7 @@ test("phone light gain text uses the readable positive token", async ({ page }) 
   await installTauriBridge(page, { richPortfolio: true });
   await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
   await page.goto("/#/wallets");
-  const gain = page.locator(".wallet-change-mobile-list .text-emerald-500").first();
+  const gain = page.locator(".fd-wallet-matrix-row strong[data-tone='gain']").first();
   await expect(gain).toBeVisible();
   await expect(gain).toHaveCSS("color", "rgb(31, 122, 89)");
 });
@@ -114,7 +114,7 @@ test("phone landscape tab bar keeps its compact height", async ({ page }) => {
   await expect(page.locator(".mobile-tab-bar")).toHaveCSS("height", "48px");
 });
 
-test("phone More badge clears the icon and tabs retain a safe area", async ({ page }) => {
+test("phone More badge keeps the standard icon clear and matches both plan screens", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page);
   await page.evaluate(async (schema) => {
@@ -127,14 +127,21 @@ test("phone More badge clears the icon and tabs retain a safe area", async ({ pa
       });
     }
   }, readFileSync(resolve("src-tauri/migrations/init/alerts_up.sql"), "utf8"));
-  await page.goto("/#/goals");
   const tab = page.locator(".mobile-tab-bar .mobile-tab").last();
+  await page.goto("/#/overview");
   await expect(tab).toBeVisible();
   await expect(tab.locator(".mobile-tab-badge")).toHaveText("2");
-  const icon = await tab.locator("svg").boundingBox();
-  const badge = await tab.locator(".mobile-tab-badge").boundingBox();
-  expect(badge).not.toBeNull();
-  expect(icon).not.toBeNull();
-  expect(badge!.x).toBeGreaterThanOrEqual(icon!.x + icon!.width);
-  await expect(page.locator(".mobile-tab-bar")).toHaveCSS("height", "60px");
+  const standardIcon = (await tab.locator("svg").boundingBox())!;
+  const standardBadge = (await tab.locator(".mobile-tab-badge").boundingBox())!;
+  expect(standardBadge.x).toBeGreaterThanOrEqual(standardIcon.x + standardIcon.width);
+  for (const route of ["/goals", "/rebalance"]) {
+    await page.goto(`/#${route}`);
+    await expect(page.getByTestId(route === "/goals" ? "goals-phone" : "rebalance-phone")).toBeVisible();
+    const icon = (await tab.locator("svg").boundingBox())!;
+    const badge = (await tab.locator(".mobile-tab-badge").boundingBox())!;
+    expect({ icon: [icon.x, Math.round(icon.y), icon.width, icon.height],
+      badge: [badge.x, Math.round(badge.y), badge.width, badge.height] })
+      .toEqual({ icon: [338.125, 794, 20, 20], badge: [354.125, 790, 17, 16] });
+    await expect(page.locator(".mobile-tab-bar")).toHaveCSS("height", "60px");
+  }
 });
