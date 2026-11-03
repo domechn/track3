@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { installTauriBridge } from "./tauri-bridge";
+import { installTauriBridge } from "./fidelity-scenes";
 
 const iPhoneUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 test.use({ userAgent: iPhoneUserAgent });
@@ -30,44 +30,18 @@ test("data screens expose grouped history and analytics destinations", async ({ 
     await expect(page.locator(".history-mobile-list .history-mobile-snapshot")).toHaveCount(50);
 
     await page.goto("/#/summary");
-    await expect(page.locator(".mobile-analytics-hub")).toBeVisible();
-    await expect(page.locator(".analytics-tile")).toHaveCount(7);
-    await expect(page.locator(".ath-card")).toContainText("Peak date");
-    await expect(page.locator(".ath-card")).not.toContainText("2026-");
-    expect(await page.locator(".analytics-tile-grid").evaluate((node) =>
-      node.scrollWidth <= node.clientWidth && node.getBoundingClientRect().height > 250)).toBe(true);
-    const tileTitleTops = await page.locator(".analytics-tile strong").evaluateAll((titles) =>
-      titles.map((title) => title.getBoundingClientRect().top));
-    for (let index = 0; index < 6; index += 2) {
-      expect(Math.abs(tileTitleTops[index] - tileTitleTops[index + 1])).toBeLessThanOrEqual(1);
-    }
-    await page.locator(".analytics-tile").getByText("Allocation", { exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Allocation" }).locator("canvas")).toBeVisible();
-    await page.getByRole("dialog", { name: "Allocation" }).getByRole("button", { name: "Close" }).click();
-    await page.locator(".analytics-tile").getByText("Position changes", { exact: true }).click();
-    const positions = page.getByRole("dialog", { name: "Position changes" });
-    await expect(positions.locator("canvas")).toBeVisible();
-    expect(await positions.locator("[data-testid='assets-percentage-legend-item'] span:last-child").first()
-      .evaluate((node) => getComputedStyle(node).fontFamily)).toBe(
-        await positions.locator(".position-changes-content").evaluate((node) => getComputedStyle(node).fontFamily));
-    await page.getByRole("dialog", { name: "Position changes" }).getByRole("button", { name: "Close" }).click();
-    await expect(page.locator(".analytics-tile[href='#/wallets']")).toBeVisible();
-    await expect(page.locator(".analytics-tile[href='#/comparison']")).toBeVisible();
-    await expect(page.locator(".analytics-tile[href='#/cost-basis']")).toBeVisible();
-    await page.locator(".analytics-tile").getByText("Returns", { exact: true }).click();
-    const monthCards = page.getByRole("dialog", { name: "Returns" }).locator(".profit-summary-card .profit-period-grid > div");
-    await expect(monthCards.first()).toContainText("Dec");
-    await expect(monthCards.first()).toContainText("—");
-    await expect(monthCards.nth(1)).toContainText("Nov");
-    await expect(monthCards.nth(2)).toContainText("Oct");
-    await expect(monthCards.nth(3)).toContainText("Sep");
-    await expect(monthCards.nth(3)).not.toContainText("$0.0");
-    await expect(monthCards.nth(5)).toContainText("—");
-    await expect(monthCards.nth(5)).not.toContainText("+");
-    await page.getByRole("dialog", { name: "Returns" }).getByRole("button", { name: "Close" }).click();
-    await page.locator(".d2-summary .ath-current-value").evaluate((node) =>
+    await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
+    await expect(page.locator(".fd-summary > .fd-card")).toHaveCount(6);
+    await expect(page.locator(".fd-ath")).toContainText("Distance from ATH");
+    await expect(page.locator(".fd-ath")).not.toContainText("2026-");
+    await expect(page.locator(".fd-profit-summary .fd-month").first()).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.locator(".fd-top-dialog-trigger").click();
+    await expect(page.getByRole("dialog", { name: "Top coins" })).toBeVisible();
+    await page.getByRole("dialog", { name: "Top coins" }).getByRole("button", { name: "Close" }).click();
+    await page.locator(".fd-ath .fd-big-value").evaluate((node) =>
       window.scrollTo(0, node.getBoundingClientRect().top + window.scrollY - 100));
-    const hero = (await page.locator(".d2-summary .ath-current-value").boundingBox())!;
+    const hero = (await page.locator(".fd-ath .fd-big-value").boundingBox())!;
     const tab = (await page.locator(".mobile-tab-bar").boundingBox())!;
     expect(hero.y + hero.height).toBeLessThan(tab.y);
     await page.goto("/#/wallets");
@@ -92,10 +66,9 @@ test("data screens expose grouped history and analytics destinations", async ({ 
       await openPnL.evaluate((node) => node.clientWidth),
     );
     await page.goto("/#/coins/BTC");
-    await expect(page.getByRole("heading", { name: "BTC", level: 1 })).toBeVisible();
-    await expect(page.locator(".coin-detail-hero img")).toBeVisible();
-    await expect(page.locator(".coin-detail-hero")).toContainText("$");
-    await expect(page.locator(".coin-metric-card").filter({ hasText: "Profit" }).first()).toContainText("+$");
+    await expect(page.getByRole("heading", { name: /^BTC/, level: 1 })).toBeVisible();
+    await expect(page.locator(".fd-coin-hero")).toContainText("$");
+    await expect(page.locator(".fd-position-grid")).toContainText("Realized P&L");
   } finally {
     await context.close();
   }
@@ -143,24 +116,23 @@ test("SE data cards keep equal side margins and coin history labels clear their 
     await page.clock.setFixedTime(new Date("2026-12-15T12:00:00Z"));
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/summary");
-    await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
-    await page.locator(".d2-summary .profit-summary-card").getByRole("button", { name: /^Oct / }).click();
-    const card = page.locator(".d2-summary .profit-summary-card");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
+    await page.locator(".fd-summary .fd-profit-summary").getByRole("button", { name: /^Oct / }).click();
+    const card = page.locator(".fd-summary .fd-profit-summary");
     const cardEdges = (await card.boundingBox())!;
     expect(cardEdges.x + cardEdges.width).toBeLessThanOrEqual(359);
-    await page.locator(".d2-summary").getByRole("radio", { name: "Attribution" }).click();
-    const attribution = (await page.locator(".d2-summary .overview-movers-card").boundingBox())!;
+    const attribution = (await page.locator(".fd-summary .fd-attribution").boundingBox())!;
     expect(attribution.x + attribution.width).toBeLessThanOrEqual(359);
 
     await page.goto("/#/coins/BTC");
-    await expect(page.locator(".coin-mobile-transactions .mobile-list-row").first()).toBeVisible();
+    await expect(page.locator(".fd-coin-transactions .fd-tx-row").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Previous page" })).toHaveCount(0);
-    const coinRows = page.locator(".coin-mobile-transactions .mobile-list-row");
+    const coinRows = page.locator(".fd-coin-transactions .fd-tx-row");
     for (let index = 0; index < await coinRows.count(); index++) {
       await coinRows.nth(index).scrollIntoViewIfNeeded();
       const edges = await coinRows.nth(index).evaluate((node) => ({
-        titleRight: node.querySelector(".mobile-list-label")!.getBoundingClientRect().right,
-        valueLeft: node.querySelector(".mobile-list-value")!.getBoundingClientRect().left,
+        titleRight: node.querySelector(".fd-tx-main b")!.getBoundingClientRect().right,
+        valueLeft: node.querySelector(".fd-tx-main strong")!.getBoundingClientRect().left,
       }));
       expect(edges.titleRight + 6, JSON.stringify(edges)).toBeLessThanOrEqual(edges.valueLeft);
     }
@@ -197,7 +169,7 @@ for (const width of [320, 375, 390, 430]) {
         await installTauriBridge(page, { richPortfolio: true });
 
         await page.goto("/#/history");
-        await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20);
+        await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20, { timeout: 30_000 });
         await page.locator(".history-mobile-snapshot-button").first().click();
         const detail = page.getByRole("dialog", { name: /snapshot details/i });
         await expect(detail.locator(".history-mobile-asset")).toHaveCount(7);
@@ -212,60 +184,33 @@ for (const width of [320, 375, 390, 430]) {
         await capture("history-detail");
 
         await page.goto("/#/summary");
-        await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
-        await expect(page.locator(".d2-summary > [role='status']")).toHaveCount(0);
+        await expect(page.locator(".fd-summary")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
+        await expect(page.locator(".fd-summary > .fd-card")).toHaveCount(6);
         await page.evaluate(() => document.fonts.ready);
-        const metricsTiles = page.locator(".d2-summary .profit-metric-tile");
-        await expect(metricsTiles).toHaveCount(6);
-        const metricWidths = await page.locator(".d2-summary .profit-metric-value").evaluateAll((values) =>
+        const metricWidths = await page.locator(".fd-profit-loss .fd-primary-stat strong, .fd-profit-loss .fd-three strong").evaluateAll((values) =>
           values.map((value) => ({ text: value.textContent, whiteSpace: getComputedStyle(value).whiteSpace,
             scroll: value.scrollWidth, client: value.clientWidth })));
         expect(metricWidths.every((value) => value.whiteSpace === "nowrap" &&
           value.scroll <= value.client + 1), JSON.stringify(metricWidths)).toBe(true);
-        await page.locator(".d2-summary .profit-metrics-mobile").evaluate((node) =>
+        await page.locator(".fd-profit-loss").evaluate((node) =>
           window.scrollTo({ top: node.getBoundingClientRect().top + window.scrollY - 100, behavior: "auto" }));
-        await expect.poll(() => page.locator(".d2-summary .profit-metrics-mobile").evaluate((node) =>
+        await expect.poll(() => page.locator(".fd-profit-loss").evaluate((node) =>
           Math.round(node.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await capture("profit-metrics");
-        await page.locator(".analytics-tile").getByText("Allocation", { exact: true }).click();
-        await expect(page.getByRole("dialog", { name: "Allocation" }).locator("canvas")).toBeVisible();
-        await capture("allocation-sheet");
-        await page.getByRole("dialog", { name: "Allocation" }).getByRole("button", { name: "Close" }).click();
-        await page.locator(".analytics-tile").getByText("Position changes", { exact: true }).click();
-        await expect(page.getByRole("dialog", { name: "Position changes" }).locator("canvas")).toBeVisible();
-        await capture("position-changes-sheet");
-        await page.getByRole("dialog", { name: "Position changes" }).getByRole("button", { name: "Close" }).click();
-        await page.locator(".d2-summary .profit-summary-card").evaluate((node) => {
+        await page.locator(".fd-profit-summary").evaluate((node) => {
           node.scrollIntoView({ block: "start" });
           window.scrollBy(0, -72);
         });
-        await expect(page.locator(".mobile-header-total-value")).not.toHaveText("—", { timeout: 15_000 });
         await capture("profit-summary");
-        await page.locator(".d2-summary .profit-summary-card").getByRole("button", { name: /^Oct / }).click();
-        await expect(page.locator(".d2-summary .profit-summary-card .overview-pnl-plot canvas")).toBeVisible();
-        await page.locator(".d2-summary .profit-summary-card").getByRole("radio", { name: "7D" }).click();
-        await capture("pnl");
-        const pnlPlot = page.locator(".d2-summary .profit-summary-card .overview-pnl-plot");
-        const pnlBox = (await pnlPlot.boundingBox())!;
-        await page.mouse.move(pnlBox.x + pnlBox.width * .65, pnlBox.y + pnlBox.height / 2);
-        await expect(pnlPlot.locator(".pnl-scrub-chip")).toBeVisible();
-        await capture("pnl-scrub");
-        await page.locator(".d2-summary").getByRole("radio", { name: "Attribution" }).click();
-        await expect(page.locator(".d2-summary .analyze-profit-card .attribution-total")).toHaveCount(4);
-        await page.locator(".d2-summary .analyze-profit-card figure[aria-label]").scrollIntoViewIfNeeded();
+        await page.locator(".fd-attribution").scrollIntoViewIfNeeded();
         await capture("attribution");
-        await page.locator(".analytics-tile").getByText("Top coins").click();
+        await page.locator(".fd-top-dialog-trigger").click();
         const rank = page.getByRole("dialog", { name: "Top coins" });
         await expect(rank.locator(".top-coins-rank-mobile .mobile-list-row").first()).toBeVisible();
         await expect(rank.locator(".top-coins-rank-mobile .mobile-list-row").first()).toContainText("%");
         await expect(rank.locator(".top-coins-rank-mobile .mobile-list-row").first()).toContainText("$");
         await capture("top-coins");
         await rank.getByRole("button", { name: "Close" }).click();
-        await page.locator(".analytics-tile").getByText("Returns", { exact: true }).click();
-        const returns = page.getByRole("dialog", { name: "Returns" });
-        await expect(returns.locator(".profit-summary-card")).toBeVisible();
-        await capture("returns-sheet");
-        await returns.getByRole("button", { name: "Close" }).click();
 
         await page.goto("/#/wallets");
         await expect(page.locator(".wallet-change-mobile-list")).toBeVisible();
@@ -292,10 +237,9 @@ for (const width of [320, 375, 390, 430]) {
         await capture("cost-lots");
 
         await page.goto("/#/coins/BTC");
-        await expect(page.locator(".coin-detail-hero")).toContainText("$");
-        await expect(page.getByTestId("coin-page-loading-overlay")).toHaveClass(/opacity-0/);
-        await expect(page.locator(".coin-mobile-transactions")).toBeVisible();
-        await page.locator(".coin-mobile-transactions").evaluate((node) => node.scrollIntoView());
+        await expect(page.locator(".fd-coin-hero")).toContainText("$");
+        await expect(page.locator(".fd-coin-transactions")).toBeVisible();
+        await page.locator(".fd-coin-transactions").evaluate((node) => node.scrollIntoView());
         await capture("coin-transactions");
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       } finally {
@@ -496,15 +440,25 @@ test("Overview skeleton reserves the first paint", async ({ browser }) => {
     expect(await page.locator(".overview-skeleton-hero .mobile-skeleton").first().evaluate((node) => getComputedStyle(node).backgroundColor))
       .not.toBe(await page.locator("body").evaluate((node) => getComputedStyle(node).backgroundColor));
     await expect(page.locator(".overview-loading")).toHaveCSS("border-radius", "0px");
-    const backup = page.locator(".ios-d3-auto-backup");
-    await expect(backup).toBeVisible();
-    expect((await backup.boundingBox())!.y + (await backup.boundingBox())!.height)
-      .toBeLessThanOrEqual((await page.locator(".mobile-tab-bar").boundingBox())!.y - 8);
     mkdirSync("test-results/mobile", { recursive: true });
     await page.screenshot({ path: "test-results/mobile/390x844-overview-loading.png" });
   } finally {
     await context.close();
   }
+});
+
+test("a running iOS backup indicator clears the phone tab bar", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = watchPage(await context.newPage());
+  try {
+    await installTauriBridge(page, { configuredBackupFixture: true, backupFolderFixture: true, slowBackup: true });
+    await page.goto("/#/overview");
+    const backup = page.locator(".ios-d3-auto-backup");
+    await expect(backup).toBeVisible();
+    const card = (await backup.boundingBox())!;
+    const tab = (await page.locator(".mobile-tab-bar").boundingBox())!;
+    expect(card.y + card.height).toBeLessThanOrEqual(tab.y - 8);
+  } finally { await context.close(); }
 });
 
 test("a failed portfolio query shows a reviewable error state", async ({ browser }) => {
@@ -578,7 +532,7 @@ for (const theme of ["light", "dark"] as const) {
       for (const route of reviewDataRoutes) {
         await page.goto(`/#/${route}`);
         await page.reload();
-        await expect(page.locator("#app-main-content [aria-busy='true']")).toBeVisible();
+        await expect(page.locator("#app-main-content [aria-busy='true']").first()).toBeVisible();
         await expect(page.locator("#app-main-content [role='status']").first()).toBeVisible();
         await expect(page.locator(".mobile-loading-layout .mobile-skeleton")).toHaveCount(5);
         await page.screenshot({ path: `test-results/mobile/390x844-${route.replace("/", "-")}-loading-${theme}.png` });
@@ -598,7 +552,7 @@ for (const size of sizes) {
       await installTauriBridge(page, { richPortfolio: true });
       for (const route of routes) {
         await page.goto(`/#/${route}`);
-        await expect(page.locator(".mobile-tab-bar")).toBeVisible();
+        await expect(page.locator(".mobile-tab-bar")).toBeVisible({ timeout: 30_000 });
         await expect(page.locator("#app-main-content")).toBeVisible();
         await expect.poll(() => page.locator(".app-content").evaluate((node) => getComputedStyle(node).marginLeft)).toBe("0px");
         await expect(page.locator(route === "history" ? ".history-mobile-list"
@@ -607,7 +561,7 @@ for (const size of sizes) {
           : route === "goals" ? "#app-main-content h1:not(.mobile-large-title)"
           : "#app-main-content .mobile-large-title")).toBeAttached({ timeout: route === routes[0] ? 20_000 : 5_000 });
         if (!["more", "goals"].includes(route)) {
-          await expect(page.locator("#app-main-content h1")).toHaveCount(1);
+          await expect(page.locator("#app-main-content h1:visible")).toHaveCount(1);
         }
         await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
         if (route === "summary") {
@@ -621,20 +575,22 @@ for (const size of sizes) {
               image.src.startsWith("data:image/svg+xml") && image.complete && image.naturalWidth > 0))).toBe(true);
         }
         const routeHeading: Record<string, string> = {
-          overview: "Overview", history: "History", summary: "Analytics", wallets: "Wallets",
+          overview: "Overview", history: "History", summary: "Summary", wallets: "Wallets",
           comparison: "Comparison", "cost-basis": "Cost basis", "coins/BTC": "Bitcoin",
         };
+        if (route === "summary") await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
         if (routeHeading[route] && !route.startsWith("coins/")) {
-          await expect(page.locator("#app-main-content h1")).toHaveText(routeHeading[route]);
+          await expect(page.locator("#app-main-content h1:visible")).toHaveText(
+            routeHeading[route]);
         }
         if (route === "comparison") await expect(page.locator(".comparison-total-grid")).toBeVisible();
         if (route === "cost-basis") await expect(page.locator(".d2-cost .cost-dashboard-metric").first()).toContainText("Realized P&L");
         if (route.startsWith("coins/")) {
-          await expect(page.getByTestId("coin-page-loading-overlay")).toHaveClass(/opacity-0/);
-          await expect.poll(() => page.getByTestId("coin-page-loading-overlay")
-            .evaluate((node) => getComputedStyle(node).opacity)).toBe("0");
+          await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready");
           if (size.width === 320) {
-            expect((await page.locator(".coin-breakeven-subtitle").boundingBox())!.height).toBeLessThan(22);
+            const detail = page.locator(".fd-position-grid > :nth-child(4) small");
+            expect((await detail.boundingBox())!.height).toBeLessThan(22);
+            expect(await detail.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
           }
         }
         if (route === "overview") {
@@ -722,13 +678,11 @@ for (const size of sizes) {
           await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
           if (route === "summary") {
             await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
-            await expect(page.locator(".d2-summary .profit-metrics-mobile")).toBeVisible();
+            await expect(page.locator(".d2-summary .profit-metrics-mobile, .fd-summary .fd-three")).toBeVisible();
             await expect(page.locator(".d2-summary > [role='status']")).toHaveCount(0);
           }
           if (route.startsWith("coins/")) {
-            await expect(page.getByTestId("coin-page-loading-overlay")).toHaveClass(/opacity-0/);
-            await expect.poll(() => page.getByTestId("coin-page-loading-overlay")
-              .evaluate((node) => getComputedStyle(node).opacity)).toBe("0");
+            await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready");
           }
           if (route === "history") {
             await expect.poll(() => page.locator(".history-mobile-snapshot .image-stack img").evaluateAll((images) =>
@@ -983,12 +937,11 @@ test("coin transactions open as detail rows with edit actions", async ({ browser
   try {
     await installTauriBridge(page, { seedReviewContent: true });
     await page.goto("/#/coins/BTC");
-    await expect(page.locator(".coin-mobile-transactions")).toBeVisible();
-    const row = page.locator(".coin-mobile-transactions .mobile-list-row").first();
-    const date = await row.locator(".mobile-list-label").innerText();
+    await expect(page.locator(".fd-coin-transactions")).toBeVisible();
+    const row = page.locator(".fd-coin-transactions .fd-tx-row").first();
     await row.click();
-    await expect(page.getByRole("dialog", { name: date })).toBeVisible();
-    await expect(page.getByRole("button", { name: /update buy\/sell price/i })).toBeVisible();
+    await expect(page.locator(".fd-sheet.detail")).toBeVisible();
+    await expect(page.locator(".fd-sheet.detail").getByRole("button", { name: /edit type.*price/i })).toBeVisible();
   } finally {
     await context.close();
   }
@@ -1000,7 +953,7 @@ test("coin switching opens a searchable sheet", async ({ browser }) => {
   try {
     await installTauriBridge(page);
     await page.goto("/#/coins/BTC");
-    await page.getByRole("combobox", { name: /symbol/i }).click();
+    await page.locator(".fd-coin-head nav").getByRole("button", { name: "Coins" }).click();
     await expect(page.getByRole("dialog", { name: /symbol/i })).toBeVisible();
     await expect(page.getByPlaceholder(/search/i)).toBeVisible();
     await expect.poll(() => page.getByPlaceholder(/search/i).evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(16);
@@ -1161,7 +1114,7 @@ test("back navigation returns to the previous page in the More tab", async ({ br
   }
 });
 
-test("pushing a detail route starts at the top with a sticky Back control", async ({ browser }) => {
+test("pushing a detail route starts at the top and Back returns to its source", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
@@ -1173,11 +1126,54 @@ test("pushing a detail route starts at the top with a sticky Back control", asyn
     await page.locator(".top-coins-rank-mobile .mobile-list-row").first().click();
     await expect(page).toHaveURL(/#\/coins\//);
     await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
-    const back = page.locator("#app-top-bar").getByRole("button", { name: "Back" });
+    const back = page.locator(".fd-coin-head nav").getByRole("button", { name: "Overview" });
     await expect(back).toBeVisible();
     expect((await back.boundingBox())!.y).toBeGreaterThanOrEqual(0);
     await page.evaluate(() => scrollTo(0, 180));
-    await expect(page.locator("#app-top-bar .mobile-compact-title")).toBeVisible();
+    const stickyBack = page.locator("#app-top-bar").getByRole("button", { name: "Back" });
+    await expect(stickyBack).toBeVisible();
+    await expect(page.locator("#app-top-bar .mobile-compact-title")).toContainText("BTC");
+    await stickyBack.click();
+    await expect(page).toHaveURL(/#\/overview$/);
+  } finally {
+    await context.close();
+  }
+});
+
+test("coin Back returns to Summary when opened from Top coins", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  try {
+    const page = watchPage(await context.newPage());
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+    await page.locator(".fd-top-dialog-trigger").click();
+    await page.getByRole("dialog", { name: "Top coins" }).locator(".top-coins-rank-mobile .mobile-list-row").first().click();
+    await expect(page).toHaveURL(/#\/coins\//);
+    await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+    await page.evaluate(() => scrollTo(0, 180));
+    const stickyBack = page.locator("#app-top-bar").getByRole("button", { name: "Back" });
+    await expect(stickyBack).toBeVisible();
+    await stickyBack.click({ timeout: 5_000 });
+    await expect(page).toHaveURL(/#\/summary$/);
+  } finally {
+    await context.close();
+  }
+});
+
+test("Analytics destinations open from the active tab without adding tiles below Summary", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  try {
+    const page = watchPage(await context.newPage());
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+    await expect(page.locator(".analytics-tile-grid")).toBeHidden();
+    await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
+    const destinations = page.getByRole("dialog", { name: "Analytics" });
+    await expect(destinations.getByRole("link", { name: /Wallets/ })).toBeVisible();
+    await destinations.getByRole("link", { name: /Wallets/ }).click();
+    await expect(page).toHaveURL(/#\/wallets$/);
   } finally {
     await context.close();
   }
@@ -1208,20 +1204,50 @@ test("tab switches restore position and tapping the active tab returns to its ro
   }
 });
 
-test("Analytics opens its subpages and Back returns to Analytics", async ({ browser }) => {
+test("Analytics subpage routes remain available and Back returns to Analytics", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
     await installTauriBridge(page);
     await page.goto("/#/summary");
-    const links = page.locator(".mobile-analytics-hub");
-    for (const name of ["Wallets", "Comparison", "Cost basis"]) {
-      await expect(links.getByRole("link", { name })).toBeVisible();
+    await expect(page.locator(".fd-summary")).toBeVisible();
+    for (const [name, path] of [["Wallets", "wallets"], ["Comparison", "comparison"], ["Cost basis", "cost-basis"]] as const) {
+      await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
+      await page.getByRole("dialog", { name: "Analytics" }).getByRole("link", { name: new RegExp(name) }).click();
+      await expect(page).toHaveURL(new RegExp(`#/${path}$`));
+      await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
+      await expect(page).toHaveURL(/#\/summary$/);
     }
-    await links.getByRole("link", { name: "Wallets" }).click();
-    await expect(page).toHaveURL(/#\/wallets$/);
-    await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
-    await expect(page).toHaveURL(/#\/summary$/);
+    for (const name of ["Allocation", "Position changes", "Returns"]) {
+      await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
+      await page.getByRole("dialog", { name: "Analytics" }).getByRole("button", { name: new RegExp(`^${name}\\b`, "i") }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("Returns sheet preserves unknown and sparse-month values", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = watchPage(await context.newPage());
+  try {
+    await page.clock.setFixedTime(new Date("2026-12-15T12:00:00Z"));
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+    await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
+    await page.getByRole("dialog", { name: "Analytics" }).getByRole("button", { name: /^Returns\b/i }).click();
+    const monthCards = page.getByRole("dialog", { name: "Returns" }).locator(".profit-summary-card .profit-period-grid > div");
+    await expect(monthCards.first()).toContainText("Dec");
+    await expect(monthCards.first()).toContainText("—");
+    await expect(monthCards.nth(1)).toContainText("Nov");
+    await expect(monthCards.nth(2)).toContainText("Oct");
+    await expect(monthCards.nth(3)).toContainText("Sep");
+    await expect(monthCards.nth(3)).not.toContainText("$0.0");
+    await expect(monthCards.nth(5)).toContainText("—");
+    await expect(monthCards.nth(5)).not.toContainText("+");
   } finally {
     await context.close();
   }

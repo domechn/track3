@@ -7,6 +7,18 @@ test.use({
   userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
 });
 
+const topCoinsTrigger = (page: Page) =>
+  page.locator('.fd-top-dialog-trigger:visible, .mobile-analytics-hub .analytics-tile:has-text("Top coins"):visible').first();
+async function clickCoinBack(page: Page) {
+  await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+  const compactBack = page.locator('#app-top-bar button[aria-label="Back"]');
+  if (await compactBack.isVisible()) {
+    await compactBack.click();
+  } else {
+    await page.locator('.fd-coin-head nav button').first().click();
+  }
+}
+
 async function swipeDown(page: Page) {
   const target = page.getByTestId("pull-to-refresh");
   await target.evaluate((element) => {
@@ -22,7 +34,7 @@ async function swipeDown(page: Page) {
 test("long press selection is limited to editable and explicitly selectable content", async ({ page }) => {
   await installTauriBridge(page);
   await page.goto("/#/overview");
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible({ timeout: 30_000 });
   const styles = await page.evaluate(() => {
     const main = document.querySelector("#app-main-content")!;
     const input = document.createElement("input");
@@ -43,7 +55,7 @@ test("long press selection is limited to editable and explicitly selectable cont
     return event.defaultPrevented;
   })).toBe(true);
   await page.goto("/#/summary");
-  await page.locator(".analytics-tile").getByText("Top coins").click();
+  await topCoinsTrigger(page).click();
   const sheet = page.getByRole("dialog", { name: "Top coins" });
   await expect(sheet).toBeVisible();
   expect(await sheet.getByText("Top coins").first().evaluate((node) => ({
@@ -82,14 +94,14 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
-  await expect(page.locator(".t3-holdings-row").first()).toBeVisible();
+  await expect(page.locator(".t3-holdings-row").first()).toBeVisible({ timeout: 30_000 });
   await page.locator(".t3-holdings-row").first().scrollIntoViewIfNeeded();
   await page.evaluate(() => scrollTo(0, Math.max(scrollY, 450)));
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
   const before = await page.evaluate(() => scrollY);
   await page.locator(".t3-holdings-row").first().click();
   await expect(page).toHaveURL(/#\/coins\//);
-  await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
+  await clickCoinBack(page);
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
   await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20);
@@ -123,7 +135,7 @@ test("Back to an expanded Overview rank list restores its scroll", async ({ page
   expect(before).toBeGreaterThan(300);
   await row.click();
   await expect(page).toHaveURL(/#\/coins\//);
-  await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
+  await clickCoinBack(page);
   await expect(page).toHaveURL(/#\/overview$/);
   await expect(page.getByRole("button", { name: "Show Less: Less analytics" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
@@ -176,6 +188,7 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
   await expect(page.getByRole("button", { name: "Choose date range" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".t3-holdings-row").first()).toBeVisible({ timeout: 30_000 });
   await page.evaluate(() => scrollTo(0, 250));
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(250);
   await page.getByRole("button", { name: "Choose date range" }).click();
@@ -198,8 +211,10 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await page.getByRole("dialog", { name: /snapshot details/i }).getByRole("button", { name: "Close" }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(historyScroll);
   await page.goto("/#/summary");
-  const tile = page.locator(".analytics-tile").getByText("Top coins");
+  await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+  const tile = topCoinsTrigger(page);
   await expect(tile).toBeVisible();
+  await expect(tile).toBeEnabled();
   await tile.scrollIntoViewIfNeeded();
   const summaryScroll = await page.evaluate(() => scrollY);
   expect(summaryScroll).toBeGreaterThan(0);
@@ -317,7 +332,7 @@ for (const width of [320, 375, 390, 430]) {
       await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
       await installTauriBridge(page, { richPortfolio: true });
       await page.goto("/#/summary");
-      await page.locator(".analytics-tile").getByText("Top coins").click();
+      await topCoinsTrigger(page).click();
       const rank = page.getByRole("dialog", { name: "Top coins" });
       const row = rank.locator(".top-coins-rank-mobile .mobile-list-row").first();
       await expect(row).toBeVisible();

@@ -14,6 +14,8 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import PageLoadingOverlay from "@/mobile/components/page-loading-overlay";
 import { useLayoutEffect } from "react";
 import { useTranslation } from "@/mobile/i18n";
+import SummaryFidelity from "@/mobile/components/summary-fidelity";
+import { useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 const SUMMARY_COMPONENT_COUNT = 4;
 
 const App = ({
@@ -114,4 +116,14 @@ const App = ({
   );
 };
 
-export default App;
+export default function Summary(props: {
+  currency: CurrencyRateDetail;
+  dateRange: TDateRange;
+  quoteColor: QuoteColor;
+}) {
+  const isMobile = useIsMobile();
+  const compact = useSizeClass().width === "compact";
+  return isMobile && compact
+    ? <SummaryFidelity {...props} />
+    : <App {...props} />;
+}

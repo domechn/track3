@@ -1,22 +1,24 @@
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "@/mobile/i18n";
-import { useHaptics } from "@/mobile/components/mobile";
+import { useHaptics, useSizeClass } from "@/mobile/components/mobile";
 import { MobileIcon } from "@/mobile/components/mobile/icons";
 import {
-  ChevronLeftIcon, ChevronRightIcon, DashboardIcon, BarChartIcon,
+  ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, DashboardIcon, BarChartIcon,
   BackpackIcon, MixIcon, LayersIcon, ClockIcon, ActivityLogIcon,
   BellIcon, RocketIcon, GearIcon,
 } from "@radix-ui/react-icons";
 
 export type MobileTab = "overview" | "history" | "analytics" | "more";
+export const ANALYTICS_DESTINATIONS_EVENT = "track3:analytics-destinations";
 export const tabRoots: Record<MobileTab, string> = {
   overview: "/overview", history: "/history", analytics: "/summary", more: "/more",
 };
 
-export function tabForPath(path: string): MobileTab {
+export function tabForPath(path: string, wide = false): MobileTab {
   if (path.startsWith("/history")) return "history";
-  if (path.startsWith("/overview")) return "overview";
-  if (/^\/(summary|wallets|comparison|cost-basis|coins)(\/|$)/.test(path)) return "analytics";
+  if (path.startsWith("/overview") || (path.startsWith("/coins/") && !wide)) return "overview";
+  if (path.startsWith("/coins/") && wide) return "analytics";
+  if (/^\/(summary|wallets|comparison|cost-basis)(\/|$)/.test(path)) return "analytics";
   return "more";
 }
 
@@ -30,7 +32,8 @@ function Navigation({ unread = 0, onTabSwitch, sidebar = false, collapsed = fals
   const { t } = useTranslation();
   const haptic = useHaptics();
   const { pathname, search, hash } = useLocation();
-  const selected = tabForPath(pathname);
+  const selected = tabForPath(pathname, useSizeClass().width === "wide");
+  const analyticsMenuAvailable = !sidebar && selected === "analytics" && pathname === "/summary" && !search && !hash;
   const tabs = [
     { id: "overview" as const, title: t("nav.overview") },
     { id: "history" as const, title: t("nav.history") },
@@ -42,18 +45,24 @@ function Navigation({ unread = 0, onTabSwitch, sidebar = false, collapsed = fals
     {tabs.map(({ id, title }) => <Link key={id} to={tabRoots[id]}
       aria-label={id === "more" && unread > 0
         ? `${title}, ${t("goals.unread").replace("{count}", String(unread))}` : title}
+      aria-description={id === "analytics" && analyticsMenuAvailable ? t("mobile.analyticsDestinationsHint") : undefined}
       onClick={(event) => {
         haptic("selection");
         if (selected === id && pathname === tabRoots[id] && !search && !hash) {
           event.preventDefault();
           onTabSwitch?.(true);
-          window.scrollTo(0, 0);
+          if (id === "analytics" && !sidebar) {
+            window.dispatchEvent(new Event(ANALYTICS_DESTINATIONS_EVENT));
+          } else {
+            window.scrollTo(0, 0);
+          }
         } else {
           onTabSwitch?.(selected === id);
         }
       }}
       className="mobile-tab" aria-current={selected === id ? "page" : undefined}>
-      <span className="mobile-tab-icon"><MobileIcon name={id} filled={selected === id} />{id === "more" && unread > 0 &&
+      <span className="mobile-tab-icon"><MobileIcon name={id} filled={selected === id} />{id === "analytics" && analyticsMenuAvailable &&
+        <ChevronUpIcon className="mobile-analytics-disclosure" aria-hidden="true" />}{id === "more" && unread > 0 &&
         <span className="mobile-tab-badge" aria-hidden="true">{unread > 99 ? "99+" : unread}</span>}</span>
       <span className="mobile-nav-label">{title}</span>
       {id === "more" && unread > 0 && <span className="sr-only">{t("goals.unread").replace("{count}", String(unread))}</span>}

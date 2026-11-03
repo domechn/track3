@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { installTauriBridge } from "./tauri-bridge";
+import { installTauriBridge } from "./fidelity-scenes";
 
 const iPhoneUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 test.use({ userAgent: iPhoneUserAgent, isMobile: true, hasTouch: true });
@@ -20,12 +20,13 @@ test("phone starts dark without storing a theme and preserves a stored light the
 
 test("phone quote preference flips numeric gain without changing the displayed value", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installTauriBridge(page, { richPortfolio: true });
+  await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
+  await installTauriBridge(page, { fidelitySample: "full" });
   await page.goto("/#/summary");
-  await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
-  const gain = page.locator(".d2-summary .profit-metric-value[data-tone='gain']").first();
+  await expect(page.locator(".fd-summary")).toHaveAttribute("aria-busy", "false");
+  const gain = page.locator(".fd-summary .fd-primary-stat strong[data-tone='gain']");
   await expect(gain).toBeVisible();
-  await expect(gain).toContainText("$3,219.48");
+  await expect(gain).toContainText("$188,809.27");
   await expect(gain).toHaveCSS("color", /^rgb/);
   await expect(page.locator("html")).toHaveAttribute("data-quote", "green-up");
   const before = await gain.evaluate((node) => ({ text: node.textContent, color: getComputedStyle(node).color }));
@@ -33,9 +34,9 @@ test("phone quote preference flips numeric gain without changing the displayed v
   await page.getByRole("button", { name: "Red Up / Green Down" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-quote", "red-up");
   await page.goto("/#/summary");
-  await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false");
+  await expect(page.locator(".fd-summary")).toHaveAttribute("aria-busy", "false");
   await expect(gain).toBeVisible();
-  await expect(gain).toContainText("$3,219.48");
+  await expect(gain).toContainText("$188,809.27");
   await expect(gain).toHaveCSS("color", /^rgb/);
   const after = await gain.evaluate((node) => ({ text: node.textContent, color: getComputedStyle(node).color }));
   expect(after.text).toBe(before.text);
@@ -74,7 +75,7 @@ test("phone and iPad keep the Overview inset, flat History, and bordered analysi
     await expect(records).toHaveCSS("border-left-width", "0px");
 
     await page.goto("/#/summary");
-    const metrics = page.locator(".profit-metrics-card");
+    const metrics = page.locator(".fd-summary > .fd-card, .profit-metrics-card").first();
     await expect(metrics).toBeVisible();
     await expect(metrics).toHaveCSS("border-left-width", "1px");
 

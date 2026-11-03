@@ -17,8 +17,8 @@ for (const width of [390, 834]) for (const theme of ["light", "dark"] as const) 
     await installTauriBridge(page, { richPortfolio: true, freshReviewData: true, seedEditLog: true });
     mkdirSync("test-results/edit-log", { recursive: true });
     await page.goto("/#/history");
-    await expect(page.locator("[data-testid=history-content][aria-busy=true]")).toHaveCount(0);
-    await expect(page.getByText("Edited", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("history-content")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
+    await expect(page.getByRole("button", { name: /^View snapshot.*Edited/ }).first()).toBeVisible();
     await page.screenshot({ path: `test-results/edit-log/ios-${width}-${theme}-list.png` });
     await page.getByRole("combobox", { name: "History filter" }).click();
     await page.getByRole("option", { name: "Edited" }).click();

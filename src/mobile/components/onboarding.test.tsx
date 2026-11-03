@@ -31,6 +31,7 @@ afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0))
 })
 it("uses iPhone Refresh and Backup copy, omits Pro, and navigates to Sources", async () => {
+  await import("@/components/onboarding/onboarding-guide")
   render(<App />)
   const dialog = await screen.findByTestId("onboarding-dialog")
   for (let i = 0; i < 4; i++) {

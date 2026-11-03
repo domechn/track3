@@ -189,6 +189,7 @@ beforeEach(() => {
 
 describe("Settings configuration route base currency warm start", () => {
   it("does not flash USD before showing cached currency on direct route navigation", async () => {
+    await import("@/components/configuration");
     render(
       <ChartResizeContext.Provider
         value={{

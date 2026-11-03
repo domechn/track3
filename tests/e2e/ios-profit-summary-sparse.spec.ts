@@ -14,7 +14,16 @@ test("phone explains sparse 2026 profit months and the October baseline", async 
     await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
     await installTauriBridge(page, { sparseProfitHistory: true });
     await page.goto("/#/summary");
-    const summary = page.locator(".d2-summary .profit-summary-card");
+    const main = page.locator(".fd-summary");
+    await expect(main).toHaveAttribute("data-state", "ready");
+    await expect(main.locator(".fd-month")).toHaveCount(10);
+    await expect(main.locator(".fd-month").filter({ hasText: "Feb" })).toContainText("No snapshot");
+    await expect(main.locator(".fd-month").filter({ hasText: "Oct" })).toContainText("since 4 Apr");
+    await expect(main.locator(".fd-year")).toHaveCount(1);
+    await expect(main.locator(".fd-summary-chart")).toContainText("31 Dec 25");
+    await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
+    await page.getByRole("dialog", { name: "Analytics" }).getByRole("button", { name: /^Returns\b/ }).click();
+    const summary = page.getByRole("dialog", { name: "Returns" }).locator(".profit-summary-card");
     await expect(summary).toContainText("Periods 3 of 10");
     await expect(summary.getByRole("button", { name: /^Oct/ })).toContainText("since 4 Apr");
     await expect(summary.getByRole("button", { name: /^Oct/ })).toContainText("-$81.9k");
@@ -25,10 +34,7 @@ test("phone explains sparse 2026 profit months and the October baseline", async 
     await expect(feb.getByText("No snapshot in this month")).toBeVisible();
     expect(await feb.getByText("No snapshot in this month").evaluate((node) =>
       node.scrollWidth <= node.clientWidth)).toBe(true);
-    await summary.evaluate((element) => {
-      const headerHeight = document.getElementById("app-top-bar")?.getBoundingClientRect().height ?? 0;
-      window.scrollBy(0, element.getBoundingClientRect().top - headerHeight - 8);
-    });
+    await summary.scrollIntoViewIfNeeded();
     mkdirSync("test-results/profit-summary-sparse", { recursive: true });
     await summary.screenshot({ path: "test-results/profit-summary-sparse/mobile-390.png" });
   } finally {
